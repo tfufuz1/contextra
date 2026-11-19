@@ -419,30 +419,25 @@ dependencies = [
 name = "contextra-db"
 version = "0.1.0"
 dependencies = [
- "ahash",
- "bytes",
  "contextra-checkpoint",
+ "contextra-crypto",
+ "contextra-durable-fs",
  "contextra-env",
  "contextra-erasure",
  "contextra-graph",
  "contextra-ids",
  "contextra-mvcc",
  "contextra-ports",
+ "contextra-privacy",
  "contextra-rank",
  "contextra-store",
  "contextra-text",
  "contextra-types",
  "contextra-vector",
- "criterion",
- "parking_lot 0.12.5",
  "proptest",
- "serde",
- "serde_json",
  "tempfile",
  "thiserror",
  "tokio",
- "tokio-util",
- "tracing",
 ]
 
 [[package]]
@@ -684,6 +679,7 @@ dependencies = [
  "contextra-crypto",
  "contextra-durable-fs",
  "contextra-env",
+ "contextra-erasure",
  "contextra-ids",
  "contextra-mvcc",
  "contextra-sys",

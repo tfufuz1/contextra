@@ -66,7 +66,7 @@ impl Clone for EraseTarget {
             // `SubjectRef` (aus contextra-ids) implementiert kein Clone; die 16 Byte werden kopiert.
             Self::Subject { tenant, subject } => Self::Subject {
                 tenant: *tenant,
-                subject: SubjectRef(subject.0),
+                subject: SubjectRef::from_bytes(*subject.as_bytes()),
             },
             Self::Collection { tenant, collection } => Self::Collection {
                 tenant: *tenant,
@@ -127,7 +127,7 @@ impl EraseTarget {
             Self::Subject { tenant, subject } => {
                 out.push(TAG_SUBJECT);
                 out.extend_from_slice(&tenant.0.to_be_bytes());
-                out.extend_from_slice(&subject.0);
+                out.extend_from_slice(subject.as_bytes());
             }
             Self::Collection { tenant, collection } => {
                 out.push(TAG_COLLECTION);
@@ -165,7 +165,7 @@ impl EraseTarget {
                 subject.copy_from_slice(r.take(16)?);
                 Self::Subject {
                     tenant,
-                    subject: SubjectRef(subject),
+                    subject: SubjectRef::from_bytes(subject),
                 }
             }
             TAG_COLLECTION => {

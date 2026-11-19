@@ -17,14 +17,6 @@ contextra-db = { workspace = true }
 
 [features]
 default = []
-reranking = ["contextra-db/reranking"]
-experimental-diskann = ["contextra-db/experimental-diskann"]
-background-maintenance = ["contextra-db/background-maintenance"]
-graph-connectivity-health = ["contextra-db/graph-connectivity-health"]
-edge-reinforcement-learning = ["contextra-db/edge-reinforcement-learning"]
-exp-extraction = ["contextra-db/exp-extraction"]
-entity-extraction = ["contextra-db/entity-extraction"]
-auto-extraction-opt-out = ["contextra-db/auto-extraction-opt-out"]
 
 [dev-dependencies]
 contextra-types = { workspace = true }
