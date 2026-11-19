@@ -53,20 +53,23 @@ impl EvictionWorker {
                     match cmd {
                         EvictionCommand::EvictLru { target_free_bytes } => {
                             let freed = store.evict_lru_fair(target_free_bytes);
+                            #[cfg(feature = "tracing")]
                             tracing::debug!(
                                 freed_bytes = freed,
                                 "KV eviction worker: LRU evict done"
                             );
+                            #[cfg(not(feature = "tracing"))]
+                            let _ = freed;
                         }
                         EvictionCommand::Shutdown => break,
                     }
                 }
-            })
-            .map_err(|e| {
-                tracing::error!(error = %e, "failed to spawn kv-eviction-worker thread");
-                e
-            })
-            .ok();
+            });
+        #[cfg(feature = "tracing")]
+        if let Err(e) = &handle_opt {
+            tracing::error!(error = %e, "failed to spawn kv-eviction-worker thread");
+        }
+        let handle_opt = handle_opt.ok();
 
         Self {
             sender: parking_lot::Mutex::new(sender),

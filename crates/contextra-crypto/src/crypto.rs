@@ -67,6 +67,9 @@ pub struct KeyManager {
     cipher_cache: OnceLock<Aes256GcmSiv>,
     nonce_prefix: [u8; 4],
     nonce_counter: AtomicU64,
+    /// Gesetzt durch [`KeyManager::emergency_wipe`]: Danach verweigert der Manager jede
+    /// kryptographische Operation (Fail-Closed, kein Weiterarbeiten mit dem Nullschlüssel).
+    wiped: bool,
 }
 
 impl std::fmt::Debug for KeyManager {
@@ -122,6 +125,7 @@ impl KeyManager {
             cipher_cache,
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
+            wiped: false,
         })
     }
 
@@ -148,6 +152,7 @@ impl KeyManager {
             cipher_cache,
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
+            wiped: false,
         })
     }
 
@@ -164,6 +169,7 @@ impl KeyManager {
     /// Derives a sub-key for a specific file or logical stream.
     /// This prevents nonce-reuse when multiple files use the same master key.
     pub fn derive_file_key(&self, file_id: &[u8]) -> Result<Self> {
+        self.ensure_live()?;
         if file_id.is_empty() {
             return Err(CryptoError::InvalidInput(
                 "file_id cannot be empty".to_string(),
@@ -207,11 +213,13 @@ impl KeyManager {
             cipher_cache,
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
+            wiped: false,
         })
     }
 
     /// Derives a sub-key specifically for a KV-cache segment based on a versioned info string.
     pub fn derive_segment_key(&self, info: &str) -> Result<Self> {
+        self.ensure_live()?;
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
 
@@ -235,6 +243,7 @@ impl KeyManager {
             cipher_cache,
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
+            wiped: false,
         })
     }
 
@@ -244,6 +253,7 @@ impl KeyManager {
     /// Uses HKDF info string `"contextra-kv-layer-v2:"` with length-prefixed variable fields (S-2 fix).
     /// Internal helper to expand HKDF info into a new volatile `KeyManager` instance.
     fn derive_sub_key_from_info(&self, info: &[u8]) -> Result<Self> {
+        self.ensure_live()?;
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
 
@@ -266,6 +276,7 @@ impl KeyManager {
             cipher_cache,
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
+            wiped: false,
         })
     }
 
@@ -400,8 +411,19 @@ impl KeyManager {
         Ok(key)
     }
 
+    /// Fail-Closed-Guard: Ein gewipetes Schlüsselmaterial darf nie weiterverwendet werden.
+    fn ensure_live(&self) -> Result<()> {
+        if self.wiped {
+            return Err(CryptoError::KeyRevoked(
+                "key material was wiped by emergency_wipe".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Internal accessor for instance-bound cached AES-256-GCM-SIV cipher.
     fn cipher(&self) -> Result<&Aes256GcmSiv> {
+        self.ensure_live()?;
         if let Some(c) = self.cipher_cache.get() {
             return Ok(c);
         }
@@ -455,10 +477,14 @@ impl KeyManager {
     }
 
     /// Emergency Trigger: Explicitly wipes the key from memory and clears cipher cache.
+    ///
+    /// Nach dem Wipe schlagen alle Ver-/Entschlüsselungen und Schlüsselableitungen mit
+    /// [`CryptoError::KeyRevoked`] fehl (kein stiller Nullschlüssel).
     pub fn emergency_wipe(&mut self) {
         self.key.emergency_wipe();
         self.cipher_cache.take();
         self.nonce_counter.store(0, Ordering::SeqCst);
+        self.wiped = true;
     }
 
     /// Exports the 32-byte raw Data Encryption Key (DEK) wrapped in [`Zeroizing<Vec<u8>>`].
@@ -562,6 +588,31 @@ mod tests {
 
         // Ensure key is zero after wipe
         assert_eq!(km.inspect_key_bytes_for_test(), &[0u8; 32]);
+    }
+
+    #[test]
+    fn wiped_key_manager_fails_closed() {
+        let mut km = KeyManager::try_new("password", b"salt").expect("init");
+        let (ct, nonce) = km.encrypt_auto_nonce(b"before wipe").expect("encrypt");
+
+        km.emergency_wipe();
+
+        assert!(matches!(
+            km.encrypt_auto_nonce(b"after wipe"),
+            Err(CryptoError::KeyRevoked(_))
+        ));
+        assert!(matches!(
+            km.decrypt_auto_nonce(&ct, &nonce),
+            Err(CryptoError::KeyRevoked(_))
+        ));
+        assert!(matches!(
+            km.derive_file_key(b"file"),
+            Err(CryptoError::KeyRevoked(_))
+        ));
+        assert!(matches!(
+            km.derive_segment_key("segment"),
+            Err(CryptoError::KeyRevoked(_))
+        ));
     }
 
     #[test]
@@ -999,7 +1050,8 @@ mod tests_cr42_differential {
     #[test]
     fn test_derive_kv_key_bytes_deterministic_and_matches_reference() -> Result<()> {
         let km = KeyManager::try_new("master-passphrase-differential!!", b"salt42")?;
-        let tenant = TenantId::try_new(101).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+        let tenant =
+            TenantId::try_new(101).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
         let fp_bytes = [0x5Au8; 32];
 
         let key_1 = km.derive_kv_key_bytes(tenant, &fp_bytes)?;
@@ -1035,7 +1087,8 @@ mod tests_cr42_differential {
     #[test]
     fn test_derive_kv_key_preserves_bit_level_compatibility() -> Result<()> {
         let km = KeyManager::try_new("master-passphrase-differential!!", b"salt42")?;
-        let tenant = TenantId::try_new(101).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+        let tenant =
+            TenantId::try_new(101).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
         let fp = crate::kv_cipher::ModelFingerprint {
             hash: [0x5Au8; 32],
             model_id: "test-model-llama".to_string(),

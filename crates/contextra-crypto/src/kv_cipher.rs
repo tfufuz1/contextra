@@ -108,18 +108,12 @@ impl KvCipher for KeyManager {
     }
 
     fn open(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        if ciphertext.len() < 12 {
-            return Err(CryptoError::Crypto(
-                "Ciphertext too short for nonce payload".into(),
-            ));
-        }
-        let nonce: &[u8; 12] =
-            ciphertext[..12]
-                .try_into()
-                .map_err(|e: std::array::TryFromSliceError| {
-                    CryptoError::InvalidInput(e.to_string())
-                })?;
-        let ct = &ciphertext[12..];
+        let (nonce_bytes, ct) = ciphertext
+            .split_at_checked(12)
+            .ok_or_else(|| CryptoError::Crypto("Ciphertext too short for nonce payload".into()))?;
+        let nonce: &[u8; 12] = nonce_bytes
+            .try_into()
+            .map_err(|e: std::array::TryFromSliceError| CryptoError::InvalidInput(e.to_string()))?;
         self.decrypt_auto_nonce(ct, nonce)
     }
 }
@@ -135,9 +129,7 @@ pub struct KvSegmentCipher {
 impl KvSegmentCipher {
     /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager`.
     pub fn new(key_manager: KeyManager) -> Self {
-        Self {
-            key_manager,
-        }
+        Self { key_manager }
     }
 
     /// Encrypts KV-cache plaintext payload for a given `(tenant_id, model_fingerprint)` pair.
@@ -217,7 +209,6 @@ impl KvCipher for KvSegmentCipher {
     }
 }
 
-#[cfg(test)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -357,6 +348,4 @@ mod tests {
             "Expected KvFormatVersionMismatch, got: {err:?}"
         );
     }
-
-
 }

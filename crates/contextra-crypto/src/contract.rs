@@ -9,7 +9,7 @@
 //! Definiert die minimalen Schnittstellen (Traits) zur Entropiegewinnung und Schlüsselverwaltung (KMS),
 //! die von Konsumenten injiziert werden können, sowie eine I/O-freie Referenzimplementierung.
 
-use crate::error::Result;
+use crate::error::{CryptoError, Result};
 use zeroize::Zeroizing;
 
 /// Trait zur Bereitstellung kryptographischer Entropie (Zufallsbytes).
@@ -20,12 +20,18 @@ pub trait CryptoEntropy: Send + Sync {
     fn fill_bytes(&mut self, dest: &mut [u8]);
 }
 
-/// Standard-Implementierung von [`CryptoEntropy`] basierend auf einem deterministischen Generator.
+/// Deterministische Test-Entropiequelle (xorshift) für reproduzierbare Tests.
+///
+/// **Nicht kryptographisch sicher** und deshalb ausschließlich unter `test`/`test-utils`
+/// verfügbar: Produktiver Code darf nie auf vorhersagbare Zufallswerte zurückfallen
+/// (Fail-Closed, SPEC §4.3).
+#[cfg(any(test, feature = "test-utils"))]
 #[derive(Debug, Clone)]
 pub struct DeterministicEntropy {
     state: u64,
 }
 
+#[cfg(any(test, feature = "test-utils"))]
 impl DeterministicEntropy {
     /// Erzeugt eine neue deterministische Entropiequelle mit festem Startwert (Seed).
     pub fn new(seed: u64) -> Self {
@@ -35,6 +41,7 @@ impl DeterministicEntropy {
     }
 }
 
+#[cfg(any(test, feature = "test-utils"))]
 impl CryptoEntropy for DeterministicEntropy {
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         for chunk in dest.chunks_mut(8) {
@@ -42,8 +49,9 @@ impl CryptoEntropy for DeterministicEntropy {
             self.state ^= self.state >> 7;
             self.state ^= self.state << 17;
             let bytes = self.state.to_le_bytes();
-            let len = chunk.len().min(8);
-            chunk.copy_from_slice(&bytes[..len]);
+            for (dst, src) in chunk.iter_mut().zip(bytes) {
+                *dst = src;
+            }
         }
     }
 }
@@ -92,26 +100,30 @@ impl KmsContract for InMemoryKms {
     }
 
     fn derive_data_key(&self, key_id: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
-        let mut out = [0u8; 32];
-        crate::kdf::hkdf_expand(&*self.master_key, key_id, &mut out)?;
+        let mut out = Zeroizing::new([0u8; 32]);
+        crate::kdf::hkdf_expand(&*self.master_key, key_id, out.as_mut_slice())?;
         Ok(Zeroizing::new(out.to_vec()))
     }
 
     fn wrap_key(&self, key_id: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
         let derived = self.derive_data_key(key_id)?;
-        let mut key_arr = [0u8; 32];
-        key_arr.copy_from_slice(&derived);
-        let dek = crate::dek::Dek::new(key_arr);
+        let key_arr =
+            Zeroizing::new(<[u8; 32]>::try_from(derived.as_slice()).map_err(|_| {
+                CryptoError::InvalidLength("derived data key must be 32 bytes".into())
+            })?);
+        let dek = crate::dek::Dek::new(*key_arr);
         let doc_tag = [0u8; 16];
-        let nonce = [0x55u8; 12];
-        crate::aead::seal_record_with_nonce(&dek, doc_tag, key_id, plaintext, nonce)
+        // Zufällige 96-Bit-Nonce aus dem OS-CSPRNG (fehlbar); nie eine feste Nonce.
+        crate::aead::seal_record(&dek, doc_tag, key_id, plaintext)
     }
 
     fn unwrap_key(&self, key_id: &[u8], wrapped: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
         let derived = self.derive_data_key(key_id)?;
-        let mut key_arr = [0u8; 32];
-        key_arr.copy_from_slice(&derived);
-        let dek = crate::dek::Dek::new(key_arr);
+        let key_arr =
+            Zeroizing::new(<[u8; 32]>::try_from(derived.as_slice()).map_err(|_| {
+                CryptoError::InvalidLength("derived data key must be 32 bytes".into())
+            })?);
+        let dek = crate::dek::Dek::new(*key_arr);
         let opened = crate::aead::open_record(&dek, key_id, wrapped)?;
         Ok(Zeroizing::new(opened.to_vec()))
     }
