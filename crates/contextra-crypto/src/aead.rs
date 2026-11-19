@@ -7,8 +7,10 @@
 // SECTION [epic=crypto-aead,seq=1] Imports & Konstanten
 use crate::dek::Dek;
 use crate::error::{CryptoError, Result};
+use crate::secret::SecretKey32;
 use aes_gcm_siv::aead::{Aead, KeyInit, Payload};
 use aes_gcm_siv::{Aes256GcmSiv, Key, Nonce};
+use contextra_ids::{CollectionId, DocId, TenantId};
 use rand::RngCore;
 use zeroize::Zeroizing;
 
@@ -203,5 +205,79 @@ mod tests {
             "Truncated tag must fail AEAD verification"
         );
     }
+}
+// !SECTION
+
+// SECTION [epic=crypto-hierarchy,seq=3] AEAD nach Spec §3.4 (AES-256-GCM-SIV)
+// NOTE: Wire-Format `Nonce (12 Byte) || Ciphertext || Tag (16 Byte)`. Nonce ausschließlich aus
+// dem OS-CSPRNG (fehlbar, kein deterministischer Fallback). Das bestehende `seal_record`-Format
+// bleibt unverändert.
+
+/// Baut den AAD-Kontext `tenant || collection || doc || version` (je 8 Byte, little-endian).
+#[inline]
+pub fn build_aad(tenant: TenantId, collection: CollectionId, doc: DocId, version: u64) -> [u8; 32] {
+    let mut aad = [0u8; 32];
+    let parts = [
+        tenant.as_u64().to_le_bytes(),
+        collection.as_u64().to_le_bytes(),
+        doc.as_u64().to_le_bytes(),
+        version.to_le_bytes(),
+    ];
+    for (chunk, part) in aad.chunks_exact_mut(8).zip(parts.iter()) {
+        chunk.copy_from_slice(part);
+    }
+    aad
+}
+
+/// Verschlüsselt `plaintext` mit AES-256-GCM-SIV und bindet `aad` ein.
+pub fn encrypt_aead(key: &SecretKey32, aad: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
+    let cipher = Aes256GcmSiv::new_from_slice(key.as_bytes())
+        .map_err(|e| CryptoError::CipherInit(e.to_string()))?;
+
+    let mut nonce_bytes = [0u8; 12];
+    rand::rngs::OsRng
+        .try_fill_bytes(&mut nonce_bytes)
+        .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
+
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(
+            nonce,
+            Payload {
+                msg: plaintext,
+                aad,
+            },
+        )
+        .map_err(|_| CryptoError::EncryptionFailed)?;
+
+    let mut out = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
+    out.extend_from_slice(&nonce_bytes);
+    out.extend_from_slice(&ciphertext);
+    Ok(out)
+}
+
+/// Entschlüsselt einen Blob aus `encrypt_aead` unter Validierung von `aad`.
+pub fn decrypt_aead(key: &SecretKey32, aad: &[u8], blob: &[u8]) -> Result<Vec<u8>> {
+    const NONCE_LEN: usize = 12;
+    const TAG_LEN: usize = 16;
+
+    let (nonce_bytes, ciphertext) = blob
+        .split_at_checked(NONCE_LEN)
+        .filter(|(_, ct)| ct.len() >= TAG_LEN)
+        .ok_or(CryptoError::CiphertextTooShort)?;
+
+    let cipher = Aes256GcmSiv::new_from_slice(key.as_bytes())
+        .map_err(|e| CryptoError::CipherInit(e.to_string()))?;
+
+    let nonce = Nonce::from_slice(nonce_bytes);
+    cipher
+        .decrypt(
+            nonce,
+            Payload {
+                msg: ciphertext,
+                aad,
+            },
+        )
+        .map_err(|_| CryptoError::DecryptionFailed)
 }
 // !SECTION

@@ -1,33 +1,11 @@
-[lints.rust]
-unexpected_cfgs = { level = "deny", check-cfg = ['cfg(loom)'] }
-deprecated = "allow"
-
-[lints.clippy]
-undocumented_unsafe_blocks = "deny"
-panic = "allow"
-todo = "deny"
-unimplemented = "deny"
-unreachable = "deny"
-await_holding_lock = "deny"
-await_holding_refcell_ref = "deny"
-dbg_macro = "deny"
-unwrap_used = "allow"
-expect_used = "allow"
-indexing_slicing = "allow"
-cast_possible_truncation = "allow"
-cast_sign_loss = "allow"
-doc_lazy_continuation = "allow"
-disallowed_methods = "allow"
-disallowed_types = "allow"
-
 [package]
 autobenches = false
 name = "contextra-crypto"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version = "1.89"
-description = "Encryption at Rest and KV-Cache Security utilities for Contextra"
+rust-version.workspace = true
+description = "Cryptographic primitives for Contextra: AES-256-GCM-SIV AEAD, HKDF key hierarchy, Argon2id KDF, zeroize-protected keys"
 readme = "README.md"
 repository = "https://github.com/tfufuz1/contextra"
 keywords = ["cryptography", "aead", "kdf", "wal", "zeroize"]
@@ -38,6 +16,9 @@ publish = false
 [package.metadata.contextra]
 ring = "0"
 klasse = "A"
+
+[lints]
+workspace = true
 
 [dependencies]
 thiserror = { workspace = true }
@@ -53,8 +34,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 contextra-ids = { path = "../contextra-ids", version = "0.1.0" }
 contextra-env = { path = "../contextra-env", version = "0.1.0" }
-contextra-types = { path = "../contextra-types", version = "0.1.0", optional = true }
-contextra-ports = { path = "../contextra-ports", version = "0.1.0", optional = true }
 rand = { workspace = true }
 tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
@@ -64,18 +43,12 @@ lru = "0.16.4"
 regex = { workspace = true }
 
 [features]
-default = ["kv-encryption"]
-workspace = ["dep:contextra-types", "dep:contextra-ports"]
-types-compat = ["workspace"]
-ports-compat = ["workspace"]
+default = []
+std = ["contextra-ids/std", "contextra-env/std"]
 test-utils = []
-kv-encryption = []
-cloud-egress-guard = []
 
 [dev-dependencies]
 contextra-crypto = { path = ".", features = ["test-utils"] }
-contextra-types = { path = "../contextra-types" }
-contextra-ports = { path = "../contextra-ports" }
 contextra-env = { path = "../contextra-env", features = ["test-utils"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }

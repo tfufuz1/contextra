@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Testet bewusst den veralteten KV-Segment-Pfad.
 //! # Integrationstest: `loom_kv_deferred_zeroize.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `loom_kv_deferred_zeroize`.
@@ -142,7 +143,7 @@ mod loom_tests {
 mod normal_tests {
     use contextra_crypto::kv_segment::segment::KvSegment;
     use contextra_crypto::kv_segment::store::TenantIsolatedKvStore;
-    use contextra_types::TenantId;
+    use contextra_ids::TenantId;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::thread;

@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Benchmarkt bewusst den veralteten KV-Segment-Pfad.
 //! # Benchmark-Suite: Kryptographische Kernoperationen (`benches/crypto_benchmarks.rs`)
 //!
 //! Misst Durchsatz und Latenz von AES-256-GCM-SIV, HKDF-Schlüsselableitung und KV-Sharding.
@@ -65,7 +66,7 @@ fn bench_hmac_integrity(c: &mut Criterion) {
 // ADR-082 Performance-Nachweis Benchmarks
 
 use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 
 fn bench_kv_insert_n_segments(c: &mut Criterion) {
     let mut group = c.benchmark_group("kv_insert_n_segments");

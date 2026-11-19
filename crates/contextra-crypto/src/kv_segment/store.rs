@@ -61,7 +61,6 @@ impl TenantState {
     }
 
     /// Mutabler Zugriff auf ein Segment mit LRU-Update.
-    #[cfg(feature = "kv-encryption")]
     fn get_segment_ref_mut(&mut self, id: u64) -> Option<&mut KvSegment> {
         self.cache.get_mut(&id)
     }
@@ -259,7 +258,6 @@ impl TenantIsolatedKvStore {
     }
 
     /// Verschlüsselt einen Klartext-Tensor und fügt ein verschlüsseltes Segment ein.
-    #[cfg(feature = "kv-encryption")]
     pub fn insert_encrypted_segment(
         &self,
         cipher: &crate::KvSegmentCipher,
@@ -294,7 +292,6 @@ impl TenantIsolatedKvStore {
     }
 
     /// Liest ein bestimmtes Segment eines Mandanten und entschlüsselt es falls nötig.
-    #[cfg(feature = "kv-encryption")]
     pub fn get_decrypted_segment(
         &self,
         cipher: &crate::KvSegmentCipher,

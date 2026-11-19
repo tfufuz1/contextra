@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Testet bewusst den veralteten KV-Segment-Pfad.
 //! # Integrationstest: `eviction_worker_tokio_runtime_nonblocking_regression.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `eviction_worker_tokio_runtime_nonblocking_regression`.
@@ -8,7 +9,7 @@
 use contextra_crypto::kv_segment::segment::KvSegment;
 use contextra_crypto::kv_segment::store::TenantIsolatedKvStore;
 use contextra_crypto::kv_segment::EvictionWorker;
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 

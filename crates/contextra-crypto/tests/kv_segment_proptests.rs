@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Testet bewusst den veralteten KV-Segment-Pfad.
 //! # Integrationstest: `kv_segment_proptests.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `kv_segment_proptests`.
@@ -10,7 +11,7 @@
 #![forbid(unsafe_code)]
 
 use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use proptest::prelude::*;
 use std::collections::HashSet;
 use zeroize::Zeroize;

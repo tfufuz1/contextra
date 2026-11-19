@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Testet bewusst den veralteten KV-Segment-Pfad.
 //! # Integrationstest: `campaign_j25.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_j25`.
@@ -18,7 +19,7 @@ use contextra_crypto::{
     wal_crypto::{EncryptedWal, IntegrityVerifier, WalEntrySnapshot},
     KeyManager,
 };
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use std::collections::HashSet;
 
 fn hex_decode(hex: &str) -> Vec<u8> {

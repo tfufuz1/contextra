@@ -7,6 +7,9 @@
 
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+// Offene Schuld: indexing_slicing ist nicht Teil von INV-4 (unwrap/expect/panic/todo). Die
+// bestehenden Index-Zugriffe in kv_segment/store.rs und kdf.rs werden in einem eigenen
+// Refactoring mit Fehlerpfaden ersetzt.
 #![allow(clippy::indexing_slicing)]
 
 //! # Kryptographie-Kern für Contextra (Ring 0)
@@ -44,13 +47,13 @@ pub mod aead;
 pub mod anti_tamper;
 pub mod audit_chain;
 pub mod contract;
-#[cfg(feature = "workspace")]
-pub mod compat;
 pub mod crypto;
 pub mod dek;
 pub mod error;
 pub mod kdf;
 pub mod kv_cipher;
+// KV-Segment-Logik ist als veraltet markiert; interne Nutzung bleibt bewusst erlaubt.
+#[allow(deprecated)]
 pub mod kv_segment;
 pub mod secret;
 pub mod wal_completeness;
@@ -74,9 +77,17 @@ pub use crypto::KeyManager as CryptoKey;
 pub use crypto::KeyManager;
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
-#[cfg(feature = "kv-encryption")]
+pub use kdf::{
+    derive_collection_kek, derive_document_dek, derive_master_key, derive_subject_doc_dek,
+    derive_subject_key, derive_tenant_kek,
+};
+pub use secret::{
+    CollectionKek, DocumentDek, ErasureKey, MasterKey, SecretKey32, SubjectDocDek, SubjectKey,
+    TenantKek,
+};
 pub use kv_cipher::KvSegmentCipher;
 pub use kv_cipher::{EncryptedKvLayer, KvCipher, ModelFingerprint};
+#[allow(deprecated)]
 pub use kv_segment::{
     delete_mode::KvDeleteMode,
     eviction_worker::{emergency_wipe, EvictionWorker},
@@ -86,7 +97,6 @@ pub use kv_segment::{
     CURRENT_KV_KEY_DERIVATION_VERSION,
 };
 pub use wal_completeness::verify_wal_chain_completeness;
-#[cfg(feature = "cloud-egress-guard")]
 pub use wal_crypto::CloudEgressGuard;
 pub use wal_crypto::{
     EncryptedWal, IntegrityVerifier, KmsProvider, LocalKeyManagerKms, WalEntrySnapshot, WalHmac,

@@ -160,3 +160,77 @@ mod tests {
     }
 }
 // !SECTION
+
+// SECTION [epic=crypto-hierarchy,seq=1] Schlüsselhierarchie-Typen (Spec §3.1)
+// NOTE: Spec nennt den Typ `SecretKey`. Dieser Name ist bereits durch den öffentlichen,
+// generischen `SecretKey<const N>` belegt (von `dek.rs` und Konsumenten genutzt). Daher
+// heißt der nicht-generische, nicht klonbare Spec-Typ `SecretKey32`. Semantik laut Spec:
+// kein Clone, kein Debug, kein Serialize, ZeroizeOnDrop (INV-11).
+
+/// 256-Bit geheimer Schlüssel mit garantierter Speicherbereinigung (Spec §3.1 `SecretKey`).
+/// Implementiert bewusst WEDER Clone, Debug NOCH Serialize.
+#[derive(Zeroize, ZeroizeOnDrop)]
+pub struct SecretKey32([u8; 32]);
+
+impl SecretKey32 {
+    /// Erstellt den Schlüssel aus 32 Bytes.
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    /// Lesezugriff auf die Schlüsselbytes.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+/// Stark typisierte Schlüssel-Rollen zur Verhinderung von Verwechslungen im Typsystem.
+/// Jede Rolle hält ausschließlich einen `SecretKey32` und ist damit zeroize-geschützt.
+#[derive(ZeroizeOnDrop)]
+pub struct MasterKey(SecretKey32);
+/// Tenant-Key-Encryption-Key (TenantKEK).
+#[derive(ZeroizeOnDrop)]
+pub struct TenantKek(SecretKey32);
+/// Collection-Key-Encryption-Key (CollectionKEK).
+#[derive(ZeroizeOnDrop)]
+pub struct CollectionKek(SecretKey32);
+/// DocumentDEK für Datenklasse K.
+#[derive(ZeroizeOnDrop)]
+pub struct DocumentDek(SecretKey32);
+/// SubjectKey für Datenklasse P (adressiert über `SubjectRef`).
+#[derive(ZeroizeOnDrop)]
+pub struct SubjectKey(SecretKey32);
+/// SubjectDocDEK für Datenklasse P.
+#[derive(ZeroizeOnDrop)]
+pub struct SubjectDocDek(SecretKey32);
+/// ErasureKey für Journal, Ledger und Berichte.
+#[derive(ZeroizeOnDrop)]
+pub struct ErasureKey(SecretKey32);
+
+macro_rules! impl_key_wrapper {
+    ($name:ident) => {
+        impl $name {
+            /// Umhüllt einen `SecretKey32` in die typisierte Rolle.
+            #[inline]
+            pub const fn from_secret(key: SecretKey32) -> Self {
+                Self(key)
+            }
+
+            /// Lesezugriff auf die Schlüsselbytes.
+            #[inline]
+            pub fn as_bytes(&self) -> &[u8; 32] {
+                self.0.as_bytes()
+            }
+        }
+    };
+}
+
+impl_key_wrapper!(MasterKey);
+impl_key_wrapper!(TenantKek);
+impl_key_wrapper!(CollectionKek);
+impl_key_wrapper!(DocumentDek);
+impl_key_wrapper!(SubjectKey);
+impl_key_wrapper!(SubjectDocDek);
+impl_key_wrapper!(ErasureKey);
+// !SECTION

@@ -1,3 +1,4 @@
+#![allow(deprecated)] // Testet bewusst den veralteten KV-Segment-Pfad.
 //! # Integrationstest: `kv_segment_concurrency.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `kv_segment_concurrency`.
@@ -10,7 +11,7 @@
 use contextra_crypto::kv_segment::{
     emergency_wipe, EvictionWorker, KvSegment, TenantIsolatedKvStore,
 };
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;

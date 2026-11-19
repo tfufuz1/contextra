@@ -17,7 +17,11 @@
 #![forbid(unsafe_code)]
 
 use crate::error::{CryptoError, Result};
+use crate::secret::{
+    CollectionKek, DocumentDek, MasterKey, SecretKey32, SubjectDocDek, SubjectKey, TenantKek,
+};
 use argon2::{Algorithm, Argon2, Params, Version};
+use contextra_ids::{CollectionId, DocId, SubjectRef, TenantId};
 use zeroize::ZeroizeOnDrop;
 
 /// Magischer Header-Marker "MFKD" (Contextra Key Derivation)
@@ -317,3 +321,130 @@ pub fn hkdf_expand(prk: &[u8], info: &[u8], out: &mut [u8]) -> Result<()> {
         .map_err(|_| CryptoError::Crypto("hkdf expand failed".into()))?;
     Ok(())
 }
+
+// SECTION [epic=crypto-hierarchy,seq=2] Schlüsselhierarchie-Ableitung (Spec §3.2, §3.3)
+// NOTE: Domänentrennung über versionierte Info-Strings ("contextra/…/v1"). Die bestehenden
+// Funktionen `derive_key_argon2id` und `hkdf_expand` bleiben unverändert, weil persistierte
+// Formate (INV-1, INV-6) von ihnen abhängen. Die Spec-Funktionen sind additiv.
+
+/// Spec §3.2 Argon2id-Parameter: m = 256 MiB, t = 4, p = 1, 32 Byte Ausgabe.
+const SPEC_ARGON2_M_COST_KIB: u32 = 256 * 1024;
+const SPEC_ARGON2_T_COST: u32 = 4;
+const SPEC_ARGON2_P_COST: u32 = 1;
+
+/// Leitet den `MasterKey` aus Passphrase und 32-Byte-Salt ab (Spec §3.2).
+///
+/// Fail-Closed: leere Passphrase wird abgelehnt, es gibt keinen Fallback.
+pub fn derive_master_key(passphrase: &[u8], salt: &[u8; 32]) -> Result<MasterKey> {
+    if passphrase.is_empty() {
+        return Err(CryptoError::EmptyPassphrase);
+    }
+
+    let params = Params::new(
+        SPEC_ARGON2_M_COST_KIB,
+        SPEC_ARGON2_T_COST,
+        SPEC_ARGON2_P_COST,
+        Some(32),
+    )
+    .map_err(|e| CryptoError::Argon2Config(e.to_string()))?;
+
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+    let mut okm = [0u8; 32];
+    argon2
+        .hash_password_into(passphrase, salt, &mut okm)
+        .map_err(|e| CryptoError::Argon2Derivation(e.to_string()))?;
+
+    let key = SecretKey32::from_bytes(okm);
+    zeroize::Zeroize::zeroize(&mut okm);
+    Ok(MasterKey::from_secret(key))
+}
+
+/// Gemeinsame HKDF-SHA-256-Expansion auf 32 Byte. Der Ausgabepuffer wird nach dem
+/// Umkopieren in den `SecretKey32` genullt (INV-11).
+fn hkdf_expand_32(ikm: &[u8; 32], info: &[u8]) -> Result<SecretKey32> {
+    let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, ikm);
+    let mut okm = [0u8; 32];
+    hk.expand(info, &mut okm)
+        .map_err(|_| CryptoError::HkdfExpandFailed)?;
+    let key = SecretKey32::from_bytes(okm);
+    zeroize::Zeroize::zeroize(&mut okm);
+    Ok(key)
+}
+
+/// Verkettet Info-Bestandteile zu einem HKDF-`info`-Feld.
+fn info_parts(parts: &[&[u8]]) -> Vec<u8> {
+    parts.concat()
+}
+
+/// Leitet den `TenantKek` aus dem `MasterKey` ab (Spec §3.3).
+pub fn derive_tenant_kek(master: &MasterKey, tenant_id: TenantId) -> Result<TenantKek> {
+    let info = info_parts(&[b"contextra/tenant/v1", &tenant_id.as_u64().to_le_bytes()]);
+    Ok(TenantKek::from_secret(hkdf_expand_32(
+        master.as_bytes(),
+        &info,
+    )?))
+}
+
+/// Leitet den `CollectionKek` aus dem `TenantKek` ab. `epoch` erlaubt die Rotation bei Neuanlage.
+pub fn derive_collection_kek(
+    tenant_kek: &TenantKek,
+    collection_id: CollectionId,
+    epoch: u64,
+) -> Result<CollectionKek> {
+    let info = info_parts(&[
+        b"contextra/collection/v1",
+        &collection_id.as_u64().to_le_bytes(),
+        &epoch.to_le_bytes(),
+    ]);
+    Ok(CollectionKek::from_secret(hkdf_expand_32(
+        tenant_kek.as_bytes(),
+        &info,
+    )?))
+}
+
+/// Leitet den `DocumentDek` (Klasse K) aus dem `CollectionKek` ab.
+pub fn derive_document_dek(
+    coll_kek: &CollectionKek,
+    doc_id: DocId,
+    version: u64,
+) -> Result<DocumentDek> {
+    let info = info_parts(&[
+        b"contextra/doc/v1",
+        &doc_id.as_u64().to_le_bytes(),
+        &version.to_le_bytes(),
+    ]);
+    Ok(DocumentDek::from_secret(hkdf_expand_32(
+        coll_kek.as_bytes(),
+        &info,
+    )?))
+}
+
+/// Leitet den `SubjectKey` (Klasse P) aus dem `CollectionKek` ab.
+pub fn derive_subject_key(
+    coll_kek: &CollectionKek,
+    subject_ref: &SubjectRef,
+) -> Result<SubjectKey> {
+    let info = info_parts(&[b"contextra/subject/v1", subject_ref.as_bytes()]);
+    Ok(SubjectKey::from_secret(hkdf_expand_32(
+        coll_kek.as_bytes(),
+        &info,
+    )?))
+}
+
+/// Leitet den `SubjectDocDek` (Klasse P) aus dem `SubjectKey` ab.
+pub fn derive_subject_doc_dek(
+    subject_key: &SubjectKey,
+    doc_id: DocId,
+    version: u64,
+) -> Result<SubjectDocDek> {
+    let info = info_parts(&[
+        b"contextra/subject_doc/v1",
+        &doc_id.as_u64().to_le_bytes(),
+        &version.to_le_bytes(),
+    ]);
+    Ok(SubjectDocDek::from_secret(hkdf_expand_32(
+        subject_key.as_bytes(),
+        &info,
+    )?))
+}
+// !SECTION

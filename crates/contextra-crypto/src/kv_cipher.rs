@@ -128,12 +128,10 @@ impl KvCipher for KeyManager {
 /// Consolidates onto `KeyRegistry` envelope crypto-shredding as the single shredding path.
 // ANCHOR[contextra-crypto:KV-001]
 /// Chiffre für segmentweise verschlüsselte KV-Einträge.
-#[cfg(feature = "kv-encryption")]
 pub struct KvSegmentCipher {
     key_manager: KeyManager,
 }
 
-#[cfg(feature = "kv-encryption")]
 impl KvSegmentCipher {
     /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager`.
     pub fn new(key_manager: KeyManager) -> Self {
@@ -209,7 +207,6 @@ impl KvSegmentCipher {
     }
 }
 
-#[cfg(feature = "kv-encryption")]
 impl KvCipher for KvSegmentCipher {
     fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
         self.key_manager.seal(plaintext)
@@ -220,7 +217,7 @@ impl KvCipher for KvSegmentCipher {
     }
 }
 
-#[cfg(all(test, feature = "kv-encryption"))]
+#[cfg(test)]
 #[cfg(test)]
 mod tests {
     use super::*;

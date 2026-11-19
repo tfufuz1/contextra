@@ -14,7 +14,7 @@ use contextra_crypto::kdf::hkdf_expand;
 use contextra_crypto::kv_cipher::{EncryptedKvLayer, ModelFingerprint};
 use contextra_crypto::wal_completeness::verify_wal_chain_completeness;
 use contextra_crypto::wal_crypto::WalHmac;
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;

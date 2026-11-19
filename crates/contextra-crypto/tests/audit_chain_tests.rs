@@ -9,7 +9,7 @@ use contextra_crypto::audit_chain::AuditHeadAnchor;
 use contextra_crypto::{
     compute_record_commitment, AuditChain, DataClass,
 };
-use contextra_types::{DocId, TxId};
+use contextra_ids::{DocId, TxId};
 
 #[test]
 fn test_audit_chain_integrity_and_tamper_detection() {

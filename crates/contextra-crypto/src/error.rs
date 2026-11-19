@@ -65,9 +65,49 @@ pub enum CryptoError {
         reason: String,
     },
 
-
     #[error("WAL truncation detected: tail HMAC mismatch")]
     WalTruncationDetected,
+
+    // --- Spec contextra-crypto v2.0 §4 (Schlüsselhierarchie / AEAD / Argon2id) ---
+    /// Passphrase darf nicht leer sein.
+    #[error("passphrase cannot be empty")]
+    EmptyPassphrase,
+
+    /// Argon2id-Parameter ungültig.
+    #[error("argon2 configuration error: {0}")]
+    Argon2Config(String),
+
+    /// Argon2id-Ableitung fehlgeschlagen.
+    #[error("argon2 key derivation failed: {0}")]
+    Argon2Derivation(String),
+
+    /// HKDF-Expansion fehlgeschlagen (Ausgabelänge ungültig).
+    #[error("HKDF expansion failed: output length invalid or key rejected")]
+    HkdfExpandFailed,
+
+    /// Cipher-Initialisierung fehlgeschlagen.
+    #[error("cipher initialization failed: {0}")]
+    CipherInit(String),
+
+    /// OS-CSPRNG lieferte keinen Zufall (Fail-Closed, kein Fallback).
+    #[error("OS CSPRNG failure: {0}")]
+    RngFailure(String),
+
+    /// AEAD-Verschlüsselung fehlgeschlagen.
+    #[error("AEAD encryption operation failed")]
+    EncryptionFailed,
+
+    /// AEAD-Entschlüsselung fehlgeschlagen: Tag-Mismatch, Korruption oder falscher AAD-Kontext.
+    #[error("AEAD decryption failed: tag mismatch, corrupted data, or invalid AAD context")]
+    DecryptionFailed,
+
+    /// Chiffretext kürzer als Nonce (12 Byte) + Tag (16 Byte).
+    #[error("ciphertext blob too short (missing 12-byte nonce or 16-byte tag)")]
+    CiphertextTooShort,
+
+    /// Schlüsselslot wurde nach Löschung nicht genullt.
+    #[error("key slot verification failed: slot is not zeroed")]
+    SlotNotZeroed,
 
     #[error("key or group has been revoked: {0}")]
     KeyRevoked(String),

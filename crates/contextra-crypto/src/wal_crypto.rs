@@ -140,21 +140,18 @@ impl KmsProvider for LocalKeyManagerKms {
     }
 }
 
-#[cfg(feature = "cloud-egress-guard")]
 /// Egress guard for inspecting and sanitizing encrypted payload blocks prior to cloud egress.
 #[derive(Debug, Clone)]
 pub struct CloudEgressGuard {
     max_egress_bytes: usize,
 }
 
-#[cfg(feature = "cloud-egress-guard")]
 impl Default for CloudEgressGuard {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cfg(feature = "cloud-egress-guard")]
 impl CloudEgressGuard {
     /// Creates a new `CloudEgressGuard` with a default maximum payload limit of 10 MB.
     pub fn new() -> Self {
@@ -1145,7 +1142,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "cloud-egress-guard")]
     fn test_cloud_egress_guard_validation() -> Result<()> {
         let guard = CloudEgressGuard::with_max_bytes(1024);
 

@@ -10,7 +10,7 @@
 
 use contextra_crypto::wal_crypto::{EncryptedWal, IntegrityVerifier, WalEntrySnapshot, WalHmac};
 use contextra_crypto::{CryptoKey, KvSegmentCipher, ModelFingerprint};
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use proptest::prelude::*;
 
 proptest! {

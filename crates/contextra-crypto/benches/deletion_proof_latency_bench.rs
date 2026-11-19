@@ -12,7 +12,7 @@
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
 };
-use contextra_types::{TenantId, TxId};
+use contextra_ids::{TenantId, TxId};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 fn bench_deletion_proof_creation_latency(c: &mut Criterion) {
