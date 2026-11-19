@@ -92,7 +92,7 @@ impl DiskAnnIndex {
                 }
 
                 let file = crate::diskann::io::open_read(&inner.config.index_path)?;
-                let mmap = contextra_sys::mmap_readonly(&file).map_err(VectorError::from)?;
+                let mmap = crate::persistence::FileBytes::from_file(&file)?;
 
                 if mmap.len() < DiskAnnHeader::SIZE + DiskAnnFooter::SIZE {
                     return Err(VectorError::Storage(

@@ -119,8 +119,8 @@ pub(crate) fn create_truncate(path: &Path) -> Result<File> {
 
 // ANCHOR[contextra-vector:W07-IO-007]
 /// Öffnet ein sicheres Nur-Lese-Memory-Mapping über `contextra_sys::mmap_readonly`.
-pub(crate) fn open_mmap_readonly(file: &File) -> Result<memmap2::Mmap> {
-    contextra_sys::mmap_readonly(file).map_err(VectorError::from)
+pub(crate) fn open_mmap_readonly(file: &File) -> Result<crate::persistence::FileBytes> {
+    crate::persistence::FileBytes::from_file(file)
 }
 
 // ANCHOR[contextra-vector:W07-IO-008]

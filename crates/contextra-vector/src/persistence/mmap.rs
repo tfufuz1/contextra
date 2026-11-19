@@ -11,20 +11,19 @@ use crate::error::{Result, VectorError};
 #[derive(Clone)]
 /// A reader for memory-mapped HNSW indices.
 pub struct MmapIndex {
-    pub mmap: std::sync::Arc<memmap2::Mmap>,
+    pub mmap: std::sync::Arc<super::bytes::FileBytes>,
     pub header: HnswHeader,
     pub path: Option<std::path::PathBuf>,
 }
 
 impl MmapIndex {
-    #[cfg(any(feature = "mmap", feature = "workspace"))]
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let path_buf = path.as_ref().to_path_buf();
         let file = crate::persistence::io::open_readonly(&path_buf)
             .map_err(|e| VectorError::Storage(format!("Failed to open HNSW file: {}", e)))?;
 
-        let mmap = contextra_sys::mmap_readonly(&file)
-            .map_err(|e| VectorError::Storage(format!("Failed to mmap HNSW: {}", e)))?;
+        let mmap = super::bytes::FileBytes::from_file(&file)
+            .map_err(|e| VectorError::Storage(format!("Failed to read HNSW: {}", e)))?;
 
         let header_slice = mmap
             .get(0..HnswHeader::SIZE)
