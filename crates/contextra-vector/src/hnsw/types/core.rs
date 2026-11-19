@@ -95,7 +95,7 @@ pub struct HnswColdCore {
     pub quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
     pub sq8_bias: RwLock<Sq8Bias>,
     pub mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
-    pub seq_log: RwLock<contextra_mvcc::SequenceLog>,
+    pub seq_log: RwLock<contextra_env::seq_log::SequenceLog>,
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
     pub deleted_nodes: RwLock<RoaringTreemap>,

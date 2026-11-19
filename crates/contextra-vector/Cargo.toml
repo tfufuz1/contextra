@@ -17,7 +17,6 @@ klasse = "A"
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
 contextra-durable-fs = { workspace = true }
-contextra-mvcc = { workspace = true }
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
 contextra-simd = { workspace = true, optional = true }

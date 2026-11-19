@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: SequenceLog-Kompaktierung und Snapshot-Verwaltung fuer GenericHnswIndex.
-// INVARIANTEN: Aufrufe delegieren thread-sicher ueber RwLock an contextra_mvcc::SequenceLog.
+// INVARIANTEN: Aufrufe delegieren thread-sicher ueber RwLock an contextra_env::seq_log::SequenceLog.
 // HOTSPOTS: GenericHnswIndex::pin_snapshot, GenericHnswIndex::compact_seq_log
 // STAND: TS:2026-11-12T00:00:00Z
 

@@ -11,7 +11,7 @@
 //! - `born_seq`: Transaktionssequenznummer der Einfügung.
 //! - `died_seq`: Transaktionssequenznummer der Löschung (Tombstone).
 //!
-//! Änderungen im MVCC-Sequenzlog (`contextra_mvcc::SeqLogChange`) seit dem Transaktionszeitpunkt
+//! Änderungen im MVCC-Sequenzlog (`contextra_env::seq_log::SeqLogChange`) seit dem Transaktionszeitpunkt
 //! des Snapshots (`snapshot_tx`) werden in strikter WAL-Reihenfolge nachgespielt, bevor die
 //! neuen Speicherstrukturen atomar unter `write_mutex` ausgetauscht werden.
 
@@ -45,7 +45,7 @@ pub(super) fn compute_replay_decisions(
 
     for change in delta_changes {
         match change {
-            contextra_mvcc::SeqLogChange::Insert { doc_id, seq } => {
+            contextra_env::seq_log::SeqLogChange::Insert { doc_id, seq } => {
                 let vector_opt = {
                     let doc_map = core.hot.doc_to_node.read();
                     let mmap_count = core
@@ -76,7 +76,7 @@ pub(super) fn compute_replay_decisions(
                     });
                 }
             }
-            contextra_mvcc::SeqLogChange::Delete { doc_id, .. } => {
+            contextra_env::seq_log::SeqLogChange::Delete { doc_id, .. } => {
                 decisions.push(ReplayDecision::Delete { doc_id });
             }
         }
