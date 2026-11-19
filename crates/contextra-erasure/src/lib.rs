@@ -1,7 +1,6 @@
-//! Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht.
+//! Löschkern: Löschkette nach SPEC §5 (Saga), §6 (ReadGate), §7 (ErasureLayer).
 //!
-//! Ring 3 (SPEC §5.1, §5.2, §11). Abhängigkeitsregel AR-3 (SPEC §5.3): Erlaubte Abhängigkeiten
-//! sind ausschließlich `contextra-types`, `contextra-ports` und `contextra-crypto`.
+//! Ring 0 (E0). Die einzige Löschmethode ist [`chain`]. Abhängigkeiten nur abwärts (R1).
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -10,37 +9,12 @@
     deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
 )]
 
-pub mod backend;
+pub mod chain;
 pub mod crypto_local;
-#[cfg(feature = "signing")]
-pub mod deletion_proof;
-pub mod erasure_domain;
 pub mod error;
 pub mod gate;
 pub mod io;
-pub mod journal;
-pub mod ledger;
-pub mod measure;
-pub mod purge;
-pub mod replace;
-pub mod report;
-pub mod restore;
-pub mod restricted;
-pub mod saga;
-pub mod scope;
-pub mod supersede;
-#[cfg(test)]
-pub mod test_mocks;
 pub mod types_local;
 pub mod vault;
-
-#[cfg(feature = "signing")]
-pub mod ed25519_proof;
-#[cfg(feature = "vault")]
-pub mod kv_shredding;
-#[cfg(feature = "signing")]
-pub mod orchestrator;
-#[cfg(feature = "signing")]
-pub mod revocation_log;
 
 pub use gate::saga_gate::{GateDecision, RangeGate, ReadGate, SagaGate};

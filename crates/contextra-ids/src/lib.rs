@@ -7,6 +7,7 @@
 #![warn(missing_docs)]
 
 use core::fmt;
+use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::mem::{align_of, size_of};
 use thiserror::Error;
@@ -74,6 +75,14 @@ pub enum IdError {
 
 /// Result alias for identifier operations.
 pub type Result<T> = core::result::Result<T, IdError>;
+
+/// Füllt 16 Byte aus einer Zufallsquelle. Fehler werden zu `IdError::EntropyExhaustion`.
+fn random_16<R: RngCore>(rng: &mut R) -> Result<[u8; 16]> {
+    let mut bytes = [0u8; 16];
+    rng.try_fill_bytes(&mut bytes)
+        .map_err(|e| IdError::EntropyExhaustion(e.to_string()))?;
+    Ok(bytes)
+}
 
 // ─── IDs ─────────────────────────────────────────────────────────────────────
 
@@ -320,6 +329,7 @@ impl DocId {
 
     /// Returns the lower 64 bits of the identifier.
     #[inline]
+    #[allow(clippy::cast_possible_truncation)] // Bewusst: nur die unteren 64 Bit werden geliefert.
     pub const fn as_u64(self) -> u64 {
         self.0 as u64
     }
@@ -703,17 +713,17 @@ define_ref_newtype!(DocKey, "Dokumentenschlüssel (SPEC 7.2).");
 /// - Fehlbare Erzeugung: Ausschließlich über `OsRng::try_fill_bytes`.
 /// - Geschwärztes Display & Debug: Verhindert PII-Tracking in Traces/Logs (INV-12).
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Zeroize, ZeroizeOnDrop, Serialize, Deserialize)]
-pub struct SubjectRef(pub [u8; 16]);
+pub struct SubjectRef([u8; 16]);
 
 impl SubjectRef {
     /// Erzeugt ein neues kryptographisch zufälliges `SubjectRef` über den OS-CSPRNG.
     pub fn generate() -> Result<Self> {
-        use rand::RngCore;
-        let mut bytes = [0u8; 16];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut bytes)
-            .map_err(|e| IdError::EntropyExhaustion(e.to_string()))?;
-        Ok(Self(bytes))
+        Self::from_rng(&mut OsRng)
+    }
+
+    /// Erzeugt die Instanz aus einer injizierbaren Zufallsquelle (Entropie-Fehlerpfad, T-ID1).
+    fn from_rng<R: RngCore>(rng: &mut R) -> Result<Self> {
+        random_16(rng).map(Self)
     }
 
     /// Konstruiert `SubjectRef` aus rohen 16 Bytes (nur für autorisierte Deserialisierer/Layer).
@@ -753,17 +763,17 @@ impl fmt::Display for SubjectRef {
 /// ohne dass das umgebende K-Dokument umgeschrieben werden muss.
 /// Kein `Clone`.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct PersonalRef(pub [u8; 16]);
+pub struct PersonalRef([u8; 16]);
 
 impl PersonalRef {
     /// Erzeugt ein neues zufälliges `PersonalRef`.
     pub fn generate() -> Result<Self> {
-        use rand::RngCore;
-        let mut bytes = [0u8; 16];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut bytes)
-            .map_err(|e| IdError::EntropyExhaustion(e.to_string()))?;
-        Ok(Self(bytes))
+        Self::from_rng(&mut OsRng)
+    }
+
+    /// Erzeugt die Instanz aus einer injizierbaren Zufallsquelle (Entropie-Fehlerpfad, T-ID1).
+    fn from_rng<R: RngCore>(rng: &mut R) -> Result<Self> {
+        random_16(rng).map(Self)
     }
 
     /// Konstruiert aus 16 Bytes.
@@ -798,12 +808,12 @@ pub struct ErasureId(pub [u8; 16]);
 impl ErasureId {
     /// Erzeugt eine neue zufällige `ErasureId`.
     pub fn generate() -> Result<Self> {
-        use rand::RngCore;
-        let mut bytes = [0u8; 16];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut bytes)
-            .map_err(|e| IdError::EntropyExhaustion(e.to_string()))?;
-        Ok(Self(bytes))
+        Self::from_rng(&mut OsRng)
+    }
+
+    /// Erzeugt die Instanz aus einer injizierbaren Zufallsquelle (Entropie-Fehlerpfad, T-ID1).
+    fn from_rng<R: RngCore>(rng: &mut R) -> Result<Self> {
+        random_16(rng).map(Self)
     }
 
     /// Konstruiert aus 16 Bytes.
@@ -896,16 +906,30 @@ pub enum TenantScopeViolation {
         /// Actual `TenantId` bound to the value.
         actual: TenantId,
     },
+    /// Tenant scope bound to the reserved `TenantId(0)`.
+    #[error("tenant ID cannot be 0")]
+    InvalidZero,
 }
 
 /// Ein Wrapper-Typ, der einen Wert untrennbar an eine `TenantId` bindet.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TenantScoped<T> {
     tenant_id: TenantId,
     value: T,
 }
 
 impl<T> TenantScoped<T> {
+    /// Geprüfter Konstruktor: lehnt die reservierte `TenantId(0)` mit `InvalidZero` ab.
+    pub fn try_new(
+        tenant_id: TenantId,
+        value: T,
+    ) -> core::result::Result<Self, TenantScopeViolation> {
+        if tenant_id.is_system() {
+            return Err(TenantScopeViolation::InvalidZero);
+        }
+        Ok(Self { tenant_id, value })
+    }
+
     /// Creates a new `TenantScoped` value bound to the specified `TenantId`.
     #[inline]
     pub fn new(tenant_id: TenantId, value: T) -> Self {
@@ -953,3 +977,6 @@ impl<T> TenantScoped<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

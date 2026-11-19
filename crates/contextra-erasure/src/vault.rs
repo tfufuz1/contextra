@@ -3,11 +3,9 @@
 //! Enthält `FileVault`, die 16-Shard-Fassade über `VaultTable` und `DurableVaultShard`.
 
 pub mod durable;
-pub mod keyring;
 pub mod open;
 pub mod rehash;
 pub mod scrub;
-pub mod sealer;
 pub mod slot;
 pub mod table;
 
@@ -19,14 +17,12 @@ use std::sync::Arc;
 use table::VaultTable;
 
 pub use durable::VAULT_SLOT_BASE;
-pub use keyring::{file_id_to_tag, mask_file_key, InMemoryKeyring, VaultKeyring};
 pub use open::{
     compute_metablock_mac, encode_metablock, open_vault, open_vault_shard, MetablockParams,
     VaultOpenOutcome, VAULT_METABLOCK_SIZE,
 };
 pub use rehash::{rehash, rehash_durable_shard, rehash_shard, RehashOutcome};
 pub use scrub::{scrub_shard_step, ScrubOutcome, VaultScrubContext};
-pub use sealer::VaultSealer;
 pub use slot::{
     compute_header_tag, compute_slot_mac, decode_slot, encode_slot, encode_slot_body,
     encode_vault_header, mask_epoch_key, slot_probe_start, tombstone_image, verify_vault_header,

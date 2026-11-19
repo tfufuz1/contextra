@@ -64,7 +64,8 @@ fn generate_golden_ids_data() {
     let col_ref = CollectionRef::try_new(b"coll_test_1".to_vec()).unwrap();
     let doc_key = DocKey::try_new(b"key_test_1".to_vec()).unwrap();
     let op_ref = OperatorRef::try_new(b"op_test_1".to_vec()).unwrap();
-    let sub_ref = SubjectRef::try_new(b"sub_test_1".to_vec()).unwrap();
+    // SubjectRef ist seit SPEC §3.2 eine feste 128-Bit-Referenz (`[u8; 16]`), kein Vec mehr.
+    let sub_ref = SubjectRef::from_bytes(*b"sub_test_1\0\0\0\0\0\0");
     let ten_ref = TenantRef::try_new(b"ten_test_1".to_vec()).unwrap();
 
     let serde_bundle = serde_json::json!({

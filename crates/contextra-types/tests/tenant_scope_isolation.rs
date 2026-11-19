@@ -39,11 +39,10 @@ fn test_into_inner_checked_mismatched_tenant_does_not_leak_value() {
     assert!(result.is_err());
 
     let err = result.expect_err("should be mismatch error");
-    match err {
-        TenantScopeViolation::Mismatch { expected, actual } => {
-            assert_eq!(expected, requester_tenant);
-            assert_eq!(actual, owner_tenant);
-        }
+    assert!(matches!(err, TenantScopeViolation::Mismatch { .. }));
+    if let TenantScopeViolation::Mismatch { expected, actual } = err.clone() {
+        assert_eq!(expected, requester_tenant);
+        assert_eq!(actual, owner_tenant);
     }
 
     // Verify error display string contains tenant IDs but no inner value leak
