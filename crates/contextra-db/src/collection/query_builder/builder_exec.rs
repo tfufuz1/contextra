@@ -378,6 +378,10 @@ where
             let doc_key = self
                 .collection
                 .namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+            // SPEC §6.2: ReadGate je Kandidat vor Fusion; gesperrte Treffer werden verworfen.
+            if !self.collection.is_readable_key(&doc_key) {
+                continue;
+            }
             if let Some(bytes) = self
                 .collection
                 .storage()
@@ -395,6 +399,12 @@ where
                 } else {
                     continue;
                 };
+                if !self
+                    .collection
+                    .is_readable_key(&self.collection.namespaced_key(id.as_bytes(), 0))
+                {
+                    continue;
+                }
                 let prov = crate::ProvenanceRecord {
                     source_collection: Some(self.collection.name().to_string()),
                     ..Default::default()

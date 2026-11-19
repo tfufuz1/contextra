@@ -112,6 +112,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
 
             for (k, v) in batch {
+                // SPEC §6.2: gesperrte Einträge werden ausgelassen.
+                if !self.is_readable_key(&k) {
+                    continue;
+                }
                 if self.name == "default" && k.starts_with(b"__") {
                     continue;
                 }
@@ -200,9 +204,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 break;
             }
 
-            for (_k, v) in batch {
+            for (k, v) in batch {
+                if !self.is_readable_key(&k) {
+                    continue;
+                }
                 if let Ok(rel) = serde_json::from_slice::<ExportRelationV1>(&v) {
-                    relations.push(rel);
+                    // Kanten zu oder von einem gesperrten Knoten werden nicht exportiert.
+                    let from_key = self.namespaced_key(rel.from.as_bytes(), 0);
+                    let to_key = self.namespaced_key(rel.to.as_bytes(), 0);
+                    if self.is_readable_key(&from_key) && self.is_readable_key(&to_key) {
+                        relations.push(rel);
+                    }
                 }
             }
 

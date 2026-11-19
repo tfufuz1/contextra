@@ -31,7 +31,7 @@ async fn create_test_collection(
         m: 16,
         ef_construction: 64,
         ef_search: 64,
-        distance_metric: DistanceMetric::Cosine,
+        distance_metric: contextra_vector::DistanceMetric::Cosine,
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).expect("hnsw index"));

@@ -29,6 +29,19 @@ impl SstableReader {
 
     /// Iterates over all entries in sorted key order (allocates memory for all entries).
     pub async fn iter(&self) -> Result<Vec<(Bytes, Bytes, u64)>> {
+        Ok(self
+            .iter_with_tx()
+            .await?
+            .into_iter()
+            .map(|(k, v, seq, _tx)| (k, v, seq))
+            .collect())
+    }
+
+    /// Like [`Self::iter`], but additionally returns the transaction id of each entry.
+    ///
+    /// Required by the purge rewrite (SPEC §5.3, Schritt 4d), which must re-emit retained
+    /// entries with their original transaction id.
+    pub async fn iter_with_tx(&self) -> Result<Vec<(Bytes, Bytes, u64, u64)>> {
         let mut results = Vec::new();
         if self.index.is_empty() {
             return Ok(results);
@@ -85,7 +98,7 @@ impl SstableReader {
                 let end_tx = ep_tx.checked_add(8).ok_or_else(|| {
                     ContextraError::Storage("overflow calculating tx position".into())
                 })?;
-                let _tx_id = u64::from_le_bytes(
+                let tx_id = u64::from_le_bytes(
                     block_data
                         .get(ep_tx..end_tx)
                         .ok_or_else(|| ContextraError::Storage("malformed block: tx_id".into()))?
@@ -120,7 +133,7 @@ impl SstableReader {
                 let key_bytes = block_data.slice(ep..end_k);
                 let val_bytes = block_data.slice(ep_val..end_val);
 
-                results.push((key_bytes, val_bytes, seq_no));
+                results.push((key_bytes, val_bytes, seq_no, tx_id));
             }
         }
 

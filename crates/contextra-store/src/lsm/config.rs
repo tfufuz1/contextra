@@ -150,6 +150,3 @@ impl LsmConfig {
     }
 }
 
-// MIGRATION(S-70): validate_against_features moved to crate::compat::license
-#[cfg(feature = "workspace")]
-pub use crate::compat::license::*;

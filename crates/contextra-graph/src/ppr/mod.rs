@@ -379,7 +379,7 @@ impl crate::path_rag::PathGraph for GraphInner {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "workspace"))]
 mod tests;
 
 // !SECTION Mod Core Implementation

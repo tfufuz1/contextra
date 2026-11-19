@@ -113,7 +113,9 @@ impl KeyManager {
         let _ = cipher_cache.set(cipher);
 
         let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut nonce_prefix)
+            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
 
         Ok(Self {
             key: VolatileEncryptionKey::new(key_raw),
@@ -137,7 +139,9 @@ impl KeyManager {
         let _ = cipher_cache.set(cipher);
 
         let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut nonce_prefix)
+            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
 
         Ok(Self {
             key: VolatileEncryptionKey::new(key_raw),
@@ -150,7 +154,9 @@ impl KeyManager {
     /// Creates a new KeyManager with a cryptographically secure random salt.
     pub fn try_new_random_salt(passphrase: &str) -> Result<(Self, [u8; 32])> {
         let mut salt = [0u8; 32];
-        rand::rngs::OsRng.fill_bytes(&mut salt);
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut salt)
+            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
         let km = Self::try_new(passphrase, &salt)?;
         Ok((km, salt))
     }
@@ -192,7 +198,9 @@ impl KeyManager {
         let _ = cipher_cache.set(cipher);
 
         let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut nonce_prefix)
+            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),
@@ -218,7 +226,9 @@ impl KeyManager {
         let _ = cipher_cache.set(cipher);
 
         let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut nonce_prefix)
+            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),
@@ -247,7 +257,9 @@ impl KeyManager {
         let _ = cipher_cache.set(cipher);
 
         let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut nonce_prefix)
+            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),

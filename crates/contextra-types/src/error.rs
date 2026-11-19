@@ -384,6 +384,15 @@ pub enum ContextraError {
         /// Path of target file.
         target_path: String,
     },
+
+    /// Read blocked by the erasure ReadGate (SPEC §6.2): the target was erased.
+    /// Fail-closed; not distinguishable from a never-existing target.
+    #[error("Erased: target is no longer readable")]
+    Erased,
+
+    /// Read of a restricted (Art. 18 DSGVO) target without an audit entry (SPEC §5.7, T-DEL-13).
+    #[error("Restricted read requires an audit entry")]
+    RestrictedReadAuditRequired,
 }
 
 impl ContextraError {

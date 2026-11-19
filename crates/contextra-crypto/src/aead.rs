@@ -63,14 +63,19 @@ pub fn seal_record_with_rng<R: RngCore>(
     rng: &mut R,
 ) -> Result<Vec<u8>> {
     let mut nonce = [0u8; 12];
-    rng.fill_bytes(&mut nonce);
+    // Fail-Closed: fehlbarer RNG-Pfad, kein Panic und kein deterministischer Fallback.
+    rng.try_fill_bytes(&mut nonce)
+        .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
     seal_record_with_nonce(dek, doc, key_bytes, plain, nonce)
 }
 
 /// Seals a record using OsRng (convenience wrapper).
+///
+/// Fail-Closed: RNG- oder AEAD-Fehler werden als `Err` zurückgegeben. Es gibt
+/// keinen stillen Fallback auf leere Umschläge.
 // ANCHOR[contextra-crypto:AEAD-003] Standard-Versiegelung via OsRng
-pub fn seal_record(dek: &Dek, doc: [u8; 16], key_bytes: &[u8], plain: &[u8]) -> Vec<u8> {
-    seal_record_with_rng(dek, doc, key_bytes, plain, &mut rand::rngs::OsRng).unwrap_or_default()
+pub fn seal_record(dek: &Dek, doc: [u8; 16], key_bytes: &[u8], plain: &[u8]) -> Result<Vec<u8>> {
+    seal_record_with_rng(dek, doc, key_bytes, plain, &mut rand::rngs::OsRng)
 }
 
 // !SECTION
@@ -137,7 +142,7 @@ mod tests {
         let key_bytes = b"sample_record_key";
         let plaintext = b"cryptographic building block envelope content";
 
-        let env = seal_record(&dek, doc, key_bytes, plaintext);
+        let env = seal_record(&dek, doc, key_bytes, plaintext).expect("seal");
         let opened = open_record(&dek, key_bytes, &env).expect("open record");
         assert_eq!(opened.as_slice(), plaintext);
     }
@@ -163,7 +168,7 @@ mod tests {
         let wrong_key_bytes = b"wrong_record_key";
         let plaintext = b"authenticated payload";
 
-        let env = seal_record(&dek, doc, key_bytes, plaintext);
+        let env = seal_record(&dek, doc, key_bytes, plaintext).expect("seal");
         let res = open_record(&dek, wrong_key_bytes, &env);
         assert!(
             matches!(res, Err(CryptoError::Aead(_))),
@@ -178,7 +183,7 @@ mod tests {
         let key_bytes = b"sample_record_key";
         let plaintext = b"authenticated payload";
 
-        let mut env = seal_record(&dek, doc, key_bytes, plaintext);
+        let mut env = seal_record(&dek, doc, key_bytes, plaintext).expect("seal");
         let last_idx = env.len() - 1;
         env[last_idx] ^= 0x01; // flip 1 bit in tag/ciphertext
 
@@ -196,7 +201,7 @@ mod tests {
         let key_bytes = b"sample_record_key";
         let plaintext = b"authenticated payload";
 
-        let env = seal_record(&dek, doc, key_bytes, plaintext);
+        let env = seal_record(&dek, doc, key_bytes, plaintext).expect("seal");
         let truncated = &env[..env.len() - 8]; // truncate tag
 
         let res = open_record(&dek, key_bytes, truncated);

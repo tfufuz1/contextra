@@ -218,6 +218,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         doc_id: DocId,
     ) -> Result<Vec<contextra_types::domain::MemoryLink>> {
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+        // SPEC §6.2 (Graph-Traversal): gesperrter Knoten liefert keine Kanten.
+        if !self.is_readable_key(&doc_key) {
+            return Ok(Vec::new());
+        }
         // SSI: nicht tx-gebunden — reiner Lesezugriff für Link-Abfrage
         if let Some(bytes) = self.storage.get_at_seq(&doc_key, u64::MAX).await? {
             if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {

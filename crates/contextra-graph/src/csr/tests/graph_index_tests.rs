@@ -13,7 +13,7 @@
 
 use super::super::*;
 use super::basic_tests::setup_test_graph;
-use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload, MAX_VISITED_NODES};
+use crate::csr::types::{CsrGraphConfig, EdgePayload, PersistedEdgePayload, MAX_VISITED_NODES};
 use contextra_ports::{GraphIndex, StorageEngine};
 use crate::error::GraphError;
 use contextra_types::{ContextraError, Edge, Entity, EntityId, TxId};

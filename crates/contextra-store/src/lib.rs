@@ -21,11 +21,10 @@
 //! `unsafe`-Blöcke im Produktionscode.
 //!
 //! ## Ring-Hierarchie & Abhängigkeiten
-//! - **Ring 1 / Klasse B:** Kernkomponente des Storage-Bundles (`types`, `ports`, `mvcc`, `crypto`, `sys`, `store`).
-//! - **Eingehende Abhängigkeiten:** Wird genutzt von `contextra-engine`, `contextra-db`,
-//!   `contextra-checkpoint` und der übergeordneten Fassade `contextra`.
-//! - **Ausgehende Abhängigkeiten:** Nutzt `contextra-types`, `contextra-ports`, `contextra-crypto`,
-//!   `contextra-sys`, `contextra-mvcc`.
+//! - **Ring 1 (E1):** Domänenbaustein. Kern-Closure: `ids`, `env`, `sys`, `durable-fs`, `crypto`.
+//! - **Ausgehende Abhängigkeiten:** `contextra-ids`, `contextra-env`, `contextra-sys`,
+//!   `contextra-durable-fs`, `contextra-crypto`, `contextra-mvcc`. Keine E2-/E3-Abhängigkeiten (R1, R2).
+//! - **Eingehende Abhängigkeiten:** E2-Schicht (`contextra-db`) über die öffentliche API.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -52,7 +51,6 @@
 
 pub mod error;
 pub mod traits;
-pub mod compat;
 pub use error::{StoreError, StoreResult};
 pub mod budget;
 pub mod stats;
@@ -60,8 +58,6 @@ pub mod stats;
 #[cfg(not(loom))]
 pub mod compaction;
 #[cfg(not(loom))]
-#[cfg(feature = "workspace")]
-pub mod engine;
 pub mod fsync;
 pub mod key_source;
 #[cfg(not(loom))]
@@ -71,8 +67,6 @@ pub mod manifest;
 #[cfg(not(loom))]
 pub mod memtable;
 #[cfg(not(loom))]
-#[cfg(feature = "workspace")]
-pub mod scanner;
 #[cfg(not(loom))]
 pub mod sstable;
 #[cfg(not(loom))]

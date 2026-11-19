@@ -217,7 +217,11 @@ pub(crate) async fn flush(storage: &LsmStorage) -> Result<()> {
                         }
                     }
 
-                    if let Err(e) = storage.compaction_engine.vfs.remove_file(&wal_path) {
+                    // SPEC §5.3 Schritt 4c: WAL-Drain ist an scrub_if_safe gekoppelt (best effort im Flush).
+                    if let Err(e) = crate::lsm::erasure::scrub_or_remove_best_effort(
+                        storage.compaction_engine.vfs.as_ref(),
+                        &wal_path,
+                    ) {
                         tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
                     } else {
                         let uuid_sidecar =

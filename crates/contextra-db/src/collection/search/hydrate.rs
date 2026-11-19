@@ -30,6 +30,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let doc_key = self.namespaced_key(&sd.doc_id.inner().to_le_bytes(), 1);
             // SSI: nicht tx-gebunden — Hydrierung von Suchergebnissen am Snapshot
             if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {
+                if !self.is_readable_key(&doc_key) {
+                    skipped_tombstones += 1;
+                    continue;
+                }
                 let (id, metadata) =
                     if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
                         (meta.id, meta.metadata)
@@ -40,6 +44,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         skipped_tombstones += 1;
                         continue;
                     };
+                if !self.is_readable_key(&self.namespaced_key(id.as_bytes(), 0)) {
+                    skipped_tombstones += 1;
+                    continue;
+                }
                 let rank = (results.len() + 1) as u32;
                 let rrf_contrib = 1.0 / (60.0 + rank as f32);
                 let prov = crate::fusion::ProvenanceBuilder::new(60.0)
@@ -79,6 +87,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
             // SSI: nicht tx-gebunden — Hydrierung von Suchergebnissen am Snapshot
             if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {
+                if !self.is_readable_key(&doc_key) {
+                    skipped_tombstones += 1;
+                    continue;
+                }
                 let (id, metadata) =
                     if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
                         (meta.id, meta.metadata)
@@ -89,6 +101,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         skipped_tombstones += 1;
                         continue;
                     };
+                if !self.is_readable_key(&self.namespaced_key(id.as_bytes(), 0)) {
+                    skipped_tombstones += 1;
+                    continue;
+                }
                 let prov = crate::ProvenanceRecord {
                     source_collection: Some(self.name.clone()),
                     ..Default::default()

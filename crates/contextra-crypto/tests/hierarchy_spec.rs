@@ -5,10 +5,11 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
+use contextra_crypto::aead::seal_record_with_rng;
 use contextra_crypto::{
-    build_aad, decrypt_aead, derive_collection_kek, derive_document_dek, derive_master_key,
-    derive_subject_doc_dek, derive_subject_key, derive_tenant_kek, encrypt_aead, CryptoError,
-    MasterKey, SecretKey32,
+    build_aad, decrypt_aead, derive_collection_kek, derive_document_dek, derive_erasure_key,
+    derive_master_key, derive_subject_doc_dek, derive_subject_key, derive_tenant_kek, encrypt_aead,
+    CryptoError, Dek, MasterKey, SecretKey32,
 };
 use contextra_ids::{CollectionId, DocId, SubjectRef, TenantId};
 
@@ -199,4 +200,54 @@ fn aead_rejects_blob_shorter_than_nonce_plus_tag() {
         decrypt_aead(&key, &aad, &[0u8; 28]),
         Err(CryptoError::DecryptionFailed)
     ));
+}
+
+// ---------------------------------------------------------------- ErasureKey (§2)
+
+#[test]
+fn erasure_key_matches_independent_reference() {
+    let erasure = derive_erasure_key(&known_master()).expect("derive");
+    assert_eq!(
+        hex(erasure.as_bytes()),
+        "7cc0105ba14aae7ff476ed016f83924c4558473a17b3003e56ba37f5f7f01587"
+    );
+}
+
+#[test]
+fn erasure_key_is_separated_from_kek_chain() {
+    let master = known_master();
+    let erasure = derive_erasure_key(&master).expect("derive");
+    let tenant = derive_tenant_kek(&master, TenantId(42)).unwrap();
+    let coll = derive_collection_kek(&tenant, CollectionId(7), 1).unwrap();
+    assert_ne!(erasure.as_bytes(), tenant.as_bytes(), "erasure vs tenant");
+    assert_ne!(erasure.as_bytes(), coll.as_bytes(), "erasure vs collection");
+}
+
+// ---------------------------------------------------------------- Fail-Closed RNG (INV-4, §1)
+
+/// RNG, dessen fehlbarer Pfad immer scheitert. Der Produktionspfad nutzt ausschließlich
+/// `try_fill_bytes`; `fill_bytes` wird dort nie aufgerufen.
+struct FailingRng;
+
+impl rand::RngCore for FailingRng {
+    fn next_u32(&mut self) -> u32 {
+        0
+    }
+    fn next_u64(&mut self) -> u64 {
+        0
+    }
+    fn fill_bytes(&mut self, _dest: &mut [u8]) {}
+    fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), rand::Error> {
+        Err(rand::Error::new(std::io::Error::other("rng unavailable")))
+    }
+}
+
+#[test]
+fn seal_with_failing_rng_is_fail_closed_without_empty_envelope() {
+    let dek = Dek::new([0x55u8; 32]);
+    let res = seal_record_with_rng(&dek, [1u8; 16], b"key", b"plain", &mut FailingRng);
+    assert!(
+        matches!(res, Err(CryptoError::RngFailure(_))),
+        "RNG-Ausfall muss als Err gemeldet werden, nicht als leerer Umschlag"
+    );
 }

@@ -9,6 +9,3 @@ pub(crate) mod write;
 
 use super::*;
 
-// MIGRATION(S-70): neuer Pfad crate::compat::engine::lsm
-#[cfg(feature = "workspace")]
-pub use crate::compat::engine::*;

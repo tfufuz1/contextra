@@ -71,6 +71,7 @@ pub(super) use std::sync::atomic::Ordering;
 
 pub mod config;
 pub(crate) mod engine;
+pub mod erasure;
 mod guard;
 pub mod observer;
 mod validate;

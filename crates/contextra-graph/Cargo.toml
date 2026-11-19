@@ -28,7 +28,7 @@ apprh-diffusion = []
 k-path-diffusion = []
 graph-connectivity-health = []
 edge-reinforcement-learning = []
-docid-128 = []
+docid-128 = ["contextra-ids/docid-128"]
 test-support = []
 
 # Deprecated alias features retained until G-92
@@ -67,11 +67,233 @@ criterion = { workspace = true }
 [[bench]]
 name = "csr_traversal_bench"
 harness = false
+required-features = ["workspace"]
 
 [[bench]]
 name = "binary_edge_regression"
 harness = false
+required-features = ["workspace"]
 
 [[test]]
 name = "ppr_candidate_stream"
+required-features = ["workspace"]
+
+[[example]]
+name = "isolated_graph_traversal"
+required-features = ["workspace"]
+
+[[test]]
+name = "algorithm_test_doubles"
+required-features = ["workspace"]
+
+[[test]]
+name = "apprh_determinism_permutation"
+required-features = ["workspace"]
+
+[[test]]
+name = "apprh_gate_monitor"
+required-features = ["workspace"]
+
+[[test]]
+name = "apprh_selector_shadow_to_production"
+required-features = ["workspace"]
+
+[[test]]
+name = "apprh_tests"
+required-features = ["workspace"]
+
+[[test]]
+name = "budgeted_k_path_hub_entity"
+required-features = ["workspace"]
+
+[[test]]
+name = "community_hyperedges_included_flag"
+required-features = ["workspace"]
+
+[[test]]
+name = "csr_benchmark"
+required-features = ["workspace"]
+
+[[test]]
+name = "csr_complexity_bench"
+required-features = ["workspace"]
+
+[[test]]
+name = "dangling_nodes_audit_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "diffusion_shadow_gate_thresholds"
+required-features = ["workspace"]
+
+[[test]]
+name = "docid_128_path_rag"
+required-features = ["workspace"]
+
+[[test]]
+name = "entity_extraction_edge_cases"
+required-features = ["workspace"]
+
+[[test]]
+name = "entity_extraction_tests"
+required-features = ["workspace"]
+
+[[test]]
+name = "error_mapping"
+required-features = ["workspace"]
+
+[[test]]
+name = "golden_corpus"
+required-features = ["workspace"]
+
+[[test]]
+name = "golden_generator"
+required-features = ["workspace"]
+
+[[test]]
+name = "golden_ports_type_compatibility"
+required-features = ["workspace"]
+
+[[test]]
+name = "graph_collection_mutation_trait_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "graph_persist_robustness"
+required-features = ["workspace"]
+
+[[test]]
+name = "hub_node_benchmark"
+required-features = ["workspace"]
+
+[[test]]
+name = "hyperedge_cascade_crash_recovery"
+required-features = ["workspace"]
+
+[[test]]
+name = "hyperedge_cascade_fanout"
+required-features = ["workspace"]
+
+[[test]]
+name = "hyperedge_cascade_queue_persistence"
+required-features = ["workspace"]
+
+[[test]]
+name = "hyperedge_compact_race"
+required-features = ["workspace"]
+
+[[test]]
+name = "hyperedge_memory_budget"
+required-features = ["workspace"]
+
+[[test]]
+name = "hyperedge_payload_sharing"
+required-features = ["workspace"]
+
+[[test]]
+name = "hyperedge_persistence_survives_restart"
+required-features = ["workspace"]
+
+[[test]]
+name = "hyperedge_suggest"
+required-features = ["workspace"]
+
+[[test]]
+name = "hyperedge_suggest_llm_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "hyperedge_suggest_tests"
+required-features = ["workspace"]
+
+[[test]]
+name = "integration_graph"
+required-features = ["workspace"]
+
+[[test]]
+name = "ip08_resource_tracker_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "leanrag_cascade_through_superedge"
+required-features = ["workspace"]
+
+[[test]]
+name = "leanrag_graph_sink_batch_commit"
+required-features = ["workspace"]
+
+[[test]]
+name = "leiden_reference_validation"
+required-features = ["workspace"]
+
+[[test]]
+name = "path_rag_at_snapshot"
+required-features = ["workspace"]
+
+[[test]]
+name = "persistence_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "ppr_alloc_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "ppr_cost_model_selection"
+required-features = ["workspace"]
+
+[[test]]
+name = "ppr_reference_validation"
+required-features = ["workspace"]
+
+[[test]]
+name = "ppr_snapshot_isolation"
+required-features = ["workspace"]
+
+[[test]]
+name = "ppr_strategy_equivalence"
+required-features = ["workspace"]
+
+[[test]]
+name = "proptest_csr_invariants"
+required-features = ["workspace"]
+
+[[test]]
+name = "proptest_tl_hfd_diffusion"
+required-features = ["workspace"]
+
+[[test]]
+name = "proptest_tl_hfd_lovasz"
+required-features = ["workspace"]
+
+[[test]]
+name = "provider_tests"
+required-features = ["workspace"]
+
+[[test]]
+name = "reader_writer_concurrency"
+required-features = ["workspace"]
+
+[[test]]
+name = "source_doc_ids_populated"
+required-features = ["workspace"]
+
+[[test]]
+name = "star_expansion_equals_clique"
+required-features = ["workspace"]
+
+[[test]]
+name = "supersession_characterization_tests"
+required-features = ["workspace"]
+
+[[test]]
+name = "tlhfd_shadow_mode_parity"
+required-features = ["workspace"]
+
+[[test]]
+name = "type_parity"
+required-features = ["workspace"]
+
+[[test]]
+name = "types_diff"
 required-features = ["workspace"]

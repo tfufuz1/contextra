@@ -42,6 +42,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn get_at_snapshot(&self, id: &str, seq_no: u64) -> Result<Option<crate::Document>> {
         validate_doc_id(id)?;
         let key = self.namespaced_key(id.as_bytes(), 0);
+        // SPEC §6.2: ReadGate vor jeder Ausgabe (Fail-Closed).
+        self.check_read_key(&key)?;
         if let Some(data) = self.storage.get_at_seq(&key, seq_no).await? {
             if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&data) {
                 return Ok(Some(crate::Document {
@@ -124,6 +126,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
 
             for (k, v) in batch {
+                // SPEC §6.2: gesperrte Einträge werden still ausgelassen.
+                if !self.is_readable_key(&k) {
+                    continue;
+                }
                 let key_str = String::from_utf8_lossy(&k).to_string();
                 let user_key = if self.name == "default" {
                     key_str
@@ -215,6 +221,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
 
             for (k, v) in batch {
+                // SPEC §6.2: gesperrte Einträge werden still ausgelassen.
+                if !self.is_readable_key(&k) {
+                    continue;
+                }
                 let key_str = String::from_utf8_lossy(&k).to_string();
                 let user_key = if self.name == "default" {
                     key_str
@@ -306,6 +316,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         max_seq: u64,
     ) -> Result<Option<StoredDocument>> {
         let key = self.namespaced_key(id.as_bytes(), 0);
+        self.check_read_key(&key)?;
         if let Some(bytes) = self.storage.get_at_seq_tracked(tx, &key, max_seq).await? {
             let doc: StoredDocument = serde_json::from_slice(&bytes)?;
             Ok(Some(doc))

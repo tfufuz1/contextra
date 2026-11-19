@@ -416,24 +416,6 @@ impl LsmStorage {
     pub fn vfs(&self) -> &std::sync::Arc<dyn crate::io_seam::Vfs> {
         &self.compaction_engine.vfs
     }
-
-    /// Erzeugt eine entkoppelte [`StoreScanView`] für Scanner und Purger.
-    ///
-    /// Dies ist die einzige erlaubte Stelle, an der `LsmStorage` seine Interna
-    /// an Scanner weitergibt. Scanner halten danach keine `Arc<LsmStorage>` mehr.
-    #[cfg(feature = "workspace")]
-    pub async fn scan_view(self: &Arc<Self>) -> crate::compat::scanner::StoreScanView {
-        let (active_memtable, immutable_memtables) = self.memtables_for_scanner().await;
-        crate::compat::scanner::StoreScanView {
-            active_memtable,
-            immutable_memtables,
-            sstables: Arc::clone(&self.sstables),
-            block_cache: Arc::clone(&self.block_cache),
-            data_path: self.config.path.clone(),
-            vfs: Arc::clone(self.vfs()),
-            snapshot_registry: Arc::clone(&self.snapshot_registry),
-        }
-    }
 }
 
 

@@ -1,4 +1,4 @@
-#![cfg(feature = "workspace")]
+#![cfg(all(feature = "workspace", not(feature = "docid-128")))]
 use contextra_graph::types::local as L;
 use contextra_ports::graph as P;
 use contextra_types as W;

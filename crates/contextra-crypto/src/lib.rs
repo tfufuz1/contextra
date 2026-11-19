@@ -78,8 +78,8 @@ pub use crypto::KeyManager;
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
 pub use kdf::{
-    derive_collection_kek, derive_document_dek, derive_master_key, derive_subject_doc_dek,
-    derive_subject_key, derive_tenant_kek,
+    derive_collection_kek, derive_document_dek, derive_erasure_key, derive_master_key,
+    derive_subject_doc_dek, derive_subject_key, derive_tenant_kek,
 };
 pub use secret::{
     CollectionKek, DocumentDek, ErasureKey, MasterKey, SecretKey32, SubjectDocDek, SubjectKey,

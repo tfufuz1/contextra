@@ -30,7 +30,7 @@ async fn test_collection_query_with_corrupted_diskann_returns_results_via_fallba
         dimension: 4,
         max_degree: 4,
         beam_width: 4,
-        distance_metric: DistanceMetric::Euclidean,
+        distance_metric: contextra_vector::DistanceMetric::Euclidean,
         fallback_policy: DiskAnnFallbackPolicy::UseHnswOnFailure,
         ..DiskAnnConfig::default()
     };

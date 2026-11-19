@@ -18,6 +18,9 @@
 pub mod kv_lock;
 
 #[cfg(not(loom))]
+pub(crate) mod read_gate;
+
+#[cfg(not(loom))]
 pub mod crud;
 #[cfg(not(loom))]
 pub mod maintenance;
@@ -302,6 +305,8 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) clock: parking_lot::RwLock<Arc<dyn Clock>>,
     /// Injected metrics sink port for operational observability.
     pub(super) metrics: parking_lot::RwLock<Arc<dyn MetricsSink>>,
+    /// ReadGate der Löschsaga (SPEC §6): wird an jedem Lesepfad vor der Ausgabe geprüft.
+    pub(super) read_gate: Arc<dyn contextra_erasure::ReadGate>,
 }
 
 #[cfg(not(loom))]
@@ -328,6 +333,7 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             pressure_rx: parking_lot::RwLock::new(self.pressure_rx.read().clone()),
             clock: parking_lot::RwLock::new(self.clock.read().clone()),
             metrics: parking_lot::RwLock::new(self.metrics.read().clone()),
+            read_gate: self.read_gate.clone(),
         }
     }
 }
@@ -406,6 +412,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             pressure_rx: parking_lot::RwLock::new(pressure_rx),
             clock: parking_lot::RwLock::new(Arc::new(SystemClock::new())),
             metrics: parking_lot::RwLock::new(Arc::new(NoopMetricsSink)),
+            read_gate: read_gate::default_read_gate(),
         }
     }
 

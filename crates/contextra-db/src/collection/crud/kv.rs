@@ -59,6 +59,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn get_kv(&self, id: &str) -> Result<Option<serde_json::Value>> {
         validate_doc_id(id)?;
         let key = self.namespaced_key(id.as_bytes(), 0);
+        self.check_read_key(&key)?;
         // SSI: nicht tx-gebunden — reines KV-Lesen ohne Transaktionskontext
         if let Some(data) = self.storage.get(&key).await? {
             let val: serde_json::Value = serde_json::from_slice(&data)?;

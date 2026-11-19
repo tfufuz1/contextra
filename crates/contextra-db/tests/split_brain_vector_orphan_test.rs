@@ -1,7 +1,6 @@
 //! Split-Brain & Idempotency Integration Testsuite for Vector-ID ↔ Document Consistency.
 // ANCHOR[TEST:SPLIT_BRAIN_CONSISTENCY] STATUS:IN_PROGRESS (TS:2026-09-09T22:00:00Z) (SESSION: 504d02fc)
 
-use contextra_db::context_compaction::ConsolidationSession;
 use contextra_db::transaction::CommitIntent;
 use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_ports::{StorageEngine, VectorIndex};
@@ -146,7 +145,6 @@ async fn test_vector_deleted_process_killed_before_document_tombstone() {
     let hnsw_path = dir_path.join("hnsw.index");
     col.vector_index()
         .save(&hnsw_path)
-        .await
         .expect("save hnsw");
 
     // 3. Direct query before repair_on_open: verify HNSW index alone returns 0 hits for doc_2
@@ -512,23 +510,17 @@ async fn test_concurrent_partial_rebuild_and_context_compaction_no_lock_starvati
         col_rebuild
             .vector_index()
             .rebuild_region(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-            .await
     });
 
     let col_compaction = col.clone();
+    // Konkurrierender Schreiber: ConsolidationSession existiert im Soll-Zustand nicht;
+    // der Race gegen rebuild_region bleibt über einen direkten Insert erhalten.
     let task_compaction = tokio::spawn(async move {
-        let doc_5 = DocId::from_key("doc_5").expect("DocId from key");
-        let doc_6 = DocId::from_key("doc_6").expect("DocId from key");
-        let target_doc_id = DocId::from_key("doc_target_compacted").expect("DocId target");
-
-        let session =
-            ConsolidationSession::start(&col_compaction, &[doc_5, doc_6], target_doc_id).await?;
-        session
-            .commit(
+        col_compaction
+            .insert(
                 "doc_target_compacted",
                 &[1.0, 1.0, 0.0, 0.0],
-                "Compacted summary text",
-                None,
+                Some(json!({ "text": "Compacted summary text" })),
             )
             .await
     });

@@ -52,7 +52,7 @@ impl StorageEngine for FaultyStorage {
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-02-GET]
     // Testet die Funktionalität von `get`.
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-        Box::pin(async move { self.inner.get(key).await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::get(&self.inner, key).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-03-GET_AT_SEQ]
@@ -62,7 +62,7 @@ impl StorageEngine for FaultyStorage {
         key: &'a [u8],
         seq: u64,
     ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-        Box::pin(async move { self.inner.get_at_seq(key, seq).await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::get_at_seq(&self.inner, key, seq).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-04-PUT]
@@ -79,7 +79,7 @@ impl StorageEngine for FaultyStorage {
                     "INJECTED FAULT: CSR-Graph staging storage put failure".into(),
                 ));
             }
-            self.inner.put(tx_id, key, value).await
+            <LsmStorage as StorageEngine>::put(&self.inner, tx_id, key, value).await
         })
     }
 
@@ -102,14 +102,14 @@ impl StorageEngine for FaultyStorage {
                     "INJECTED FAULT: CSR-Graph staging storage put failure".into(),
                 ));
             }
-            self.inner.put_if_absent(tx_id, key, value).await
+            <LsmStorage as StorageEngine>::put_if_absent(&self.inner, tx_id, key, value).await
         })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-06-DELETE]
     // Testet die Funktionalität von `delete`.
     fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { self.inner.delete(tx_id, key).await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::delete(&self.inner, tx_id, key).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-07-COMMIT]
@@ -141,56 +141,56 @@ impl StorageEngine for FaultyStorage {
                 }
             }
 
-            self.inner.commit(tx_id).await
+            <LsmStorage as StorageEngine>::commit(&self.inner, tx_id).await
         })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-08-ROLLBACK]
     // Testet die Funktionalität von `rollback`.
     fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { self.inner.rollback(tx_id).await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::rollback(&self.inner, tx_id).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-09-ROLLBACK_TO_TX]
     // Testet die Funktionalität von `rollback_to_tx`.
     fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { self.inner.rollback_to_tx(tx_id).await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::rollback_to_tx(&self.inner, tx_id).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-10-FLUSH]
     // Testet die Funktionalität von `flush`.
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { self.inner.flush().await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::flush(&self.inner).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-11-STATS]
     // Testet die Funktionalität von `stats`.
     fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-        Box::pin(async move { self.inner.stats().await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::stats(&self.inner).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-12-LAST_SEQ_NO]
     // Testet die Funktionalität von `last_seq_no`.
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
-        Box::pin(async move { self.inner.last_seq_no().await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::last_seq_no(&self.inner).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-13-LAST_TX_ID]
     // Testet die Funktionalität von `last_tx_id`.
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        Box::pin(async move { self.inner.last_tx_id().await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::last_tx_id(&self.inner).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-14-PIN_CHECKPOINT]
     // Testet die Funktionalität von `pin_checkpoint`.
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { self.inner.pin_checkpoint(seq_no).await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::pin_checkpoint(&self.inner, seq_no).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-15-UNPIN_CHECKPOINT]
     // Testet die Funktionalität von `unpin_checkpoint`.
     fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { self.inner.unpin_checkpoint(seq_no).await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::unpin_checkpoint(&self.inner, seq_no).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-16-SCAN_PREFIX]
@@ -199,7 +199,7 @@ impl StorageEngine for FaultyStorage {
         &'a self,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move { self.inner.scan_prefix(prefix).await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::scan_prefix(&self.inner, prefix).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-17-SCAN_PREFIX_AT]
@@ -209,7 +209,7 @@ impl StorageEngine for FaultyStorage {
         prefix: &'a [u8],
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move { self.inner.scan_prefix_at(prefix, seq_no).await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::scan_prefix_at(&self.inner, prefix, seq_no).await })
     }
 
     // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-18-SCAN]
@@ -220,7 +220,7 @@ impl StorageEngine for FaultyStorage {
         end: std::ops::Bound<&'a [u8]>,
         limit: Option<usize>,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move { self.inner.scan(start, end, limit).await })
+        Box::pin(async move { <LsmStorage as StorageEngine>::scan(&self.inner, start, end, limit).await })
     }
 }
 

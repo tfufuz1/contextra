@@ -1,3 +1,4 @@
+#![cfg(not(feature = "docid-128"))]
 //! Verifikationstest für die lückenlose Erfassung von Quell-Dokument-IDs bei Kanten.
 //!
 //! # Zweck

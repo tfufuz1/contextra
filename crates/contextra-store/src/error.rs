@@ -110,6 +110,10 @@ pub enum StoreError {
     /// Sandbox error.
     #[error("Sandbox error: {0}")]
     Sandbox(String),
+
+    /// Fehler im Löschpfad (SPEC §5.3, Schritte 4c/4d): Barriere, SSTable-Rewrite oder Scrubbing.
+    #[error("Erasure error: {0}")]
+    Erasure(String),
 }
 
 impl StoreError {

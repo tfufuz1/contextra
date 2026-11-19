@@ -28,4 +28,18 @@ pub enum ApprhError {
     NonFinite,
 }
 
+impl From<ApprhError> for crate::error::GraphError {
+    fn from(err: ApprhError) -> Self {
+        match err {
+            ApprhError::InvalidParameter(msg) => crate::error::GraphError::InvalidInput(msg),
+            ApprhError::EmptySeeds => {
+                crate::error::GraphError::InvalidInput(ApprhError::EmptySeeds.to_string())
+            }
+            ApprhError::NonFinite => {
+                crate::error::GraphError::Internal(ApprhError::NonFinite.to_string())
+            }
+        }
+    }
+}
+
 // !SECTION Error Core Implementation

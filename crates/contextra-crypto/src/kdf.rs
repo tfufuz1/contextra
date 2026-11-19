@@ -18,7 +18,8 @@
 
 use crate::error::{CryptoError, Result};
 use crate::secret::{
-    CollectionKek, DocumentDek, MasterKey, SecretKey32, SubjectDocDek, SubjectKey, TenantKek,
+    CollectionKek, DocumentDek, ErasureKey, MasterKey, SecretKey32, SubjectDocDek, SubjectKey,
+    TenantKek,
 };
 use argon2::{Algorithm, Argon2, Params, Version};
 use contextra_ids::{CollectionId, DocId, SubjectRef, TenantId};
@@ -135,7 +136,8 @@ impl KdfHeader {
     /// Erstellt einen neuen `KdfHeader` v1 mit zufälligem 32-Byte-Salt und OWASP-Standardparametern.
     pub fn generate_default() -> Result<Self> {
         let mut salt = vec![0u8; 32];
-        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut salt);
+        rand::RngCore::try_fill_bytes(&mut rand::rngs::OsRng, &mut salt)
+            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
         Ok(Self {
             version: KDF_HEADER_VERSION_1,
             kdf_id: KDF_ID_ARGON2ID,
@@ -427,6 +429,19 @@ pub fn derive_subject_key(
     let info = info_parts(&[b"contextra/subject/v1", subject_ref.as_bytes()]);
     Ok(SubjectKey::from_secret(hkdf_expand_32(
         coll_kek.as_bytes(),
+        &info,
+    )?))
+}
+
+/// Leitet den `ErasureKey` direkt aus dem `MasterKey` ab (Spec §2, `contextra/erasure/v1`).
+///
+/// Der ErasureKey schützt Journal, Ledger und Berichte und ist unabhängig von der
+/// Mandanten-/Collection-Hierarchie, damit Löschmaterial über Collection-Drops hinaus
+/// verfügbar bleibt.
+pub fn derive_erasure_key(master: &MasterKey) -> Result<ErasureKey> {
+    let info = info_parts(&[b"contextra/erasure/v1"]);
+    Ok(ErasureKey::from_secret(hkdf_expand_32(
+        master.as_bytes(),
         &info,
     )?))
 }

@@ -10,20 +10,22 @@ rust-version.workspace = true
 description = "Contextra — Embedded hybrid-search for AI agents"
 
 [package.metadata.contextra]
-ring = "3"
+ring = "2"
 
 [dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
+contextra-erasure = { workspace = true }
 contextra-mvcc = { workspace = true }
 contextra-store = { workspace = true, features = ["workspace"] }
 contextra-vector = { workspace = true, features = ["workspace"] }
 contextra-text = { workspace = true, features = ["workspace"] }
-contextra-checkpoint = { workspace = true }
+contextra-checkpoint = { workspace = true, features = ["workspace"] }
 contextra-rank = { workspace = true, features = ["workspace"] }
 contextra-graph = { workspace = true, features = ["workspace"] }
 bytes = { workspace = true }
-blake3 = { workspace = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
@@ -31,7 +33,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 parking_lot = { workspace = true }
 tokio-util = { version = "0.7.18", features = ["rt"] }
-zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
 thiserror = { workspace = true }
 
 [dev-dependencies]
@@ -40,13 +41,10 @@ tempfile = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 proptest = "1.4"
 contextra-vector = { workspace = true }
-contextra-testkit = { workspace = true }
-contextra-store = { workspace = true }
+contextra-store = { workspace = true, features = ["workspace"] }
 contextra-graph = { workspace = true }
-contextra-text = { workspace = true, features = ["workspace"] }
-contextra-checkpoint = { workspace = true }
-wat = "1"
-sha2 = "0.10"
+contextra-text = { workspace = true }
+contextra-checkpoint = { workspace = true, features = ["workspace"] }
 
 [features]
 default = []

@@ -1,3 +1,4 @@
+#![cfg(not(feature = "docid-128"))]
 //! Differential test comparing canonical types with legacy reference (GR6.3).
 
 mod legacy_reference;

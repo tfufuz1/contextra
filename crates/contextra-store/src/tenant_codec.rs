@@ -111,10 +111,6 @@ impl TenantKeyCodec {
 }
 
 /// Internal trait abstraction enabling `TenantScopedStorage` to wrap both `S: StorageEngine` and `Arc<S>`.
-// MIGRATION(S-70): StorageEngineHandle moved to compat::engine::tenant_storage
-#[cfg(feature = "workspace")]
-pub use crate::compat::engine::tenant_storage::*;
-
 pub struct TenantScopedStorage<S> {
     #[allow(dead_code)]
     pub(crate) inner: S,
@@ -194,7 +190,6 @@ pub(crate) fn bound_as_ref(bound: &Bound<Vec<u8>>) -> Bound<&[u8]> {
 }
 
 
-mod storage_engine;
 
 #[cfg(test)]
 mod tests;

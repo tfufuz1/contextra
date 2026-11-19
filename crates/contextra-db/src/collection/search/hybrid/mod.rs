@@ -362,6 +362,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             let links = self.get_links(current_id).await?;
             for link in links {
+                // SPEC §6.2: Zielknoten je Kante gegen das ReadGate prüfen; gesperrte Pfade brechen ab.
+                let target_key = self.namespaced_key(&link.target.inner().to_le_bytes(), 1);
+                if !self.is_readable_key(&target_key) {
+                    continue;
+                }
                 if visited.insert(link.target) {
                     let next_depth = depth + 1;
                     results.push((link.target, next_depth));

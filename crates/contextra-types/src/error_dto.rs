@@ -376,6 +376,16 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "target_path": target_path,
                 })),
             },
+            ContextraError::Erased => Self {
+                kind: "Erased".to_string(),
+                message: err.to_string(),
+                details: None,
+            },
+            ContextraError::RestrictedReadAuditRequired => Self {
+                kind: "RestrictedReadAuditRequired".to_string(),
+                message: err.to_string(),
+                details: None,
+            },
         }
     }
 }
@@ -538,6 +548,11 @@ mod tests {
                     target_path: "/b".into(),
                 },
                 "CrossDeviceLink",
+            ),
+            (ContextraError::Erased, "Erased"),
+            (
+                ContextraError::RestrictedReadAuditRequired,
+                "RestrictedReadAuditRequired",
             ),
         ];
 
