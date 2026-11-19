@@ -1,3 +1,5 @@
+> **Löschpfad v3.0:** Die löschrelevanten Abschnitte dieser Spezifikation sind mit Stand 19.11.2026 durch `docs/SPEC.md` v3.0 ersetzt bzw. präzisiert (§5, §6, §7, §9, §12, §13, §14, §16 der SPEC). Widerspricht ein Abschnitt unten der SPEC, gilt die SPEC. Abschnitte, die so markiert sind, sind überholt. Weitere Verweise: §23 SPEC (Ersetzungstabelle).
+
 # contextra-crypto — Implementierungsspezifikation (Soll-Zustand)
 
 **Ebene:** E1 (Domänenbaustein / Ring 1)  

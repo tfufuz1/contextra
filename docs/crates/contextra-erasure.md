@@ -1,98 +1,190 @@
-# contextra-erasure — Crate-Spezifikation (Soll-Zustand, abgeleitet aus SPEC)
+# contextra-erasure — Crate-Spezifikation (Löschkette, v3.0)
 
-**Ebene:** E0 (Fundament / Löschkern)
-**Normative Quelle:** `docs/SPEC.md` §5 (Löschkette), §6 (ReadGate), §7 (ErasureLayer), §12 (Testkatalog), §13 (Invarianten). Bei Widerspruch gilt die SPEC.
-**Status:** Normativ (Soll-Zustand)
-**Geltungsbereich:** `crates/contextra-erasure`
-
-Dieses Dokument ersetzt die frühere Crate-Spec mit der alten Löschkette (`SagaState::KeyDestroyed`, `EraseTarget::KeyRange`, `ErasureCore`, `DeletionProof`, Purge-Window, WAL-Journal). Diese Teile existieren nicht mehr.
+**Ebene:** E0 · **Normativ unter:** `docs/SPEC.md` v3.0 (§6, §7, §9, §10, §12, §13, §14, §16)
+**Status:** Soll-Zustand. Ersetzt die Fassung vom 18.11.2026 vollständig.
 
 ---
 
-## 1. Zweck
+## 1 Zweck und Grenzen
 
-`contextra-erasure` ist der Löschkern: die 6-Schritte-Löschkette mit Journal und Recovery, der In-Memory-ReadGate, der Tresor für Schlüssel-Vernichtung, die Messung über `Scanner<Armed>` und die Schnittstelle `ErasureLayer` für E1-Schichten. Es ist die einzige Löschmethode des Workspace.
+`contextra-erasure` ist der **Koordinator** der Löschkette. Er besitzt:
 
-## 2. Architekturregeln
+- die Zustandsmaschine (`state`), das Journal-Protokoll und die Recovery,
+- die Ports (`ErasureLayer`, `ReadGate`, `KeyVault`, `KeyAnchor`, `ErasureJournal`, `ErasedSetMirror`, `ReportSink`, `PositiveControl`, `ProofSigner`, `RetentionAttestation`),
+- Messung und Bericht (`ErasureReport` V5, Siegel 1–4, Klassifikation),
+- die Schlüssel-Abstraktion `ScopeDescriptor` und die Scope-Auflösung.
 
-1. E0: keine Abhängigkeiten auf E1-/E2-Crates (`store`, `vector`, `text`, `graph`, `crypto`, `types`, `ports`).
-2. `#![forbid(unsafe_code)]`, Zero-Panic (`unwrap`, `expect`, `panic!`, `todo!` verboten in Nicht-Test-Code).
-3. `default = []` (R3). Keine Feature-gesteuerten Löschpfade.
-4. ErasureLayer wird hier definiert, E1-Crates implementieren ihn (SPEC §7).
+Sie besitzt **nicht**:
 
-## 3. Module
+- Schlüsselkryptografie (→ `contextra-crypto`),
+- Dateisystem-I/O (→ `contextra-durable-fs`, Trait `Vfs`),
+- Speicherstrukturen (→ `store`, `text`, `vector`, `graph`, `checkpoint`, `mvcc`).
 
-| Modul | Inhalt | SPEC |
+Die Implementierungen der Ports liegen in E1. Diese Crate kennt sie nur über Trait-Objekte. Eine Abhängigkeit nach oben besteht nicht (R1).
+
+## 2 Module
+
+| Modul | Inhalt | Status |
 |---|---|---|
-| `chain::target` | `EraseTarget` (Document, Subject, Collection, Tenant), kanonische Kodierung, Vault-Tag | §5.1 |
-| `chain::state` | `SagaState` mit Übergangstabelle, `is_terminal`, `blocks_reads`, `PendingReason` | §5.2, INV-9, INV-10 |
-| `chain::retention` | `RetentionCode`, `RetentionAttestation`, `blocks_erasure` | §5.3 Schritt 1 |
-| `chain::layer` | `ErasureLayer` (id, key_coverage, resolve, on_gate, purge, witness), `LayerScope`, `PurgeCx`, `PurgeOutcome` | §7 |
-| `chain::ports` | Ports `Journal`, `GateSink`, `KeyVault`, `DiskReserve`, `PositiveControl`, `ReportSink`; `CommitBarrier` | §5.3, §10.1 |
-| `chain::journal` | `JournalRecord`, `FileJournal` (fsync pro Eintrag, Prüfsumme, Torn-Tail-Behandlung) | §5.3 fsync-Anker, §5.5 |
-| `chain::saga` | `Chain`: Schritte 1–6, Restrict/Lift, Eskalation, Recovery | §5.3, §5.5, §5.7 |
-| `chain::adapters` | `SagaGateSink` (Textschlüssel-Layout), `FileVaultKeys` (Tresor, Konstantzeit-Prüfung) | §5.3 Schritt 3, §6 |
-| `gate::saga_gate` | `SagaGate`, `ReadGate`, `GateDecision`, `RangeGate` | §6.3 |
-| `vault` | `FileVault`: Slots, Tombstones, Shards, Durable-Schicht | §4, §5.3 Schritt 3 |
-| `types_local` | Messtypen `Scanner`, `ControlEvidence`, `LayerWitness`, `LayerId`, `KeyCoverage`, `MeasureClass`; VFS-Port; `OperatorRef` | §6, §7 |
-| `error` | `ErasureError` | §11.1 |
+| `types` | `ErasureScope`, `EraseTarget`, `ClassSet`, `ResidualRisk`, `AssumptionCode`, `Custody`, `Class` (reine Datentypen) | Typen liegen in `contextra-types` (§2.4 SPEC). Hier nur Re-Exporte |
+| `state` | Zustände, `step`, `classify`, `TransitionError` | neu, total kodiert |
+| `saga` | Takt 1 (`erase`), Takt 2 (Epoche), Hygiene | neu |
+| `journal` | Datei-Format, Group-Commit, Torn-Tail, Replay | neu |
+| `ports` | alle Traits aus §9 SPEC | neu, ersetzt `ReportSink` ohne Implementierung |
+| `gate` | `ReadGate`-Port und `LiveMask`/`ErasedSet`-Datenstruktur | Implementierung in `db` bzw. `store` |
+| `scope` | Auflösung `Document`, `Subject`, `Collection`, `Tenant` | neu |
+| `witness` | `LayerWitness`, `Scanner<Armed>`, Positivkontrolle | neu, `Scanner<Armed>` nur über `arm()` |
+| `report` | `ErasureReport` V5, kanonische Kodierung, Siegel | neu |
+| `recover` | Startpfad (§6.6 SPEC) | neu |
 
-## 4. Zustände (SPEC §5.2)
+**Entfernt** gegenüber der Fassung vom 18.11.2026: `vault` (SagaState-Vault, Tresor-Tombstones), `crypto_local`, `types_local` (Vfs-Duplikat, R4), `io` (Vfs-Duplikat), `gate` in der alten Form, `ReportSink` ohne Implementierung. Die Modulkette `saga` → `vault` → `gate` → `io` → `types_local` wird nicht übernommen.
 
-Ein Datum durchläuft `Requested → Gated → KeyRevoked → Purging → Verifying → Completed`. Ein Art.-18-Zweig läuft über `Requested → Restricted → Gated` (Eskalation) oder `Restricted → Lifted`. Aufbewahrungspflicht führt zu `Refused`. Jeder nicht-terminale Zustand kann nach `Pending(reason)` gehen und kehrt in den gespeicherten Resume-Zustand zurück.
+## 3 Zustände und Übergänge
 
-Die Übergangstabelle ist in `SagaState::can_transition_to` normativ kodiert. Terminal sind `Completed`, `Lifted`, `Refused` (INV-9). `Gated` ist irreversibel (INV-10).
+Die Zustände und ihr Verhalten stehen in SPEC §6.2. Diese Crate implementiert:
 
-## 5. Die 6 Schritte (SPEC §5.3) und ihre Umsetzung
+```rust
+pub enum State {
+    Requested, Frozen, LogicallyDeleted, PlaintextPurged, PlaintextMeasured,
+    KeyDestroyed, CryptoMeasured, EpochSealed, Hygiene, HygieneMeasured,
+    Reported, Completed,
+    Restricted { basis: RestrictBasis, until: Option<Timestamp> },
+    Refused, Lifted,
+    Pending { reason: PendingReason, attempt: u32, next_retry_at: Timestamp },
+}
 
-| Schritt | Code | Durabler Anker |
+pub fn step(state: &State, ev: Event) -> Result<State, TransitionError>;
+pub fn classify(state: &State) -> Class;     // L | P | CStar | C1 | C2 | C3 | M
+```
+
+**Eigenschaften (testpflichtig, T-DEL-24):**
+
+- `step` ist total über `(State, Event)`; ungültige Kombinationen liefern `TransitionError`, nie Panik.
+- `classify` ist **monoton**: Ein Zustand, der eine Klasse erreicht, verliert sie nicht durch spätere Ereignisse außer `Lifted`/`Refused` (die vor Takt 2 stehen müssen).
+- `E` impliziert `L`, `P`, `C` (Klassenordnung L < P < C* < C1–C3 < M).
+- `Completed`, `Refused`, `Lifted` sind terminal (INV-9).
+- `Restricted` darf nicht nach `KeyDestroyed` oder später entstehen (Art. 18 schützt nicht gegen bereits erfolgte Vernichtung; Gate-Test).
+
+## 4 Takt 1 (synchron, Klasse L)
+
+Funktion: `Eraser::erase(scope, on_retention) -> Result<ErasureTicket, EraseError>`, asynchron.
+
+Ablauf (SPEC §6.3):
+
+1. Validierung (Mandant, Berechtigung, Scope-Typ).
+2. `RetentionAttestation::check` (Reject → `Refused`, Restrict → `Restricted`).
+3. Duplikaterkennung über `scope_commitment` (BLAKE3-keyed). Laufende Saga ⇒ bestehendes Ticket.
+4. `ScopeDescriptor` als `AEAD(K_saga[erasure_id])`, nur das Chiffrat und der Referenz-Hash gehen ins Journal.
+5. Group-Commit (`journal::GroupCommit`, Wartefenster 1–2 ms, dedizierter Thread). Flush-Fehler ⇒ `Err`, keine Sperre.
+6. Nach `fsync`: `LiveMask`/`SubjectMask`/Epochenmarke setzen, Publikation mit `SeqCst`. `CommitBarrier::exclusive()` mit Haltezeit ≤ 1 ms.
+7. Ticket `Frozen`, Siegel 1.
+
+Ein Lesezugriff nach Schritt 6 erhält `Erased` (ReadGate).
+
+**Fehlersemantik:** Jede Stufe vor Schritt 6 ist folgenlos. Schritt 6 ist erst nach durablem Eintrag erlaubt (INV-JRN-1).
+
+## 5 Takt 2 (Epochen, Klassen P, C)
+
+Ein Worker (`saga::epoch::Worker`) schließt Epochen nach Zeitfenster (Standard 5 s, Obergrenze 60 s) oder Mengenschwelle (1.024).
+
+Reihenfolge je Epoche (SPEC §6.4):
+
+1. Scope-Chiffrate entschlüsseln, Slot-Liste erzeugen.
+2. `ErasureLayer::purge` für Ebene A (Layer `store`, `text`, `vector`, `graph`, `mvcc`, `checkpoint`, `db` als Cache).
+3. `ErasureLayer::witness` mit `Scanner<Armed>` → `LayerWitness` (Siegel 2).
+4. Pre-Destruction-Inventar: Digests aller Chiffratblöcke je `key_id`.
+5. `KeyDestroyed`-Intent mit Wrap-Nonce, durabel (Regel J1).
+6. `KeyVault::destroy_batch` (idempotent).
+7. Messung C: `verify_absent`, Entschlüsselungsprobe (`KeyAbsent`), Lesepfad-Probe (`Erased`), Nadelscan nach Wrap-Nonce.
+8. Epoch Seal (`KeyVault::rotate_epoch`) ⇒ C1–C3 (Siegel 3).
+
+**Idempotenz:** Ist der Schlüssel nach einem protokollierten Intent bereits abwesend, gilt Schritt 6 als vollzogen.
+
+**Abbruch:** Jeder Fehler lässt den Zustand unverändert; die Sperre bleibt. Der Worker setzt `Pending` mit Backoff.
+
+## 6 Hygiene (Klasse M)
+
+Terminiert durch `purge_rebuild_max` (14 Tage). Ablauf in SPEC §6.5: Purge-Compaction (S3, S4, S6), WAL-Entfernung mit Dateiprüfung, Index-Neuaufbau mit `ArtKey`-Wechsel, Checkpoint-Sweep, Lineage-Kaskade, Messung M (Siegel 4).
+
+Die Compaction-Primitive gehören zu `store` (§10.4 SPEC). Diese Crate ruft sie über `ErasureLayer::purge` auf und prüft das Ergebnis über `witness`.
+
+## 7 Journal
+
+- Eigene Datei über `Vfs` (`contextra-durable-fs`), **nicht** im LSM-WAL (ER-E15).
+- Eintrag: `erasure_id (16 B) ‖ state (u8) ‖ attempt (u32) ‖ clock (u64) ‖ payload_len (u32) ‖ payload ‖ hash_chain (BLAKE3, 32 B)`.
+- **Torn-Tail:** Ein unvollständiger letzter Eintrag wird beim Start verworfen. Vollständige Einträge nie (T-JRN-1).
+- **Replay** ist idempotent. `recover()` läuft vor Freigabe des Lesepfads (INV-RECOVER-1).
+- `K_saga[erasure_id]` wird bei `Completed` vernichtet. Danach enthält das Journal keinen Scope-Klartext und keinen Personenbezug mehr.
+- Größe: Gate `journal-growth`. Kompaktion des Journals nur nach `Completed` oder `Refused`.
+
+## 8 Ports (Kurzübersicht, Signaturen in SPEC §9)
+
+| Port | Implementiert in | Hinweis |
 |---|---|---|
-| 1 Validierung & Intent | `Chain::erase`: Retention-Prüfung, keyed-BLAKE3-Duplikaterkennung, `resolve` aller Schichten | fsync #1 (`Requested`) |
-| 2 Gate | `Chain::gate_step`: exklusive `CommitBarrier`, `GateSink::activate`, bei Restricted zusätzlich `lift_restricted` | fsync #2 (`Gated`) |
-| 3 Schlüsselvernichtung | `Chain::shred_step`: `on_gate` aller Schichten, `KeyVault::destroy`, `verify_absent`, dann `KeyRevoked` | fsync #3 (`KeyRevoked`) |
-| 4 Purge | `Chain::purge`: Plattenreserve, Purge in Prioritätsreihenfolge, idempotent | Übergang `Verifying` |
-| 5 Messung | `Chain::verify`: Positivkontrolle (`PositiveControl`), Witnesses mit `Scanner<Armed>`, Lesepfad muss `Erased` liefern | — |
-| 6 Bericht & Abschluss | `ReportSink::publish` (signierter Bericht und Ledger, fsync #4), dann `Completed` | fsync #4 |
+| `ErasureLayer` | `store`, `text`, `vector`, `graph`, `checkpoint`, `mvcc`, `crypto` | je Layer genau eine Implementierung; Schichtzuordnung §9.1 SPEC |
+| `ReadGate` | `db` (`TenantScopedStorage`) | O(1), `check` vor jeder Entschlüsselung |
+| `KeyVault` | `crypto` | Custody K0/K1 ausgeliefert; K2/K3 `CapabilityUnsupported` |
+| `KeyAnchor` | `crypto` (`FileOnly`, `OsKeyring`) | `profile()` bestimmt maximale Klasse |
+| `ErasureJournal` | `erasure::journal` | Eigene Implementierung, nicht austauschbar im Regulated-Tier |
+| `ErasedSetMirror` | `erasure` (Dateiziel), Fremdsystem optional | Pflicht im Regulated-Tier |
+| `ReportSink` | `erasure::report` (Ledger außerhalb `data_dir`) | Ohne Ledger-Pfad: Start verweigert |
+| `ProofSigner` | `crypto` (Ed25519) | |
+| `PositiveControl` | `testkit` (Lab) und `erasure` (Scanner-Selbsttest) | Live-Canary nur in Lab/CI (ER-E17) |
+| `RetentionAttestation` | Betreiber | Default: `Reject` bei aktiver Pflicht |
 
-Die Reihenfolge ist normativ und wird im Code durch die Aufrufreihenfolge erzwungen. Ein Test prüft, dass der Gate vor der Schlüsselvernichtung aktiv ist (`gate_ist_aktiv_bevor_der_schluessel_vernichtet_wird`).
+**Verboten:** Ports mit Stub-Implementierung, die Erfolg melden (INV-WIRING-2). Fehlt eine Implementierung, liefert der Aufruf `CapabilityUnsupported`.
 
-## 6. Fehlerpolitik (SPEC §11)
+## 9 Scanner und Messung
 
-- Transiente I/O-Fehler (`Io`, `Storage`) setzen `Pending(IoBackoff)` mit Resume-Ziel.
-- Logische Fehler (Rückstand im Scan, fehlende Positivkontrolle, fehlende Gate-Unterstützung) lassen den Zustand unverändert und geben den Fehler zurück.
-- `ShredVerificationFailed` lässt den Zustand auf `Gated`.
-- Der Zustand wird erst nach erfolgreichem Journal-Append (fsync) geändert.
+- `Scanner<S>` mit Typzustand `Disarmed` → `Armed`. `arm()` führt den Positivkontrolltest aus und schlägt fehl, wenn die Kontrolle nicht gefunden wird (INV-WITNESS-MINT-1, T-DEL-7, T-DEL-33).
+- `LayerWitness` enthält: Ebene, Methode, Zählwerte, Digest, Positivkontrolle (Ergebnis), Ergebnis.
+- Der Scanner sieht keine Store-Interna. Er arbeitet auf Bytes (`ForensicScanner`, §19.3 SPEC).
+- Die Messung ist rein lesend. Der Purger kennt den Witness nicht (Trennung, §8 Invariante 2).
 
-## 7. Recovery (SPEC §5.5)
+## 10 Bericht `ErasureReport` V5
 
-`Chain::recover` lädt das Journal, bildet den letzten Zustand jeder Saga und aktiviert sofort das Gate für `Gated`, `KeyRevoked`, `Purging`, `Verifying` und `Completed` (Erased) sowie `Restricted`. Offene Sagas werden zurückgegeben. `Chain::resume` setzt eine Saga fort, `Pending` wird zuerst in den Resume-Zustand überführt.
+- Kanonische Kodierung: festgelegte Feldreihenfolge, Längenpräfixe für Byte-Felder, keine Map-Typen. `bincode` für signierte Felder verboten (ER-E16).
+- Ed25519-Signatur über die kanonischen Bytes. Unbekannte Felder werden abgelehnt.
+- Pflichtfelder: siehe SPEC §13.1.
+- Merkle-Pfade binden jede Einzelmessung an die Wurzel.
+- V4 ist eingefroren. Ein V4-Bericht wird nicht mehr erzeugt; sein Verifier bleibt für Altbestände bis zum Ende der Aufbewahrungsfrist.
+- **Verboten im Bericht:** Klartext-IDs, Dateinamen, DocIds, Inhalte, Chunk-Hashes (INV-12).
 
-## 8. Lesesperre (SPEC §6)
+Verifikation: `doctor verify-report` (offline). Testvektoren für einen unabhängigen Verifier (T-DEL-28).
 
-`SagaGate::check` ist O(1) ohne I/O. Der Fast-Path ohne aktive Sperre ist atomar und lock-frei. Mit aktiver Sperre nimmt `check` ein Read-Lock und liest einen konsistenten Snapshot. Präfix-Lookup iteriert über die distinkten Präfixlängen. Restricted hat Vorrang vor Erased.
+## 11 Fehler
 
-## 9. Testabdeckung (SPEC §12)
+`ErasureError` mit Kategorien aus SPEC §11.1. Keine Variante trägt Klartext oder Schlüsselmaterial. `Display` und `Debug` sind geprüft (INV-12, Test).
 
-| Kennung | Abdeckung |
-|---|---|
-| T-DEL-4 | `t_del_4_nach_neustart_bleibt_completed_datum_erased` |
-| T-DEL-8 | Collection-Gate über Präfix, Mandanten-Test `mandanten_loeschung_deckt_alle_dokumente_des_mandanten_ab` |
-| T-DEL-12 | `t_del_12_crash_in_phase_3_neustart_setzt_fort_mit_aktivem_gate` |
-| T-DEL-13 | Restrict/Lift-Tests; `RestrictedReadAuditRequired` existiert |
-| T-DEL-14 | `t_del_14_purge_ist_idempotent` |
-| T-DEL-15 | `t_del_15_verify_key_absent_nur_nach_vernichtung` |
-| Positivkontrolle (T-DEL-7) | Gemessen über `ohne_positivkontrolle_ist_messung_ungueltig` (Gegenprobe) |
+## 12 Konfiguration
 
-## 10. Abweichungen und offene Punkte
+Die Werte stehen in SPEC §18 (`ErasureConfig`). Diese Crate validiert sie in `ErasureConfig::validate()` vor dem Öffnen. Verletzungen liefern `ConfigError`, nie einen Standardwert.
 
-Die folgenden Punkte weichen vom SPEC-Wortlaut ab oder sind nicht umgesetzt. Sie sind bewusst benannt:
+## 13 Lint und Gates
 
-1. **Vault-Vernichtung:** Der Tresor nutzt seine Tombstone-Semantik (D-111/D-113) statt Zufalls-Überschreiben plus Nullen (§5.3 Schritt 3.3/3.4). Die Prüfung `verify_absent` bestätigt die Abwesenheit.
-2. **Duplikaterkennung:** keyed BLAKE3 statt HMAC (BLAKE3 ist bereits Abhängigkeit).
-3. **Subjekt-Löschung (T-DEL-9):** Ohne Subjekt-zu-Schlüssel-Index liefert `SagaGateSink` für `Subject` fail-closed `NotImplemented`.
-4. **Positivkontrolle und Canary (§5.3 Schritt 5.1/5.3):** Die Kette konsumiert den Port `PositiveControl`. Das Einfügen und Suchen des Canary muss die Speicherschicht liefern.
-5. **Signierter Bericht und Ledger (§5.3 Schritt 6):** Es gibt nur den Port `ReportSink`. Eine Ed25519-Implementierung mit hash-verkettetem Ledger außerhalb des Datenverzeichnisses fehlt.
-6. **Krypto-Duplikate:** `crypto_local`, `sha2` und `hmac` liegen noch im Tresor-Kern. Die SPEC verlangt Krypto-Primitive ausschließlich in `contextra-crypto` (R4). Die Verschiebung ist offen, weil sie persistierte Tresor-Formate (INV-1) berührt.
-7. **Schichten-Implementierungen:** In diesem Crate existieren nur Test-Doubles für `ErasureLayer`. Die E1-Implementierungen liegen in den jeweiligen Crates.
-8. **Schlüssel-Layout:** `TextKeyLayout` (`t:{tenant}:{collection}:chunk:{doc}`) ist eine Konvention. Der Store muss dasselbe Layout verwenden.
-9. **Cargo.lock:** Nach Entfernung der Abhängigkeiten ist die Lock-Datei des Workspace zu aktualisieren.
+- `#![forbid(unsafe_code)]`, `#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`.
+- Keine Abhängigkeit auf `aes-gcm-siv`, `sha2`, `hkdf`, `argon2` (SPEC §4.8). Kryptografie nur über den Port `ProofSigner` und über `crypto`.
+- Gates: `layering`, `ownership`, `surface-coverage`, `claim-generator`, `deletion-honesty`, `loc-budget` (≤ 2.500 Zeilen für die gesamte Löschkette, SPEC §21).
+
+## 14 Tests
+
+Pflichttests: T-DEL-7, T-DEL-14, T-DEL-15, T-DEL-20, T-DEL-21, T-DEL-22, T-DEL-23, T-DEL-24, T-DEL-25, T-DEL-26, T-DEL-28, T-DEL-30, T-DEL-31, T-DEL-33, T-DEL-35. Mutationstests (`cargo-mutants`, Gate ≥ 95 % für `step`, `classify`, Barriere, Anker). `loom` für `LiveMask`-Publikation und ReadGate.
+
+## 15 Arbeitspakete (Reihenfolge)
+
+| WP | Inhalt | Gate |
+|---|---|---|
+| L-1 | Typen und `state::step`/`classify` mit Tests T-DEL-24 | `layering`, mutants |
+| L-2 | `journal` mit Torn-Tail und Replay (T-JRN-1, T-DEL-21) | Fuzz Journal-Replay |
+| L-3 | `ports` ohne Stub-Implementierungen | `unwired` |
+| L-4 | `scope`, `witness`, Positivkontrolle | T-DEL-7, T-DEL-33 |
+| L-5 | Takt 1 und Takt 2 gegen `ReferenceModel` | T-DEL-26 |
+| L-6 | Vfs-Dubletten auflösen (`ports`, `erasure::types_local`, `store::io_seam`, `store::io_seam::types`) → nur `durable-fs` | `ownership` |
+| L-7 | Bericht V5 mit Ed25519 und Testvektoren | T-DEL-28 |
+| L-8 | Recovery vor Lesepfad (T-DEL-20) | Crash-Matrix |
+
+**Phase 1 (Erasure Lab, `testkit`) muss vor L-5 stehen** (ER-E20, Gate G0).
+
+## 16 Offene Punkte
+
+Siehe SPEC §23. Für diese Crate relevant: P-01, P-03, P-06, P-11, P-19 (NIST CE-Bedingungen), O-37 (K2-Spike), O-39 (Standardwerte).
