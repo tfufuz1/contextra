@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)] // Testcode: R6 gilt nur für Nicht-Test-Code.
 //! Golden test for TOMBSTONE_BIT — Format invariant guard per ADR-0120.
 //!
 //! Diese Datei muss grün sein, BEVOR jede Änderung an TOMBSTONE_BIT oder den

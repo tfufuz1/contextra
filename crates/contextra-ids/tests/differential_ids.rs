@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)] // Testcode: R6 gilt nur für Nicht-Test-Code.
 //! Differential test between contextra-ids and frozen legacy implementations (SPEC-v2 §4.1 Abnahme 2)
 
 use contextra_ids::DocId;
