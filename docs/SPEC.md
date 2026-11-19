@@ -4,7 +4,6 @@
 **Datum:** 19. November 2026
 **Status:** FINAL — Einzige Quelle der Wahrheit
 **Geltungsbereich:** Gesamter Workspace `contextra`
-**Löschkette:** Normativ gemäß `docs/Finale Löscharchitektur.md` (eingearbeitet in §4, §5, §6, §7, §10–§14)
 
 ---
 
