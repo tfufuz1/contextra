@@ -63,7 +63,7 @@ fn hkdf_hierarchy_matches_independent_reference() {
         "496e33ffbecded3488ef7fb32b6f439118e3f1f6bfb713b9473fa21e1a55dc74"
     );
 
-    let subject = derive_subject_key(&coll, &SubjectRef([0xAB; 16])).unwrap();
+    let subject = derive_subject_key(&coll, &SubjectRef::from_bytes([0xAB; 16])).unwrap();
     assert_eq!(
         hex(subject.as_bytes()),
         "756b058eb6d954b35d3cfe60bb989f94f4fbf1c3e99a64c9ef780617164f484b"
@@ -100,7 +100,7 @@ fn hkdf_domain_separation_and_context_binding() {
 
     // Klasse K und Klasse P dürfen für denselben Doc/Version nie denselben Schlüssel ergeben.
     let dek = derive_document_dek(&c_e1, DocId(9), 1).unwrap();
-    let sk = derive_subject_key(&c_e1, &SubjectRef([9; 16])).unwrap();
+    let sk = derive_subject_key(&c_e1, &SubjectRef::from_bytes([9; 16])).unwrap();
     let sdek = derive_subject_doc_dek(&sk, DocId(9), 1).unwrap();
     assert_ne!(dek.as_bytes(), sdek.as_bytes(), "K/P domain separation");
 

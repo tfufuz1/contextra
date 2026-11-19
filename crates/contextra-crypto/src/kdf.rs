@@ -201,13 +201,18 @@ impl KdfHeader {
             )));
         }
 
-        if &bytes[0..4] != KDF_HEADER_MAGIC {
+        if bytes
+            .get(0..4)
+            .is_none_or(|magic| magic != KDF_HEADER_MAGIC)
+        {
             return Err(CryptoError::InvalidInput(
                 "Ungültige KdfHeader Magic Bytes".to_string(),
             ));
         }
 
-        let version = bytes[4];
+        let version = bytes.get(4).copied().ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen von version".to_string())
+        })?;
         if version != KDF_HEADER_VERSION_1 {
             return Err(CryptoError::InvalidInput(format!(
                 "Nicht unterstützte KdfHeader Version: {}",
@@ -215,7 +220,10 @@ impl KdfHeader {
             )));
         }
 
-        let kdf_id = bytes[5];
+        let kdf_id = bytes
+            .get(5)
+            .copied()
+            .ok_or_else(|| CryptoError::InvalidInput("Fehler beim Lesen von kdf_id".to_string()))?;
         if kdf_id != KDF_ID_ARGON2ID {
             return Err(CryptoError::InvalidInput(format!(
                 "Nicht unterstützte KdfId: {}",
@@ -223,22 +231,10 @@ impl KdfHeader {
             )));
         }
 
-        let m_cost_kib = u32::from_be_bytes(bytes[6..10].try_into().map_err(|_| {
-            CryptoError::InvalidInput("Fehler beim Lesen von m_cost_kib".to_string())
-        })?);
-        let t_cost =
-            u32::from_be_bytes(bytes[10..14].try_into().map_err(|_| {
-                CryptoError::InvalidInput("Fehler beim Lesen von t_cost".to_string())
-            })?);
-        let p_cost =
-            u32::from_be_bytes(bytes[14..18].try_into().map_err(|_| {
-                CryptoError::InvalidInput("Fehler beim Lesen von p_cost".to_string())
-            })?);
-
-        let salt_len =
-            u32::from_be_bytes(bytes[18..22].try_into().map_err(|_| {
-                CryptoError::InvalidInput("Fehler beim Lesen von salt_len".to_string())
-            })?) as usize;
+        let m_cost_kib = read_u32_be(bytes, 6, "m_cost_kib")?;
+        let t_cost = read_u32_be(bytes, 10, "t_cost")?;
+        let p_cost = read_u32_be(bytes, 14, "p_cost")?;
+        let salt_len = read_u32_be(bytes, 18, "salt_len")? as usize;
 
         if salt_len < MIN_SALT_LEN {
             return Err(CryptoError::InvalidInput(format!(
@@ -260,7 +256,10 @@ impl KdfHeader {
             )));
         }
 
-        let salt = bytes[MIN_HEADER_LEN..MIN_HEADER_LEN + salt_len].to_vec();
+        let salt = bytes
+            .get(MIN_HEADER_LEN..MIN_HEADER_LEN + salt_len)
+            .ok_or_else(|| CryptoError::InvalidInput("KdfHeader Salt unvollständig".to_string()))?
+            .to_vec();
 
         Ok(Self {
             version,
@@ -273,6 +272,15 @@ impl KdfHeader {
             salt,
         })
     }
+}
+
+/// Liest ein Big-Endian-`u32` ab `offset`, ohne Panic-Pfad.
+fn read_u32_be(bytes: &[u8], offset: usize, field: &str) -> Result<u32> {
+    bytes
+        .get(offset..offset.saturating_add(4))
+        .and_then(|s| <[u8; 4]>::try_from(s).ok())
+        .map(u32::from_be_bytes)
+        .ok_or_else(|| CryptoError::InvalidInput(format!("Fehler beim Lesen von {field}")))
 }
 
 /// Wrapper für abgeleitetes 256-Bit Schlüsselmaterial, das bei Drop automatisch aus dem Speicher gelöscht wird.

@@ -9,7 +9,7 @@ use crate::secret::SecretKey;
 use aes_gcm_siv::aead::{Aead, KeyInit, Payload};
 use aes_gcm_siv::{Aes256GcmSiv, Key, Nonce};
 use sha2::{Digest, Sha256};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// Key representing a storage or tenant unit.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
@@ -65,7 +65,10 @@ pub const WRAP_AAD: &[u8] = b"ctx/dek-wrap/v1";
 // ANCHOR[contextra-crypto:DEK-003] Deterministische DEK-Ableitung nach D-79
 // NOTE: Hash der Vorfahren-Salts garantiert Mandanten- und Dokumentenisolierung (TS:2026-11-11)
 /// Derives a DEK using AncestorSalts and DocTag.
-pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek {
+///
+/// # Errors
+/// Liefert [`CryptoError`], wenn die HKDF-Expansion scheitert (kein stiller Null-Schlüssel).
+pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Result<Dek> {
     let mut hasher = Sha256::new();
     hasher.update(DEK_SALT_LABEL);
     hasher.update(a.t);
@@ -78,14 +81,16 @@ pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek {
     hasher.update(a.d);
     let salt: [u8; 32] = hasher.finalize().into();
 
-    let mut out = [0u8; 32];
     let mut info = Vec::with_capacity(DEK_LABEL.len() + 32 + 16);
     info.extend_from_slice(DEK_LABEL);
     info.extend_from_slice(&salt);
     info.extend_from_slice(&doc);
 
-    let _ = hkdf_expand(unit.0.as_bytes(), &info, &mut out);
-    Dek(SecretKey::new(out))
+    // Fail-Closed: Scheitert die HKDF-Expansion, wird ein Fehler geliefert statt eines
+    // stillen Null-Schlüssels.
+    let mut out = Zeroizing::new([0u8; 32]);
+    hkdf_expand(unit.0.as_bytes(), &info, out.as_mut_slice())?;
+    Ok(Dek(SecretKey::new(*out)))
 }
 
 /// Wraps a DEK using a Key Encryption Key (KEK / UnitKey) and AES-256-GCM-SIV.
@@ -118,9 +123,11 @@ pub fn unwrap_dek(kek: &UnitKey, wrapped: &[u8]) -> Result<Dek> {
         msg: ct,
         aad: WRAP_AAD,
     };
-    let pt = cipher
-        .decrypt(Nonce::from_slice(nonce), payload)
-        .map_err(|_| CryptoError::Aead("DEK unwrap failed: tag mismatch".into()))?;
+    let pt = Zeroizing::new(
+        cipher
+            .decrypt(Nonce::from_slice(nonce), payload)
+            .map_err(|_| CryptoError::Aead("DEK unwrap failed: tag mismatch".into()))?,
+    );
 
     if pt.len() != 32 {
         return Err(CryptoError::InvalidLength(format!(
@@ -129,9 +136,9 @@ pub fn unwrap_dek(kek: &UnitKey, wrapped: &[u8]) -> Result<Dek> {
         )));
     }
 
-    let mut key_bytes = [0u8; 32];
+    let mut key_bytes = Zeroizing::new([0u8; 32]);
     key_bytes.copy_from_slice(&pt);
-    Ok(Dek(SecretKey::new(key_bytes)))
+    Ok(Dek(SecretKey::new(*key_bytes)))
 }
 
 // !SECTION

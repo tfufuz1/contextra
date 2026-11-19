@@ -6,11 +6,15 @@
 // STAND: TS:2026-11-09
 
 #![forbid(unsafe_code)]
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
-// Offene Schuld: indexing_slicing ist nicht Teil von INV-4 (unwrap/expect/panic/todo). Die
-// bestehenden Index-Zugriffe in kv_segment/store.rs und kdf.rs werden in einem eigenen
-// Refactoring mit Fehlerpfaden ersetzt.
-#![allow(clippy::indexing_slicing)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::panic
+    )
+)]
 
 //! # Kryptographie-Kern für Contextra (Ring 0)
 //!
@@ -76,15 +80,11 @@ pub use audit_chain::{
 pub use crypto::KeyManager as CryptoKey;
 pub use crypto::KeyManager;
 pub use error::{CryptoError, Result};
-pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
 pub use kdf::{
     derive_collection_kek, derive_document_dek, derive_erasure_key, derive_master_key,
     derive_subject_doc_dek, derive_subject_key, derive_tenant_kek,
 };
-pub use secret::{
-    CollectionKek, DocumentDek, ErasureKey, MasterKey, SecretKey32, SubjectDocDek, SubjectKey,
-    TenantKek,
-};
+pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
 pub use kv_cipher::KvSegmentCipher;
 pub use kv_cipher::{EncryptedKvLayer, KvCipher, ModelFingerprint};
 #[allow(deprecated)]
@@ -95,6 +95,10 @@ pub use kv_segment::{
     segment::KvSegment,
     store::TenantIsolatedKvStore,
     CURRENT_KV_KEY_DERIVATION_VERSION,
+};
+pub use secret::{
+    CollectionKek, DocumentDek, ErasureKey, MasterKey, SecretKey32, SubjectDocDek, SubjectKey,
+    TenantKek,
 };
 pub use wal_completeness::verify_wal_chain_completeness;
 pub use wal_crypto::CloudEgressGuard;

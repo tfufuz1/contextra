@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Cryptographic primitives for Contextra: AES-256-GCM-SIV AEAD, HKDF key hierarchy, Argon2id KDF, zeroize-protected keys"
+description = "Cryptographic primitives, AES-256-GCM-SIV AEAD, HKDF key derivation, and Argon2id for Contextra"
 readme = "README.md"
 repository = "https://github.com/tfufuz1/contextra"
 keywords = ["cryptography", "aead", "kdf", "wal", "zeroize"]
@@ -21,35 +21,43 @@ klasse = "A"
 workspace = true
 
 [dependencies]
+# E0-Fundamente (Kern-Closure: ids, env)
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
 thiserror = { workspace = true }
-sha2 = "0.10"
-hmac = "0.12"
+
+# Kryptographische Primitive (SPEC §4)
 aes-gcm-siv = "0.11"
 argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
 hkdf = "0.12"
+sha2 = "0.10"
 subtle = "2.6"
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
+rand = { workspace = true }
+
+# WAL-Integritaet, Audit-Chain und KV-Segmente (INV-6: Verhalten unveraendert)
+hmac = "0.12"
 blake3 = { workspace = true }
 bincode = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-contextra-ids = { path = "../contextra-ids", version = "0.1.0" }
-contextra-env = { path = "../contextra-env", version = "0.1.0" }
-rand = { workspace = true }
-tracing = { workspace = true }
-zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 parking_lot = { workspace = true }
 ahash = { workspace = true }
 lru = "0.16.4"
 regex = { workspace = true }
 
+# Optionale Beobachtbarkeit (default-Features leer, R3)
+tracing = { workspace = true, optional = true }
+
 [features]
 default = []
 std = ["contextra-ids/std", "contextra-env/std"]
+tracing = ["dep:tracing"]
 test-utils = []
 
 [dev-dependencies]
 contextra-crypto = { path = ".", features = ["test-utils"] }
-contextra-env = { path = "../contextra-env", features = ["test-utils"] }
+contextra-env = { workspace = true, features = ["test-utils"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
