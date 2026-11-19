@@ -6,7 +6,7 @@
 //!   - R1: Journal `Requested+Intent` mit Umfang des alten Dokuments und `new_doc_tag`.
 //!   - R2: `PreGate::run`: neues Dokument dauerhaft anlegen (LSM).
 //!   - R3: Gate des alten Dokuments.
-//!   - R4: Vernichtung des `D`-Slots, Journal `KeyDestroyed`, danach Purge.
+//!   - R4: Vernichtung des `D`-Slots, Journal `KeyRevoked`, danach Purge.
 //! - **Absturz / Recovery:** Wenn neues Dokument vor R3 fehlt, bleibt das alte Dokument
 //!   unberührt und der Status ist `Pending { phase: Replace, reason: ReplacementMissing }`.
 //! - **I-25:** Bei `replace_erasing` ist nie alter Inhalt gesperrt, während neuer Inhalt
@@ -27,7 +27,7 @@ pub enum ReplaceStep {
     /// R3: Neudokument dauerhaft bestätigt, Altdokument gegated.
     R3GatedOld,
     /// R4: D-Slot des Altdokuments vernichtet, Übergang zum physischen Purge.
-    R4KeyDestroyed,
+    R4KeyRevoked,
 }
 
 /// Plan und Zustandsverwaltung für die Ersetzung eines Mehr-Betroffenen-Dokuments (SPEC D-115).
@@ -125,13 +125,13 @@ impl ReplacePlan {
     /// Schaltet auf R4 (D-Slot des Altdokuments vernichtet) vor (D-115 R4).
     pub fn advance_to_r4_key_destroyed(&mut self) -> Result<(), ErasureError> {
         match self.step {
-            ReplaceStep::R3GatedOld | ReplaceStep::R4KeyDestroyed => {
-                self.step = ReplaceStep::R4KeyDestroyed;
+            ReplaceStep::R3GatedOld | ReplaceStep::R4KeyRevoked => {
+                self.step = ReplaceStep::R4KeyRevoked;
                 Ok(())
             }
             _ => Err(ErasureError::InvalidTransition {
                 from: format!("{:?}", self.step),
-                to: format!("{:?}", ReplaceStep::R4KeyDestroyed),
+                to: format!("{:?}", ReplaceStep::R4KeyRevoked),
             }),
         }
     }

@@ -586,7 +586,7 @@ impl fmt::Debug for LedgerEntry {
         write!(
             f,
             "LedgerEntry {{ gated_seq: {:?}, completed_at: {:?}, chain_hash: {:02x?} }}",
-            self.gated_seq, self.completed_at, &self.chain_hash
+            self.gated_seq, self.completed_at, self.chain_hash
         )
     }
 }
@@ -622,7 +622,7 @@ impl LayerId {
 
 impl fmt::Debug for LayerId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "LayerId({:02x?})", &self.0)
+        write!(f, "LayerId({:02x?})", self.0)
     }
 }
 
@@ -969,7 +969,7 @@ impl LayerWitness {
 
 impl fmt::Debug for LayerWitness {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "LayerWitness {{ hash: {:02x?} }}", &self.witness_hash)
+        write!(f, "LayerWitness {{ hash: {:02x?} }}", self.witness_hash)
     }
 }
 
@@ -1233,7 +1233,8 @@ pub enum ErasureStatus {
     /// Im Gate gesperrt.
     Gated,
     /// Schlüssel vernichtet.
-    KeyDestroyed,
+    #[serde(alias = "KeyDestroyed")]
+    KeyRevoked,
     /// Bereinigung läuft.
     Purging,
     /// Messung läuft.
@@ -1515,18 +1516,6 @@ pub fn open_vfs_file(
 // =========================================================================
 // Autarke Basis- & Porttypen (Klasse A Entkopplung)
 // =========================================================================
-
-/// Mandanten-Identifikator.
-
-
-
-/// Collection-Identifikator.
-
-
-
-/// Dokument-Identifikator.
-
-
 
 /// Transaktions-Identifikator.
 #[derive(

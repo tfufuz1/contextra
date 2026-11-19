@@ -108,8 +108,8 @@ pub enum RecordType {
     Intent = 0x01,
     /// Completed / Purged nach Ausführung
     Completed = 0x02,
-    /// KeyDestroyed
-    KeyDestroyed = 0x03,
+    /// KeyRevoked
+    KeyRevoked = 0x03,
 }
 
 impl RecordType {
@@ -118,7 +118,7 @@ impl RecordType {
         match v {
             0x01 => Ok(RecordType::Intent),
             0x02 => Ok(RecordType::Completed),
-            0x03 => Ok(RecordType::KeyDestroyed),
+            0x03 => Ok(RecordType::KeyRevoked),
             other => Err(LedgerError::InvalidRecord(format!(
                 "Unknown record type byte: {:#04x}",
                 other

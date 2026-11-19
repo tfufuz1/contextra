@@ -13,8 +13,8 @@ pub enum RecordCode {
     RequestedIntent = 1,
     /// 2: Gated
     Gated = 2,
-    /// 3: KeyDestroyed
-    KeyDestroyed = 3,
+    /// 3: KeyRevoked
+    KeyRevoked = 3,
     /// 4: Purging
     Purging = 4,
     /// 5: Verifying
@@ -41,7 +41,7 @@ impl RecordCode {
         match val {
             1 => Ok(Self::RequestedIntent),
             2 => Ok(Self::Gated),
-            3 => Ok(Self::KeyDestroyed),
+            3 => Ok(Self::KeyRevoked),
             4 => Ok(Self::Purging),
             5 => Ok(Self::Verifying),
             6 => Ok(Self::Completed),
@@ -65,7 +65,7 @@ impl RecordCode {
         match self {
             Self::RequestedIntent => SagaState::Requested,
             Self::Gated => SagaState::Gated,
-            Self::KeyDestroyed => SagaState::KeyDestroyed,
+            Self::KeyRevoked => SagaState::KeyRevoked,
             Self::Purging => SagaState::Purging,
             Self::Verifying => SagaState::Verifying,
             Self::Completed => SagaState::Completed,
@@ -373,7 +373,7 @@ impl JournalEntry {
         let record_code = match self.state {
             SagaState::Requested => RecordCode::RequestedIntent,
             SagaState::Gated => RecordCode::Gated,
-            SagaState::KeyDestroyed => RecordCode::KeyDestroyed,
+            SagaState::KeyRevoked => RecordCode::KeyRevoked,
             SagaState::Purging => RecordCode::Purging,
             SagaState::Verifying => RecordCode::Verifying,
             SagaState::Completed => RecordCode::Completed,

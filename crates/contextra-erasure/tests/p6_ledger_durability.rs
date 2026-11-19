@@ -55,7 +55,7 @@ impl MockSagaDriver {
         }
 
         let item = BatchRecordItem {
-            record_type: RecordType::KeyDestroyed,
+            record_type: RecordType::KeyRevoked,
             commitment,
             range_tags: vec![0x42; 8],
             gated_seq,

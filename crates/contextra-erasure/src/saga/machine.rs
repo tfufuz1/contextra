@@ -1,7 +1,7 @@
 //! Zustandsmaschine des Löschablaufs (SPEC §11.2, ER-18).
 //!
 //! Zustände:
-//!   Requested → Gated → KeyDestroyed → Purging → Verifying → Completed
+//!   Requested → Gated → KeyRevoked → Purging → Verifying → Completed
 //!      └──────────┴──────────┴── Pending(reason) (idempotent, wiederholbar)
 //!   Refused  (terminal, vor Gate)
 
@@ -30,7 +30,8 @@ pub enum SagaState {
     /// Gate gesetzt und Schlüssel vernichtet – Daten unlesbar.
     Gated,
     /// Schlüssel vernichtet (Intermediate-Zustand, Purge noch offen).
-    KeyDestroyed,
+    #[serde(alias = "KeyDestroyed")]
+    KeyRevoked,
     /// Purge-Phase läuft.
     Purging,
     /// Verifikations-Phase läuft.
@@ -62,11 +63,11 @@ impl SagaState {
             (Requested, Restricted) => true,
             (Requested, Refused) => true,
             (Requested, Pending) => true,
-            (Gated, KeyDestroyed) => true,
+            (Gated, KeyRevoked) => true,
             (Gated, Purging) => true, // D-117: Superseded Version ohne KeyDestroy direkt zu Purging
             (Gated, Pending) => true,
-            (KeyDestroyed, Purging) => true,
-            (KeyDestroyed, Pending) => true,
+            (KeyRevoked, Purging) => true,
+            (KeyRevoked, Pending) => true,
             (Purging, Verifying) => true,
             (Purging, Pending) => true,
             (Verifying, Completed) => true,
@@ -77,7 +78,7 @@ impl SagaState {
             (Restricted, Pending) => true,
             // Pending kann nur zu den aktiven Schritten fortsetzen, NIE direkt zu Completed (FW-9, I-4)
             (Pending, Gated) => true,
-            (Pending, KeyDestroyed) => true,
+            (Pending, KeyRevoked) => true,
             (Pending, Purging) => true,
             (Pending, Verifying) => true,
             // Idempotenz: gleicher Zustand ist kein Fehler
@@ -92,7 +93,7 @@ impl std::fmt::Display for SagaState {
         match self {
             Self::Requested => write!(f, "Requested"),
             Self::Gated => write!(f, "Gated"),
-            Self::KeyDestroyed => write!(f, "KeyDestroyed"),
+            Self::KeyRevoked => write!(f, "KeyRevoked"),
             Self::Purging => write!(f, "Purging"),
             Self::Verifying => write!(f, "Verifying"),
             Self::Completed => write!(f, "Completed"),

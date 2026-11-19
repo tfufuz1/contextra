@@ -88,10 +88,8 @@ pub fn scrub_shard_step<C: VaultScrubContext>(
                         f_orphans.push(sd.tag);
                     }
                 }
-                SlotType::Document => {
-                    if sd.gen < seq_floor && !ctx.document_in_manifest(&sd.tag) {
-                        d_orphans.push(sd.tag);
-                    }
+                SlotType::Document if sd.gen < seq_floor && !ctx.document_in_manifest(&sd.tag) => {
+                    d_orphans.push(sd.tag);
                 }
                 _ => {}
             }

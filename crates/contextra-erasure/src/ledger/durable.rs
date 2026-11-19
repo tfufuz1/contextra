@@ -21,7 +21,7 @@ pub struct LedgerAnchorProof {
 /// Eingabedaten für einen Batch-Append im Ledger.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchRecordItem {
-    /// Record-Typ (z. B. Completed oder KeyDestroyed)
+    /// Record-Typ (z. B. Completed oder KeyRevoked)
     pub record_type: RecordType,
     /// Commitment-Hash
     pub commitment: [u8; 32],

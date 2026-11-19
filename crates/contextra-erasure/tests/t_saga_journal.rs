@@ -24,9 +24,9 @@ async fn t_crash_1_and_idempotence() {
         .expect("transition to Gated");
     assert_eq!(saga.state(), SagaState::Gated);
 
-    saga.transition_to(SagaState::KeyDestroyed)
-        .expect("transition to KeyDestroyed");
-    assert_eq!(saga.state(), SagaState::KeyDestroyed);
+    saga.transition_to(SagaState::KeyRevoked)
+        .expect("transition to KeyRevoked");
+    assert_eq!(saga.state(), SagaState::KeyRevoked);
 
     saga.transition_to(SagaState::Purging)
         .expect("transition to Purging");
@@ -55,7 +55,7 @@ async fn t_driver_linearization_and_advance() {
     let outcome = driver.step(&mut saga).expect("step to key destroyed");
     assert!(matches!(
         outcome,
-        StepOutcome::Advanced(SagaState::KeyDestroyed)
+        StepOutcome::Advanced(SagaState::KeyRevoked)
     ));
 
     let outcome = driver.step(&mut saga).expect("step to purging");
@@ -104,8 +104,8 @@ async fn t_cancel_1_and_journal_persistence() {
 async fn t_crash_matrix_recovery_table() {
     // Crash-Matrix Tabelle nach SPEC 11.2:
     // Schritt 1 (Requested) -> Crash -> Recovery findet Requested -> Wiederanlauf setzt bei Gated an
-    // Schritt 2 (Gated) -> Crash -> Recovery findet Gated -> Wiederanlauf setzt bei KeyDestroyed an
-    // Schritt 3 (KeyDestroyed) -> Crash -> Recovery findet KeyDestroyed -> Wiederanlauf setzt bei Purging an
+    // Schritt 2 (Gated) -> Crash -> Recovery findet Gated -> Wiederanlauf setzt bei KeyRevoked an
+    // Schritt 3 (KeyRevoked) -> Crash -> Recovery findet KeyRevoked -> Wiederanlauf setzt bei Purging an
     // Schritt 4 (Purging) -> Crash -> Recovery findet Purging -> Wiederanlauf setzt bei Verifying an
     // Schritt 5 (Verifying) -> Crash -> Recovery findet Verifying -> Wiederanlauf setzt bei Completed an
     // Schritt 6 (Completed) -> Crash -> Recovery findet Completed -> Terminal (keine Fortsetzung)
@@ -113,8 +113,8 @@ async fn t_crash_matrix_recovery_table() {
 
     let cases = vec![
         (SagaState::Requested, SagaState::Gated),
-        (SagaState::Gated, SagaState::KeyDestroyed),
-        (SagaState::KeyDestroyed, SagaState::Purging),
+        (SagaState::Gated, SagaState::KeyRevoked),
+        (SagaState::KeyRevoked, SagaState::Purging),
         (SagaState::Purging, SagaState::Verifying),
         (SagaState::Verifying, SagaState::Completed),
     ];

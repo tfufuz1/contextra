@@ -269,7 +269,7 @@ impl KeyRegistry {
                         if let Some(mut entry) = groups_guard.remove(&group_id) {
                             entry.kek.0.zeroize();
                             entry.wrapped_kek.zeroize();
-                            for (_, rec) in entry.record_deks.iter_mut() {
+                            for rec in entry.record_deks.values_mut() {
                                 rec.wrapped_dek.zeroize();
                             }
                         }
@@ -415,7 +415,7 @@ impl KeyRegistry {
             if let Some(mut entry) = groups.remove(&group_id) {
                 entry.kek.0.zeroize();
                 entry.wrapped_kek.zeroize();
-                for (_, rec) in entry.record_deks.iter_mut() {
+                for rec in entry.record_deks.values_mut() {
                     rec.wrapped_dek.zeroize();
                 }
             }
@@ -963,7 +963,7 @@ impl KeyRegistry {
                 entry.kek.0.zeroize();
                 entry.wrapped_kek.zeroize();
                 let count = entry.record_deks.len();
-                for (_, rec) in entry.record_deks.iter_mut() {
+                for rec in entry.record_deks.values_mut() {
                     rec.wrapped_dek.zeroize();
                 }
                 count

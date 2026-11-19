@@ -22,8 +22,8 @@ fn test_t_repl_1_2_3_replace_erasing_protocol() {
     assert_eq!(saga.state(), SagaState::Requested);
     // R2: PreGate run (new document durable in LSM) -> transition to Gated
     assert!(saga.transition_to(SagaState::Gated).is_ok());
-    // R3: KeyDestroyed
-    assert!(saga.transition_to(SagaState::KeyDestroyed).is_ok());
+    // R3: KeyRevoked
+    assert!(saga.transition_to(SagaState::KeyRevoked).is_ok());
     // R4: Purging -> Verifying -> Completed
     assert!(saga.transition_to(SagaState::Purging).is_ok());
     assert!(saga.transition_to(SagaState::Verifying).is_ok());
@@ -96,7 +96,7 @@ fn test_saga_state_transition_matrix_exhaustive() {
     let all_states = [
         SagaState::Requested,
         SagaState::Gated,
-        SagaState::KeyDestroyed,
+        SagaState::KeyRevoked,
         SagaState::Purging,
         SagaState::Verifying,
         SagaState::Completed,

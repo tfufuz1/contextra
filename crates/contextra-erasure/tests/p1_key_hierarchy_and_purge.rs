@@ -213,7 +213,7 @@ fn test_keystore_port_adapter() {
     let err = store.decrypt_record(&payload).unwrap_err();
     assert_eq!(
         err,
-        KeyStoreError::KeyDestroyed {
+        KeyStoreError::KeyRevoked {
             group_id: 500,
             epoch: 1
         }
@@ -223,7 +223,7 @@ fn test_keystore_port_adapter() {
     let kek_err = store.get_or_derive_kek(scope).unwrap_err();
     assert_eq!(
         kek_err,
-        KeyStoreError::KeyDestroyed {
+        KeyStoreError::KeyRevoked {
             group_id: 500,
             epoch: 1
         }

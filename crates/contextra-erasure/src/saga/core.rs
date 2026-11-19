@@ -4,7 +4,7 @@
 //! 1. Validierung & RetentionAttestation (Matrix D-124 Abs. 6), resolve je Schicht, Journal Requested+Intent (fsync #1).
 //! 2. Gate setzen unter CommitBarrier::exclusive -> add_gate mit gated_seq (fsync #2).
 //! 3. on_gate je Schicht, Schlüsselvernichtung höchster Ebene via SagaVault (fsync #3), Fehlen prüfen.
-//! 4. Journal KeyDestroyed (fsync #4) -> Observer-Benachrichtigung Gated -> Rückgabe Gated.
+//! 4. Journal KeyRevoked (fsync #4) -> Observer-Benachrichtigung Gated -> Rückgabe Gated.
 //! 5. Purge-Fenster in Reihenfolge a–g:
 //!    a) Snapshots widerrufen (SnapshotRevoker)
 //!    b) Textsegment-Rewrite
@@ -296,7 +296,7 @@ impl ErasureCore {
                 let status = match entry.saga.state() {
                     SagaState::Requested => ErasureStatus::Requested,
                     SagaState::Gated => ErasureStatus::Gated,
-                    SagaState::KeyDestroyed => ErasureStatus::KeyDestroyed,
+                    SagaState::KeyRevoked => ErasureStatus::KeyRevoked,
                     SagaState::Purging => ErasureStatus::Purging,
                     SagaState::Verifying => ErasureStatus::Verifying,
                     SagaState::Completed => ErasureStatus::Completed,
@@ -536,10 +536,10 @@ impl ErasureCore {
             });
         }
 
-        // --- SCHRITT 4: Journal KeyDestroyed (fsync #4) & Rückgabe Gated ---
-        saga.transition_to(SagaState::KeyDestroyed)?;
+        // --- SCHRITT 4: Journal KeyRevoked (fsync #4) & Rückgabe Gated ---
+        saga.transition_to(SagaState::KeyRevoked)?;
         deps.journal
-            .append_state(erasure_id, SagaState::KeyDestroyed, None)
+            .append_state(erasure_id, SagaState::KeyRevoked, None)
             .await?;
 
         Self::notify_observer(&deps, erasure_id, &req.target, ObservedPhase::Gated).await;
@@ -782,7 +782,7 @@ impl ErasureCore {
         Ok(ErasureStatus::Completed)
     }
 
-    /// Führt ein Purge-Fenster über alle offenen Sagas im Zustand `KeyDestroyed` oder `Purging` aus.
+    /// Führt ein Purge-Fenster über alle offenen Sagas im Zustand `KeyRevoked` oder `Purging` aus.
     pub async fn run_purge_window(
         &self,
     ) -> Result<crate::purge::window::WindowOutcome, ErasureError> {
@@ -794,7 +794,7 @@ impl ErasureCore {
                 .await
                 .iter()
                 .filter(|(_, entry)| {
-                    entry.saga.state() == SagaState::KeyDestroyed
+                    entry.saga.state() == SagaState::KeyRevoked
                         || entry.saga.state() == SagaState::Purging
                 })
                 .map(|(id, entry)| {
@@ -851,8 +851,8 @@ impl ErasureCore {
             let id = saga.erasure_id();
             let next_step = match saga.state() {
                 SagaState::Requested => SagaState::Gated,
-                SagaState::Gated => SagaState::KeyDestroyed,
-                SagaState::KeyDestroyed => SagaState::Purging,
+                SagaState::Gated => SagaState::KeyRevoked,
+                SagaState::KeyRevoked => SagaState::Purging,
                 SagaState::Purging => SagaState::Verifying,
                 SagaState::Verifying => SagaState::Completed,
                 SagaState::Pending => SagaState::Purging,
@@ -891,7 +891,7 @@ impl ErasureCore {
             let status = match entry.saga.state() {
                 SagaState::Requested => ErasureStatus::Requested,
                 SagaState::Gated => ErasureStatus::Gated,
-                SagaState::KeyDestroyed => ErasureStatus::KeyDestroyed,
+                SagaState::KeyRevoked => ErasureStatus::KeyRevoked,
                 SagaState::Purging => ErasureStatus::Purging,
                 SagaState::Verifying => ErasureStatus::Verifying,
                 SagaState::Completed => ErasureStatus::Completed,

@@ -246,7 +246,7 @@ pub fn evaluate_residual_risks_with_context(ctx: &ResidualRiskContext) -> Vec<Re
         risks.push(ResidualRiskId::IndexTopologyInference);
     }
 
-    // 8. TextIndexUntilPurge: zwischen KeyDestroyed und Segment-Rewrite
+    // 8. TextIndexUntilPurge: zwischen KeyRevoked und Segment-Rewrite
     if !ctx.purge_complete {
         risks.push(ResidualRiskId::TextIndexUntilPurge);
     }

@@ -74,8 +74,8 @@ impl SagaDriver {
 
         let next = match saga.state() {
             SagaState::Requested => SagaState::Gated,
-            SagaState::Gated => SagaState::KeyDestroyed,
-            SagaState::KeyDestroyed => SagaState::Purging,
+            SagaState::Gated => SagaState::KeyRevoked,
+            SagaState::KeyRevoked => SagaState::Purging,
             SagaState::Purging => SagaState::Verifying,
             SagaState::Verifying => SagaState::Completed,
             SagaState::Pending => {

@@ -50,9 +50,9 @@ fn test_t_repl_1_protocol_order_and_missing_replacement() {
     plan.advance_to_r3_gate_old().expect("Advance to R3");
     assert_eq!(plan.step(), ReplaceStep::R3GatedOld);
 
-    // R3 -> R4 (KeyDestroyed -> Purging)
+    // R3 -> R4 (KeyRevoked -> Purging)
     plan.advance_to_r4_key_destroyed().expect("Advance to R4");
-    assert_eq!(plan.step(), ReplaceStep::R4KeyDestroyed);
+    assert_eq!(plan.step(), ReplaceStep::R4KeyRevoked);
 }
 
 /// SPEC: T-REPL-2 (D-115 SameIdentity Ablehnung und Idempotenz)

@@ -258,7 +258,8 @@ pub enum ErasureStatus {
     /// Im Gate persistiert, Lesepfade gesperrt.
     Gated,
     /// Schlüssel in Keyslots dauerhaft vernichtet.
-    KeyDestroyed,
+    #[serde(alias = "KeyDestroyed")]
+    KeyRevoked,
     /// Physisches Umschreiben und Bereinigen läuft.
     Purging,
     /// Unabhängige Messung läuft.
@@ -464,6 +465,7 @@ pub struct ControlEvidence(());
 impl ControlEvidence {
     /// Bezeugt das Auffinden des Kontrollmusters (nur in autorisierten Modulen aufgerufen).
     #[inline]
+    #[allow(dead_code)] // Duplikat zu types_local::ControlEvidence; Typ-Bereinigung ausstehend
     pub(crate) const fn observed() -> Self {
         Self(())
     }

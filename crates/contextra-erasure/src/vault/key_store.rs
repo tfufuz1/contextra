@@ -87,7 +87,7 @@ pub enum KeyStoreError {
     },
     /// Schlüssel wurde bereits vernichtet (Fail-Closed).
     #[error("Schlüssel für Gruppe {group_id}, Epoche {epoch} wurde bereits vernichtet")]
-    KeyDestroyed {
+    KeyRevoked {
         /// Betroffene Gruppen-ID.
         group_id: u64,
         /// Betroffene Epoche.
@@ -147,7 +147,7 @@ impl KeyStore for KeyRegistry {
         let subkey = self
             .get_or_derive_epoch(scope.group_id, scope.epoch)
             .map_err(|e| match e {
-                crate::error::ErasureError::Refused => KeyStoreError::KeyDestroyed {
+                crate::error::ErasureError::Refused => KeyStoreError::KeyRevoked {
                     group_id: scope.group_id,
                     epoch: scope.epoch,
                 },
@@ -164,7 +164,7 @@ impl KeyStore for KeyRegistry {
     ) -> Result<EncryptedEpochRecordPayload, KeyStoreError> {
         self.encrypt_envelope_record_epoch(scope.group_id, scope.epoch, record_id, plaintext)
             .map_err(|e| match e {
-                crate::error::ErasureError::Refused => KeyStoreError::KeyDestroyed {
+                crate::error::ErasureError::Refused => KeyStoreError::KeyRevoked {
                     group_id: scope.group_id,
                     epoch: scope.epoch,
                 },
@@ -178,7 +178,7 @@ impl KeyStore for KeyRegistry {
     ) -> Result<Vec<u8>, KeyStoreError> {
         self.decrypt_envelope_record_epoch(payload)
             .map_err(|e| match e {
-                crate::error::ErasureError::Refused => KeyStoreError::KeyDestroyed {
+                crate::error::ErasureError::Refused => KeyStoreError::KeyRevoked {
                     group_id: payload.group_id,
                     epoch: payload.epoch,
                 },
@@ -207,7 +207,7 @@ impl KeyStore for KeyRegistry {
                     KeyStoreError::NotFound { group_id, epoch }
                 }
                 crate::kv_shredding::KeyShredError::KekAlreadyDestroyed { group_id, epoch } => {
-                    KeyStoreError::KeyDestroyed { group_id, epoch }
+                    KeyStoreError::KeyRevoked { group_id, epoch }
                 }
                 crate::kv_shredding::KeyShredError::Crypto(s) => KeyStoreError::Crypto(s),
                 crate::kv_shredding::KeyShredError::InvalidInput(s) => {
