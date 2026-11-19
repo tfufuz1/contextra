@@ -11,7 +11,7 @@
 // SECTION: Module Declarations & Core Architecture
 // ANCHOR[id=env-modules,epic=env-core,seq=1]
 // NOTE: Alle Submodule sind autark und verwenden ausschließlich die Rust-Standardbibliothek.
-// LINK crates/contextra-env/SPEC.md#4-bindender-vertrag-42-s
+// LINK docs/crates/contextra-env.md §2
 // =========================================================================
 
 /// Port trait and default system implementations for wall-clock and monotonic time.
@@ -82,3 +82,52 @@ pub fn unix_ms(c: &dyn Clock) -> u64 {
 }
 
 // !SECTION: Time Utility Functions
+
+// =========================================================================
+// SECTION: Unit Tests
+// ANCHOR[id=env-tests,epic=env-core,seq=3]
+// NOTE: Prüft die Zeit-Hilfsfunktion und die Arc-Delegation ohne Test-Features.
+// =========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    /// Minimale feste Uhr, unabhängig vom `test-utils`-Feature.
+    struct FixedClock(u64);
+
+    impl Clock for FixedClock {
+        fn now_unix_nanos(&self) -> u64 {
+            self.0
+        }
+
+        fn monotonic_nanos(&self) -> u64 {
+            self.0
+        }
+    }
+
+    #[test]
+    fn test_unix_ms_rounds_down() {
+        // NOTE: Verifiziert SPEC-v2 §4.2 / B02 (abrundende Ganzzahldivision).
+        assert_eq!(unix_ms(&FixedClock(0)), 0);
+        assert_eq!(unix_ms(&FixedClock(999_999)), 0);
+        assert_eq!(unix_ms(&FixedClock(1_000_000)), 1);
+        assert_eq!(unix_ms(&FixedClock(1_000_001)), 1);
+        assert_eq!(unix_ms(&FixedClock(1_500_000_000)), 1_500);
+        assert_eq!(unix_ms(&FixedClock(u64::MAX)), u64::MAX / 1_000_000);
+    }
+
+    #[test]
+    fn test_arc_clock_delegates() {
+        // NOTE: Verifiziert INV-ENV-TIME-1/2 über die Arc-Delegation.
+        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
+        let a = clock.monotonic_nanos();
+        let b = clock.monotonic_nanos();
+        assert!(b >= a);
+        assert!(clock.now_unix_nanos() > 0);
+        assert_eq!(unix_ms(&clock), clock.now_unix_nanos() / 1_000_000);
+    }
+}
+
+// !SECTION: Unit Tests

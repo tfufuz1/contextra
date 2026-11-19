@@ -7,7 +7,7 @@
 // SECTION: Aggregated Port Re-exports
 // ANCHOR[id=env-root,epic=env-core,seq=3]
 // NOTE: Bündelt alle Kernports des Environment-Ökosystems für saubere Entkopplung.
-// LINK crates/contextra-env/SPEC.md#1-zweck
+// LINK docs/crates/contextra-env.md §1
 // =========================================================================
 
 pub use crate::clock::{Clock, SystemClock};

@@ -26,6 +26,10 @@ impl From<VectorError> for contextra_types::ContextraError {
                     },
                 )
             }
+            // Kein eigener Typ-Variant in contextra-types; Verlust der Konnektivität ist ein Index-Fehler.
+            VectorError::ConnectivityLoss => contextra_types::ContextraError::Index(
+                "graph index disconnected: connectivity repair failed".to_string(),
+            ),
             VectorError::NotFound(msg) => contextra_types::ContextraError::NotFound(msg),
             VectorError::Conflict(msg) => contextra_types::ContextraError::Conflict(msg),
             VectorError::Concurrency(msg) => contextra_types::ContextraError::Index(msg),

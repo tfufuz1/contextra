@@ -6,7 +6,7 @@ use contextra_env::*;
 // SECTION: Conformance Test Suite
 // ANCHOR[id=conformance-tests,epic=env-core,seq=5]
 // NOTE: Verifiziert alle Grundverträge der vier Environment-Kernports.
-// LINK crates/contextra-env/SPEC.md#4-bindender-vertrag-42-s
+// LINK docs/crates/contextra-env.md §2
 // =========================================================================
 
 #[test]

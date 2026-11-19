@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock};
 // SECTION: MetricsSink Port Trait
 // ANCHOR[id=metrics-root,epic=metrics,seq=1]
 // NOTE: Primäre Schnittstelle für Telemetrie und Performance-Monitoring.
-// LINK crates/contextra-env/SPEC.md#44-metricssink
+// LINK docs/crates/contextra-env.md §2.4
 // =========================================================================
 
 /// Metrics sink port trait for recording system counters, gauges, and histograms.
@@ -47,6 +47,18 @@ pub trait MetricsSink: Send + Sync + 'static {
     /// # Crash
     /// Reiner flüchtiger RAM-Histogrammwert; keine I/O oder persistente Mutation.
     fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]);
+
+    /// Records a duration given in nanoseconds as a histogram observation in seconds.
+    ///
+    /// Additive Komfortmethode gemäß Spec §2.4 (`record_histogram_duration_ns`). Die Umrechnung
+    /// erfolgt in `f64`; Dauern oberhalb von 2^53 ns (~104 Tage) verlieren Präzision, was für
+    /// Latenz-Buckets irrelevant ist.
+    ///
+    /// # Fehler
+    /// Keine; garantiert panikfrei und nicht-blockierend.
+    fn record_histogram_duration_ns(&self, name: &str, nanos: u64, labels: &[(&str, &str)]) {
+        self.record_histogram(name, nanos as f64 / 1_000_000_000.0, labels);
+    }
 }
 
 // !SECTION: MetricsSink Port Trait
@@ -391,10 +403,8 @@ mod tests {
 
         let snap = sink.snapshot();
         let hist_key = MetricKey::new("search_latency", &key_labels);
-        let hist_snap = snap
-            .histograms
-            .get(&hist_key)
-            .expect("histogram key present");
+        // NOTE: Fehlt der Schlüssel, liefert `unwrap_or_default` einen leeren Snapshot und die Assertions scheitern.
+        let hist_snap = snap.histograms.get(&hist_key).cloned().unwrap_or_default();
 
         assert_eq!(hist_snap.count, 2);
         assert!((hist_snap.sum - 0.022).abs() < 1e-6);
@@ -402,6 +412,116 @@ mod tests {
         assert_eq!(hist_snap.max, Some(0.020));
         assert_eq!(hist_snap.buckets.get("<= 0.005s"), Some(&1));
         assert_eq!(hist_snap.buckets.get("<= 0.050s"), Some(&1));
+    }
+    #[test]
+    fn test_label_order_is_normalized() {
+        // NOTE: MetricKey sortiert Labels; unterschiedliche Reihenfolgen zählen dieselbe Zeitreihe.
+        let sink = InMemoryMetricsSink::new();
+        sink.record_counter("req", 1, &[("a", "1"), ("b", "2")]);
+        sink.record_counter("req", 2, &[("b", "2"), ("a", "1")]);
+
+        let snap = sink.snapshot();
+        assert_eq!(snap.counters.len(), 1);
+        let key = MetricKey::new("req", &[("a", "1"), ("b", "2")]);
+        assert_eq!(snap.counters.get(&key), Some(&3));
+    }
+
+    #[test]
+    fn test_gauge_last_write_wins() {
+        let sink = InMemoryMetricsSink::new();
+        sink.record_gauge("g", 1.0, &[]);
+        sink.record_gauge("g", -2.5, &[]);
+        let snap = sink.snapshot();
+        assert_eq!(snap.gauges.get(&MetricKey::new("g", &[])), Some(&-2.5));
+    }
+
+    #[test]
+    fn test_histogram_bucket_bounds_are_inclusive() {
+        // NOTE: Jede Obergrenze ist inklusiv; jeder Wert landet in genau einem Bucket.
+        let sink = InMemoryMetricsSink::new();
+        let samples = [
+            0.001, 0.005, 0.010, 0.050, 0.100, 0.500, 1.000, 5.000, 10.000, 10.500,
+        ];
+        for value in samples {
+            sink.record_histogram("h", value, &[]);
+        }
+
+        let snap = sink.snapshot();
+        let hist = snap
+            .histograms
+            .get(&MetricKey::new("h", &[]))
+            .cloned()
+            .unwrap_or_default();
+        assert_eq!(hist.count, 10);
+        for bucket in hist.buckets.values() {
+            assert_eq!(*bucket, 1);
+        }
+        assert_eq!(hist.buckets.get("<= 0.001s"), Some(&1));
+        assert_eq!(hist.buckets.get("> 10.000s"), Some(&1));
+        assert_eq!(hist.min, Some(0.001));
+        assert_eq!(hist.max, Some(10.5));
+    }
+
+    #[test]
+    fn test_snapshot_is_point_in_time() {
+        let sink = InMemoryMetricsSink::new();
+        sink.record_counter("c", 1, &[]);
+        let snap = sink.snapshot();
+        sink.record_counter("c", 1, &[]);
+        assert_eq!(snap.counters.get(&MetricKey::new("c", &[])), Some(&1));
+        assert_eq!(
+            sink.snapshot().counters.get(&MetricKey::new("c", &[])),
+            Some(&2)
+        );
+    }
+
+    #[test]
+    fn test_counter_concurrent_increments_are_exact() {
+        // NOTE: 8 Threads × 1000 Inkremente müssen exakt 8000 ergeben.
+        let sink = Arc::new(InMemoryMetricsSink::new());
+        let handles: Vec<_> = (0..8)
+            .map(|_| {
+                let s = sink.clone();
+                std::thread::spawn(move || {
+                    for _ in 0..1000 {
+                        s.record_counter("concurrent", 1, &[]);
+                    }
+                })
+            })
+            .collect();
+        for handle in handles {
+            let _ = handle.join();
+        }
+        let snap = sink.snapshot();
+        assert_eq!(
+            snap.counters.get(&MetricKey::new("concurrent", &[])),
+            Some(&8000)
+        );
+    }
+
+    #[test]
+    fn test_histogram_duration_ns_is_recorded_in_seconds() {
+        // NOTE: 1.5 s in Nanosekunden landet im Bucket "<= 5.000s" und hat Summe 1.5.
+        let sink = InMemoryMetricsSink::new();
+        sink.record_histogram_duration_ns("saga", 1_500_000_000, &[]);
+        let snap = sink.snapshot();
+        let hist = snap
+            .histograms
+            .get(&MetricKey::new("saga", &[]))
+            .cloned()
+            .unwrap_or_default();
+        assert_eq!(hist.count, 1);
+        assert!((hist.sum - 1.5).abs() < 1e-9);
+        assert_eq!(hist.buckets.get("<= 5.000s"), Some(&1));
+    }
+
+    #[test]
+    fn test_arc_dyn_metrics_sink() {
+        // NOTE: Verifiziert Object Safety und die Arc-Delegation.
+        let sink: Arc<dyn MetricsSink> = Arc::new(NoopMetricsSink);
+        sink.record_counter("x", 1, &[]);
+        sink.record_gauge("x", 1.0, &[]);
+        sink.record_histogram("x", 1.0, &[]);
     }
 }
 

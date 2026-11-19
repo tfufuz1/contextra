@@ -7,7 +7,7 @@ use std::sync::Arc;
 // SECTION: IdGen Port Trait
 // ANCHOR[id=idgen-root,epic=id-gen,seq=1]
 // NOTE: Primäre Abstraktion zur Erzeugung prozessweiter oder lokaler eindeutiger IDs.
-// LINK crates/contextra-env/SPEC.md#43-idgen
+// LINK docs/crates/contextra-env.md §2.3
 // =========================================================================
 
 /// Port trait for unique ID generation.
@@ -43,7 +43,7 @@ pub struct SequentialIdGen {
 
 impl SequentialIdGen {
     /// Creates a new [`SequentialIdGen`] starting at `start`.
-    pub fn new(start: u64) -> Self {
+    pub const fn new(start: u64) -> Self {
         Self {
             next: AtomicU64::new(start),
         }
@@ -108,6 +108,22 @@ mod tests {
     }
 
     #[test]
+    fn test_sequential_id_gen_default_starts_at_one() {
+        // NOTE: ID 0 ist als Sentinel reserviert; die Default-Sequenz beginnt bei 1.
+        let gen = SequentialIdGen::default();
+        assert_eq!(gen.next_id(), 1);
+        assert_eq!(gen.next_id(), 2);
+    }
+
+    #[test]
+    fn test_sequential_id_gen_wraps_on_overflow() {
+        // NOTE: Dokumentiertes Verhalten: u64::MAX -> 0 (atomares Wrapping).
+        let gen = SequentialIdGen::new(u64::MAX);
+        assert_eq!(gen.next_id(), u64::MAX);
+        assert_eq!(gen.next_id(), 0);
+    }
+
+    #[test]
     fn test_sequential_id_gen_concurrent_no_duplicates() {
         // NOTE: Verifiziert INV-ENV-ID-1 (Nebenläufige Eindeutigkeit über 8 Threads à 1000 IDs = 8000 eindeutige IDs)
         let gen = Arc::new(SequentialIdGen::new(1));
@@ -126,8 +142,8 @@ mod tests {
 
         let mut all_ids = BTreeSet::new();
         for handle in handles {
-            let ids = handle.join().expect("Thread panicked");
-            for id in ids {
+            // Ein paniziertes Thread-Ergebnis liefert eine leere Liste und lässt die Zählung scheitern.
+            for id in handle.join().unwrap_or_default() {
                 assert!(all_ids.insert(id), "Duplicate ID found: {id}");
             }
         }

@@ -43,6 +43,14 @@ pub mod compat;
 // Crate-lokale Kern-Verträge (Index, Maintain, DistanceFn, Transform).
 pub mod contract;
 
+// ANCHOR[contextra-vector:ROOT-MOD-PURGE]
+// Physische Vektor-Bereinigung für die DSGVO-Löschkette (Phase 4e).
+pub mod purge;
+
+// ANCHOR[contextra-vector:ROOT-MOD-VECTOR-INDEX]
+// Normative k-NN-Schnittstelle mit Ausschlussfilter.
+pub mod vector_index;
+
 // ANCHOR[contextra-vector:ROOT-MOD-ERROR]
 // Crate-lokales Fehler-Enum VectorError.
 pub mod error;
@@ -102,6 +110,10 @@ pub mod quantize_rabitq;
 pub use compat::candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 
 pub use compute_pool::ComputePool;
+
+pub use purge::{VectorPurgeOutcome, VectorPurger};
+
+pub use vector_index::{VectorIndex, VectorSearchHit};
 
 pub use contract::{
     BlockTransform, Clock as ContractClock, DistanceFn, Error as ContractError, ExternalId,

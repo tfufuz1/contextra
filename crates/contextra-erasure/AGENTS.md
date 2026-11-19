@@ -19,15 +19,11 @@ Zentraler Löschkern: 6-Schritte-Löschsaga, Crypto-Shredding, In-Memory ReadGat
 ## 2. Kern-Richtlinien für Agenten
 
 - **Ring-Isolation (E0):** Keine direkten Abhängigkeiten auf konkrete Speicher-Crates (`store`, `vector`, etc.); Steuerung erfolgt strikt über Port-Traits aus `contextra-ports`.
-- **Die 6-Schritte-Löschsaga:**
-  1. Intent & Validierung (fsync #1) — `RetentionAttestation` prüfen, Journal-Append.
-  2. Gate setzen (fsync #2) — `CommitBarrier::exclusive()`, ReadGate auf `Erased`, Journal.
-  3. Schlüsselvernichtung (fsync #3) — `layer.on_gate`, DEK/KEK/SubjectKey überschreiben + nullen (`zeroize`), `verify_key_absent`. **Ab hier kryptographisch unlesbar!**
-  4. Physischer Purge — Asynchron unter `PurgeBarrier` in Reihenfolge: a) mvcc -> b) text -> c) wal -> d) sstable -> e) vector -> f) graph -> g) crypto -> h) caches.
-  5. Messung — Positivkontrolle via `Scanner<Armed>`, alle `LayerWitness.residue_matches == 0`.
-  6. Bericht & Ledger — Ed25519-signierter Bericht, hash-verkettetes Ledger außerhalb des Datenverzeichnisses, Journal `Completed` (terminal).
-- **ReadGate-Garantie:** Liefert ab Zustand `Gated` synchron O(1) `GateDecision::Erased` (Fail-Closed).
-- **Historische Mängel (E-F01 bis E-F16):** Keine Fallback-Schlüssel, keine Null-Schlüssel, kein Klartext-Fallback, echte AES-256-GCM-SIV AEAD.
+- **Löschkette:** Ausschließlich `chain::Chain` (SPEC §5.3). Schritte: 1 Intent (fsync #1), 2 Gate unter `CommitBarrier` (fsync #2), 3 `on_gate` → Schlüsselvernichtung → `verify_absent` → `KeyRevoked`, 4 Purge in Prioritätsreihenfolge, 5 Messung mit Positivkontrolle und Lesepfad-Test, 6 Bericht über `ReportSink` → `Completed`.
+- **Normative Quelle:** `docs/SPEC.md` §5–§7. Die Crate-Spec `docs/crates/contextra-erasure.md` leitet sich davon ab. Bei Widerspruch gilt die SPEC.
+- **ReadGate-Garantie:** `SagaGate::check` ist O(1). Gate vor Schlüsselvernichtung, Gate nie zurücknehmen (INV-10).
+- **Verbotene Altlasten:** Keine Saga-Orchestrierung außerhalb von `chain/`, kein `KeyDestroyed`/`KeyRange`, keine eigenen Krypto-Primitive ausserhalb des Tresor-Kerns (R4, Restarbeit siehe Crate-Spec §10).
+
 
 ---
 
@@ -35,25 +31,25 @@ Zentraler Löschkern: 6-Schritte-Löschsaga, Crypto-Shredding, In-Memory ReadGat
 
 ## Inventar (generiert)
 
-- **Pfad:** `crates/contextra-erasure` · **Ring:** 3 · **Version:** 0.1.0
-- **Beschreibung:** Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht.
-- **src:** 83 Dateien, 16726 LOC · **unsafe:** 0 Vorkommen, Policy `forbid`
-- **Interne Abhängigkeiten (normal, 0):** –
-- **Interne Dev/Build-Abhängigkeiten (0):** –
-- **Externe Abhängigkeiten (normal, 18):** `aes-gcm-siv`, `ahash`, `bincode`, `blake3`, `bytes`, `ed25519-dalek`, `futures-util`, `hmac`, `parking_lot`, `rand`, `serde`, `serde_json`, `sha2`, `subtle`, `thiserror`, `tokio`, `tracing`, `zeroize`
+- **Pfad:** `crates/contextra-erasure` · **Ring:** 0 · **Version:** 0.1.0
+- **Beschreibung:** Löschkern: Löschkette (Saga), ReadGate, Tresor, Messung, Schichtschnittstelle.
+- **src:** 23 Dateien, 4359 LOC · **unsafe:** 0 Vorkommen, Policy `forbid`
+- **Interne Abhängigkeiten (normal, 3):** `contextra-durable-fs`, `contextra-env`, `contextra-ids`
+- **Interne Dev/Build-Abhängigkeiten (1):** `contextra-env`
+- **Externe Abhängigkeiten (normal, 11):** `blake3`, `bytes`, `hmac`, `parking_lot`, `serde`, `serde_json`, `sha2`, `subtle`, `thiserror`, `tracing`, `zeroize`
 - **Reverse-Abhängigkeiten (0):** –
 - **Kopplung an Hub-Crates:** ausgehend –; eingehend –
-- **Features (4):** `async`, `default`, `signing`, `vault`
+- **Features (1):** `default`
 
 ### Öffentliche API (grob, aus src/)
-- struct (186): `ActiveScopeFlight`, `AncestorSalts`, `AppendLog`, `Armed`, `ArmedScanner`, `BarrierExclusive`, `BarrierShared`, `BatchGateOutcome`, `BatchGateRequest`, `BatchRecordItem`, `BlobRewriter`, `CollectionId`, `CollectionRef`, `CompactionPermit`, `ControlEvidence` … (+171)
-- enum (86): `AdmissionFailure`, `CollectionStatus`, `CustodyLevel`, `DeletionLayer`, `DeletionProofError`, `DeletionScope`, `DisposeFailure`, `EraseMode`, `EraseTarget`, `ErasureError`, `ErasureStatus`, `EvidenceKind`, `ExcludedScope`, `FenceFailure`, `FenceGateError` … (+71)
-- trait (35): `Clock`, `CommitBarrier`, `EpochKeys`, `ErasureLayer`, `ErasureObserver`, `ErasureTarget`, `FenceGate`, `FileKeyring`, `IdGen`, `KeyStore`, `LayerScanner`, `LayerWitnessExt`, `LedgerSink`, `LedgerStorage`, `ProofKeyProvider` … (+20)
-- fn (447): `acquire`, `acquire_with_lease`, `add_batch`, `add_entry`, `add_erased`, `add_erased_with_bounds`, `add_fenced_key`, `add_finding`, `add_prefix_seq`, `add_restricted`, `add_restricted_with_bounds`, `advance_to_next`, `advance_to_r2_intent`, `advance_to_r3_gate_old`, `advance_to_r4_key_destroyed` … (+432)
-- type (7): `BoxFuture`, `CryptoError`, `InMemoryKeyring`, `Result`, `ScopeLayerId`, `SignerId`, `WitnessEntry`
-- const (34): `CACHE_EVICT`, `CTRALEDG_MAGIC`, `CTRALEDG_VERSION`, `CTX_FILE_MAGIC`, `CTX_FORMAT_VERSION`, `DEFAULT_EXCLUDED_SCOPES`, `DEFAULT_SHRED_KEY_GROUP_SIZE`, `FIXED_HEADER_LEN`, `GEN`, `GENESIS_HASH`, `MAC`, `MIN_FRAME_LEN`, `PAYLOAD`, `SIZE`, `SLOT_CLEANUP` … (+19)
-- mod (79): `appendlog`, `backend`, `batch`, `binding`, `build`, `canonical`, `codec`, `core`, `crypto_local`, `cx`, `deletion_proof`, `driver`, `durable`, `ed25519_proof`, `entry` … (+64)
-- pub use: `appendlog::{AppendLog, DurableJournal}`, `binding::{compute_witnesses_chain_hash, verify_witnesses_binding}`, `build::{ build_report, build_report_with_options, canonicalize_report, ErasureReport, FieldMeasurementSection, LayerKeyCoverage, LayerWitnessReport, ProcessHardeningStatus, ReachStatus, ReportBuildOptions, WitnessEntry, }`, `canonical::{ canonicalize_json, canonicalize_value, to_canonical_json, to_canonical_json_string, verify_canonical_nfc, }`, `codec::{decode_scope, encode_scope}`, `core::{EraseExecutionRequest, ErasureConfig, ErasureCore, ErasureCoreStatus, ErasureDeps}`, `crate::saga::SagaState`, `crate::types_local::VerifiedVia`, `crate::types_local::{ Armed, ControlEvidence, LayerWitness, MeasureClass, Scanner, Unarmed, }`, `crate::types_local::{ EraseMode, EraseTarget, PendingReason, RetentionAttestation, RetentionCode, Timing, }` … (+53)
+- struct (38): `AncestorSalts`, `Armed`, `BarrierExclusive`, `Chain`, `ChainDeps`, `CommitBarrier`, `ControlEvidence`, `Dek`, `Destroyed`, `DurableVaultShard`, `FileJournal`, `FileVault`, `FileVaultKeys`, `JournalRecord`, `LayerId` … (+23)
+- enum (15): `EraseTarget`, `ErasureError`, `GateDecision`, `GateMode`, `HkdfError`, `KeyCoverage`, `MeasureClass`, `PendingReason`, `RangeGate`, `RetentionCode`, `SagaState`, `ShardBackend`, `SlotType`, `TargetKind`, `VerifiedVia`
+- trait (12): `Clock`, `DiskReserve`, `ErasureLayer`, `GateSink`, `Journal`, `KeyVault`, `PositiveControl`, `ReadGate`, `ReportSink`, `VaultScrubContext`, `Vfs`, `VfsFile`
+- fn (136): `activate_key`, `activate_prefix`, `activate_restricted_key`, `activate_restricted_prefix`, `arm`, `armed`, `as_bytes`, `barrier`, `blocks_erasure`, `blocks_reads`, `bytes`, `can_transition_to`, `capacity`, `class`, `collect_active_slots` … (+121)
+- type (2): `BoxFuture`, `LayerFuture`
+- const (19): `CTX_FILE_MAGIC`, `CTX_FORMAT_VERSION`, `GEN`, `MAC`, `MAX_DISTINCT_PREFIX_LENGTHS`, `PAYLOAD`, `SLOT_TYPE`, `STATUS`, `STATUS_ACTIVE`, `STATUS_EMPTY`, `STATUS_TOMBSTONE`, `TAG`, `VAULT_ALG_IDS`, `VAULT_FILE_KIND`, `VAULT_HEADER_SIZE` … (+4)
+- mod (23): `adapters`, `chain`, `crypto_local`, `durable`, `error`, `gate`, `io`, `journal`, `layer`, `off`, `open`, `ports`, `rehash`, `retention`, `saga` … (+8)
+- pub use: `crate::types_local::VerifiedVia`, `durable::VAULT_SLOT_BASE`, `gate::saga_gate::{GateDecision, RangeGate, ReadGate, SagaGate}`, `journal::{FileJournal, JournalRecord}`, `layer::{ErasureLayer, LayerFuture, LayerScope, PurgeCx, PurgeOutcome}`, `open::{ compute_metablock_mac, encode_metablock, open_vault, open_vault_shard, MetablockParams, VaultOpenOutcome, VAULT_METABLOCK_SIZE, }`, `ports::{ CommitBarrier, DiskReserve, GateMode, GateSink, Journal, KeyVault, PositiveControl, ReportSink, }`, `rehash::{rehash, rehash_durable_shard, rehash_shard, RehashOutcome}`, `retention::{RetentionAttestation, RetentionCode}`, `saga::{Chain, ChainDeps, Receipt}` … (+6)
 
 Regeneriert mit `python3 tools/crate_inventory.py agents`. Manuelle Notizen stehen außerhalb dieses Blocks.
 
