@@ -10,6 +10,8 @@ description = "Injectable environment (clock, rng, id generation, metrics) for C
 workspace = true
 
 [dependencies]
+contextra-ids = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 

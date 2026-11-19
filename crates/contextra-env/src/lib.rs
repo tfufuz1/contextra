@@ -1,8 +1,9 @@
 //! Canonical environment abstractions for Contextra (Clock, Rng, IdGen, Metrics).
 //!
 //! # Architecture Role
-//! Zero internal workspace dependencies (E0 Foundation Micro-Core).
-//! Pure standard library environment contracts and deterministic test doubles.
+//! Internal workspace dependencies: `contextra-ids` (DocId, TOMBSTONE_BIT) for the
+//! versioned sequence log `seq_log`. Otherwise standard library and `tracing` only.
+//! Environment contracts and deterministic test doubles.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -34,6 +35,9 @@ pub mod metrics;
 /// LINK rng.rs#rng-root
 pub mod rng;
 
+/// Versioniertes Sequenz-Log für snapshot-isolierte Suchen (ehemals contextra-mvcc).
+pub mod seq_log;
+
 /// Controllable manual clock implementation for testing determinism.
 /// Gated behind optional `test-utils` feature (SPEC K13).
 /// LINK manual_clock.rs#manual-clock-root
@@ -55,6 +59,7 @@ pub use metrics::{
     HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricSnapshot, MetricsSink, NoopMetricsSink,
 };
 pub use rng::{Rng, SeededRng};
+pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
 
 #[cfg(feature = "test-utils")]
 pub use manual_clock::ManualClock;

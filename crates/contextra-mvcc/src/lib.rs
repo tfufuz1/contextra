@@ -98,13 +98,13 @@ pub use crate::mvcc_error::Result;
 
 // SECTION Core MVCC Modules
 pub mod mvcc_error;
-pub mod seq_log;
+pub use contextra_env::seq_log;
 pub mod snapshot;
 pub mod ssi;
 pub mod tombstone;
 pub mod tx_buffer;
 
-pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
+pub use contextra_env::seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
 pub use snapshot::{SnapshotGuard, SnapshotRegistry};
 pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};

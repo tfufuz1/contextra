@@ -27,9 +27,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use contextra_env::{Clock, SystemClock};
+use crate::{Clock, SystemClock};
 
-use crate::types::DocId;
+use contextra_ids::DocId;
 
 // SECTION Constants
 // ANCHOR[id=seq-log-constants]
@@ -152,11 +152,11 @@ pub struct SequenceLog {
     /// Liste aller historischen Dokumentversionen.
     entries: Vec<SeqLogEntry>,
     /// Zuordnung von gepinnter Sequenznummer zu Liste von Erstellungs-Zeitstempeln (in Nanosekunden).
-    pinned_snapshots: ahash::AHashMap<u64, Vec<u64>>,
+    pinned_snapshots: std::collections::BTreeMap<u64, Vec<u64>>,
     /// Unterste Grenze, bis zu der bereits eine Verdichtung (Kompaktierung) stattgefunden hat.
     compacted_below: Option<u64>,
     /// Schneller Lookup für aktuell gelöschte Dokumente und ihre Lösch-Sequenznummer.
-    deletions: ahash::AHashMap<DocId, u64>,
+    deletions: std::collections::BTreeMap<DocId, u64>,
     /// Konfigurierte Maximaldauer für aktive Snapshot-Pins (Standard: 5 Minuten).
     max_pin_duration: Duration,
     /// Abstrakte Systemuhr zur Ermittlung monoton steigender Nanosekunden.
@@ -194,9 +194,9 @@ impl SequenceLog {
     pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
         Self {
             entries: Vec::new(),
-            pinned_snapshots: ahash::AHashMap::default(),
+            pinned_snapshots: std::collections::BTreeMap::new(),
             compacted_below: None,
-            deletions: ahash::AHashMap::default(),
+            deletions: std::collections::BTreeMap::new(),
             max_pin_duration: DEFAULT_MAX_PIN_DURATION,
             clock,
         }
@@ -274,7 +274,7 @@ impl SequenceLog {
     /// 3. Ist die Liste der Zeitstempel für diese Sequenznummer leer, den Eintrag vollständig aus der Map löschen.
     pub fn unpin_snapshot(&mut self, seq_no: u64) {
         let seq_no = seq_no & !contextra_ids::TOMBSTONE_BIT;
-        if let std::collections::hash_map::Entry::Occupied(mut entry) =
+        if let std::collections::btree_map::Entry::Occupied(mut entry) =
             self.pinned_snapshots.entry(seq_no)
         {
             let timestamps = entry.get_mut();
@@ -512,7 +512,21 @@ impl SequenceLog {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_env::ManualClock;
+    /// Fester Test-Takt (Unix- und Monotonic-Zeit), unabhängig vom `test-utils`-Feature.
+    #[derive(Debug)]
+    struct FixedClock {
+        unix: u64,
+        mono: u64,
+    }
+
+    impl Clock for FixedClock {
+        fn now_unix_nanos(&self) -> u64 {
+            self.unix
+        }
+        fn monotonic_nanos(&self) -> u64 {
+            self.mono
+        }
+    }
 
     // Prüft die O(1)-Sichtbarkeitsprüfung eines einzelnen SeqLogEntry-Eintrags an verschiedenen Grenzwerten.
     #[test]
@@ -747,7 +761,7 @@ mod tests {
     // Prüft TTL-Ablauf und das automatische Bereinigen veralteter Snapshot-Pins über eine manuelle Uhr.
     #[test]
     fn test_sequence_log_pin_ttl_and_expiration() {
-        let clock = Arc::new(ManualClock::new(100_000_000_000, 100_000_000_000));
+        let clock = Arc::new(FixedClock { unix: 100_000_000_000, mono: 100_000_000_000 });
         let mut log = SequenceLog::with_clock(clock.clone() as Arc<dyn Clock>)
             .with_max_pin_duration(Duration::from_secs(10));
         assert_eq!(log.max_pin_duration(), Duration::from_secs(10));
@@ -789,7 +803,7 @@ mod tests {
     // Prüft die korrekte Handhabung einer benutzerdefinierten maximalen Pin-Dauer.
     #[test]
     fn test_sequence_log_pin_ttl_custom_duration() {
-        let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
+        let clock = Arc::new(FixedClock { unix: 1_000_000_000, mono: 1_000_000_000 });
         let mut log = SequenceLog::with_clock(clock.clone() as Arc<dyn Clock>);
         assert_eq!(log.max_pin_duration(), DEFAULT_MAX_PIN_DURATION);
 
@@ -815,7 +829,7 @@ mod tests {
     // Prüft, dass rückwärtsspringende Zeitstempel dank sättigender Subtraktion keine Panics auslösen.
     #[test]
     fn test_sequence_log_zero_panic_time_arithmetic() {
-        let clock = Arc::new(ManualClock::new(100_000_000, 100_000_000));
+        let clock = Arc::new(FixedClock { unix: 100_000_000, mono: 100_000_000 });
         let mut log = SequenceLog::with_clock(clock.clone() as Arc<dyn Clock>);
         let now_nanos = clock.now_unix_nanos();
         let future_nanos = now_nanos + 100_000_000_000;

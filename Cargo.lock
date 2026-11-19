@@ -487,6 +487,10 @@ dependencies = [
 [[package]]
 name = "contextra-env"
 version = "0.1.0"
+dependencies = [
+ "contextra-ids",
+ "tracing",
+]
 
 [[package]]
 name = "contextra-erasure"
@@ -788,7 +792,6 @@ dependencies = [
  "contextra-durable-fs",
  "contextra-env",
  "contextra-ids",
- "contextra-mvcc",
  "contextra-ports",
  "contextra-simd",
  "contextra-types",
