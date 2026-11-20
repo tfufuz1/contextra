@@ -204,7 +204,7 @@ Die Reihenfolge folgt der Abhängigkeitslogik: zuerst Typen ohne externe Verbrau
 | U-IDS-2 | `SubjectRef` ohne `Clone`, `Debug` redigiert, `Zeroize` | Aufrufer in `contextra` und `mcp` anpassen (15 Dateien, Ownership) | Test `redaction` |
 | U-IDS-3 | Neuer Typ `TicketId` plus Ersetzung `ErasureId` → `TicketId` (12 Dateien) | mechanisch | `grep -rn ErasureId crates` leer |
 | U-IDS-4 | `OperatorRef` → `PrincipalRef` (10 Dateien). `PrincipalRef::try_new` verlangt gültige Namen | Konfigurationsloader in `contextra` liefert die Namen | Test `principal_name` |
-| U-IDS-5 | `Seq` und `Timestamp` entfernen. Ersatz: `u64` in `ports::version`, `u64` Nanosekunden aus `Clock` (env). Reihenfolge: zuerst `env` (Schritt E-ENV-3), dann dieser Schritt | 11 + 12 Dateien | `grep -rn "ids::Seq\|ids::Timestamp"` leer |
+| U-IDS-5 | `Seq` und `Timestamp` entfernen. Ersatz: `u64` in `ports::version`, `u64` Nanosekunden aus `Clock` (env). Reihenfolge: zuerst `env` (Schritt U-ENV-3), dann dieser Schritt | 11 + 12 Dateien | `grep -rn "ids::Seq\|ids::Timestamp"` leer |
 | U-IDS-6 | `TxId` entfernen. Ersatz `u64`. Größter Schritt | 333 Verweise, mechanische Ersetzung mit Compiler-Führung | `grep -rn "TxId" crates` leer |
 | U-IDS-7 | `EntityId` entfernen. Ersatz `graph::EntityId` (kommt mit `contextra-graph`-PLAN) | 139 Verweise. Bis dahin bleibt der Graph in M4b ausgeschaltet, `db` verweist nicht auf `EntityId` | `grep -rn "ids::EntityId"` leer |
 | U-IDS-8 | `TOMBSTONE_BIT` entfernen. Ersatz über `ChunkSlot`-Bitmap im Aufrufer | 59 Verweise. Entspricht dem Umbau der Versionierung | `grep -rn TOMBSTONE_BIT` leer |
@@ -250,4 +250,4 @@ Nicht testen: Verteilung der Zufallsbytes. Das ist die Aufgabe des Betriebssyste
 | G-03 | `layering.rs` bestätigt: `ids` hat keine Abhängigkeit auf ein Workspace-Crate |
 | Dokumentation | `PLAN.md` referenziert nur Kapitel und IDs aus SPEC v4.1 |
 
-**Reihenfolge im Repository:** Dieses PLAN wird als erster Commit der Fundamentreihe eingecheckt. Die Umsetzung U-IDS-1 bis U-IDS-12 folgt, wenn `contextra-env` (E-ENV-3) bereit ist, weil U-IDS-5 davon abhängt.
+**Reihenfolge im Repository:** Dieses PLAN wird als erster Commit der Fundamentreihe eingecheckt. Die Umsetzung U-IDS-1 bis U-IDS-12 folgt, wenn `contextra-env` (U-ENV-3) bereit ist, weil U-IDS-5 davon abhängt.

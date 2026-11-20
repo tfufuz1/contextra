@@ -1,330 +1,234 @@
-# contextra-sys — Implementierungsspezifikation (Soll-Zustand)
+# contextra-sys — Implementierungsspezifikation
 
-**Ebene:** E0 (Autarkes Fundament / Ring 0 — Unsafe-Insel)  
-**Kern-Closure:** Leer (0 interne Workspace-Abhängigkeiten)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-sys`  
-**Referenzdokumente:** `docs/SPEC.md` §2.3 (R5), §4; `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-15, AP-21)  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-sys` ist eine der exakt zwei autorisierten **Unsafe-Inseln** im Contextra-Workspace (neben `contextra-simd`).
-Es kapselt alle hardware- und betriebssystemnahen Systemaufrufe (POSIX und Win32) hinter typsicheren, sicheren Rust-Schnittstellen:
-- **Speichersperrung (`mlock` / `munlock` / `VirtualLock`):** Verhindert das Auslagern sensibler Schlüssel in die Swap-Partition (Art. 32 DSGVO, SPEC §4).
-- **Speicherabgebildete Dateien (`mmap`):** Speichersichere Kapselung von Memory-Mapped I/O für LSM-SSTables und Vektor-Indizes via `memmap2`.
-- **I/O-Beratung & Deskriptor-Flags (`posix_fadvise` / `O_DIRECT`):** Optimierung sequentieller Kompaktions-Reads und Vermeidung von Page-Cache-Pollution.
-- **Verzeichnis-Synchronisation (`fsync_dir`):** Persistierung von Directory-Inodes für atomare Renames.
-
-### Unsafe-Insel-Garantien (R5, INV-3, INV-11)
-1. **Isolations-Garantie:** Sämtlicher FFI- und Low-Level-OS-Code ist hier konzentriert. Außerhalb von `sys` und `simd` gilt im gesamten Workspace ausnahmslos `#![forbid(unsafe_code)]`.
-2. **Dokumentationspflicht für Unsafe:** Jeder einzelne `unsafe`-Block MUSS zwingend mit einem fundierten `// SAFETY:`-Kommentar begründet werden.
-3. **Sichere Außengrenze:** Alle nach außen exportierten Structs, Enums und Funktionen sind zu 100 % sicher aufrufbar (Safe Rust). Rohe Zeiger und ungültige Dateideskriptoren verlassen das Crate nicht.
-4. **Fehlerresilienz:** Betriebssystemfehler (`errno`, `GetLastError`) werden ausnahmslos in das typsichere `SysError`-Enum übersetzt; keine Panics.
-5. **Leere Default-Features (R3):** `default = []`.
+**Ebene:** E0 (Fundament)
+**Status:** Normativ, abgeleitet aus `docs/SPEC.md` v4.1
+**Version:** 4.1
+**Geltungsbereich:** `crates/contextra-sys`
+**Normative Quellen:** SPEC 3.1 (Zeile `contextra-sys`), 3.2 (R5, R6), 3.3, 3.5, 5.5, 5.6, 5.5 REQ-KEY-6, 8.7, 11.2 (T-OPS-09), 15, ADR-41, ADR-53, ADR-19, G-02, G-03, G-05, G-13, REM-13, REM-14.
 
 ---
 
-## 2. Kanonische Komponenten & Schnittstellen
+## 1. Zweck und Ebene
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                contextra-sys                                │
-│                                                                             │
-│   ┌──────────────────────────┐             ┌────────────────────────────┐   │
-│   │       LockedMemory       │             │         MmapHandle         │   │
-│   │ mlock / VirtualLock RAII │             │ Safe Mmap / Read-only Slice│   │
-│   │ Zeroize on Drop          │             │ madvise Sequential/Random  │   │
-│   └─────────────┬────────────┘             └─────────────┬──────────────┘   │
-│                 │                                        │                  │
-│                 ▼                                        ▼                  │
-│   ┌──────────────────────────┐             ┌────────────────────────────┐   │
-│   │       posix / os         │             │          vault             │   │
-│   │ sync_dir, advise_io,     │             │ SecureMemoryPool,          │   │
-│   │ direct_io flags          │             │ LockedKeySlot              │   │
-│   └──────────────────────────┘             └────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+`contextra-sys` ist die **einzige** Stelle des Workspace für Systemaufrufe, die `unsafe` benötigen, außer `contextra-simd` (R5, ADR-53). Das Crate kapselt die Aufrufe in sichere Funktionen mit Fehlertyp. Es enthält keine Logik über Daten, Schlüssel oder Dateiformate.
+
+SPEC 3.1 nennt drei Aufgaben: **mlock** (Speichersperre), **Dumpable** (Core-Dumps aus), **Direct-IO**. Dazu kommen zwei Primitive, die SPEC an anderer Stelle verlangt: der Prozess-Lock auf `data_dir` (SPEC 3.5, 8.7) und die Mapping-Funktion für schreibgeschützte Dateien (SPEC 5.8, Store-Replay).
+
+### 1.1 Ist-Befund (gemessen am HEAD `f8b44b2`)
+
+| Messgröße | Wert | Befund |
+|---|---|---|
+| Quelldateien | 14 `.rs` inkl. `benches/`, `examples/`, `tests/`, 2.987 Zeilen | Benches und Beispiele gehören nach SPEC 13.1 nicht in dieses Crate |
+| `unsafe`-Blöcke in `src/` | 22 (vault 1, acl_win32 7, posix 4, mmap 1, mlock 5, durability 4) | Die Verteilung ist die Grundlage von U-SYS-1 |
+| Abhängigkeiten | `memmap2`, `thiserror`, `tracing`, `libc` (Unix-Zielabhängigkeit) | `tracing` entfällt (E-SYS-09). `libc` bleibt |
+| Features | keine | ok |
+| Fehlende SPEC-Primitive | `PR_SET_DUMPABLE = 0` (ADR-41), `O_DIRECT` (SPEC 3.1), Datei-Lock für `LOCK` (SPEC 3.5, 8.7) | Es gibt kein einziges Vorkommen von `prctl`, `O_DIRECT` oder `flock` |
+| Fehlerinjektion im Produktcode | `fault_injection::set_fail_mlock` (globaler Atomar-Zustand), `set_fail_fsync` | Verletzt REM-13. Injektion gehört in `contextra-testkit` über Traits |
+| Richtlinie für `mlock` | `MemLockPolicy` mit Warnung statt Verweigerung | ADR-41 verlangt Verweigerung des Starts. Die Richtlinie entfällt |
+| Verbraucher außerhalb des Crates | `mmap_readonly`/`Sealed*` in 8 Dateien (7 DiskANN in `vector`, 1 `store/wal/replay.rs`); `DurableFile`, `write_all_durable`, `durable_flush_*`, `LockedRegions`, `VaultBuffer`, `MemoryLocker`, `mem_lock`, `apply_dont_dump`, `posix`-Funktionen, `acl_win32` jeweils 0 | Die meisten Module sind ohne Verbraucher. Die Schlüssel-Sperre (REQ-KEY-6) hat heute keine Implementierung |
+| Tests | 48 bestanden (`error_paths`, `integration_tests`) | Grün |
+| Namensgebung | `vault` (Modul, `VaultBuffer`, `LockedRegions`), Inline-Module `mem`, `fsmeta`, `map` als „Baukasten-Zielmodule“ | Widerspricht ADR-19 und REM-14. Der Begriff `vault` ist nach SPEC 1.3 ein Altbegriff (REM-01, REM-19) |
+
+Ergebnis: Das Crate enthält viel nicht Benötigtes und fehlt genau die Primitive, auf die der Schlüsselpfad angewiesen ist.
 
 ---
 
-### 2.1 RAM-Sperrung (`LockedMemory<T>`)
+## 2. Vertrag (öffentliche API)
 
-Verhindert Swap-Leaks kryptographischer Schlüssel:
+Alle Funktionen liefern `Result<_, SysError>`. Es gibt keinen Fallback, der einen Fehler stillschweigend verschluckt. Die Fehlermeldung trägt nie Speicherinhalte, Pfade mit Personenbezug oder Schlüsselbytes.
+
+### 2.1 Speicher (`mlock.rs`, `locked.rs`)
 
 ```rust
-use std::mem::size_of;
+/// Sperrt Seiten im Arbeitsspeicher (mlock). Fehler verweigern den Start (ADR-41). Kein Fallback.
+pub fn lock_pages(ptr: *const u8, len: usize) -> Result<(), SysError>;
 
-/// RAII-Wrapper zur Bindung von Speicher im physischen RAM (mlock).
-///
-/// Beim Erzeugen wird `mlock` aufgerufen; beim Droppen wird der Speicher
-/// zuerst mit Nullen überschrieben (`Zeroize`) und anschließend per `munlock` freigegeben.
-pub struct LockedMemory<T> {
-    data: T,
+/// Hebt die Sperre auf. Fehler werden nicht propagiert, weil der Aufrufer nach Drop nicht mehr reagieren kann.
+pub fn unlock_pages(ptr: *const u8, len: usize);
+
+/// Schließt eine Region aus Core-Dumps aus (madvise MADV_DONTDUMP).
+pub fn exclude_from_core_dumps(ptr: *const u8, len: usize) -> Result<(), SysError>;
+
+/// Setzt PR_SET_DUMPABLE auf 0 für den Prozess (ADR-41). Linux.
+pub fn disable_process_dumps() -> Result<(), SysError>;
+
+/// Abstraktion für Tests (T-OPS-09). Produktionsimplementierung ist `OsMemoryLocker`.
+pub trait MemoryLocker: Send + Sync + 'static {
+    fn lock(&self, ptr: *const u8, len: usize) -> Result<(), SysError>;
+    fn unlock(&self, ptr: *const u8, len: usize);
 }
+#[derive(Debug, Clone, Copy, Default)]
+pub struct OsMemoryLocker;
 
-impl<T> LockedMemory<T> {
-    /// Versucht, den Speicherbereich der übergebenen Daten im RAM zu sperren.
-    pub fn new(data: T) -> Result<Self, SysError> {
-        let ptr = &data as *const T as *const libc::c_void;
-        let size = size_of::<T>();
-
-        #[cfg(unix)]
-        {
-            // SAFETY: ptr verweist auf eine gültige, initialisierte Instanz von T
-            // auf dem Stack/Heap des aktuellen Threads mit exakter Größe size_of::<T>().
-            let res = unsafe { libc::mlock(ptr, size) };
-            if res != 0 {
-                return Err(SysError::MemoryLockFailed(std::io::Error::last_os_error()));
-            }
-        }
-
-        #[cfg(windows)]
-        {
-            // SAFETY: ptr und size entsprechen einem gültigen virtuellen Speicherbereich des Prozesses.
-            let res = unsafe {
-                windows_sys::Win32::System::Memory::VirtualLock(
-                    ptr as *mut _,
-                    size,
-                )
-            };
-            if res == 0 {
-                return Err(SysError::MemoryLockFailed(std::io::Error::last_os_error()));
-            }
-        }
-
-        Ok(Self { data })
-    }
-
-    #[inline]
-    pub fn get(&self) -> &T {
-        &self.data
-    }
-
-    #[inline]
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.data
-    }
+/// Fester, gesperrter Puffer für Schlüsselmaterial (REQ-KEY-6, ADR-41).
+/// Mlock bei Erzeugung, MADV_DONTDUMP, Nullung und Freigabe bei Drop.
+/// Kein Clone, kein Debug des Inhalts, kein Serialize.
+pub struct LockedBuffer { /* private */ }
+impl LockedBuffer {
+    pub fn new(len: usize, locker: &dyn MemoryLocker) -> Result<Self, SysError>;
+    pub fn as_slice(&self) -> &[u8];
+    pub fn as_mut_slice(&mut self) -> &mut [u8];
+    pub fn len(&self) -> usize;
 }
-
-impl<T> Drop for LockedMemory<T> {
-    fn drop(&mut self) {
-        let ptr = &self.data as *const T as *const libc::c_void;
-        let size = size_of::<T>();
-
-        #[cfg(unix)]
-        {
-            // SAFETY: Der Speicherbereich wurde im Konstruktor erfolgreich per mlock gesperrt
-            // und ist bis zum Ende des Destruktors gültig.
-            unsafe {
-                libc::munlock(ptr, size);
-            }
-        }
-
-        #[cfg(windows)]
-        {
-            // SAFETY: Entspricht dem im Konstruktor gesperrten Adressbereich.
-            unsafe {
-                windows_sys::Win32::System::Memory::VirtualUnlock(
-                    ptr as *mut _,
-                    size,
-                );
-            }
-        }
-    }
-}
+impl Drop for LockedBuffer { /* zeroize, unlock, dealloc */ }
 ```
 
----
+Begründung für die Injektion über `&dyn MemoryLocker`: Der Test T-OPS-09 („mlock nicht möglich: `Refused`“) braucht einen Fehlerpfad ohne globalen Zustand. Ein globaler Schalter im Produktcode ist verboten (REM-13).
 
-### 2.2 Speichersicheres Memory-Mapping (`MmapHandle`)
-
-Kapselung von `memmap2::Mmap` mit I/O-Hints:
+### 2.2 Dateien (`io.rs`, `lock.rs`, `sync.rs`)
 
 ```rust
-use std::fs::File;
-use std::path::Path;
+/// Öffnet eine Datei mit O_DIRECT (Linux). Ausrichtung der Puffer ist Aufgabe des Aufrufers.
+pub fn open_direct(path: &Path, write: bool, create: bool) -> Result<File, SysError>;
 
-/// Speichersichere, unveränderliche Speicherabbildung einer Datei.
-pub struct MmapHandle {
-    mmap: memmap2::Mmap,
-}
+/// Datensynchronisation. fdatasync (Linux), F_FULLFSYNC (macOS). Die Plattform-Entscheidung liegt hier.
+pub fn sync_data_full(file: &File) -> Result<(), SysError>;
 
-impl MmapHandle {
-    /// Öffnet eine Datei schreibgeschützt und erstellt das Speicherabbild.
-    pub fn open_read_only(file: &File) -> Result<Self, SysError> {
-        // SAFETY: Das Mapping ist schreibgeschützt. Der Aufrufer muss sicherstellen,
-        // dass die Datei während der Lebensdauer nicht von extern abgeschnitten (truncated) wird.
-        let mmap = unsafe {
-            memmap2::MmapOptions::new()
-                .map(file)
-                .map_err(|e| SysError::MmapFailed(e))?
-        };
-        Ok(Self { mmap })
-    }
-
-    #[inline]
-    pub fn as_slice(&self) -> &[u8] {
-        &self.mmap[..]
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.mmap.len()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.mmap.is_empty()
-    }
-
-    /// Weist das Betriebssystem an, das Mapping für sequentielle Lesezugriffe vorzuladen.
-    pub fn advise_sequential(&self) -> Result<(), SysError> {
-        #[cfg(unix)]
-        {
-            // SAFETY: mmap.as_ptr() und mmap.len() beschreiben einen gültigen gemappten Speicherbereich.
-            let res = unsafe {
-                libc::madvise(
-                    self.mmap.as_ptr() as *mut libc::c_void,
-                    self.mmap.len(),
-                    libc::MADV_SEQUENTIAL,
-                )
-            };
-            if res != 0 {
-                return Err(SysError::MadviseFailed(std::io::Error::last_os_error()));
-            }
-        }
-        Ok(())
-    }
-
-    /// Deaktiviert Read-Ahead für zufällige Zugriffsmuster (Sparse Point Lookups).
-    pub fn advise_random(&self) -> Result<(), SysError> {
-        #[cfg(unix)]
-        {
-            // SAFETY: Gültiger Pointer und Länge aus memmap2.
-            let res = unsafe {
-                libc::madvise(
-                    self.mmap.as_ptr() as *mut libc::c_void,
-                    self.mmap.len(),
-                    libc::MADV_RANDOM,
-                )
-            };
-            if res != 0 {
-                return Err(SysError::MadviseFailed(std::io::Error::last_os_error()));
-            }
-        }
-        Ok(())
-    }
+/// Exklusive Prozesssperre auf eine Datei (flock LOCK_EX | LOCK_NB). Gibt bei Drop frei.
+pub struct ProcessLock { /* File, privat */ }
+impl ProcessLock {
+    pub fn acquire(path: &Path) -> Result<Self, SysError>;   // `LockHeld`, wenn belegt
 }
 ```
 
----
+`sync_dir` (`fsync` auf ein Verzeichnis) ist eine Standardbibliotheksoperation (`File::open(dir)?.sync_all()`) und gehört zu `contextra-durable-fs`, nicht hierher.
 
-### 2.3 POSIX & OS Dateisystem-Primitive (`posix.rs`)
+### 2.3 Speicherabbildung (`map.rs`)
 
 ```rust
-use std::os::unix::io::AsRawFd;
+/// Schreibgeschützte Abbildung einer Datei (memmap2). Deref zu `[u8]`. Null-Länge-Dateien liefern eine leere Abbildung.
+pub struct ReadOnlyMap { /* memmap2::Mmap oder leer */ }
+impl Deref for ReadOnlyMap { type Target = [u8]; /* ... */ }
 
-/// Synchronisiert einen Verzeichniseintrag durabel auf Speichermedien.
-///
-/// Unerlässlich nach atomarem `rename`, um Dateisystem-Inodes auf ext4/xfs abzusichern.
-pub fn sync_directory(dir: &std::fs::File) -> Result<(), SysError> {
-    #[cfg(unix)]
-    {
-        let fd = dir.as_raw_fd();
-        // SAFETY: dir ist eine geöffnete, gültige Datei/Verzeichnisreferenz.
-        let res = unsafe { libc::fsync(fd) };
-        if res != 0 {
-            return Err(SysError::SyncFailed(std::io::Error::last_os_error()));
-        }
-    }
-    #[cfg(windows)]
-    {
-        dir.sync_all().map_err(SysError::SyncFailed)?;
-    }
-    Ok(())
-}
+pub fn map_readonly(file: &File) -> Result<ReadOnlyMap, SysError>;
 ```
 
----
-
-## 3. Fehlerbehandlung (`SysError`)
+### 2.4 Fehler (`error.rs`)
 
 ```rust
 #[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
 pub enum SysError {
-    #[error("Memory lock operation failed (mlock/VirtualLock): {0}")]
-    MemoryLockFailed(#[source] std::io::Error),
-
-    #[error("Memory mapping failed: {0}")]
-    MmapFailed(#[source] std::io::Error),
-
-    #[error("Memory advice failed (madvise): {0}")]
-    MadviseFailed(#[source] std::io::Error),
-
-    #[error("File descriptor synchronization failed (fsync): {0}")]
-    SyncFailed(#[source] std::io::Error),
-
-    #[error("Platform capability unsupported on current OS: {0}")]
-    UnsupportedPlatform(&'static str),
+    MemoryLockFailed { errno: i32 },
+    MemoryUnlockFailed { errno: i32 },
+    CoreDumpPolicyFailed { errno: i32 },
+    DirectIoUnsupported,
+    LockHeld,                          // ProcessLock: Datei bereits gesperrt
+    Sync { errno: i32 },
+    Map { errno: i32 },
+    Io(std::io::ErrorKind),
 }
 ```
 
+Die Variante `Io` trägt nur den `ErrorKind`, nie den Pfad.
+
 ---
 
-## 4. `Cargo.toml` Spezifikation
+## 3. Abhängigkeiten
 
-```toml
-[package]
-name = "contextra-sys"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-description = "Low-level unsafe system abstractions and FFI island for Contextra (Ring 0)"
+| Crate | Status | Begründung |
+|---|---|---|
+| `libc` | behalten (nur `cfg(unix)`) | Systemaufrufe `mlock`, `madvise`, `prctl`, `flock`, `fcntl` |
+| `memmap2` | behalten | Abbildung in `map.rs`. Die `unsafe`-Stelle `Mmap::map` bleibt in `sys` |
+| `thiserror` | behalten | `SysError` |
+| `zeroize` | **hinzufügen** | `LockedBuffer` (Nullung bei Drop) |
+| `tracing` | **entfernen** (E-SYS-09) | Kein Logging in `sys`. Fehler gehen als Wert nach oben |
 
-[lints]
-workspace = true
+Interne Abhängigkeiten: keine (SPEC 3.3, `sys` = `[]`).
 
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
+---
 
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = [
-    "Win32_Foundation",
-    "Win32_Security",
-    "Win32_Security_Authorization",
-    "Win32_Storage_FileSystem",
-    "Win32_System_Memory",
-    "Win32_System_Threading",
-] }
+## 4. Module
 
-[dependencies]
-memmap2 = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
-
-[dev-dependencies]
-tempfile = "3"
-
-[features]
-default = []
+```
+src/
+  lib.rs           # #![deny(unsafe_op_in_unsafe_fn)], Re-Exports, Modul-Dokumentation. `forbid` nicht möglich, siehe 4.1
+  error.rs         # SysError
+  mlock.rs         # lock_pages, unlock_pages, exclude_from_core_dumps, disable_process_dumps
+  locker.rs        # MemoryLocker, OsMemoryLocker
+  locked.rs        # LockedBuffer
+  io.rs            # open_direct, sync_data_full
+  lock.rs          # ProcessLock
+  map.rs           # ReadOnlyMap, map_readonly
+tests/
+  memory.rs        # T-SYS-01, T-SYS-02, T-SYS-03
+  process_lock.rs  # T-SYS-04
+  io.rs            # T-SYS-05, T-SYS-07
+  map.rs           # T-SYS-06
+  unsafe_islands.rs # T-SYS-08 (Allowlist für Test-Targets)
 ```
 
+### 4.1 `unsafe`-Regel
+
+R5 verlangt `#![forbid(unsafe_code)]` außer in `sys` und `simd`. In `sys` ist `unsafe` erlaubt, aber nur in den Modulen `mlock.rs`, `io.rs`, `lock.rs`, `map.rs`. Jeder `unsafe`-Block trägt einen `// SAFETY:`-Kommentar mit der Bedingung, die der Aufruf einhält. `#![deny(unsafe_op_in_unsafe_fn)]` ist gesetzt. `forbid` ist nicht möglich, weil das Crate die Aufrufe selbst macht.
+
 ---
 
-## 5. Implementierungs-Arbeitspakete für Entwickler
+## 5. Entfernungen
 
-1. **`Cargo.toml`:**
-   - Default-Features leeren (`default = []`).
-   - `publish = false` sicherstellen.
-2. **Altlasten-Bereinigung (`AP-15`, `AP-21`):**
-   - In `tests/unsafe_islands.rs` sicherstellen, dass nur `contextra-sys` und `contextra-simd` als Unsafe-Islands registriert sind (`contextra-wire` entfernt).
-   - In `src/vault.rs` und `src/lib.rs` alle veralteten Kommentare zu `contextra-vault` bereinigen.
-3. **Audit aller `unsafe`-Blöcke:**
-   - Sicherstellen, dass ausnahmslos jeder `unsafe`-Block einen `// SAFETY:`-Kommentar enthält.
-4. **Verifikation:**
-   - `cargo test -p contextra-sys`
+| ID | Entfernen | Ort | Grund | Ersatz | Verbraucher |
+|---|---|---|---|---|---|
+| E-SYS-01 | `acl_win32.rs` (7 `unsafe`, `set_restrictive_file_acl`, `verify_file_acl_owner_only`) | `src/acl_win32.rs`, `fsmeta` | Kein Verbraucher. Windows ist nicht Zielplattform (SPEC 1.2 nennt Linux-Hardware). Dateirechte setzt der Betrieb | keiner. Dateirechte werden über `0600`-Prüfung in `contextra` (`KeyFile`, SPEC REQ-KEY-7) geprüft | 0 |
+| E-SYS-02 | `posix.rs` (`set_fd_limit`, `ensure_fd_limit`, `reopen_and_dup2`, 4 `unsafe`) | `src/posix.rs` | Kein Verbraucher. Kein SPEC-Bedarf | keiner | 0 |
+| E-SYS-03 | `durability.rs` vollständig (`DurableFile`, `write_all_durable`, `durable_flush_file`, `durable_flush_dir`, `set_fail_fsync`) | `src/durability.rs` | Duplikat zu `contextra-durable-fs` (SPEC 3.3, `durable-fs` besitzt Durabilität). Globale Fehlerinjektion verletzt REM-13 | `sync_data_full` in `io.rs`, `sync_dir` in `durable-fs` | 0 |
+| E-SYS-04 | `vault.rs` (`LockedRegions`, `VaultBuffer`) | `src/vault.rs` | Name `vault` ist ein Altbegriff (REM-01, REM-19). Die Funktionalität ersetzt `LockedBuffer` mit Drop-Nullung und `&dyn MemoryLocker` | `locked.rs` | 0 |
+| E-SYS-05 | `mlock.rs`-Fehlerinjektion (`fault_injection`, `set_fail_mlock`, `should_fail_mlock`) | `src/mlock.rs` | REM-13. Injektion über `MemoryLocker`-Trait | `&dyn MemoryLocker` | 0 |
+| E-SYS-06 | `MemLockPolicy` mit Fallback (`mem_lock_typed`, `mem_lock_with_policy`, `mem_lock` mit `bool`) | `src/mlock.rs` | ADR-41: Start verweigert, kein Fallback. Die Richtlinie widerspricht der Entscheidung | `lock_pages -> Result` | 0 |
+| E-SYS-07 | `contract.rs` (`NoopMemoryLocker`) | `src/contract.rs` | ADR-19 (Selbstdeklaration), REM-14. Der Noop-Locker liegt in `contextra-testkit` | `testkit::NoopLocker` | 0 |
+| E-SYS-08 | Inline-Module `mem`, `fsmeta`, `map` in `lib.rs` mit LINK- und SECTION-Kommentaren | `src/lib.rs` | „Baukasten-Zielmodule“ ohne Funktion. REM-14 | flache Re-Exports | 0 |
+| E-SYS-09 | Abhängigkeit `tracing` | `Cargo.toml` | Kein Logging in `sys` (T-LOG-01: Protokolle ohne Nutzdaten, hier gibt es keine Protokolle) | keine | 0 |
+| E-SYS-10 | `SealedFile`, `SealedMap`, `SealedReadOnly`, `Unsealed`, `new_verified`, `verified_len`, `get_subslice` | `src/mmap.rs` | Altes Siegel-Modell (INV-IO-1 aus Altdokumentation). Der Seal-Begriff der SPEC ist ein anderer (Kapitel 4) | `map_readonly` | 8 (davon 7 in DiskANN, entfernt durch REM-09) |
+| E-SYS-11 | `examples/` (2 Dateien), `benches/sys_bench.rs` | Crate-Verzeichnis | Benchmarks liegen in `contextra-bench` (SPEC 3.1). Beispiele gehören nach SPEC 13.1 nicht in den Produktbaum | keine | 0 |
+| E-SYS-12 | ANCHOR-, LINK-, SECTION-, NOTE-Kommentare (`ANCHOR[id=...,epic=...]`) in allen Dateien | alle `src/` | ADR-19, REM-14 | Dokumentationskommentare | |
+| E-SYS-13 | `tests/integration_tests.rs`, `tests/error_paths.rs` in der bestehenden Form | `tests/` | Testen entfernte Funktionen | `tests/memory.rs` u. a. | |
+
+---
+
+## 6. Umbau (je Schritt ein Commit, Workspace grün)
+
+| Schritt | Inhalt | Verbraucher-Anpassung | Prüfung |
+|---|---|---|---|
+| U-SYS-1 | Verbraucherlose Module entfernen: `acl_win32.rs`, `posix.rs`, `durability.rs`, `vault.rs`, `contract.rs`, Inline-Module in `lib.rs` (E-SYS-01 bis E-SYS-04, E-SYS-07, E-SYS-08) | keine (Verbraucher 0) | `cargo check --workspace` |
+| U-SYS-2 | Fehlerinjektion und Policy aus `mlock.rs` entfernen (E-SYS-05, E-SYS-06). Neue Funktionen `lock_pages`, `unlock_pages`, `exclude_from_core_dumps` mit `Result`. `MemoryLocker` und `OsMemoryLocker` in `locker.rs` | keine | `cargo check -p contextra-sys` |
+| U-SYS-3 | `mmap.rs` auf `map_readonly`/`ReadOnlyMap` reduzieren (E-SYS-10). Verbraucher `store/src/wal/replay.rs` auf `map_readonly` umstellen. DiskANN-Verbraucher entfallen mit REM-09 in `vector` (siehe `vector`-PLAN) | 1 Datei in `store` | `cargo check -p contextra-store` |
+| U-SYS-4 | Neue Primitive: `disable_process_dumps` (A-SYS-01), `open_direct` (A-SYS-02), `ProcessLock` (A-SYS-03), `LockedBuffer` (A-SYS-04), `sync_data_full` (A-SYS-05) | keine, Verbraucher kommen mit den PLANs von `crypto`, `store`, `durable-fs` | Tests aus Abschnitt 7 |
+| U-SYS-5 | `tracing` entfernen (E-SYS-09). `zeroize` und `libc` (cfg unix) als Abhängigkeiten. `Cargo.toml` aufräumen | keine | `cargo tree -p contextra-sys` zeigt `libc`, `memmap2`, `thiserror`, `zeroize` |
+| U-SYS-6 | `examples/` und `benches/` löschen (E-SYS-11) | keine | `cargo build -p contextra-sys --all-targets` |
+| U-SYS-7 | Tests neu (`tests/memory.rs`, `process_lock.rs`, `io.rs`, `map.rs`, `unsafe_islands.rs`). Alte Testdateien löschen (E-SYS-13) | keine | `cargo test -p contextra-sys` |
+
+**Abhängigkeit zu anderen PLANs.** `durable-fs` verliert `durability`-Funktionen aus `sys` und übernimmt `sync_dir`. `crypto` braucht `LockedBuffer` (U-SYS-4). Die Reihenfolge ist: U-SYS-1 bis U-SYS-3 zuerst, dann `durable-fs`, dann U-SYS-4 zusammen mit `crypto`.
+
+---
+
+## 7. Tests
+
+| ID | Prüfung | Ort |
+|---|---|---|
+| T-SYS-01 | Nach `disable_process_dumps()` liefert `prctl(PR_GET_DUMPABLE)` den Wert 0 (Test-Target, nach ADR-53 erlaubt) | `tests/memory.rs` |
+| T-SYS-02 | `lock_pages` auf eine 4-KiB-Region gelingt. Bei `RLIMIT_MEMLOCK = 0` in einem Kindprozess liefert es `MemoryLockFailed { errno: ENOMEM|EPERM }` ohne Fallback | `tests/memory.rs` (Kindprozess über `std::process::Command` mit Umgebungsvariable) |
+| T-SYS-03 | `LockedBuffer::new` mit einem `MemoryLocker`-Double, das `Err` liefert, gibt `Err` zurück und hinterlässt keinen Puffer. Mit `OsMemoryLocker` ist `len()` korrekt | `tests/memory.rs` |
+| T-SYS-04 | `ProcessLock::acquire` auf dieselbe Datei aus einem Kindprozess liefert `LockHeld`. Nach Drop ist die Sperre frei | `tests/process_lock.rs` |
+| T-SYS-05 | `open_direct` auf einem ext4-Pfad schreibt einen 4-KiB-ausgerichteten Block. Auf einem Dateisystem ohne O_DIRECT liefert es `DirectIoUnsupported`. Test wird auf CI-Runner mit ext4 ausgeführt, sonst als `#[ignore]` markiert | `tests/io.rs` |
+| T-SYS-06 | `map_readonly` auf eine leere Datei liefert Länge 0. Auf einer 1-MiB-Datei liefert es denselben Inhalt wie `std::fs::read` | `tests/map.rs` |
+| T-SYS-07 | `sync_data_full` auf einer regulären Datei liefert `Ok` | `tests/io.rs` |
+| T-SYS-08 | Ein Test liest den Quellbaum und prüft, dass `unsafe` nur in `mlock.rs`, `io.rs`, `lock.rs`, `map.rs` steht (Allowlist aus Abschnitt 4.1) | `tests/unsafe_islands.rs` |
+| T-SYS-09 | `Debug`/`Display` von `SysError` enthalten keine Pfade, keine Byte-Sequenzen aus Puffern (Property-Test mit Pfad-Canary) | `tests/memory.rs` |
+| T-SYS-10 | `LockedBuffer` nullt beim Drop den Speicher. Test über `zeroize_slice` einzeln und über einen Drop-Zähler im Test-Feature | `tests/memory.rs` |
+
+**Bekannte Lücke:** T-SYS-02 und T-SYS-04 brauchen Kindprozesse. Der Test wird als Integrationstest mit eigenem Binary (`[[test]]` mit `harness = false`) ausgeführt, damit `RLIMIT_MEMLOCK` nicht den Testlauf stört.
+
+---
+
+## 8. Abnahme
+
+| Gate | Prüfung für `contextra-sys` |
+|---|---|
+| G-01 | `cargo check`, `cargo test`, `cargo clippy -- -D warnings` auf Linux, Toolchain 1.89.0 |
+| G-02 | `unsafe` nur in `mlock.rs`, `io.rs`, `lock.rs`, `map.rs` (T-SYS-08). `#![deny(unsafe_op_in_unsafe_fn)]` gesetzt |
+| G-03 | `sys` hat keine Workspace-Abhängigkeit |
+| G-05 | `cargo tree -p contextra-sys` enthält keine Netzwerk-Crates |
+| G-06 | `default = []` (keine Features) |
+| G-13 | keine `unwrap`/`expect`/`panic!` in `src/` außerhalb `#[cfg(test)]` |
+| ADR-41 | `disable_process_dumps` und `lock_pages` sind vorhanden und ohne Fallback (T-SYS-01, T-SYS-02) |
+| SPEC 3.5 | `ProcessLock` existiert und ist mit dem Verzeichnis `data_dir/LOCK` nutzbar (T-SYS-04) |
+
+**Reihenfolge im Repository:** Nach dem `env`-PLAN als dritter Commit. Die Umsetzung U-SYS-1 bis U-SYS-7 folgt. `durable-fs` setzt auf U-SYS-1 bis U-SYS-3 auf.

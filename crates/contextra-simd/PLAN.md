@@ -1,240 +1,185 @@
-# contextra-simd — Implementierungsspezifikation (Soll-Zustand)
+# contextra-simd — Implementierungsspezifikation
 
-**Ebene:** E0 (Autarkes Fundament / Ring 0 — Unsafe-Insel)  
-**Kern-Closure:** Leer (0 interne Workspace-Abhängigkeiten)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-simd`  
-**Referenzdokumente:** `docs/SPEC.md` §2.3 (R1, R5), §13 (INV-3, INV-5); `ANALYSIS-E0-CONTRADICTIONS.md` (§2.2, §10); `ALTLASTEN-AUDIT.md` (AP-15, AP-21)  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-simd` ist die hardwarenahe **Unsafe-Insel** für datenparallele Vektoroperationen in Contextra. Es implementiert optimierte Distanz- und Ähnlichkeitskerne für Gleitkomma- (`f32`) und quantisierte Vektoren (`u8`), die von `contextra-vector` (HNSW) und `contextra-rank` genutzt werden.
-
-### Beseitigung des Ebenenverstoßes (R1)
-Im Altzustand existierte in `crates/contextra-simd/Cargo.toml` eine optionale Abhängigkeit auf `contextra-types` (Ebene 2) mit den Features `workspace` und `types-compat`. **Dieser Ebenenverstoß wird ersatzlos gestrichen.** `contextra-simd` operiert als reiner E0-Kernel ausschließlich auf primitiven Slices (`&[f32]`, `&[u8]`).
-
-### Unsafe-Insel-Garantien (R5, INV-3)
-1. **Unsafe-Begrenzung:** `unsafe` ist **ausschließlich** für SIMD-Intrinsics in `kernels/avx2.rs`, `kernels/avx512.rs` und `kernels/neon.rs` erlaubt.
-2. **Dokumentation:** Jeder `unsafe`-Block benötigt zwingend einen `// SAFETY:`-Kommentar.
-3. **100 % sichere API:** Alle öffentlichen Einstiegspunkte sind reguläre Safe-Rust-Funktionen (`fn`, nicht `unsafe fn`).
-4. **NaN- und Unendlich-Schutz:** Vektoren mit `f32::NAN` oder `f32::INFINITY` werden vor der Berechnung abgewiesen (`SimdError::InvalidFloat`).
-5. **Determinismus (INV-5):** Jeder SIMD-Pfad liefert bitidentische Distanzergebnisse zur skalaren IEEE-754 Referenz (`kernels/scalar.rs`).
-6. **Leere Default-Features (R3):** `default = []`.
+**Ebene:** E0 (Fundament)
+**Status:** Normativ, abgeleitet aus `docs/SPEC.md` v4.1
+**Version:** 4.1
+**Geltungsbereich:** `crates/contextra-simd`
+**Normative Quellen:** SPEC 3.1 (Zeile `contextra-simd`), 3.2 (R3, R5, R7), 3.3, 4.4, 6.3 (REQ-VEC-1, REQ-VEC-1a, REQ-VEC-2), 11.1 (T-RAG-04), 15, ADR-04, ADR-19, ADR-51, ADR-53, ADR-54, G-02, G-03, G-06, G-07, G-13, REM-23, CMP-7, REM-27.
 
 ---
 
-## 2. Hardware-Dispatch & Architektur
+## 1. Zweck und Ebene
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                contextra-simd                               │
-│                                                                             │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                         Dispatcher (lib.rs)                         │   │
-│   │   (Dynamische CPU-Feature-Erkennung beim Start via cpuid/getauxval)  │   │
-│   └──────────────────────────────────┬──────────────────────────────────┘   │
-│                                      │                                      │
-│         ┌────────────────────────────┼────────────────────────────┐         │
-│         ▼                            ▼                            ▼         │
-│   ┌───────────────┐            ┌───────────────┐            ┌───────────┐   │
-│   │    AVX-512    │            │     AVX2      │            │ ARM NEON  │   │
-│   │ (x86_64 512b) │            │ (x86_64 256b) │            │(AArch64)  │   │
-│   └───────────────┘            └───────────────┘            └───────────┘   │
-│                                      │                                      │
-│                                      ▼ Fallback                             │
-│                        ┌───────────────────────────┐                        │
-│                        │     Scalar Reference      │                        │
-│                        │  (IEEE 754 Referenzpfad)  │                        │
-│                        └───────────────────────────┘                        │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+`contextra-simd` liefert die Distanzkerne für Vektoren: SIMD-Implementierungen mit Laufzeit-Erkennung und eine skalare Referenz. Das Crate kennt keine Metrik-Auswahl, keine Vektorsuche und keine Speicherung. Es ist ein reines Rechenmodul mit einer `unsafe`-Insel nach R5.
+
+Die Entscheidung, welche Metrik ein Index benutzt, trifft `contextra-vector`. Dort liegt auch die Zuordnung „Metrik → Kern“ (REM-23).
+
+### 1.1 Ist-Befund (gemessen am HEAD `f8b44b2`)
+
+| Messgröße | Wert | Befund |
+|---|---|---|
+| Quelldateien | 21 `.rs`, 6.461 Zeilen (inkl. Tests, Benches, Beispielen) | Kernel-Dateien: `kernels/{scalar,avx2,avx512,neon,mod}.rs`, `dispatch.rs`, `metric.rs`, `contract.rs`, `error.rs`, `compat/mod.rs` |
+| Abhängigkeiten | `contextra-types` (optional), `tracing` (optional), `serde` (optional), `bytemuck`, `thiserror` | `contextra-types` verletzt R7 und ist die Ursache von `compat/` (CMP-7). `tracing` gehört nicht hierher |
+| Features | `default = ["std"]`, `std`, `serde`, `workspace`, `types-compat`, `simd-avx512` | `workspace` und `types-compat` verletzen R7 und ADR-54. `simd-avx512` ist eine Kernel-Weiche (siehe 5) |
+| Öffentliche Funktionen | ca. 40 Funktionen, darunter `*_scalar`, `*_trusted`, `*_f32_bytes`, `*_u8`, `*_parts` | Paarweise Duplikate (z. B. `cosine_distance` und `cosine_distance_f32_bytes`). Ein Kern hat viele Einstiegspunkte |
+| `DistanceMetric` | in `metric.rs` definiert, zusätzlich in `contextra-types` und `contextra-vector/src/types.rs` | Dreifach definiert. R4 verletzt |
+| Verbraucher außerhalb | 3 Dateien: `vector/src/distance/dispatch.rs`, `vector/tests/simd_differential_test.rs`, `vector/tests/proof_simd_dispatch_legacy.rs` | Der Verbraucher `vector` wird neu geschrieben. Die Schnittstelle richtet sich nach Abschnitt 2 |
+| `unsafe` | Ja, in `kernels/avx2.rs`, `kernels/avx512.rs`, `kernels/neon.rs` | Erlaubte Insel nach R5 |
+| Tests | 98 bestanden (`differential_tests`, `kernel_reference_tests`, `simd_cross_validation`, weitere) | Grün |
+
+Ergebnis: Der Kern ist technisch in Ordnung. Die Einstiegspunkte sind zahlreich, und die Metrik-Typisierung ist dreifach verteilt.
 
 ---
 
-### 2.1 Dynamischer Funktions-Dispatch
+## 2. Vertrag (öffentliche API)
+
+Die API stellt nur Kerne bereit, keine Metriken. Alle Kerne haben eine Länge-Prüfung und liefern `Result`.
 
 ```rust
-use std::sync::atomic::{AtomicPtr, Ordering};
-
-pub type DistanceFnF32 = fn(&[f32], &[f32]) -> Result<f32, SimdError>;
-pub type DistanceFnU8 = fn(&[u8], &[u8]) -> Result<u32, SimdError>;
-
-/// Unterstützte Distanzmetriken.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum VectorMetric {
-    Cosine,
-    EuclideanL2,
-    DotProduct,
-}
-
-pub struct SimdDispatcher {
-    cosine_f32: AtomicPtr<()>,
-    l2_f32: AtomicPtr<()>,
-    dot_f32: AtomicPtr<()>,
-}
-
-impl SimdDispatcher {
-    /// Initialisiert den Dispatcher basierend auf CPU-Instruktionssatz-Erkennung.
-    pub fn detect() -> Self {
-        #[cfg(target_arch = "x86_64")]
-        {
-            if is_x86_feature_detected!("avx512f") {
-                return Self::avx512();
-            }
-            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
-                return Self::avx2();
-            }
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                return Self::neon();
-            }
-        }
-
-        Self::scalar()
-    }
-}
-```
-
----
-
-### 2.2 Distanzfunktionen & NaN-Validierung
-
-```rust
-/// Berechnet die Cosine-Distanz zweier f32-Vektoren (1.0 - Cosine-Similarity).
-pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, SimdError> {
-    validate_slices_f32(a, b)?;
-    let sim = get_dispatcher().cosine_f32(a, b)?;
-    Ok(1.0 - sim)
-}
-
-/// Berechnet die quadratische Euklidische Distanz (L2-Squared) zweier f32-Vektoren.
-pub fn euclidean_distance_sq(a: &[f32], b: &[f32]) -> Result<f32, SimdError> {
-    validate_slices_f32(a, b)?;
-    get_dispatcher().l2_f32(a, b)
-}
-
-/// Berechnet das Skalarprodukt zweier f32-Vektoren.
-pub fn dot_product(a: &[f32], b: &[f32]) -> Result<f32, SimdError> {
-    validate_slices_f32(a, b)?;
-    get_dispatcher().dot_f32(a, b)
-}
-
-/// Schnelle Validierung auf Dimensionsübereinstimmung und ungültige Floats.
-#[inline]
-pub fn validate_slices_f32(a: &[f32], b: &[f32]) -> Result<(), SimdError> {
-    if a.len() != b.len() {
-        return Err(SimdError::DimensionMismatch {
-            expected: a.len(),
-            actual: b.len(),
-        });
-    }
-    if a.is_empty() {
-        return Err(SimdError::EmptyVector);
-    }
-    for &x in a.iter().chain(b.iter()) {
-        if x.is_nan() || x.is_infinite() {
-            return Err(SimdError::InvalidFloat);
-        }
-    }
-    Ok(())
-}
-```
-
----
-
-### 2.3 SQ8 Quantisierungs-Kerne (`u8`)
-
-Für Quantized HNSW-Suche in `contextra-vector`:
-
-```rust
-/// Berechnet das Skalarprodukt zweier 8-Bit quantisierter Vektoren.
-pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, SimdError> {
-    if a.len() != b.len() {
-        return Err(SimdError::DimensionMismatch {
-            expected: a.len(),
-            actual: b.len(),
-        });
-    }
-    if a.is_empty() {
-        return Err(SimdError::EmptyVector);
-    }
-    get_dispatcher().dot_u8(a, b)
-}
-```
-
----
-
-## 3. Fehlerbehandlung (`SimdError`)
-
-```rust
+// Fehler. Keine Vektorinhalte im Fehler.
 #[non_exhaustive]
-#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
 pub enum SimdError {
-    #[error("Vector dimensions do not match: expected {expected}, got {actual}")]
-    DimensionMismatch { expected: usize, actual: usize },
-
-    #[error("Vector cannot be empty")]
-    EmptyVector,
-
-    #[error("Vector contains invalid floating point values (NaN or Infinity)")]
-    InvalidFloat,
-
-    #[error("Vector norm is zero, cannot compute cosine similarity")]
-    ZeroNorm,
-
-    #[error("Hardware execution failed: {0}")]
-    HardwareError(String),
+    LengthMismatch { left: usize, right: usize },
+    NonFinite,            // NaN oder ±∞ in der Eingabe
+    EmptyInput,
 }
+
+// Fp32-Kerne (exakte Nachberechnung, REQ-VEC-3)
+pub fn dot_f32(a: &[f32], b: &[f32]) -> Result<f32, SimdError>;
+pub fn l2_sq_f32(a: &[f32], b: &[f32]) -> Result<f32, SimdError>;
+pub fn norm_sq_f32(a: &[f32]) -> Result<f32, SimdError>;
+
+// Asymmetrisch: fp32-Anfrage gegen SQ8-Code (REQ-VEC-1, REQ-VEC-1a)
+// Dequantisierung pro Dimension: x = code * scale[i] + offset[i]
+pub fn dot_f32_sq8(q: &[f32], code: &[u8], scale: &[f32], offset: &[f32]) -> Result<f32, SimdError>;
+pub fn l2_sq_f32_sq8(q: &[f32], code: &[u8], scale: &[f32], offset: &[f32]) -> Result<f32, SimdError>;
+
+// Symmetrisch: SQ8 gegen SQ8 (Navigation im HNSW)
+pub fn l2_sq_sq8(a: &[u8], b: &[u8]) -> Result<u32, SimdError>;
+pub fn dot_sq8(a: &[u8], b: &[u8]) -> Result<u32, SimdError>;
+
+// Laufzeit-Diagnose ohne Nutzdaten
+pub fn active_target() -> Target;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Target { Scalar, Avx2, Avx512, Neon }
+
+// Nur Testbau (Feature `test-override`): erzwingt einen Kern für Differentialtests
+#[cfg(feature = "test-override")]
+pub fn force_target(t: Target) -> Result<(), SimdError>;
+pub mod reference { /* skalare Referenzkerne, alle obigen Funktionen */ }
 ```
+
+**Begründung der Reduktion.** Die Liste oben ersetzt rund 40 öffentliche Funktionen. Die `*_trusted`-Varianten entfallen: Eingaben werden immer geprüft. Die Kosten der Prüfung sind bei Vektoren mit 384 bis 768 Dimensionen gering gegenüber dem Kern. Die `*_parts`-Varianten (Kosinus aus Teilsummen) entfallen. Der Aufrufer berechnet Normen über `norm_sq_f32`.
+
+`DistanceMetric` ist nicht Teil der API. Metrik-Zuordnung liegt in `contextra-vector` (REM-23).
 
 ---
 
-## 4. `Cargo.toml` Spezifikation
+## 3. Abhängigkeiten
 
-```toml
-[package]
-name = "contextra-simd"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-description = "Hardware-accelerated vector distance kernels with SIMD dynamic dispatch and scalar IEEE-754 reference"
+| Crate | Status | Begründung |
+|---|---|---|
+| `bytemuck` | behalten | Umwandlung `&[u8]` ↔ `&[f32]` ohne `unsafe` im Aufrufer |
+| `thiserror` | behalten | `SimdError` |
+| `contextra-types` | **entfernen** (REM-27, R7) | Keine Abhängigkeit auf den Typ-Sammelort |
+| `tracing` | **entfernen** | Kein Logging in Kernen |
+| `serde` | **entfernen** | Keine Serialisierung von Kernen oder Fehlern |
+| `criterion` | **entfernen aus dev-deps** | Benchmarks gehören nach `contextra-bench` (SPEC 3.1) |
+| `proptest` | behalten (dev) | Differentialtests |
+| `simsimd` | behalten (dev) | Unabhängige Referenz für Differentialtests (nur Test) |
+| `serde_json` | **entfernen aus dev-deps** | keine Fixture-Serialisierung nötig, Fixtures als `&'static [f32]` |
 
-[lints]
-workspace = true
-
-[features]
-default = []
-std = []
-simd-avx512 = []
-
-[dependencies]
-bytemuck = "1.25"
-thiserror = { workspace = true }
-tracing = { workspace = true, optional = true }
-
-[dev-dependencies]
-proptest = "1.4"
-criterion = "0.5"
-```
+Interne Abhängigkeiten: keine (SPEC 3.3, `simd` = `[]`).
 
 ---
 
-## 5. Implementierungs-Arbeitspakete für Entwickler
+## 4. Module
 
-1. **`Cargo.toml`:**
-   - Entfernen der Abhängigkeit `contextra-types`.
-   - Entfernen der Features `workspace` und `types-compat`.
-   - `default = []` setzen (R3).
-2. **Kerne-Bereinigung:**
-   - In `kernels/avx2.rs`, `kernels/avx512.rs`, `kernels/neon.rs` sicherstellen, dass jeder `unsafe`-Block einen `// SAFETY:`-Kommentar trägt.
-3. **Differenzialtests (INV-5):**
-   - Proptest-Suite ausführen: Jeder AVX/NEON-Kernel liefert exakt dieselben Werte wie `scalar.rs`.
-4. **Verifikation:**
-   - `cargo test -p contextra-simd`
+```
+src/
+  lib.rs              # Re-Exports, #![deny(unsafe_op_in_unsafe_fn)], Modul-Dokumentation
+  error.rs            # SimdError
+  target.rs           # Target, Laufzeit-Erkennung (is_x86_feature_detected!, aarch64 NEON)
+  dispatch.rs         # OnceLock<&'static Kernels>, Auswahl beim ersten Aufruf
+  validate.rs         # Längen- und NaN-Prüfung
+  kernels/
+    mod.rs            # Kernel-Tabelle (Struct mit Funktionszeigern)
+    scalar.rs         # Referenz, keine unsafe
+    avx2.rs           # unsafe, #[target_feature(enable = "avx2,fma")]
+    avx512.rs         # unsafe, #[target_feature(enable = "avx512f")]
+    neon.rs           # unsafe, aarch64
+  reference.rs        # re-export von kernels::scalar
+tests/
+  differential.rs     # jede SIMD-Variante gegen scalar, Eingaben aus proptest
+  reference_values.rs # feste Erwartungswerte aus simsimd
+  validation.rs       # Längen, NaN, leere Eingaben
+  unsafe_islands.rs   # T-SIMD-06
+```
+
+Entfallen: `contract.rs`, `metric.rs`, `compat/mod.rs`, `dispatch.rs`-Teile zu `set_dispatch_override`/`get_dispatch_override` (nur `force_target` bleibt), `tests/building_block_conformance.rs`, `tests/edge_cases_tests.rs`, `tests/golden_distance_oracle.rs`, `tests/quantized_and_mixed_precision_tests.rs`, `tests/simd_cross_validation.rs`, `examples/`, `benches/`.
+
+---
+
+## 5. Entfernungen
+
+| ID | Entfernen | Grund | Ersatz | Verbraucher |
+|---|---|---|---|---|
+| E-SIMD-01 | `compat/mod.rs` vollständig (`From`-Impls zu `contextra_types`, Tests mit `ContextraError`) | R7, ADR-51, CMP-7 | keine. Die Fehlerabbildung macht `vector` | 0 außerhalb |
+| E-SIMD-02 | Features `workspace`, `types-compat`, `serde` | R7, ADR-54 | keine | 0 |
+| E-SIMD-03 | Feature `simd-avx512` | ADR-54: keine Feature-Weiche, die einen zweiten Pfad für denselben Kern einschaltet. Die Auswahl erfolgt zur Laufzeit (`is_x86_feature_detected!("avx512f")`) | Laufzeit-Dispatch | 0 |
+| E-SIMD-04 | `metric.rs` (`DistanceMetric`) | R4: drei Definitionen im Workspace. Metrik-Zuordnung gehört `vector` | `vector::DistanceMetric` (in Vector-PLAN) | 2 (über `compute_distance`) |
+| E-SIMD-05 | `contract.rs` (`DistanceFn`, `MetricDistanceFn`) | ADR-19, REM-14. Trait-Vertrag ohne zweiten Implementierer | Funktionen aus Abschnitt 2 | 0 |
+| E-SIMD-06 | Öffentliche Funktionen `*_trusted`, `*_parts`, `*_u8` ohne Längenprüfung, `compute_distance`, `compute_distance_f32_bytes`, `cosine_distance_f32_bytes`, `normalize_inplace`, `validate_vector` (öffentlich) | Duplikate (siehe Abschnitt 2) | Abschnitt 2 | 3 Dateien in `vector` |
+| E-SIMD-07 | `set_dispatch_override`, `get_dispatch_override`, `SimdPathOverride` als öffentliche Funktionen | Ersetzt durch `force_target` unter Feature `test-override` | `force_target` | 2 Tests in `vector` |
+| E-SIMD-08 | Abhängigkeiten `tracing`, `serde`, `contextra-types` | R7, Abschnitt 3 | keine | 0 |
+| E-SIMD-09 | `examples/standalone.rs`, `examples/standalone_simd.rs`, `benches/simd_bench.rs` | SPEC 3.1: Benchmarks in `contextra-bench` | `contextra-bench` | 0 |
+| E-SIMD-10 | Tests `building_block_conformance.rs`, `edge_cases_tests.rs`, `golden_distance_oracle.rs`, `quantized_and_mixed_precision_tests.rs`, `simd_cross_validation.rs` | Prüfen entfernte Funktionen oder Duplikate. Relevante Fälle werden in Abschnitt 7 übernommen | Abschnitt 7 | 0 |
+| E-SIMD-11 | Erklärende ANCHOR-, LINK-, FILE-CONTEXT-Kommentare | ADR-19, REM-14 | Dokumentation | 0 |
+
+---
+
+## 6. Umbau (je Schritt ein Commit, Workspace grün)
+
+Der einzige Verbraucher ist `contextra-vector`. Bis dessen PLAN umgesetzt ist, kompiliert `vector` gegen die alten Funktionsnamen. Um die Regel „Workspace grün je Commit“ einzuhalten, werden die Verbraucher in `vector` im selben Commit angepasst wie die Entfernung.
+
+| Schritt | Inhalt | Verbraucher-Anpassung | Prüfung |
+|---|---|---|---|
+| U-SIMD-1 | Features `workspace`, `types-compat`, `serde`, `simd-avx512` entfernen. Abhängigkeiten `contextra-types`, `tracing`, `serde` entfernen. `compat/` löschen (E-SIMD-01 bis E-SIMD-03, E-SIMD-08) | keine außerhalb `vector` | `cargo check -p contextra-simd` |
+| U-SIMD-2 | `dispatch.rs` auf `OnceLock` mit Laufzeit-Erkennung umstellen. AVX-512 wird ohne Feature gewählt, wenn die CPU `avx512f` hat. Die Rust-1.89-Stabilisierung der AVX-512-Intrinsics wird beim Umbau am Toolchain verifiziert, bevor der Kern ohne `nightly` kompiliert | keine | `cargo test -p contextra-simd` |
+| U-SIMD-3 | Neue API aus Abschnitt 2 einführen (`dot_f32`, `l2_sq_f32`, `norm_sq_f32`, SQ8-Varianten). Scalar-Referenz in `kernels/scalar.rs` mit Längenprüfung | `vector/src/distance/dispatch.rs` ruft die neuen Funktionen auf. Metrik-Zuordnung wechselt nach `vector` (E-SIMD-04) | `cargo check -p contextra-vector` |
+| U-SIMD-4 | Alte öffentliche Funktionen löschen (E-SIMD-06, E-SIMD-07) | die beiden `vector`-Tests auf `force_target` umstellen | `grep -rn "compute_distance\|_trusted\|set_dispatch_override" crates` leer außer `vector` nach Umbau |
+| U-SIMD-5 | Tests und Beispiele bereinigen (E-SIMD-09, E-SIMD-10). Differentialtests neu nach Abschnitt 7 | keine | `cargo test -p contextra-simd --all-features` |
+| U-SIMD-6 | `criterion` und `serde_json` aus dev-deps entfernen | keine | `cargo tree -p contextra-simd --edges dev` |
+
+**Reihenfolge bei der Metrik.** U-SIMD-3 ersetzt `compute_distance` durch die Kern-Funktionen. Die Zuordnung „Metrik → Kern“ wird in `vector` ergänzt, bevor U-SIMD-4 die alte Funktion entfernt. Das verhindert einen Zwischenzustand ohne Metrik-Logik.
+
+---
+
+## 7. Tests
+
+| ID | Prüfung | Ort |
+|---|---|---|
+| T-SIMD-01 | Jede SIMD-Variante (AVX2, AVX-512, NEON, sofern verfügbar) liefert für 10.000 zufällige Paare denselben Wert wie `reference::*` bis auf relative Toleranz `1e-5` (fp32) bzw. exakt (sq8, u32) | `tests/differential.rs` |
+| T-SIMD-02 | Referenzwerte für `dot_f32`, `l2_sq_f32`, `norm_sq_f32` stimmen mit `simsimd` überein (dev-Abhängigkeit) | `tests/reference_values.rs` |
+| T-SIMD-03 | `LengthMismatch` bei unterschiedlichen Längen, `EmptyInput` bei leeren Eingaben, `NonFinite` bei NaN und ∞ (jeweils in jedem Kern) | `tests/validation.rs` |
+| T-SIMD-04 | Dimensionen 1, 3, 7, 8, 15, 16, 17, 384, 768, 1024 (Restbehandlung der SIMD-Breiten) | `tests/differential.rs` |
+| T-SIMD-05 | `force_target` (nur Feature `test-override`) erzwingt den Kern, `active_target()` liefert ihn zurück | `tests/differential.rs` |
+| T-SIMD-06 | `unsafe` nur in `kernels/avx2.rs`, `kernels/avx512.rs`, `kernels/neon.rs` (Allowlist) | `tests/unsafe_islands.rs` |
+| T-SIMD-07 | `SQ8`-Kerne sind bei denselben Codes deterministisch über alle Targets (Gleichheit der `u32`-Summen) | `tests/differential.rs` |
+| T-SIMD-08 | `dot_f32_sq8` mit `scale = 1`, `offset = 0` stimmt mit `dot_f32` über dem Code als fp32 überein | `tests/reference_values.rs` |
+
+---
+
+## 8. Abnahme
+
+| Gate | Prüfung für `contextra-simd` |
+|---|---|
+| G-01 | `cargo check`, `cargo test`, `cargo test --no-default-features`, `cargo clippy -- -D warnings`, Toolchain 1.89.0 |
+| G-02 | `unsafe` nur in den drei Kern-Dateien (T-SIMD-06). `#![deny(unsafe_op_in_unsafe_fn)]` gesetzt |
+| G-03 | Keine Workspace-Abhängigkeit in `[dependencies]` |
+| G-06 | `default = ["std"]` ist nach R3 als einzige Ausnahme zulässig. Feature `std` ist leer und wird nur für die Fehlertypen mit `std::error::Error` verwendet |
+| G-07 | `grep -rn "contextra_types\|compat\|simd-avx512\|types-compat\|workspace" crates/contextra-simd` leer |
+| G-13 | keine `unwrap`/`expect`/`panic!` in `src/` außerhalb `#[cfg(test)]` |
+| R5 | `#![forbid(unsafe_code)]` in allen Modulen außer `kernels/avx2.rs`, `kernels/avx512.rs`, `kernels/neon.rs`. Diese Ausnahme ist über T-SIMD-06 belegt |
+
+**Reihenfolge im Repository:** Nach dem `sys`-PLAN als vierter Commit. Die Umsetzung U-SIMD-1 bis U-SIMD-6 folgt. `vector` wird in seinem eigenen PLAN im selben Zeitraum angepasst.
