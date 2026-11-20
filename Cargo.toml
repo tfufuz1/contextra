@@ -21,7 +21,6 @@ members = [
     "crates/contextra-types",
     "crates/contextra-ports",
     "crates/contextra-mvcc",
-    "crates/contextra-engine",
     "crates/contextra-rank",
     "crates/contextra-erasure",
 ]
@@ -43,7 +42,6 @@ default-members = [
     "crates/contextra-rank",
     "crates/contextra-store",
     "crates/contextra-checkpoint",
-    "crates/contextra-engine",
     "crates/contextra-db",
     "crates/contextra-mcp",
     "crates/contextra",
@@ -117,7 +115,6 @@ contextra = { path = "crates/contextra" }
 contextra-types = { path = "crates/contextra-types" }
 contextra-ports = { path = "crates/contextra-ports" }
 contextra-mvcc = { path = "crates/contextra-mvcc" }
-contextra-engine = { path = "crates/contextra-engine" }
 contextra-rank = { path = "crates/contextra-rank" }
 contextra-erasure = { path = "crates/contextra-erasure" }
 

@@ -454,30 +454,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-engine"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "contextra-checkpoint",
- "contextra-db",
- "contextra-graph",
- "contextra-ports",
- "contextra-rank",
- "contextra-store",
- "contextra-testkit",
- "contextra-text",
- "contextra-types",
- "contextra-vector",
- "proptest",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "contextra-env"
 version = "0.1.0"
 dependencies = [
