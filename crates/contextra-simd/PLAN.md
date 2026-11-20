@@ -183,3 +183,13 @@ Der einzige Verbraucher ist `contextra-vector`. Bis dessen PLAN umgesetzt ist, k
 | R5 | `#![forbid(unsafe_code)]` in allen Modulen außer `kernels/avx2.rs`, `kernels/avx512.rs`, `kernels/neon.rs`. Diese Ausnahme ist über T-SIMD-06 belegt |
 
 **Reihenfolge im Repository:** Nach dem `sys`-PLAN als vierter Commit. Die Umsetzung U-SIMD-1 bis U-SIMD-6 folgt. `vector` wird in seinem eigenen PLAN im selben Zeitraum angepasst.
+
+---
+
+## Nachtrag N-1: Ziel der Metrik-Definition
+
+**Quelle:** `crates/contextra-types/PLAN.md`, Abschnitt 3.3 und Entscheidung O-TYP-3.
+
+- Zeile 25 (Dreifach-Definition von `DistanceMetric`): Die Definition in `contextra-types` entfällt mit diesem Crate. Die Definition in `contextra-vector/src/types.rs` wandert nach `contextra-ports::vector_index` (`crates/contextra-ports/PLAN.md`, Nachtrag N-1). Die Definition in `metric.rs` dieses Crates entfällt (E-SIMD-04).
+- E-SIMD-04: Ziel ist nicht mehr `vector::DistanceMetric`, sondern `contextra-ports::vector_index::DistanceMetric`. Die Distanzfunktionen `distance` und `distance_u8` stehen in `contextra-vector::metric` und rufen die Kernel dieses Crates auf.
+- `contextra-simd` erhält keine Metrik-Enum. Die Kern-API bleibt auf Funktionen wie `dot_f32`, `l2_sq_f32` und Varianten beschränkt, wie in Abschnitt „Kern-API“ oben beschrieben. Die Abhängigkeit von `contextra-types` (R7) entfällt damit vollständig.

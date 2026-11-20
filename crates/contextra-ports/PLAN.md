@@ -364,3 +364,24 @@ Die Entscheidung ist zu bestätigen, bevor U-PRT-15 ausgeführt wird. Bis dahin 
 ---
 
 **Reihenfolge im Repository:** Nach dem `durable-fs`-PLAN als sechster Commit. `ports` ist der letzte E0-PLAN. Die Umsetzung beginnt mit U-PRT-1, das additive U-PRT-3 folgt danach, weil die Besitzer-Crates die neuen Traits implementieren müssen, bevor die alten Traits entfallen.
+
+---
+
+## Nachtrag N-1: Aufnahme aus der Auflösung von `contextra-types`
+
+**Quelle:** `crates/contextra-types/PLAN.md`, Abschnitt 3 (Verteilung) und Abschnitt 5 (U-TYP-1). Dieser Nachtrag ist additiv und ändert keine Entscheidung oben.
+
+| Modul | Aufnahme | Begründung (Regel aus `contextra-types/PLAN.md` Abschnitt 2) |
+|---|---|---|
+| `dto.rs` | `ScoredDocument`, `Signal`, `OnSignalFailure`, `ContextChunk`, `ContextWindow`, `TokenBudget`, `BudgetStrategy`, `Reservation`, `RetrievalStrategy` | V2, V3: von mehreren E1-Crates genutzt |
+| `embedding.rs` | `Embedding` (inkl. `new`, `dim`, `as_slice`, `l2_norm`, `normalize`), `ModelFingerprint` | V3: `vector` und `crypto` (E1) |
+| `vector_index.rs` | `DistanceMetric` (nur Typ). Die Methoden `compute` und `compute_u8` werden in `contextra-vector::metric` als freie Funktionen geführt | V3, V6 (Rust erlaubt keine inherenten Methoden über Crate-Grenzen) |
+| `reranker.rs` | `RerankResult` | Rückgabetyp des `Reranker`-Ports |
+| `context.rs` (neu) | `RequestContext` | V3: `ports` (7 Dateien), `text`, `vector`, `crypto`, `graph` |
+| `erasure.rs` | `ScanMethod`, `SagaRecord`, `ErasureRequest` (SPEC 15) | V2. `SagaRecord` ist ein DTO, weil `crypto` nicht von `erasure` abhängen darf (ADR-32) |
+
+**Zeit und Sequenz.** `Seq` und `TxId` sind in `ports::version` `u64` (E-IDS-06, E-IDS-07). `Timestamp` ist `u64` Nanosekunden aus `Clock` (E-IDS-08). `ports` führt keine eigenen Sequenztypen.
+
+**Nicht aufgenommen:** `DocKey`, `CollectionRef`, `TenantRef`, `OperatorRef`, Tombstone, Schema, `TenantScoped`, Konfigurationstypen nach SPEC 14. Sie entfallen (`contextra-types/PLAN.md`, E-TYP-07).
+
+**Umbau-Reihenfolge.** Die Aufnahme ist der Schritt U-TYP-1 und gehört in U-PRT-3 (additiv), vor den Entfernungen E-PRT-01 bis E-PRT-11. Abhängigkeit unverändert: `ids`, `roaring`, `zeroize`, `thiserror`.
