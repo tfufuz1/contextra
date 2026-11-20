@@ -1,0 +1,185 @@
+## contextra-checkpoint
+
+Pfad: `crates/contextra-checkpoint`
+
+Abhängigkeiten (direkt): contextra-ids, contextra-env, contextra-types, contextra-ports, bytes, tokio, tracing, serde, serde_json, parking_lot, blake3, thiserror
+
+### Module
+
+- `/src/compat/error.rs`
+- `/src/compat/mod.rs`
+- `/src/compat/ports_impl.rs`
+- `/src/compat/snapshot_bridge.rs`
+- `/src/contract.rs`
+- `/src/error.rs`
+- `/src/fs_seam.rs`
+- `/src/guard.rs`
+- `/src/guard/tests.rs`
+- `/src/hardlink_cloner.rs`
+- `/src/lib.rs`
+- `/src/manifest.rs`
+- `/src/meta.rs`
+- `/src/meta/tests.rs`
+- `/src/orphan.rs`
+- `/src/orphan/tests.rs`
+- `/src/snapshot_source.rs`
+- `/src/store.rs`
+- `/src/store/tests.rs`
+- `/src/vfs.rs`
+
+### Öffentliche Typen
+
+- **BoxFuture** (type) – src/snapshot_source.rs:12
+- **CheckpointError** (enum) – src/error.rs:17
+- **CheckpointGuard** (struct) – src/guard.rs:154
+- **CheckpointHardlinkCloner** (trait) – src/hardlink_cloner.rs:151
+- **CheckpointManifest** (struct) – src/manifest.rs:43
+- **CheckpointMeta** (struct) – src/meta.rs:74
+- **CheckpointRegistry** (trait) – src/store.rs:47
+- **CheckpointResult** (type) – src/error.rs:9
+- **CheckpointVfs** (trait) – src/vfs.rs:9
+- **DefaultHardlinkCloner** (struct) – src/hardlink_cloner.rs:178
+- **FsSeam** (trait) – src/fs_seam.rs:11
+- **HardlinkCloneResult** (struct) – src/hardlink_cloner.rs:128
+- **InMemorySnapshotSource** (struct) – src/contract.rs:28
+- **InstanceOrphanRegistry** (struct) – src/orphan.rs:306
+- **LoomDirEntry** (struct) – src/hardlink_cloner.rs:106
+- **LoomMetadata** (struct) – src/hardlink_cloner.rs:113
+- **LoomReadDir** (struct) – src/hardlink_cloner.rs:99
+- **OrphanRegistry** (struct) – src/orphan.rs:129
+- **OrphanState** (struct) – src/orphan.rs:241
+- **PersistentCheckpointStore** (struct) – src/store.rs:235
+- **PinGuard** (struct) – src/guard.rs:43
+- **PinId** (type) – src/orphan.rs:29
+- **PinnedSeqNoOrphan** (struct) – src/orphan.rs:213
+- **RecoveryReport** (struct) – src/orphan.rs:38
+- **Result** (type) – src/error.rs:12
+- **SnapshotPinner** (trait) – src/hardlink_cloner.rs:30
+- **SnapshotSource** (trait) – src/snapshot_source.rs:15
+- **StateCheckpoint** (struct) – src/meta.rs:149
+- **StdFsSeam** (struct) – src/fs_seam.rs:30
+- **VersionedKeyMap** (type) – src/contract.rs:22
+- **WorkflowState** (struct) – src/meta.rs:18
+
+### Öffentliche Funktionen
+
+- `pub async fn allocate_tx(&self) -> Result<TxId> `  – src/store.rs:414
+- `pub async fn await_pending_rollbacks() `  – src/orphan.rs:647
+- `pub async fn close(&self) -> Result<()> `  – src/store.rs:813
+- `pub async fn copy<P: AsRef<Path>, Q: AsRef<Path>>(_from: P, _to: Q) -> std::io::Result<u64> `  – src/hardlink_cloner.rs:95
+- `pub async fn create_checkpoint(`  – src/store.rs:518
+- `pub async fn create_dir_all<P: AsRef<Path>>(_path: P) -> std::io::Result<()> `  – src/hardlink_cloner.rs:69
+- `pub async fn create_hardlink_clone(`  – src/store.rs:905
+- `pub async fn drop_checkpoint(&self, name: &str) -> Result<()> `  – src/store.rs:615
+- `pub async fn flush_orphan_registry(&self) -> Result<()> `  – src/store.rs:800
+- `pub async fn flush_orphan_registry(&self) -> std::io::Result<()> `  – src/orphan.rs:484
+- `pub async fn for_agent_step(storage: Arc<S>, tx: TxId) -> Result<Self> `  – src/guard.rs:272
+- `pub async fn for_agent_step_with_clock(`  – src/guard.rs:298
+- `pub async fn for_agent_step_with_registry(`  – src/guard.rs:278
+- `pub async fn get_checkpoint(&self, name: &str) -> Result<Option<CheckpointMeta>> `  – src/store.rs:748
+- `pub async fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(`  – src/hardlink_cloner.rs:88
+- `pub async fn list_checkpoints(&self) -> Result<Vec<CheckpointMeta>> `  – src/store.rs:714
+- `pub async fn metadata<P: AsRef<Path>>(_path: P) -> std::io::Result<LoomMetadata> `  – src/hardlink_cloner.rs:77
+- `pub async fn next_entry(&mut self) -> std::io::Result<Option<LoomDirEntry>> `  – src/hardlink_cloner.rs:101
+- `pub async fn open(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self> `  – src/store.rs:298
+- `pub async fn open_and_recover(`  – src/store.rs:271
+- `pub async fn open_and_recover_with_orphan_registry(`  – src/store.rs:282
+- `pub async fn open_with_orphan_registry(`  – src/store.rs:306
+- `pub async fn pin(`  – src/guard.rs:58
+- `pub async fn pin_with_clock(`  – src/guard.rs:76
+- `pub async fn read_dir<P: AsRef<Path>>(_path: P) -> std::io::Result<LoomReadDir> `  – src/hardlink_cloner.rs:73
+- `pub async fn recover_and_clean<S: crate::snapshot_source::SnapshotSource>(`  – src/orphan.rs:180
+- `pub async fn recover_orphaned_checkpoints(&self) -> Result<Vec<TxId>> `  – src/store.rs:874
+- `pub async fn recover_orphaned_pins(&self) -> Result<Vec<PinId>> `  – src/store.rs:850
+- `pub async fn remove_file<P: AsRef<Path>>(_path: P) -> std::io::Result<()> `  – src/hardlink_cloner.rs:84
+- `pub async fn restore_checkpoint(&self, name: &str) -> Result<CheckpointMeta> `  – src/store.rs:760
+- `pub async fn rollback(mut self) -> Result<()> `  – src/guard.rs:373
+- `pub async fn shutdown(&self) -> Result<()> `  – src/store.rs:808
+- `pub async fn unpin(mut self) -> Result<()> `  – src/guard.rs:110
+- `pub fn checkpoint(&self) -> Result<&StateCheckpoint> `  – src/guard.rs:316
+- `pub fn checkpoint_counter(&self) -> u64 `  – src/store.rs:447
+- `pub fn checkpoint_guard_skipped_rollback_count(&self) -> u64 `  – src/store.rs:442
+- `pub fn clear_all(&self) `  – src/orphan.rs:169
+- `pub fn clear_all(&self) `  – src/orphan.rs:586
+- `pub fn clear_all_orphaned_checkpoints(&self) `  – src/store.rs:838
+- `pub fn clear_all_orphaned_checkpoints() `  – src/orphan.rs:644
+- `pub fn clear_orphan_pin(&self, seq_no: u64) `  – src/orphan.rs:534
+- `pub fn clear_orphaned_checkpoint(&self, tx_id: TxId) `  – src/orphan.rs:573
+- `pub fn clear_orphaned_checkpoint(&self, tx_id: TxId) `  – src/store.rs:833
+- `pub fn clear_orphaned_checkpoint(_tx_id: TxId) `  – src/orphan.rs:636
+- `pub fn clock(&self) -> &Arc<dyn Clock> `  – src/guard.rs:266
+- `pub fn clock(&self) -> &Arc<dyn Clock> `  – src/guard.rs:93
+- `pub fn clock(&self) -> &Arc<dyn Clock> `  – src/orphan.rs:367
+- `pub fn clock(&self) -> &Arc<dyn Clock> `  – src/store.rs:464
+- `pub fn commit(mut self) -> Result<StateCheckpoint> `  – src/guard.rs:330
+- `pub fn create_guard(&self, tx_id: TxId) -> Result<CheckpointGuard<S>> `  – src/store.rs:491
+- `pub fn cross_device_link(`  – src/error.rs:73
+- `pub fn defuse(mut self) `  – src/guard.rs:98
+- `pub fn drain_orphan_pins(&self) -> Vec<PinnedSeqNoOrphan> `  – src/orphan.rs:512
+- `pub fn drain_orphaned_checkpoints(&self) -> Vec<StateCheckpoint> `  – src/orphan.rs:551
+- `pub fn get_orphan_pins(&self) -> Vec<PinnedSeqNoOrphan> `  – src/orphan.rs:529
+- `pub fn get_orphaned_checkpoints(&self) -> Vec<StateCheckpoint> `  – src/orphan.rs:568
+- `pub fn get_orphaned_checkpoints(&self) -> Vec<StateCheckpoint> `  – src/store.rs:828
+- `pub fn get_orphaned_checkpoints() -> Vec<StateCheckpoint> `  – src/orphan.rs:617
+- `pub fn get_orphaned_checkpoints_for_namespace(ns: &str) -> Vec<StateCheckpoint> `  – src/orphan.rs:623
+- `pub fn get_orphans(&self) -> Vec<PinId> `  – src/orphan.rs:160
+- `pub fn get_sync(&self, key: &[u8]) -> Option<Vec<u8>> `  – src/contract.rs:42
+- `pub fn global_orphan_registry() -> &'static OrphanRegistry `  – src/orphan.rs:78
+- `pub fn internal(msg: impl Into<String>) -> Self `  – src/error.rs:68
+- `pub fn into_workflow_state(&self) -> WorkflowState `  – src/meta.rs:117
+- `pub fn invalid_input(msg: impl Into<String>) -> Self `  – src/error.rs:63
+- `pub fn is_empty(&self) -> bool `  – src/orphan.rs:47
+- `pub fn load_sync(path: &std::path::Path) -> Self `  – src/orphan.rs:270
+- `pub fn load_sync(path: &std::path::Path) -> Self `  – src/orphan.rs:377
+- `pub fn load_vfs(vfs: &dyn crate::vfs::CheckpointVfs, path: &std::path::Path) -> Self `  – src/orphan.rs:284
+- `pub fn monotonic_timestamp_ms(&self) -> u64 `  – src/store.rs:480
+- `pub fn monotonic_timestamp_ms() -> u64 `  – src/orphan.rs:106
+- `pub fn monotonic_timestamp_ms_with(clock: &dyn Clock) -> u64 `  – src/orphan.rs:99
+- `pub fn new() -> Self `  – src/contract.rs:37
+- `pub fn new() -> Self `  – src/fs_seam.rs:34
+- `pub fn new() -> Self `  – src/hardlink_cloner.rs:182
+- `pub fn new(checkpoint: StateCheckpoint, storage: Arc<S>, namespace: impl Into<String>) -> Self `  – src/guard.rs:167
+- `pub fn new(file_path: impl Into<std::path::PathBuf>) -> Self `  – src/orphan.rs:143
+- `pub fn new(meta: CheckpointMeta, components: Vec<String>) -> Result<Self> `  – src/manifest.rs:70
+- `pub fn new(persist_path: impl Into<std::path::PathBuf>) -> Self `  – src/orphan.rs:335
+- `pub fn new(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self> `  – src/store.rs:335
+- `pub fn new_with_orphan_registry(`  – src/store.rs:343
+- `pub fn new_with_vfs(`  – src/orphan.rs:341
+- `pub fn orphan_registry(&self) -> &Arc<InstanceOrphanRegistry> `  – src/store.rs:795
+- `pub fn orphaned_checkpoint_count() -> usize `  – src/orphan.rs:656
+- `pub fn path(&self) -> std::path::PathBuf `  – src/hardlink_cloner.rs:108
+- `pub fn pending_rollback_count() -> usize `  – src/orphan.rs:650
+- `pub fn persist_sync(&self) -> std::io::Result<()> `  – src/orphan.rs:252
+- `pub fn persist_sync(&self) -> std::io::Result<()> `  – src/orphan.rs:417
+- `pub fn persist_vfs(&self, vfs: &dyn crate::vfs::CheckpointVfs) -> std::io::Result<()> `  – src/orphan.rs:261
+- `pub fn register_checkpoint_sync(&self, cp: StateCheckpoint) `  – src/orphan.rs:462
+- `pub fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> `  – src/orphan.rs:150
+- `pub fn register_orphan_sync(&self, orphan: PinnedSeqNoOrphan) `  – src/orphan.rs:441
+- `pub fn register_orphaned_checkpoint(&self, cp: StateCheckpoint) `  – src/store.rs:823
+- `pub fn register_orphaned_checkpoint(cp: StateCheckpoint) `  – src/orphan.rs:604
+- `pub fn register_pinned_seq_no_orphan(&self, orphan: PinnedSeqNoOrphan) `  – src/store.rs:818
+- `pub fn register_pinned_seq_no_orphan(orphan: PinnedSeqNoOrphan) `  – src/orphan.rs:226
+- `pub fn rollback_blocking(mut self) -> Result<()> `  – src/guard.rs:416
+- `pub fn set_clock(&mut self, clock: Arc<dyn Clock>) `  – src/orphan.rs:362
+- `pub fn set_metrics_sink(&mut self, sink: Arc<dyn MetricsSink>) `  – src/store.rs:469
+- `pub fn skipped_rollback_count(&self) -> u64 `  – src/store.rs:437
+- `pub fn storage(&self) -> &Arc<S> `  – src/store.rs:790
+- `pub fn to_workflow_state(&self) -> WorkflowState `  – src/meta.rs:128
+- `pub fn total_recovered(&self) -> usize `  – src/orphan.rs:52
+- `pub fn validate_id_width(&self) -> Result<()> `  – src/meta.rs:101
+- `pub fn verify(&self) -> Result<()> `  – src/manifest.rs:102
+- `pub fn vfs(&self) -> Option<&Arc<dyn crate::vfs::CheckpointVfs>> `  – src/orphan.rs:372
+- `pub fn with_clock(`  – src/guard.rs:173
+- `pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self `  – src/orphan.rs:350
+- `pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self `  – src/store.rs:455
+- `pub fn with_metrics_sink(mut self, sink: Arc<dyn MetricsSink>) -> Self `  – src/guard.rs:254
+- `pub fn with_metrics_sink(mut self, sink: Arc<dyn MetricsSink>) -> Self `  – src/store.rs:474
+- `pub fn with_metrics_sink_opt(mut self, sink: Option<Arc<dyn MetricsSink>>) -> Self `  – src/guard.rs:260
+- `pub fn with_registry(`  – src/guard.rs:194
+- `pub fn with_registry_and_counter(`  – src/guard.rs:213
+- `pub fn with_registry_counter_and_clock(`  – src/guard.rs:232
+- `pub fn with_vfs(mut self, vfs: Arc<dyn crate::vfs::CheckpointVfs>) -> Self `  – src/orphan.rs:356
+- `pub(crate) fn clock_timestamp_ms(clock: &dyn Clock) -> u64 `  – src/orphan.rs:112
+- `pub(crate) fn validate_identifier(field_name: &str, value: &str) -> Result<()> `  – src/meta.rs:42
+
+---

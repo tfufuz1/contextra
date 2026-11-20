@@ -1,0 +1,192 @@
+## contextra-privacy
+
+Pfad: `crates/contextra-privacy`
+
+Abhängigkeiten (direkt): contextra-ids, contextra-env, thiserror, serde, serde_json, rand, tracing, zeroize, parking_lot, tokio, scc, blake3, regex
+
+### Module
+
+- `/src/audit_trace.rs`
+- `/src/bulk_exfiltration_detector.rs`
+- `/src/context_edit_audit.rs`
+- `/src/contract.rs`
+- `/src/data_class.rs`
+- `/src/egress_gateway.rs`
+- `/src/egress_guard.rs`
+- `/src/egress_vault.rs`
+- `/src/entity_recognizer.rs`
+- `/src/error.rs`
+- `/src/guarded_payload.rs`
+- `/src/lib.rs`
+- `/src/processing_registry.rs`
+- `/src/types.rs`
+
+### Öffentliche Typen
+
+- **BlockReason** (enum) – src/egress_vault.rs:195
+- **BoxFuture** (type) – src/egress_vault.rs:178
+- **BulkExfiltrationDetector** (struct) – src/bulk_exfiltration_detector.rs:159
+- **BulkExfiltrationOutcome** (enum) – src/bulk_exfiltration_detector.rs:78
+- **CloudQueryRequest** (struct) – src/egress_gateway.rs:451
+- **CloudQueryResponse** (struct) – src/egress_gateway.rs:463
+- **CloudResponseRehydrator** (struct) – src/egress_gateway.rs:310
+- **CompiledPattern** (struct) – src/egress_vault.rs:232
+- **ContextEditAuditError** (enum) – src/context_edit_audit.rs:39
+- **ContextEditAuditRecord** (struct) – src/context_edit_audit.rs:72
+- **ContextEditInput** (struct) – src/context_edit_audit.rs:52
+- **ContextEditKind** (enum) – src/context_edit_audit.rs:25
+- **DataClass** (enum) – src/data_class.rs:7
+- **DefaultEgressClassifier** (type) – src/egress_gateway.rs:38
+- **DefaultEgressGuard** (struct) – src/egress_gateway.rs:53
+- **DeterministicBlake3Hasher** (struct) – src/bulk_exfiltration_detector.rs:28
+- **DeterministicBuildHasher** (struct) – src/bulk_exfiltration_detector.rs:48
+- **EgressClassification** (enum) – src/egress_vault.rs:222
+- **EgressClassifier** (trait) – src/egress_vault.rs:556
+- **EgressClassifierTrace** (trait) – src/audit_trace.rs:87
+- **EgressDecision** (enum) – src/types.rs:8
+- **EgressError** (type) – src/error.rs:63
+- **EgressGateway** (struct) – src/egress_gateway.rs:75
+- **EgressGatewayBuilder** (struct) – src/egress_gateway.rs:94
+- **EgressGuard** (struct) – src/egress_guard.rs:63
+- **EgressGuardCheck** (trait) – src/egress_gateway.rs:46
+- **EgressPolicy** (trait) – src/types.rs:18
+- **EgressVault** (struct) – src/egress_vault.rs:373
+- **EgressVaultError** (enum) – src/egress_vault.rs:258
+- **EntityMatch** (struct) – src/entity_recognizer.rs:34
+- **EntityRecognizer** (trait) – src/egress_vault.rs:31
+- **Error** (type) – src/error.rs:66
+- **Gazetteer** (struct) – src/entity_recognizer.rs:48
+- **GuardedPayload** (struct) – src/guarded_payload.rs:35
+- **InjectionDetector** (trait) – src/egress_gateway.rs:63
+- **ManualClock** (struct) – tests/privacy_consolidated_tests.rs:20
+- **NoOpRecognizer** (struct) – src/egress_vault.rs:39
+- **PatternRecognizer** (type) – src/entity_recognizer.rs:29
+- **PersonalDataFound** (struct) – src/data_class.rs:69
+- **PolicyCategory** (enum) – src/egress_vault.rs:184
+- **PrivacyError** (enum) – src/error.rs:17
+- **ProcessingActivityRecord** (struct) – src/processing_registry.rs:58
+- **ProcessingRegistry** (struct) – src/processing_registry.rs:93
+- **ProcessingRegistryExport** (struct) – src/processing_registry.rs:136
+- **ProcessorRole** (enum) – src/processing_registry.rs:31
+- **Result** (type) – src/error.rs:69
+- **RuleBasedEntityRecognizer** (struct) – src/entity_recognizer.rs:87
+- **Sanitized** (struct) – src/guarded_payload.rs:22
+- **SessionId** (struct) – src/bulk_exfiltration_detector.rs:61
+- **SurrogateVault** (struct) – src/egress_vault.rs:51
+- **TextSearchEngine** (trait) – src/egress_guard.rs:36
+- **TextSearchResult** (struct) – src/egress_guard.rs:27
+- **Unsanitized** (struct) – src/guarded_payload.rs:18
+- **Validated** (struct) – src/data_class.rs:29
+
+### Öffentliche Funktionen
+
+- `pub async fn check(&self, payload: &str) -> EgressClassification `  – src/egress_guard.rs:136
+- `pub async fn check_scoped(`  – src/egress_guard.rs:111
+- `pub async fn classify_layer1(`  – src/egress_vault.rs:297
+- `pub async fn classify_layer1_arc(`  – src/egress_vault.rs:316
+- `pub async fn classify_scoped(`  – src/egress_vault.rs:458
+- `pub async fn handle_cloud_query(`  – src/egress_gateway.rs:478
+- `pub async fn handle_cloud_query_scoped(`  – src/egress_gateway.rs:491
+- `pub async fn handle_cloud_query_scoped_with_bulk_detector(`  – src/egress_gateway.rs:538
+- `pub async fn handle_cloud_query_scoped_with_guard(`  – src/egress_gateway.rs:514
+- `pub async fn handle_cloud_query_with_bulk_detector(`  – src/egress_gateway.rs:605
+- `pub async fn handle_cloud_query_with_guard(`  – src/egress_gateway.rs:568
+- `pub async fn process(`  – src/egress_gateway.rs:210
+- `pub async fn process_cloud_response(`  – src/egress_gateway.rs:629
+- `pub async fn process_with_components(`  – src/egress_gateway.rs:231
+- `pub fn add_gazetteer_term(mut self, term: impl Into<String>) -> Self `  – src/entity_recognizer.rs:132
+- `pub fn add_term(&mut self, term: impl Into<String>) `  – src/entity_recognizer.rs:63
+- `pub fn advance(&self, duration: Duration) `  – tests/privacy_consolidated_tests.rs:31
+- `pub fn append_record(&mut self, mut record: ProcessingActivityRecord, clock: &dyn Clock) `  – src/processing_registry.rs:109
+- `pub fn as_str(&self) -> &'static str `  – src/processing_registry.rs:41
+- `pub fn build(self) -> Result<EgressGateway, EgressError> `  – src/egress_gateway.rs:157
+- `pub fn build_context_edit_audit_record(`  – src/context_edit_audit.rs:175
+- `pub fn builder() -> EgressGatewayBuilder `  – src/egress_gateway.rs:205
+- `pub fn capacity_exceeded(msg: impl Into<String>) -> Self `  – src/error.rs:111
+- `pub fn category(&self) -> PolicyCategory `  – src/egress_vault.rs:210
+- `pub fn check_bulk_exfiltration(`  – src/egress_gateway.rs:583
+- `pub fn clear(&self) `  – src/egress_vault.rs:143
+- `pub fn compact(&self) `  – src/egress_vault.rs:155
+- `pub fn compute_audit_trace(payload: &str, rule_id: &str, nanos: u64) -> [u8; 32] `  – src/audit_trace.rs:62
+- `pub fn compute_record_hash(`  – src/context_edit_audit.rs:114
+- `pub fn corrupt(msg: impl Into<String>) -> Self `  – src/error.rs:138
+- `pub fn default_patterns() -> Vec<String> `  – src/egress_vault.rs:385
+- `pub fn default_version() -> u32 `  – src/processing_registry.rs:51
+- `pub fn export(&self) -> ProcessingRegistryExport `  – src/processing_registry.rs:126
+- `pub fn extract_rule_id(classification: &EgressClassification) -> String `  – src/audit_trace.rs:36
+- `pub fn filter_by_tenant(&self, tenant_id: TenantId) -> Self `  – src/processing_registry.rs:153
+- `pub fn from_sanitized(sanitized: String, session_id: String) -> Self `  – src/guarded_payload.rs:82
+- `pub fn generate_registry(records: &[ProcessingActivityRecord]) -> ProcessingRegistryExport `  – src/processing_registry.rs:231
+- `pub fn generate_surrogate(&self, entity_text: &str) -> Result<String, EgressVaultError> `  – src/egress_vault.rs:97
+- `pub fn get_entity(&self, surrogate: &str) -> Option<String> `  – src/egress_vault.rs:123
+- `pub fn inner(&self) -> &T `  – src/data_class.rs:40
+- `pub fn internal_error(msg: impl Into<String>) -> Self `  – src/error.rs:123
+- `pub fn into_inner(mut self) -> String `  – src/guarded_payload.rs:95
+- `pub fn into_inner(self) -> T `  – src/data_class.rs:46
+- `pub fn invalid_input(msg: impl Into<String>) -> Self `  – src/error.rs:106
+- `pub fn invalid_params(msg: impl Into<String>) -> Self `  – src/error.rs:101
+- `pub fn io(msg: impl Into<String>) -> Self `  – src/error.rs:128
+- `pub fn is_empty(&self) -> bool `  – src/egress_vault.rs:137
+- `pub fn is_empty(&self) -> bool `  – src/entity_recognizer.rs:72
+- `pub fn len(&self) -> usize `  – src/egress_vault.rs:132
+- `pub fn len(&self) -> usize `  – src/entity_recognizer.rs:77
+- `pub fn max_input_length(&self) -> usize `  – src/entity_recognizer.rs:126
+- `pub fn min_bytes(&self) -> usize `  – src/egress_guard.rs:97
+- `pub fn new() -> Self `  – src/egress_gateway.rs:106
+- `pub fn new() -> Self `  – src/entity_recognizer.rs:104
+- `pub fn new() -> Self `  – src/entity_recognizer.rs:55
+- `pub fn new() -> Self `  – src/processing_registry.rs:100
+- `pub fn new(initial_nanos: u64) -> Self `  – tests/privacy_consolidated_tests.rs:25
+- `pub fn new(max_bytes_per_window: usize, window: Duration) -> Self `  – src/bulk_exfiltration_detector.rs:184
+- `pub fn new(name: impl Into<String>, pattern: &str) -> Result<Self, EgressVaultError> `  – src/egress_vault.rs:241
+- `pub fn new(patterns: Vec<String>) -> Result<Self, EgressVaultError> `  – src/egress_vault.rs:402
+- `pub fn new(raw: String, session_id: String) -> Self `  – src/guarded_payload.rs:64
+- `pub fn new(records: Vec<ProcessingActivityRecord>) -> Self `  – src/processing_registry.rs:144
+- `pub fn new(search_engine: Arc<dyn TextSearchEngine>, threshold: f32, min_bytes: usize) -> Self `  – src/egress_guard.rs:73
+- `pub fn new(session_salt: [u8; 16]) -> Self `  – src/egress_vault.rs:68
+- `pub fn new(vault_map: impl IntoIterator<Item = (String, String)>) -> Self `  – src/egress_gateway.rs:316
+- `pub fn patterns(&self) -> &[CompiledPattern] `  – src/egress_vault.rs:437
+- `pub fn pii_vault_forces_crypto_shred(is_pii_match: bool, is_memory_only: bool) -> bool `  – src/egress_gateway.rs:398
+- `pub fn pii_vault_requires_isolated_retention(is_pii_match: bool, is_memory_only: bool) -> bool `  – src/egress_gateway.rs:388
+- `pub fn policy_category(&self) -> PolicyCategory `  – src/egress_vault.rs:442
+- `pub fn policy_violation(msg: impl Into<String>) -> Self `  – src/error.rs:117
+- `pub fn random_salt() -> Self `  – src/egress_vault.rs:77
+- `pub fn recognize(&self, text: &str) -> Vec<(Range<usize>, String)> `  – src/entity_recognizer.rs:139
+- `pub fn recognize_bounded(`  – src/entity_recognizer.rs:152
+- `pub fn recognize_detailed(&self, text: &str) -> Vec<EntityMatch> `  – src/entity_recognizer.rs:144
+- `pub fn recognize_detailed_bounded(&self, text: &str) -> Result<Vec<EntityMatch>, EgressError> `  – src/entity_recognizer.rs:167
+- `pub fn record_and_check(`  – src/bulk_exfiltration_detector.rs:216
+- `pub fn record_and_check_at_nanos(`  – src/bulk_exfiltration_detector.rs:243
+- `pub fn record_and_check_with_clock(`  – src/bulk_exfiltration_detector.rs:226
+- `pub fn records(&self) -> &[ProcessingActivityRecord] `  – src/processing_registry.rs:120
+- `pub fn rehydrate(&self, cloud_response_text: &str) -> String `  – src/egress_gateway.rs:326
+- `pub fn render_audit_line(record: &ContextEditAuditRecord) -> String `  – src/context_edit_audit.rs:250
+- `pub fn render_markdown(export: &ProcessingRegistryExport) -> String `  – src/processing_registry.rs:251
+- `pub fn resolve_effective_kv_delete_mode<D, K>(`  – src/egress_gateway.rs:430
+- `pub fn resolve_effective_retention_mode<D, K>(`  – src/egress_gateway.rs:404
+- `pub fn sanitize_and_vault(`  – src/egress_vault.rs:489
+- `pub fn sanitize_and_vault_scoped(`  – src/egress_vault.rs:471
+- `pub fn session_id(&self) -> &str `  – src/guarded_payload.rs:51
+- `pub fn state_conflict(msg: impl Into<String>) -> Self `  – src/error.rs:133
+- `pub fn surrogate_vault(&self) -> &Arc<SurrogateVault> `  – src/egress_vault.rs:452
+- `pub fn threshold(&self) -> f32 `  – src/egress_guard.rs:91
+- `pub fn timeout(&self) -> Duration `  – src/egress_guard.rs:103
+- `pub fn timeout(&self) -> Duration `  – src/egress_vault.rs:447
+- `pub fn try_default() -> Result<Self, EgressVaultError> `  – src/egress_vault.rs:396
+- `pub fn validate_k_payload<T: AsRef<str>>(`  – src/data_class.rs:52
+- `pub fn verify_audit_chain(chain: &[ContextEditAuditRecord]) -> Result<(), ContextEditAuditError> `  – src/context_edit_audit.rs:210
+- `pub fn with_bulk_detector(`  – src/egress_gateway.rs:141
+- `pub fn with_classifier(mut self, classifier: Arc<dyn EgressClassifier>) -> Self `  – src/egress_gateway.rs:111
+- `pub fn with_clock(`  – src/bulk_exfiltration_detector.rs:195
+- `pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self `  – src/egress_gateway.rs:151
+- `pub fn with_egress_guard(mut self, guard: Arc<dyn EgressGuardCheck>) -> Self `  – src/egress_gateway.rs:117
+- `pub fn with_egress_vault(mut self, vault: Arc<EgressVault>) -> Self `  – src/egress_gateway.rs:129
+- `pub fn with_gazetteer(gazetteer: Gazetteer) -> Self `  – src/entity_recognizer.rs:110
+- `pub fn with_max_input_length(mut self, limit: usize) -> Self `  – src/entity_recognizer.rs:119
+- `pub fn with_recognizer(mut self, recognizer: Arc<dyn EntityRecognizer>) -> Self `  – src/egress_gateway.rs:123
+- `pub fn with_surrogate_vault(mut self, surrogate_vault: Arc<SurrogateVault>) -> Self `  – src/egress_gateway.rs:135
+- `pub fn with_surrogate_vault(mut self, surrogate_vault: Arc<SurrogateVault>) -> Self `  – src/egress_vault.rs:431
+- `pub fn with_timeout(mut self, timeout: Duration) -> Self `  – src/egress_guard.rs:84
+- `pub fn with_timeout(mut self, timeout: Duration) -> Self `  – src/egress_vault.rs:425
+
+---

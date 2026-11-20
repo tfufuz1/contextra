@@ -1,0 +1,248 @@
+## contextra-crypto
+
+Pfad: `crates/contextra-crypto`
+
+Abhängigkeiten (direkt): contextra-ids, contextra-env, thiserror, aes-gcm-siv, argon2, hkdf, sha2, subtle, zeroize, rand, hmac, blake3, bincode, serde, serde_json, parking_lot, ahash, lru, regex, tracing
+
+### Module
+
+- `/src/aead.rs`
+- `/src/anti_tamper.rs`
+- `/src/audit_chain.rs`
+- `/src/contract.rs`
+- `/src/crypto.rs`
+- `/src/dek.rs`
+- `/src/error.rs`
+- `/src/kdf.rs`
+- `/src/kv_cipher.rs`
+- `/src/kv_segment/delete_mode.rs`
+- `/src/kv_segment/eviction_worker.rs`
+- `/src/kv_segment/manager.rs`
+- `/src/kv_segment/mod.rs`
+- `/src/kv_segment/segment.rs`
+- `/src/kv_segment/store.rs`
+- `/src/lib.rs`
+- `/src/secret.rs`
+- `/src/wal_completeness.rs`
+- `/src/wal_crypto.rs`
+
+### Öffentliche Typen
+
+- **AncestorSalts** (struct) – src/dek.rs:51
+- **AuditChain** (struct) – src/audit_chain.rs:183
+- **AuditChainEntry** (struct) – src/audit_chain.rs:52
+- **AuditChainHeadSignature** (struct) – src/audit_chain.rs:116
+- **AuditHeadAnchor** (struct) – src/audit_chain.rs:127
+- **Blake3Chain** (struct) – src/anti_tamper.rs:111
+- **CloudEgressGuard** (struct) – src/wal_crypto.rs:145
+- **CollectionKek** (struct) – src/secret.rs:197
+- **CryptoEntropy** (trait) – src/contract.rs:18
+- **CryptoError** (enum) – src/error.rs:27
+- **DataClass** (enum) – src/audit_chain.rs:33
+- **Dek** (struct) – src/dek.rs:35
+- **DeletionProofTamperInput** (struct) – fuzz/fuzz_targets/deletion_proof_tamper.rs:20
+- **DerivedKey** (struct) – src/kdf.rs:288
+- **DeterministicEntropy** (struct) – src/contract.rs:30
+- **DocTag** (type) – src/dek.rs:48
+- **DocumentDek** (struct) – src/secret.rs:200
+- **EncryptedCommitmentSalt** (struct) – src/audit_chain.rs:162
+- **EncryptedKvLayer** (struct) – src/kv_cipher.rs:77
+- **EncryptedSegmentPayload** (struct) – src/kv_segment/segment.rs:24
+- **EncryptedWal** (struct) – src/wal_crypto.rs:200
+- **ErasureKey** (struct) – src/secret.rs:209
+- **EvictionWorker** (struct) – src/kv_segment/eviction_worker.rs:40
+- **FuzzWalEntry** (struct) – fuzz/fuzz_targets/wal_hmac_chain_verify_fuzz.rs:11
+- **FuzzWalHmacChainInput** (struct) – fuzz/fuzz_targets/wal_hmac_chain_verify_fuzz.rs:26
+- **InMemoryKms** (struct) – src/contract.rs:78
+- **IntegrityVerifier** (struct) – src/wal_crypto.rs:358
+- **KdfHeader** (struct) – src/kdf.rs:128
+- **KdfParams** (struct) – src/kdf.rs:56
+- **KeyManager** (struct) – src/crypto.rs:65
+- **KmsContract** (trait) – src/contract.rs:60
+- **KmsProvider** (trait) – src/wal_crypto.rs:32
+- **KvCipher** (trait) – src/kv_cipher.rs:94
+- **KvDeleteMode** (enum) – src/kv_segment/delete_mode.rs:22
+- **KvSegment** (struct) – src/kv_segment/segment.rs:47
+- **KvSegmentCipher** (struct) – src/kv_cipher.rs:125
+- **KvSegmentConfig** (struct) – src/kv_segment/manager.rs:19
+- **KvSegmentManager** (struct) – src/kv_segment/manager.rs:43
+- **KvSegmentPayload** (struct) – src/kv_segment/manager.rs:26
+- **LocalKeyManagerKms** (struct) – src/wal_crypto.rs:55
+- **MasterKey** (struct) – src/secret.rs:191
+- **MockCommand** (enum) – tests/loom_eviction_worker_shutdown_race.rs:22
+- **MockEvictionWorker** (struct) – tests/loom_eviction_worker_shutdown_race.rs:61
+- **ModelFingerprint** (struct) – src/kv_cipher.rs:43
+- **Result** (type) – src/error.rs:17
+- **Salt** (type) – src/dek.rs:47
+- **Secret** (struct) – src/secret.rs:69
+- **SecretKey** (struct) – src/secret.rs:14
+- **SecretKey32** (struct) – src/secret.rs:173
+- **SpillHandler** (type) – src/kv_segment/store.rs:26
+- **SubjectDocDek** (struct) – src/secret.rs:206
+- **SubjectKey** (struct) – src/secret.rs:203
+- **TamperMutation** (struct) – fuzz/fuzz_targets/deletion_proof_tamper.rs:14
+- **TenantIsolatedKvStore** (struct) – src/kv_segment/store.rs:120
+- **TenantKek** (struct) – src/secret.rs:194
+- **UnitKey** (struct) – src/dek.rs:20
+- **VerifyExternalFuzzInput** (struct) – fuzz/fuzz_targets/deletion_proof_verify_external_fuzz.rs:14
+- **VolatileEncryptionKey** (struct) – src/anti_tamper.rs:30
+- **WalEntrySnapshot** (struct) – src/wal_crypto.rs:330
+- **WalHmac** (struct) – src/wal_crypto.rs:288
+
+### Öffentliche Funktionen
+
+- `pub fn append(`  – src/audit_chain.rs:200
+- `pub fn as_bytes(&self) -> &[u8; 32] `  – src/secret.rs:183
+- `pub fn as_bytes(&self) -> &[u8; 32] `  – src/secret.rs:222
+- `pub fn as_bytes(&self) -> &[u8; N] `  – src/secret.rs:32
+- `pub fn as_bytes(&self) -> &[u8] `  – src/anti_tamper.rs:49
+- `pub fn as_bytes(&self) -> &[u8] `  – src/kv_segment/segment.rs:178
+- `pub fn build_aad(tenant: TenantId, collection: CollectionId, doc: DocId, version: u64) -> [u8; 32] `  – src/aead.rs:223
+- `pub fn cipher_for(&self, tenant_id: contextra_ids::TenantId) -> Result<Self> `  – src/crypto.rs:382
+- `pub fn cipher_for_bytes(`  – src/crypto.rs:310
+- `pub fn cipher_for_scoped<T>(`  – src/crypto.rs:393
+- `pub fn cipher_for_scoped_bytes<T>(`  – src/crypto.rs:320
+- `pub fn clear_all(&self) `  – src/kv_segment/store.rs:533
+- `pub fn compute_hash(`  – src/audit_chain.rs:76
+- `pub fn compute_record_commitment(salt: &[u8], attr: &[u8]) -> [u8; 32] `  – src/audit_chain.rs:172
+- `pub fn constant_time_compare(a: &[u8], b: &[u8]) -> bool `  – src/anti_tamper.rs:87
+- `pub fn current_hash(&self) -> &[u8; 32] `  – src/anti_tamper.rs:142
+- `pub fn decrypt(&self, encrypted: &EncryptedKvLayer) -> Result<Vec<u8>> `  – src/kv_cipher.rs:165
+- `pub fn decrypt_aead(key: &SecretKey32, aad: &[u8], blob: &[u8]) -> Result<Vec<u8>> `  – src/aead.rs:265
+- `pub fn decrypt_auto_nonce(&self, ciphertext: &[u8], nonce_bytes: &[u8; 12]) -> Result<Vec<u8>> `  – src/crypto.rs:471
+- `pub fn decrypt_chunk(&self, data: &[u8]) -> Result<Vec<u8>> `  – src/wal_crypto.rs:255
+- `pub fn decrypt_data(&self, cipher: &KvSegmentCipher) -> Result<Vec<u8>, crate::CryptoError> `  – src/kv_segment/segment.rs:137
+- `pub fn decrypt_with_version(`  – src/kv_cipher.rs:192
+- `pub fn delete_mode(&self) -> KvDeleteMode `  – src/kv_segment/manager.rs:61
+- `pub fn delete_segment(&self, _group_id: u64) -> Result<bool, CryptoError> `  – src/kv_segment/manager.rs:137
+- `pub fn derive_collection_kek(`  – src/kdf.rs:399
+- `pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Result<Dek> `  – src/dek.rs:71
+- `pub fn derive_document_dek(`  – src/kdf.rs:416
+- `pub fn derive_erasure_key(master: &MasterKey) -> Result<ErasureKey> `  – src/kdf.rs:449
+- `pub fn derive_file_key(&self, file_id: &[u8]) -> Result<Self> `  – src/crypto.rs:171
+- `pub fn derive_key_argon2id(passphrase: &str, header: &KdfHeader) -> Result<DerivedKey> `  – src/kdf.rs:299
+- `pub fn derive_kv_key(`  – src/crypto.rs:335
+- `pub fn derive_kv_key_bytes(`  – src/crypto.rs:284
+- `pub fn derive_kv_key_scoped(`  – src/crypto.rs:370
+- `pub fn derive_kv_key_scoped_bytes(`  – src/crypto.rs:298
+- `pub fn derive_master_key(passphrase: &[u8], salt: &[u8; 32]) -> Result<MasterKey> `  – src/kdf.rs:348
+- `pub fn derive_segment_key(&self, info: &str) -> Result<Self> `  – src/crypto.rs:221
+- `pub fn derive_subject_doc_dek(`  – src/kdf.rs:458
+- `pub fn derive_subject_key(`  – src/kdf.rs:433
+- `pub fn derive_tenant_kek(master: &MasterKey, tenant_id: TenantId) -> Result<TenantKek> `  – src/kdf.rs:390
+- `pub fn emergency_wipe(&mut self) `  – src/anti_tamper.rs:44
+- `pub fn emergency_wipe(&mut self) `  – src/crypto.rs:483
+- `pub fn emergency_wipe(store: &TenantIsolatedKvStore) `  – src/kv_segment/eviction_worker.rs:106
+- `pub fn encrypt(`  – src/kv_cipher.rs:139
+- `pub fn encrypt_aead(key: &SecretKey32, aad: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> `  – src/aead.rs:238
+- `pub fn encrypt_auto_nonce(&self, data: &[u8]) -> Result<(Vec<u8>, [u8; 12])> `  – src/crypto.rs:440
+- `pub fn encrypt_chunk(&self, payload: &[u8]) -> Result<Vec<u8>> `  – src/wal_crypto.rs:243
+- `pub fn encrypt_with_version(`  – src/kv_cipher.rs:180
+- `pub fn entries(&self) -> &[AuditChainEntry] `  – src/audit_chain.rs:255
+- `pub fn evict_lru_fair(&self, target_free_bytes: usize) -> usize `  – src/kv_segment/store.rs:410
+- `pub fn evict_lru_fair_with_hook<F>(&self, target_free_bytes: usize, mut hook: F) -> usize`  – src/kv_segment/store.rs:422
+- `pub fn export_dek(&self) -> Zeroizing<Vec<u8>> `  – src/crypto.rs:491
+- `pub fn expose_secret(&self) -> &T `  – src/secret.rs:81
+- `pub fn expose_secret(&self) -> &[u8; 32] `  – src/dek.rs:27
+- `pub fn expose_secret(&self) -> &[u8; 32] `  – src/dek.rs:42
+- `pub fn expose_secret(&self) -> &[u8; N] `  – src/secret.rs:26
+- `pub fn expose_secret_mut(&mut self) -> &mut T `  – src/secret.rs:87
+- `pub fn extend(&mut self, context: &[u8], data: &[u8]) -> [u8; 32] `  – src/anti_tamper.rs:126
+- `pub fn finalize(self) -> [u8; 32] `  – src/wal_crypto.rs:315
+- `pub fn from_bytes(bytes: &[u8]) -> Result<Self> `  – src/kdf.rs:192
+- `pub fn generate_default() -> Result<Self> `  – src/kdf.rs:137
+- `pub fn get_decrypted_segment(`  – src/kv_segment/store.rs:311
+- `pub fn get_segment_bytes(&self, tenant: TenantId, segment_id: u64) -> Option<Vec<u8>> `  – src/kv_segment/store.rs:267
+- `pub fn get_segments(&self, tenant: TenantId) -> Vec<u64> `  – src/kv_segment/store.rs:299
+- `pub fn get_tenant_segment_len(&self, tenant: TenantId) -> usize `  – src/kv_segment/store.rs:331
+- `pub fn head_hash(&self) -> [u8; 32] `  – src/audit_chain.rs:260
+- `pub fn hkdf_expand(prk: &[u8], info: &[u8], out: &mut [u8]) -> Result<()> `  – src/kdf.rs:325
+- `pub fn insert_encrypted_segment(`  – src/kv_segment/store.rs:276
+- `pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment) `  – src/kv_segment/store.rs:196
+- `pub fn inspect_key_bytes_for_test(&self) -> &[u8; 32] `  – src/anti_tamper.rs:55
+- `pub fn inspect_key_bytes_for_test(&self) -> &[u8; 32] `  – src/crypto.rs:497
+- `pub fn integrity_key(&self) -> Result<[u8; 32]> `  – src/crypto.rs:405
+- `pub fn is_empty(&self) -> bool `  – src/audit_chain.rs:250
+- `pub fn is_empty(&self) -> bool `  – src/kv_segment/segment.rs:188
+- `pub fn key_manager(&self) -> &KeyManager `  – src/wal_crypto.rs:72
+- `pub fn kms(&self) -> &Arc<dyn KmsProvider> `  – src/wal_crypto.rs:237
+- `pub fn last_hmac_snapshot(&self) -> [u8; 32] `  – src/wal_crypto.rs:384
+- `pub fn last_seq_no_snapshot(&self) -> Option<u64> `  – src/wal_crypto.rs:394
+- `pub fn len(&self) -> usize `  – src/audit_chain.rs:245
+- `pub fn len(&self) -> usize `  – src/kv_segment/segment.rs:183
+- `pub fn new() -> Self `  – src/audit_chain.rs:191
+- `pub fn new() -> Self `  – src/kv_segment/store.rs:139
+- `pub fn new() -> Self `  – src/wal_crypto.rs:157
+- `pub fn new(`  – src/kv_cipher.rs:54
+- `pub fn new(`  – src/kv_segment/manager.rs:50
+- `pub fn new(active_id: impl Into<String>, master_key: [u8; 32]) -> Self `  – src/contract.rs:85
+- `pub fn new(bytes: [u8; 32]) -> Self `  – src/dek.rs:23
+- `pub fn new(bytes: [u8; 32]) -> Self `  – src/dek.rs:38
+- `pub fn new(bytes: [u8; N]) -> Self `  – src/secret.rs:20
+- `pub fn new(genesis: [u8; 32]) -> Self `  – src/anti_tamper.rs:118
+- `pub fn new(inner: T) -> Self `  – src/secret.rs:75
+- `pub fn new(integrity_key: &[u8]) -> Result<Self> `  – src/wal_crypto.rs:293
+- `pub fn new(integrity_key: &[u8]) -> Self `  – src/wal_crypto.rs:365
+- `pub fn new(key_manager: KeyManager) -> Self `  – src/kv_cipher.rs:131
+- `pub fn new(key_manager: KeyManager, file_id: &[u8]) -> Result<Self> `  – src/wal_crypto.rs:213
+- `pub fn new(key_manager: KeyManager, key_id: impl Into<String>) -> Self `  – src/wal_crypto.rs:63
+- `pub fn new(m_cost_kib: u32, t_cost: u32, p_cost: u32) -> Result<Self> `  – src/kdf.rs:74
+- `pub fn new(params: KdfParams, salt: Vec<u8>) -> Result<Self> `  – src/kdf.rs:150
+- `pub fn new(raw: [u8; 32]) -> Self `  – src/anti_tamper.rs:36
+- `pub fn new(seed: u64) -> Self `  – src/contract.rs:37
+- `pub fn new(seq_no: u64, head_hash: [u8; 32]) -> Self `  – src/audit_chain.rs:138
+- `pub fn new(tenant_id: TenantId, segment_id: u64, data: Vec<u8>) -> Self `  – src/kv_segment/segment.rs:70
+- `pub fn new_encrypted(`  – src/kv_segment/segment.rs:104
+- `pub fn new_for_test(m_cost_kib: u32, t_cost: u32, p_cost: u32) -> Self `  – src/kdf.rs:99
+- `pub fn new_with_metadata(`  – src/kv_segment/segment.rs:84
+- `pub fn on_rollback(&self, tenant: TenantId, chunk_ids: &[u64]) `  – src/kv_segment/store.rs:222
+- `pub fn open_record(dek: &Dek, key_bytes: &[u8], env: &[u8]) -> Result<Zeroizing<Vec<u8>>> `  – src/aead.rs:88
+- `pub fn read_segment(&self, segment: &KvSegmentPayload) -> Result<Vec<u8>, CryptoError> `  – src/kv_segment/manager.rs:99
+- `pub fn remove_segment(&self, tenant: TenantId, segment_id: u64) `  – src/kv_segment/store.rs:262
+- `pub fn remove_segments_for_rollback(&self, tenant: TenantId, segment_ids: &[u64]) `  – src/kv_segment/store.rs:231
+- `pub fn seal_record(dek: &Dek, doc: [u8; 16], key_bytes: &[u8], plain: &[u8]) -> Result<Vec<u8>> `  – src/aead.rs:77
+- `pub fn seal_record_with_nonce(`  – src/aead.rs:26
+- `pub fn seal_record_with_rng<R: RngCore>(`  – src/aead.rs:58
+- `pub fn set_last_hmac(&mut self, hmac: [u8; 32]) `  – src/wal_crypto.rs:379
+- `pub fn set_last_seq_no(&mut self, seq_no: Option<u64>) `  – src/wal_crypto.rs:389
+- `pub fn set_spill_handler(&self, handler: SpillHandler) `  – src/kv_segment/store.rs:175
+- `pub fn shutdown(&self) `  – src/kv_segment/eviction_worker.rs:89
+- `pub fn shutdown(&self) `  – tests/loom_eviction_worker_shutdown_race.rs:230
+- `pub fn shutdown(&self) `  – tests/loom_eviction_worker_shutdown_race.rs:92
+- `pub fn sign_head_with_bytes(`  – src/audit_chain.rs:265
+- `pub fn skip_hmac_verify_legacy(&mut self, entry: &WalEntrySnapshot) `  – src/wal_crypto.rs:557
+- `pub fn spawn() -> Self `  – tests/loom_eviction_worker_shutdown_race.rs:207
+- `pub fn spawn() -> Self `  – tests/loom_eviction_worker_shutdown_race.rs:67
+- `pub fn spawn(store: Arc<TenantIsolatedKvStore>) -> Self `  – src/kv_segment/eviction_worker.rs:47
+- `pub fn step_count(&self) -> u64 `  – src/anti_tamper.rs:147
+- `pub fn storage(reason: impl Into<String>) -> Self `  – src/error.rs:132
+- `pub fn to_bytes(&self) -> Vec<u8> `  – src/kdf.rs:176
+- `pub fn to_spill_bytes(&self) -> Vec<u8> `  – src/kv_segment/segment.rs:168
+- `pub fn trigger_eviction(&self, target_free_bytes: usize) `  – src/kv_segment/eviction_worker.rs:81
+- `pub fn trigger_eviction(&self, target_free_bytes: usize) `  – tests/loom_eviction_worker_shutdown_race.rs:225
+- `pub fn trigger_eviction(&self, target_free_bytes: usize) `  – tests/loom_eviction_worker_shutdown_race.rs:87
+- `pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self> `  – src/crypto.rs:91
+- `pub fn try_new_random_salt(passphrase: &str) -> Result<(Self, [u8; 32])> `  – src/crypto.rs:160
+- `pub fn try_new_with_kdf(passphrase: &str, header: &KdfHeader) -> Result<Self> `  – src/crypto.rs:136
+- `pub fn unwrap_dek(kek: &UnitKey, wrapped: &[u8]) -> Result<Dek> `  – src/dek.rs:116
+- `pub fn update(&mut self, data: &[u8]) `  – src/wal_crypto.rs:310
+- `pub fn validate_egress_payload(&self, payload: &[u8]) -> Result<()> `  – src/wal_crypto.rs:169
+- `pub fn verify_and_update(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> `  – src/wal_crypto.rs:563
+- `pub fn verify_and_update_v2(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> `  – src/wal_crypto.rs:488
+- `pub fn verify_and_update_v3(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> `  – src/wal_crypto.rs:399
+- `pub fn verify_chain(&self) -> Result<bool> `  – src/audit_chain.rs:297
+- `pub fn verify_chain_with_anchor(&self, anchor: &AuditHeadAnchor) -> Result<bool> `  – src/audit_chain.rs:345
+- `pub fn verify_current_hash(&self, expected: &[u8; 32]) -> Result<()> `  – src/anti_tamper.rs:152
+- `pub fn verify_tag_constant_time(expected: &[u8], actual: &[u8]) -> Result<()> `  – src/anti_tamper.rs:97
+- `pub fn verify_wal_chain_completeness(`  – src/wal_completeness.rs:43
+- `pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self `  – src/error.rs:124
+- `pub fn with_capacity(segment_capacity_per_tenant: usize) -> Self `  – src/kv_segment/store.rs:167
+- `pub fn with_kms(kms: Arc<dyn KmsProvider>) -> Self `  – src/wal_crypto.rs:232
+- `pub fn with_max_bytes(max_egress_bytes: usize) -> Self `  – src/wal_crypto.rs:164
+- `pub fn with_shard_count(n: usize) -> Self `  – src/kv_segment/store.rs:145
+- `pub fn with_signature(`  – src/audit_chain.rs:147
+- `pub fn wrap_dek(kek: &UnitKey, dek: &Dek, nonce: [u8; 12]) -> Result<Vec<u8>> `  – src/dek.rs:98
+- `pub fn write_segment(`  – src/kv_segment/manager.rs:66
+- `pub(crate) fn evict_lru_global(&self, target_free_bytes: usize) -> usize `  – src/kv_segment/store.rs:340
+
+---
