@@ -75,7 +75,7 @@ Alle Entscheidungen sind final. Änderungen erfordern eine neue Spezifikationsve
 | ADR-02 | **Keine Eigennachweise** im Produkt: kein Canary, kein Nadelscan, keine Messklassen L/P/C/M, keine signierten Berichte, keine Bescheinigung, kein Prüfwerkzeug. Stattdessen Journal, Ledger und Tests in CI. | Jede Selbstmessung prüft sich mit denselben Annahmen, kostet Laufzeit und erzeugt Aussagen, die der Betreiber nicht verwerten kann. | Messung A/B, `Scanner<Armed>`, JCS und Ed25519, `contextra-verify` |
 | ADR-03 | **Frühe Schlüsselvernichtung ist der Standard.** Reihenfolge: Gate, Schlüssel, Arbeitsspeicher, danach gebündelte Bereinigung gemeinsamer Strukturen. | Ohne Messschritt entfällt der Grund für die Reihenfolge „erst bereinigen“. Aller Klartext, der nur über den Schlüssel erreichbar ist, ist sofort weg. | Reihenfolge S3, S4, S5 aus v3.0 |
 | ADR-04 | **HNSW mit SQ8** ist der Standardindex. Exakte flache Suche bis 20.000 Vektoren je Shard und als Referenz im Test. DiskANN und RaBitQ entfallen. | 200.000 flache Vektoren genügen nicht für Unternehmensbestände. Flache Suche kostet ab 1 Mio. Vektoren zu viel Latenz. | Flach als Standard (v3.0), DiskANN |
-| ADR-05 | **Graph-Crate verlässt den Workspace.** Rückkehr nur über das Gate G-GRAPH (Abschnitt 12.3). | 34.600 Zeilen ohne belegten Nutzen für die Trefferqualität. Lineage und Provenienz gehören nicht dazu. | Verschlanken auf Kantenlogik |
+| ADR-05 | **Graph-Crate wird reduziert**(Abschnitt 12.3). | reduzieren. | Verschlanken |
 | ADR-06 | `contextra-mvcc` wird zu **`contextra-version`**: Versionskatalog, Snapshots, Aufbewahrung. Kein SSI, kein TxBuffer. | RAG braucht atomare Schreibstapel und Snapshot-Lesen, keine serialisierbaren Transaktionen. | SSI, interaktive Transaktionen |
 | ADR-07 | **Ein Schreib-Task je Shard** (Mandant × Collection), viele Shards parallel. Lesen ist sperrfrei über unveränderliche Snapshots. | Der Knoten-weite Einzelschreiber aus v2.2 bremst Mehrmandantenbetrieb. | Ein Schreiber je Prozess |
 | ADR-08 | **KeyTable als Slot-Datei mit Überschreiben an Ort** statt Shard-Neuschreiben. | Vernichtung kostet einen 80-Byte-Schreibvorgang statt eines Shards von Dutzenden MB. Gestapelte Vernichtungen teilen sich einen `fdatasync`. | 256 Shards mit `tmp → rename` (v2.2) |
@@ -129,7 +129,7 @@ Umfang alt = Zeilen laut Funktionsinventar (inkl. Tests). Umfang Ziel ist eine *
 | `contextra-server` | E3 | **neu**, optional, HTTP/gRPC mit Auth (M6) | – | offen |
 | `contextra-kms` | E3 | **neu**, optional, KMS-Anbindung (M6) | – | 1.000 |
 
-Entfernt: `contextra-engine`, `contextra-vault`, `contextra-graph` (ADR-05, Archiv-Tag `archive/graph`).
+Entfernt: `contextra-engine`, `contextra-vault`, .
 Gesamtschätzung: **rund 110.000 Zeilen gegenüber rund 249.000 heute** (ohne `server` und `kms`).
 
 ### 3.2 Schichten und Abhängigkeitsregeln
@@ -973,7 +973,6 @@ Je Entfernung ein Commit. Nach jedem Commit `cargo check --workspace`. Keine Ver
 
 | ID | Entfernen | Ort | Abnahme |
 |---|---|---|---|
-| REM-17 | **Crate `contextra-graph`** vollständig (Perkolation, TL-HFD, APPRH, Session-DAG, Hyperedge, PPR, Pfad-RAG). Archiv-Tag `archive/graph` | `crates/contextra-graph/`, `ports/graph*.rs`, `testkit/in_memory_graph.rs` | Verzeichnis fehlt |
 | REM-18 | Kalibrierung, Resonanz-, Ext-, Global-, Normalized-Fusion | `contextra-rank/src/calibration/`, `fusion/{resonance,ext,global,normalized}.rs` | Dateien fehlen |
 | REM-19 | `contextra-engine` | `crates/contextra-engine/` | Verzeichnis fehlt |
 | REM-20 | LLM-Klassifikation, Egress-Vault, Egress-Gateway, Bulk-Exfiltration, Kontext-Edit-Audit | `contextra-privacy/src/{egress_vault,egress_gateway,bulk_exfiltration_detector,context_edit_audit}.rs` | Dateien fehlen. Verbleibend: `entity_recognizer`, `data_class`, `egress_guard`, `processing_registry`, `guarded_payload` |
@@ -987,11 +986,38 @@ Je Entfernung ein Commit. Nach jedem Commit `cargo check --workspace`. Keine Ver
 | REM-28 | Duplizierte Kryptoabhängigkeiten (`sha2`, `hmac` in `erasure`, `engine`, `types`) | `Cargo.toml` | nur `contextra-crypto` hat Kryptoabhängigkeiten |
 | REM-29 | Verweise auf entfernte Dokumente und Crates | `CLAUDE.md`, `AGENTS.md`, Crate-READMEs, `docs/crates/*.md` | G-07 grün |
 
-**Gate G-GRAPH (Rückkehr eines Graphindex).** Er kehrt nur zurück, wenn ein Benchmark auf einem Referenzdatensatz mindestens +3 Punkte nDCG@10 bei höchstens +10 % Suchlatenz p95 belegt und der Index die Löschkette (`SealScoped`, Gate) vollständig umsetzt.
 
 **Gate G-INDEX (Rückkehr von DiskANN oder RaBitQ).** Nur mit einem Bestand, den HNSW im RAM-Budget nicht hält (> 50 Mio. Chunks je Prozess), und einem Benchmark mit Rückruf und Latenz.
 
 **Gate G-STORE (Store).** Die eigene LSM bleibt, wenn sie in M1 auf Messhardware erreicht: Punktzugriff p99 ≤ 1 ms (warm), ≥ 50.000 Schreibvorgänge/s im Gruppen-Commit, Wiederanlauf nach Absturz in ≤ 10 s bei 10 GB. Sonst wird sie hinter dem Port `KvStore` durch `redb` oder `fjall` ersetzt. Die Entscheidung fällt anhand der Messung, nicht der Aufwandsschätzung.
+
+---
+### contextra-graph
+Kein Enterprise-Kunde (CISO, Legal Counsel, Head of AI) kauft ein System wegen _TL-HFD mit Lovász-Erweiterung_. Was sich im Markt für regulierte KI-Systeme hingegen **extrem gut als Alleinstellungsmerkmal** verkaufen lässt, ist die Kombination aus:
+
+  
+
+1. **Auditierbares PathRAG + Provenance:** Nicht nur „Wir haben 5 Chunks gefunden“, sondern _„Hier ist der exakte, deterministisch reproduzierbare Begründungspfad über 3 Paragrafen hinweg“_.
+    
+2. **Spurlose Graph-Erasure (`ConsistencyEnforcer` + `contextra-erasure`):** Bei fast allen GraphRAG-Systemen bleiben nach dem Löschen eines Dokuments „Ghost-Nodes“ oder verwaiste Relationen im Graphen zurück. Garantieren zu können, dass ein gelöschter Mandant/Patient sowohl aus den Vektoren als auch aus der Graph-Topologie kryptografisch und strukturell verschwindet, ist ein echter Enterprise-USP.
+    
+3. **Time-Travel & Branching Agent Memory (`SessionBranchTree` + MVCC-Snapshots):** Nachweisen zu können, auf welchem exakten Wissens- und Graph-Zustand ein KI-Agent am Dienstag um 14:00 Uhr eine Entscheidung getroffen hat (und Sackgassen sauber verwerfen zu können), löst das größte Governance-Problem von KI-Agenten in Unternehmen.
+    
+
+## 3. Konkreter Schnittplan für `contextra-graph`
+
+|**Komponente**|**Aktion**|**Begründung**|
+|---|---|---|
+|`tl_hfd` + `lovasz.rs`|**Komplett löschen**|Reines arXiv-Overengineering, hohe Komplexität, kein kundenseitiger Mehrwert.|
+|`apprh` (`GateMonitor`, `Selector`, `ShadowComparison`)|**Shadow- & Gate-Logik löschen**|Entweder ihr nutzt _nur_ `ForwardPush` PPR auf einem normalen `CsrGraph` (Empfehlung) oder _nur_ Hypergraph-Push – aber ohne Shadow-A/B-Testing im Hot-Path.|
+|`percolation` (`find_rebonding_candidates`)|**Komplett löschen**|Fachlich und datenschutzrechtlich riskant (konstruiert neue Zusammenhänge nach Löschungen).|
+|`Dense PPR`|**Löschen**|Durch `ForwardPush` PPR vollständig abgedeckt und schneller.|
+|`CsrGraph` + `ForwardPush` PPR|**Behalten**|Schnelles, deterministisches, speichereffizientes Fundament.|
+|`PathRAG`|**Behalten**|Direkter Qualitäts- und Erklärbarkeitsgewinn für das LLM.|
+|`ConsistencyEnforcer`|**Behalten**|Zwingend nötig für saubere DSGVO-Löschungen im Graphen.|
+|`SessionBranchTree`|**Behalten**|Starker USP für auditable Agent-Workflows.|
+|`EdgeReinforcementBuffer`|**Optional halten (Feature-Flag)**|Nur aktivieren, wenn der Mandant explizit adaptives Agent-Memory statt deterministischem Dokumenten-Retrieval nutzt.|
+
 
 ---
 
