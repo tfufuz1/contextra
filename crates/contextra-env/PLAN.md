@@ -214,3 +214,29 @@ Entfallen: `src/env.rs`, `src/id_gen.rs`, `src/seq_log.rs`, `src/rng.rs` (Trait 
 | ADR-37 | `MetricsSink` hat keine Labels und keine Gleitkommawerte |
 
 **Reihenfolge im Repository:** Dieses PLAN wird nach `contextra-ids` als zweiter Commit der Fundamentreihe eingecheckt. Die Umsetzung beginnt mit U-ENV-1 und endet mit U-ENV-8. U-ENV-3 ist Voraussetzung für `contextra-ids` U-IDS-5.
+
+---
+
+## Nachtrag N-1: Aufnahme aus der Auflösung von `contextra-types` und Korrektur von U-ENV-4
+
+**Quelle:** `crates/contextra-types/PLAN.md`, Abschnitt 3.2 und Abschnitt 5 (U-TYP-3). `crates/contextra-mvcc/PLAN.md` (Umbenennung nach `contextra-version`).
+
+### N-1.1 Neues Modul `budget.rs` (U-ENV-9)
+
+| Item | Inhalt | Verbraucher |
+|---|---|---|
+| `ResourceBudget` | Obergrenzen für Speicher und Arbeit, reine Werte | `store` (6 Dateien), `graph` (4 Dateien) |
+| `ResourceTracker` | Zähler mit `consume_memory`, `release_memory`, `memory_used`, `budget`, `has_memory_capacity`. Ohne I/O, Zustand nur im Zähler | dieselben |
+
+**Begründung:** Beide Verbraucher liegen auf E1 und dürfen einander nicht importieren (R2). `env` ist bereits Abhängigkeit beider. Entscheidung O-TYP-1 in `contextra-types/PLAN.md`.
+
+**Einordnung:** U-ENV-9 ist additiv. Es folgt nach U-ENV-3 (Zeit-API) und vor dem Entfernen von `contextra-types` (U-TYP-7).
+
+### N-1.2 Korrektur U-ENV-4 (Ziel `SequenceLog`)
+
+Die Zeile U-ENV-4 oben nennt `contextra-mvcc/src/snapshot_log.rs`. Das ist falsch an zwei Stellen:
+
+- Die Datei heißt im Ist `contextra-env/src/seq_log.rs` (`SequenceLog`, `SeqLogEntry`).
+- Das Ziel ist `contextra-version/src/sequence.rs`. Der Crate-Name `contextra-mvcc` gilt nur bis zur Umbenennung (ADR-06). Siehe `crates/contextra-mvcc/PLAN.md`, U-VER-3 und Entscheidung O-VER-3.
+
+Der Loom-Test `loom_sequence_log.rs` wandert mit dem Typ.
