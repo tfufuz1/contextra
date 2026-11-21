@@ -1,12 +1,13 @@
 # Contextra Spezifikation v4.1 (RAG-Edition, Soll-Zustand)
 
 **Datum:** 20. November 2026
-**Nachtrag v4.1.1:** 21. November 2026. Anhänge D und E sind als `benchmarks/budgets.toml` und `capabilities.toml` umgesetzt, die Schichtprüfung läuft über `tools/check_spec_sync.py` (Abschnitt 13.6, SYNC-1 bis SYNC-4). Inhalt der Normen unverändert.
+**Nachtrag v4.1.1:** 21. November 2026. Anhänge D und E liegen als `benchmarks/budgets.toml` und `capabilities.toml` im Repository, die Schichtprüfung läuft über `tools/check_spec_sync.py` (Abschnitt 13.6, SYNC-1 bis SYNC-4). Stand 21. November 2026 existieren alle genannten Dateien; der Befund H-31 des Reviews ist behoben. Inhalt der Normen unverändert.
+**Überarbeitung v4.1.2:** 21. November 2026. Umgesetzt: N-07, H-31, M-05, M-11, M-12, M-13, M-14, M-27, K-19 aus dem Review `SPEC_Review_v4.1.1`. Die Entscheidungen D1 bis D10 sind **nicht** getroffen und stehen offen in Kapitel 16.
 **Status:** Final zur Umsetzung. Einzige normative Quelle für Produktumfang, Architektur, Löschkette, Betrieb, Crate-Verträge und Refactoring-Reihenfolge.
 **Geltung:** Gesamter Workspace `contextra`.
-**Ersetzt:** `docs/SPEC.md` v4.0 (Archiv: `docs/archive/SPEC_v4.0.md`). Die Dokumente v2.1, Löschspezifikation v2.2 und Implementierungsspezifikation v3.0 sind Quellarchiv unter `docs/archive/`.
+**Ersetzt:** `docs/SPEC.md` v4.0 (Archiv: `docs/archive/SPEC_v4.0.md`). Die Löschspezifikation v2.2 und die Implementierungsspezifikation v3.0 sind Quellarchiv unter `docs/archive/`. Die Spezifikation v2.1 ist nicht archiviert.
 **Kennungen:** `ADR-n` Entscheidung, `REQ-<Bereich>-n` Anforderung, `INV-n` Invariante, `REM-n` Entfernung, `CMP-n` Compat-Auflösung, `F-n` Befund, `T-n` Test, `G-n` Build-Gate. MUSS, DARF NICHT, SOLL nach RFC 2119.
-**Offene Punkte:** keine. Jeder Befund aus Kapitel 0.3 hat eine Entscheidung (Kapitel 14). Die Spezifikation beantwortet alle Fragen, die für die Crate-Implementierungsspezifikationen (`crates/<name>/PLAN.md`) nötig sind.
+**Offene Punkte:** Die Entscheidungen D1 bis D10 (Kapitel 16) sind offen. Sie betreffen Rechtsfolgen, Architekturgrenzen und Schutzziele und sind bis zu ihrer Entscheidung nicht umsetzungsreif. Die Befunde aus Kapitel 0.3 haben Entscheidungen in Kapitel 14, soweit sie nicht in Kapitel 16 aufgeführt sind.
 
 ---
 
@@ -14,7 +15,7 @@
 
 ### 0.1 Grundentscheidungen
 
-Contextra ist eine **RAG-Engine für Unternehmensdaten** mit **DSGVO-konformer Löschung personenbezogener Daten**. Sechs Grundentscheidungen tragen diese Spezifikation:
+Contextra ist eine **RAG-Engine für Unternehmensdaten** mit einer nachvollziehbar gestuften Löschung personenbezogener Daten (Löschkette, Kapitel 7). Sechs Grundentscheidungen tragen diese Spezifikation:
 
 1. **Löschung und Versionierung sind getrennte Systeme** (Kapitel 4). Die Löschung arbeitet auf *Seals* (verschlüsselte Inhaltseinheiten), die Versionierung verweist nur auf Seals.
 2. **Keine Eigennachweise im Produkt.** Die Löschkette führt Operationen aus und protokolliert sie. Prüfung geschieht in Tests und CI (ADR-02).
@@ -80,7 +81,7 @@ Jeder Befund ist mit der Quelle belegt (Dateiname, Zeile oder Messung in Anhang 
 | F-25 | REQ-TXT-2 | `df(t)` wird beim Löschen nicht korrigiert. Ranking-Abweichung bis Scrub. Deterministisch, aber nicht exakt. | 6.4 (dokumentierte Abweichung mit Obergrenze) |
 | F-26 | Code: 77 Stellen | `Instant::now`/`SystemTime::now` außerhalb `contextra-env`. Verletzt REQ-TIM-1. | G-12 |
 | F-27 | `Cargo.toml` `default-members` | `contextra-testkit` und `contextra-graph` im Standard-Build, obwohl Testkit „nicht im Standard-Build“ laut 3.1. | 12.6 |
-| F-28 | `tests/alloc_profiler.rs`, `graph/tests/ppr_alloc_test.rs` | `unsafe impl GlobalAlloc` außerhalb `sys`/`simd`. G-02 erlaubt das nicht. Test-Allocatoren sind ein legitimer Sonderfall. | ADR-53 |
+| F-28 | `crates/contextra-text/tests/alloc_profiler.rs`, `crates/contextra-graph/tests/ppr_alloc_test.rs` | `unsafe impl GlobalAlloc` außerhalb `sys`/`simd`. G-02 erlaubt das nicht. Test-Allocatoren sind ein legitimer Sonderfall. | ADR-53 |
 | F-29 | REQ-REC-2 | Entscheidungsregel für halb geschriebene Slots ist mehrdeutig (Zustand `Destroyed` oder Integrity). | 7.7 (eindeutige Tabelle) |
 | F-30 | REQ-ER-3 | Review-Erinnerung ohne Konsequenz bei Ablauf. Ein offener Auftrag im Zustand `Restricted` ist für Art. 17 nicht abgeschlossen, die Spezifikation sagt das nicht. | 7.5 (Pending-Frist) |
 | F-31 | REQ-SRC-1 / 6.5 | Mandanten-Principals kommen laut Spezifikation aus der Anfrage. Im MCP-Kontext ist die Anfrage vom Modell beeinflussbar. | ADR-38 |
@@ -395,9 +396,8 @@ Erasure ──────────────────✗──► Versi
 ### 4.4 Traits (in `contextra-ports`, Pfad `ports::erasure`, `ports::version`, `ports::crypto`)
 
 ```rust
-pub struct SealOrd(pub u32);
-pub struct ChunkSlot(pub u32);
-pub struct SegOrd(pub u32);
+// SealOrd, ChunkSlot, SegOrd: einzige Definition in contextra-ids (Kapitel 15, R4, ADR-33).
+// In den Signaturen dieses Abschnitts werden sie nur verwendet.
 
 pub enum SealState { Open, Restricted, Erased }          // Lesesicht, abgeleitet aus Registry und Gate
 pub enum RetireReason { RetentionExpired }
@@ -720,7 +720,7 @@ Unbekannte Formate werden mit `Refused` abgewiesen, nie geraten. ODF, OLE und YA
 
 ### 6.2 Embedding
 
-**REQ-EMB-1 (Port).** `EmbeddingProvider { dim(), model_id(), embed_batch(&[&str]) }`. `model_id` und `dim` stehen im Index-Kopf. Batchgröße 64, maximale Eingabe 512 Token (Chunking garantiert das, ein größerer Eingang ist `Refused`).
+**REQ-EMB-1 (Port).** `EmbeddingProvider { dim(), model_id(), embed_batch(&[&str]) }`. `model_id` und `dim` stehen im Index-Kopf. Batchgröße 64, maximale Eingabe 512 Token (das Chunking begrenzt die Eingabe auf dieses Maß; ein größerer Eingang ist `Refused`).
 
 **REQ-EMB-2 (Backends).** `contextra-embed`: lokales ONNX (`ort`), Modelldatei mit erwartetem SHA-256 (ADR-36), Abweichung führt zu `Refused`. `contextra-embed-http`: konfigurierter interner Dienst, TLS, Allowlist, Zeitgrenzen. Ohne Backend läuft die Fassade mit vorberechneten Vektoren (Aufrufer liefert sie).
 
@@ -1074,7 +1074,7 @@ Diese Grenzen gelten unabhängig von der Implementierung und stehen im Betriebsh
 | Externe Ausleitung | Systeme außerhalb | nicht durch die Software kontrollierbar | nicht zuzuordnen |
 
 Weitere Grenzen:
-- **Überschreiben ist eine Annahme.** Auf Copy-on-Write-Dateisystemen und Flash hat das Überschreiben eines Slots keine garantierte physische Wirkung. Die KEK-Rotation (REQ-KEY-5) begrenzt den Zeitraum. Mit K3 (Vault Transit) ist die Vernichtung der KEK im KMS die tragende Maßnahme.
+- **Überschreiben ist eine Annahme.** Auf Copy-on-Write-Dateisystemen und Flash hat das Überschreiben eines Slots keine verlässlich nachweisbare physische Wirkung. Die KEK-Rotation (REQ-KEY-5) begrenzt den Zeitraum. Mit K3 (Vault Transit) ist die Vernichtung der KEK im KMS die tragende Maßnahme.
 - **Kompaktion des Store (ADR-31, REQ-SCR-3).** Ciphertext ohne Schlüssel ist kryptografisch entfernt. Die Kompaktion entfernt ihn zusätzlich, damit keine Kopie stehen bleibt, die ein späterer Schlüssel-Fehler freilegen könnte. Das ist die Begründung für `compaction_after_erase = true`.
 - **Nicht deklarierte Mitbetroffene** werden nur über die Entdeckung gefunden, nie automatisch zugeordnet.
 - **Rechtliche Einordnung** der Schlüsselvernichtung als Löschung trifft der Verantwortliche (ADR-45).
@@ -1357,7 +1357,7 @@ Die Prüfung der Löschung liegt in Testcode. Ein Test darf das Datenverzeichnis
 | T-ER-07 | Gleichzeitiger Ingest und Erase desselben Betroffenen: serialisiert nach REQ-CON-1b, kein Seal bleibt unerfasst (Schedule-Exploration mit `loom`) |
 | T-ER-08 | Jeder Lesepfad prüft das Gate: Suche (Vektor, Text), `get`, Zeitreise, Graph, Export, `assemble`, Ingest-Duplikat |
 | T-ER-09 | Jeder Zwischenspeicher implementiert `SealScoped` und wird bei E2 geleert (Registrierungstest über alle Cache-Typen) |
-| T-ER-10 | Zeitreise auf gelöschten Seal: `NotFound` ohne Sonderregel (REQ-VER-6) |
+| T-ER-10 | Zeitreise auf gelöschten Seal: `Erased` ohne Sonderregel (REQ-VER-6) |
 | T-ER-11 | **Entkopplung:** Löschung ändert den Versionskatalog nicht. Versions-GC ohne `erasure`-Crate kompiliert und läuft. `erasure` ohne `version`-Crate kompiliert und läuft |
 | T-ER-12 | `ContentRetired` vernichtet den Seal mit Grund `Retention` |
 | T-ER-13 | Mehrbetroffene: Standard `Restrict`, keine automatische Löschung. `RedactReingest` legt neuen Seal an, alter wird erst danach vernichtet |
@@ -1496,7 +1496,7 @@ Je Entfernung ein Commit. Nach jedem Commit `cargo check --workspace`. Keine Ver
 | REM-11 | Messen, Signieren, Berichten: `audit_chain.rs`, `wal_completeness.rs`, `wal_crypto.rs`, `kv_segment/`, `kv_cipher.rs`, `dek.rs` (ersetzt durch `DocKey`-Modul) | `contextra-crypto/src/` | Dateien fehlen. Kein `ed25519`, kein JCS im Workspace |
 | REM-12 | SSI, TxBuffer, ReadSet | `contextra-mvcc/src/ssi.rs`, `contextra-mvcc/src/tx_buffer.rs` | Dateien fehlen |
 | REM-13 | `Poisoned`, Fault-Injection im Produktcode | `contextra-durable-fs/src/health.rs`, `contextra-durable-fs/src/fault_injector.rs`, `contextra-store/src/io_seam.rs`, `contextra-store/src/io_seam/` | Fault-Injection nur in `contextra-testkit` |
-| REM-14 | Selbstdeklarationen: `contract.rs` (9 Dateien), `ANCHOR`-Kommentare (460 Dateien), `FILE-CONTEXT` (417 Dateien), `INVENTAR.md`, `SPEC.md`, `AGENTS.md` pro Crate, Auditor-Skripte (`port_contract_auditor.py`, `contract_diff_detector.py`, `type_registry_sync.py`, `isolation_proof.py`, `erasure_leak_prober.py`, `fsync_durability_tracer.py`, `error_topology_mapper.py`, `concurrency_lock_auditor.py`, `unsafe_boundary_tracer.py`, `crate_inventory.py`, `generate_function_inventory.py`, `generate_interface_spec.py`, `dead_code_microprobe.py`, `feature_audit.py`, `abhaengigkeits_budget.py`, `gate_dependencies.py`, `test_matrix_advisor.py`, `orchestrate_diagnostics.py`, `pattern_diagnostic.py`, `agentic_context_pack.py`, `rust_ast_inspector.py`, `async_boundary_scanner.py`, `zero_panic_analyzer.py`, `determinism_guard.py`, `contract_diff_detector.py`) | `crates/*/src/`, `crates/*/`, `tools/` | G-09 grün. `tools/` enthält nur `doc_lint.py`, `loc.py`, `test_coverage_matrix.py`, `check_spec_sync.py`, `quickcheck.sh`, `agent_tooling_common.py` (Bibliothek) und `baseline/` (Stand v4.1.1, siehe 13.6) |
+| REM-14 | Selbstdeklarationen: `contract.rs` (9 Dateien), `ANCHOR`-Kommentare (460 Dateien), `FILE-CONTEXT` (415 Dateien), `INVENTAR.md`, `SPEC.md`, `AGENTS.md` pro Crate, Auditor-Skripte (`port_contract_auditor.py`, `contract_diff_detector.py`, `type_registry_sync.py`, `isolation_proof.py`, `erasure_leak_prober.py`, `fsync_durability_tracer.py`, `error_topology_mapper.py`, `concurrency_lock_auditor.py`, `unsafe_boundary_tracer.py`, `crate_inventory.py`, `generate_function_inventory.py`, `generate_interface_spec.py`, `dead_code_microprobe.py`, `feature_audit.py`, `abhaengigkeits_budget.py`, `gate_dependencies.py`, `test_matrix_advisor.py`, `orchestrate_diagnostics.py`, `pattern_diagnostic.py`, `agentic_context_pack.py`, `rust_ast_inspector.py`, `async_boundary_scanner.py`, `zero_panic_analyzer.py`, `determinism_guard.py`, `contract_diff_detector.py`) | `crates/*/src/`, `crates/*/`, `tools/` | G-09 grün. `tools/` enthält nur `doc_lint.py`, `loc.py`, `test_coverage_matrix.py`, `check_spec_sync.py`, `quickcheck.sh`, `agent_tooling_common.py` (Bibliothek) und `baseline/` (Stand v4.1.1, siehe 13.6) |
 | REM-15 | Alle `compat/`-Module und `compat.rs`. Umfang 7.465 Zeilen, Auflösung nach 12.5 | siehe 12.5 | G-11 grün |
 | REM-16 | Altmodell-Texte: Berichte, Bescheinigung, Satzbibliothek, Annahmen- und Residuenkataloge | `contextra-erasure`, Dokumente | `grep -rn "Bescheinigung\|Satzbibliothek\|A-FLASH\|R-GROUP-LINK"` leer außer in 7.9 |
 | REM-17 | Feature `experimental` und alle Feature-Namen mit Präfix `exp-` in allen Crates (`exp-dibud`, `exp-resonance`, `experimental-rank`, `experimental-graph`) | `Cargo.toml` aller Crates | `grep -rn "experimental\|exp-" crates --include=Cargo.toml` leer |
@@ -1519,7 +1519,7 @@ Je Entfernung ein Commit. Nach jedem Commit `cargo check --workspace`. Keine Ver
 | REM-29 | Verweise auf entfernte Dokumente: `README.md` (Root), `CLAUDE.md`, `benchmarks/README.md`, `benchmarks/contextra-bench/AGENTS.md`, Crate-READMEs. `docs/crates/` und Root-`AGENTS.md` existieren nicht (F-39) | genannte Dateien | G-07 und G-08 grün |
 | REM-30 | **`contextra-types` als Crate** (9.596 Zeilen). Inhalt: IDs und Ordinale nach `contextra-ids`, DTOs nach `contextra-ports::dto`, Rest zum Besitzer (ADR-33) | `crates/contextra-types/` | Verzeichnis fehlt, `grep -rn "contextra_types\|contextra-types"` leer |
 | REM-31 | **Graph-Entfernung (nur bei G-GRAPH verfehlt).** Sonst Reduktion nach 12.4 | `crates/contextra-graph/` | Verzeichnis fehlt, oder G-GRAPH grün |
-| REM-32 | `contextra-ingest`: `fmt-odf`, `fmt-ole`, `fmt-structured`, `compat/`, `canonical.rs` (Pipeline nutzt `ir.rs`), Features `workspace`, `types-compat` | `crates/contextra-ingest/` (zurückgeholt, 12.13.2) | Abnahme: Features entfallen, `grep -rn "canonical"` leer |
+| REM-32 | `contextra-ingest`: `fmt-odf`, `fmt-ole`, `fmt-structured`, `compat/`, `canonical.rs` (Pipeline nutzt `ir.rs`), Features `workspace`, `types-compat` | `crates/contextra-ingest/` (zurückgeholt, 13.2) | Abnahme: Features entfallen, `grep -rn "canonical"` leer |
 | REM-33 | Nicht zurückholen: `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-wire`, `contextra-py`, `contextra-prompt-guard` (in Commit `e5ec76c28` eingefroren) | Historie | nicht im Workspace |
 | REM-34 | Verbleib im Workspace-`Cargo.toml`: `[workspace.dependencies]` mit Ollama, Candle, Frozen-Zone-Kommentaren. `[workspace.lints]` bleibt | `Cargo.toml` | `grep -n "Frozen\|ollama\|candle"` leer |
 | REM-35 | `contextra-crypto/src/dek.rs` durch `DocKey`-Modul ersetzt | `contextra-crypto/src/dek.rs` | Datei fehlt |
@@ -1885,7 +1885,7 @@ Messung mit `find`, `grep`, `wc` und `git` am geklonten Stand. Alle Zahlen der S
 | `tests/layering.rs` (G-03) | angelegt bis M0 | fehlt | `ls` |
 | `tests/unsafe_islands.rs` | G-02 | vorhanden | `ls` |
 | `ANCHOR[`-Kommentare | nicht erfasst | **460** Dateien | `grep -rl` |
-| `FILE-CONTEXT`-Kommentare | nicht erfasst | **417** Dateien | `grep -rl` |
+| `FILE-CONTEXT`-Kommentare | nicht erfasst | **415** Dateien in `crates/` (Messung 21.11.2026) | `grep -rl` |
 | `contract.rs` | nicht erfasst | **9** Dateien | `find` |
 | Skripte in `tools/` | nicht erfasst | **29** | `ls tools` |
 | `Cargo.lock` | Version 4 | Version 4 | `head` |
@@ -2015,4 +2015,23 @@ forbidden_crate_names = ["contextra-types", "contextra-mvcc", "contextra-engine"
 
 ---
 
-*Ende der Spezifikation v4.1.*
+## 16. Offene Entscheidungen (Stand 21. November 2026)
+
+Diese Entscheidungen hat der Verantwortliche noch nicht getroffen. Sie sind nicht durch die Spezifikation festgelegt, und eine Umsetzung darf sie nicht stillschweigend beantworten. Jede Entscheidung ist mit ihren Befunden aus dem Review `SPEC_Review_v4.1.1` verknüpft. Die Empfehlungen stammen aus dem Review und sind keine Festlegungen.
+
+| Nr. | Frage | Befunde | Empfehlung (Review) | Status |
+|---|---|---|---|---|
+| D1 | Wie lange darf ein Auftrag im Zustand `Restricted` bleiben, und was passiert bei Ablauf? | K-08 | Pflichtschalter ohne Standardwert. Bei Ablauf `Overdue` mit Ledger-Eintrag, keine automatische Freigabe und keine automatische Löschung. | offen |
+| D2 | Darf bei einem Fehler des Gate-Logs gelesen werden? | K-01, K-02 | Nein, für die betroffenen Seals. Lokale, nicht durabel gespeicherte Lesesperre, bis das Gate wieder durabel ist. | offen |
+| D3 | Was geschieht mit Treffern der Entdeckung, die nicht deklariert sind? | K-07 | `Restrict` für Treffer mit identifizierenden Bezeichnern als Mandantenstandard. `Report` nur mit Status `Partial`. | offen |
+| D4 | Klasse K ohne Verschlüsselung und unbefristetes Ledger? | K-17, H-05 | Keine Klartextoption. Ledger mit Aufbewahrungsfrist als Pflichtschalter. | offen |
+| D5 | Wie viele Mandanten pro Prozess, und welche Referenz gilt? | H-27 | Budget je Prozess statt fester Mandantenzahl. | offen |
+| D6 | Standardgewicht des Graph-Signals | K-20 | Kein Standardgewicht ohne Messung. Standard bleibt 0, bis ein Gewicht aus dem Benchmark begründet ist. | offen |
+| D7 | Werkzeuge für Synchronität (SYNC-1 bis SYNC-5) | H-30, H-31, M-01, M-24 | Sync-Werkzeuge wiederherstellen. Der Review-Befund H-31 ist mit dem Stand 21. November 2026 behoben; die Entscheidung über die Gate-Semantik (H-30) bleibt offen. | teilweise umgesetzt |
+| D8 | Ist `contextra-text` optional? | M-09 | Pflicht. Hybridsuche ist Kernfunktion (ADR-04, 6.4). | offen |
+| D9 | Zielplattform und Integrität des Löschlogs | H-22, H-23 | Zielplattform Linux (x86_64) benennen. Integritäts-MAC mit Schlüssel aus dem Anker, ADR-02 präzisieren. | offen |
+| D10 | Eingabe der Passphrase und Änderungen der Konfiguration zur Laufzeit | H-24, H-26 | Passphrase über Umgebungsvariable oder Datei mit Rechten 0600. Konfigurationsänderung nur mit Neustart. | offen |
+
+**Weitere offene technische Punkte aus dem Review** (nicht als Entscheidung des Verantwortlichen klassifiziert, aber noch nicht in der Spezifikation geklärt): K-01 bis K-03 und K-09 bis K-18 (Zustandsmatrix, Startreihenfolge, Formatfelder, Lebenszyklus), H-01 bis H-04, H-10 bis H-21, H-24 bis H-26, H-28 (Latenzfenster: „64 Buckets“ und „10 s mit 1 s Schritt“ widersprechen sich). Sie bleiben bis zur Spezifikation v4.2 offen.
+
+*Ende der Spezifikation v4.1 (Überarbeitung v4.1.2).*
