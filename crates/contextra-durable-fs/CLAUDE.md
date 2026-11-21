@@ -3,7 +3,7 @@
 > Crate-Kontext. Gilt zusätzlich zur Root-`CLAUDE.md` und zu `docs/SPEC.md` (maßgeblich bei Widerspruch).
 
 ## Rolle
-Crash-sichere Dateisystemoperationen und synchrones Flushen auf Platte. Grundlage für Durability (INV-FSYNC-1, siehe `tools/fsync_durability_tracer.py`).
+Crash-sichere Dateisystemoperationen und synchrones Flushen auf Platte. Grundlage für Durability (INV-FSYNC-1). Der frühere Tracer `tools/fsync_durability_tracer.py` wurde entfernt (Historie: `git show 0ec4de767:tools/fsync_durability_tracer.py`).
 
 ## Eckdaten (Messung 21.11.2026)
 - Ebene: **E0** (SPEC §3.1). Keine internen Abhängigkeiten.

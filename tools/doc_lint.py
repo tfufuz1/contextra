@@ -42,6 +42,23 @@ ALLOWED_PATHS = {
 }
 
 
+NEGATION_MARKERS = ("keine", "kein ", "nicht", "unzulässig", "ohne ", "verbot", "vermeid", "statt ")
+QUOTE_PAIRS = (("„", "“"), ('"', '"'), ("'", "'"), ("»", "«"), ("`", "`"))
+
+
+def _is_quoted_or_negated(line: str, start: int, end: int) -> bool:
+    """Fehlalarm-Filter: Begriff wird zitiert (Verbotsliste) oder in einem Verbot verwendet."""
+    low = line.lower()
+    if any(marker in low for marker in NEGATION_MARKERS):
+        return True
+    for open_q, close_q in QUOTE_PAIRS:
+        before = line.rfind(open_q, 0, start)
+        after = line.find(close_q, end)
+        if before != -1 and after != -1:
+            return True
+    return False
+
+
 def is_allowed_path(rel_path: str) -> bool:
     for ap in ALLOWED_PATHS:
         if rel_path.startswith(ap):
@@ -85,7 +102,8 @@ def lint_documentation_and_code(root: Path) -> List[Dict[str, Any]]:
                 if any(k in l_lower for k in ("forbidden wording", "inv-7", "suche nach", "verbot", "verbotene")):
                     continue
                 for pat, msg in FORBIDDEN_COMPLIANCE_PATTERNS:
-                    if pat.search(line):
+                    m = pat.search(line)
+                    if m and not _is_quoted_or_negated(line, m.start(), m.end()):
                         findings.append({
                             "file": rel_path,
                             "line": idx,

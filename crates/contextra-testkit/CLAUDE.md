@@ -20,7 +20,7 @@ RUSTUP_TOOLCHAIN=stable cargo test -p contextra-testkit --test layering   # G-03
 ```
 
 ## Ist-Abweichungen zur Spec
-- **`tests/layering.rs` fehlt** (G-03, SPEC §11.6). Gleichzeitig prüft `tools/gate_dependencies.py` die Schichtregeln über `capabilities.toml`, das ebenfalls fehlt. Beides zusammen klären.
+- **`tests/layering.rs` fehlt** (G-03, SPEC §11.6). Die Schichtregeln (Anhang E der Spec) sollen hier als Rust-Test geprüft werden, nicht über ein Python-Skript. Das frühere `tools/gate_dependencies.py` wurde entfernt. `capabilities.toml` fehlt ebenfalls; vorher klären, ob die Datei gebraucht wird.
 - **FaultVfs** liegt aktuell in `durable-fs`. REM-13 verschiebt es hierher.
 - 1 `Instant`/`SystemTime` außerhalb `env` (G-12).
 - Zweck des Crates ist Test-Verhalten. Produktionscode darf keine Abhängigkeit darauf haben (nur `[dev-dependencies]`).
