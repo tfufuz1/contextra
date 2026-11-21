@@ -83,7 +83,11 @@ Schritte, je Schritt ein Commit, Workspace grün. Die Auflösung ist eine Quersc
 **Offene Punkte (Entscheidung nötig):**
 - **O-1 Zielbesitzer.** `witness.rs`, `filter.rs`, `document.rs`, `tombstone.rs`, `model_fingerprint.rs`, `retrieval_strategy.rs`, `schema.rs`, `budget.rs`: SPEC 3.4 und 15 nennen keinen Besitzer. Entscheidung des Nutzers.
 - **O-2 `MemoryType`/`WorkflowState`.** REM-24 entfernt sie. Ist die Entfernung vollständig oder gehört ein Rest zu `contextra-graph`?
+<<<<<<< HEAD
 - **O-3 Umbenennung von `contextra-version` zu `contextra-version`** (ADR-06). Betrifft viele `Cargo.toml`. Freigabe des Nutzers (CLAUDE.md §6, Punkt 4).
+=======
+- **O-3 Umbenennung von `contextra-mvcc` zu `contextra-version`** (ADR-06). Betrifft viele `Cargo.toml`. Freigabe des Nutzers (CLAUDE.md §6, Punkt 4).
+>>>>>>> a9b569ed6 (Shell-Commit)
 - **O-4 `contextra-erasure` und `contextra-types`.** `erasure.rs` in `types` hat Löschtypen. Die Verteilung auf `ports::erasure` oder `contextra-erasure` ist zu entscheiden.
 
 ## 7. Tests

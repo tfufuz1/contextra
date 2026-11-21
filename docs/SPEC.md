@@ -1674,8 +1674,16 @@ Der Auftrag an die Entwickler ist damit vollständig, eine Rückfrage an diese S
 
 **SYNC-4 (Toolchain).** Für Produktion und Gate G-01 gilt weiterhin `rust-toolchain.toml` (1.89.0). Im Entwicklungs-Sandbox ist der Download dieser Toolchain blockiert. Dort gilt `RUSTUP_TOOLCHAIN=stable`. Gemessen wurde mit 1.97.0. Die Abweichung ist bis zur Verfügbarkeit einer lokalen 1.89.0-Toolchain ausdrücklich vermerkt.
 
+<<<<<<< HEAD
 **SYNC-5 (Ratchet und Gate-Vorbereitung, Notiz vom 21.11.2026).** Zwei Ratchets verhindern neue Befunde, ohne den Ist-Bestand sofort auf null zu verlangen. (a) G-03: `python3 tools/check_spec_sync.py layering --ratchet` vergleicht die Schichtbefunde mit `layering_baseline.txt`. Neue Befunde sind Fehler, bekannte nicht. `--update-baseline` schreibt die Baseline nur nach bewusstem Abbau. Der Test `crates/contextra-testkit/tests/layering.rs` ruft denselben Ratchet auf. (b) G-13: `tools/unwrap_ratchet.py` vergleicht die Zählung von `unwrap()`, `expect(`, `panic!(` je Crate mit `.unwrap-baseline.json`. Ein Anstieg ist ein Fehler, `--update` nur nach bewusstem Abbau. Vorbereitung für die Gates: Jedes Crate erhält eine `README.md` nach 3.6. Diese Notiz ändert keine Norm. Die Gates bleiben wie in 11.6 beschrieben.
 
+=======
+<<<<<<< HEAD
+=======
+**SYNC-5 (Ratchet und Gate-Vorbereitung, Notiz vom 21.11.2026).** Zwei Ratchets verhindern neue Befunde, ohne den Ist-Bestand sofort auf null zu verlangen. (a) G-03: `python3 tools/check_spec_sync.py layering --ratchet` vergleicht die Schichtbefunde mit `layering_baseline.txt`. Neue Befunde sind Fehler, bekannte nicht. `--update-baseline` schreibt die Baseline nur nach bewusstem Abbau. Der Test `crates/contextra-testkit/tests/layering.rs` ruft denselben Ratchet auf. (b) G-13: `tools/unwrap_ratchet.py` vergleicht die Zählung von `unwrap()`, `expect(`, `panic!(` je Crate mit `.unwrap-baseline.json`. Ein Anstieg ist ein Fehler, `--update` nur nach bewusstem Abbau. Vorbereitung für die Gates: Jedes Crate erhält eine `README.md` nach 3.6. Diese Notiz ändert keine Norm. Die Gates bleiben wie in 11.6 beschrieben.
+
+>>>>>>> e75eff1ef (Shell-Commit)
+>>>>>>> a9b569ed6 (Shell-Commit)
 ---
 
 ## 14. Nachweis der Befundauflösung

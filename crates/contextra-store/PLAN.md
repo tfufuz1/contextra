@@ -13,8 +13,13 @@ Scrub-Ziel: `ScrubTarget` für den Store (SPEC 4.4, 3.4). Ist: nicht implementie
 
 ## 3. Abhängigkeiten
 **Erlaubt (Anhang E):** `ports`, `ids`, `env`, `sys`, `durable-fs`.
+<<<<<<< HEAD
 **Ist (Cargo.toml):** `contextra-ids`, `contextra-env`, `contextra-sys`, `contextra-durable-fs` (erlaubt), dazu **`contextra-erasure`, `contextra-crypto`, `contextra-version`** (**verboten**, R2 und ADR-32, REM-27), sowie `tokio`, `quick_cache`, `lru`, `memmap2`, `parking_lot` u. a.
 **Ist-Abweichung:** `contextra-crypto`, `contextra-erasure`, `contextra-version` müssen entfernt werden (REM-27, SPEC 3.4: Schlüsselvernichtung über `KeyDestroyer`, Scrub über `ScrubTarget`). `contextra-ports` fehlt in Ist, obwohl Anhang E es verlangt.
+=======
+**Ist (Cargo.toml):** `contextra-ids`, `contextra-env`, `contextra-sys`, `contextra-durable-fs` (erlaubt), dazu **`contextra-erasure`, `contextra-crypto`, `contextra-mvcc`** (**verboten**, R2 und ADR-32, REM-27), sowie `tokio`, `quick_cache`, `lru`, `memmap2`, `parking_lot` u. a.
+**Ist-Abweichung:** `contextra-crypto`, `contextra-erasure`, `contextra-mvcc` müssen entfernt werden (REM-27, SPEC 3.4: Schlüsselvernichtung über `KeyDestroyer`, Scrub über `ScrubTarget`). `contextra-ports` fehlt in Ist, obwohl Anhang E es verlangt.
+>>>>>>> a9b569ed6 (Shell-Commit)
 **Features:** Ist `workspace`, `test-hooks`, `inspect`, `memory-only-storage`, `fault-injection`, `block-cache-v2`, `sieve-cache`, `legacy-wal-key`, `docid-128`. Soll (SPEC 15): keine Features außer den in Kapitel 15 genannten. `workspace` verletzt CMP-10 und G-11. `fault-injection` widerspricht REM-13 (Fault-Injection gehört nach testkit).
 
 ## 4. Module
@@ -36,7 +41,11 @@ Soll-Module ohne Ist-Entsprechung: `kv` (KvStore-Familie), `segments` (`SegmentS
 | REM-05 | dito | siehe SPEC 12 |
 | REM-08 | dito | siehe SPEC 12 |
 | REM-26 | dito | siehe SPEC 12 |
+<<<<<<< HEAD
 | REM-27 | Abhängigkeiten zu `crypto`, `erasure`, `mvcc` | `grep -rln "contextra_crypto\|contextra_erasure\|contextra_version" crates/contextra-store` leer |
+=======
+| REM-27 | Abhängigkeiten zu `crypto`, `erasure`, `mvcc` | `grep -rln "contextra_crypto\|contextra_erasure\|contextra_mvcc" crates/contextra-store` leer |
+>>>>>>> a9b569ed6 (Shell-Commit)
 | CMP-4 | Feature und Schlüssel-Kompatibilität `legacy-wal-key`, `workspace` (SPEC 12.5 prüfen) | `grep -rn "compat\|workspace" crates/contextra-store/Cargo.toml` leer |
 | REM-14 | ANCHOR-Dateien (51) | `grep -rl "ANCHOR\[" crates/contextra-store` leer |
 

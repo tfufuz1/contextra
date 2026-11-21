@@ -13,7 +13,11 @@ Implementiert (SPEC 3.4): `Checkpointer`. Ist: `Checkpoint` und `CheckpointCoord
 ## 3. Abhängigkeiten
 **Erlaubt (Anhang E):** `ports`, `ids`, `env`, `durable-fs`.
 **Ist (Cargo.toml):** erlaubt sind `contextra-ids`, `contextra-env`, `contextra-ports`. **Verboten:** `contextra-types` (R1, REM-30, 9 Dateien). Weitere: `tokio` (**normale Abhängigkeit**, Wrapper in `deny.toml`, Übergang E29), `bytes`, `tracing`, `serde`, `serde_json`, `parking_lot`, `blake3`, `thiserror`.
+<<<<<<< HEAD
 **Ist-Abweichung:** `contextra-durable-fs` fehlt in Ist, obwohl erlaubt und nötig. Im Quelltext wird `contextra_version` in einer Datei referenziert (R2-Verstoß, Anhang E erlaubt `mvcc` nicht).
+=======
+**Ist-Abweichung:** `contextra-durable-fs` fehlt in Ist, obwohl erlaubt und nötig. Im Quelltext wird `contextra_mvcc` in einer Datei referenziert (R2-Verstoß, Anhang E erlaubt `mvcc` nicht).
+>>>>>>> a9b569ed6 (Shell-Commit)
 **Features:** Ist `default`, `workspace`, `types-compat`, `ports-compat`, `docid-128`. Ist-Abweichung: `workspace`, `types-compat`, `ports-compat` (R7, CMP-10).
 
 ## 4. Module
@@ -36,13 +40,21 @@ Implementiert (SPEC 3.4): `Checkpointer`. Ist: `Checkpoint` und `CheckpointCoord
 |---|---|---|
 | CMP-2 | `src/compat/` | `find crates/contextra-checkpoint -type d -name compat` leer |
 | REM-30 | Import `contextra-types` (9 Dateien) | `grep -rln "contextra_types" crates/contextra-checkpoint` leer |
+<<<<<<< HEAD
 | REM-27 | Import `contextra_version` | `grep -rn "contextra_version" crates/contextra-checkpoint` leer |
+=======
+| REM-27 | Import `contextra_mvcc` | `grep -rn "contextra_mvcc" crates/contextra-checkpoint` leer |
+>>>>>>> a9b569ed6 (Shell-Commit)
 | CMP-10 | Features `workspace`, `types-compat`, `ports-compat` | `grep -n "compat\|workspace" crates/contextra-checkpoint/Cargo.toml` leer |
 | REM-14 | ANCHOR-Dateien (7), `contract.rs` | `grep -rl "ANCHOR\[" crates/contextra-checkpoint` leer |
 
 ## 6. Umbau
 1. `compat/` auflösen (CMP-2). Die Zieltypen aus `ports` verwenden.
+<<<<<<< HEAD
 2. `contextra-types` und `contextra-version` lösen (REM-30, REM-27).
+=======
+2. `contextra-types` und `contextra-mvcc` lösen (REM-30, REM-27).
+>>>>>>> a9b569ed6 (Shell-Commit)
 3. Abhängigkeit `contextra-durable-fs` ergänzen.
 4. `tokio` klären (Punkt 10 CLAUDE.md).
 5. `unwrap`/`expect`/`panic!` (128 Treffer) nach R6 abbauen.
@@ -61,7 +73,11 @@ Implementiert (SPEC 3.4): `Checkpointer`. Ist: `Checkpoint` und `CheckpointCoord
 | Gate | Ist-Befund | Soll |
 |---|---|---|
 | G-02 | kein `unsafe`, `forbid` in `lib.rs` | eingehalten |
+<<<<<<< HEAD
 | G-03 | `contextra-types`, `contextra_version` | verletzt |
+=======
+| G-03 | `contextra-types`, `contextra_mvcc` | verletzt |
+>>>>>>> a9b569ed6 (Shell-Commit)
 | G-09 | 7 Dateien mit ANCHOR, `contract.rs` | verletzt (REM-14) |
 | G-11 | `compat/`, Features | verletzt (CMP-2, CMP-10) |
 | G-13 | 128 Treffer | Abbau nach R6 |

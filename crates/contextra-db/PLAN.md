@@ -11,8 +11,13 @@ Der Crate implementiert keine Ports. Er verdrahtet sie (SPEC 3.4). Die öffentli
 
 ## 3. Abhängigkeiten
 **Erlaubt (Anhang E):** `contextra-crypto`, `contextra-erasure`, `contextra-version`, `contextra-store`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-privacy`, `contextra-checkpoint`, `contextra-ports`, `contextra-ids`, `contextra-env`, `contextra-ingest`, `contextra-embed`.
+<<<<<<< HEAD
 **Ist (Cargo.toml):** alle E1-Crates außer `version` (im Ist `contextra-version`), dazu `contextra-ids`, `contextra-env`, `contextra-ports`, `contextra-durable-fs`, **`contextra-types`** (verboten, R1, REM-30, 2 Dateien).
 **Ist-Abweichungen:** `contextra-durable-fs` ist in Anhang E für `db` nicht erlaubt. `contextra-version` ist noch der Ist-Name (ADR-06). `contextra-ingest` und `contextra-embed` fehlen im Ist-Workspace-Stand von `db`.
+=======
+**Ist (Cargo.toml):** alle E1-Crates außer `version` (im Ist `contextra-mvcc`), dazu `contextra-ids`, `contextra-env`, `contextra-ports`, `contextra-durable-fs`, **`contextra-types`** (verboten, R1, REM-30, 2 Dateien).
+**Ist-Abweichungen:** `contextra-durable-fs` ist in Anhang E für `db` nicht erlaubt. `contextra-mvcc` ist noch der Ist-Name (ADR-06). `contextra-ingest` und `contextra-embed` fehlen im Ist-Workspace-Stand von `db`.
+>>>>>>> a9b569ed6 (Shell-Commit)
 **Features:** Ist nur `default`. Soll: `graph`, `text`, `vector`, `embed`, `ingest` (SPEC 15, 9). Ohne Feature `graph` muss `db` ohne Graph-Code kompilieren (T-GR-12).
 
 ## 4. Module
@@ -34,7 +39,11 @@ Soll-Module ohne Ist-Entsprechung: Schreib-Task je Shard, Scheduler, Startsequen
 
 ## 6. Umbau
 1. `contextra-types` aus `Cargo.toml` und Quellen entfernen (REM-30).
+<<<<<<< HEAD
 2. `contextra-version` → `contextra-version` (ADR-06, Freigabe nötig, CLAUDE.md §6 Punkt 4).
+=======
+2. `contextra-mvcc` → `contextra-version` (ADR-06, Freigabe nötig, CLAUDE.md §6 Punkt 4).
+>>>>>>> a9b569ed6 (Shell-Commit)
 3. Abhängigkeit `contextra-durable-fs` klären: nach Anhang E nicht erlaubt.
 4. Features `graph`, `text`, `vector`, `embed`, `ingest` anlegen (SPEC 9, 15).
 5. Crate `contextra-ingest` und `contextra-embed` anlegen oder bestätigen (Anhang E). Ohne diese Crates kein vollständiger Schreibpfad.
@@ -52,7 +61,11 @@ T-OPS-01 bis T-OPS-10, T-SEC-03, T-RAG-11, T-ER-07 (SPEC 15). Ist: keine dieser 
 | Gate | Ist-Befund | Soll |
 |---|---|---|
 | G-02 | `forbid(unsafe_code)` in `lib.rs` | eingehalten |
+<<<<<<< HEAD
 | G-03 | `contextra-types`, `contextra-durable-fs`, `contextra-version` | verletzt |
+=======
+| G-03 | `contextra-types`, `contextra-durable-fs`, `contextra-mvcc` | verletzt |
+>>>>>>> a9b569ed6 (Shell-Commit)
 | G-07 | Import `contextra_types` (2) | verletzt (REM-30) |
 | G-09 | keine ANCHOR-Dateien, kein `contract.rs` | eingehalten |
 | G-13 | 0 Treffer | eingehalten |

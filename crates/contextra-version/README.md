@@ -1,6 +1,12 @@
+<<<<<<< HEAD:crates/contextra-version/README.md
 # contextra-version
 
 **Zweck:** Multi-Version Concurrency Control: Sequenz-Log, Transaktionspuffer, Versionskatalog. **Ist-Name `contextra-version`.** Laut Spec (ADR-06) wird das Crate zu **`contextra-version`** umbenannt, mit Versionskatalog, Snapshots und Aufbewahrung.
+=======
+# contextra-mvcc
+
+**Zweck:** Multi-Version Concurrency Control: Sequenz-Log, Transaktionspuffer, Versionskatalog. **Ist-Name `contextra-mvcc`.** Laut Spec (ADR-06) wird das Crate zu **`contextra-version`** umbenannt, mit Versionskatalog, Snapshots und Aufbewahrung.
+>>>>>>> a9b569ed6 (Shell-Commit):crates/contextra-mvcc/README.md
 
 **Ebene:** E1 (Ist-Name, Ziel contextra-version, ADR-06)
 
