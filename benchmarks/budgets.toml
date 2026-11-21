@@ -1,0 +1,45 @@
+# Startwerte. Jeder Wert wird erst verbindlich, wenn der Benchmark ihn misst (INV-8).
+[search.s]
+hybrid_p50_ms = 15
+hybrid_p95_ms = 40
+filtered_factor_max = 1.5
+recall_at10_min = 0.95
+qps_min = 200
+ram_per_chunk_kb_max = 1.5
+cold_start_ready_s = 10
+
+[search.l]
+hybrid_p50_ms = 30
+hybrid_p95_ms = 80
+filtered_factor_max = 1.5
+recall_at10_min = 0.95
+qps_min = 100
+ram_per_chunk_kb_max = 1.5
+cold_start_ready_s = 60
+
+[graph]
+pathrag_extra_p95_ms_s = 25
+pathrag_extra_p95_ms_l = 50
+ingest_relations_per_s = 20000
+ram_per_entity_b = 96
+ram_per_edge_b = 48
+
+[ingest]
+chunks_per_s_per_shard = 2000
+chunker_mb_per_s_per_core = 5
+bulk_factor_min = 1.5
+
+[erasure]
+e1_p99_ms_1000_seals = 5
+e2_p99_s_1000_seals = 1
+tenant_offboarding_ms = 100
+search_overhead_max_pct = 3
+ingest_ratio_min_pct = 95
+search_overhead_during_scrub_max_pct = 5
+ram_overhead_max_pct = 1
+
+[keys]
+argon2_m_min_mib = 64
+argon2_t_min = 3
+argon2_p_min = 1
+slot_size_bytes = 128

@@ -1,0 +1,35 @@
+# Erlaubte interne Abhängigkeiten je Crate. Prüfung über cargo metadata.
+# Dev-Abhängigkeiten werden nur auf contextra-testkit geprüft.
+[allowed]
+contextra-ids          = []
+contextra-env          = ["contextra-ids"]
+contextra-sys          = []
+contextra-simd         = []
+contextra-durable-fs   = ["contextra-env", "contextra-ids", "contextra-sys"]
+contextra-ports        = ["contextra-ids"]
+contextra-crypto       = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-durable-fs"]
+contextra-erasure      = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-durable-fs"]
+contextra-version      = ["contextra-ports", "contextra-ids", "contextra-env"]
+contextra-store        = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-sys", "contextra-durable-fs"]
+contextra-vector       = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-simd", "contextra-durable-fs"]
+contextra-text         = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-durable-fs"]
+contextra-graph        = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-durable-fs"]
+contextra-rank         = ["contextra-ports", "contextra-ids"]
+contextra-privacy      = ["contextra-ids", "contextra-env"]
+contextra-checkpoint   = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-durable-fs"]
+contextra-ingest       = []
+contextra-embed        = ["contextra-ports", "contextra-ids"]
+contextra-db           = ["contextra-crypto", "contextra-erasure", "contextra-version", "contextra-store", "contextra-vector", "contextra-text", "contextra-graph", "contextra-rank", "contextra-privacy", "contextra-checkpoint", "contextra-ports", "contextra-ids", "contextra-env", "contextra-ingest", "contextra-embed"]
+contextra              = ["contextra-db", "contextra-ports", "contextra-ids", "contextra-privacy"]
+contextra-mcp          = ["contextra", "contextra-ports", "contextra-privacy"]
+contextra-embed-http   = ["contextra-ports"]
+contextra-kms          = ["contextra-ports"]
+contextra-server       = ["contextra", "contextra-ports"]
+
+# Regeln, die die Tabelle nicht ausdrückt:
+[rules]
+e1_crates = ["crypto", "erasure", "version", "store", "vector", "text", "graph", "rank", "privacy", "checkpoint"]
+e1_no_e1_dependency = true                       # R2
+ports_only_ids = true                            # R1
+compat_forbidden = true                          # R7, CMP-10
+forbidden_crate_names = ["contextra-types", "contextra-mvcc", "contextra-engine", "contextra-vault"]

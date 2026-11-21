@@ -36,7 +36,7 @@ Keine Ports implementiert. Bietet Mocks und Fault-Injection für die Tests der Z
 1. Import `contextra-types` lösen (REM-30). Typen aus `ports::dto` bzw. `ids`.
 2. Canary-Scanner (T-ENC-01), Mock-Embedder, Mock-Gate anlegen (SPEC 15).
 3. Schedule-Exploration mit `loom` anbinden.
-4. Datei `tests/layering.rs` fehlt (Ist-Abweichung, G-03, Stand 21.11.2026: `cargo test -p contextra-testkit --test layering` meldet „no test target“). Anlegen, sobald die Schichtregeln als Rust-Test festgelegt sind (Offener Punkt O-3).
+4. Datei `tests/layering.rs` vorhanden (G-03, Sitzung 3, 21.11.2026): ruft `tools/check_spec_sync.py layering --ratchet` auf. Nach dem Umbau grün halten.
 5. Selbstdeklarationen entfernen (nach Freigabe).
 
 **Offene Punkte (Entscheidung nötig):**
@@ -44,7 +44,7 @@ Keine Ports implementiert. Bietet Mocks und Fault-Injection für die Tests der Z
 - **O-2** Umfang der `conformance/`-Module gegen SPEC 15 festlegen.
 
 ## 7. Tests
-- G-03: `tests/layering.rs` (SPEC 11.6, 13.6 SYNC-2). Ist-Abweichung: Datei fehlt.
+- G-03: `tests/layering.rs` (SPEC 11.6, 13.6 SYNC-2), Ratchet gegen `layering_baseline.txt`.
 - Ist-Befund: nicht gezählt.
 
 ## 8. Abnahme

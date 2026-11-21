@@ -50,6 +50,16 @@ cmd_lint() {
   return $rc
 }
 
+cmd_sync() {
+  echo "== SYNC-1: Anhänge D/E gegen budgets.toml/capabilities.toml =="
+  python3 tools/check_spec_sync.py check
+}
+
+cmd_layering() {
+  echo "== G-03 / SYNC-2: Schichtregeln (Ratchet gegen layering_baseline.txt) =="
+  RUSTUP_TOOLCHAIN="$TC" python3 tools/check_spec_sync.py layering --ratchet
+}
+
 cmd_coverage() {
   echo "== test_coverage_matrix -> $EVID/coverage =="
   python3 tools/test_coverage_matrix.py --workspace . --output-dir "$EVID/coverage" > "$EVID/coverage.log" 2>&1
@@ -62,11 +72,21 @@ cmd_coverage() {
   return $rc
 }
 
-case "${1:-all}" in
-  build)    cmd_build ;;
-  gates)    cmd_gates ;;
-  lint)     cmd_lint ;;
-  coverage) cmd_coverage ;;
-  all)      cmd_build; echo; cmd_gates; echo; cmd_lint; echo; cmd_coverage ;;
-  *) echo "Usage: $0 {build|gates|lint|coverage|all}"; exit 2 ;;
-esac
+# Mehrere Befehle möglich: quickcheck.sh sync layering build
+run_one() {
+  case "$1" in
+    build)    cmd_build ;;
+    sync)     cmd_sync ;;
+    layering) cmd_layering ;;
+    gates)    cmd_gates ;;
+    lint)     cmd_lint ;;
+    coverage) cmd_coverage ;;
+    all)      cmd_build; echo; cmd_sync; echo; cmd_layering; echo; cmd_gates; echo; cmd_lint; echo; cmd_coverage ;;
+    *) echo "Usage: $0 {build|sync|layering|gates|lint|coverage|all} [...]"; return 2 ;;
+  esac
+}
+
+if [ $# -eq 0 ]; then set -- all; fi
+rc=0
+for c in "$@"; do run_one "$c" || rc=$?; echo; done
+exit $rc
