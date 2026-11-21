@@ -1,6 +1,7 @@
 # Contextra Spezifikation v4.1 (RAG-Edition, Soll-Zustand)
 
 **Datum:** 20. November 2026
+**Nachtrag v4.1.1:** 21. November 2026. Anhänge D und E sind als `benchmarks/budgets.toml` und `capabilities.toml` umgesetzt, die Schichtprüfung läuft über `tools/check_spec_sync.py` (Abschnitt 13.6, SYNC-1 bis SYNC-4). Inhalt der Normen unverändert.
 **Status:** Final zur Umsetzung. Einzige normative Quelle für Produktumfang, Architektur, Löschkette, Betrieb, Crate-Verträge und Refactoring-Reihenfolge.
 **Geltung:** Gesamter Workspace `contextra`.
 **Ersetzt:** `docs/SPEC.md` v4.0 (Archiv: `docs/archive/SPEC_v4.0.md`). Die Dokumente v2.1, Löschspezifikation v2.2 und Implementierungsspezifikation v3.0 sind Quellarchiv unter `docs/archive/`.
@@ -1454,14 +1455,14 @@ Die Prüfung der Löschung liegt in Testcode. Ein Test darf das Datenverzeichnis
 |---|---|
 | G-01 | `cargo check --workspace`, `cargo test --workspace`, `cargo test --no-default-features` pro Crate, `cargo clippy --workspace -- -D warnings` grün. Toolchain 1.89.0 laut `rust-toolchain.toml` |
 | G-02 | `unsafe_code = "forbid"` in allen Crates außer `contextra-sys` und `contextra-simd` (gemessen: nur dort Produktcode mit `unsafe`). Test-Targets mit eigenem Allocator liegen in `tests/unsafe_islands.rs` (ADR-53) |
-| G-03 | Schichtprüfung R1, R2, R7, R9 über `cargo metadata` gegen Anhang E (`crates/contextra-testkit/tests/layering.rs`). Datei wird in M0 angelegt |
+| G-03 | Schichtprüfung R1, R2, R7, R9 über `cargo metadata` gegen Anhang E. Prüfer: `python3 tools/check_spec_sync.py layering` (SYNC-2). Zusätzlich `crates/contextra-testkit/tests/layering.rs` (M0), der dieselben Regeln als Rust-Test prüft |
 | G-04 | Genau eine Definition von `MAX_SEARCH_K` (`grep -rn "const MAX_SEARCH_K" crates \| wc -l` = 1) |
 | G-05 | `cargo tree -e normal` der Kern-Crates enthält keine Netzwerk-Crates (Sperrliste: `reqwest`, `hyper`, `ureq`, `tonic`, `h2`, `native-tls`, `openssl`, `rustls`) |
 | G-06 | `default = []` in jedem Crate außer den in R3 begründeten Ausnahmen |
 | G-07 | Keine Erwähnung entfernter Crates oder Symbole im Produktcode (Liste 12) |
 | G-08 | Dokumentationslint (REQ-DOC-2 und REQ-DOC-3) |
 | G-09 | Keine Selbstdeklarationsdateien (REM-14): `grep -rln "ANCHOR\[\|FILE-CONTEXT"` leer, keine `contract.rs`, keine `INVENTAR.md`/`SPEC.md`/`AGENTS.md` in `crates/` |
-| G-10 | `benchmarks/budgets.toml` vorhanden, Verweise auf fehlende Dateien sind Fehler |
+| G-10 | `benchmarks/budgets.toml` vorhanden und identisch zu Anhang D (`python3 tools/check_spec_sync.py check`, SYNC-1). Verweise auf fehlende Dateien sind Fehler |
 | G-11 | Compat-Auflösung: `find crates benchmarks -type d -name compat` leer. `grep -rn "compat\|workspace\|types-compat\|ports-compat" crates/*/Cargo.toml` leer, außer dem Feature-Namen `workspace` in keinem Crate |
 | G-12 | `grep -rn "Instant::now\|SystemTime::now" crates --include=*.rs` außerhalb `crates/contextra-env/` leer |
 | G-13 | `grep` auf `unwrap()`, `expect(`, `panic!(`, `todo!(`, `unimplemented!(`, `unreachable!(` in Produktcode außerhalb `#[cfg(test)]` leer. Clippy-Lints auf `deny` |
@@ -1495,7 +1496,7 @@ Je Entfernung ein Commit. Nach jedem Commit `cargo check --workspace`. Keine Ver
 | REM-11 | Messen, Signieren, Berichten: `audit_chain.rs`, `wal_completeness.rs`, `wal_crypto.rs`, `kv_segment/`, `kv_cipher.rs`, `dek.rs` (ersetzt durch `DocKey`-Modul) | `contextra-crypto/src/` | Dateien fehlen. Kein `ed25519`, kein JCS im Workspace |
 | REM-12 | SSI, TxBuffer, ReadSet | `contextra-mvcc/src/ssi.rs`, `contextra-mvcc/src/tx_buffer.rs` | Dateien fehlen |
 | REM-13 | `Poisoned`, Fault-Injection im Produktcode | `contextra-durable-fs/src/health.rs`, `contextra-durable-fs/src/fault_injector.rs`, `contextra-store/src/io_seam.rs`, `contextra-store/src/io_seam/` | Fault-Injection nur in `contextra-testkit` |
-| REM-14 | Selbstdeklarationen: `contract.rs` (9 Dateien), `ANCHOR`-Kommentare (460 Dateien), `FILE-CONTEXT` (417 Dateien), `INVENTAR.md`, `SPEC.md`, `AGENTS.md` pro Crate, Auditor-Skripte (`port_contract_auditor.py`, `contract_diff_detector.py`, `type_registry_sync.py`, `isolation_proof.py`, `erasure_leak_prober.py`, `fsync_durability_tracer.py`, `error_topology_mapper.py`, `concurrency_lock_auditor.py`, `unsafe_boundary_tracer.py`, `crate_inventory.py`, `generate_function_inventory.py`, `generate_interface_spec.py`, `dead_code_microprobe.py`, `feature_audit.py`, `abhaengigkeits_budget.py`, `gate_dependencies.py`, `test_matrix_advisor.py`, `orchestrate_diagnostics.py`, `pattern_diagnostic.py`, `agentic_context_pack.py`, `rust_ast_inspector.py`, `async_boundary_scanner.py`, `zero_panic_analyzer.py`, `determinism_guard.py`, `contract_diff_detector.py`) | `crates/*/src/`, `crates/*/`, `tools/` | G-09 grün. `tools/` enthält nur `doc_lint.py`, `loc.py`, `test_coverage_matrix.py`, `baseline/` und die Skripte aus 11.6 |
+| REM-14 | Selbstdeklarationen: `contract.rs` (9 Dateien), `ANCHOR`-Kommentare (460 Dateien), `FILE-CONTEXT` (417 Dateien), `INVENTAR.md`, `SPEC.md`, `AGENTS.md` pro Crate, Auditor-Skripte (`port_contract_auditor.py`, `contract_diff_detector.py`, `type_registry_sync.py`, `isolation_proof.py`, `erasure_leak_prober.py`, `fsync_durability_tracer.py`, `error_topology_mapper.py`, `concurrency_lock_auditor.py`, `unsafe_boundary_tracer.py`, `crate_inventory.py`, `generate_function_inventory.py`, `generate_interface_spec.py`, `dead_code_microprobe.py`, `feature_audit.py`, `abhaengigkeits_budget.py`, `gate_dependencies.py`, `test_matrix_advisor.py`, `orchestrate_diagnostics.py`, `pattern_diagnostic.py`, `agentic_context_pack.py`, `rust_ast_inspector.py`, `async_boundary_scanner.py`, `zero_panic_analyzer.py`, `determinism_guard.py`, `contract_diff_detector.py`) | `crates/*/src/`, `crates/*/`, `tools/` | G-09 grün. `tools/` enthält nur `doc_lint.py`, `loc.py`, `test_coverage_matrix.py`, `check_spec_sync.py`, `quickcheck.sh`, `agent_tooling_common.py` (Bibliothek) und `baseline/` (Stand v4.1.1, siehe 13.6) |
 | REM-15 | Alle `compat/`-Module und `compat.rs`. Umfang 7.465 Zeilen, Auflösung nach 12.5 | siehe 12.5 | G-11 grün |
 | REM-16 | Altmodell-Texte: Berichte, Bescheinigung, Satzbibliothek, Annahmen- und Residuenkataloge | `contextra-erasure`, Dokumente | `grep -rn "Bescheinigung\|Satzbibliothek\|A-FLASH\|R-GROUP-LINK"` leer außer in 7.9 |
 | REM-17 | Feature `experimental` und alle Feature-Namen mit Präfix `exp-` in allen Crates (`exp-dibud`, `exp-resonance`, `experimental-rank`, `experimental-graph`) | `Cargo.toml` aller Crates | `grep -rn "experimental\|exp-" crates --include=Cargo.toml` leer |
@@ -1660,6 +1661,20 @@ Jedes Crate erhält genau eine Implementierungsspezifikation. Sie wird aus diese
 8. **Abnahme:** Gates aus 11.6, die das Crate betreffen.
 
 Der Auftrag an die Entwickler ist damit vollständig, eine Rückfrage an diese Spezifikation ist nicht vorgesehen. Fragen zur Umsetzung klärt der Verantwortliche per Änderung dieses Dokuments.
+
+---
+
+### 13.6 Werkzeuge und Synchronität
+
+**SYNC-1 (Anhänge sind Quelle).** Die TOML-Blöcke in Anhang D und Anhang E sind normativ. `benchmarks/budgets.toml` und `capabilities.toml` sind 1:1-Kopien davon. Änderungen erfolgen zuerst in der Spec, danach `python3 tools/check_spec_sync.py sync`. Spec und Dateien gehören in denselben Commit. `check` muss grün sein, bevor ein Merge erfolgt. Von Hand wird keine der beiden Dateien geändert.
+
+**SYNC-2 (Schichtprüfung).** `tools/check_spec_sync.py layering` ruft `cargo metadata` auf und prüft die normalen Abhängigkeiten der Workspace-Crates gegen Anhang E: erlaubte Kanten (R1 und Tabelle), E1 → E1 (R2), `compat`-Features und `src/compat/`-Verzeichnisse (R7), verbotene Crate-Namen (`contextra-types`, `contextra-mvcc`, `contextra-engine`, `contextra-vault`). Dev-Abhängigkeiten werden nicht geprüft, dies entspricht REM-27 („außerhalb von dev-dependencies“). Exit-Code 1 bei Verletzung. Der aktuelle Befund (Stand 21.11.2026) ist rot. Er zeigt die offenen Punkte aus REM-27 und die Umbenennung nach ADR-06 und wird mit deren Umsetzung grün.
+
+**SYNC-3 (Einstieg).** `tools/quickcheck.sh` ist der einheitliche Einstieg: `build`, `sync`, `layering`, `gates`, `lint`, `coverage`, `all`. Ausgaben liegen ausschließlich unter `evidence/` (gitignored). Neue Prüfungen kommen in diese Struktur, nicht als eigenständige Skripte. Ausnahmen sind Gates aus 11.6, die ein eigenes Werkzeug verlangen.
+
+**SYNC-4 (Toolchain).** Für Produktion und Gate G-01 gilt weiterhin `rust-toolchain.toml` (1.89.0). Im Entwicklungs-Sandbox ist der Download dieser Toolchain blockiert. Dort gilt `RUSTUP_TOOLCHAIN=stable`. Gemessen wurde mit 1.97.0. Die Abweichung ist bis zur Verfügbarkeit einer lokalen 1.89.0-Toolchain ausdrücklich vermerkt.
+
+**SYNC-5 (Ratchet und Gate-Vorbereitung, Notiz vom 21.11.2026).** Zwei Ratchets verhindern neue Befunde, ohne den Ist-Bestand sofort auf null zu verlangen. (a) G-03: `python3 tools/check_spec_sync.py layering --ratchet` vergleicht die Schichtbefunde mit `layering_baseline.txt`. Neue Befunde sind Fehler, bekannte nicht. `--update-baseline` schreibt die Baseline nur nach bewusstem Abbau. Der Test `crates/contextra-testkit/tests/layering.rs` ruft denselben Ratchet auf. (b) G-13: `tools/unwrap_ratchet.py` vergleicht die Zählung von `unwrap()`, `expect(`, `panic!(` je Crate mit `.unwrap-baseline.json`. Ein Anstieg ist ein Fehler, `--update` nur nach bewusstem Abbau. Vorbereitung für die Gates: Jedes Crate erhält eine `README.md` nach 3.6. Diese Notiz ändert keine Norm. Die Gates bleiben wie in 11.6 beschrieben.
 
 ---
 
@@ -1883,6 +1898,8 @@ Messung mit `find`, `grep`, `wc` und `git` am geklonten Stand. Alle Zahlen der S
 
 Die Zeilenzahlen der Zielspalte (Abschnitt 3.1) sind Schätzungen mit ±25 % Spanne.
 
+**Nachtrag 21.11.2026 (keine Neumessung der Tabelle oben):** Die Zeilen „`benchmarks/budgets.toml` … fehlend“ und „`tests/layering.rs` … fehlt“ beziehen sich auf den Stand vom 20.11.2026. Beide Dateien existieren inzwischen (Abschnitt 13.6). Die Schichtprüfung ergab am 21.11.2026 49 Befunde (`check_spec_sync.py layering`), darunter die in REM-27 genannten Verletzungen.
+
 ## Anhang C: Glossar
 
 | Begriff | Bedeutung |
@@ -1903,6 +1920,8 @@ Die Zeilenzahlen der Zielspalte (Abschnitt 3.1) sind Schätzungen mit ±25 % Spa
 | **Compat-Auflösung** | Entfernen der Bridge-Schichten und Verschieben ihrer Inhalte in die Besitzer-Module (12.5) |
 
 ## Anhang D: `benchmarks/budgets.toml` (Startwerte)
+
+Quelle für `benchmarks/budgets.toml` (SYNC-1). Prüfung: `python3 tools/check_spec_sync.py check`.
 
 ```toml
 # Startwerte. Jeder Wert wird erst verbindlich, wenn der Benchmark ihn misst (INV-8).
@@ -1953,6 +1972,8 @@ slot_size_bytes = 128
 ```
 
 ## Anhang E: Schichtregeln für G-03 (maschinenlesbar)
+
+Quelle für `capabilities.toml` (SYNC-1). Prüfung der Abhängigkeiten: `python3 tools/check_spec_sync.py layering` (SYNC-2).
 
 ```toml
 # Erlaubte interne Abhängigkeiten je Crate. Prüfung über cargo metadata.

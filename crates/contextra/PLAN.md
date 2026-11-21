@@ -1,104 +1,59 @@
-# contextra — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
+# contextra — Implementierungsspezifikation
 
-**Ebene:** E2 (Façade)
-**Kern-Closure:** `db`, `types`, `ids`, `privacy`, `erasure`
-**Status:** Normativ (Soll-Zustand)
-**Version:** 2.1
-**Geltungsbereich:** `crates/contextra`
-**Normative Quellen:** `docs/SPEC.md` §1, §2.4, §5.3, §5.4, §11.2, §14, INV-7, INV-CLAIMS-1.
+**Ebene:** E2 (Fassade)
+**Normative Quelle:** `docs/SPEC.md` v4.1, Nachtrag v4.1.1 (maßgeblich bei Widerspruch). **Stand:** 21.11.2026, Abgleich mit SPEC v4.1. Verweist nur auf SPEC-Kapitel und IDs. Ist-Abweichungen sind markiert, ungeklärte Punkte stehen unter „Offene Punkte (Entscheidung nötig)“ in Abschnitt 6.
 
----
+## 1. Zweck und Ebene
+Öffentliche API nach 6.8, Konfigurationsladen, Fehlerabbildung (SPEC 15). Entfernen: REM-02 (Profile), REM-24 (Agentengedächtnis), REM-25 (Query-Rewriter). Ziel-Umfang: 1.500 Zeilen (SPEC 3.1). Ist: 3.807 Zeilen laut Zielspalte (Altbestand).
+Abhängigkeiten nach Anhang E: `db`, `ports`, `ids`, `privacy`.
 
-## 1. Zweck
+## 2. Vertrag
+Öffentliche API nach 6.8 (Schnittstelle für `mcp` und `server`). Der Build ist im Ist rot (CLAUDE.md §2): die Dateien importieren Typen aus `contextra-db`, die dort nicht mehr existieren. Die Liste steht im Abschnitt „Ist-Zustand“ von `CLAUDE.md`.
 
-`contextra` ist die Rust-API für Anwendungen. Sie öffnet die Engine, führt Schreib- und Suchaufrufe auf `contextra-db` zurück und startet Löschungen.
+## 3. Abhängigkeiten
+**Erlaubt (Anhang E):** `db`, `ports`, `ids`, `privacy`.
+**Ist (Cargo.toml):** `contextra-types` (**verboten**, REM-30, 15 Dateien), `contextra-ports`, `contextra-db`, `tokio` (normal, Wrapper in `deny.toml`, Übergang E29), `serde`, `serde_json`, `uuid`, `thiserror`, `tracing`, `zeroize`.
+**Ist-Abweichung:** `contextra-ids` und `contextra-privacy` fehlen in Ist, obwohl Anhang E sie verlangt.
+**Features:** Ist `default`, `embedded`. Soll: keine Features außer SPEC 15. `embedded` ist nicht genannt, offen.
 
-Die Façade enthält keine zweite Saga, keinen Cache und keine Lineage. S4 und S5 liegen nicht hier. `contextra-engine` ist ein deprecated Re-Export von `contextra-db` und ebenfalls keine Schicht.
+## 4. Module
+| Datei | Verantwortung (Ist) | Befund |
+|---|---|---|
+| `src/lib.rs` | Wurzel, API | Soll |
+| `src/builder.rs`, `src/boot.rs` | Aufbau, Start | Soll (Konfigurationsladen), Verbleib zu prüfen |
+| `src/collection_profile.rs`, `src/performance_profile.rs` | Profile | **REM-02 (Profile): entfernen** |
+| `src/agent_memory.rs` | Agentengedächtnis | **REM-24: entfernen** |
+| `src/query_rewriter.rs` | Query-Rewriter (LLM) | **REM-25: entfernen** |
 
-## 2. Architekturregeln
+## 5. Entfernungen
+| ID | Gegenstand | Abnahme-Befehl |
+|---|---|---|
+| REM-02 | `collection_profile.rs`, `performance_profile.rs` | `ls crates/contextra/src/*profile*` leer |
+| REM-24 | `src/agent_memory.rs`, Zettelkasten-Typen | `grep -rn "MemoryType\|WorkflowState" crates/contextra` leer |
+| REM-25 | `src/query_rewriter.rs` | `grep -rn "QueryRewriter\|LlmTextGenerator" crates/contextra` leer |
+| REM-30 | Import `contextra-types` (15 Dateien) | `grep -rln "contextra_types" crates/contextra` leer |
+| REM-14 | ANCHOR-Dateien (21) | `grep -rl "ANCHOR\[" crates/contextra` leer |
 
-1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
-2. Keine Abhängigkeit auf ein entferntes Crate (SPEC §2.2). Kein Feature `candle`, `onnx` oder `ollama`.
-3. Keine Aussage „O(1)", „DSGVO-konform", „gelöscht" oder „unwiederbringlich" in der API-Dokumentation, solange sie nicht an eine gemessene Klasse gebunden ist (INV-7, INV-CLAIMS-1).
-4. Collection-Löschung und Subjekt-Löschung geben das `ErasureTicket` von Takt 1 zurück. Sie beenden die Saga nicht.
+## 6. Umbau
+1. Build-Fehler beheben, bevor etwas anderes passiert. Ursache sind fehlende Typen aus `contextra-db` (CLAUDE.md §2). Entscheidung nötig: Stub oder Feature-Gating (CLAUDE.md §6 Punkt 2).
+2. REM-02, REM-24, REM-25 entfernen.
+3. `contextra-types` lösen (REM-30).
+4. Abhängigkeiten `contextra-ids` und `contextra-privacy` ergänzen.
+5. `tokio` klären (Punkt 10 CLAUDE.md).
+6. `unwrap`/`expect`/`panic!` (1 Treffer) nach R6 abbauen.
 
-## 3. Öffnen
-
-`Contextra::open` prüft vor dem ersten Lesen (SPEC §14):
-
-- `data_dir` ist vorhanden und beschreibbar.
-- `erasure.ledger_dir` ist kein Unterverzeichnis von `data_dir`.
-- `erasure.disk_reserve_bytes` ist mindestens 1 GiB.
-- Bei `EncryptionConfig::Required` ist die Passphrase nicht leer.
-- `mixed_policy` ist `BlockAll`.
-- Im Regulated-Tier ist `erased_set_mirror` gesetzt.
-- `CustodyProfile::K2` und `K3` ohne bestandene Konformitätssuite liefern `CapabilityUnsupported`.
-
-Danach ruft `open` `contextra-db` auf. Dort läuft `Chain::recover`, bevor der Lesepfad öffnet. Fehlt das `ReadGate` bei `GuardPolicy::Required`, schlägt `open` fehl (SPEC §11.2).
-
-`ContextraConfig` wird aus `contextra-types` re-exportiert und hier nicht ein zweites Mal definiert (R4).
-
-## 4. Schreiben und Suche
-
-`insert_k` nimmt `Validated<T>`. `insert_p` nimmt `SubjectRef` und liefert `PersonalRef`. `insert` einer D-Klasse ohne `LineageRef` reicht den Fehler `ClassViolation` aus `contextra-db` durch.
-
-`hybrid_search`, `get` und `scan` laufen über `TenantScopedStorage`. `get` auf einen gelöschten und auf einen nie geschriebenen Schlüssel liefert `ContextraError::Erased` mit dem Außentext `not found`.
-
-## 5. Löschen
-
-```rust
-pub async fn erase_subject(
-    &self,
-    subject: SubjectRef,
-    attestation: RetentionAttestation,
-) -> Result<ErasureTicket, ContextraError>;
-
-pub async fn drop_collection(
-    &self,
-    collection: CollectionId,
-    attestation: RetentionAttestation,
-) -> Result<ErasureTicket, ContextraError>;
-```
-
-Das Ticket nennt `ErasureId` und den Zustand nach Takt 1: `Frozen`, `Restricted` oder `Refused`. Es ist kein `DeletionProof`. Der Zustand `KeyRevoked` existiert nicht. Der kanonische Zustand nach der Schlüsselvernichtung heißt `KeyDestroyed` und tritt in Takt 2 ein, nicht in dieser Rückgabe.
-
-`erase_subject` und `drop_collection` dokumentieren die Saga als die Schritte 1 bis 9. Sie dokumentieren keine konstante Laufzeit. Die Schlüsselvernichtung eines einzelnen `DocDek` ist ein Schritt der Saga. Die Saga insgesamt ist es nicht.
-
-Ein Profil `enterprise_regulated` setzt `GuardPolicy::Required`, `DataClassPolicy::Enforced`, `EncryptionConfig::Required` und ein `ledger_dir`, das der Aufrufer außerhalb von `data_dir` übergibt. Das Profil ist eine Voreinstellung der Konfiguration. Es ist keine Compliance-Bescheinigung.
-
-## 6. `Cargo.toml`
-
-```toml
-[package]
-name = "contextra"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-description = "Embedded hybrid-search facade"
-
-[lints]
-workspace = true
-
-[dependencies]
-contextra-db = { workspace = true }
-contextra-types = { workspace = true }
-contextra-ids = { workspace = true }
-contextra-privacy = { workspace = true }
-contextra-erasure = { workspace = true }
-
-[features]
-default = []
-```
-
-`uuid` mit ungeprüftem `UUIDv4` ist keine Abhängigkeit. IDs entstehen in `contextra-ids`.
+**Offene Punkte (Entscheidung nötig):**
+- **O-1** Build-Fehler: Stub oder Feature-Gating (CLAUDE.md §6 Punkt 2).
+- **O-2** Feature `embedded`: nicht in SPEC 15.
+- **O-3** `tokio` als normale Abhängigkeit der Fassade (Punkt 10 CLAUDE.md).
 
 ## 7. Tests
+API-Oberflächentest, Konfigurationsfehler (T-OPS-03, SPEC 15). Ist: nicht gezählt.
 
-| Pflicht | Prüfung |
-|---|---|
-| §14 | `ledger_dir` unter `data_dir` lässt `open` fehlschlagen |
-| §14 | Leere Passphrase bei `Required` lässt `open` fehlschlagen |
-| T-DEL-5 | `EncryptionConfig::None` liefert ein Ticket, dessen späterer Bericht höchstens Klasse L trägt |
-| Lesepfad | `get` nach `Frozen` und `get` einer unbekannten `DocId` haben denselben `Display`-Text |
-| INV-7 | Die Rustdoc-Texte von `erase_subject` und `drop_collection` enthalten weder `O(1)` noch `DSGVO-konform` |
+## 8. Abnahme
+| Gate | Ist-Befund | Soll |
+|---|---|---|
+| G-01 | Build rot (20 Fehler laut CLAUDE.md §2) | grün |
+| G-03 | `types` verboten, `ids`/`privacy` fehlen | verletzt |
+| G-07 | Import `contextra_types` (15) | verletzt (REM-30) |
+| G-09 | 21 Dateien mit ANCHOR | verletzt (REM-14) |

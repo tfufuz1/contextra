@@ -1,97 +1,56 @@
-# contextra-testkit — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
+# contextra-testkit — Implementierungsspezifikation
 
-**Ebene:** E3 (Endpunkt, Erasure Lab)
-**Kern-Closure:** `ids`, `env`, `types`, `ports`, `erasure`, `durable-fs`
-**Status:** Normativ (Soll-Zustand)
-**Version:** 2.1
-**Geltungsbereich:** `crates/contextra-testkit`
-**Normative Quellen:** `docs/SPEC.md` §5.8, §12, §15, INV-WITNESS-MINT-1, INV-WIRING-2, R2.
+**Ebene:** E3, nur Dev-Abhängigkeit (SPEC 15, 3.2)
+**Normative Quelle:** `docs/SPEC.md` v4.1, Nachtrag v4.1.1 (maßgeblich bei Widerspruch). **Stand:** 21.11.2026, Abgleich mit SPEC v4.1. Verweist nur auf SPEC-Kapitel und IDs. Ist-Abweichungen sind markiert, ungeklärte Punkte stehen unter „Offene Punkte (Entscheidung nötig)“ in Abschnitt 6.
 
----
+## 1. Zweck und Ebene
+Prüfwerkzeuge für Tests: FaultVfs, Canary-Scanner (T-ENC-01), Mock-Store, Mock-Uhr, Schedule-Exploration (`loom`), Mock-Embedder, Mock-Gate. Enthält die Datei mock.rs aus CMP-3 (SPEC 15, F-27). Ziel-Umfang: 7.000 Zeilen (SPEC 3.1). Ist: 7.389 Zeilen laut Zielspalte (Altbestand). Nur Dev-Abhängigkeit aller Crates außer `bench`, `server`, `kms` (Anhang E).
 
-## 1. Zweck
+## 2. Vertrag
+Keine Ports implementiert. Bietet Mocks und Fault-Injection für die Tests der Ziel-Crates. Ist: `src/fault_vfs.rs`, `src/in_memory_graph.rs`, `src/in_memory_store.rs`, `src/in_memory_text.rs`, `src/conformance/*` (Clock, Failure, Graph, KV-Ports, Metrics, Rng, Routing-Ports, Storage, Text, Vector, VFS).
 
-`contextra-testkit` ist das Erasure Lab und die gemeinsame Testinfrastruktur.
+## 3. Abhängigkeiten
+**Erlaubt (Anhang E, dev):** alle außer `bench`, `server`, `kms`.
+**Ist (Cargo.toml):** `contextra-ports` (erlaubt), `contextra-types` (**verboten**, REM-30, 14 Dateien).
+**Features:** Ist `default`, `testkit`, `erasure-conformance`. Soll (SPEC 15): keine Features außer Kapitel 15. `erasure-conformance` ist nicht genannt, offen.
 
-- In-Memory-Doubles der Ports `StorageEngine`, `VectorIndex`, `TextIndex`, `GraphIndex`.
-- Fehlerinjektion für I/O, volle Platte und Handle-Poisoning.
-- Canary-Erzeugung für die Positivkontrolle `AC-1`.
-- Der Layering-Gate-Test `tests/layering.rs` (SPEC §15).
-- Synthetische Korpora mit festem Seed.
+## 4. Module
+| Datei | Verantwortung (Ist) | Befund |
+|---|---|---|
+| `src/fault_vfs.rs` | FaultVfs | Soll (SPEC 15, Absturzmatrix in `durable-fs`) |
+| `src/in_memory_store.rs` | Mock-Store | Soll (Mock-Store) |
+| `src/in_memory_graph.rs`, `src/in_memory_text.rs` | Mocks | Soll, zu prüfen |
+| `src/conformance/*` | Konformitätsprüfungen je Port | Soll (Testwerkzeug), Umfang gegen SPEC 15 prüfen |
+| `src/conformance/clock.rs`, `rng.rs` | Mock-Uhr, Zufall | Soll (Mock-Uhr). Hinweis: `Clock` liegt in `env`, Mock-Uhr nur hier |
+| Canary-Scanner, Mock-Embedder, Mock-Gate | nicht gefunden | Soll, fehlt im Ist (prüfen) |
 
-E0- und E1-Crates binden dieses Crate weder als Abhängigkeit noch als Dev-Abhängigkeit (R2).
+## 5. Entfernungen
+| ID | Gegenstand | Abnahme-Befehl |
+|---|---|---|
+| CMP-3 | Keine Entfernung. Datei mock.rs (aus CMP-3) ist neu anzulegen | nach Umbau: `test -f crates/contextra-testkit/src/mock.rs` |
+| REM-30 | Import `contextra-types` (14 Dateien) | `grep -rln "contextra_types" crates/contextra-testkit` leer |
+| REM-14 | ANCHOR-Dateien (22) | `grep -rl "ANCHOR\[" crates/contextra-testkit` leer |
+| Zeitquelle | `Instant::now` in 1 Datei außerhalb `env` (G-12) | Fundstelle auf `Clock` umstellen |
 
-## 2. Architekturregeln
+## 6. Umbau
+1. Import `contextra-types` lösen (REM-30). Typen aus `ports::dto` bzw. `ids`.
+2. Canary-Scanner (T-ENC-01), Mock-Embedder, Mock-Gate anlegen (SPEC 15).
+3. Schedule-Exploration mit `loom` anbinden.
+4. Datei `tests/layering.rs` ist vorhanden (G-03, erledigt laut CLAUDE.md). Prüfen, dass sie nach dem Umbau grün bleibt.
+5. Selbstdeklarationen entfernen (nach Freigabe).
 
-1. `#![forbid(unsafe_code)]`. Zero-Panic in Hilfscode, der von Tests als Bibliothek aufgerufen wird. `default = []`.
-2. `Scanner<Armed>` wird hier nicht konstruiert. Der einzige Übergang von `Scanner<Unarmed>` zu `Scanner<Armed>` ist `Chain::verify_control` nach bestandener Positivkontrolle (INV-WITNESS-MINT-1).
-3. Ein Double, das `purge` oder `witness` mit `Ok` beantwortet, ohne den Canary zu entfernen oder die Messung wirklich auszuführen, ist ein Stub und darf nicht als Schichtregistrierung dienen (INV-WIRING-2).
-4. Kein Test gilt als Löschtest, wenn er nur das Gate setzt. Der Katalog verlangt den Durchlauf der Saga einschließlich Purge (SPEC §12). Ein reiner Gate-Test prüft höchstens Klasse L.
-
-## 3. Positivkontrolle
-
-`CanaryPattern` ist 32 Byte. `generate` füllt sie über `OsRng::try_fill_bytes` und liefert `Err`, wenn der RNG scheitert. `fill_bytes` ohne Fehlerpfad wird nicht verwendet.
-
-Der Canary wird über den Schreibpfad der zu messenden Schicht eingefügt, nicht nachträglich in eine Datei gepatcht.
-
-`CanaryScanner::scan_dir` zählt Rohbyte-Treffer. Das Ergebnis ist eine Zahl. Es ist kein `LayerWitness` und kein `Scanner<Armed>`. Ein Test, der nur `scan_dir` aufruft, hat `AC-1` nicht bestanden.
-
-T-DEL-7 ist erfüllt, wenn ein `Scanner<Unarmed>` den eingefügten Canary findet und `Chain::verify_control` danach einen `Scanner<Armed>` erzeugt. Schlägt das Finden fehl, bleibt der Scanner unbewaffnet und der Messlauf ist ungültig.
-
-Ein Compile-Fail-Test zeigt, dass `Scanner<Armed>` außerhalb von `contextra-erasure` nicht konstruierbar ist.
-
-## 4. Doubles
-
-Ein In-Memory-Double speichert, was der Test geschrieben hat, und entfernt es in `purge`, wenn es als Schicht-Double auftritt. `witness` liest den Speicher und meldet `residue_matches`. Ein leerer Speicher ohne vorherigen Canary-Fund ist kein bestandener Lauf.
-
-`FaultVfs` implementiert `Vfs` aus `contextra-durable-fs`, einschließlich `scrub_if_safe` und `enqueue_pending_delete`. Ein injizierter Fehler am Journal-Flush muss beim Aufrufer `JournalNotDurable` ergeben, ohne dass der Double eine Lesesperre setzt.
-
-## 5. Layering-Gate
-
-`crates/contextra-testkit/tests/layering.rs` nutzt `cargo metadata` und prüft SPEC §15:
-
-1. Jedes Crate hat `default = []`.
-2. Keine E0- oder E1-Crate hängt von E2 oder E3 ab.
-3. Die Domänen-Closure jeder E1-Crate ist eine Teilmenge von E0 und hat höchstens fünf Mitglieder. `contextra-ports` und `contextra-erasure` zählen nicht mit.
-4. `[lints] workspace = true` ist gesetzt.
-5. Kein Crate aus SPEC §2.2 ist Workspace-Member.
-6. Die Gates `surface-coverage`, `claim-generator` und `deletion-honesty` sind im CI-Auftrag referenziert.
-
-`contextra-store` darf in diesem Test nicht von `contextra-crypto` oder `contextra-mvcc` abhängen. `contextra-vector` darf nicht von `contextra-mvcc` abhängen. `contextra-ports` darf nicht von `contextra-types` abhängen.
-
-## 6. `Cargo.toml`
-
-```toml
-[package]
-name = "contextra-testkit"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-description = "Erasure lab, fault injection, and the layering gate"
-
-[lints]
-workspace = true
-
-[dependencies]
-contextra-ids = { workspace = true }
-contextra-env = { workspace = true }
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
-contextra-erasure = { workspace = true }
-contextra-durable-fs = { workspace = true }
-rand = { workspace = true }
-thiserror = { workspace = true }
-
-[features]
-default = []
-```
+**Offene Punkte (Entscheidung nötig):**
+- **O-1** Feature `erasure-conformance`: entfernen oder in SPEC 15 aufnehmen.
+- **O-2** Umfang der `conformance/`-Module gegen SPEC 15 festlegen.
 
 ## 7. Tests
+- G-03: `tests/layering.rs` (SPEC 15, 11.6).
+- Ist-Befund: nicht gezählt.
 
-| Kennung | Pflicht |
-|---|---|
-| T-DEL-7 | Positivkontrolle bewaffnet den Scanner. Ein fehlender Canary bewaffnet ihn nicht |
-| INV-WITNESS-MINT-1 | `Scanner::<Armed>::new` ist außerhalb von `contextra-erasure` ein Compile-Fehler |
-| T-DEL-23 | Eine Konstante anstelle der Messung lässt den Lab-Test fehlschlagen |
-| §15 | `layering.rs` bricht ab, wenn `ports` von `types` abhängt oder `store` von `crypto` abhängt |
+## 8. Abnahme
+| Gate | Ist-Befund | Soll |
+|---|---|---|
+| G-02 | `forbid(unsafe_code)` in 3 Dateien | eingehalten |
+| G-07 | Import `contextra_types` (14) | verletzt (REM-30) |
+| G-09 | 22 Dateien mit ANCHOR | verletzt (REM-14) |
+| G-12 | 1 Treffer außerhalb `env` | verletzt |

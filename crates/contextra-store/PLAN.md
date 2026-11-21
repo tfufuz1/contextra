@@ -1,134 +1,69 @@
-# contextra-store — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
+# contextra-store — Implementierungsspezifikation
 
-**Ebene:** E1 (Domäne)
-**Domänen-Closure:** `ids`, `env`, `sys`, `durable-fs` (höchstens 5, SPEC §15)
-**Verträge:** `ports`, `erasure` (zählen nicht gegen die fünf)
-**Status:** Normativ (Soll-Zustand)
-**Version:** 2.1
-**Geltungsbereich:** `crates/contextra-store`
-**Normative Quellen:** `docs/SPEC.md` §4.5, §4.6, §5.3 Schritte 3 und 8, §5.9 Schichten S1 und S1b, §5.11, §6, §7 (`StoreLayer`), §9.2, §10.2, INV-6.
+**Ebene:** E1 (Kern, R2)
+**Normative Quelle:** `docs/SPEC.md` v4.1, Nachtrag v4.1.1 (maßgeblich bei Widerspruch). **Stand:** 21.11.2026, Abgleich mit SPEC v4.1. Verweist nur auf SPEC-Kapitel und IDs. Ist-Abweichungen sind markiert, ungeklärte Punkte stehen unter „Offene Punkte (Entscheidung nötig)“ in Abschnitt 6.
 
----
+## 1. Zweck und Ebene
+LSM-Speicher: Memtable, SST, Manifest, WAL (`lsm/`), KV-Familien (`kv`, `KvStore`), Segmente (`SegmentStore`, ohne eigene Verschlüsselung), Kompaktion mit Löschfilter für Records toter Seals (REQ-SCR-3), `fsync`, `budget`, `stats` (SPEC 15, 3.1, Kapitel 5). Ziel-Umfang: 14.000 Zeilen (SPEC 3.1). Ist: 35.383 Zeilen laut Zielspalte (Altbestand), das größte Crate des Workspace.
+Abhängigkeiten nach Anhang E: `ports`, `ids`, `env`, `sys`, `durable-fs`.
 
-## 1. Zweck
+## 2. Vertrag
+Implementiert (SPEC 3.4): `KvStore` und `SegmentStore`. Ist: `KvStore` ist als Trait in `contextra-ports` (Datei kv.rs) unter dem Namen `KvPrefixStore` definiert (siehe PLAN von `contextra-ports`, O-1). `SegmentStore` fehlt im Ports-Crate.
+Scrub-Ziel: `ScrubTarget` für den Store (SPEC 4.4, 3.4). Ist: nicht implementiert.
 
-`contextra-store` ist die LSM-Persistenz: WAL, MemTable, SSTables, Blob-Segmente, Block-Cache und Manifest.
+## 3. Abhängigkeiten
+**Erlaubt (Anhang E):** `ports`, `ids`, `env`, `sys`, `durable-fs`.
+**Ist (Cargo.toml):** `contextra-ids`, `contextra-env`, `contextra-sys`, `contextra-durable-fs` (erlaubt), dazu **`contextra-erasure`, `contextra-crypto`, `contextra-mvcc`** (**verboten**, R2 und ADR-32, REM-27), sowie `tokio`, `quick_cache`, `lru`, `memmap2`, `parking_lot` u. a.
+**Ist-Abweichung:** `contextra-crypto`, `contextra-erasure`, `contextra-mvcc` müssen entfernt werden (REM-27, SPEC 3.4: Schlüsselvernichtung über `KeyDestroyer`, Scrub über `ScrubTarget`). `contextra-ports` fehlt in Ist, obwohl Anhang E es verlangt.
+**Features:** Ist `workspace`, `test-hooks`, `inspect`, `memory-only-storage`, `fault-injection`, `block-cache-v2`, `sieve-cache`, `legacy-wal-key`, `docid-128`. Soll (SPEC 15): keine Features außer den in Kapitel 15 genannten. `workspace` verletzt CMP-10 und G-11. `fault-injection` widerspricht REM-13 (Fault-Injection gehört nach testkit).
 
-- Records der Klassen K, P und D liegen verschlüsselt unter dem `DocDek` ihrer Einheit. Die AEAD-Versiegelung führt `contextra-db` mit `contextra-crypto` aus und übergibt Chiffretext. Store persistiert ihn. Damit bleibt die Kern-Closure in E0 (SPEC §15). Die äußere Blockhülle liegt unter `K_eng`.
-- Ein Block darf Records mehrerer Einheiten enthalten. Jeder Record bleibt unter seinem eigenen `DocDek`. Die Vernichtung eines `DocDek` macht die anderen Records des Blocks nicht unlesbar (§4.5).
-- `LsmStorage` ist nach außen `pub(crate)`. Jeder Lesezugriff der Engine läuft über `TenantScopedStorage` in `contextra-db`. Dort sitzt die einzige Gate-Prüfstelle (§6.1).
+## 4. Module
+| Datei | Verantwortung (Ist) | Befund |
+|---|---|---|
+| `src/lsm/*` | LSM-Kern: Commit, Engine, Flush, Group-Commit, Fence, Locks, Erasure-Modul | Soll `lsm/` (SPEC 15). `src/lsm/erasure.rs` verstößt gegen R2: prüfen und lösen |
+| `src/compaction/*` | Kompaktion, adaptive Planung, Retention, Merge-Operator | Soll `compaction` (SPEC 15). Die adaptiven Teile sind nicht in SPEC 15 genannt, offen |
+| `src/io_seam/*` | E/A-Naht, `real_fs` | zu prüfen |
+| `src/key_source.rs` | Schlüsselquelle | **Ist-Abweichung**: Schlüssel sind Sache von `crypto` (R4) |
+| `src/budget.rs`, `src/fsync.rs`, `src/error.rs`, `src/lib.rs` | Budget, Fsync, Fehler | Soll `budget`, `fsync` |
+| `src/compaction/tests*`, `src/compaction/tests.rs` | Tests im Produktcode | Verbleib offen |
 
-WAL-, Manifest-, Flush- und Recovery-Formate bleiben beim Umbau stabil (INV-6). Ein Formatwechsel trägt eine Formatkennung (INV-1).
+Soll-Module ohne Ist-Entsprechung: `kv` (KvStore-Familie), `segments` (`SegmentStore` mit Kopf nach 5.8). Ist: `segments` fehlt als eigenes Modul.
 
-## 2. Architekturregeln
+## 5. Entfernungen
+| ID | Gegenstand | Abnahme-Befehl |
+|---|---|---|
+| REM-02 | in SPEC 15 genannt, Inhalt in SPEC 12 nachlesen (offen) | siehe SPEC 12 |
+| REM-05 | dito | siehe SPEC 12 |
+| REM-08 | dito | siehe SPEC 12 |
+| REM-26 | dito | siehe SPEC 12 |
+| REM-27 | Abhängigkeiten zu `crypto`, `erasure`, `mvcc` | `grep -rln "contextra_crypto\|contextra_erasure\|contextra_mvcc" crates/contextra-store` leer |
+| CMP-4 | Feature und Schlüssel-Kompatibilität `legacy-wal-key`, `workspace` (SPEC 12.5 prüfen) | `grep -rn "compat\|workspace" crates/contextra-store/Cargo.toml` leer |
+| REM-14 | ANCHOR-Dateien (51) | `grep -rl "ANCHOR\[" crates/contextra-store` leer |
 
-1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
-2. Keine Abhängigkeit auf `contextra-crypto`, `contextra-mvcc` oder ein anderes E1-Crate. Keine Dev-Abhängigkeit auf `contextra-testkit` (R2).
-3. `StoreLayer` implementiert `ErasureLayer` aus `contextra-erasure`.
-4. Logs enthalten keinen Klartext des Löschziels (INV-12).
-5. Dateinamen entstehen aus der Sequenz oder aus `OsRng::try_fill_bytes`. Kein ungeprüftes UUIDv4.
+## 6. Umbau
+1. Abhängigkeiten zu `crypto`, `erasure`, `mvcc` lösen (REM-27). Schlüsselvernichtung über den Port `KeyDestroyer`, Scrub über `ScrubTarget` (ADR-32).
+2. `key_source.rs` und `src/lsm/erasure.rs` nach `crypto` bzw. `erasure` verlagern oder über Ports anbinden.
+3. Feature `workspace` entfernen (CMP-10), `fault-injection` nach `testkit` (REM-13).
+4. `unwrap`/`expect`/`panic!` (1.247 Treffer) nach R6 abbauen, schrittweise je Modul.
+5. Benchmark G-STORE als Gate vor und nach dem Umbau.
 
-## 3. Komponenten
-
-```
-LsmStorage (pub(crate))
-  WAL (append, group commit, Chiffretext)
-  Active MemTable / Immutable MemTables
-  SSTables L0..Ln und Blob-Segmente
-  Block-Cache (Purgeable, Schicht S4 gemeinsam mit db)
-  TableManifest
-  PendingDelete-Journal
-  StoreLayer (ErasureLayer)
-```
-
-SSTable-Aufbau, unverändert in der Rolle, mit Formatkennung im Magic:
-
-```
-Magic (Formatkennung) | Data Blocks (Chiffretext) | Filter | Index | Footer
-```
-
-Klartext-Canaries dürfen nach Insert und Flush in keiner Datei stehen (T-DEL-1).
-
-## 4. Rolle in der Löschsaga
-
-`StoreLayer` ist Schicht **S1** (LSM und WAL) und **S1b** (Blob-Segmente). Messung: `LsmScanner` (Klartext, Chiffrat, Nadel). Der Scanner teilt keinen Code mit dem Purger (INV-WITNESS-MINT-1). Der Orchestrator misst zusätzlich mit einer Black-Box-Probe (D-13).
-
-`purge` ist idempotent (T-DEL-14). `witness` ist lesend.
-
-### 4.1 Schritt 3 — Ebene A, MemTable und Cache
-
-Vor der Bereinigung steht der Übergang `PlaintextPurged` im Journal. Die Arbeit ist asynchron und ruft kein `block_on`.
-
-- Einträge des Scopes werden der aktiven MemTable entzogen oder mit dem nächsten Flush aus dem Klartext entfernt.
-- Der Block-Cache des Scopes implementiert `Purgeable` aus `contextra-ports`, wird invalidiert und zeroized (S4, REQ-DEL-N7). Den dokumentbezogenen RRF-Cache `er_cache` hält `contextra-rank`. Den Surrogat-Vault hält `contextra-privacy`. Embedding- und Antwort-Cache registriert `contextra-db`, sobald sie existieren.
-- Noch nicht versiegelte WAL-Puffer des Scopes werden verworfen. Bereits durabel geschriebene WAL-Chiffrate bleiben bis Schritt 8 bestehen. Sie sind unter dem `DocDek` und werden in Schritt 5 unlesbar.
-
-### 4.2 Schritt 8 — Hygiene, Purge-Compaction und WAL
-
-Die Hygiene ist durch `purge_rebuild_max_days` (Startwert 14 Tage) terminiert. Sie läuft unter `PurgeBarrier::purge` aus `contextra-ports`. `purge_waiting` fordert laufende Kompaktionen auf, den Slot freizugeben (§10.2).
-
-1. **SSTables und Blobs.** `erase_keys` schreibt betroffene SSTables und Blob-Segmente streamend neu (`create_like`: gleicher Key-Manager, gleiche Formatversion, originale `seq` und `tx_id`). Alle MVCC-Versionen, Tombstones und Klartext-Indexschlüssel der Zielschlüssel entfallen. Austausch: `tmp` → `fsync` → Manifest-Commit → `fsync` → Verzeichnis-`fsync` → Reader-Swap.
-2. **Kompaktionsfilter.** `ReadGate::check_range` liefert `ContainsErased`. Solche Ranges nimmt das Kompaktionsergebnis nicht auf (§6.3). `RestrictedNeverDiscard` behält die Range.
-3. **PendingDelete.** Ersetzte Dateien werden erst gelöscht, wenn keine offene Zeitreise sie mehr pinnt (§9.2). Den `min_active_seqno` liefert `contextra-mvcc` über `contextra-db`. Store importiert `mvcc` nicht. Der Block-Cache ersetzter Dateien wird zeroized.
-4. **WAL.** Aktive WALs rotieren, MemTables flushen, versiegelte WAL-Dateien werden gelöscht. Über `contextra-durable-fs` wird geprüft, dass die Dateien nicht mehr existieren. Bleibt eine Datei, bleibt die Saga `Pending` mit Retry.
-5. **Abschlussmessung.** `LsmScanner` läuft mit Positivkontrolle `AC-1`. Klasse M setzt Siegel 4 voraus und wird vom Koordinator vergeben, nicht von Store.
-
-Physisches Überschreiben ersetzt die Schlüsselvernichtung nicht. Die kryptographische Garantie liegt in Schritt 5 (`contextra-crypto`). Der Scanner sieht keine Flash-Remanenz (Annahme `A-FLASH`).
-
-### 4.3 Lesepfad innerhalb des Store
-
-Store führt den Gate-Check nicht als zweite, abweichende Stelle aus. Er reicht Schlüssel und Ranges an den Aufrufer. `get` entschlüsselt nicht. Kompaktionen rufen `check_range` auf, bevor eine Range in das Ergebnis kommt.
-
-## 5. Fehler (`StoreError`)
-
-`#[non_exhaustive]`: `WalCorrupted`, `SstableCorrupted`, `ManifestRecovery`, `CompactionFailed`, `DurableFs`, `Io`, `PendingDeleteBlocked`, `WalFileRemains`. Ein I/O-Fehler im Purge ist transient. Die Saga setzt `Pending(IoBackoff)` und wiederholt (§11.1). Store ändert den Saga-Zustand nicht selbst.
-
-## 6. `Cargo.toml`
-
-```toml
-[package]
-name = "contextra-store"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-description = "LSM storage engine: WAL, memtable, SSTables, blob segments"
-
-[lints]
-workspace = true
-
-[dependencies]
-contextra-ids = { workspace = true }
-contextra-env = { workspace = true }
-contextra-sys = { workspace = true }
-contextra-durable-fs = { workspace = true }
-contextra-ports = { workspace = true }
-contextra-erasure = { workspace = true }
-bytes = { workspace = true }
-blake3 = { workspace = true }
-crc32fast = { workspace = true }
-parking_lot = { workspace = true }
-ahash = { workspace = true }
-thiserror = { workspace = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
-proptest = "1.4"
-
-[features]
-default = []
-std = ["contextra-ids/std", "contextra-env/std"]
-```
+**Offene Punkte (Entscheidung nötig):**
+- **O-1** Zuordnung der adaptiven Kompaktion (`compaction/adaptive/*`), nicht in SPEC 15.
+- **O-2** `quick_cache`, `lru`, `tokio` (Abhängigkeiten): nicht in SPEC 15. `tokio` ist Teil von Punkt 10 der CLAUDE.md, `deny.toml` führt `contextra-store` als Wrapper.
+- **O-3** Inhalt von REM-02, REM-05, REM-08, REM-26 aus SPEC 12 bestätigen.
+- **O-4** Reihenfolge und Zuschnitt des Umbaus (größtes Crate, eigene Sitzung je Schritt, CLAUDE.md §8).
 
 ## 7. Tests
+- G-STORE-Benchmark, Wiederanlauf, Kompaktionsfilter (SPEC 15).
+- Ist-Befund: Tests in `src/compaction/tests/*`, Zählung nicht erfolgt.
 
-| Kennung | Pflicht |
-|---|---|
-| T-DEL-1 | Nach Insert und Flush kein Klartext-Canary in WAL, SSTable oder Blob |
-| T-DEL-2 | Nach Purge-Compaction `residue_matches == 0` im `LsmScanner` |
-| T-DEL-12 | Crash in Schritt 3: MemTable-Purge ist wiederholbar, Lesesperre bleibt Aufgabe des Koordinators |
-| T-DEL-14 | Zweites `purge` ist ein No-op |
-| T-DEL-16 | Abbruch während Manifest-Commit: Recovery sieht alte oder neue Generation, nie eine Mischung |
-| T-DEL-17 | Rohsicht der Store-Dateien nach Hygiene |
-
-`scrub` einer Datei ohne bestandene Positivkontrolle ist kein Nachweis.
+## 8. Abnahme
+| Gate | Ist-Befund | Soll |
+|---|---|---|
+| G-02 | kein `unsafe` (erlaubt wäre nur in `sys`/`simd`), `forbid` in 2 Dateien | eingehalten (Ausnahme laut tests/unsafe_islands.rs prüfen) |
+| G-03 | verbotene Kanten zu `crypto`, `erasure`, `mvcc` | verletzt (REM-27) |
+| G-07 | Import `contextra_types` (1 Datei) | verletzt (REM-30) |
+| G-09 | 51 Dateien mit ANCHOR/FILE-CONTEXT | verletzt (REM-14) |
+| G-11 | Feature `workspace` | verletzt (CMP-10) |
+| G-12 | 7 Treffer `Instant::now`/`SystemTime::now` | verletzt, Fundstellen auf `Clock` umstellen |
+| G-13 | 1.247 Treffer | Abbau nach R6 |

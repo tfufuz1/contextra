@@ -1,162 +1,68 @@
-# contextra-erasure — Crate-Spezifikation (Soll-Zustand, gemäß Finaler Löscharchitektur)
+# contextra-erasure — Implementierungsspezifikation
 
-**Ebene:** E0 (Fundament / Löschkern)
-**Normative Quellen:** `docs/SPEC.md` §4 (Schlüssel), §5 (Löschsaga), §6 (ReadGate), §7 (ErasureLayer), §10 (Barrieren), §12 (Testkatalog), §13 (Invarianten), §17 (finalisierte Entscheidungen).
-**Status:** Normativ (Soll-Zustand)
-**Geltungsbereich:** `crates/contextra-erasure`
+**Ebene:** E1 (Kern, sicherheitskritisch, R2)
+**Normative Quelle:** `docs/SPEC.md` v4.1, Nachtrag v4.1.1 (maßgeblich bei Widerspruch). **Stand:** 21.11.2026, Abgleich mit SPEC v4.1. Verweist nur auf SPEC-Kapitel und IDs. Ist-Abweichungen sind markiert, ungeklärte Punkte stehen unter „Offene Punkte (Entscheidung nötig)“ in Abschnitt 6.
 
-Diese Spec ersetzt die Vorfassung. Die Vorfassung beschrieb eine 6-Schritte-Saga mit Schlüsselvernichtung vor Purge. Sie ist überholt.
+## 1. Zweck und Ebene
+Löschkette: Log (CXEL, 7.8), Gate (CXGS, `TenantGate: ReadGate`, 7.8), Ticket, Klassifikation (7.3), Kette E0 bis E4 mit Ports (7.4), Zustandsautomat (7.5), Scrub-Planung (7.6, reine Planung), Prüfung (REQ-ER-3, REQ-ER-6), Halt (REQ-RET-2), Ledger (7.10) (SPEC 15, Kapitel 7). Abhängigkeiten nach Anhang E: `ports`, `ids`, `env`, `durable-fs`. Ziel-Umfang: 4.500 Zeilen (SPEC 3.1, REM-10). Ist: laut Zielspalte 6.708 Zeilen (Altbestand).
 
----
+## 2. Vertrag
+Implementiert: `ReadGate` (Besitz des Gates je Mandant, SPEC 3.4) über `TenantGate` in `gate.rs`. Der Registry-Port liegt in `erasure` (SPEC 3.4). Der `ErasureSink` ist Empfänger, nicht Implementierung dieses Crates.
+Ist-Abweichung: Die Module entsprechen nicht dem Soll `log`, `gate`, `ticket`, `classify`, `chain`, `state`, `scrub_plan`, `review`, `hold`, `ledger`. Ist hat `chain/` mit `journal`, `layer`, `saga`, `state`, `target`, `retention`, `adapters`, `ports` sowie Gate-Modul `src/gate/saga_gate.rs`. Die Zuordnung zum Soll ist zu prüfen.
 
-## 1. Zweck
+## 3. Abhängigkeiten
+**Erlaubt (Anhang E):** `ports`, `ids`, `env`, `durable-fs`.
+**Ist (Cargo.toml, normal):** `contextra-ids`, `contextra-env`, `contextra-durable-fs`, `subtle`, `thiserror`, `tracing`, `serde`, `serde_json`, `zeroize`, `blake3`, `sha2`, `hmac`, `bytes`, `parking_lot`.
+**Ist-Abweichung:** `contextra-ports` fehlt in der Ist-Liste, obwohl Anhang E und SPEC 15 es verlangen. Ob die Löschkette ohne Port-Abhängigkeit auskommt, ist offen (siehe 6).
+**Dev-Abhängigkeit:** `tokio` (Features `test-util`, `macros`, `rt`), Zeile 39 in `Cargo.toml`, Abschnitt `[dev-dependencies]`. Das ist keine normale Abhängigkeit. `deny.toml` erfasst sie trotzdem, weil dort kein Wrapper für `contextra-erasure` steht. Entscheidung für Punkt 10 der CLAUDE.md siehe Abschnitt 6.
+**Features:** `default = []` (R3 eingehalten).
 
-`contextra-erasure` ist der **einzige Löschkern** des Workspace. Er enthält:
-
-- die Saga-Typen, die Zustandsmaschine und den Koordinator (Schritte 1 bis 9),
-- den Journal-Port und die Recovery,
-- den Lesesperren-Kern (`ReadGate`, `ErasedSet`, `LiveMask`, `Slot`),
-- den Messkern (`Scanner<Unarmed>` und `Scanner<Armed>`, `LayerWitness`, `ResidualReport`),
-- den Bericht `DeletionProof` V5 und die Signatur über den Port aus `contextra-crypto`,
-- die Schnittstelle `ErasureLayer` für Schichten S1–S8.
-
-Schlüsselmaterial, Verschlüsselung und Schlüsselhierarchie liegen **nicht** hier, sondern in `contextra-crypto` (R4). Der Tresor (`FileVault`) entfällt als eigene Schlüsselverwaltung. Seine Funktion geht in `KeyAnchor` (Port) und `contextra-crypto` auf.
-
-## 2. Architekturregeln
-
-1. E0: keine Abhängigkeiten auf E1- oder E2-Crates (`store`, `vector`, `text`, `graph`, `crypto`, `db`, `engine`). `contextra-crypto` ist E1 und wird über den Port `EffaceableKeySlot` bzw. über den Trait `KeyVault` angebunden, nicht direkt importiert. Die Abhängigkeit auf Krypto-Primitive entfällt damit (R4, §4.10 der SPEC).
-2. `#![forbid(unsafe_code)]`. Zero-Panic (`unwrap`, `expect`, `panic!`, `todo!` verboten in Nicht-Test-Code).
-3. `default = []` (R3). Keine feature-gesteuerten Löschpfade. Ed25519-Signatur ist Pflicht, kein Feature.
-4. `ErasureLayer` wird hier definiert. E1-Crates implementieren ihn. Die Definition ist nicht in `contextra-ports`.
-5. Kein `ControlEvidence::observed()`-Konstruktor außerhalb dieses Crates. `Scanner<Armed>` ist nur über `Chain::verify` nach bestandener Positivkontrolle erzeugbar (INV-WITNESS-MINT-1, Befund C-06).
-
-## 3. Module
-
-| Modul | Inhalt | SPEC |
+## 4. Module
+| Datei | Verantwortung (Ist) | Befund |
 |---|---|---|
-| `scope` | `ErasureScope` (`TenantId`, `CollectionId`, `ErasureTarget`), `ScopeId` (128 Bit), `ScopeDescriptor` (verschlüsselt unter `K_saga`) | §5.3 Schritt 1 |
-| `target` | `EraseTarget` (Document, Subject, Collection, Tenant), kanonische Kodierung | §5.1 |
-| `state` | `SagaState` mit Übergangstabelle, `is_terminal`, `blocks_reads`, `Pending(reason)`, `Restricted{basis, until}`, `Partial{outstanding}` | §5.2, INV-9, INV-10 |
-| `retention` | `RetentionCode`, `RetentionAttestation`, `blocks_erasure` | §5.3 Schritt 1 |
-| `layer` | `ErasureLayer`, `LayerId`, `LayerScope`, `KeyCoverage`, `PurgeCx`, `PurgeOutcome` | §7 |
-| `ports` | `Journal`, `GateSink`, `KeyVault`, `DiskReserve`, `PositiveControl`, `ReportSink`, `Signer`, `TimeStamper` | §5.3, §10 |
-| `journal` | `ErasureJournal`: `JournalRecord`, `FileJournal` (fsync je Eintrag, Prüfsumme, Torn-Tail-Behandlung), Group-Commit (1–2 ms) | §5.3 Schritt 1, §5.5 |
-| `coordinator` | `Chain`: der **einzige** Koordinator. Schritte 1–9, Takt 1 und Takt 2, Single-Flight, Eskalation, Retry | §5.3, §10.4 |
-| `epoch` | `EpochSeal`: Re-Wrap, atomares KeyTable-Replace, Crash-Fortsetzung | §4.4, REQ-DEL-N13 |
-| `gate` | `ReadGate`, `GateDecision`, `RangeGate`, `ErasedSet`, `LiveMask`, `Slot`, `SagaGate` | §6 |
-| `fence` | Dekker-Protokoll (`SeqCst`), `#[must_use]`-Publikationsticket | §10.3 |
-| `measure` | `Scanner<Unarmed>`, `Scanner<Armed>`, `ControlEvidence`, `LayerWitness`, `Inventory` (Pre-Destruction), `NeedleScan`, `DecryptProbe`, `CanaryProbe` | §5.8 |
-| `report` | `DeletionProof` V5 (kanonisch), `Siegel`, `MeasureClass`, `ResidualReport`, `Certificate` (datensparsam), Außentext-Satzbibliothek | §5.3 Schritt 9 |
-| `signing` | Ed25519-Signatur über den Port `Signer`, Zeitanker über `TimeStamper` | INV-PROOF-KEY-1 |
-| `restore` | `RestoreGuard`, `ErasedSetMirror`-Port, `restore_reapplied` | §5.11 |
-| `recipients` | `RecipientLedger` (ohne Nutzinhalt) | §5.12 |
-| `error` | `ErasureError` (typisiert, §11) | §11.1 |
+| `src/chain/*` (adapters, journal, layer, mod, ports, retention, saga, state, target) | Löschkette | Soll-Zuordnung zu 7.4 und 7.5 prüfen |
+| `src/gate/saga_gate.rs` | Gate (Saga-Anbindung) | Soll (`gate`, CXGS) |
+| `src/io.rs` | E/A | zu prüfen |
+| `src/error.rs`, `src/lib.rs` | Fehler, Wurzel | Soll |
+| `src/vault.rs`, `src/vault/*` (durable, open, rehash, scrub, slot, table) | Tresor-Logik | **Ist-Abweichung**: Soll-Module nennen keinen Tresor. Herkunft ist `contextra-vault` (REM-01). Entfernen oder zuordnen, siehe 6 |
+| `src/crypto_local.rs` | lokale Kopie von Krypto-Typen | **Ist-Abweichung**: Krypto nur in `contextra-crypto` (R4). Entfernen |
+| `src/types_local.rs` | lokale Kopie von Typen | **Ist-Abweichung**: Typen aus `types` (REM-30). Entfernen |
 
-## 4. Zustände (SPEC §5.2)
+Soll-Module ohne Ist-Entsprechung: `ticket`, `classify` (7.3), `review`, `hold`, `ledger` (7.10), `scrub_plan` (7.6).
 
-Kanonische Zustände: `Requested`, `Authorized`, `Frozen`, `LogicallyDeleted`, `PlaintextPurged`, `PlaintextMeasured`, `KeyDestroyed`, `CryptoMeasured`, `EpochSealed`, `Hygiene`, `HygieneMeasured`, `Reported`, `Completed`, `Restricted{basis, until}`, `Partial{outstanding}`, `Pending(reason)`, `Refused`, `Lifted`.
-
-Terminal: `Completed`, `Refused`, `Lifted` (INV-9). `Frozen` und alle späteren Zustände blockieren Lesezugriffe (INV-10). Die Übergangstabelle ist in `SagaState::can_transition_to` normativ kodiert. Ungültige Übergänge sind Fehler, keine stillen No-ops.
-
-Die Umbenennung der Vorfassung lautet: `Gated` → `Frozen`, `KeyRevoked` → `KeyDestroyed`, `Purging` → `PlaintextPurged`, `Verifying` → `PlaintextMeasured` bzw. `CryptoMeasured`.
-
-## 5. Die Saga (Schritte 1–9)
-
-| Schritt | Takt | Code | Durabler Anker | Siegel / Klasse |
-|---|---|---|---|---|
-| 1 Validierung, Intent, Lesesperre | 1 | `Chain::erase` → `Chain::freeze`: Scope-Auflösung, Retention-Prüfung, `K_saga`-Descriptor, Group-Commit, `ErasedSet` + `LiveMask` mit Fence | fsync (`Frozen`) | L / **Siegel 1** |
-| 2 Logische Löschung, Kaskade | 2 | `Chain::logical_delete`: Key-Lock halten, `ErasureManifest` lesen, WAL-Tombstone, Lineage-Kaskade (INV-DERIVED-1), Mixed-Policy | WAL-Commit | L |
-| 3 Ebene-A-Bereinigung | 2 | `Chain::purge_plaintext`: Arena-Nullung (`fp32`, `SQ8`), Caches zeroizen, MemTable, Text-Segment-Neuschreibung mit neuem `ArtKey` | Journal vor jedem Teilschritt | P (Vorbereitung) |
-| 4 Messung Ebene A | 2 | `Chain::measure_plaintext`: Scanner mit Positivkontrolle `AC-1`, Pre-Destruction-Inventar | Bericht mit Positivkontrolle | P / **Siegel 2** |
-| 5 Schlüsselvernichtung | 2 | `Chain::destroy_key`: optionale Karenz (§5.3 SPEC), Journal-Intent J1, `KeyTable`-Replace, `KeyRegistry`-Ereignis | fsync (Intent), fsync (Replace) | `KeyDestroyed` |
-| 6 Messung Ebene B | 2 | `Chain::measure_crypto`: Nadelscan, Entschlüsselungsprobe (`KeyAbsent`), Kanarien-Probe | Bericht | C\* (vorläufig) |
-| 7 Epoch Seal | 2 | `EpochSeal::run`: `KEK[e+1]`, Re-Wrap, `KeyTable`-Replace, `KEK[e]`-Vernichtung | Journal, fsync | C1 / C2 / C3 / **Siegel 3** |
-| 8 Hygiene | Hintergrund | `Chain::hygiene`: Purge-Compaction, WAL-Entfernung mit Pflichtprüfung, Graph-Generation `g+1`, Checkpoint-Sweep, `HygieneMeasured` | Manifest-Commit | M / **Siegel 4** |
-| 9 Bericht und Abschluss | — | `Chain::report`: `DeletionProof` V5, Ed25519, Zeitanker, Ledger, `K_saga`-Vernichtung | fsync | Abschluss |
-
-**Reihenfolge ist normativ** (INV-DEL-ORDER-1). Ein Test prüft, dass das Gate aktiv ist, bevor der Schlüssel vernichtet wird (`gate_ist_aktiv_bevor_der_schluessel_vernichtet_wird`). Ein weiterer Test prüft, dass Schritt 3 und 4 vor Schritt 5 liegen (`purge_vor_schluesselvernichtung`).
-
-## 6. Fehlerpolitik (SPEC §11)
-
-- Transiente I/O-Fehler setzen `Pending(IoBackoff)` mit Resume-Ziel und Retry-Backoff. Kein `Ok(verified: false)`.
-- Logische Fehler (Rückstand im Scan, fehlende Positivkontrolle, fehlende Schichtunterstützung) lassen den Zustand unverändert und geben den Fehler zurück.
-- `ShredVerificationFailed` lässt den Zustand auf `Frozen`.
-- `CapabilityUnsupported` für K2 und K3 ohne Konformitätssuite.
-- Der Zustand wird erst nach erfolgreichem Journal-Append (`fsync`) geändert.
-- Ein nicht durabler Journal-Flush lässt Takt 1 `Err` liefern und setzt keine Lesesperre.
-- `erase_sla`-Überschreitung setzt Ticket-Status `Overdue` und erzeugt einen Alarm.
-
-## 7. Recovery (SPEC §5.5)
-
-`Chain::recover` läuft **vor** Freigabe des Lesepfads. Es lädt das Journal, bildet den letzten Zustand jeder Saga, füllt `ErasedSet` und `LiveMask` für alle Scopes in `Frozen`, `Restricted`, `PlaintextPurged` und allen späteren Zuständen. Danach setzt es jede offene Saga an ihrem Resume-Punkt fort. `Chain::resume` setzt eine einzelne Saga fort. `Pending` wird zuerst in den Resume-Zustand überführt.
-
-## 8. Lesesperre (SPEC §6)
-
-- `SagaGate::check` ist O(1), ohne I/O, ohne Blockierung.
-- Der Fast-Path ohne aktive Sperre ist atomar und lock-frei (`LiveMask`-Lesen mit `SeqCst`).
-- Mit aktiver Sperre liest `check` einen konsistenten Snapshot.
-- Präfix-Lookup iteriert über die distinkten Präfixlängen.
-- `Restricted` hat Vorrang vor `Erased`.
-- Zeitreisen (`as_of`) und offene Snapshots werden gegen den **aktuellen** Stand geprüft.
-
-## 9. Messung und Nachweis (SPEC §5.8)
-
-- `Scanner<Unarmed>` ist ein reiner Beobachter. Er kann nicht messen, sondern nur Positivkontrollen ausführen.
-- `Scanner<Armed>` entsteht ausschließlich in `Chain::verify_control`, nach bestandener Positivkontrolle `AC-1`. Der Konstruktor ist `pub(crate)`.
-- Jede Pflichtschicht liefert zwei Quellen (D-13): den besitzenden Scanner der Schicht und die Black-Box-Probe des Orchestrators. Eine reine `witness()`-Selbstauskunft genügt nicht.
-- Eine Liste ohne Schichten ist ungültig. `verify` ohne mindestens eine gemessene Schicht meldet `NoLayerMeasured`, nie einen leeren Bericht (Befund C-04).
-- Der Lesepfad-Test (Schritt 6, Entschlüsselungsprobe) ist eine echte Leseabfrage über den regulären Lesepfad, nicht `gate.decision(target)` direkt nach `activate` (Befund C-07).
-- Verification und Validation sind getrennte Zustände im Bericht.
-
-## 10. Bericht und Signatur (SPEC §5.3 Schritt 9)
-
-- `DeletionProof` V5 wird in **kanonischer Kodierung** serialisiert. Mehrdeutige Formate (z. B. `bincode`) sind für signierte Felder verboten.
-- Pflichtfelder: Klasse, Siegel 1–4 (verkettet), `legal_state`, `backup_window`, `assumptions[]`, `residuals[]`, Schicht-Digests mit Positivkontrollen, `Custody`, `DestroyAttestation`, Epoch-Seal-Referenz, `subject_ref_hash`, Pflicht-Ausschlüsse, `Verification`- und `Validation`-Status (Concurrence-Signatur im Regulated-Tier).
-- Signatur: **Ed25519** über den Port `Signer`. Der Signaturschlüssel ist kein Datenschlüssel (INV-PROOF-KEY-1).
-- Zeitanker: optional RFC-3161-Stempel über den Port `TimeStamper`.
-- `certificate()` erzeugt die einseitige Bescheinigung ausschließlich aus Berichtsfeldern. Sie enthält keine IDs, keine Dateinamen und keine Inhalte (REQ-DEL-N21).
-- Außentexte entstehen nur aus der geschlossenen Satzbibliothek. Jeder Satz ist an einen gemessenen Wert gebunden (INV-CLAIMS-1, Gate `claim-generator`).
-- Ein verändertes Feld, ein falsches Siegel oder ein fehlendes Pflichtfeld führt zu einem Fehler bei `doctor verify-report` (REQ-DEL-N9, T-DEL-22).
-
-## 11. Fehler-Hierarchie
-
-`ErasureError` ist `#[non_exhaustive]` und enthält mindestens:
-
-| Variante | Bedeutung | Zustand |
+## 5. Entfernungen
+| ID | Gegenstand | Abnahme-Befehl |
 |---|---|---|
-| `Io`, `Storage` | transient | `Pending(IoBackoff)` |
-| `ScopeNotFound`, `TenantMismatch`, `NotAuthorized` | logisch | unverändert |
-| `RetentionBlocks` | Aufbewahrungspflicht | `Refused` |
-| `PositiveControlFailed` | Messlauf ungültig | unverändert, Wiederholung |
-| `NoLayerMeasured` | Bericht ohne Schichten | unverändert |
-| `ShredVerificationFailed` | Vernichtung nicht bestätigt | `Frozen` |
-| `KeyAbsent` | Entschlüsselungsprobe (erwartet) | Messergebnis |
-| `CapabilityUnsupported` | K2/K3 ohne Suite | unverändert |
-| `RestrictedReadAuditRequired` | Lesezugriff ohne Audit | — |
-| `JournalNotDurable` | Flush fehlgeschlagen | Takt 1 `Err`, keine Sperre |
-| `RestoreBeyondHorizon` | abgelaufenes Schlüssel-Backup | verweigert |
-| `UnsupportedSubject` | Subjekt-Löschung ohne Index | fail-closed (siehe §12 Punkt 3) |
+| REM-10 | Löschkette in Altform, nach Kapitel 7 neu aufbauen (Zustand laut SPEC 12, offen) | siehe SPEC 12 |
+| REM-16 | laut SPEC 15 genannt, Inhalt in SPEC 12 nachlesen (offen) | siehe SPEC 12 |
+| R4 | `crypto_local.rs` | `ls crates/contextra-erasure/src/crypto_local.rs` nicht vorhanden |
+| REM-30 | `types_local.rs` und Typen aus `contextra-types` | `grep -rn "contextra_types" crates/contextra-erasure` leer |
+| REM-01 | `src/vault*`, sofern Herkunft `contextra-vault` | `grep -rn "vault" crates/contextra-erasure/src` leer, nach Entscheidung |
+| REM-14 | `contract.rs` (nicht vorhanden), ANCHOR-Dateien (0) | `grep -rl "ANCHOR\[" crates/contextra-erasure` leer |
 
-## 12. Verbindliche Ausführungsentscheidungen
+## 6. Umbau
+1. Module nach Soll (Kapitel 7.3 bis 7.10) ordnen. Je Modul ein Commit.
+2. `crypto_local.rs` und `types_local.rs` entfernen, Typen aus den Besitzern beziehen.
+3. Abhängigkeit `contextra-ports` herstellen (Port-Implementierungen, ReadGate).
+4. `unwrap`/`expect`/`panic!` (42 Treffer in `src`) nach R6 abbauen.
+5. Die `Instant::now`/`SystemTime::now`-Treffer (3) auf `Clock` aus `env` umstellen (R10, G-12).
 
-1. Der Regulated-Tier ist `TenantPolicy::Regulated`; dort sind `GuardPolicy::Required`, ein `ErasedSetMirror` und die Concurrence-Signatur Pflicht. Fehlt eines davon, verweigert `Contextra::open` den Start.
-2. `contextra-db` liefert den Subjekt-zu-DocDek-Index. Fehlt er zur Laufzeit, liefert der Start `CapabilityUnsupported`, bevor ein Löschauftrag angenommen wird.
-3. Nach `Frozen` gibt es weder Karenz noch Rücknahme. `Restricted` ist ausschließlich ein Hold- oder Aufbewahrungspfad vor `Frozen`.
-4. Produktive Schichten liegen bei den S1–S8-Besitzern und werden beim Öffnen durch `contextra-db` registriert. Test-Doubles sind nur Tests; ein Erfolg meldender Ersatz ist ein Build-Fehler (INV-WIRING-2).
-5. Ohne produktive `PositiveControl` ist eine Messung ungültig. Ohne `Signer` aus `contextra-crypto` ist das Erstellen eines Berichts ungültig.
-6. `BlockAll` ist die einzige Mixed-Policy. Ersatzdaten entstehen außerhalb der Saga als neuer regulärer Schreibvorgang.
+**Offene Punkte (Entscheidung nötig):**
+- **O-1 Tresor (`vault/`).** Verbleib entscheiden. SPEC 15 nennt keinen Tresor in `erasure`.
+- **O-2 Tokio (Punkt 10 der CLAUDE.md).** Die Dev-Abhängigkeit ist die einzige tokio-Nutzung von `erasure`. Zwei Wege: (a) `tokio` als Dev-Abhängigkeit entfernen und die Tests umschreiben, (b) in `deny.toml` einen Wrapper für `contextra-erasure` mit TRANSITION-Vermerk eintragen. Entscheidung des Nutzers.
+- **O-3 Fehlende Abhängigkeit `contextra-ports`.** Umbau nötig, bevor `ReadGate` implementiert werden kann.
+- **O-4 Inhalt von REM-10 und REM-16** nach SPEC 12 lesen und bestätigen.
 
-## 13. Testabdeckung (SPEC §12)
+## 7. Tests
+- T-ER-01 bis T-ER-26 (Anteile, SPEC 15), T-LOG-01.
+- G-14: CI-Lauf T-ENC-01 und T-LOG-01 grün.
+- Ist-Befund: nicht gezählt.
 
-| Kennung | Abdeckung |
-|---|---|
-| T-DEL-1 … T-DEL-6 | Verschlüsselung, Verifikation, Neustart, Klasse ohne Schlüssel, Suche |
-| T-DEL-7 | Positivkontrolle `Scanner<Unarmed>` → `Scanner<Armed>` |
-| T-DEL-8 | Collection-Drop über `KEK[coll, *]` |
-| T-DEL-12 | Crash in Schritt 3, Neustart, Gate sofort aktiv |
-| T-DEL-13 | Restrict und Lift, `RestrictedReadAuditRequired` |
-| T-DEL-14 | `purge` idempotent |
-| T-DEL-15 | `verify_key_absent` nur nach vollständiger Nullung |
-| T-DEL-16 bis T-DEL-26 | Siehe SPEC §12. Implementierung über `contextra-testkit` (Erasure Lab) |
-
-Pflicht-Negativtests: Ohne Positivkontrolle ist die Messung ungültig. Ein Bericht ohne gemessene Schicht wird abgewiesen. `Scanner<Armed>` ist ohne Positivkontrolle nicht konstruierbar (Compile-Fehler-Test).
+## 8. Abnahme
+| Gate | Ist-Befund | Soll |
+|---|---|---|
+| G-02 | kein `unsafe`, `forbid(unsafe_code)` in `lib.rs` | eingehalten |
+| G-03 | `contextra-ports` fehlt in Ist, `tokio` nur dev | offen (O-3, O-2) |
+| G-05 | Netzwerk-Crates im normalen Baum: keine gefunden (`cargo tree -e normal`) | eingehalten |
+| G-12 | 3 Treffer `Instant::now`/`SystemTime::now` | verletzt |
+| G-13 | 42 Treffer | Abbau nach R6 |

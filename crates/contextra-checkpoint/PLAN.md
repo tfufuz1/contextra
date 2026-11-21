@@ -1,105 +1,67 @@
-# contextra-checkpoint — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
+# contextra-checkpoint — Implementierungsspezifikation
 
-**Ebene:** E1 (Domäne)
-**Domänen-Closure:** `ids`, `env`, `durable-fs`
-**Verträge:** `erasure` (`CheckpointLayer`). Zählt nicht gegen die fünf (SPEC §15).
-**Status:** Normativ (Soll-Zustand)
-**Version:** 2.1
-**Geltungsbereich:** `crates/contextra-checkpoint`
-**Normative Quellen:** `docs/SPEC.md` §5.3 Schritt 8, §5.9 Schicht S6, §5.11, §6.3, §7, INV-12.
+**Ebene:** E1 (Kern, R2)
+**Normative Quelle:** `docs/SPEC.md` v4.1, Nachtrag v4.1.1 (maßgeblich bei Widerspruch). **Stand:** 21.11.2026, Abgleich mit SPEC v4.1. Verweist nur auf SPEC-Kapitel und IDs. Ist-Abweichungen sind markiert, ungeklärte Punkte stehen unter „Offene Punkte (Entscheidung nötig)“ in Abschnitt 6.
 
----
+## 1. Zweck und Ebene
+Hartlink-Snapshot und Restore, Ausschluss von `keys/` und `erasure/` (ADR-42), Retention nach `checkpoint_retention` (SPEC 15, 3.1). Ziel-Umfang: 3.000 Zeilen (SPEC 3.1). Ist: 10.901 Zeilen laut Zielspalte (Altbestand).
+Abhängigkeiten nach Anhang E: `ports`, `ids`, `env`, `durable-fs`. Dev-Abhängigkeit `testkit` (SPEC 15).
 
-## 1. Zweck
+## 2. Vertrag
+Implementiert (SPEC 3.4): `Checkpointer`. Ist: `Checkpoint` und `CheckpointCoordinator` in `contextra-ports` (Datei checkpoint.rs), Name abweichend (siehe PLAN von `contextra-ports`, O-1).
 
-`contextra-checkpoint` erzeugt Point-in-Time-Abbilder über Hardlinks auf unveränderliche SSTables und eine kopierte Manifest-Datei.
+## 3. Abhängigkeiten
+**Erlaubt (Anhang E):** `ports`, `ids`, `env`, `durable-fs`.
+**Ist (Cargo.toml):** erlaubt sind `contextra-ids`, `contextra-env`, `contextra-ports`. **Verboten:** `contextra-types` (R1, REM-30, 9 Dateien). Weitere: `tokio` (**normale Abhängigkeit**, Wrapper in `deny.toml`, Übergang E29), `bytes`, `tracing`, `serde`, `serde_json`, `parking_lot`, `blake3`, `thiserror`.
+**Ist-Abweichung:** `contextra-durable-fs` fehlt in Ist, obwohl erlaubt und nötig. Im Quelltext wird `contextra_mvcc` in einer Datei referenziert (R2-Verstoß, Anhang E erlaubt `mvcc` nicht).
+**Features:** Ist `default`, `workspace`, `types-compat`, `ports-compat`, `docid-128`. Ist-Abweichung: `workspace`, `types-compat`, `ports-compat` (R7, CMP-10).
 
-Schicht **S6**. `CheckpointLayer` implementiert `ErasureLayer` aus `contextra-erasure`. Die Messung heißt `CheckpointScanner`.
+## 4. Module
+| Datei | Verantwortung (Ist) | Befund |
+|---|---|---|
+| `src/hardlink_cloner.rs` | Hartlink-Kopie (Snapshot) | Soll |
+| `src/manifest.rs` | Manifest | Soll |
+| `src/meta.rs`, `src/meta/tests.rs` | Metadaten | Soll, zu prüfen |
+| `src/guard.rs`, `src/guard/tests.rs` | Schutz (Ausschluss keys/erasure) | Soll, zu prüfen |
+| `src/orphan.rs`, `src/orphan/tests.rs` | verwaiste Dateien | zu prüfen |
+| `src/store.rs`, `src/store/tests.rs` | Speicher-Anbindung | zu prüfen; Abhängigkeit von `store` ist verboten |
+| `src/snapshot_source.rs` | Snapshot-Quelle | Soll, zu prüfen |
+| `src/fs_seam.rs`, `src/vfs.rs` | Dateisystem-Naht | zu prüfen, Verbleib gegen `durable-fs` |
+| `src/compat/*` (ports_impl, snapshot_bridge, error, mod) | Kompatibilitätsmodul | **entfernen** (CMP-2, R7, G-11) |
+| `src/contract.rs` | Selbstdeklaration | REM-14 |
+| `src/error.rs`, `src/lib.rs` | Fehler, Wurzel | Soll |
 
-Ein Checkpoint ist eine Datenkopie im Sinn von Spur D (SPEC §5.11). Er enthält Chiffretext. Er enthält keine `KeyTable`, keinen Keystore, kein `master.salt` und keinen Wrap-Blob. Ein Lauf, der eine dieser Dateien verlinkt oder kopiert, endet mit `CheckpointError::KeyMaterialRefused`.
+## 5. Entfernungen
+| ID | Gegenstand | Abnahme-Befehl |
+|---|---|---|
+| CMP-2 | `src/compat/` | `find crates/contextra-checkpoint -type d -name compat` leer |
+| REM-30 | Import `contextra-types` (9 Dateien) | `grep -rln "contextra_types" crates/contextra-checkpoint` leer |
+| REM-27 | Import `contextra_mvcc` | `grep -rn "contextra_mvcc" crates/contextra-checkpoint` leer |
+| CMP-10 | Features `workspace`, `types-compat`, `ports-compat` | `grep -n "compat\|workspace" crates/contextra-checkpoint/Cargo.toml` leer |
+| REM-14 | ANCHOR-Dateien (7), `contract.rs` | `grep -rl "ANCHOR\[" crates/contextra-checkpoint` leer |
 
-Die Vernichtung eines `DocDek` macht den Chiffretext in jedem Hardlink unlesbar. Das ersetzt den Sweep nicht. Hardlinks teilen die Blöcke der Quelldatei nicht mehr, sobald die Quelle neu geschrieben wurde. Der Sweep muss jeden Checkpoint selbst bereinigen (SPEC §5.3 Schritt 8).
+## 6. Umbau
+1. `compat/` auflösen (CMP-2). Die Zieltypen aus `ports` verwenden.
+2. `contextra-types` und `contextra-mvcc` lösen (REM-30, REM-27).
+3. Abhängigkeit `contextra-durable-fs` ergänzen.
+4. `tokio` klären (Punkt 10 CLAUDE.md).
+5. `unwrap`/`expect`/`panic!` (128 Treffer) nach R6 abbauen.
 
-## 2. Architekturregeln
+**Offene Punkte (Entscheidung nötig):**
+- **O-1** `tokio` als normale Abhängigkeit (Punkt 10 CLAUDE.md).
+- **O-2** `store.rs`: Zuordnung, da `store` nach Anhang E nicht aus `checkpoint` erreichbar sein darf.
+- **O-3** Inhalt von CMP-2 nach SPEC 12.5 bestätigen.
 
-1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
-2. Keine Abhängigkeit auf `contextra-store`, `contextra-crypto`, `contextra-mvcc` oder ein anderes E1-Crate. Keine Dev-Abhängigkeit auf `contextra-testkit`.
-3. Kein `unwrap` und kein `expect` in Beispielen und Bibliothekscode. Metadaten-Fehler sind `Result`.
-4. Logs nennen keine Nutzbytes des Löschziels (INV-12).
+## 7. Tests
+- Ausschluss von `keys/` und `erasure/`, Restore mit Gate-Erhalt (SPEC 15).
+- Dev-Abhängigkeit `testkit`: in Ist nicht gefunden, prüfen.
+- Ist: nicht gezählt.
 
-## 3. Anlegen
-
-`create_checkpoint` legt das Zielverzeichnis an, verlinkt Dateien mit der Endung `sst` und kopiert das Manifest. Die Kopie des Manifests wird mit `fsync` abgeschlossen, danach das Verzeichnis.
-
-`allow_copy_fallback` darf eine SSTable nur dann kopieren, wenn `hard_link` mit einem Fehler scheitert, der kein bereits geschriebenes Ziel hinterlässt. Die Kopie ist Chiffretext derselben Bytes. Ein Fallback, der entschlüsselt, existiert nicht.
-
-Dateinamen aus der Schlüsselverwaltung (`keytable`, `keystore`, `master.salt` und ihre temporären Geschwister) werden nicht übernommen.
-
-Verwaiste Zielverzeichnisse nach einem Crash löscht der `OrphanCleaner` nur, wenn kein Manifest-`fsync` abgeschlossen wurde. Ein abgeschlossener Checkpoint bleibt stehen, bis der Sweep ihn erfasst.
-
-## 4. Policies (SPEC §5.9 S6)
-
-| Policy | Wirkung |
-|---|---|
-| `Rewrite` | Standard. Jeder Checkpoint, der den Scope enthält, wird ohne den Scope neu geschrieben und ausgetauscht. |
-| `ExpireNow` | Der Checkpoint wird gelöscht, sobald kein Leser ihn mehr pinnt. |
-| `ExpireAfterHold` | Nur zulässig, solange die Saga `Restricted` ist. Nach `Lifted` oder nach dem Wechsel auf `Frozen` gilt wieder `Rewrite`. |
-
-`ExpireAfterHold` auf einer Saga, die nicht `Restricted` ist, liefert `CheckpointError::PolicyNotApplicable`. Ein Checkpoint gilt erst nach abgeschlossenem `Rewrite` oder nach nachgewiesenem `ExpireNow` als bereinigt. Bis dahin bleibt er ein Residuum im Bericht. Die Klasse M vergibt der Koordinator.
-
-`purge` ist idempotent (T-DEL-14).
-
-## 5. Sweep und Restore
-
-Schritt 8 ruft `CheckpointLayer::purge` unter der Policy der Collection auf. Der Austausch eines neu geschriebenen Checkpoints läuft über `contextra-durable-fs`: `tmp` → `fsync` → `rename` → Verzeichnis-`fsync`. Ersetzte Dateien, die eine offene Zeitreise noch pinnt, gehen in `PendingDelete`.
-
-Restore ist an das aktuelle `ReadGate` gebunden (SPEC §6.3):
-
-1. Vor dem ersten Lesen eines wiederhergestellten Bytes ruft der Restore `ReadGate::check` für jeden Scope des Checkpoints auf.
-2. `Erased` verweigert die Wiederherstellung dieses Scopes. Die übrigen Scopes dürfen nur gelesen werden, wenn der Restore-Guard in `contextra-db` `restore_reapplied` geschrieben hat.
-3. Ein Checkpoint wird nicht als Quelle einer `KeyTable` eingespielt.
-
-Der Guard selbst liegt in `contextra-db` und `contextra-erasure` (SPEC §5.11). Dieses Crate stellt die Dateien bereit und verweigert den Lesezugriff, wenn das Gate `Erased` oder `Restricted` ohne Audit sagt.
-
-## 6. Fehler (`CheckpointError`)
-
-`#[non_exhaustive]`: `DestinationAlreadyExists`, `HardlinkFailed`, `Io`, `DurableFs`, `KeyMaterialRefused`, `PolicyNotApplicable`, `RestoreBlocked`, `PendingDeleteBlocked`.
-
-## 7. `Cargo.toml`
-
-```toml
-[package]
-name = "contextra-checkpoint"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-description = "Hardlink checkpoints and erasure sweep under Rewrite, ExpireNow, ExpireAfterHold"
-
-[lints]
-workspace = true
-
-[dependencies]
-contextra-ids = { workspace = true }
-contextra-env = { workspace = true }
-contextra-durable-fs = { workspace = true }
-contextra-erasure = { workspace = true }
-thiserror = { workspace = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
-
-[features]
-default = []
-std = ["contextra-ids/std", "contextra-env/std"]
-```
-
-## 8. Tests
-
-| Kennung | Pflicht |
-|---|---|
-| T-DEL-14 | Zweites `purge` derselben Policy ist ein No-op |
-| T-DEL-17 | Nach `Rewrite` enthält die Checkpoint-Datei den Klartext-Canary nicht |
-| T-DEL-18 | Restore eines Checkpoints von vor der Löschung bleibt am Gate gesperrt |
-| S6 | Ein Lauf, der `keytable` verlinken würde, liefert `KeyMaterialRefused` |
-| Policy | `ExpireAfterHold` außerhalb von `Restricted` liefert `PolicyNotApplicable` |
+## 8. Abnahme
+| Gate | Ist-Befund | Soll |
+|---|---|---|
+| G-02 | kein `unsafe`, `forbid` in `lib.rs` | eingehalten |
+| G-03 | `contextra-types`, `contextra_mvcc` | verletzt |
+| G-09 | 7 Dateien mit ANCHOR, `contract.rs` | verletzt (REM-14) |
+| G-11 | `compat/`, Features | verletzt (CMP-2, CMP-10) |
+| G-13 | 128 Treffer | Abbau nach R6 |

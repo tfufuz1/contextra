@@ -1,109 +1,61 @@
-# contextra-mcp — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
+# contextra-mcp — Implementierungsspezifikation
 
-**Ebene:** E3 (Endpunkt)
-**Kern-Closure:** `contextra`, `types`, `ids`, `privacy`, `erasure`
-**Status:** Normativ (Soll-Zustand)
-**Version:** 2.1
-**Geltungsbereich:** `crates/contextra-mcp`
-**Normative Quellen:** `docs/SPEC.md` §1.2, §5.2, §5.3, §5.4, §6.3, §11, INV-7, INV-12, INV-CLAIMS-1.
+**Ebene:** E3 (Adapter)
+**Normative Quelle:** `docs/SPEC.md` v4.1, Nachtrag v4.1.1 (maßgeblich bei Widerspruch). **Stand:** 21.11.2026, Abgleich mit SPEC v4.1. Verweist nur auf SPEC-Kapitel und IDs. Ist-Abweichungen sind markiert, ungeklärte Punkte stehen unter „Offene Punkte (Entscheidung nötig)“ in Abschnitt 6.
 
----
+## 1. Zweck und Ebene
+MCP-Server über stdio: Tool-Schemas aus den Fassadentypen, Principals aus Konfiguration (ADR-38), Routing, Validierung, Protokoll (SPEC 15, 3.2). Ziel-Umfang: 2.500 Zeilen (SPEC 3.1). Ist: 7.815 Zeilen laut Zielspalte (Altbestand).
+Abhängigkeiten nach Anhang E: `contextra`, `ports`, `privacy`.
 
-## 1. Zweck
+## 2. Vertrag
+Implementiert keine Ports. Konsumiert die Fassade `contextra` (öffentliche API nach 6.8) und den Egress-Guard aus `privacy`. Binary: `src/bin/contextra-mcp-server.rs`.
 
-`contextra-mcp` spricht MCP über stdio als JSON-RPC 2.0. Jedes Tool ruft die Façade `contextra` auf. Die Gate-Prüfung sitzt damit auf demselben Pfad wie die Rust-API (SPEC §6.3).
+## 3. Abhängigkeiten
+**Erlaubt (Anhang E):** `contextra`, `ports`, `privacy`.
+**Ist (Cargo.toml):** `contextra`, `contextra-types` (**verboten**, R1, REM-30, 10 Dateien), `contextra-ports`, `contextra-rank` (**nicht erlaubt**), `contextra-crypto` (**nicht erlaubt**), `contextra-privacy`.
+**Ist-Abweichung:** `rank` und `crypto` dürfen von `mcp` nicht direkt verwendet werden. Der Zugriff läuft über die Fassade.
+**Features:** Ist `default`, `test-utils`. Soll: keine Features außer SPEC 15. `test-utils` ist in SPEC 15 nicht genannt.
 
-Das Crate startet keine eigene Saga und signiert keine Berichte. Es gibt keine Module, die Erfolg melden, ohne die Façade aufzurufen (INV-WIRING-2). Entfernte Inferenz-Crates werden nicht importiert.
+## 4. Module
+| Datei | Verantwortung (Ist) | Befund |
+|---|---|---|
+| `src/bin/contextra-mcp-server.rs` | Einstieg | Soll |
+| `src/server.rs`, `src/server_dispatch.rs`, `src/server_tools.rs`, `src/protocol.rs` | Server, Protokoll | Soll |
+| `src/routing.rs`, `src/validation.rs`, `src/config.rs` | Routing, Prüfung, Konfiguration | Soll (ADR-38) |
+| `src/tools_crud.rs` | Tool-Implementierung | zu prüfen gegen SPEC 15 (Tool-Schemas) |
+| `src/egress_gateway.rs`, `src/egress_guard.rs`, `src/bulk_exfiltration_detector.rs` | Egress-Logik | **Doppelung mit `contextra-privacy`** (dort `egress_guard`, `bulk_exfiltration_detector`). Entfernen oder in privacy nutzen (REM-21, REM-22 prüfen) |
+| `src/prompt_injection.rs`, `src/sandbox.rs`, `src/explain.rs`, `src/io.rs` | Hilfen | nicht in SPEC 15 genannt, offen |
+| `src/tests.rs` | Tests im Produktcode | Verbleib offen |
+| `src/lib.rs` | Wurzel | Soll |
 
-## 2. Architekturregeln
+## 5. Entfernungen
+| ID | Gegenstand | Abnahme-Befehl |
+|---|---|---|
+| REM-21, REM-22 | in SPEC 15 genannt, Inhalt in SPEC 12 nachlesen (offen) | siehe SPEC 12 |
+| Doppelung Egress | `egress_guard.rs`, `egress_gateway.rs`, `bulk_exfiltration_detector.rs` | `grep -rln "egress_guard" crates/contextra-mcp` nach Entscheidung leer |
+| REM-30 | Import `contextra-types` (10 Dateien) | `grep -rln "contextra_types" crates/contextra-mcp` leer |
+| REM-14 | ANCHOR-Dateien (27) | `grep -rl "ANCHOR\[" crates/contextra-mcp` leer |
 
-1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
-2. Antworten und Logs enthalten keinen Klartext eines Löschziels (INV-12).
-3. Außentexte stammen aus der Satzbibliothek von `contextra-erasure` und nur zusammen mit dem Messwert, an den der Satz gebunden ist (INV-CLAIMS-1).
-4. `Erased` und ein unbekannter Schlüssel sind in der Antwort dasselbe Fehlerbild.
+## 6. Umbau
+1. Abhängigkeiten `contextra-rank` und `contextra-crypto` entfernen. Benötigte Funktionen über die Fassade beziehen.
+2. `contextra-types` entfernen (REM-30).
+3. Egress-Doppelung auflösen (Entscheidung, siehe O-1).
+4. `unwrap`/`expect`/`panic!` (113 Treffer) nach R6 abbauen.
+5. Testschalter `test-utils` prüfen.
 
-## 3. Tools
+**Offene Punkte (Entscheidung nötig):**
+- **O-1** Egress-Logik: in `mcp` behalten oder nur über `privacy` nutzen?
+- **O-2** `prompt_injection.rs`, `sandbox.rs`: nicht in SPEC 15.
+- **O-3** Feature `test-utils`: entfernen oder in SPEC 15 aufnehmen.
+- **O-4** Inhalt von REM-21 und REM-22 nach SPEC 12 bestätigen.
 
-### 3.1 `search_hybrid`
+## 7. Tests
+T-SEC-04, Schema-Roundtrip (SPEC 15). Ist: `src/tests.rs`. Zählung nicht erfolgt.
 
-Eingabe: `query`, `collection`, `top_k`, optionales `as_of`. Ausgabe: Treffer, die das Gate freigegeben hat. Ein gelöschtes Dokument erscheint nicht. `as_of` ändert das nicht.
-
-### 3.2 `get_document`
-
-Eingabe: `collection`, `doc_id`. Ausgabe: Inhalt, wenn das Gate `Open` sagt.
-
-Fehlt das Dokument oder ist es `Erased` oder `Restricted`, lautet die JSON-RPC-Fehlermeldung `not found`. Dieselbe Meldung, derselbe Code. Die Antwort enthält kein Feld, das die beiden Fälle trennt, und keinen Status `KeyRevoked`.
-
-### 3.3 `erase_subject`
-
-Eingabe: `subject_ref`, `attestation_code`, `operator_ref`.
-
-Der Aufruf startet die Saga mit den Schritten 1 bis 9 über `Contextra::erase_subject` und kehrt nach Takt 1 zurück.
-
-Ausgabe, nur diese Felder:
-
-| Feld | Inhalt |
-|---|---|
-| `erasure_id` | `ErasureId` |
-| `state` | `Frozen`, `Restricted` oder `Refused` |
-| `seal` | `1`, wenn der Zustand `Frozen` ist, sonst keins |
-| `class` | `L`, wenn Siegel 1 vorliegt, sonst keine Klasse |
-
-Die Antwort ist kein `DeletionProof` und kein Beleg für Schlüsselvernichtung. `KeyDestroyed` ist zu diesem Zeitpunkt noch nicht erreicht. Der Name `KeyRevoked` wird nicht verwendet. Ein Satz wie „gelöscht" wird nicht gesendet.
-
-`Refused` entsteht bei einer Aufbewahrungspflicht. `Restricted` entsteht bei Legal Hold. Beides ist kein Erfolg der Vernichtung.
-
-### 3.4 `verify_erasure`
-
-Eingabe: `erasure_id`. Ausgabe: der aktuelle `SagaState` aus SPEC §5.2 und, sobald ein Bericht existiert, die gemessene Klasse (`L`, `P`, `C*`, `C1`, `C2`, `C3`, `M`) und die vorliegenden Siegel.
-
-Ein Außensatz wird nur angehängt, wenn die Satzbibliothek ihn an genau diesen Messwert bindet. Ohne bestandene Messung gibt es keinen Satz. „100 % gelöscht", „unwiederbringlich" und „DSGVO-konform" sind keine zulässigen Ausgaben.
-
-### 3.5 Weitere Löschziele
-
-`erase_document`, `drop_collection` und `drop_tenant` folgen demselben Ticket-Format wie `erase_subject`. Sie unterscheiden sich in `EraseTarget`, nicht im Statusvokabular.
-
-## 4. Fehlerbild
-
-Transportfehler sind JSON-RPC-Fehler ohne Payload-Echo. `JournalNotDurable` wird als Fehler von Takt 1 gemeldet und nicht als Ticket mit gesetzter Lesesperre. `CapabilityUnsupported` wird durchgereicht und nicht in einen Erfolg umgedeutet.
-
-## 5. `Cargo.toml`
-
-```toml
-[package]
-name = "contextra-mcp"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-description = "MCP stdio server for the Contextra facade"
-
-[lints]
-workspace = true
-
-[dependencies]
-contextra = { workspace = true }
-contextra-types = { workspace = true }
-contextra-ids = { workspace = true }
-contextra-privacy = { workspace = true }
-contextra-erasure = { workspace = true }
-tokio = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-
-[features]
-default = []
-```
-
-Keine Abhängigkeit auf `contextra-crypto` für eine eigene Signatur. Die Signatur bleibt im Berichtspfad von `contextra-erasure` über den Port aus `contextra-crypto`.
-
-## 6. Tests
-
-| Pflicht | Prüfung |
-|---|---|
-| T-DEL-11 | `search_hybrid` und `get_document` liefern einen gelöschten Scope nicht aus |
-| Ticket | `erase_subject` enthält nach Takt 1 weder `KeyRevoked` noch `KeyDestroyed` noch einen `DeletionProof` |
-| INV-12 | Die Fehlermeldung von `get_document` ist für einen unbekannten und einen gelöschten Schlüssel gleich |
-| INV-CLAIMS-1 | `verify_erasure` ohne Messung enthält keinen Außensatz |
-| INV-WIRING-2 | Kein Tool-Handler liefert `Ok`, ohne die Façade aufzurufen |
+## 8. Abnahme
+| Gate | Ist-Befund | Soll |
+|---|---|---|
+| G-03 | `rank`, `crypto` nicht erlaubt; `types` verboten | verletzt |
+| G-07 | Import `contextra_types` (10) | verletzt (REM-30) |
+| G-09 | 27 Dateien mit ANCHOR | verletzt (REM-14) |
+| G-13 | 113 Treffer | Abbau nach R6 |

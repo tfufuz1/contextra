@@ -1,110 +1,64 @@
-# contextra-vector — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
+# contextra-vector — Implementierungsspezifikation
 
-**Ebene:** E1 (Domäne)
-**Domänen-Closure:** `ids`, `env`, `simd`, `durable-fs`
-**Verträge:** `ports` (`VectorIndex`), `erasure` (`VectorLayer`). Beide zählen nicht gegen die fünf (SPEC §15). `VectorIndex` wird hier implementiert und nicht neu definiert.
-**Status:** Normativ (Soll-Zustand)
-**Version:** 2.1
-**Geltungsbereich:** `crates/contextra-vector`
-**Normative Quellen:** `docs/SPEC.md` §4.7, §5.3 Schritte 3 und 8, §5.9 Schicht S2, §5.10, §6.2, §6.3, §7 (`VectorLayer`), INV-5, INV-HNSW-SLOT-1, VETO-F02, INV-ARTKEY-1.
+**Ebene:** E1 (Kern, R2)
+**Normative Quelle:** `docs/SPEC.md` v4.1, Nachtrag v4.1.1 (maßgeblich bei Widerspruch). **Stand:** 21.11.2026, Abgleich mit SPEC v4.1. Verweist nur auf SPEC-Kapitel und IDs. Ist-Abweichungen sind markiert, ungeklärte Punkte stehen unter „Offene Punkte (Entscheidung nötig)“ in Abschnitt 6.
 
----
+## 1. Zweck und Ebene
+Vektorindex: HNSW (`hnsw/`, Graph, Delta, Persistenz nach REQ-VEC-4), exakte Suche mit SIMD (`exact`), SQ8 mit Kalibrierung (`sq8`, REQ-VEC-1a), ACORN-Filtertraversierung (`acorn`), Planer (`planner`, REQ-FLT-3), Scrub (`scrub`, `ScrubTarget`, REQ-VEC-5), Port `VectorIndex`, Typen, Fehler (SPEC 15, 6.3). Ziel-Umfang: 11.000 Zeilen (SPEC 3.1). Ist: 34.675 Zeilen laut Zielspalte (Altbestand). **DiskANN und RaBitQ entfallen** (ADR-04, SPEC 3.1).
+Abhängigkeiten nach Anhang E: `ports`, `ids`, `env`, `simd`, `durable-fs`.
 
-## 1. Zweck
+## 2. Vertrag
+Implementiert (SPEC 3.4): `VectorIndex` und `ScrubTarget`. Ist: `VectorIndex` ist in `contextra-ports` (`vector_index.rs`) definiert. Die Ist-Signatur ist gegen SPEC 4.4 und 15 zu prüfen. `ScrubTarget` fehlt im Ports-Crate.
 
-`contextra-vector` ist der HNSW-Index: ANN-Suche, skalare Quantisierung SQ8 und SQ4, Distanz über `contextra-simd` mit bitidentischem skalarem Fallback (INV-5).
+## 3. Abhängigkeiten
+**Erlaubt (Anhang E):** `ports`, `ids`, `env`, `simd`, `durable-fs`.
+**Ist (Cargo.toml):** `contextra-ids`, `contextra-env`, `contextra-durable-fs`, `contextra-simd` (erlaubt, optional), `contextra-ports` (erlaubt), dazu **`contextra-types`** (**verboten**, R1 und REM-30). Weitere: `roaring`, `subtle`, `ahash`, `parking_lot`, `rand`, `tracing`, `serde`, `zeroize`, `thiserror`, `blake3`.
+**Ist-Abweichung:** `contextra-types` wird in 86 Dateien importiert (Messung dieses Abgleichs). Das ist der größte Befund des Crates.
+**Features:** Ist `default = []`, `std`, `simd`, `serde`, `tracing`, `inspect`, `experimental`, `mmap`, `diskann`, `quantize-rabitq`, `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `graph`, `experimental-all`, `partial-index-rebuild`, `workspace`, `ports-compat`, `docid-128`. Soll (SPEC 15): keine Features außer den in Kapitel 15 genannten. Ist-Abweichung: alle `experimental-*`, `diskann`, `quantize-rabitq` (ADR-04: raus), `workspace`, `ports-compat` (CMP-10).
 
-Schicht **S2**. Persistente Vektor-Payloads (fp32 und SQ8) liegen je Slot unter dem `DocDek`. Die HNSW-Topologie einer Generation liegt unter einem `ArtKey`. Die Versiegelung ruft `contextra-db` über `contextra-crypto` auf. Dieses Crate persistiert Chiffretext und hält die Arbeitsarena.
+## 4. Module
+| Datei | Verantwortung (Ist) | Befund |
+|---|---|---|
+| `src/hnsw/*` | HNSW-Index | Soll `hnsw/` |
+| `src/acorn/*` (gamma_augmentation, naive_reference, mod) | ACORN-Traversierung | Soll `acorn` |
+| `src/diskann/*` | DiskANN | **entfernen** (ADR-04) |
+| `src/compat/*` | Kompatibilitätsmodul (Kandidaten-Stream, DiskANN-/HNSW-Adapter, Purge, Scanner, Typen) | **entfernen** (R7, CMP-8, G-11); Inhalte in Soll-Module verschieben |
+| `src/contract.rs` | Selbstdeklaration | REM-14 |
+| `src/casting.rs`, `src/compute_pool.rs` | Hilfen | zu prüfen |
 
-## 2. Architekturregeln
+Soll-Module ohne Ist-Entsprechung: `exact` (SIMD), `sq8` (Kalibrierung), `planner`, `scrub`, `index`, `types`, `error` (SPEC 15). Zu prüfen, ob im Ist unter anderem Namen vorhanden.
 
-1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
-2. Keine Abhängigkeit auf andere E1-Crates und keine Dev-Abhängigkeit auf `contextra-testkit`.
-3. `VectorLayer` implementiert `ErasureLayer` aus `contextra-erasure`.
-4. **VETO-F02.** Beim Löschen gibt es kein Rewiring und keine heuristische Neuvernetzung von Nachbarn.
-5. **INV-HNSW-SLOT-1.** Ein `Slot` (`u32`, dicht je Collection) wird erst nach dem abgeschlossenen Neuaufbau der Generation `g+1` wiederverwendet.
-6. Die `LiveMask` aus `contextra-erasure` ist der Kandidatenfilter. Eine Suche überspringt gelöschte Slots, bevor Distanz und Fusion laufen.
+## 5. Entfernungen
+| ID | Gegenstand | Abnahme-Befehl |
+|---|---|---|
+| ADR-04 / REM-09 | `src/diskann/*`, Features `diskann`, `experimental-diskann`, `quantize-rabitq`, `experimental-rabitq` | `ls crates/contextra-vector/src/diskann` nicht vorhanden |
+| REM-23 | laut SPEC 15 genannt, Inhalt in SPEC 12 nachlesen (offen) | siehe SPEC 12 |
+| CMP-8 | `src/compat/` | `find crates/contextra-vector -type d -name compat` leer |
+| REM-30 | Import `contextra-types` (86 Dateien) | `grep -rln "contextra_types" crates/contextra-vector` leer |
+| CMP-10 | Features `workspace`, `ports-compat` | `grep -n "compat\|workspace" crates/contextra-vector/Cargo.toml` leer |
+| REM-14 | ANCHOR-Dateien (185), `contract.rs` | `grep -rl "ANCHOR\[" crates/contextra-vector` leer |
 
-## 3. Rolle in der Löschsaga
+## 6. Umbau
+1. `diskann/` und die experimentellen Features entfernen (ADR-04). Grenze: Vor dem Entfernen prüfen, ob `compat/` davon abhängt.
+2. `compat/` auflösen, in `hnsw/`, `exact`, `planner` verschieben (CMP-8).
+3. Typen aus `contextra-types` in `ports::dto` oder `ids` verlagern (REM-30, 86 Dateien). Eigene Sitzung je Schritt.
+4. `unwrap`/`expect`/`panic!` (162 Treffer) nach R6 abbauen.
 
-Messung: `VectorScanner`, plus Black-Box-Probe des Orchestrators. Positivkontrolle `AC-1` ist Pflicht. `purge` ist idempotent (T-DEL-14).
+**Offene Punkte (Entscheidung nötig):**
+- **O-1** REM-23 und die Dateien in `casting.rs`, `compute_pool.rs`: Zuordnung ungeklärt.
+- **O-2** Feature `graph` im Vector-Crate: nicht in SPEC 15 genannt.
+- **O-3** Freigabe für die Umbaureihenfolge (große Änderung, CLAUDE.md §8).
 
-### 3.1 Schritt 3 — Ebene A, Arena
+## 7. Tests
+- T-RAG-04, T-RAG-05, T-IDX-01, T-ER-03 (SPEC 15).
+- Ist-Befund: nicht gezählt.
 
-Vor dem Übergang `PlaintextPurged` im Journal:
-
-1. Die Slots der Einheit werden in der fp32-Arena und in der SQ8-Arena deterministisch genullt (`zeroize`).
-2. Kanten bleiben stehen. Es wird kein Nachbar neu verbunden (VETO-F02).
-3. Die Slot-Nummer bleibt bis zum Neuaufbau gesperrt.
-4. Der persistente Snapshot-Payload ist bereits unter dem `DocDek`. Seine Unlesbarkeit entsteht in Schritt 5. Schritt 3 entfernt den Klartext aus der Arena.
-
-Das Restresiduum `R-GRAPH` (Topologie ohne Nutzdaten, interne Slot-Nummern) bleibt im Bericht, bis Schritt 8 die Generation wechselt (REQ-DEL-N25).
-
-### 3.2 Schritt 8 — Generation `g+1`
-
-Auslöser, gemeinsam für mehrere Löschungen: Tombstone-Anteil ≥ `tombstone_rebuild_ratio` (Start 0,2), Frist `purge_rebuild_max_days` (Start 14 Tage), oder `seal-now`.
-
-1. Ein Hintergrundworker baut Generation `g+1` nur aus lebenden Slots. Der Aufbau ist deterministisch (INV-INDEX-APPLY-1, INV-5).
-2. Atomarer Umschalt-Commit auf `g+1` (`tmp` → `fsync` → `rename` → Verzeichnis-`fsync`).
-3. `contextra-crypto` vernichtet den `ArtKey` der Generation `g` (INV-ARTKEY-1). Danach schließt der Koordinator `R-GRAPH`.
-4. Slots der Generation `g` werden wiederverwendbar.
-
-`VectorScanner` prüft Rohbytes der Embeddings und die dekodierte Sicht. Ohne bestandene Positivkontrolle ist der Lauf ungültig.
-
-### 3.3 Suche
-
-`search_knn` liest die `LiveMask` mit `SeqCst`, bevor ein Kandidat die Distanzberechnung erreicht (§6.3, §10.3). Verworfene Kandidaten zählt der Aufrufer in `contextra-db`, der die Trefferliste auf `k` auffüllt. Dieses Crate fusioniert nicht.
-
-SQ4 ist eine Suchoptimierung. Die Löschpflicht gilt für jede persistierte Quantisierungsstufe, die Nutzbytes der Einheit enthält. SQ4-Bytes eines gelöschten Slots werden in Schritt 3 mit genullt.
-
-## 4. Fehler (`VectorError`)
-
-`#[non_exhaustive]`: `DimensionMismatch`, `InvalidFloat`, `CorruptedStorage`, `Io`, `GenerationSwitchFailed`, `SlotStillLive`. Ein Konnektivitätsfehler durch unterlassenes Rewiring ist kein Fehlerbild. Der Neuaufbau ist der einzige Reparaturweg.
-
-## 5. `Cargo.toml`
-
-```toml
-[package]
-name = "contextra-vector"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-description = "HNSW vector index with generation rebuild and LiveMask filtering"
-
-[lints]
-workspace = true
-
-[dependencies]
-contextra-ids = { workspace = true }
-contextra-env = { workspace = true }
-contextra-simd = { workspace = true }
-contextra-durable-fs = { workspace = true }
-contextra-ports = { workspace = true }
-contextra-erasure = { workspace = true }
-ahash = { workspace = true }
-parking_lot = { workspace = true }
-thiserror = { workspace = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
-proptest = "1.4"
-
-[features]
-default = []
-std = ["contextra-ids/std", "contextra-env/std"]
-quantize = []
-```
-
-`quantize` schaltet SQ4 zu. Die Löschpfade von fp32 und SQ8 sind nicht feature-gesteuert (R3).
-
-## 6. Tests
-
-| Kennung | Pflicht |
-|---|---|
-| T-DEL-6 | Nach `Frozen` liefert die Vektorsuche das Dokument nicht |
-| T-DEL-14 | Zweites Arena-`purge` ist ein No-op |
-| T-DEL-17 | Rohbytes der fp32- und SQ8-Arena enthalten das Embedding nicht mehr |
-| T-DEL-19 | `remember` während gehaltener Slot-Sperre wird abgewiesen |
-
-Ein Test, der nur die `LiveMask` setzt und die Arena nicht nullt, prüft höchstens Klasse L (§12).
+## 8. Abnahme
+| Gate | Ist-Befund | Soll |
+|---|---|---|
+| G-02 | `forbid(unsafe_code)` in 2 Dateien, kein `unsafe`-Gebrauch im Crate | eingehalten |
+| G-03 | `contextra-types` (R1) | verletzt (REM-30) |
+| G-07 | Erwähnung `contextra-types` in 86 Dateien | verletzt |
+| G-09 | 185 Dateien mit ANCHOR/FILE-CONTEXT, `contract.rs` | verletzt (REM-14) |
+| G-11 | `compat/`-Verzeichnis, Features `workspace`, `ports-compat` | verletzt (CMP-8, CMP-10) |
+| G-13 | 162 Treffer | Abbau nach R6 |
