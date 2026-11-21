@@ -1,5 +1,4 @@
 //! SSTable Reader: Block-Leseoperationen und Zero-Copy-Block-Dekodierung.
-// ANCHOR[contextra-store:SST-RDR-110]
 
 use super::SstableReader;
 use crate::error::{StoreError as ContextraError, StoreResult as Result};

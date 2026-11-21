@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Recall@10 Beweis gegen Brute-Force-Orakel für deterministische Korpora (als Konstante eingefroren, Toleranz 0).
 
 use contextra_ports::VectorIndex;
 use contextra_types::{DistanceMetric, DocId, TxId};

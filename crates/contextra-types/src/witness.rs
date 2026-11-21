@@ -15,10 +15,6 @@
 //! # Deprecated
 //! Löschdomänen-Typen (`ScanMethod`, `SagaRecord`) sind nach `contextra-erasure` migriert.
 
-// FILE-CONTEXT
-// ZWECK: Typsichere Restmessung und Basistypen für physische Löschnachweise (§4.2, §20.5, INV-WITNESS-MINT-1).
-// INVARIANTEN: LayerWitness liegt ausschließlich in contextra-ports::scanner.
-// HOTSPOTS: [1-40]
 
 #![forbid(unsafe_code)]
 //! Residual measurement and context types (§4.2, §20.5).
@@ -32,11 +28,9 @@
 
 use serde::{Deserialize, Serialize};
 
-// ANCHOR[contextra-types:WITNESS-001]
 /// Scanner methodology applied during storage residue verification.
 // MIGRATION(S-70): ScanMethod gehört nach contextra-erasure
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:WIT-001]
 #[deprecated(
     since = "0.1.0",
     note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
@@ -50,10 +44,8 @@ pub enum ScanMethod {
     FeatureDisabled,
 }
 
-// ANCHOR[contextra-types:WITNESS-002]
 /// Request context containing tenant and transaction identity for deletion operations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:WIT-002]
 pub struct RequestContext {
     /// Tenant identifier for authorization and scope isolation.
     pub tenant_id: crate::TenantId,
@@ -62,7 +54,6 @@ pub struct RequestContext {
 }
 
 impl RequestContext {
-    // ANCHOR[contextra-types:WITNESS-003]
     /// Creates a new `RequestContext`.
     ///
     /// # Parameter
@@ -73,10 +64,8 @@ impl RequestContext {
     }
 }
 
-// ANCHOR[contextra-types:WITNESS-004]
 /// Saga record containing deletion tracking state and digests.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:WIT-003]
 #[deprecated(
     since = "0.1.0",
     note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
@@ -87,7 +76,6 @@ pub struct SagaRecord {
 }
 
 impl SagaRecord {
-    // ANCHOR[contextra-types:WITNESS-005]
     /// Creates a new `SagaRecord`.
     ///
     /// # Parameter

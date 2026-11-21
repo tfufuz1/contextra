@@ -1,10 +1,5 @@
 //! Averaging-based Personalized PageRank for Hypergraphs (APPRH).
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Adaptiver PageRank mit Hyperkanten-Expansion (APPRH).
-// INVARIANTEN: Deterministische Diffusion, budgetierte Iterationen.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 
@@ -41,7 +36,6 @@ use crate::types::EntityId;
 ///
 /// # Complexity
 /// Time complexity bounded by push budget $O(1 / (\alpha \cdot \epsilon))$, independent of total graph size.
-// ANCHOR[contextra-graph:SRC-APPRH-MOD-001]
 pub fn apprh_local<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -57,7 +51,6 @@ pub fn apprh_local<G: PathGraph>(
 ///
 /// # Errors
 /// Returns [`contextra_types::ContextraError::InvalidInput`] if `hyperedge_decay_factor` is non-finite or outside `(0.0, 1.0]`.
-// ANCHOR[contextra-graph:SRC-APPRH-MOD-002]
 pub fn forward_push_apprh<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -88,7 +81,6 @@ impl CsrGraph {
     ///
     /// # Invariants
     /// Runs exclusively in shadow mode unless feature-flag activated. Bit-identical determinism.
-    // ANCHOR[contextra-graph:SRC-APPRH-MOD-003]
     pub fn apprh_diffusion(
         &self,
         seeds: &[EntityId],
@@ -98,7 +90,6 @@ impl CsrGraph {
     }
 
     /// Computes shadow comparison between Forward-Push PPR and APPRH on CsrGraph.
-    // ANCHOR[contextra-graph:SRC-APPRH-MOD-004]
     pub fn apprh_shadow_compare(
         &self,
         seeds: &[EntityId],
@@ -116,7 +107,6 @@ mod tests {
     use crate::csr::CsrGraph;
     use crate::types::Entity;
 
-    // ANCHOR[contextra-graph:SRC-APPRH-MOD-005]
     #[tokio::test]
     async fn test_apprh_diffusion_and_shadow_compare_diagnostic_paths() {
         let graph = std::sync::Arc::new(CsrGraph::new());

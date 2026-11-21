@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Boot-Sequenz B0-B9 (SPEC §13.5, INV-BOOT-1, INV-WIRING-2, REQ-FAC-005)
 
 //! # Modul: Boot-Sequenz & Verdrahtungs-Selbsttest (Ring 4)
 //!

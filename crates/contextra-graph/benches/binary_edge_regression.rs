@@ -1,4 +1,3 @@
-// ANCHOR[contextra-graph:BENCHES-BINARY-EDGE-REGRESSION-001]
 //! Benchmark zur Performancemessung von binären Kanten im Vergleich zu Hyperkanten.
 //!
 //! # Zweck

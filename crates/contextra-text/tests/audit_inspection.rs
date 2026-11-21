@@ -9,7 +9,6 @@ use contextra_text::morphology::{
 };
 use contextra_text::tokenizer::{GermanMorphTokenizer, Tokenizer};
 
-// ANCHOR[contextra-text:TEST-135]
 // Testfall `inspect_20_compounds`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn inspect_20_compounds() {
@@ -50,7 +49,6 @@ fn inspect_20_compounds() {
     }
 }
 
-// ANCHOR[contextra-text:TEST-136]
 // Testfall `inspect_umlaut_bimap`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn inspect_umlaut_bimap() {
@@ -86,7 +84,6 @@ fn inspect_umlaut_bimap() {
     }
 }
 
-// ANCHOR[contextra-text:TEST-137]
 // Testfall `test_b3_avgdl_consistency_100_insert_50_delete`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Result<()> {
@@ -306,7 +303,6 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-138]
 // Testfall `test_b6_morphology_idempotency_and_proper_nouns`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_b6_morphology_idempotency_and_proper_nouns() {
@@ -340,7 +336,6 @@ fn test_b6_morphology_idempotency_and_proper_nouns() {
     );
 }
 
-// ANCHOR[contextra-text:TEST-139]
 // Testfall `test_b5_wand_vs_bruteforce_1000_docs_3_terms`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_b5_wand_vs_bruteforce_1000_docs_3_terms() -> contextra_types::Result<()> {

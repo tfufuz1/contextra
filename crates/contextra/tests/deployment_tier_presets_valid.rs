@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Test deployment tier presets validation (Spec B.1.8 / INV-COLLECTION-PROFILE-2)
 
 //! # Integrationstest: `deployment_tier_presets_valid`
 //!
@@ -9,7 +7,6 @@
 
 use contextra::collection_profile::DeploymentTier;
 
-// ANCHOR[contextra:TEST-DTP-001]
 // Stellt sicher, dass alle 4 DeploymentTier-Presets nach dem Auflösen fehlerfrei durch die Profilvalidierung laufen.
 #[test]
 fn test_all_deployment_tier_presets_valid() {

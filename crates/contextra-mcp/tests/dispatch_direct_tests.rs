@@ -2,7 +2,6 @@
 // =========================================================================
 // SECTION: dispatch_direct_tests
 // =========================================================================
-// ANCHOR[contextra-mcp:ITEST-DISPATCH-D-001]
 
 use contextra::Contextra;
 use contextra_mcp::io::{read_line_bounded, MAX_RPC_BYTES};

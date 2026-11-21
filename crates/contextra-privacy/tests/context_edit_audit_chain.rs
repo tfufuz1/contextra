@@ -1,7 +1,4 @@
 //! Integritätstests für die kryptografische Hash-Verkettung von Kontextbearbeitungs-Auditspuren.
-// FILE-CONTEXT
-// ZWECK: Integrationstest für ContextEditAuditRecord-Verkettung, Hash-Integrität, Clock-Port-Injektion und Manipulationserkennung.
-// INVARIANTEN: Zeitstempel wird ausschließlich über Clock bezogen;
 //              Kein Klartext des Scratchpad-Inhalts in den Records;
 //              Verifizierung liefert exakt den ersten fehlerhaften Index bei Manipulation.
 
@@ -43,7 +40,6 @@ impl Clock for MockSequenceClock {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-CEAC-001]
 // Prüft: Prüft die Gültigkeit der BLAKE3-Kette und stellt sicher, dass kein Klartext protokolliert wird.
 fn test_audit_chain_validity_and_no_plaintext_leak() {
     let tenant = TenantId(42);
@@ -108,7 +104,6 @@ fn test_audit_chain_validity_and_no_plaintext_leak() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-CEAC-002]
 // Prüft: Prüft die Erkennung von Datenmanipulationen an beliebigen Gliedern der Audit-Kette.
 fn test_audit_chain_tampering_at_index_i() {
     let tenant = TenantId(100);

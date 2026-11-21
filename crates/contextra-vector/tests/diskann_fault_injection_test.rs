@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1).
-// INVARIANTEN: Simulates interrupted/failed DiskANN rebuild mid-write and verifies that the previous functional index state remains valid, loadable, and searchable.
 
 #![cfg(feature = "experimental-diskann")]
 

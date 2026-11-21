@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: E2E-Löschtests (T-DEL-1 und T-DEL-3) für Contextra Facade (Ring 4).
-// INVARIANTEN: Nutzt ausschließlich bestehende öffentliche Schnittstellen.
 
 //! # Integrationstest: `deletion_e2e`
 //!
@@ -15,7 +12,6 @@ use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
-// ANCHOR[contextra:TEST-DE2-001]
 /// Rekursive Hilfsfunktion zur Zählung von Canary-Byte-Treffern in allen Dateien eines Verzeichnisses.
 fn count_canary_occurrences(dir: &Path, canary: &[u8]) -> usize {
     let mut matches = 0;
@@ -36,7 +32,6 @@ fn count_canary_occurrences(dir: &Path, canary: &[u8]) -> usize {
     matches
 }
 
-// ANCHOR[contextra:TEST-DE2-002]
 /// T-DEL-1: Schreiben, Löschen, Vollkompaktion/Flush -> Canary-Bytesuche im Datenverzeichnis erwartet 0 Treffer.
 #[tokio::test]
 async fn test_tdel_1_canary_bytes_erased_after_compaction() -> Result<(), ContextraError> {
@@ -84,7 +79,6 @@ async fn test_tdel_1_canary_bytes_erased_after_compaction() -> Result<(), Contex
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-DE2-003]
 /// T-DEL-3: Droppen einer Collection löscht diese vollständig für den Tenant.
 #[tokio::test]
 async fn test_tdel_3_drop_collection_e2e() -> Result<(), ContextraError> {

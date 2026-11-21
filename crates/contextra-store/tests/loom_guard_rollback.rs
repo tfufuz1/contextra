@@ -1,4 +1,3 @@
-// ANCHOR[TEST:LOOM-GUARD-ROLLBACK] STATUS:DONE (TS:2026-11-08)
 //! Loom model test for Guard-Drop rollback against concurrent append / HMAC access.
 
 #![cfg(loom)]

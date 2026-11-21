@@ -1,7 +1,6 @@
 // =========================================================================
 // SECTION: explain
 // =========================================================================
-// ANCHOR[contextra-mcp:EXPLAIN-001]
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;

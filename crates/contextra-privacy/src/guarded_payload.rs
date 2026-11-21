@@ -13,15 +13,12 @@
 use std::marker::PhantomData;
 use zeroize::Zeroize;
 
-// ANCHOR[contextra-privacy:GP-001]
 /// Marker-Typ: Payload hat noch nicht alle Egress-Guard-Layer durchlaufen und gilt als unbereinigt.
 pub struct Unsanitized;
 
-// ANCHOR[contextra-privacy:GP-002]
 /// Marker-Typ: Payload hat alle 5 Egress-Guard-Layer erfolgreich durchlaufen und ist bereinigt.
 pub struct Sanitized;
 
-// ANCHOR[contextra-privacy:GP-003]
 /// Type-State-Wrapper für Cloud-Egress-Payloads.
 ///
 /// Ein `GuardedPayload<Sanitized>` kann NUR durch den vollständigen Durchlauf
@@ -46,7 +43,6 @@ impl<S> Drop for GuardedPayload<S> {
 }
 
 impl<S> GuardedPayload<S> {
-    // ANCHOR[contextra-privacy:GP-004]
     /// Gibt eine Referenz auf die zugeordnete Sitzungs-ID (`session_id`) zurück.
     pub fn session_id(&self) -> &str {
         &self.session_id
@@ -54,7 +50,6 @@ impl<S> GuardedPayload<S> {
 }
 
 impl GuardedPayload<Unsanitized> {
-    // ANCHOR[contextra-privacy:GP-005]
     /// Erstellt einen neuen unsanitizierten Payload (Eingang aus MCP-Client oder interner Engine).
     ///
     /// # Ablauf
@@ -71,7 +66,6 @@ impl GuardedPayload<Unsanitized> {
 }
 
 impl GuardedPayload<Sanitized> {
-    // ANCHOR[contextra-privacy:GP-006]
     /// Konstruiert einen bereinigten Payload nach erfolgreicher Bereinigung.
     ///
     /// # Ablauf
@@ -87,7 +81,6 @@ impl GuardedPayload<Sanitized> {
         }
     }
 
-    // ANCHOR[contextra-privacy:GP-007]
     /// Extrahiert den bereinigten String aus dem Schutzbehälter für den Versand.
     ///
     /// # Ablauf
@@ -101,7 +94,6 @@ impl GuardedPayload<Sanitized> {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-privacy:TEST-GP-001]
     // Prüft, dass die Type-States Unsanitized und Sanitized getrennt konstruierbar sind und Werte korrekt halten.
     #[test]
     fn test_guarded_payload_type_states_are_distinct() {

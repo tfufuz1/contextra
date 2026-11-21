@@ -204,7 +204,6 @@ pub struct SstableMetadata {
 ///
 /// Note: Uses a whole-SSTable Bloom filter with a default FPR. The Bloom filter FPR should be
 /// treated as a tunable parameter and configured via [`crate::lsm::LsmConfig`].
-// ANCHOR[contextra-store:SST-BLD-001]
 /// Erzeugt deterministisch geordnete SSTable-Dateien mit Datenbloecken und Index.
 pub struct SstableBuilder {
     path: PathBuf,

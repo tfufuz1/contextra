@@ -14,7 +14,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::thread;
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-COMPACT-RACE-001]
 #[test]
 fn test_hyperedge_compact_race() {
     let graph = Arc::new(CsrGraph::new());

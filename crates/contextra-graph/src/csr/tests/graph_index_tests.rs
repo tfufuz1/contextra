@@ -4,11 +4,6 @@
 //! # Zweck
 //! Sichert die Einhaltung der Schnittstellenvereinbarungen gegen funktionale Regressionen ab.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::super::*;
@@ -19,7 +14,6 @@ use crate::error::GraphError;
 use contextra_types::{ContextraError, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-001]
 #[tokio::test]
 #[allow(non_snake_case)]
 
@@ -43,7 +37,6 @@ async fn test_set_storage_and_with_config_and_storage_CASE_initialization() {
     assert!(graph.storage.is_some());
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-002]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_insert_entity_direct_and_edge_direct_CASE_and_boundaries() {
@@ -72,7 +65,6 @@ async fn test_insert_entity_direct_and_edge_direct_CASE_and_boundaries() {
     assert_eq!(graph.edge_count(), 1);
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-003]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_persist_entity_edge_delete_persistence_CASE_direct_calls() {
@@ -111,7 +103,6 @@ async fn test_persist_entity_edge_delete_persistence_CASE_direct_calls() {
     storage.commit(tx2).await.unwrap(); // unwrap allowed
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-004]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_load_from_storage_CASE_legacy_f32_weight_and_invalid_key() {
@@ -168,7 +159,6 @@ impl tracing::field::Visit for StringVisitor {
     }
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-005]
 #[tokio::test]
 async fn test_traverse_max_hops_exceeded_emits_warning() {
     use tracing_subscriber::layer::SubscriberExt;
@@ -195,7 +185,6 @@ async fn test_traverse_max_hops_exceeded_emits_warning() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-006]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_traverse_at_time_CASE_saturating_max_hops() {
@@ -211,7 +200,6 @@ async fn test_traverse_at_time_CASE_saturating_max_hops() {
     assert!(results.len() <= 4);
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-007]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_traverse_CASE_exceeds_max_hops_returns_invalid_input() {
@@ -227,7 +215,6 @@ async fn test_traverse_CASE_exceeds_max_hops_returns_invalid_input() {
     assert!(matches!(err_time, ContextraError::InvalidInput(_)));
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-008]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_pagerank_CASE_empty_graph_and_isolated_node() {
@@ -246,7 +233,6 @@ async fn test_pagerank_CASE_empty_graph_and_isolated_node() {
     assert!((rank - 1.0).abs() < 1e-4);
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-009]
 #[test]
 #[allow(non_snake_case)]
 fn test_serialization_roundtrip_CASE_persisted_edge_payload() {
@@ -273,7 +259,6 @@ fn test_serialization_roundtrip_CASE_persisted_edge_payload() {
 }
 
 proptest::proptest! {
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-010]
     #[test]
     fn test_prop_csr_offset_array_structural_consistency(
         node_count in 1..=30usize,
@@ -320,7 +305,6 @@ proptest::proptest! {
     }
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-011]
 #[tokio::test]
 async fn test_bitemporal_independent_axis_evaluation() {
     let graph = CsrGraph::new();
@@ -417,7 +401,6 @@ async fn test_bitemporal_independent_axis_evaluation() {
     verify_bitemporal_assertions(&graph, id1, id2, "compacted_csr").await;
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-012]
 #[tokio::test]
 async fn test_bitemporal_regression_pure_tx_time_unchanged() {
     let graph = CsrGraph::new();
@@ -471,7 +454,6 @@ async fn test_bitemporal_regression_pure_tx_time_unchanged() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-013]
 #[tokio::test]
 async fn test_hub_node_1m_neighbors_bfs_capped() -> contextra_types::Result<()> {
     // Use a high rebuild_threshold to avoid repeated O(N) CSR compactions during setup
@@ -518,7 +500,6 @@ async fn test_hub_node_1m_neighbors_bfs_capped() -> contextra_types::Result<()> 
     Ok(())
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-014]
 #[tokio::test]
 async fn test_consistency_enforcer_contradiction_suppression() {
     let graph = Arc::new(CsrGraph::with_consistency_enforcer(3));
@@ -588,7 +569,6 @@ async fn test_consistency_enforcer_contradiction_suppression() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-015]
 #[tokio::test]
 async fn test_default_csr_graph_no_consistency_check() {
     let graph = Arc::new(CsrGraph::new());
@@ -620,7 +600,6 @@ async fn test_default_csr_graph_no_consistency_check() {
     }
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-016]
 #[tokio::test]
 async fn test_csr_is_entity_deleted_returns_false_for_live_entity() {
     use crate::test_doubles::InMemoryStorageEngine;
@@ -648,7 +627,6 @@ async fn test_csr_is_entity_deleted_returns_false_for_live_entity() {
     assert!(!graph.is_entity_deleted(entity_live).await);
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-017]
 #[test]
 #[cfg(feature = "edge-reinforcement-learning")]
 fn test_edge_store_invalidated_after_compact() {

@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Smoke-Treiber zur Ausführung der Fuzzing-Logik gegen alle Korpusdateien ohne libfuzzer/cargo-fuzz Laufzeitabhängigkeit.
 
 use std::fs;
 use std::path::PathBuf;

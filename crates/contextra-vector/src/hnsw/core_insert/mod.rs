@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: HNSW Einfüge-Pipeline (Compute & Apply) und Konnektivitätswächter.
-// INVARIANTEN: Lock-Hierarchie: write_mutex -> entry_point -> nodes; Zero-Panic.
-// HOTSPOTS: compute_insert_with_context, apply_insert, check_connectivity
-// STAND: 2026-11-12
 
 //! HNSW Einfüge-Pipeline und Graph-Konnektivitätsprüfungen.
 //!

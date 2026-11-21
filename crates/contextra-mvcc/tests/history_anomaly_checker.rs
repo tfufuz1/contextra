@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-HISTORY-ANOMALY-CHECKER-ROOT]
 //! # Elle/Jepsen-inspirierter History- und Anomalie-Checker (T-ISO)
 //!
 //! Prüft auf:

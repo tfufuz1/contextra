@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:BENCH-ROOT]
 //! # Benchmarks für `contextra-mvcc`
 //!
 //! Misst die Durchsatz- und Latenzleistung kritischer Kernoperationen:

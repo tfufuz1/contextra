@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Backoff- und Cooldown-Zustandsautomat für HNSW-Rebuilds ohne Wanduhr.
-// INVARIANTEN: Zeitabfragen erfolgen ausschließlich über Clock (INV-INDEX-APPLY-1); saturierende Arithmetik.
-// HOTSPOTS: BackoffTracker::check_and_update
-// STAND: TS:2026-11-11T02:00:00Z
 
 use std::sync::atomic::Ordering;
 use std::time::Duration;

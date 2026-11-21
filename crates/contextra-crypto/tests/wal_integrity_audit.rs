@@ -3,9 +3,6 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `wal_integrity_audit`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// FILE-CONTEXT
-// ZWECK: Integrationstests und Audit-Regressionstests für WAL-Integrität, Sequence-Number-Zustandsmaschine, Nonce-Politik und V2/V3-Protokolle.
-// INVARIANTEN: Monotone Sequence-Nummern, verweigerte Replays/Lücken, Nonce-Eindeutigkeit, Zero-Panics.
 
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot, WalHmac};

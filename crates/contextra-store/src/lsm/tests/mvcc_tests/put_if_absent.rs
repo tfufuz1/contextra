@@ -1,6 +1,5 @@
 //! # Put-If-Absent Concurrency & Deadlock Tests
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Prueft TOCTOU-Sicherheit und Deadlock-Freiheit von put_if_absent
 

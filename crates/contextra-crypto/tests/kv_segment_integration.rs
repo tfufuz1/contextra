@@ -4,9 +4,6 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `kv_segment_integration`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// FILE-CONTEXT
-// ZWECK: Integrationstest für KvSegment-Verschlüsselung, Zeroize und Prozess-Speicherabbild-Prüfung (P9).
-// STAND: TS:2026-09-08T00:00:00Z
 
 #![forbid(unsafe_code)]
 

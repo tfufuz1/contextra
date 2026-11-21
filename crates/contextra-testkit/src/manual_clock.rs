@@ -18,17 +18,12 @@
 //! - Mehrere Threads können die Uhr parallel abfragen oder vorstellen, ohne dass
 //!   Sperren (Locks) benötigt werden.
 
-// FILE-CONTEXT
-// STAND: 2026-09-19T20:12:00Z (SESSION: 01c5be8b)
-// ZWECK: Deterministic Clock Mock for unit and integration testing without real sleep.
-// INVARIANTEN: Monotonic time progression, thread-safe via AtomicU64 nanoseconds.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use contextra_ports::Clock;
 
-// ANCHOR[contextra-testkit:MANUAL-CLOCK-STRUCT-001]
 /// Thread-sichere, manuell vorstellbare Uhr für reproduzierbare Tests.
 ///
 /// **Zweck:** Ermöglicht deterministische zeitabhängige Tests ohne Abhängigkeit
@@ -52,7 +47,6 @@ impl Default for ManualClock {
 }
 
 impl ManualClock {
-    // ANCHOR[contextra-testkit:MANUAL-CLOCK-NEW-001]
     /// Erstellt eine neue `ManualClock` mit einem gegebenen Nanosekundenwert.
     ///
     /// **Parameter:**
@@ -65,7 +59,6 @@ impl ManualClock {
         }
     }
 
-    // ANCHOR[contextra-testkit:MANUAL-CLOCK-ADVANCE-001]
     /// Stellt die Uhr um eine bestimmte Dauer vor.
     ///
     /// **Ablauf:**
@@ -80,7 +73,6 @@ impl ManualClock {
         self.nanos.fetch_add(delta, Ordering::SeqCst);
     }
 
-    // ANCHOR[contextra-testkit:MANUAL-CLOCK-SET-001]
     /// Setzt die Uhr absolut auf einen bestimmten Nanosekunden-Zeitstempel.
     ///
     /// **Hinweis:** Kann die Zeit auch rückwärts setzen; sollte mit Bedacht
@@ -90,26 +82,22 @@ impl ManualClock {
         self.nanos.store(nanos, Ordering::SeqCst);
     }
 
-    // ANCHOR[contextra-testkit:MANUAL-CLOCK-NOW-001]
     /// Liest den aktuellen Zeitstempel in Nanosekunden seit UNIX_EPOCH aus.
     pub fn now_nanos(&self) -> u64 {
         self.nanos.load(Ordering::SeqCst)
     }
 
-    // ANCHOR[contextra-testkit:MANUAL-CLOCK-NOW-SECS-001]
     /// Gibt den aktuellen Zeitstempel als Fließkommazahl in Sekunden zurück.
     pub fn now_secs_f64(&self) -> f64 {
         self.now_nanos() as f64 / 1_000_000_000.0
     }
 
-    // ANCHOR[contextra-testkit:MANUAL-CLOCK-SYSTEM-TIME-001]
     /// Konvertiert den aktuellen Zustand in einen Standard-Rust-[`SystemTime`]-Zeitpunkt.
     pub fn now_system_time(&self) -> SystemTime {
         UNIX_EPOCH + Duration::from_nanos(self.now_nanos())
     }
 }
 
-// ANCHOR[contextra-testkit:MANUAL-CLOCK-TRAIT-IMPL-001]
 impl Clock for ManualClock {
     /// Liefert die Unix-Nanosekunden gemäß `Clock`-Port-Spezifikation.
     fn now_unix_nanos(&self) -> u64 {
@@ -127,7 +115,6 @@ impl Clock for ManualClock {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-testkit:TEST-CLOCK-ADVANCE-001]
     // Prüft das relative Vorstellen der Uhr um verschiedene Zeiteinheiten (ns, s).
     #[test]
     fn test_manual_clock_advance() {
@@ -141,7 +128,6 @@ mod tests {
         assert_eq!(clock.now_nanos(), 1_000_000_150);
     }
 
-    // ANCHOR[contextra-testkit:TEST-CLOCK-SET-001]
     // Prüft das absolute Setzen der Uhr und die Umrechnung in SystemTime.
     #[test]
     fn test_manual_clock_set() {
@@ -154,7 +140,6 @@ mod tests {
         );
     }
 
-    // ANCHOR[contextra-testkit:TEST-CLOCK-DYN-001]
     // Prüft die Nutzung von ManualClock über ein Trait-Objekt `&dyn Clock`.
     #[test]
     fn test_manual_clock_as_dyn_clock() {

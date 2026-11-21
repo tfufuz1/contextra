@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Schichtbasierte Graph-Traversierung (Layer Search) mit Backlink- und Kontextanbindung.
-// INVARIANTEN: Zero-Panic; deterministische Auswertung; Kantenauflösung über SearchContext.
-// HOTSPOTS: search_layer_with_context
-// STAND: 2026-11-12
 
 //! Schichtbasierte Graph-Traversierung im HNSW-Index.
 
@@ -31,7 +26,6 @@ impl HnswIndexCore {
         self.search_layer_with_context(query, query_quantized, entry_points, ef, layer, &[], None)
     }
 
-    // ANCHOR[contextra-vector:HNSW-SEARCH-LAYER-CTX]
     /// Führt die Schichtsuche mit Berücksichtigung vorheriger vorbereiteter Einfügungen aus.
     pub(crate) fn search_layer_with_context(
         &self,

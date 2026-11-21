@@ -1,7 +1,6 @@
 //! # SSTable-Builder (Ring 1)
 //!
 //! Erstellt SSTables aus sortierten Key-Value-Paaren.
-// ANCHOR[contextra-store:SST-BLD-103]
 
 mod block;
 mod meta;

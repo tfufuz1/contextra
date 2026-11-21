@@ -3,11 +3,6 @@
 //! # Zweck
 //! Schätzt Heap- und Peak-Speicherverbrauch für Indexe, Arrays und Kompaktierungsläufe.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use std::collections::HashSet;
@@ -19,7 +14,6 @@ use super::super::types::EdgePayload;
 use super::GraphInner;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// ANCHOR[contextra-graph:SRC-CSR-INNER-ESTIMATE-001]
 
 // SECTION Estimate Core Implementation
 pub struct MemoryEstimate {
@@ -29,7 +23,6 @@ pub struct MemoryEstimate {
 
 impl MemoryEstimate {
     #[inline]
-    // ANCHOR[contextra-graph:SRC-CSR-INNER-ESTIMATE-002]
     pub fn total_bytes(&self) -> usize {
         self.shared_payload_bytes + self.private_bytes
     }

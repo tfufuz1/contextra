@@ -69,7 +69,6 @@ fn make_sample_record(tenant_u64: u64, name: &str, purpose: &str) -> ProcessingA
 
 // 1. Serde JSON Roundtrip
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-001]
 // Prüft: Prüft JSON-Serialisierung und Deserialisierung des Verarbeitungsverzeichnisses.
 fn test_01_registry_json_serde_roundtrip() {
     let rec = make_sample_record(101, "Kundendatenbank", "Vertragsabwicklung");
@@ -85,7 +84,6 @@ fn test_01_registry_json_serde_roundtrip() {
 
 // 2. Bincode Roundtrip
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-002]
 // Prüft: Prüft Bincode-Binär-Serialisierung des Verarbeitungsverzeichnisses.
 fn test_02_registry_bincode_serde_roundtrip() {
     let rec = make_sample_record(202, "Personalverwaltung", "Lohnabrechnung");
@@ -104,7 +102,6 @@ fn test_02_registry_bincode_serde_roundtrip() {
 
 // 3. Golden Test (Deterministic JSON String Output)
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-003]
 // Prüft: Prüft das Schema-Format des Verzeichnisses gegen die Golden-Definition.
 fn test_03_registry_golden_json_format() {
     let rec = ProcessingActivityRecord {
@@ -132,7 +129,6 @@ fn test_03_registry_golden_json_format() {
 
 // 4. Tenant Isolation & Filtering
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-004]
 // Prüft: Prüft die Filterung von Verarbeitungsdatensätzen nach Mandanten-ID.
 fn test_04_tenant_filtering_isolation() {
     let rec_t1 = make_sample_record(1, "Vertrieb", "Kundenakquise");
@@ -153,7 +149,6 @@ fn test_04_tenant_filtering_isolation() {
 
 // 5. Art. 15 Data Subject Access Search (Exact Match)
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-CONS-005]
 // Prüft: Prüft die exakte Volltextsuche für Auskunftsersuchen nach Art. 15 DSGVO.
 async fn test_05_art15_search_exact_matches() {
     let rec1 = make_sample_record(10, "Bewerbermanagement", "Recruiting");
@@ -169,7 +164,6 @@ async fn test_05_art15_search_exact_matches() {
 
 // 6. Art. 15 Search (Empty Query / No Match)
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-CONS-006]
 // Prüft: Prüft die Textsuche bei leeren Abfragen oder fehlenden Treffern.
 async fn test_06_art15_search_empty_or_no_match() {
     let rec = make_sample_record(10, "Support-Tickets", "Kunden-Helpline");
@@ -184,7 +178,6 @@ async fn test_06_art15_search_empty_or_no_match() {
 
 // 7. Art. 15 Search Limit & Score Ordering
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-CONS-007]
 // Prüft: Prüft die Relevanzsortierung und Trefferbegrenzung der Textsuche.
 async fn test_07_art15_search_limit_and_score_ordering() {
     let mut rec1 = make_sample_record(5, "E-Mail Marketing", "Newsletter");
@@ -201,7 +194,6 @@ async fn test_07_art15_search_limit_and_score_ordering() {
 
 // 8. Markdown Rendering Multi-Tenant
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-008]
 // Prüft: Prüft das Rendern einer tabellarischen Markdown-Übersicht für mehrere Mandanten.
 fn test_08_markdown_rendering_multi_tenant() {
     let r1 = make_sample_record(100, "Aktion A", "Zweck A");
@@ -216,7 +208,6 @@ fn test_08_markdown_rendering_multi_tenant() {
 
 // 9. Audit Chain Construction with ManualClock
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-009]
 // Prüft: Prüft den Aufbau einer verketteten Audit-Spur mit deterministischer manueller Uhr.
 fn test_09_audit_chain_construction_manual_clock() {
     let clock = ManualClock::new(100_000_000);
@@ -251,7 +242,6 @@ fn test_09_audit_chain_construction_manual_clock() {
 
 // 10. Audit Chain Tampering Detection at Index 0
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-010]
 // Prüft: Prüft die Manipulationserkennung beim ersten Glied der Audit-Kette.
 fn test_10_audit_chain_tamper_detection_index_0() {
     let clock = ManualClock::new(50_000);
@@ -278,7 +268,6 @@ fn test_10_audit_chain_tamper_detection_index_0() {
 
 // 11. Audit Chain Tampering Detection at Index 1 (Bytes Affected)
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-011]
 // Prüft: Prüft die Manipulationserkennung bei veränderter Byte-Anzahl.
 fn test_11_audit_chain_tamper_bytes_affected() {
     let clock = ManualClock::new(10_000);
@@ -316,7 +305,6 @@ fn test_11_audit_chain_tamper_bytes_affected() {
 
 // 12. Audit Chain Tampering Detection at Index 1 (Subgoal Index)
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-012]
 // Prüft: Prüft die Manipulationserkennung bei geändertem Subgoal-Index.
 fn test_12_audit_chain_tamper_subgoal_index() {
     let clock = ManualClock::new(20_000);
@@ -352,7 +340,6 @@ fn test_12_audit_chain_tamper_subgoal_index() {
 
 // 13. Audit Line Formatter Test
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-013]
 // Prüft: Prüft die Formatierung der Audit-Protokollzeile.
 fn test_13_render_audit_line_format() {
     let clock = ManualClock::new(123_456_789);
@@ -381,7 +368,6 @@ fn test_13_render_audit_line_format() {
 
 // 14. ProcessorRole as_str
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-016]
 // Prüft: Prüft die String-Repräsentationen von ProcessorRole.
 fn test_14_processor_role_as_str() {
     assert_eq!(ProcessorRole::Controller.as_str(), "Verantwortlicher");
@@ -390,7 +376,6 @@ fn test_14_processor_role_as_str() {
 
 // 15. ProcessingRegistryExport Constructor
 #[test]
-// ANCHOR[contextra-privacy:TEST-CONS-017]
 // Prüft: Prüft die Konstruktion eines ProcessingRegistryExport-Objekts.
 fn test_15_processing_registry_export_new() {
     let export = ProcessingRegistryExport::new(vec![]);

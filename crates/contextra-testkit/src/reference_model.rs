@@ -18,14 +18,10 @@
 //! Bei einer Leseoperation mit Sequenznummer `seq` wird die Historie rückwärts
 //! durchsucht, bis der jüngste Eintrag mit `version_seq <= seq` gefunden wird.
 
-// FILE-CONTEXT: Reference MVCC store model for deterministic property testing.
-// STAND: 2026-09-28
-// INVARIANTEN: Rein std, Ring-konform, deterministisch, zero time/rand dependencies.
 
 use std::collections::BTreeMap;
 use std::ops::Bound;
 
-// ANCHOR[contextra-testkit:REF-OP-ENUM-001]
 /// Operation for batch execution on the reference model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefOp {
@@ -35,7 +31,6 @@ pub enum RefOp {
     Delete { key: Vec<u8> },
 }
 
-// ANCHOR[contextra-testkit:REFERENCE-MODEL-STRUCT-001]
 /// Deterministic, std-only MVCC reference model for Contextra store verification.
 ///
 /// **Zweck:** Bietet eine überprüfbare "Ground Truth" für Transaktionsisolation,
@@ -58,7 +53,6 @@ pub struct ReferenceModel {
 }
 
 impl ReferenceModel {
-    // ANCHOR[contextra-testkit:REF-MODEL-NEW-001]
     /// Creates a new empty reference model initialized at sequence number 0.
     pub fn new() -> Self {
         Self {
@@ -68,7 +62,6 @@ impl ReferenceModel {
         }
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-PUT-001]
     /// Stages a `Put` operation in uncommitted pending buffer.
     pub fn put(&mut self, key: &[u8], value: &[u8]) {
         self.pending_writes.push(RefOp::Put {
@@ -77,20 +70,17 @@ impl ReferenceModel {
         });
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-DELETE-001]
     /// Stages a `Delete` operation in uncommitted pending buffer.
     pub fn delete(&mut self, key: &[u8]) {
         self.pending_writes
             .push(RefOp::Delete { key: key.to_vec() });
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-ROLLBACK-001]
     /// Clears any uncommitted pending writes without advancing sequence number.
     pub fn rollback(&mut self) {
         self.pending_writes.clear();
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-COMMIT-001]
     /// Commits all pending operations under a new sequence number.
     ///
     /// Returns the sequence number assigned to this commit batch.
@@ -128,20 +118,17 @@ impl ReferenceModel {
         commit_seq
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-COMMIT-BATCH-001]
     /// Appends `ops` to pending buffer and commits them under a new sequence number.
     pub fn commit_batch(&mut self, ops: Vec<RefOp>) -> u64 {
         self.pending_writes.extend(ops);
         self.commit()
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-SNAPSHOT-SEQ-001]
     /// Returns the current high water mark sequence number.
     pub fn snapshot_seq(&self) -> u64 {
         self.current_seq
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-GET-AT-001]
     /// Retrieves the value of `key` as visible at `seq`.
     ///
     /// Returns `Some(value)` if key exists and was active (not deleted) at `seq`, `None` otherwise.
@@ -161,7 +148,6 @@ impl ReferenceModel {
         latest.1.clone()
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-SCAN-PREFIX-AT-001]
     /// Scans keys starting with `prefix` and returns key-value pairs visible at `seq`.
     ///
     /// **Ablauf:**
@@ -184,7 +170,6 @@ impl ReferenceModel {
         results
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-SCAN-RANGE-AT-001]
     /// Scans key range `[start, end]` (using `Bound`) and returns visible pairs at `seq`.
     pub fn scan_range_at(
         &self,
@@ -211,19 +196,16 @@ impl ReferenceModel {
         results
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-GET-LATEST-001]
     /// Gets the latest committed value for `key`.
     pub fn get_latest(&self, key: &[u8]) -> Option<Vec<u8>> {
         self.get_at(key, self.current_seq)
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-SCAN-PREFIX-LATEST-001]
     /// Scans all entries starting with `prefix` at latest sequence number.
     pub fn scan_prefix_latest(&self, prefix: &[u8]) -> Vec<(Vec<u8>, Vec<u8>)> {
         self.scan_prefix_at(prefix, self.current_seq)
     }
 
-    // ANCHOR[contextra-testkit:REF-MODEL-SNAPSHOT-MAP-AT-001]
     /// Returns a full snapshot map of latest visible key-values at `seq`.
     pub fn snapshot_map_at(&self, seq: u64) -> BTreeMap<Vec<u8>, Vec<u8>> {
         let mut map = BTreeMap::new();
@@ -244,7 +226,6 @@ impl ReferenceModel {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-testkit:TEST-REF-MODEL-ISOLATION-001]
     // Prüft MVCC-Snapshot-Isolation über mehrere Sequenznummern und Präfix-Scans.
     #[test]
     fn test_reference_model_mvcc_isolation() {

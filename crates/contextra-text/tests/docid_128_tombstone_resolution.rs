@@ -220,7 +220,6 @@ impl StorageEngine for MockStorage {
 }
 
 #[cfg(feature = "docid-128")]
-// ANCHOR[contextra-text:TEST-155]
 // Testfall `test_docid_128_tombstone_resolution_exceeding_u64_max`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_docid_128_tombstone_resolution_exceeding_u64_max() -> contextra_types::Result<()> {

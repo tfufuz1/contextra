@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-LOOM-SEQ-LOG]
 //! # Loom-Modell für `SequenceLog` (SPEC-v2 B11)
 #![allow(unexpected_cfgs)]
 

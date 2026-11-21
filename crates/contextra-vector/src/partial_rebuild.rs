@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Lokaler Partial-Rebuild-Trigger für HNSW-Hot-Path-Regionen (F-02).
-// INVARIANTEN: INV-NUC-1: Partial-Rebuild darf globalen HNSW-Graph nicht inkonsistent hinterlassen.
-// NICHT-OFFENSICHTLICH: Ergänzt den globalen HNSW_REBUILD_DELETION_RATIO-Trigger hinter Feature-Flag partial-index-rebuild.
-// STAND: TS:2026-11-11T02:00:00Z
 
 //! F-02: Lokaler Partial-Rebuild-Trigger für HNSW-Hot-Path-Regionen.
 //!
@@ -38,7 +33,6 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 // SECTION Konfiguration
 
-// ANCHOR[contextra-vector:PARTIAL-REBUILD-CONFIG]
 /// Konfiguration für den Partial-Rebuild-Trigger.
 #[derive(Debug, Clone)]
 pub struct PartialRebuildConfig {
@@ -63,7 +57,6 @@ impl Default for PartialRebuildConfig {
 
 // SECTION TraversalTracker & Heuristik-Wächter
 
-// ANCHOR[contextra-vector:PARTIAL-REBUILD-TRACKER]
 /// Ringpuffer für besuchte HNSW-Knoten-IDs während ef_search-Traversierungen.
 #[derive(Debug)]
 pub struct TraversalTracker {
@@ -81,7 +74,6 @@ impl TraversalTracker {
     }
 
     /// Trägt die in einem ef_search-Lauf besuchten Node-IDs ein.
-    // ANCHOR[contextra-vector:PARTIAL-REBUILD-RECORD]
     pub fn record_traversal(&mut self, visited_node_ids: Vec<u64>) {
         if self.config.traversal_window == 0 || visited_node_ids.is_empty() {
             return;
@@ -94,7 +86,6 @@ impl TraversalTracker {
 
     /// Berechnet S_local für alle Hot-Path-Regionen.
     /// Gibt Knoten-IDs zurück, für die S_local > θ_c gilt.
-    // ANCHOR[contextra-vector:PARTIAL-REBUILD-OVERSATURATED]
     pub fn find_oversaturated_regions(
         &self,
         tombstone_map: &BTreeMap<u64, bool>, // node_id → is_tombstoned
@@ -155,7 +146,6 @@ impl TraversalTracker {
 ///
 /// Returns `Some(hot_node_ids)` wenn Partial-Rebuild ausgelöst werden soll,
 /// `None` wenn kein Rebuild nötig.
-// ANCHOR[contextra-vector:PARTIAL-REBUILD-TRIGGER]
 #[cfg(feature = "partial-index-rebuild")]
 pub fn should_trigger_partial_rebuild(
     tracker: &TraversalTracker,

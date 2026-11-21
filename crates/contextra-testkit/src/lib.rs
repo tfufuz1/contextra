@@ -28,46 +28,33 @@
 //!   `contextra-crypto`, `contextra-db`, `contextra-engine`,
 //!   `contextra-graph`, `contextra-mvcc`, `contextra-privacy`, `contextra-store`.
 
-// FILE-CONTEXT
-// STAND: 2026-10-29
-// ZWECK: Deterministic test utilities, ManualClock, InMemoryStorageEngine, InMemoryVectorIndex, InMemoryTextIndex, InMemoryGraphIndex, FaultVfs, ReferenceModel, Mocks, and Conformance suites.
-// INVARIANTEN: No unsafe code allowed in testkit (#![forbid(unsafe_code)]).
 
 #![forbid(unsafe_code)]
 
-// ANCHOR[contextra-testkit:MOD-CONFORMANCE-001]
 /// Modul mit standardisierten Konformitätsprüfsuiten für Contextra-Port-Traits.
 pub mod conformance;
 
-// ANCHOR[contextra-testkit:MOD-FAULT-VFS-001]
 /// Virtuelles Dateisystem mit deterministischer Fehlerinjektion (I/O- und fsync-Failures).
 pub mod fault_vfs;
 
-// ANCHOR[contextra-testkit:MOD-IN-MEM-GRAPH-001]
 /// Deterministische In-Memory-Referenzimplementierung des `GraphIndex`-Ports.
 pub mod in_memory_graph;
 
-// ANCHOR[contextra-testkit:MOD-IN-MEM-STORE-001]
 /// Transaktionale In-Memory-Referenzimplementierung des `StorageEngine`-Ports.
 pub mod in_memory_store;
 
-// ANCHOR[contextra-testkit:MOD-IN-MEM-TEXT-001]
 /// Deterministische In-Memory-Referenzimplementierung des `TextIndex`-Ports.
 pub mod in_memory_text;
 
-// ANCHOR[contextra-testkit:MOD-IN-MEM-VECTOR-001]
 /// Deterministische In-Memory-Referenzimplementierung des `VectorIndex`-Ports.
 pub mod in_memory_vector;
 
-// ANCHOR[contextra-testkit:MOD-MANUAL-CLOCK-001]
 /// Manuell steuerbare Uhr zur reproduzierbaren Zeitmessung im `Clock`-Port.
 pub mod manual_clock;
 
-// ANCHOR[contextra-testkit:MOD-MOCKS-001]
 /// Mocks für externe Provider wie Embedding-Generatoren und Metrik-Sinks.
 pub mod mocks;
 
-// ANCHOR[contextra-testkit:MOD-REF-MODEL-001]
 /// Formales Referenzmodell zur Prüfung von MVCC- und Transaktionsisolationsgarantien.
 pub mod reference_model;
 
@@ -105,7 +92,6 @@ pub use manual_clock::ManualClock;
 pub use mocks::*;
 pub use reference_model::{RefOp, ReferenceModel};
 
-// ANCHOR[contextra-testkit:MINT-WITNESS-001]
 /// Hilfsfunktion zum Erzeugen eines synthetischen [`contextra_ports::scanner::LayerWitness`].
 ///
 /// **Zweck:** Ermöglicht Testsuiten das Instanziieren von Bereinigungs- und Scan-Zeugen

@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Criterion-Benchmark für HNSW-Suchlatenz bei 0% vs. 30% gelöschten Datensätzen (Tombstone-Overhead)
-// INVARIANTEN: Deterministische Vektoren, feste DocIDs, kein thread_rng (INV-INDEX-APPLY-1)
-// HOTSPOTS: 30-100
-// STAND: 2026-11-11
-// BEREICH: AGENTS §6, SPEC §11.4 — VETO-F02 Tombstone-Overhead und Suchlatenz
 
-// ANCHOR[contextra-vector:W11-BENCH-005]
 
 mod common;
 

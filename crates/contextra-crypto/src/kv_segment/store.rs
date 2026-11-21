@@ -7,9 +7,6 @@
 //! - Locks werden immer pro Shard genommen, niemals global über den gesamten Store.
 //! - LRU-Verdrängung rotiert fair über Mandanten, um Starvation zu verhindern.
 
-// FILE-CONTEXT
-// ZWECK: Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation).
-// STAND: TS:2026-09-13T00:00:00Z
 
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicUsize, Ordering};

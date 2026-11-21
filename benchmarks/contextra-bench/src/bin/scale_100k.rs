@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-30
-// ZWECK: Skalierungs-Benchmark fuer 100.000 Dokumente zur Messung von Einfügerat, Suchlatenz und RSS-Speicher
 
 use contextra_db::{Contextra, ContextraConfig};
 use serde::{Deserialize, Serialize};

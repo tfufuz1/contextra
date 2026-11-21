@@ -8,7 +8,6 @@ use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::time::Instant;
 
-// ANCHOR[contextra-graph:TESTS-CSR-BENCHMARK-001]
 #[tokio::test]
 async fn test_csr_delta_buffer_incremental_benchmark() {
     let num_existing_nodes = 10_000;
@@ -128,7 +127,6 @@ async fn test_csr_delta_buffer_incremental_benchmark() {
     );
 }
 
-// ANCHOR[contextra-graph:TESTS-CSR-BENCHMARK-002]
 #[tokio::test]
 async fn test_add_edge_median_latency_10k_nodes_100k_edges() {
     use std::sync::Arc;

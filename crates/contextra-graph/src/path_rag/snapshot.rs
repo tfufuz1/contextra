@@ -1,10 +1,5 @@
 //! Snapshot-isolated PathGraph implementation over `GraphInner`.
 
-// FILE-CONTEXT
-// STAND: 2026-09-28
-// ZWECK: Multi-Version Concurrency Control (MVCC) snapshot-isolated PathGraph for PathRAG.
-// REFERENZ: v17 Teil 6.3 ("PathRAG-Lücke") & Teil 12 (Snapshot-Isolation-Prinzip 6).
-// INVARIANTEN: Zero-allocation view over `GraphInner`; Panic-free execution; Strict visibility rules matching `multi_traverse_at`.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -17,7 +12,6 @@ use crate::hyperedge::{HyperEdge, HyperEdgeId};
 use crate::path_rag::PathGraph;
 
 /// Snapshot-isolated wrapper around `GraphInner` at a specific transaction sequence number (`as_of_tx`).
-// ANCHOR[contextra-graph:SRC-PATH-RAG-SNAPSHOT-001]
 
 // SECTION Snapshot Core Implementation
 pub struct SnapshotPathGraph<'a> {
@@ -27,7 +21,6 @@ pub struct SnapshotPathGraph<'a> {
 
 impl<'a> SnapshotPathGraph<'a> {
     /// Creates a new `SnapshotPathGraph` borrowing `inner` at transaction `as_of_tx`.
-    // ANCHOR[contextra-graph:SRC-PATH-RAG-SNAPSHOT-002]
     pub fn new(inner: &'a GraphInner, as_of_tx: TxId) -> Self {
         Self { inner, as_of_tx }
     }

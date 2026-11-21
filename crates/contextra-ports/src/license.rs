@@ -3,14 +3,12 @@
 //! LINK crates/contextra-ports/src/lib.rs
 //! LINK crates/contextra-ports/src/policy.rs
 //!
-//! // ANCHOR[contextra-ports:LICENSE-001]
 //! // SECTION license-gate-contracts
 //! // NOTE: Autorisierungsverträge für Feature-Ringe (`Fast`, `Sovereign`, `Compliance`).
 //! // Invarianten:
 //! // 1. INV-LIC-TOKEN: `AuthorizedRing` besitzt private Felder und kann nur durch `LicenseGate` gemintet werden.
 //! // 2. Fail-Closed bei abgelaufener oder fehlender Signatur.
 
-// ANCHOR[contextra-ports:VEC-DEL-MODE-001]
 /// Vector deletion mode for vector index maintenance (§15).
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -47,7 +45,6 @@ pub enum FeatureRing {
     Compliance,
 }
 
-// ANCHOR[contextra-ports:AUTH-RING-001]
 /// Token representing an authorized feature ring granting access to engine features (§15).
 ///
 /// `AuthorizedRing` cannot be directly instantiated outside of the `contextra-ports` crate or
@@ -92,7 +89,6 @@ pub enum LicenseError {
     Expired(i64),
 }
 
-// ANCHOR[contextra-ports:LICENSE-GATE-001]
 /// Dyn-kompatibler Port (P27) für Lizenzprüfung — Implementierung (Lizenzserver-Anbindung,
 /// Ed25519-Signaturprüfung analog zum Signaturprüfpfad §14.1) ist NICHT Teil dieses Tickets
 /// und folgt in einem eigenen, separat zu beauftragenden Schritt.

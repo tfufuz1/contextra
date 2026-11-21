@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Persistierungs- und Mmap-Ladelogik fuer GenericHnswIndex ueber write_atomic_with.
-// INVARIANTEN: Persistierung schreibt Header v2 atomar und schuetzt vor unvollstaendigen Zustaenden.
-// HOTSPOTS: GenericHnswIndex::save_internal, GenericHnswIndex::load_mmap_from_instance
-// STAND: TS:2026-11-12T00:00:00Z
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -119,7 +114,6 @@ impl<K: DistanceKernel> GenericHnswIndex<K> {
         Ok(())
     }
 
-    // ANCHOR[contextra-vector:HNSW-SAVE-INTERNAL]
     pub(crate) fn save_internal(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
         let inner = &self.inner;
         let dest = path.as_ref();

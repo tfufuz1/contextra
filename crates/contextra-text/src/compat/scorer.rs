@@ -1,5 +1,4 @@
 //! Bm25Scorer Ports-Adapter (SPEC §6.2 text, B04).
-// ANCHOR[contextra-text:COMPAT-003]
 
 use crate::inverted::InvertedIndex;
 use contextra_ports::{TextIndex, TextIndexStats};
@@ -25,7 +24,6 @@ pub struct Bm25Scorer<S: contextra_ports::StorageEngine> {
 }
 
 impl<S: contextra_ports::StorageEngine> Bm25Scorer<S> {
-    // ANCHOR[contextra-text:LIB-002]
     /// Erzeugt eine neue `Bm25Scorer`-Instanz über der angegebenen Speicher-Engine.
     ///
     /// # Ablauf
@@ -43,7 +41,6 @@ impl<S: contextra_ports::StorageEngine> Bm25Scorer<S> {
 }
 
 impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
-    // ANCHOR[contextra-text:LIB-003]
     /// Führt eine Volltextsuche anhand der Query aus und liefert bis zu `k` Treffer.
     ///
     /// # Ablauf
@@ -54,7 +51,6 @@ impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
         self.index.search(query, k).await
     }
 
-    // ANCHOR[contextra-text:LIB-004]
     /// Führt eine Volltextsuche zu einem bestimmten MVCC-Sequenznummer-Snapshot aus.
     ///
     /// Snapshot-Isolation wird gewahrt, indem nur Einträge berücksichtigt werden,
@@ -63,7 +59,6 @@ impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
         self.index.search_at(query, k, seq_no).await
     }
 
-    // ANCHOR[contextra-text:LIB-005]
     /// Fügt ein Dokument unter der Transaktions-ID `tx` in den Index ein.
     ///
     /// # Ablauf
@@ -73,43 +68,36 @@ impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
         self.index.insert(tx, id, text).await
     }
 
-    // ANCHOR[contextra-text:LIB-006]
     /// Markiert ein Dokument unter der Transaktions-ID `tx` als gelöscht (Tombstone).
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
         self.index.delete(tx, id).await
     }
 
-    // ANCHOR[contextra-text:LIB-007]
     /// Schreibt alle für Transaktion `tx` vorgemerkten Änderungen dauerhaft in die Storage-Engine.
     async fn commit(&self, tx: TxId) -> Result<()> {
         self.index.commit(contextra_ids::TxId::new(tx.inner())).await.map_err(Into::into)
     }
 
-    // ANCHOR[contextra-text:LIB-008]
     /// Verwirft alle für die Transaktion `tx` im Speicher gepufferten Änderungen.
     async fn rollback(&self, tx: TxId) -> Result<()> {
         self.index.rollback(contextra_ids::TxId::new(tx.inner())).await.map_err(Into::into)
     }
 
-    // ANCHOR[contextra-text:LIB-009]
     /// Führt einen Rollback aller Transaktionen bis einschließlich `tx_id` aus.
     async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
         self.index.rollback_to_tx(contextra_ids::TxId::new(tx_id.inner())).await.map_err(Into::into)
     }
 
-    // ANCHOR[contextra-text:LIB-010]
     /// Liefert die höchste im Index registrierte Transaktions-ID.
     async fn last_tx_id(&self) -> Result<TxId> {
         self.index.last_tx_id().await.map(|t| TxId::new(t.inner())).map_err(Into::into)
     }
 
-    // ANCHOR[contextra-text:LIB-011]
     /// Liefert die Gesamtzahl aktiver Dokumente im Index.
     async fn len(&self) -> usize {
         self.index.len().await
     }
 
-    // ANCHOR[contextra-text:LIB-012]
     /// Liefert statistische Kennzahlen über den Textindex (z. B. Dokumentenanzahl, Terme).
     async fn stats(&self) -> Result<TextIndexStats> {
         self.index.stats().await

@@ -25,7 +25,6 @@ pub struct WorkflowState {
 use serde::{Deserialize, Serialize};
 
 // RESOLVED: AGT-CKPT-001 — UTF-8 char counting used for 256 char limit (TS: 2026-09-01T23:07:05Z) (SESSION: 358e3b0a)
-// ANCHOR[contextra-checkpoint:VAL-001]
 /// Validiert Bezeichner-Strings (z. B. Checkpoint-Namen, Collection-IDs) gegen leere Eingaben und Längenbeschränkungen.
 ///
 /// # Zweck
@@ -56,7 +55,6 @@ pub(crate) fn validate_identifier(field_name: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-checkpoint:META-001]
 /// Metadaten für einen persistenten, benannten Checkpoint.
 ///
 /// # Zweck
@@ -118,7 +116,6 @@ impl CheckpointMeta {
         self.to_workflow_state()
     }
 
-    // ANCHOR[contextra-checkpoint:META-002]
     /// Konvertiert die Metadaten in einen [`WorkflowState`].
     ///
     /// # Ablauf:
@@ -134,7 +131,6 @@ impl CheckpointMeta {
     }
 }
 
-// ANCHOR[contextra-checkpoint:STATE-001]
 /// Point-in-Time Checkpoint für einen Agenten-Schritt oder eine Transaktionsgrenze.
 ///
 /// # Zweck

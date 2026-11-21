@@ -1,11 +1,5 @@
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
-// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
-// ANCHOR[contextra-graph:SRC-PPR-FORWARD-PUSH-001]
 //! Forward-Push-Algorithmus (Andersen et al.) für personalisierten PageRank.
 //!
 //! # Zweck

@@ -7,7 +7,6 @@ use contextra_text::morphology::{GermanCompoundSplitter, MorphologicalTokenizer}
 use std::collections::HashSet;
 use std::time::Instant;
 
-// ANCHOR[contextra-text:TEST-188]
 // Testfall `test_rca_investigation_full_suite`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_rca_investigation_full_suite() {

@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Autarke Abstraktion für Transaktions-Staging und Versionsprotokollierung (Inversion of Control).
-// INVARIANTEN: Zero-Panic Doctrine; isolierte Puffer-Verwaltung ohne feste Bindung an konkrete MVCC-Implementierungen.
 
 use crate::types::{DocId, TxId};
 use parking_lot::RwLock;

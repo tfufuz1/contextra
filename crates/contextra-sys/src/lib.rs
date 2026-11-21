@@ -1,5 +1,4 @@
 // =========================================================================
-// ANCHOR[id=sys-lib-main,epic=sys-core,seq=0] Crate-Wurzel und Baukasten-Export
 // =========================================================================
 // LINK crates/contextra-sys/Cargo.toml
 // LINK crates/contextra-sys/SPEC.md
@@ -41,7 +40,6 @@
 //! 8. [`vault`]: RAII-Sicherheitsverwaltung ([`LockedRegions`], [`VaultBuffer`]) für sensible Schlüsselpuffer inklusive sicherem Nullsetzen (Zeroize).
 
 // SECTION Submodule
-// ANCHOR[id=sys-submodules,epic=sys-core,seq=1] Deklaration der internen Module
 // LINK crates/contextra-sys/src/acl_win32.rs
 pub mod acl_win32;
 // LINK crates/contextra-sys/src/contract.rs
@@ -61,7 +59,6 @@ pub mod vault;
 // !SECTION Submodule
 
 // SECTION Baukasten-Zielmodule
-// ANCHOR[id=sys-building-blocks,epic=sys-core,seq=2] Modulare Baukasten-Namespaces
 
 /// Baukasten-Zielmodul `mem`: Kapselt Memory-Locking, Vault-Speicher und Zeroization.
 // LINK crates/contextra-sys/src/mlock.rs
@@ -88,7 +85,6 @@ pub mod map {
 // !SECTION Baukasten-Zielmodule
 
 // SECTION Public Re-exports
-// ANCHOR[id=sys-reexports,epic=sys-core,seq=3] Ergonomische Direktzugriffe
 // NOTE: Re-Exports für ergonomischen Direktzugriff durch übergeordnete Ringe (z. B. contextra-store, contextra-vector).
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
 pub use contract::{MemoryLocker, NoopMemoryLocker, OsMemoryLocker};

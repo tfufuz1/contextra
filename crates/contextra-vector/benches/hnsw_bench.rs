@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Criterion-Benchmark für HNSW Hot-Paths (Insertion Throughput, Query Latency mit k=10 und k=50)
-// INVARIANTEN: Deterministische Vektorgenerierung über festen Seed, iter_batched zur Vermeidung von Speicherallokation im Messbereich
-// HOTSPOTS: 35-100
-// STAND: 2026-11-11
-// BEREICH: AGENTS §6, SPEC §11.4 — HNSW-Suchkomplexität O(log n * ef * d) und Einfügedurchsatz
 
-// ANCHOR[contextra-vector:W11-BENCH-004]
 
 mod common;
 

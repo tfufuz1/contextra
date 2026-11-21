@@ -3,7 +3,6 @@
 // =========================================================================
 // SECTION: campaign_j27_mcp_test
 // =========================================================================
-// ANCHOR[contextra-mcp:ITEST-CAMPAIGN-J-001]
 
 use contextra_mcp::prompt_injection::PromptInjectionGuard;
 use contextra_mcp::sandbox::{McpSandbox, SandboxPolicy, TOOL_REGISTRY};

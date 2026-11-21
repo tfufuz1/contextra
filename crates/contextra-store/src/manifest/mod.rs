@@ -1,8 +1,4 @@
 //! SSTable Manifest for append-only tracking of active SSTable sets.
-// FILE-CONTEXT
-// STAND: 2026-09-11
-// ZWECK: Append-Only Manifest-Protokolldatei zur Verfolgung gültiger SSTables für Crash-Safety.
-// INVARIANTEN: fsync NACH jedem Manifest-Eintrag; Add erst nach fsync der SSTable-Datei.
 
 mod apply;
 mod cleanup;

@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Atomares Schreiben von Persistenz-Dateien (temp -> sync_all -> rename -> dir sync).
-// INVARIANTEN: INV-FSYNC-1 (Fail-closed durability ohne ungesicherte Fehler, Cleanup bei Abbruch).
-// HOTSPOTS: write_atomic, write_atomic_with
-// STAND: TS:2026-11-12T00:00:00Z
 
 use std::fs::File;
 use std::io::{Result, Write};

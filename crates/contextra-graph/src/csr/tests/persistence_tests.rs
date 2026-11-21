@@ -4,11 +4,6 @@
 //! # Zweck
 //! Testet das Replay von Transaktionslogs und die Wiederherstellung persistierter Zustände.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::super::*;
@@ -18,7 +13,6 @@ use contextra_ports::{GraphIndex, StorageEngine};
 use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-001]
 #[tokio::test]
 
 // SECTION Persistence Tests Core Implementation
@@ -62,7 +56,6 @@ async fn test_remove_edge_uncompacted_and_compacted() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-002]
 #[tokio::test]
 async fn test_add_bidirectional() {
     let graph = CsrGraph::new();
@@ -91,7 +84,6 @@ async fn test_add_bidirectional() {
     assert!(n_b.contains(&id_a), "neighbors(B) must contain A");
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-003]
 #[tokio::test]
 async fn test_pagerank_linear_chain() {
     let graph = CsrGraph::new();
@@ -133,7 +125,6 @@ async fn test_pagerank_linear_chain() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-004]
 #[tokio::test]
 async fn test_traverse_handles_cycles_without_infinite_loop() {
     let graph = CsrGraph::new();
@@ -176,7 +167,6 @@ async fn test_traverse_handles_cycles_without_infinite_loop() {
     assert!(!ids.contains(&id_a), "Must not contain start node A");
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-005]
 #[tokio::test]
 async fn test_node_budgeted_cyclic_traversal_termination() {
     let graph = CsrGraph::new();
@@ -226,7 +216,6 @@ async fn test_node_budgeted_cyclic_traversal_termination() {
     }
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-006]
 #[tokio::test]
 async fn test_multi_traverse_keeps_highest_score_per_entity() {
     let graph = CsrGraph::new();
@@ -271,7 +260,6 @@ async fn test_multi_traverse_keeps_highest_score_per_entity() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-019]
 #[tokio::test]
 async fn test_concurrent_add_edge() {
     let graph = Arc::new(CsrGraph::new());
@@ -322,7 +310,6 @@ async fn test_concurrent_add_edge() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-007]
 #[tokio::test]
 async fn test_staged_edges_invisible_to_concurrent_readers() {
     let graph = CsrGraph::new();
@@ -362,7 +349,6 @@ async fn test_staged_edges_invisible_to_concurrent_readers() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-008]
 #[tokio::test]
 async fn test_graph_edges_survive_storage_roundtrip() {
     use crate::test_doubles::InMemoryStorageEngine;
@@ -398,7 +384,6 @@ async fn test_graph_edges_survive_storage_roundtrip() {
     assert!(neighbors.iter().any(|(id, _)| *id == id_b));
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-009]
 #[tokio::test]
 async fn test_csr_graph_traverse_at_filtering() {
     let graph = CsrGraph::new();
@@ -450,7 +435,6 @@ async fn test_csr_graph_traverse_at_filtering() {
     assert!(ids_seq2.contains(&3), "seq 2 traverse must include node 3");
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-010]
 #[tokio::test]
 async fn test_last_tx_id_tracking() {
     let graph = CsrGraph::new();
@@ -483,7 +467,6 @@ async fn test_last_tx_id_tracking() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-011]
 #[tokio::test]
 async fn test_traverse_at_time_exact_boundary_off_by_one() {
     let graph = CsrGraph::new();
@@ -560,7 +543,6 @@ async fn test_traverse_at_time_exact_boundary_off_by_one() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-012]
 #[tokio::test]
 async fn test_traverse_at_time_unbounded_validity() {
     let graph = CsrGraph::new();
@@ -593,7 +575,6 @@ async fn test_traverse_at_time_unbounded_validity() {
 }
 
 proptest::proptest! {
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-013]
     #[test]
     fn test_prop_add_edge_rollback_no_index_growth(
         edge_specs in proptest::collection::vec((1u64..1000, 1001u64..2000), 10..100)
@@ -619,7 +600,6 @@ proptest::proptest! {
         res?;
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-014]
     #[test]
     fn test_prop_edge_visible_monotone(
         vf in 0u64..100,
@@ -633,7 +613,6 @@ proptest::proptest! {
         proptest::prop_assert_eq!(visible, expected);
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-015]
     #[test]
     fn test_prop_traverse_at_time_never_panics(
         node_count in 1..=15usize,
@@ -670,7 +649,6 @@ proptest::proptest! {
     }
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-016]
 #[test]
 fn test_prop_csr_graph_traverse_at_consistency() {
     use proptest::prelude::*;
@@ -791,7 +769,6 @@ fn test_prop_csr_graph_traverse_at_consistency() {
     });
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-017]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_compact_async_CASE_dirty_and_clean_states() {

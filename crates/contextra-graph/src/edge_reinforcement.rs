@@ -1,17 +1,11 @@
 //! F-03: Co-Occurrence- und Traversal-basierte Kantenverstärkung (Edge Weight Reinforcement Learning).
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Dynamisches Kanten-Reinforcement-Lernen.
-// INVARIANTEN: Gewichts-Updates innerhalb definierter Schranken.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use crate::csr::CsrEdge;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-001]
 
 // SECTION Edge Reinforcement Core Implementation
 pub struct EdgeReinforcementConfig {
@@ -41,14 +35,12 @@ mod tests {
     use super::*;
     use crate::types::EntityId;
 
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-002]
     #[test]
     fn test_compute_edge_weight_formula() {
         let score = compute_edge_weight(0.3, 0.7, 0.5);
         assert!((score - 0.5).abs() < f32::EPSILON);
     }
 
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-003]
     #[test]
     fn test_cooccurrence_reinforcement_decay() {
         let mut edge = CsrEdge::new(EntityId::new(1), 1.0);
@@ -62,7 +54,6 @@ mod tests {
         assert!(edge.cooccurrence_weight >= 0.0);
     }
 
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-004]
     #[test]
     fn test_weight_normalization_caps_w_max() {
         let mut edges = vec![
@@ -81,7 +72,6 @@ mod tests {
         assert_eq!(edges[1].cooccurrence_weight, 5.0);
     }
 
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-005]
     #[test]
     fn test_traversal_reinforcement_evaporation() {
         let mut edge = CsrEdge::new(EntityId::new(1), 1.0);
@@ -95,14 +85,12 @@ mod tests {
         assert!(edge.traversal_weight >= 0.0);
     }
 
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-006]
     #[test]
     fn test_compute_edge_weight_extreme_alpha() {
         assert_eq!(compute_edge_weight(0.8, 0.2, 1.0), 0.8);
         assert_eq!(compute_edge_weight(0.8, 0.2, 0.0), 0.2);
     }
 
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-007]
     #[test]
     fn test_apply_weight_normalization_zero_and_below_max() {
         let mut edges = vec![
@@ -120,7 +108,6 @@ mod tests {
         apply_weight_normalization(&mut empty_edges, 10.0);
     }
 
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-008]
     #[test]
     fn test_cooccurrence_reinforcement_triggers_normalization() {
         let mut edge = CsrEdge::new(EntityId::new(1), 1.0);
@@ -137,12 +124,10 @@ mod tests {
 }
 
 #[inline]
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-009]
 pub fn compute_edge_weight(cooccurrence_weight: f32, traversal_weight: f32, alpha: f32) -> f32 {
     alpha * cooccurrence_weight + (1.0 - alpha) * traversal_weight
 }
 
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-010]
 pub fn apply_cooccurrence_reinforcement(
     edge: &mut CsrEdge,
     co_activation: f32,
@@ -153,7 +138,6 @@ pub fn apply_cooccurrence_reinforcement(
     edge.cooccurrence_weight > config.w_max
 }
 
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-011]
 pub fn apply_traversal_reinforcement(
     edge: &mut CsrEdge,
     path_length: usize,
@@ -167,7 +151,6 @@ pub fn apply_traversal_reinforcement(
     edge.traversal_weight = ((1.0 - config.rho) * edge.traversal_weight + reinforcement).max(0.0);
 }
 
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-012]
 pub fn apply_weight_normalization(outgoing_edges: &mut [CsrEdge], w_max: f32) {
     let sum_w: f32 = outgoing_edges.iter().map(|e| e.cooccurrence_weight).sum();
     if sum_w > w_max && sum_w > 0.0 {

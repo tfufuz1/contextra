@@ -40,7 +40,6 @@ pub mod guarded_payload;
 pub mod processing_registry;
 pub mod types;
 
-// ANCHOR[contextra-privacy:LIB-001]
 // Re-Exports für bequemen Zugriff auf die Kernfunktionalitäten
 pub use audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
 pub use bulk_exfiltration_detector::{

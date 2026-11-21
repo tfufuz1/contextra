@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-COARSENING-PROPTEST-ROOT]
 //! # Eigenschaftstest: 0 % False Negatives beim SSI-Coarsening
 //!
 //! Beweist mathematisch über Proptest, dass ein vergröberter (coarsened) Validator

@@ -1,6 +1,5 @@
 //! # Durabilitaets- und Concurrency-Committests
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Prueft HMAC-Wiederherstellung, Budget-Drift, Druckwaechter und Mutex-Freigabe
 

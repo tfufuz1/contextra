@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Schließen von Qualitäts- und Randfall-Lücken in der contextra-vector Test-Suite.
-// INVARIANTEN:
 // 1. ACORN Suche mit 0% Selektivität (kein Treffer) liefert leere Treffermenge ohne Panic.
 // 2. ACORN Suche mit 100% Selektivität liefert identische Ergebnisse wie ungefilterte Suche.
 // 3. SQ8 Quantisierung mit konstanten Vektoren (alle Dimensionen identisch) dividiert nicht durch 0.
@@ -9,7 +6,6 @@
 // HOTSPOTS: 35-150
 // STAND: 2026-11-12
 
-// ANCHOR[contextra-vector:W10-QUALITY-001]
 
 use contextra_ports::VectorIndex;
 use contextra_types::{DistanceMetric, DocId, TxId};

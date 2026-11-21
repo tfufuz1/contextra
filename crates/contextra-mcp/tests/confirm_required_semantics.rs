@@ -2,7 +2,6 @@
 // =========================================================================
 // SECTION: confirm_required_semantics
 // =========================================================================
-// ANCHOR[contextra-mcp:ITEST-CONFIRM-RE-001]
 
 use contextra_mcp::sandbox::{McpSandbox, SandboxPolicy};
 use contextra_mcp::McpServer;

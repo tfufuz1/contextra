@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: ARM NEON SIMD-Intrinsics für f32 Distanzberechnungen.
-// INVARIANTEN: Target-Architektur aarch64 / neon.
 
 //! # Modul `kernels::neon`
 //!
@@ -22,7 +19,6 @@
 use std::arch::aarch64::*;
 
 // SECTION NEON-F32-KERNELS
-// ANCHOR[contextra-simd:NEON-COSINE-F32]
 /// Computes the cosine distance between two `f32` slices using ARM NEON intrinsics.
 ///
 /// # Safety
@@ -85,7 +81,6 @@ pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     1.0 - sim
 }
 
-// ANCHOR[contextra-simd:NEON-EUCLIDEAN-F32]
 /// Computes the Euclidean distance between two `f32` slices using ARM NEON intrinsics.
 ///
 /// # Safety
@@ -131,7 +126,6 @@ pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     sum.sqrt()
 }
 
-// ANCHOR[contextra-simd:NEON-DOT-F32]
 /// Computes the dot product distance between two `f32` slices using ARM NEON intrinsics.
 ///
 /// # Safety

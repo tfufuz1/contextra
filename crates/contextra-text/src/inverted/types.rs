@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-// ANCHOR[contextra-text:INV-001]
 /// Unterstützte Sprachen und Tokenisierungsstrategien für den invertierten Index.
 ///
 /// Steuert, welcher Tokenizer für die Dokumentenindizierung und Suchabfragen verwendet wird.
@@ -18,7 +17,6 @@ pub enum Language {
 }
 
 impl Language {
-    // ANCHOR[contextra-text:INV-002]
     /// Parst einen ISO-639-1 Sprachcode ("de", "de-AT", "en", "en-US").
     ///
     /// Bewertet nur das primäre Subtag vor dem ersten Bindestrich.
@@ -33,7 +31,6 @@ impl Language {
     }
 }
 
-// ANCHOR[contextra-text:INV-003]
 /// Konsolidierte Metadaten des Textindex zur persistenten Speicherung im Schlüssel `meta:stats`.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct TextIndexMetadata {
@@ -45,7 +42,6 @@ pub struct TextIndexMetadata {
     pub avg_doc_len_x1000: u64, // Fixed-point for BM25 caching (FIND-TXT-004)
 }
 
-// ANCHOR[contextra-text:INV-004]
 /// Gepufferte statistische Änderungen einer uncommitted Transaktion.
 #[derive(Default, Clone, Copy, Debug)]
 pub(crate) struct StagedStatsChange {

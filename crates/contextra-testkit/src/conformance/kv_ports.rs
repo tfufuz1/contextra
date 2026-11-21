@@ -11,10 +11,6 @@
 //! - **Regel 10 (Fail-Closed):** Suiten liefern ein `ConformanceResult`, um Panics
 //!   in Test-Harnesses zu vermeiden.
 
-// FILE-CONTEXT
-// STAND: 2026-11-11
-// ZWECK: Conformance suites for KvPrefixStore, KvBridgeStorage, and AttentionExporter.
-// INVARIANTEN: Zero-panic test execution returning ConformanceResult; fail-closed diagnostics; deterministic execution.
 
 use super::failure::{ConformanceFailure, ConformanceResult};
 use bytes::Bytes;
@@ -51,7 +47,6 @@ fn create_sample_blocks(block_ids: &[u64]) -> Vec<KvBlock> {
         .collect()
 }
 
-// ANCHOR[contextra-testkit:CONF-KV-PREFIX-001]
 /// Prüft die Konformität einer [`KvPrefixStore`]-Implementierung gegen ihren dokumentierten Vertrag.
 ///
 /// **Geprüfte Verträge:**
@@ -215,7 +210,6 @@ pub fn run_kv_prefix_store_suite<S: KvPrefixStore>(store: &S) -> ConformanceResu
     Ok(())
 }
 
-// ANCHOR[contextra-testkit:CONF-KV-BRIDGE-001]
 /// Prüft die Konformität einer [`KvBridgeStorage`]-Implementierung gegen ihren dokumentierten Vertrag.
 ///
 /// **Geprüfte Verträge:**
@@ -395,7 +389,6 @@ where
     Ok(())
 }
 
-// ANCHOR[contextra-testkit:CONF-ATTENTION-001]
 /// Prüft die Konformität einer [`AttentionExporter`]-Implementierung gegen ihren dokumentierten Vertrag.
 ///
 /// **Geprüfte Verträge:**

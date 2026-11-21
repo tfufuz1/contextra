@@ -1,8 +1,5 @@
 //! Observability traits and re-exports for memory lifecycle and grounding validation.
 
-// FILE-CONTEXT
-// ZWECK: Observability-Modul für Grounding-Validierung.
-// INVARIANTEN: Re-exportiert primäre Grounding Trait-Definitionen aus `lifecycle`.
 
 pub use super::lifecycle::{GroundingAssessment, GroundingValidator, ResponseGroundingValidator};
 

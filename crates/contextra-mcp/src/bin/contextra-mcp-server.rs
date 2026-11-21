@@ -1,12 +1,6 @@
 // =========================================================================
 // SECTION: contextra-mcp-server
 // =========================================================================
-// ANCHOR[contextra-mcp:CONTEXTRA--001]
-// FILE-CONTEXT
-// STAND:       2026-09-10T19:25:24Z (SESSION: ae8c2fb9)
-// ZWECK:       Binary Entry Point for Contextra MCP Stdio JSON-RPC Server
-// INVARIANTEN: Logs exclusively to stderr; stdout strictly reserved for JSON-RPC transport
-// HOTSPOTS:    main()
 // SIEHE AUCH:  ADR-010, crates/contextra-mcp/src/lib.rs
 
 use contextra::Contextra;

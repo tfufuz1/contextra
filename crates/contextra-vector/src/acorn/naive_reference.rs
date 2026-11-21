@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Naive O(n) Referenzimplementierung für ACORN Recall-Baseline-Vergleiche.
-// INVARIANTEN: NICHT für Produktion — O(n) Referenzimplementierung.
 
 // NICHT für Produktion — O(n) Referenzimplementierung
 

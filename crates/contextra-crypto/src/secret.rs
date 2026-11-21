@@ -9,7 +9,6 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 // !SECTION
 
 // SECTION [epic=crypto-secret,seq=2] Feste Schlüsselcontainer (SecretKey)
-// ANCHOR[contextra-crypto:SEC-001] Fester Schlüsselbehälter mit ZeroizeOnDrop
 // NOTE: Verhindert Speicherlecks und maskiert Ausgaben in Logs (TS:2026-11-11)
 pub struct SecretKey<const N: usize> {
     bytes: [u8; N],
@@ -65,7 +64,6 @@ impl<const N: usize> Eq for SecretKey<N> {}
 // !SECTION
 
 // SECTION [epic=crypto-secret,seq=3] Dynamische Geheimbehälter (Secret)
-// ANCHOR[contextra-crypto:SEC-002] Generischer Geheimbehälter
 pub struct Secret<T: Zeroize> {
     inner: T,
 }

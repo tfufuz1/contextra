@@ -235,7 +235,6 @@ fn generate_english_doc(doc_idx: usize) -> String {
     doc
 }
 
-// ANCHOR[contextra-text:TEST-134]
 // Testfall `run_profile_10k_documents`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 #[ignore = "manuelles Profiling-Harness, 10k Dokumente, nicht Teil des Gates"]

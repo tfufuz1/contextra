@@ -4,9 +4,6 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `kv_segment_proptests`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// FILE-CONTEXT
-// ZWECK: Property-based Tests für KvSegment, TenantIsolatedKvStore und LRU-Eviction.
-// STAND: TS:2026-09-09T13:17:00Z (SESSION: a413a598)
 
 #![forbid(unsafe_code)]
 

@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Konstruktoren und Initialisierungslogik fuer HnswIndex.
-// INVARIANTEN: Determinismus B11: Zeit- und Zufallsquellen koennen explizit injiziert werden.
-// HOTSPOTS: HnswIndex::try_new_with_rng_and_clock
-// STAND: TS:2026-11-12T00:00:00Z
 
 use roaring::RoaringTreemap;
 use std::collections::BTreeMap;
@@ -22,7 +17,6 @@ use crate::hnsw::sq8_bias::Sq8Bias;
 
 impl HnswIndex {
     /// Creates a new HNSW index with explicit random number generator and clock injection for full determinism (B11).
-    // ANCHOR[contextra-vector:HNSW-NEW-RNG-CLOCK]
     pub fn try_new_with_rng_and_clock(
         config: HnswConfig,
         rng: std::sync::Arc<dyn crate::types::Rng>,

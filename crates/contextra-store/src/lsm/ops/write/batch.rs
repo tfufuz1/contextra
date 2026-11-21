@@ -1,6 +1,5 @@
 //! # Batch-Löschungen und Mengenoperationen (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: delete_many mit Schranke MAX_BATCH_SIZE
 //! // INVARIANTEN: MAX_BATCH_SIZE Schranke, fail-closed

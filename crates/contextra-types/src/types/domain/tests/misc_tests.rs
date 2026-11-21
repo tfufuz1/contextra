@@ -215,7 +215,6 @@ proptest::proptest! {
     }
 }
 
-// ANCHOR[TEST:CORE-001] STATUS:DONE (TS:2026-08-31T21:13:44Z) (SESSION: e459bd5f)
 // REVIEW-PASS[1/2] STATUS:PASS (ID: TEST:CORE-001) (TS: 2026-08-31T21:15:00Z) (SESSION: b8e4f1a2)
 // PRÜFER-KONTEXT: FRESH
 // BEFUND: Verified BLAKE3 truncation collision freedom across 100k random keys.

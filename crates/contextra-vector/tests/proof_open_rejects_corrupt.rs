@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Verifiziert, dass manipulierte oder beschädigte Header deterministisch mit typisierten Fehlern abgewiesen werden (Zero-Panic, Datei byte-identisch).
 
 use std::fs;
 use contextra_vector::persistence::{HnswHeader, MmapIndex};

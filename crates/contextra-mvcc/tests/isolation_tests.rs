@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-ISOLATION-ROOT]
 //! # Umfassende Isolations- und Nebenläufigkeitstests für `contextra-mvcc`
 //!
 //! Verifiziert die fundamentalen Garantien der Multi-Version Concurrency Control:

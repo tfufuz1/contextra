@@ -55,7 +55,6 @@ impl BuildHasher for DeterministicBuildHasher {
     }
 }
 
-// ANCHOR[contextra-privacy:BED-001]
 /// Eindeutige Sitzungs-Kennung (SessionId) zur Gruppierung von Egress-Rate-Limiting-Buckets.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SessionId(pub String);
@@ -72,7 +71,6 @@ impl From<&str> for SessionId {
     }
 }
 
-// ANCHOR[contextra-privacy:BED-002]
 /// Ergebnis der Auswertung des ausgehenden Datenvolumens gegen die konfigurierten Sitzungslimits.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BulkExfiltrationOutcome {
@@ -87,7 +85,6 @@ pub enum BulkExfiltrationOutcome {
     },
 }
 
-// ANCHOR[contextra-privacy:BED-003]
 // Interner Zähler mit gleitendem Zeitfenster (Sliding Window) für eine einzelne Sitzung.
 #[derive(Debug)]
 struct SlidingWindowCounter {
@@ -103,7 +100,6 @@ impl SlidingWindowCounter {
         }
     }
 
-    // ANCHOR[contextra-privacy:BED-004]
     // Entfernt abgelaufene Einträge außerhalb von `window_nanos` relativ zu `now_nanos`.
     // Behandelt Zeitanomalien (`now_nanos < timestamp_nanos`) und liefert `false`, falls die Zeit rückwärts lief.
     fn prune_and_sum(&mut self, now_nanos: u64, window_nanos: u64) -> bool {
@@ -123,7 +119,6 @@ impl SlidingWindowCounter {
         true
     }
 
-    // ANCHOR[contextra-privacy:BED-005]
     // Registriert den Kandidaten-Payload und prüft, ob das Limit überschritten wird.
     fn record_and_check(
         &mut self,
@@ -154,7 +149,6 @@ impl SlidingWindowCounter {
     }
 }
 
-// ANCHOR[contextra-privacy:BED-006]
 /// Volumen- und Zeitfenster-basierter Rate-Limiter für Cloud-Egress-Anfragen (Layer 4).
 pub struct BulkExfiltrationDetector {
     /// Maximal zulässige Bytes pro Zeitfenster.
@@ -175,7 +169,6 @@ impl std::fmt::Debug for BulkExfiltrationDetector {
 }
 
 impl BulkExfiltrationDetector {
-    // ANCHOR[contextra-privacy:BED-007]
     /// Erstellt einen neuen `BulkExfiltrationDetector` mit Standard-Systemzeit-Clock.
     ///
     /// # Parameter
@@ -185,7 +178,6 @@ impl BulkExfiltrationDetector {
         Self::with_clock(max_bytes_per_window, window, Arc::new(SystemClock::new()))
     }
 
-    // ANCHOR[contextra-privacy:BED-008]
     /// Erstellt einen neuen `BulkExfiltrationDetector` mit einem spezifischen [`Clock`]-Port.
     ///
     /// # Parameter
@@ -205,7 +197,6 @@ impl BulkExfiltrationDetector {
         }
     }
 
-    // ANCHOR[contextra-privacy:BED-009]
     /// Registriert `payload_len` Bytes für `session` und bewertet, ob das Limit im gleitenden Fenster überschritten wurde.
     ///
     /// Thread-sicher für nebenläufige Anfragen über mehrere Sitzungen hinweg.
@@ -221,7 +212,6 @@ impl BulkExfiltrationDetector {
         self.record_and_check_with_clock(session, payload_len, self.clock.as_ref())
     }
 
-    // ANCHOR[contextra-privacy:BED-010]
     /// Registriert Bytes für eine Sitzung unter Verwendung einer explizit übergebenen [`Clock`].
     pub fn record_and_check_with_clock(
         &self,
@@ -232,7 +222,6 @@ impl BulkExfiltrationDetector {
         self.record_and_check_at_nanos(session, payload_len, clock.monotonic_nanos())
     }
 
-    // ANCHOR[contextra-privacy:BED-011]
     /// Interner Hilfsablauf zur Auswertung an einem expliziten Nanosekunden-Zeitstempel.
     ///
     /// # Ablauf
@@ -301,7 +290,6 @@ mod tests {
         }
     }
 
-    // ANCHOR[contextra-privacy:TEST-BED-001]
     // Prüft, dass eine einzelne Anfrage unterhalb des Limits erlaubt wird.
     #[test]
     fn test_single_request_under_limit_allowed() {
@@ -312,7 +300,6 @@ mod tests {
         assert_eq!(outcome, BulkExfiltrationOutcome::Allow);
     }
 
-    // ANCHOR[contextra-privacy:TEST-BED-002]
     // Prüft, dass kumulierte Anfragen oberhalb des Limits blockiert werden.
     #[test]
     fn test_cumulative_requests_exceeding_limit_blocked() {
@@ -334,7 +321,6 @@ mod tests {
         );
     }
 
-    // ANCHOR[contextra-privacy:TEST-BED-003]
     // Prüft, dass das abgelaufene Zeitfenster das verbrauchte Datenvolumen wieder freigibt.
     #[test]
     fn test_sliding_window_expiry_resets_volume() {
@@ -361,7 +347,6 @@ mod tests {
         assert_eq!(out3, BulkExfiltrationOutcome::Allow);
     }
 
-    // ANCHOR[contextra-privacy:TEST-BED-004]
     // Prüft die strikte Trennung und Isolation verschiedener Sitzungs-Buckets.
     #[test]
     fn test_session_isolation() {
@@ -392,7 +377,6 @@ mod tests {
         );
     }
 
-    // ANCHOR[contextra-privacy:TEST-BED-005]
     // Prüft, dass nebenläufige parallele Anfragen kein Umgehen des Limits durch Race Conditions erlauben.
     #[tokio::test]
     async fn test_concurrent_requests_prevent_limit_bypass_race() {
@@ -421,7 +405,6 @@ mod tests {
         assert_eq!(blocked_count, 4);
     }
 
-    // ANCHOR[contextra-privacy:TEST-BED-006]
     // Prüft das Fail-Closed-Verhalten bei einer Zeitregression (nicht-monotone Zeitänderung).
     #[test]
     fn test_time_regression_fails_closed() {
@@ -435,7 +418,6 @@ mod tests {
         assert!(matches!(outcome, BulkExfiltrationOutcome::Block { .. }));
     }
 
-    // ANCHOR[contextra-privacy:TEST-BED-007]
     // Prüft Deterministischen Hasher und BuildHasher explizit (finish & build_hasher).
     #[test]
     fn test_deterministic_hasher_and_build_hasher() {

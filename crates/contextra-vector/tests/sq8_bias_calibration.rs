@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Mathematische Kalibrierung des SQ8 Asymmetric Distance Bias.
-// INVARIANTEN: Erwartungswert des Schätzfehlers konvergiert gegen 0.
-// HOTSPOTS: 15-25
-// STAND: 2026-11-12
 // Testpflicht AK-12 (docs/specs/CONTEXTRA_SPEC_v2.md / Spec §15.2)
 
 use contextra_vector::DistanceMetric;

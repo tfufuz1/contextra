@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Criterion-Benchmark für SQ8 Skalar-Quantisierung (Train, Quantize, Dequantize, Asymmetrische/Symmetrische Distanzen)
-// INVARIANTEN: Deterministische Trainings- und Testdaten über festen Seed, keine thread_rng-Nutzung
-// HOTSPOTS: 25-70
-// STAND: 2026-11-11
-// BEREICH: AGENTS §6, SPEC §11.4 — SQ8-Quantisierung und Nachranking
 
-// ANCHOR[contextra-vector:W11-BENCH-003]
 
 mod common;
 

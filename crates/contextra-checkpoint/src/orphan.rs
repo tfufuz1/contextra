@@ -24,11 +24,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-// ANCHOR[contextra-checkpoint:ORP-001]
 /// Typ-Alias für Sequenznummern, die als gepinnte Checkpoint-Identifikatoren verwaltet werden.
 pub type PinId = u64;
 
-// ANCHOR[contextra-checkpoint:ORP-002]
 /// Bericht über wiederhergestellte und aufgeräumte verwaiste Pins und Checkpoints.
 ///
 /// # Felder
@@ -64,7 +62,6 @@ fn warn_deprecated_global_orphan_path() {
     });
 }
 
-// ANCHOR[contextra-checkpoint:ORP-003]
 /// Veralteter globaler Zugriff auf die Orphan-Registry.
 ///
 /// # Historie & ADR-053
@@ -91,7 +88,6 @@ fn default_data_dir() -> std::path::PathBuf {
     std::env::temp_dir()
 }
 
-// ANCHOR[contextra-checkpoint:ORP-004]
 /// Liest einen Millisekunden-Zeitstempel deterministisch über die übergebene Clock-Port-Instanz.
 ///
 /// # Parameter
@@ -101,7 +97,6 @@ pub fn monotonic_timestamp_ms_with(clock: &dyn Clock) -> u64 {
     clock.now_unix_nanos() / 1_000_000
 }
 
-// ANCHOR[contextra-checkpoint:ORP-005]
 /// Liest den Millisekunden-Zeitstempel über die standardmäßige SystemClock.
 pub fn monotonic_timestamp_ms() -> u64 {
     let clock = SystemClock::new();
@@ -118,7 +113,6 @@ fn orphan_pin_file_path() -> std::path::PathBuf {
     default_data_dir().join("contextra_orphaned_pins.json")
 }
 
-// ANCHOR[contextra-checkpoint:ORP-006]
 /// Persistente Append-Only-Registry für verwaiste Sequenz-Pins (ADR-052).
 ///
 /// Veraltet zugunsten von [`InstanceOrphanRegistry`].
@@ -203,7 +197,6 @@ fn orphan_file_path() -> std::path::PathBuf {
     default_data_dir().join("contextra_orphaned_checkpoints.json")
 }
 
-// ANCHOR[contextra-checkpoint:ORP-007]
 /// Verwaiste gepinnte Sequenznummer — wird beim Recovery verarbeitet.
 ///
 /// # Felder
@@ -230,7 +223,6 @@ pub fn register_pinned_seq_no_orphan(orphan: PinnedSeqNoOrphan) {
     );
 }
 
-// ANCHOR[contextra-checkpoint:ORP-008]
 /// Serialisierbarer Gesamtzustand aller verwaisten Checkpoints und Pins einer Instanz.
 ///
 /// # Felder
@@ -297,7 +289,6 @@ impl OrphanState {
     }
 }
 
-// ANCHOR[contextra-checkpoint:ORP-009]
 /// Instanz-gebundene Orphan-Registry für Checkpoints und gepinnte Sequenznummern (ADR-053).
 ///
 /// # Thread-Sicherheit & Nebenläufigkeit
@@ -431,7 +422,6 @@ impl InstanceOrphanRegistry {
         }
     }
 
-    // ANCHOR[contextra-checkpoint:ORP-010]
     /// Registriert einen verwaisten Sequenz-Pin rein im Arbeitsspeicher ohne blockierendes Disk-I/O.
     ///
     /// # Crash-Safety & RAII Drop Semantik
@@ -453,7 +443,6 @@ impl InstanceOrphanRegistry {
         }
     }
 
-    // ANCHOR[contextra-checkpoint:ORP-011]
     /// Registriert einen verwaisten Checkpoint rein im Arbeitsspeicher ohne blockierendes Disk-I/O.
     ///
     /// # Crash-Safety & RAII Drop Semantik
@@ -473,7 +462,6 @@ impl InstanceOrphanRegistry {
         }
     }
 
-    // ANCHOR[contextra-checkpoint:ORP-012]
     /// Flusht die In-Memory-Einträge asynchron auf Festplatte, sofern Änderungen vorliegen (`is_dirty`).
     ///
     /// # Ablauf von `flush_orphan_registry`:

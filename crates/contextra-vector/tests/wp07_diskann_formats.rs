@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Bit-Flip- und Trunkierungsprüfungen für DANN/PWAL/TWAL-Formate gegen Golden-Dateien (WP-VEC-07).
-// INVARIANTEN: Zero-Panic bei korrupten oder verkürzten Headern; sichere Fehlerbehandlung oder Fallback.
-// STAND: 2026-11-11
 
 #![cfg(feature = "experimental-diskann")]
 

@@ -21,10 +21,6 @@
 
 #![allow(unexpected_cfgs)]
 
-// FILE-CONTEXT
-// STAND: 2026-09-28T00:00:00Z
-// ZWECK: Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone.
-// INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen.
 
 /// Trait zur Abstraktion von Snapshot-Pinning-Mechanismen während des SSTable-Klonens.
 pub trait SnapshotPinner: Send + Sync {
@@ -113,7 +109,6 @@ mod fs {
     pub struct LoomMetadata;
 }
 
-// ANCHOR[contextra-checkpoint:CLONE-001]
 /// Ergebnisstruktur einer durchgeführten Hardlink-Klon-Operation für SSTables.
 ///
 /// # Zweck
@@ -139,7 +134,6 @@ pub struct HardlinkCloneResult {
     pub wal_tail_offset: Option<u64>,
 }
 
-// ANCHOR[contextra-checkpoint:CLONE-002]
 /// Trait für die Schnittstelle zum physischen SSTable-Klonen via Hardlinks.
 ///
 /// # Zweck
@@ -170,7 +164,6 @@ pub trait CheckpointHardlinkCloner: Send + Sync {
     ) -> BoxFuture<'a, Result<HardlinkCloneResult>>;
 }
 
-// ANCHOR[contextra-checkpoint:CLONE-003]
 /// Produktive Implementierung von [`CheckpointHardlinkCloner`] basierend auf `tokio::fs`.
 ///
 /// Nutzt asynchrone Dateisystem-Operationen ohne den Haupt-Thread zu blockieren.
@@ -185,7 +178,6 @@ impl DefaultHardlinkCloner {
 }
 
 impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
-    // ANCHOR[contextra-checkpoint:CLONE-004]
     // Ablauf von `clone_sstable_hardlinks`:
     // 1. Snapshot in der `SnapshotRegistry` pinnen (_guard verhindert Compactor-Bereinigung).
     // 2. Zielverzeichnis anlegen falls noch nicht vorhanden.
@@ -277,7 +269,6 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
     }
 }
 
-// ANCHOR[contextra-checkpoint:CLONE-005]
 /// Hilfsfunktion zur Erkennung plattformspezifischer Cross-Device-Link-Fehler (z. B. EXDEV).
 ///
 /// # Ablauf:

@@ -9,7 +9,6 @@ use contextra_ports::SequentialIdGen;
 use contextra_types::error::Result;
 use std::sync::Arc;
 
-// ANCHOR[contextra:TEST-AMI-001]
 /// Test-Double für Vektoreinbettungen.
 struct MockEmbedder;
 
@@ -23,7 +22,6 @@ impl TextEmbeddingEngine for MockEmbedder {
     }
 }
 
-// ANCHOR[contextra:TEST-AMI-002]
 // Prüft, dass zwei unabhängig instanziierte AgentMemory-Systeme mit gleichem IdGen-Startwert identische, deterministische MemoryIds erzeugen.
 #[tokio::test]
 async fn test_agent_memory_deterministic_id_generation(
@@ -70,7 +68,6 @@ async fn test_agent_memory_deterministic_id_generation(
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-AMI-003]
 // Verifiziert, dass bei fehlendem IdGen-Port deterministische IDs mit 'fallback-'-Präfix generiert werden und recall fehlerfrei funktioniert.
 #[tokio::test]
 async fn test_agent_memory_fallback_id_generation(

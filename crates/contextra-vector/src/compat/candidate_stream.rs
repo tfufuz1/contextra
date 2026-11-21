@@ -1,7 +1,3 @@
-// FILE-CONTEXT: On-demand candidate streaming for vector search.
-// ZWECK: Liefert Vector-Kandidaten in Batches à 16 (oder konfigurierbar) via geometrisches Nachladen.
-// INVARIANTEN: #![forbid(unsafe_code)], zero panic/unwrap, max_depth = MAX_SEARCH_K.
-// STAND: TS:2026-11-11T02:00:00Z
 
 use crate::types::{DocId, ScoredDocument, MAX_SEARCH_K};
 use crate::error::Result;
@@ -13,14 +9,12 @@ use std::collections::{BTreeSet, VecDeque};
 
 // SECTION Konfiguration & Konstanten
 
-// ANCHOR[contextra-vector:STREAM-BATCH-SIZE]
 /// Default batch size for vector candidate retrieval.
 pub const DEFAULT_VECTOR_STREAM_BATCH_SIZE: usize = 16;
 // !SECTION
 
 // SECTION VectorCandidateStream Implementierung
 
-// ANCHOR[contextra-vector:STREAM-STRUCT]
 /// On-demand loading async pull-stream for vector search candidates.
 ///
 /// # Candidate Ordering & Determinism
@@ -62,7 +56,6 @@ pub struct VectorCandidateStream<'a, V: VectorIndex> {
 
 impl<'a, V: VectorIndex> VectorCandidateStream<'a, V> {
     /// Creates a new vector candidate stream for a query and index snapshot.
-    // ANCHOR[contextra-vector:STREAM-NEW]
     pub fn new(index: &'a V, query: impl Into<Vec<f32>>, seq_no: Option<u64>) -> Self {
         Self {
             index,
@@ -85,7 +78,6 @@ impl<'a, V: VectorIndex> VectorCandidateStream<'a, V> {
 
     /// Fetches the next batch of candidate documents (up to `batch_size`).
     /// Returns an empty `Vec` when exhausted.
-    // ANCHOR[contextra-vector:STREAM-NEXT-BATCH]
     pub async fn next_batch(&mut self) -> Result<Vec<ScoredDocument>> {
         while self.buffer.len() < self.batch_size && !self.exhausted {
             self.refill().await?;
@@ -104,7 +96,6 @@ impl<'a, V: VectorIndex> VectorCandidateStream<'a, V> {
 
     /// Fetches the next single candidate document ID.
     /// Returns `Ok(None)` when exhausted.
-    // ANCHOR[contextra-vector:STREAM-NEXT-DOC]
     pub async fn next_doc(&mut self) -> Result<Option<DocId>> {
         if self.buffer.is_empty() && !self.exhausted {
             self.refill().await?;
@@ -138,7 +129,6 @@ impl<'a, V: VectorIndex> VectorCandidateStream<'a, V> {
         MAX_SEARCH_K
     }
 
-    // ANCHOR[contextra-vector:STREAM-REFILL]
     async fn refill(&mut self) -> Result<()> {
         if self.exhausted {
             return Ok(());

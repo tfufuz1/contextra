@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// HERKUNFT: Stand commit f92caabaa (crates/contextra-vector/src/distance.rs)
-// ZWECK: Unveränderte Legacy-Referenzimplementierung für skalare Vektordistanzen.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LegacyDistanceMetric {

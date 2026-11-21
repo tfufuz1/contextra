@@ -2,7 +2,6 @@
 //!
 //! Zweck: Sequentieller Aufbau vollständiger SSTables (V4 MFSX / Legacy V3 MFST)
 //! inklusive Index-Block, Bloom-Filter, Trailer und atomarem Schreiben (tmp -> rename -> fsync).
-// ANCHOR[contextra-store:SST-BLD-102]
 
 use super::block::BlockBuilder;
 use super::meta::SstableMetadata;

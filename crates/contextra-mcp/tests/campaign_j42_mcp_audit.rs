@@ -2,7 +2,6 @@
 // =========================================================================
 // SECTION: campaign_j42_mcp_audit
 // =========================================================================
-// ANCHOR[contextra-mcp:ITEST-CAMPAIGN-J-001]
 
 use contextra::collection_profile::DeploymentTier;
 use contextra_crypto::AuditChain;

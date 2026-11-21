@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Test matrix of PerformanceProfile x KvDeleteMode combinations (Spec B.1.8)
 
 //! # Integrationstest: `collection_profile_matrix`
 //!
@@ -16,7 +14,6 @@ use contextra::collection_profile::{
 };
 use contextra::performance_profile::PerformanceProfile;
 
-// ANCHOR[contextra:TEST-CPM-001]
 // Prüft alle Permutationen von PerformanceProfile (Compliance, Balanced, BareMetal) und KvDeleteMode (TombstoneOnly, CryptoShred) auf korrekte Validierung bzw. Ablehnung bei Inkompatibilität.
 #[test]
 fn test_collection_profile_matrix() {

@@ -10,7 +10,6 @@ use contextra_graph::CsrGraph;
 use contextra_types::{EntityId, TxId};
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:TESTS-LEANRAG-GRAPH-SINK-BATCH-COMMIT-001]
 #[test]
 fn test_batch_commit_single_rcu_publish_and_atomic_rollback() {
     let graph = CsrGraph::new();

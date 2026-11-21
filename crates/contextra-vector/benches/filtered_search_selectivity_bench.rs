@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Criterion-Benchmark zur Messung des Recall-Abfalls und der Latenz von search_filtered
-// INVARIANTEN: Deterministische Vektoren und DocIDs, feste Seed-Initialisierung
-// HOTSPOTS: 60-140
-// STAND: 2026-11-11
-// BEREICH: AGENTS §6, SPEC §11.4 — DiskANN gefilterte Suche und Selektivitäts-Trade-offs
 
-// ANCHOR[contextra-vector:W11-BENCH-010]
 
 mod common;
 

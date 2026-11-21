@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Agent Memory Facade (Ring 4) — Provides a clean remember/recall/forget/relate API for AI Agents.
-// INVARIANTEN: #![forbid(unsafe_code)]; Zero panic doctrine (.unwrap/.expect forbidden); Wraps Contextra engine without changing business logic.
 
 //! # Modul: Agent Memory Facade (Ring 4)
 //!
@@ -37,7 +34,6 @@ use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-// ANCHOR[contextra:MEM-001]
 /// Globaler atomarer Sequenzzähler für deterministische Fallback-IDs bei fehlendem `IdGen`.
 static FALLBACK_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -49,7 +45,6 @@ static FALLBACK_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 /// - (b) This fallback mechanism is strictly utilized only when no explicit `IdGen` was injected.
 /// - (c) For production deployments requiring strict replay determinism across process restarts, an `IdGen`
 ///   must be explicitly injected via `AgentMemory::with_id_gen` or `AgentMemory::new_with_id_gen`.
-// ANCHOR[contextra:MEM-002]
 /// Generiert eine deterministische Fallback-ID (`"fallback-1"`, `"fallback-2"` etc.), wenn kein expliziter
 /// [`IdGen`]-Port in `AgentMemory` injiziert wurde.
 ///
@@ -62,7 +57,6 @@ fn next_fallback_id() -> String {
     format!("fallback-{seq}")
 }
 
-// ANCHOR[contextra:MEM-003]
 /// Eindeutiger, typisierter Identifikator für eine in [`AgentMemory`] abgelegte Erinnerung.
 ///
 /// Kapselt den internen Dokument-ID-String der Datenbank-Engine.
@@ -105,7 +99,6 @@ impl fmt::Display for MemoryId {
     }
 }
 
-// ANCHOR[contextra:MEM-004]
 /// Eindeutiger Identifikator für eine n-äre Beziehung (Hyperedge) im Wissensgraphen.
 ///
 /// Kapselt den 64-Bit-Graphenschlüssel der Wissensgraphen-Engine.
@@ -118,7 +111,6 @@ impl fmt::Display for RelationId {
     }
 }
 
-// ANCHOR[contextra:MEM-005]
 /// Repräsentation einer aus dem Speicher abgerufenen Erinnerung (`recall`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Memory {
@@ -146,7 +138,6 @@ impl From<SearchResult> for Memory {
     }
 }
 
-// ANCHOR[contextra:MEM-006]
 /// High-Level-Fassade für die Verwaltung des Agentengedächtnisses.
 ///
 /// Bietet die Kernoperationen:
@@ -161,7 +152,6 @@ pub struct AgentMemory {
 }
 
 impl AgentMemory {
-    // ANCHOR[contextra:MEM-007]
     /// Erstellt eine neue `AgentMemory`-Instanz, indem die übergebene `Contextra`-Engine in ein `Arc` gehüllt wird.
     pub fn new(engine: Contextra) -> Self {
         Self {
@@ -170,7 +160,6 @@ impl AgentMemory {
         }
     }
 
-    // ANCHOR[contextra:MEM-008]
     /// Erstellt eine neue `AgentMemory`-Instanz um ein bereits geteiltes `Arc<Contextra>`.
     pub fn new_arc(engine: Arc<Contextra>) -> Self {
         Self {
@@ -179,7 +168,6 @@ impl AgentMemory {
         }
     }
 
-    // ANCHOR[contextra:MEM-009]
     /// Erstellt eine Instanz mit einem explizit injizierten ID-Generator-Port.
     pub fn new_with_id_gen(engine: Contextra, id_gen: Arc<dyn IdGen>) -> Self {
         Self {
@@ -188,14 +176,12 @@ impl AgentMemory {
         }
     }
 
-    // ANCHOR[contextra:MEM-010]
     /// Injiziert oder aktualisiert den ID-Generator nachträglich (Builder-Muster).
     pub fn with_id_gen(mut self, id_gen: Arc<dyn IdGen>) -> Self {
         self.id_gen = Some(id_gen);
         self
     }
 
-    // ANCHOR[contextra:MEM-011]
     /// Liefert eine Referenz auf die zugrundeliegende [`Contextra`]-Engine.
     pub fn engine(&self) -> &Contextra {
         &self.engine
@@ -215,7 +201,6 @@ impl AgentMemory {
     ///   an explicit `IdGen` should be injected via `with_id_gen` or `new_with_id_gen`.
     ///
     /// Delegates directly to `Contextra::insert_text_only`.
-    // ANCHOR[contextra:MEM-012]
     /// Speichert eine Text-Erinnerung mit optionalen JSON-Metadaten.
     ///
     /// # Ablauf von `remember`:
@@ -247,7 +232,6 @@ impl AgentMemory {
     /// Retrieves top-k matching memories for a natural language query text string.
     ///
     /// Delegates directly to `Contextra::search_text` and transforms each `SearchResult` into a `Memory`.
-    // ANCHOR[contextra:MEM-013]
     /// Ruft die Top-k relevantesten Erinnerungen zu einer Suchanfrage ab.
     ///
     /// Delegiert direkt an `Contextra::search_text` und transformiert Ergebnisse in [`Memory`]-Objekte.
@@ -259,7 +243,6 @@ impl AgentMemory {
     /// Deletes a memory entry by its `MemoryId`.
     ///
     /// Delegates directly to `Contextra::delete`.
-    // ANCHOR[contextra:MEM-014]
     /// Entfernt eine Erinnerung anhand ihrer [`MemoryId`].
     ///
     /// Delegiert direkt an `Contextra::delete`.
@@ -270,7 +253,6 @@ impl AgentMemory {
     /// Establishes a directed knowledge-graph relationship between two memories with a given label.
     ///
     /// Delegates directly to `Contextra::relate`.
-    // ANCHOR[contextra:MEM-015]
     /// Erstellt eine gerichtete Beziehung zwischen zwei Erinnerungen im Wissensgraphen.
     ///
     /// # Parameter
@@ -297,7 +279,6 @@ impl AgentMemory {
     /// - `predicate` must not be empty.
     /// - `participants` must contain at least 2 entries.
     /// - Role strings in `participants` must not be empty.
-    // ANCHOR[contextra:MEM-016]
     /// Erstellt eine n-äre Beziehung (Hyperedge) zwischen zwei oder mehr Erinnerungen.
     ///
     /// # Parameter
@@ -356,7 +337,6 @@ impl AgentMemory {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra:TEST-MEM-001]
     // Prüft Präfix und monotone Erhöhung der deterministischen Fallback-IDs bei fehlendem IdGen-Port.
     #[test]
     fn test_fallback_id_prefix_and_monotonicity() {
@@ -385,7 +365,6 @@ mod tests {
         assert_ne!(id1, id2, "Consecutive fallback IDs must be distinct");
     }
 
-    // ANCHOR[contextra:TEST-MEM-002]
     // Verifiziert die exakte Reproduzierbarkeit von Fallback-IDs ausgehend von einem identischen Startzustand.
     #[test]
     fn test_fallback_id_reproducibility_from_initial_state() {

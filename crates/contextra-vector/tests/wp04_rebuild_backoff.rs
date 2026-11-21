@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Testen des Rebuild-Backoff- und Alarm-Automaten ohne Wanduhr (P28, Monotonic Counter Clock).
-// INVARIANTEN: Zeitabfragen ausschließlich über Clock-Abstraktion, saturierende Arithmetik, deterministische Übergänge.
-// STAND: TS:2026-11-11T02:00:00Z
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

@@ -1,5 +1,4 @@
 //! Fehlerbrücke zwischen `TextError` und `ContextraError` (SPEC §5.3).
-// ANCHOR[contextra-text:COMPAT-ERR-001]
 
 use crate::error::TextError;
 use contextra_types::ContextraError;

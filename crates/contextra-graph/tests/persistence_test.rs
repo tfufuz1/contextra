@@ -9,7 +9,6 @@ use contextra_ports::{GraphIndex, StorageEngine};
 use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:TESTS-PERSISTENCE-TEST-001]
 #[tokio::test]
 async fn test_graph_survives_restart() {
     let storage = Arc::new(InMemoryStorageEngine::new());
@@ -64,7 +63,6 @@ async fn test_graph_survives_restart() {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-PERSISTENCE-TEST-002]
 #[tokio::test]
 async fn test_graph_survives_reload() {
     let storage = Arc::new(InMemoryStorageEngine::new());
@@ -118,7 +116,6 @@ async fn test_graph_survives_reload() {
     );
 }
 
-// ANCHOR[contextra-graph:TESTS-PERSISTENCE-TEST-003]
 #[tokio::test]
 async fn edges_survive_restart() {
     let storage = Arc::new(InMemoryStorageEngine::new());

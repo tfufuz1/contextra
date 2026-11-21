@@ -12,7 +12,6 @@ use contextra_ports::StorageEngine;
 use contextra_types::{DocId, EntityId, TxId};
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-PERSISTENCE-SURVIVES-RESTART-001]
 #[tokio::test]
 async fn test_hyperedge_persistence_survives_restart() {
     let storage = Arc::new(InMemoryStorageEngine::new());

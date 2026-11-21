@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Criterion-Benchmark zur Messung des Durchsatzes bei unterschiedlichen Overfetch-Faktoren und Selektivitätsstufen
-// INVARIANTEN: Deterministische Vektoren und Filterkriterien über modulare DocIDs
-// HOTSPOTS: 35-85
-// STAND: 2026-11-11
-// BEREICH: AGENTS §6, SPEC §11.4 — Prädikatgefilterte Suche und Overfetch-Trade-offs
 
-// ANCHOR[contextra-vector:W11-BENCH-006]
 
 mod common;
 

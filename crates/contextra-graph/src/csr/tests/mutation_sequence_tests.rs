@@ -4,11 +4,6 @@
 //! # Zweck
 //! Überprüft die Konsistenz nach wechselnden `add_edge`, `remove_edge` und Re-Insert-Aufrufen.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use crate::csr::CsrGraph;
@@ -22,7 +17,6 @@ fn create_entity(id: u64) -> Entity {
     Entity::new(EntityId::new(id), "label", "type")
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-MUTATION-SEQUENCE-TESTS-001]
 #[tokio::test]
 async fn test_csr_mutation_sequence_equivalence() {
     let g = Arc::new(CsrGraph::new());

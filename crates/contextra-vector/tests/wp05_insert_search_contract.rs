@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Vertragstests für WP-VEC-05 (Einfüge- & Suchpfad, Tie-Break, K-Bounds, Atomarität).
-// INVARIANTEN: Zero-Panic; deterministischer Tie-Break (DocId aufsteigend bei gleichem Score); Batch-Rollback isoliert.
-// STAND: 2026-11-12
 
 use contextra_vector::hnsw::HnswIndex;
 use contextra_vector::types::{DistanceMetric, DocId, MAX_SEARCH_K};

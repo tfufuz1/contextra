@@ -11,7 +11,6 @@ use contextra_types::error::Result;
 use serde_json::json;
 use std::sync::Arc;
 
-// ANCHOR[contextra:TEST-AMF-001]
 /// Test-Double für die Einbettungs-Engine, das deterministische 16-dimensionale Vektoren liefert.
 struct MockEmbedder;
 
@@ -25,7 +24,6 @@ impl TextEmbeddingEngine for MockEmbedder {
     }
 }
 
-// ANCHOR[contextra:TEST-AMF-002]
 // Prüft den vollständigen Agenten-Gedächtnis-Lebenszyklus:
 // 1. remember (zwei Einträge mit und ohne Metadaten anlegen),
 // 2. recall (semantisches Wiederfinden des ersten Eintrags),

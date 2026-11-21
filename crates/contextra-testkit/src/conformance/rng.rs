@@ -14,7 +14,6 @@
 use super::failure::{ConformanceFailure, ConformanceResult};
 use contextra_ports::Rng;
 
-// ANCHOR[contextra-testkit:CONF-RNG-SUITE-001]
 /// Führt die vollständige Konformitätsprüfung für einen [`Rng`]-Port durch.
 ///
 /// **Ablauf:**

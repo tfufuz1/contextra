@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Hintergrund- und Delta-Persistenz für DiskANN (WP-VEC-07).
-// INVARIANTEN: Lock-Hierarchie; atomares Ersetzen von Delta-Dateien; fsync auf Verzeichnisebene.
-// STAND: 2026-11-11
 
 use super::super::types::DiskAnnIndex;
 use crate::error::{Result, VectorError};

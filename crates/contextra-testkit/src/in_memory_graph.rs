@@ -17,7 +17,6 @@ use parking_lot::RwLock;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-// ANCHOR[contextra-testkit:STAGED-GRAPH-OP-ENUM-001]
 /// Unbestätigte Graph-Operation innerhalb einer Transaktion.
 #[derive(Debug, Clone)]
 enum StagedGraphOp {
@@ -36,7 +35,6 @@ type EdgeMap = BTreeMap<(EntityId, EntityId), Edge>;
 /// Staging-Puffer: Transaktions-ID -> Liste von Graph-Operationen.
 type StagedGraphTxMap = BTreeMap<TxId, Vec<StagedGraphOp>>;
 
-// ANCHOR[contextra-testkit:IN-MEM-GRAPH-STRUCT-001]
 /// Thread-sichere In-Memory-Referenzimplementierung von [`GraphIndex`] für Tests.
 ///
 /// **Zweck:** Ermöglicht Wissensgraph- und Beziehungstests ohne externe Graphdatenbanken.
@@ -64,14 +62,12 @@ impl Default for InMemoryGraphIndex {
 }
 
 impl InMemoryGraphIndex {
-    // ANCHOR[contextra-testkit:IN-MEM-GRAPH-NEW-001]
     /// Erstellt einen neuen, leeren `InMemoryGraphIndex`.
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-// ANCHOR[contextra-testkit:IN-MEM-GRAPH-TRAIT-IMPL-001]
 impl GraphIndex for InMemoryGraphIndex {
     /// Stellt das Hinzufügen einer Entität im Transaktionskontext bereit.
     fn add_entity<'a>(&'a self, tx: TxId, entity: Entity) -> BoxFuture<'a, Result<()>> {
@@ -170,7 +166,6 @@ impl GraphIndex for InMemoryGraphIndex {
         Box::pin(async move { Ok(*self.last_tx.read()) })
     }
 
-    // ANCHOR[contextra-testkit:IN-MEM-GRAPH-NEIGHBORS-001]
     /// Liefert alle ausgehenden Nachbarknoten eines Startknotens.
     fn neighbors<'a>(&'a self, start_node: EntityId) -> BoxFuture<'a, Result<Vec<EntityId>>> {
         Box::pin(async move {
@@ -185,7 +180,6 @@ impl GraphIndex for InMemoryGraphIndex {
         })
     }
 
-    // ANCHOR[contextra-testkit:IN-MEM-GRAPH-TRAVERSE-001]
     /// Führt eine gewichtete Breitensuche (BFS) ab `start_node` bis zu `max_hops` durch.
     ///
     /// **Ablauf:**

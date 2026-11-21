@@ -3,11 +3,6 @@
 //! # Zweck
 //! Führt Kantenaktualisierungen durch und pflegt Adjazenzvektoren sowie Inverted Lists.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::super::types::EdgePayload;
@@ -177,7 +172,6 @@ impl CsrGraph {
     }
 
     #[allow(clippy::too_many_arguments)]
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-EDGE-MUTATION-001]
     pub fn load_edge_direct(
         &self,
         from: EntityId,

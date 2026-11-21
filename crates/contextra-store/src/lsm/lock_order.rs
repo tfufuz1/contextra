@@ -1,6 +1,5 @@
 //! # Sperrenregister & Rangbasierte Lock-Hierarchie (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Formale Definition der globalen Lock-Akquisitionsreihenfolge im LSM-Speicher
 //! // INVARIANTEN: INV-LOCK-ORDER-1, SPEC §3.5, SPEC §5.4, MV-08

@@ -77,7 +77,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-// ANCHOR[id=contextra-mvcc-exports]
 pub use crate::mvcc_error::{MvccError, Result as MvccResult};
 pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
 

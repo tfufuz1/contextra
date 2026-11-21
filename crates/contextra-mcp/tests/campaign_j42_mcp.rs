@@ -4,7 +4,6 @@
 // =========================================================================
 // SECTION: campaign_j42_mcp
 // =========================================================================
-// ANCHOR[contextra-mcp:ITEST-CAMPAIGN-J-001]
 
 use contextra_mcp::sandbox::{McpSandbox, ToolCategory, TOOL_REGISTRY};
 

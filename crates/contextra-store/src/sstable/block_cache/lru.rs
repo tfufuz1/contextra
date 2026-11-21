@@ -1,7 +1,6 @@
 //! # LRU-Cache Backend
 //!
 //! Zweck: Standardmäßiges Least-Recently-Used Block-Cache-Backend.
-// ANCHOR[contextra-store:SST-RDR-142]
 
 use super::traits::BlockCacheBackend;
 use bytes::Bytes;

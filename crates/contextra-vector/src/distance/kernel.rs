@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Crate-lokale Distanz-Kernel-Schnittstelle und u8-Komponenten (WP-VEC-06).
-// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); INV-SIMD-FINITE-1.
-// HOTSPOTS: DistanceKernel, CosineSimilarityPartsU8
-// STAND: 2026-11-12
 
 //! # Distance Kernel Interface
 //!
@@ -13,7 +8,6 @@ use crate::types::DistanceMetric;
 
 // SECTION Datentypen für SIMD- und Quantisierungs-Distanz
 
-// ANCHOR[contextra-vector:DIST-PARTS-U8]
 /// Rohkomponenten zur Berechnung der ganzzahligen Kosinus-Ähnlichkeit auf u8-Vektoren.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CosineSimilarityPartsU8 {
@@ -25,7 +19,6 @@ pub struct CosineSimilarityPartsU8 {
     pub norm_b_sq: u32,
 }
 
-// ANCHOR[contextra-vector:DIST-KERNEL-TRAIT]
 /// Schnittstelle für Distanzberechnungskerne auf f32- und quantisierten Vektoren.
 pub trait DistanceKernel: Send + Sync + 'static {
     /// Berechnet die Distanz zwischen zwei Slices nach Endlichkeitsvalidierung.

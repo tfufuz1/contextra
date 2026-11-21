@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Fuzz-Target für DiskANN Formatprüfungen (DANN, PWAL, TWAL)
-// INVARIANTEN: Reines fuzz_one ohne direkte libfuzzer-Laufzeitabhängigkeit für Smoke-Treiber
-// HOTSPOTS: 15-40
-// STAND: 2026-11-11
-// BEREICH: AGENTS §8, SPEC §11.4 — DiskANN Delta-Recovery und Format-Robustheit
 
-// ANCHOR[contextra-vector:W11-FUZZ-002]
 
 #![no_main]
 

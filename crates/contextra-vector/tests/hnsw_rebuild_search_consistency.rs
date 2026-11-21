@@ -1,6 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-// FILE-CONTEXT: Integration test verifying HNSW snapshot search consistency before, during, and after index rebuilds. (TS: 2026-09-11)
 
 use contextra_ports::VectorIndex;
 use contextra_ports::{Rng, SeededRng};

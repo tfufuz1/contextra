@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Schreiben des DiskANN-Index-Dateiformats DANN v1 (WP-VEC-07).
-// INVARIANTEN: Deterministische Header- & Knoten-Serialisierung; Footer-HMAC-Abschluss.
-// STAND: 2026-11-11
 
 use std::io::Write;
 use std::sync::atomic::Ordering;

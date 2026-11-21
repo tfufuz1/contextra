@@ -1,5 +1,4 @@
 //! Kompatibilitätsbrücke für `contextra-ports` und `StorageEngine` (SPEC §6.2 text, B04).
-// ANCHOR[contextra-text:COMPAT-001]
 
 use crate::storage::{BoxFuture, PostingStore};
 use bytes::Bytes;

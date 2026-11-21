@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-DETERMINISM-PROPTEST-ROOT]
 //! # Eigenschaftstest: 100 % Determinismus der SSI-Validierung
 //!
 //! Beweist, dass wiederholte Ausführungen identischer Transaktionsereignisse

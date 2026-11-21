@@ -1,4 +1,3 @@
-// ANCHOR[id=seq-log-module-root]
 //! # Sequenz-Log (`SequenceLog`) für snapshot-isolierte Index-Suchen (`_at`-Familie)
 //!
 //! LINK crates/contextra-mvcc/src/lib.rs
@@ -18,11 +17,6 @@
 //! - **Port-Nutzung**: Verwendet den [`Clock`]-Port (`contextra-env`) für deterministische
 //!   Zeitbestimmung (wichtig für TTL-Prüfungen von Snapshot-Pins ohne direkte Systemuhr-Abhängigkeit).
 
-// FILE-CONTEXT
-// ZWECK: Shared Versioned Sequence Log für Snapshot-isolierte Index-Suchen (_at Familie).
-// INVARIANTEN: Sichtbarkeitsprüfung: insert_seq <= as_of && (delete_seq.is_none() || delete_seq > as_of).
-// HOTSPOTS: 20-75
-// NICHT-OFFENSICHTLICH: Compaction prunt Einträge erst wenn delete_seq < min_active_seqno.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,14 +26,12 @@ use crate::{Clock, SystemClock};
 use contextra_ids::DocId;
 
 // SECTION Constants
-// ANCHOR[id=seq-log-constants]
 /// Standard-Lebensdauer für Snapshot-Pins (5 Minuten), bevor Diagnose-Warnungen für
 /// blockierende oder verwaiste Pins ausgelöst werden.
 pub const DEFAULT_MAX_PIN_DURATION: Duration = Duration::from_secs(300);
 // !SECTION Constants
 
 // SECTION Data Types
-// ANCHOR[id=seq-log-entry-struct]
 /// Ein versionierter Protokolleintrag für die Snapshot-Isolation (`_at`-Familie).
 ///
 /// Jeder Eintrag repräsentiert die Lebensspanne einer Dokumentversion:
@@ -65,7 +57,6 @@ pub struct SeqLogEntry {
 }
 
 impl SeqLogEntry {
-    // ANCHOR[id=seq-log-entry-is-visible]
     /// Prüft in O(1), ob dieser Protokolleintrag zu einem bestimmten Snapshot-Stand `as_of` sichtbar ist.
     ///
     /// ### Formale Sichtbarkeitsinvariante (INV-INDEX-SNAPSHOT-1):
@@ -95,7 +86,6 @@ impl SeqLogEntry {
     }
 }
 
-// ANCHOR[id=seq-log-change-enum]
 /// Repräsentiert eine historische Änderung (Einfügen oder Löschen) im Sequenz-Log für Delta-Replays.
 ///
 /// Wird von Abfragen wie [`SequenceLog::changes_since`] erzeugt, um Indizes
@@ -136,7 +126,6 @@ impl SeqLogChange {
 // !SECTION Data Types
 
 // SECTION SequenceLog Engine
-// ANCHOR[id=sequence-log-struct]
 /// Verwaltet das chronologische Sequenz-Protokoll und Sichtbarkeitsfilter für Indexstrukturen.
 ///
 /// ### Funktionsweise:
@@ -182,7 +171,6 @@ impl Default for SequenceLog {
 }
 
 impl SequenceLog {
-    // ANCHOR[id=seq-log-constructors]
     /// Erstellt ein neues, leeres `SequenceLog` mit der Standard-Systemuhr [`SystemClock`]
     /// und einer maximalen Pin-Dauer von 5 Minuten.
     pub fn new() -> Self {
@@ -245,7 +233,6 @@ impl SequenceLog {
         self.max_pin_duration
     }
 
-    // ANCHOR[id=seq-log-pinning]
     /// Pinnt eine historische Sequenznummer, um zu verhindern, dass die Hintergrund-Bereinigung
     /// (Rebuild/Compaction) gelöschte Knoten entfernt, die für diesen Stand noch sichtbar sein müssen.
     ///
@@ -329,7 +316,6 @@ impl SequenceLog {
         self.reap_expired_pins_at(now_nanos)
     }
 
-    // ANCHOR[id=seq-log-retention-calculation]
     /// Berechnet die kleinste aktuell gepinnte Sequenznummer für Aufbewahrungs- und Pruning-Zwecke.
     ///
     /// Gibt `None` zurück, falls aktuell kein einziger Snapshot gepinnt ist.
@@ -366,7 +352,6 @@ impl SequenceLog {
         self.deletions.get(&doc_id).copied()
     }
 
-    // ANCHOR[id=seq-log-mutation-recording]
     /// Zeichnet eine Einfügeoperation für ein Dokument zu einer Sequenznummer auf.
     ///
     /// ### Ablauf:
@@ -410,7 +395,6 @@ impl SequenceLog {
         }
     }
 
-    // ANCHOR[id=seq-log-visibility-check]
     /// Prüft, ob ein Dokument zu einer bestimmten Sequenznummer `seq_no` im Index sichtbar ist.
     ///
     /// Ein Dokument ist sichtbar, wenn es vor oder bei `seq_no` eingefügt wurde und nicht
@@ -434,7 +418,6 @@ impl SequenceLog {
         inserted && !deleted
     }
 
-    // ANCHOR[id=seq-log-compaction]
     /// Verdichtet (kompaktiert) das Sequenz-Log und entfernt historische Versionen,
     /// deren Entfernung strikt kleiner als `min_active_seqno` ist.
     ///
@@ -475,7 +458,6 @@ impl SequenceLog {
         self.entries.is_empty()
     }
 
-    // ANCHOR[id=seq-log-changes-since]
     /// Liefert alle Änderungen (Einfügungen und Entfernungen), die strikt nach `snapshot_seq`
     /// stattgefunden haben, aufsteigend sortiert nach Sequenznummer.
     ///

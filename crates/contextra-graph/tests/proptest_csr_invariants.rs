@@ -16,7 +16,6 @@ proptest! {
     /// PROP-1: Adjazenzliste nach Compact enthält keine tombstonierten Kanten
     /// Für beliebige Insert-Sequenzen gefolgt von N Deletes: Nach compact() enthält keine Adjazenzliste
     /// eine Kante zu einem tombstoned-Knoten oder gelöschten Kante.
-// ANCHOR[contextra-graph:TESTS-PROPTEST-CSR-INVARIANTS-001]
     #[test]
     fn prop_1_adjacency_after_compact_has_no_tombstones(
         num_nodes in 2u64..20u64,
@@ -124,7 +123,6 @@ proptest! {
 
     /// PROP-2: Kanten-Gewicht ist nicht-negativ
     /// Für beliebige Inserts mit weight ∈ [0.0..1000.0]: neighbors_with_weights(src) liefert alle Einträge mit weight ≥ 0.
-// ANCHOR[contextra-graph:TESTS-PROPTEST-CSR-INVARIANTS-002]
     #[test]
     fn prop_2_edge_weights_non_negative(
         num_nodes in 2u64..15u64,
@@ -187,7 +185,6 @@ proptest! {
 
     /// PROP-3: source_doc_ids nach Compact nicht None (für inserte Knoten/Kanten)
     /// Für N Kanten: Nach compact() ist get_source_doc_id(i) für alle i in [0..num_inserted_sources] = Some(_).
-// ANCHOR[contextra-graph:TESTS-PROPTEST-CSR-INVARIANTS-003]
     #[test]
     fn prop_3_source_doc_ids_not_none_after_compact(
         num_edges in 1usize..30usize,
@@ -257,7 +254,6 @@ proptest! {
 
     /// PROP-4: compact() ist idempotent
     /// compact(); compact(); → gleiche Adjacency-Struktur wie compact() einmal.
-// ANCHOR[contextra-graph:TESTS-PROPTEST-CSR-INVARIANTS-004]
     #[test]
     fn prop_4_compact_is_idempotent(
         num_nodes in 2u64..20u64,
@@ -331,7 +327,6 @@ proptest! {
 
     /// PROP-5: Knotenanzahl monoton wachsend (kein implizites Löschen)
     /// Anzahl der Knoten nach compact ist ≥ Anzahl vor compact.
-// ANCHOR[contextra-graph:TESTS-PROPTEST-CSR-INVARIANTS-005]
     #[test]
     fn prop_5_node_count_monotonically_non_decreasing(
         num_nodes in 1u64..25u64,

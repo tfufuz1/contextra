@@ -1,9 +1,4 @@
 //! LSM-Tree (Log-Structured Merge-Tree) storage engine.
-// FILE-CONTEXT
-// STAND: 2026-11-11
-// ZWECK: LSM-Tree-Implementierung (MemTable + SSTable + Compaction + Lesepfad + Recovery)
-// INVARIANTEN: Compaction darf keine Daten verlieren; WAL-Replay vor MemTable-Aufbau.
-// SPERRENHIERARCHIE: Siehe lock_order.rs (INV-LOCK-ORDER-1, SPEC §3.5):
 //   1. Document-Lock / Intent (RANK 100)
 //   2. commit_mutex (RANK 200)
 //   3. flush_mutex (RANK 300)

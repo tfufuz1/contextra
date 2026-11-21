@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Proptest für die mathematische Fehlergrenze von SQ8 (INV-SQ8-ERROR-BOUND-1).
 
 use contextra_vector::quantize::{ScalarQuantizer, SQ8_MAX_ERROR_FACTOR_PER_DIM};
 use proptest::prelude::*;

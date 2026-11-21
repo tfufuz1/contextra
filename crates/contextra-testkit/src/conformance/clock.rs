@@ -10,7 +10,6 @@
 use super::failure::{ConformanceFailure, ConformanceResult};
 use contextra_ports::Clock;
 
-// ANCHOR[contextra-testkit:CONF-CLOCK-SUITE-001]
 /// Führt die vollständige Konformitätsprüfung für eine [`Clock`]-Implementierung durch.
 ///
 /// **Ablauf:**

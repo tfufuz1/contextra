@@ -17,7 +17,6 @@ pub use medical_de::MedicalDomainVocabulary;
 use crate::morphology::normalize_umlauts;
 use std::collections::HashSet;
 
-// ANCHOR[contextra-text:DOM-001]
 /// Trait für domänenspezifische Vokabularpakete (z. B. Recht und Medizin).
 pub trait DomainVocabulary: Send + Sync {
     /// Domänenspezifische Komposita-Bausteine (Ergänzung zum KMU-Basiswörterbuch).
@@ -122,7 +121,6 @@ mod tests {
         );
     }
 
-    // ANCHOR[contextra-text:TEST-DOM-001]
     // Prüft Invarianten des juristischen Fachvokabulars (Mindestanzahl Stämme, Sortierung, Disjunktheit).
     #[test]
     fn test_legal_domain_vocabulary_invariants() {
@@ -130,7 +128,6 @@ mod tests {
         verify_vocabulary_invariants(&legal, "legal_de");
     }
 
-    // ANCHOR[contextra-text:TEST-DOM-002]
     // Prüft Invarianten des medizinischen Fachvokabulars (Mindestanzahl Stämme, Sortierung, Disjunktheit).
     #[test]
     fn test_medical_domain_vocabulary_invariants() {

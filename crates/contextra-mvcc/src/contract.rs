@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:CONTRACT-ROOT]
 //! # Minimalverträge und Umgebungsabstraktionen für `contextra-mvcc`
 //!
 //! LINK crates/contextra-mvcc/src/lib.rs

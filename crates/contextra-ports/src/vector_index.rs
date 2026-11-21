@@ -5,7 +5,6 @@
 //!
 //! Abstrakter Vertrag für hochperformante Vektor-Indizes (z. B. HNSW in `contextra-vector`).
 //!
-//! // ANCHOR[contextra-ports:VEC-001]
 //! // SECTION vector-index-contracts
 //! // NOTE: Verwendet AFIT / impl Future für null Overhead bei statischer Bindung.
 //! // Invarianten:
@@ -18,7 +17,6 @@ use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
-// ANCHOR[contextra-ports:VEC-STATS-001]
 /// Statistics for a vector index.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct VectorIndexStats {
@@ -39,13 +37,11 @@ pub struct VectorIndexStats {
 // INVARIANT: Implementor: HnswIndex (contextra-index/src/hnsw.rs)
 // Rebuild: Automatisch bei >20% bereinigten Nodes.
 
-// ANCHOR[contextra-ports:VEC-TRAIT-001]
 /// Vector Index Trait — abstrahiert die HNSW-Vektorsuche.
 ///
 /// # Dyn-Kompatibilität
 /// Verwendet native `async fn` (AFIT) für statischen Dispatch.
 pub trait VectorIndex: Send + Sync + 'static {
-    // ANCHOR[contextra-ports:VEC-MUT-001]
     /// Inserts a vector with an associated document ID.
     fn insert(
         &self,
@@ -78,7 +74,6 @@ pub trait VectorIndex: Send + Sync + 'static {
         }
     }
 
-    // ANCHOR[contextra-ports:VEC-SEARCH-001]
     /// Searches for the k nearest neighbors to a query vector.
     fn search(
         &self,
@@ -213,7 +208,6 @@ pub trait VectorIndex: Send + Sync + 'static {
         false
     }
 
-    // ANCHOR[contextra-ports:VEC-REBUILD-001]
     /// Triggers an asynchronous background rebuild of the index if supported.
     ///
     /// # Fehler
@@ -223,7 +217,6 @@ pub trait VectorIndex: Send + Sync + 'static {
     fn trigger_rebuild_async(&self) {}
 }
 
-// ANCHOR[contextra-ports:HYBRID-SEARCH-001]
 /// Contract for executing hybrid (vector + text) queries for profile routing.
 pub trait HybridSearchProvider: Send + Sync {
     /// Executes a hybrid query returning matched context chunks with relevance scores.

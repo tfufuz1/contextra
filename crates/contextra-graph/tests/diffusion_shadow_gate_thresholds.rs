@@ -11,7 +11,6 @@ use contextra_graph::tl_hfd::shadow::{
 };
 use contextra_types::EntityId;
 
-// ANCHOR[contextra-graph:TESTS-DIFFUSION-SHADOW-GATE-THRESHOLDS-001]
 #[test]
 fn test_tl_hfd_gate_threshold_boundaries() {
     let gate = TlHfdFlipGate;
@@ -53,7 +52,6 @@ fn test_tl_hfd_gate_threshold_boundaries() {
     assert!(gate.should_flip(&report_exact_boundary));
 }
 
-// ANCHOR[contextra-graph:TESTS-DIFFUSION-SHADOW-GATE-THRESHOLDS-002]
 #[test]
 fn test_apprh_gate_monitor_consecutive_passes_boundary() {
     let config = ApprhGateMonitorConfig {

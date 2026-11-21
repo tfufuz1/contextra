@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Contextra Primary Facade & Composition Root (Ring 4).
-// INVARIANTEN: #![forbid(unsafe_code)]; <= 20 pub fn; zero direct dependencies on Ring 0/1 internal crates.
 
 //! # Modul: Contextra Primary Facade & Composition Root (Ring 4)
 //!
@@ -57,7 +54,6 @@ pub use performance_profile::{DurabilityConfigError, DurabilityMode, Performance
 pub use query_rewriter::LlmQueryRewriter;
 
 
-// ANCHOR[contextra:LIB-001]
 /// Erzeugt einen neuen [`ContextraBuilder`] zur Konfiguration und Instanziierung der Datenbank [`Contextra`].
 ///
 /// # Parameter
@@ -87,7 +83,6 @@ pub fn builder(dimension: usize) -> ContextraBuilder {
     ContextraBuilder::new(dimension)
 }
 
-// ANCHOR[contextra:LIB-002]
 /// Öffnet oder erstellt eine [`Contextra`]-Datenbankinstanz am angegebenen Dateisystempfad mit Standardkonfiguration.
 ///
 /// Verwendet standardmäßig eine Vektordimension von 768 und das unbeschränkte Entwicklungs-Lizenzgate (`OpenFastGate`).
@@ -129,7 +124,6 @@ pub async fn open(path: impl AsRef<std::path::Path>) -> Result<Contextra, Contex
     builder(768).with_storage_path(path.as_ref()).build().await
 }
 
-// ANCHOR[contextra:LIB-003]
 /// Öffnet oder erstellt eine [`Contextra`]-Datenbankinstanz mit einer explizit übergebenen Konfiguration.
 ///
 /// # Parameter
@@ -172,7 +166,6 @@ pub async fn open_with_config(
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra:TEST-LIB-001]
     // Prüft die drei primären Fassaden-Einstiegspunkte (open, open_with_config, builder) auf korrekte Initialisierung einer leeren Datenbank.
     #[tokio::test]
     async fn test_facade_open_and_builder_entrypoints() -> Result<(), Box<dyn std::error::Error>> {

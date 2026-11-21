@@ -6,8 +6,6 @@
     clippy::indexing_slicing,
     clippy::disallowed_types
 )]
-// FILE-CONTEXT
-// ZWECK: Uferloser Test-Suite (>= 40 Tests) für RuleBasedEntityRecognizer, Gateway Pipeline Enforcements, Checksums und Zero PII Leakage.
 
 use contextra_privacy::bulk_exfiltration_detector::{BulkExfiltrationDetector, SessionId};
 use contextra_privacy::egress_gateway::{
@@ -77,7 +75,6 @@ impl Clock for MockClock {
 // ============================================================================
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-001]
 // Prüft: Prüft Testfall `test_recognizer_email_valid_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_email_valid_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -89,7 +86,6 @@ fn test_recognizer_email_valid_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-002]
 // Prüft: Prüft Testfall `test_recognizer_email_subdomain_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_email_subdomain_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -101,7 +97,6 @@ fn test_recognizer_email_subdomain_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-003]
 // Prüft: Prüft Testfall `test_recognizer_email_missing_at_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_email_missing_at_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -111,7 +106,6 @@ fn test_recognizer_email_missing_at_negative() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-004]
 // Prüft: Prüft Testfall `test_recognizer_email_invalid_tld_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_email_invalid_tld_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -125,7 +119,6 @@ fn test_recognizer_email_invalid_tld_negative() {
 // ============================================================================
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-005]
 // Prüft: Prüft Testfall `test_recognizer_iban_de_valid_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_iban_de_valid_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -138,7 +131,6 @@ fn test_recognizer_iban_de_valid_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-006]
 // Prüft: Prüft Testfall `test_recognizer_iban_de_with_spaces_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_iban_de_with_spaces_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -150,7 +142,6 @@ fn test_recognizer_iban_de_with_spaces_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-007]
 // Prüft: Prüft Testfall `test_recognizer_iban_at_valid_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_iban_at_valid_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -163,7 +154,6 @@ fn test_recognizer_iban_at_valid_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-008]
 // Prüft: Prüft Testfall `test_recognizer_iban_ch_valid_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_iban_ch_valid_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -176,7 +166,6 @@ fn test_recognizer_iban_ch_valid_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-009]
 // Prüft: Prüft Testfall `test_recognizer_iban_invalid_checksum_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_iban_invalid_checksum_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -187,7 +176,6 @@ fn test_recognizer_iban_invalid_checksum_negative() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-010]
 // Prüft: Prüft Testfall `test_recognizer_iban_wrong_country_length_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_iban_wrong_country_length_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -202,7 +190,6 @@ fn test_recognizer_iban_wrong_country_length_negative() {
 // ============================================================================
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-011]
 // Prüft: Prüft Testfall `test_recognizer_phone_de_international_plus49_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_phone_de_international_plus49_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -214,7 +201,6 @@ fn test_recognizer_phone_de_international_plus49_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-012]
 // Prüft: Prüft Testfall `test_recognizer_phone_de_international_0049_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_phone_de_international_0049_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -226,7 +212,6 @@ fn test_recognizer_phone_de_international_0049_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-013]
 // Prüft: Prüft Testfall `test_recognizer_phone_de_local_0170_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_phone_de_local_0170_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -238,7 +223,6 @@ fn test_recognizer_phone_de_local_0170_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-014]
 // Prüft: Prüft Testfall `test_recognizer_phone_de_formatting_slashes_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_phone_de_formatting_slashes_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -250,7 +234,6 @@ fn test_recognizer_phone_de_formatting_slashes_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-015]
 // Prüft: Prüft Testfall `test_recognizer_phone_too_short_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_phone_too_short_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -260,7 +243,6 @@ fn test_recognizer_phone_too_short_negative() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-016]
 // Prüft: Prüft Testfall `test_recognizer_phone_alphanumeric_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_phone_alphanumeric_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -274,7 +256,6 @@ fn test_recognizer_phone_alphanumeric_negative() {
 // ============================================================================
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-017]
 // Prüft: Prüft Testfall `test_recognizer_credit_card_visa_valid_luhn_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_credit_card_visa_valid_luhn_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -287,7 +268,6 @@ fn test_recognizer_credit_card_visa_valid_luhn_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-018]
 // Prüft: Prüft Testfall `test_recognizer_credit_card_mastercard_spaced_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_credit_card_mastercard_spaced_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -300,7 +280,6 @@ fn test_recognizer_credit_card_mastercard_spaced_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-019]
 // Prüft: Prüft Testfall `test_recognizer_credit_card_amex_hyphenated_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_credit_card_amex_hyphenated_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -313,7 +292,6 @@ fn test_recognizer_credit_card_amex_hyphenated_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-020]
 // Prüft: Prüft Testfall `test_recognizer_credit_card_invalid_luhn_checksum_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_credit_card_invalid_luhn_checksum_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -324,7 +302,6 @@ fn test_recognizer_credit_card_invalid_luhn_checksum_negative() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-021]
 // Prüft: Prüft Testfall `test_recognizer_credit_card_too_short_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_credit_card_too_short_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -338,7 +315,6 @@ fn test_recognizer_credit_card_too_short_negative() {
 // ============================================================================
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-022]
 // Prüft: Prüft Testfall `test_recognizer_steuer_id_valid_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_steuer_id_valid_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -351,7 +327,6 @@ fn test_recognizer_steuer_id_valid_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-023]
 // Prüft: Prüft Testfall `test_recognizer_steuer_id_invalid_checksum_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_steuer_id_invalid_checksum_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -362,7 +337,6 @@ fn test_recognizer_steuer_id_invalid_checksum_negative() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-024]
 // Prüft: Prüft Testfall `test_recognizer_steuer_id_leading_zero_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_steuer_id_leading_zero_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -373,7 +347,6 @@ fn test_recognizer_steuer_id_leading_zero_negative() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-025]
 // Prüft: Prüft Testfall `test_recognizer_steuer_id_invalid_duplicate_distribution_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_steuer_id_invalid_duplicate_distribution_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -388,7 +361,6 @@ fn test_recognizer_steuer_id_invalid_duplicate_distribution_negative() {
 // ============================================================================
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-026]
 // Prüft: Prüft Testfall `test_recognizer_ipv4_valid_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_ipv4_valid_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -400,7 +372,6 @@ fn test_recognizer_ipv4_valid_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-027]
 // Prüft: Prüft Testfall `test_recognizer_ipv6_valid_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_ipv6_valid_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -412,7 +383,6 @@ fn test_recognizer_ipv6_valid_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-028]
 // Prüft: Prüft Testfall `test_recognizer_ipv4_octet_overflow_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_ipv4_octet_overflow_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -422,7 +392,6 @@ fn test_recognizer_ipv4_octet_overflow_negative() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-029]
 // Prüft: Prüft Testfall `test_recognizer_ipv6_invalid_colons_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_ipv6_invalid_colons_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -436,7 +405,6 @@ fn test_recognizer_ipv6_invalid_colons_negative() {
 // ============================================================================
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-030]
 // Prüft: Prüft Testfall `test_recognizer_plz_valid_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_plz_valid_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -454,7 +422,6 @@ fn test_recognizer_plz_valid_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-031]
 // Prüft: Prüft Testfall `test_recognizer_plz_invalid_length_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_plz_invalid_length_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -464,7 +431,6 @@ fn test_recognizer_plz_invalid_length_negative() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-032]
 // Prüft: Prüft Testfall `test_recognizer_license_plate_valid_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_license_plate_valid_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -476,7 +442,6 @@ fn test_recognizer_license_plate_valid_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-033]
 // Prüft: Prüft Testfall `test_recognizer_license_plate_invalid_format_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_license_plate_invalid_format_negative() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -490,7 +455,6 @@ fn test_recognizer_license_plate_invalid_format_negative() {
 // ============================================================================
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-034]
 // Prüft: Prüft Testfall `test_recognizer_gazetteer_term_match_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_gazetteer_term_match_positive() {
     let mut gazetteer = Gazetteer::new();
@@ -505,7 +469,6 @@ fn test_recognizer_gazetteer_term_match_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-035]
 // Prüft: Prüft Testfall `test_recognizer_gazetteer_case_insensitive_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_gazetteer_case_insensitive_positive() {
     let mut gazetteer = Gazetteer::new();
@@ -520,7 +483,6 @@ fn test_recognizer_gazetteer_case_insensitive_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-036]
 // Prüft: Prüft Testfall `test_recognizer_gazetteer_unlisted_term_negative` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_gazetteer_unlisted_term_negative() {
     let mut gazetteer = Gazetteer::new();
@@ -537,7 +499,6 @@ fn test_recognizer_gazetteer_unlisted_term_negative() {
 // ============================================================================
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-037]
 // Prüft: Prüft Testfall `test_recognizer_zero_width_spaces_stripped_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_zero_width_spaces_stripped_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -553,7 +514,6 @@ fn test_recognizer_zero_width_spaces_stripped_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-038]
 // Prüft: Prüft Testfall `test_recognizer_spaced_out_iban_obfuscation_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_spaced_out_iban_obfuscation_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -565,7 +525,6 @@ fn test_recognizer_spaced_out_iban_obfuscation_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-039]
 // Prüft: Prüft Testfall `test_recognizer_cyrillic_homoglyphs_folded_positive` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_cyrillic_homoglyphs_folded_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -577,7 +536,6 @@ fn test_recognizer_cyrillic_homoglyphs_folded_positive() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-040]
 // Prüft: Prüft Testfall `test_recognizer_multibyte_utf8_boundary_safety` für Pipeline- und Erkenner-Integrität.
 fn test_recognizer_multibyte_utf8_boundary_safety() {
     let recognizer = RuleBasedEntityRecognizer::new();
@@ -596,7 +554,6 @@ fn test_recognizer_multibyte_utf8_boundary_safety() {
 // ============================================================================
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-041]
 // Prüft: Prüft Testfall `test_gateway_builder_missing_recognizer_fails` für Pipeline- und Erkenner-Integrität.
 fn test_gateway_builder_missing_recognizer_fails() {
     let classifier = Arc::new(AllowAllClassifier);
@@ -613,7 +570,6 @@ fn test_gateway_builder_missing_recognizer_fails() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-EGR-042]
 // Prüft: Prüft Testfall `test_gateway_builder_missing_egress_guard_fails` für Pipeline- und Erkenner-Integrität.
 fn test_gateway_builder_missing_egress_guard_fails() {
     let classifier = Arc::new(AllowAllClassifier);
@@ -630,7 +586,6 @@ fn test_gateway_builder_missing_egress_guard_fails() {
 }
 
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-EGR-043]
 // Prüft: Prüft Testfall `test_gateway_pipeline_all_stages_executed_in_order` für Pipeline- und Erkenner-Integrität.
 async fn test_gateway_pipeline_all_stages_executed_in_order() {
     let classifier = Arc::new(AllowAllClassifier);
@@ -674,7 +629,6 @@ async fn test_gateway_pipeline_all_stages_executed_in_order() {
 }
 
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-EGR-044]
 // Prüft: Prüft Testfall `test_gateway_pipeline_policy_block_fails_closed` für Pipeline- und Erkenner-Integrität.
 async fn test_gateway_pipeline_policy_block_fails_closed() {
     let classifier = Arc::new(BlockClassifier {
@@ -706,7 +660,6 @@ async fn test_gateway_pipeline_policy_block_fails_closed() {
 }
 
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-EGR-045]
 // Prüft: Prüft Testfall `test_gateway_pipeline_bulk_detector_block_fails_closed` für Pipeline- und Erkenner-Integrität.
 async fn test_gateway_pipeline_bulk_detector_block_fails_closed() {
     let classifier = Arc::new(AllowAllClassifier);
@@ -742,7 +695,6 @@ async fn test_gateway_pipeline_bulk_detector_block_fails_closed() {
 }
 
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-EGR-046]
 // Prüft: Prüft Testfall `test_gateway_pipeline_missing_tenant_scope_fails_closed` für Pipeline- und Erkenner-Integrität.
 async fn test_gateway_pipeline_missing_tenant_scope_fails_closed() {
     let classifier = Arc::new(AllowAllClassifier);
@@ -774,7 +726,6 @@ async fn test_gateway_pipeline_missing_tenant_scope_fails_closed() {
 }
 
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-EGR-047]
 // Prüft: Prüft Testfall `test_gateway_pipeline_empty_query_fails_closed` für Pipeline- und Erkenner-Integrität.
 async fn test_gateway_pipeline_empty_query_fails_closed() {
     let classifier = Arc::new(AllowAllClassifier);
@@ -804,7 +755,6 @@ async fn test_gateway_pipeline_empty_query_fails_closed() {
 }
 
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-EGR-048]
 // Prüft: Prüft Testfall `test_gateway_pipeline_oversized_query_fails_closed` für Pipeline- und Erkenner-Integrität.
 async fn test_gateway_pipeline_oversized_query_fails_closed() {
     let classifier = Arc::new(AllowAllClassifier);
@@ -835,7 +785,6 @@ async fn test_gateway_pipeline_oversized_query_fails_closed() {
 }
 
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-EGR-049]
 // Prüft: Prüft Testfall `test_gateway_pipeline_layer4_guard_block_fails_closed` für Pipeline- und Erkenner-Integrität.
 async fn test_gateway_pipeline_layer4_guard_block_fails_closed() {
     let classifier = Arc::new(AllowAllClassifier);
@@ -863,7 +812,6 @@ async fn test_gateway_pipeline_layer4_guard_block_fails_closed() {
 }
 
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-EGR-050]
 // Prüft: Prüft Testfall `test_gateway_pipeline_zero_raw_pii_leaked_in_audit_or_logs` für Pipeline- und Erkenner-Integrität.
 async fn test_gateway_pipeline_zero_raw_pii_leaked_in_audit_or_logs() {
     let classifier = Arc::new(AllowAllClassifier);

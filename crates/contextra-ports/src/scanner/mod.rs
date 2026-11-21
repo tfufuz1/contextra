@@ -5,13 +5,11 @@
 //! LINK crates/contextra-ports/src/scanner/witness.rs
 //! LINK crates/contextra-ports/src/scanner/session.rs
 //!
-//! // ANCHOR[contextra-ports:SCANNER-001]
 //! // SECTION scanner-witness-contracts
 //! // NOTE: Verifiziert physische Bereinigungen und Restmengen-Messungen (SPEC §12.7.4, INV-WITNESS-MINT-1).
 
 #![forbid(unsafe_code)]
 
-// ANCHOR[contextra-ports:SCANNER-MODS-001]
 /// Layer and technique descriptor types.
 pub mod layer;
 /// ScanSession state and finish gate.
@@ -26,7 +24,6 @@ pub use witness::*;
 use crate::clock::Clock;
 use crate::Result;
 
-// ANCHOR[contextra-ports:LAYER-SCANNER-001]
 /// Trait für Storage-Scanner zur Durchführung von Restmengen-Messungen.
 ///
 /// # Doctests (Compile Fail Checks)

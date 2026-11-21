@@ -1,6 +1,5 @@
 //! # Schreibpfad-Implementierung (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Fassade fuer den LSM-Schreibpfad (put, delete, delete_many, commit)
 //! // INVARIANTEN: INV-STORE-1, INV-LOCK-ORDER-1, ADR-0XX-P0A

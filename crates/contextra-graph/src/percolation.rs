@@ -4,11 +4,6 @@
 //! KEIN neuer Index — nutzt bestehende CSR-Struktur und Embedding-Infrastruktur.
 //! Re-Bonding ist eine seltene, asynchrone Background-Operation.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Perkolations- und Resilienz-Metriken für Graph-Topologien.
-// INVARIANTEN: Numerisch stabile Schwellenwertberechnungen.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use crate::types::EntityId;
@@ -19,7 +14,6 @@ use std::collections::HashMap;
 /// Diese Konfiguration steuert den lokalen Perkolations-Gesundheitsmonitor (`physio-percolation`)
 /// auf CSR-Graph-Ebene.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-// ANCHOR[contextra-graph:SRC-PERCOLATION-001]
 
 // SECTION Percolation Core Implementation
 pub struct PercolationConfig {
@@ -44,7 +38,6 @@ impl Default for PercolationConfig {
 /// Berechnet aktuelle Perkolations-Gesundheit φ(t).
 ///
 /// Gibt `None` zurück wenn zu wenige Knoten vorhanden (< 10) — Perkolation nicht sinnvoll.
-// ANCHOR[contextra-graph:SRC-PERCOLATION-002]
 pub fn compute_percolation_health(
     active_node_count: usize,
     active_edge_count: usize, // nach Tombstone-Abzug
@@ -57,7 +50,6 @@ pub fn compute_percolation_health(
 }
 
 /// Prüft ob Re-Bonding-Pass ausgelöst werden soll.
-// ANCHOR[contextra-graph:SRC-PERCOLATION-003]
 pub fn should_trigger_rebonding(health: f32, config: &PercolationConfig) -> bool {
     health < config.critical_threshold
 }
@@ -161,7 +153,6 @@ mod tests {
     use crate::types::{Entity, TxId};
     use std::sync::Arc;
 
-    // ANCHOR[contextra-graph:SRC-PERCOLATION-004]
     #[test]
     fn test_percolation_health_full_graph() {
         // Vollständig verbundener Graph mit N=10 Knoten hat N*(N-1) = 90 gerichtete Kanten
@@ -175,7 +166,6 @@ mod tests {
         assert!(phi > 1.0, "Expected health >> 1.0, got {phi}");
     }
 
-    // ANCHOR[contextra-graph:SRC-PERCOLATION-005]
     #[test]
     fn test_percolation_health_empty_graph() {
         let n_nodes = 10;
@@ -186,7 +176,6 @@ mod tests {
         assert_eq!(phi, 0.0);
     }
 
-    // ANCHOR[contextra-graph:SRC-PERCOLATION-006]
     #[test]
     fn test_percolation_should_trigger_below_threshold() {
         let config = PercolationConfig::default(); // critical_threshold = 0.7
@@ -194,7 +183,6 @@ mod tests {
         assert!(should_trigger_rebonding(0.69, &config));
     }
 
-    // ANCHOR[contextra-graph:SRC-PERCOLATION-007]
     #[test]
     fn test_percolation_no_trigger_above_threshold() {
         let config = PercolationConfig::default(); // critical_threshold = 0.7
@@ -202,7 +190,6 @@ mod tests {
         assert!(!should_trigger_rebonding(0.85, &config));
     }
 
-    // ANCHOR[contextra-graph:SRC-PERCOLATION-008]
     #[test]
     fn test_percolation_skips_too_small_graphs() {
         assert!(compute_percolation_health(0, 0).is_none());
@@ -210,7 +197,6 @@ mod tests {
         assert!(compute_percolation_health(10, 0).is_some());
     }
 
-    // ANCHOR[contextra-graph:SRC-PERCOLATION-009]
     #[tokio::test]
     async fn test_find_rebonding_candidates() {
         let graph = Arc::new(CsrGraph::new());
@@ -260,7 +246,6 @@ mod tests {
         assert!(*sim > config.rebonding_similarity);
     }
 
-    // ANCHOR[contextra-graph:SRC-PERCOLATION-010]
     #[test]
     fn test_cosine_similarity_edge_cases() {
         // Mismatched vector lengths -> 0.0
@@ -275,7 +260,6 @@ mod tests {
         assert!((cosine_similarity(&[1.0, 0.0], &[0.0, 1.0])).abs() < 1e-6);
     }
 
-    // ANCHOR[contextra-graph:SRC-PERCOLATION-011]
     #[tokio::test]
     async fn test_find_rebonding_candidates_empty_or_single_node() {
         let graph = Arc::new(CsrGraph::new());
@@ -293,7 +277,6 @@ mod tests {
         assert!(candidates_single.is_empty());
     }
 
-    // ANCHOR[contextra-graph:SRC-PERCOLATION-012]
     #[tokio::test]
     async fn test_find_rebonding_candidates_max_new_edges_truncation() {
         let graph = Arc::new(CsrGraph::new());
@@ -313,7 +296,6 @@ mod tests {
         assert_eq!(candidates.len(), 1);
     }
 
-    // ANCHOR[contextra-graph:SRC-PERCOLATION-013]
     #[test]
     fn test_percolation_config_serde_roundtrip() {
         let config = PercolationConfig {

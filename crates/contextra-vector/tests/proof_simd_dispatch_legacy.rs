@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Differenztest zwischen SIMD-Dispatch und Legacy-Skalar-Orakel für VEC-A 36-E (Wechsel auf contextra_simd::dispatch).
 #![cfg(feature = "simd")]
 
 mod legacy_reference;

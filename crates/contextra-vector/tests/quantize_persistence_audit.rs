@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Audit-Testsuite für SQ8 Kendall-Tau Rangkorrelation, Persistence Roundtrips und Mmap Fault-Tolerance
-// STAND: TS:2026-08-31T00:00:00Z
 
 #![cfg(feature = "experimental-diskann")]
 

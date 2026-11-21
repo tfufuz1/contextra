@@ -10,7 +10,6 @@ use contextra_ports::graph::{
 use contextra_types::{DocId, EntityId};
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:TESTS-GRAPH-COLLECTION-MUTATION-TRAIT-TEST-001]
 #[test]
 fn test_csr_graph_collection_mutation_via_dyn_trait() {
     let graph = Arc::new(CsrGraph::new());

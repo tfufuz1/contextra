@@ -1,6 +1,5 @@
 //! # Single-Commit Pfad (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Direkte, serielle Commit-Ausfuehrung ohne Group-Commit-Batching
 //! // INVARIANTEN: ADR-0XX-P0A, INV-STORE-1, INV-LOCK-ORDER-1

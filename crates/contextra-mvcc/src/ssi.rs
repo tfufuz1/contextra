@@ -1,4 +1,3 @@
-// ANCHOR[id=ssi-module-root]
 //! # Serializable Snapshot Isolation (SSI) — Read-Set Tracking und Konfliktvalidierung
 //!
 //! LINK crates/contextra-mvcc/src/lib.rs
@@ -26,11 +25,6 @@
 //!   Transaktionen sofort abbrechen zu müssen, werden alte Schlüssel zu gemeinsamen
 //!   Präfixen aggregiert (0 % False Negatives, konservative Konflikterkennung).
 
-// FILE-CONTEXT
-// ZWECK: In-memory SSI Read-Set Tracking, Write-Skew-Konfliktvalidierung, Fail-Closed Pruning und atomare Commit-Registrierung.
-// INVARIANTEN: INV-MVCC-SSI-1: Konfliktauflösung ist rein datengetrieben (Sequenznummernvergleich) und deterministisch.
-// HOTSPOTS: 35-220
-// NICHT-OFFENSICHTLICH: Pruning unter `committed_writes` Schreib-Lock sichert den atomaren Wasserstand. Fail-closed Protection verweigert Reads mit snapshot_seq < pruned_through.
 
 use crate::mvcc_error::{MvccError, Result};
 use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
@@ -46,13 +40,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 // SECTION Constants
-// ANCHOR[id=ssi-constants]
 /// Standard-Höchstgrenze für im Speicher gehaltene bestätigte Schreib-Schlüssel (1.000.000 Schlüssel).
 pub const DEFAULT_MAX_TRACKED_COMMIT_KEYS: usize = 1_000_000;
 // !SECTION Constants
 
 // SECTION ReadSet
-// ANCHOR[id=read-set-struct]
 /// Protokolliert gelesene Einzelschlüssel, Präfixe und deren jeweilige Snapshot-Sequenznummer für SSI.
 ///
 /// ### Speicher- und Risikoanalyse:
@@ -83,7 +75,6 @@ impl ReadSet {
         }
     }
 
-    // ANCHOR[id=read-set-record-read]
     /// Zeichnet einen Lesezugriff auf `key` zu einer bestimmten Snapshot-Sequenznummer `snapshot_seq` auf.
     ///
     /// ### Ablauf:
@@ -109,7 +100,6 @@ impl ReadSet {
         );
     }
 
-    // ANCHOR[id=read-set-record-prefix]
     /// Zeichnet einen Bereichsscan-Präfix zu `snapshot_seq` auf, um Phantom-Reads zu erkennen.
     ///
     /// Wenn nach diesem Lesezugriff eine andere Transaktion einen neuen Schlüssel committet,
@@ -187,7 +177,6 @@ impl ReadSet {
 // !SECTION ReadSet
 
 // SECTION SsiValidator Interface
-// ANCHOR[id=ssi-validator-trait]
 /// Schnittstelle (Trait) für die Validierung von Transaktionen unter Serializable Snapshot Isolation (SSI).
 ///
 /// Prüft vor dem Festschreiben (Commit) einer Transaktion, ob nebenläufige Transaktionen
@@ -209,7 +198,6 @@ pub trait SsiValidator {
 // !SECTION SsiValidator Interface
 
 // SECTION Internal Coarsening
-// ANCHOR[id=seq-bucket-enum]
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum SeqBucket {
     Exact(Vec<Vec<u8>>),
@@ -219,7 +207,6 @@ enum SeqBucket {
     },
 }
 
-// ANCHOR[id=pruning-blocker-info-struct]
 /// Diagnoseinformationen über aktive Snapshots oder Sequenznummern, die das Pruning im Validator blockieren.
 ///
 /// Wird erzeugt, wenn der Speicher für Commit-Schlüssel zu mehr als 80 % gefüllt ist,
@@ -246,7 +233,6 @@ pub struct PruningBlockerInfo {
     pub is_pin_expired: bool,
 }
 
-// ANCHOR[id=coarsen-keys-to-prefixes-fn]
 /// Coarsens exact committed key lists into prefix summaries (e.g. LCP extraction).
 ///
 /// # Architecture Decision & Invariant (B-16 / INV-MVCC-SSI-1)
@@ -301,7 +287,6 @@ fn coarsen_keys_to_prefixes(keys: &[Vec<u8>], max_prefixes: usize) -> Vec<Vec<u8
     prefixes
 }
 
-// ANCHOR[id=committed-writes-struct]
 #[derive(Debug, Default)]
 struct CommittedWrites {
     keys: AHashMap<Vec<u8>, u64>,
@@ -515,7 +500,6 @@ impl CommittedWrites {
 // !SECTION Internal Coarsening
 
 // SECTION SequenceLogSsiValidator
-// ANCHOR[id=sequence-log-ssi-validator-struct]
 /// Referenz-Implementierung von [`SsiValidator`] auf Basis von [`SequenceLog`] und In-Memory-Commit-Tracking.
 ///
 /// Arbeitet vollständig ohne Festplatten-I/O im Arbeitsspeicher und bietet deterministische
@@ -557,7 +541,6 @@ impl Default for SequenceLogSsiValidator {
 }
 
 impl SequenceLogSsiValidator {
-    // ANCHOR[id=ssi-validator-constructors]
     /// Erstellt einen neuen [`SequenceLogSsiValidator`] mit Standard-Obergrenze (1.000.000 Schlüssel)
     /// und Standard-[`SystemClock`].
     pub fn new() -> Self {
@@ -678,7 +661,6 @@ impl SequenceLogSsiValidator {
         self
     }
 
-    // ANCHOR[id=ssi-prune-through]
     /// Bereinigt (prunt) bestätigte Schreib-Einträge mit `commit_seq <= bound_seq`.
     ///
     /// Aktualisiert den atomaren `pruned_through`-Wasserstand.
@@ -754,7 +736,6 @@ impl SequenceLogSsiValidator {
         self.max_tracked_keys
     }
 
-    // ANCHOR[id=ssi-check-and-coarsen]
     /// Checks register capacity utilization and triggers coarsening or diagnostic warnings if threshold is reached.
     fn check_and_coarsen_if_needed(&self, writes: &mut CommittedWrites) {
         let threshold = (self.max_tracked_keys * 80) / 100;
@@ -815,7 +796,6 @@ impl SequenceLogSsiValidator {
         }
     }
 
-    // ANCHOR[id=ssi-diagnose-pruning-blocker]
     /// Diagnostiziert, welcher unbereinigte Stand oder aktiver Snapshot das Pruning im Validator blockiert.
     pub fn diagnose_pruning_blocker(&self) -> Option<PruningBlockerInfo> {
         self.diagnose_pruning_blocker_at(self.clock.monotonic_nanos())
@@ -862,7 +842,6 @@ impl SequenceLogSsiValidator {
         })
     }
 
-    // ANCHOR[id=ssi-record-commit-keys]
     /// Zeichnet einen committeten Schlüssel zu einer Sequenznummer auf.
     ///
     /// ### Ablauf:
@@ -891,7 +870,6 @@ impl SequenceLogSsiValidator {
         self.check_and_coarsen_if_needed(&mut writes);
     }
 
-    // ANCHOR[id=ssi-validate-point-reads]
     /// Validates point reads against committed write keys and coarsened prefix buckets.
     fn validate_point_reads(
         &self,
@@ -974,7 +952,6 @@ impl SequenceLogSsiValidator {
         Ok(())
     }
 
-    // ANCHOR[id=ssi-validate-range-reads]
     /// Validates range scan prefix reads against committed writes and coarsened prefix buckets for phantom protection.
     fn validate_range_reads(
         &self,
@@ -1033,7 +1010,6 @@ impl SequenceLogSsiValidator {
         Ok(())
     }
 
-    // ANCHOR[id=ssi-validate-internal]
     /// Validates `read_set` against `committed_writes` map and `sequence_log`.
     fn validate_internal(
         &self,
@@ -1069,7 +1045,6 @@ impl SequenceLogSsiValidator {
         Ok(())
     }
 
-    // ANCHOR[id=ssi-validate-and-record]
     /// Atomically validates `read_set` and records `write_keys` at `commit_seq` under a single write lock.
     /// Führt die Validierung und das Eintragen der Commit-Schlüssel atomar unter demselben Schreib-Lock aus.
     ///
@@ -1108,7 +1083,6 @@ impl SsiValidator for SequenceLogSsiValidator {
     }
 }
 
-// ANCHOR[id=derive-doc-id-for-key]
 // Leitet eine DocId deterministisch aus einem Schlüssel-Byte-Array ab.
 // Falls der Schlüssel valider UTF-8-Text ist, wird DocId::from_key verwendet, andernfalls AHasher.
 fn derive_doc_id_for_key(key: &[u8]) -> DocId {

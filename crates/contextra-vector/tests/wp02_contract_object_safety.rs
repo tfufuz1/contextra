@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Compile-Time Objektsicherheits- und Bound-Tests für contract.rs (WP-VEC-02).
-// INVARIANTEN: Zero-Panic, dyn-Sicherheit für DistanceFn, BlockTransform, Clock, Rng, Send + Sync.
-// HOTSPOTS: assert_object_safety
-// STAND: 2026-11-11
 
 use contextra_vector::contract::{
     BlockTransform, Clock, DistanceFn, Error as ContractError, ExternalId, Metric, Result, Rng,

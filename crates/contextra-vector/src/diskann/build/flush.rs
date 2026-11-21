@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Inkrementelles Pruning und Index-Erweiterung (WP-VEC-07).
-// INVARIANTEN: RobustPrune mit Alpha-Kriterium; NAN/INF-Filterung.
-// STAND: 2026-11-11
 
 use super::super::format::DiskAnnHeader;
 use super::super::types::DiskAnnIndex;

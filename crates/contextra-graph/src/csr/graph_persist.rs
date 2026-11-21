@@ -1,12 +1,6 @@
 #![cfg(feature = "workspace")]
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-PERSIST-001]
 //! Persistenz-Hilfsmethoden für CsrGraph.
 //!
 //! # Ring-0 Reinheit (R-03)

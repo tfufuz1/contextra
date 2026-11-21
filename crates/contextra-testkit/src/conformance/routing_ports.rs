@@ -13,10 +13,6 @@
 //! - **Regel 10 (Fail-Closed):** Suiten liefern ein `ConformanceResult`, um Panics
 //!   in Test-Harnesses zu vermeiden.
 
-// FILE-CONTEXT
-// STAND: 2026-11-11
-// ZWECK: Conformance suites for HybridSearchProvider, CommunityResolver, ContextPreparer, DriftStatusProvider, and EgressPolicy.
-// INVARIANTEN: Zero-panic test execution returning ConformanceResult; fail-closed diagnostics; deterministic execution.
 
 use super::failure::{ConformanceFailure, ConformanceResult};
 use contextra_ports::{
@@ -25,7 +21,6 @@ use contextra_ports::{
 };
 use contextra_types::{DocId, EntityId, RequestContext, TokenBudget};
 
-// ANCHOR[contextra-testkit:CONF-HYBRID-001]
 /// Prüft die Konformität einer [`HybridSearchProvider`]-Implementierung gegen ihren dokumentierten Vertrag.
 ///
 /// **Geprüfte Verträge:**
@@ -153,7 +148,6 @@ pub async fn run_hybrid_search_provider_suite<P: HybridSearchProvider>(
     Ok(())
 }
 
-// ANCHOR[contextra-testkit:CONF-COMMUNITY-001]
 /// Prüft die Konformität einer [`CommunityResolver`]-Implementierung gegen ihren dokumentierten Vertrag.
 ///
 /// **Geprüfte Verträge:**
@@ -210,7 +204,6 @@ pub async fn run_community_resolver_suite<R: CommunityResolver>(
     Ok(())
 }
 
-// ANCHOR[contextra-testkit:CONF-CONTEXT-PREP-001]
 /// Prüft die Konformität einer [`ContextPreparer`]-Implementierung gegen ihren dokumentierten Vertrag.
 ///
 /// **Geprüfte Verträge:**
@@ -335,7 +328,6 @@ pub fn run_context_preparer_suite<P: ContextPreparer>(preparer: &P) -> Conforman
     Ok(())
 }
 
-// ANCHOR[contextra-testkit:CONF-DRIFT-001]
 /// Prüft die Konformität einer [`DriftStatusProvider`]-Implementierung gegen ihren dokumentierten Vertrag.
 ///
 /// **Geprüfter Vertrag:**
@@ -360,7 +352,6 @@ pub fn run_drift_status_provider_suite<D: DriftStatusProvider>(provider: &D) -> 
     Ok(())
 }
 
-// ANCHOR[contextra-testkit:CONF-EGRESS-001]
 /// Prüft die Konformität einer [`EgressPolicy`]-Implementierung gegen ihren dokumentierten Vertrag.
 ///
 /// **Geprüfte Verträge:**

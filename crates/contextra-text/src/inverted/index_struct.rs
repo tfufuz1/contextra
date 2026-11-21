@@ -9,7 +9,6 @@ use crate::error::{Result, TextError};
 use crate::storage::PostingStore;
 use crate::types::MAX_SEARCH_K;
 use contextra_ids::{DocId, TxId};
-// ANCHOR[contextra-text:INV-008]
 /// Persistenter invertierter Index über einer Kollektion im Storage-Backend.
 ///
 /// # Nebenläufigkeit & Sperrhierarchie:
@@ -48,15 +47,12 @@ impl<S: PostingStore> Clone for InvertedIndex<S> {
 }
 
 impl<S: PostingStore> InvertedIndex<S> {
-    // ANCHOR[contextra-text:INV-009]
     /// Maximale Textgröße pro Dokument (10 MiB) zur Begrenzung von Speicherverbrauch und DoS-Schutz.
     pub const MAX_TEXT_BYTES: usize = 10 * 1024 * 1024;
 
-    // ANCHOR[contextra-text:INV-010]
     /// Maximale Anzahl gleichzeitig ungecommitteter Transaktionen (10.000).
     pub const MAX_STAGED_TRANSACTIONS: usize = 10_000;
 
-    // ANCHOR[contextra-text:INV-011]
     /// Erzeugt einen neuen invertierten Index mit expliziter Sprachkonfiguration.
     ///
     /// # Language Selection
@@ -90,13 +86,11 @@ impl<S: PostingStore> InvertedIndex<S> {
         }
     }
 
-    // ANCHOR[contextra-text:INV-012]
     /// Erzeugt einen neuen invertierten Index mit englischem Standard-Tokenizer.
     pub fn new(storage: Arc<S>, namespace: &str) -> Self {
         Self::new_with_language(storage, namespace, Language::English)
     }
 
-    // ANCHOR[contextra-text:INV-013]
     /// Konfiguriert einen benutzerdefinierten Tokenizer.
     pub fn with_tokenizer(mut self, tokenizer: Arc<dyn Tokenizer>) -> Self {
         self.tokenizer = tokenizer;
@@ -118,7 +112,6 @@ impl<S: PostingStore> InvertedIndex<S> {
         &self.commit_lock
     }
 
-    // ANCHOR[contextra-text:INV-014]
     /// Lädt die persistenten Statistiken (`meta:stats`) aus dem Storage in die atomaren In-Memory-Felder.
     pub async fn load_stats(&self) -> Result<()> {
         let meta_key = self.key("meta:stats");
@@ -250,7 +243,6 @@ impl<S: PostingStore> InvertedIndex<S> {
         k
     }
 
-    // ANCHOR[contextra-text:INV-015]
     /// Fügt ein Dokument in den Index ein oder aktualisiert ein bestehendes.
     #[tracing::instrument(skip(self, text))]
     pub async fn upsert_document(&self, tx: TxId, doc_id: DocId, text: &str) -> Result<()> {
@@ -336,7 +328,6 @@ impl<S: PostingStore> InvertedIndex<S> {
         Ok(())
     }
 
-    // ANCHOR[contextra-text:INV-025]
     /// Schreibt Postinglisten für gegebene Terme neu (Maintenance / Rewrite API).
     pub async fn rewrite_posting_lists(&self, tx: TxId, terms: &[&str]) -> Result<usize> {
         let mut rewritten = 0;
@@ -357,7 +348,6 @@ impl<S: PostingStore> InvertedIndex<S> {
         Ok(rewritten)
     }
 
-    // ANCHOR[contextra-text:INV-026]
     /// Kompaktiert Terme und bereinigt verwaiste Metadaten im Inverted Index (Maintenance / Compaction API).
     pub async fn compact_terms(&self, tx: TxId) -> Result<u64> {
         self.resolve_tombstones(tx).await
@@ -435,7 +425,6 @@ impl<S: PostingStore> InvertedIndex<S> {
         Ok(resolved)
     }
 
-    // ANCHOR[contextra-text:INV-017]
     /// Löscht ein Dokument logisch aus dem Index und markiert alle Terme mit Tombstones.
     pub async fn delete_document(&self, tx: TxId, doc_id: DocId) -> Result<()> {
         let dl_key = self.key_with_id("dl:", doc_id.inner());
@@ -504,7 +493,6 @@ impl<S: PostingStore> InvertedIndex<S> {
         Ok(())
     }
 
-    // ANCHOR[contextra-text:INV-018]
     /// Überträgt die gepufferten statistischen Änderungen einer Transaktion dauerhaft.
     pub async fn commit_stats(&self, tx: TxId) -> Result<()> {
         let change = {
@@ -566,7 +554,6 @@ impl<S: PostingStore> InvertedIndex<S> {
             .map_err(Into::into)
     }
 
-    // ANCHOR[contextra-text:INV-019]
     /// Verwirft die gepufferten statistischen Änderungen einer Transaktion bei Rollback.
     pub async fn rollback_stats(&self, tx: TxId) -> Result<()> {
         let mut guard = self.staged_stats.lock();
@@ -575,7 +562,6 @@ impl<S: PostingStore> InvertedIndex<S> {
         Ok(())
     }
 
-    // ANCHOR[contextra-text:INV-020]
     /// Führt eine Volltextsuche mit BM25 aus.
     #[tracing::instrument(skip(self, query))]
     pub async fn search_bm25(
@@ -587,7 +573,6 @@ impl<S: PostingStore> InvertedIndex<S> {
         self.search_bm25_at(query, k, max_seq).await
     }
 
-    // ANCHOR[contextra-text:INV-021]
     /// Führt eine Volltextsuche mit BM25 zu einer bestimmten MVCC-Snapshot-Sequenznummer aus.
     #[tracing::instrument(skip(self, query))]
     pub async fn search_bm25_at(

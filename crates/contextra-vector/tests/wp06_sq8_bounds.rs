@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Fehlerschranken-, Serialisierungs- und Stabilitätstests für SQ8 (WP-VEC-06).
-// INVARIANTEN: Rekonstruktionsfehler <= Delta / 510 je Dimension; Bincode/Serde Roundtrip.
-// STAND: 2026-11-12
 
 use contextra_vector::quantize::{ScalarQuantizer, SQ8_MAX_ERROR_FACTOR_PER_DIM};
 use proptest::prelude::*;

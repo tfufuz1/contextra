@@ -7,7 +7,6 @@ use std::sync::Arc;
 
 // =========================================================================
 // SECTION: Module Constants
-// ANCHOR[id=rng-constants,epic=rng,seq=1]
 // NOTE: SplitMix64 verwendet den Goldenen Schnitt für 64-Bit-Ganzzahlen.
 // Bewusst KEIN globaler Zähler (docs/crates/contextra-env.md §1, Punkt 5).
 // =========================================================================
@@ -29,7 +28,6 @@ fn high_u32(value: u64) -> u32 {
 
 // =========================================================================
 // SECTION: Rng Port Trait
-// ANCHOR[id=rng-root,epic=rng,seq=2]
 // NOTE: Primäre Zufallsabstraktion; entkoppelt Algorithmen von Systementropie.
 // LINK docs/crates/contextra-env.md §2.2
 // =========================================================================
@@ -87,7 +85,6 @@ pub trait Rng: Send + Sync + 'static {
 
 // =========================================================================
 // SECTION: SeededRng (SplitMix64) Implementation
-// ANCHOR[id=rng-splitmix64,epic=rng,seq=3]
 // NOTE: Lock-freie, threadsichere SplitMix64-Implementierung mit atomarem Zustand.
 // Die Ausgabefolge ist über `tests/golden/seeded_rng_sequences.json` festgeschrieben (INV-1).
 // =========================================================================
@@ -196,7 +193,6 @@ impl Rng for SeededRng {
 
 // =========================================================================
 // SECTION: Blanket Implementation for Arc<T>
-// ANCHOR[id=rng-arc,epic=rng,seq=4]
 // NOTE: Erlaubt direkte Nutzung von `Arc<dyn Rng>` ohne zusätzliche Allokationen.
 // =========================================================================
 
@@ -226,7 +222,6 @@ impl<T: Rng + ?Sized> Rng for Arc<T> {
 
 // =========================================================================
 // SECTION: Unit Tests
-// ANCHOR[id=rng-tests,epic=rng,seq=5]
 // =========================================================================
 
 #[cfg(test)]

@@ -9,7 +9,6 @@ use contextra_privacy::egress_vault::{
 use contextra_privacy::{TenantId, TenantScoped};
 
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-TSI-004]
 // Prüft: Prüft die Mandantenisolation bei der Ausführung von Cloud-Queries über das Gateway.
 async fn test_egress_gateway_scoped_isolation() {
     let tenant_a = TenantId::try_new(100).expect("tenant_a");
@@ -41,7 +40,6 @@ async fn test_egress_gateway_scoped_isolation() {
 }
 
 #[tokio::test]
-// ANCHOR[contextra-privacy:TEST-TSI-002]
 // Prüft: Prüft, dass Klassifikationsprüfungen bei unpassendem Mandanten-Scope blockieren.
 async fn test_egress_vault_classify_scoped_isolation() {
     let tenant_a = TenantId::try_new(100).expect("tenant_a");
@@ -67,7 +65,6 @@ async fn test_egress_vault_classify_scoped_isolation() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-TSI-003]
 // Prüft: Prüft, dass die Bereinigung bei abweichendem Mandanten-Scope verweigert wird.
 fn test_egress_vault_sanitize_scoped_isolation() {
     let tenant_a = TenantId::try_new(100).expect("tenant_a");
@@ -92,7 +89,6 @@ fn test_egress_vault_sanitize_scoped_isolation() {
 }
 
 #[test]
-// ANCHOR[contextra-privacy:TEST-TSI-001]
 // Prüft: Autarke Simulation der Schlüsselableitungs-Isolation zwischen verschiedenen Mandanten (Klasse A).
 fn test_key_manager_derive_kv_key_scoped_isolation() -> Result<(), Box<dyn std::error::Error>> {
     let tenant_a = TenantId::try_new(100).expect("tenant_a");

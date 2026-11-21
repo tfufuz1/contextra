@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Zentrales Fehler-Enum VectorError für contextra-vector (B4/R3-Konformität).
-// INVARIANTEN: Zero-Panic, thiserror, non_exhaustive, saubere Zuordnung lokaler Fehler.
-// HOTSPOTS: VectorError, Result<T>
-// STAND: 2026-11-11
 
 //! # Fehlerbehandlung für `contextra-vector` (B4- & R3-Konformität)
 //!
@@ -13,7 +8,6 @@ use thiserror::Error;
 
 // SECTION Fehler-Definitionen
 
-// ANCHOR[contextra-vector:ERR-VECTOR-ERROR]
 /// Fehlerzustände von `contextra-vector`.
 #[derive(Debug, Error, PartialEq, Clone)]
 #[non_exhaustive]
@@ -102,7 +96,6 @@ impl VectorError {
     }
 }
 
-// ANCHOR[contextra-vector:ERR-RESULT]
 /// Standardmäßiger Result-Typ für `contextra-vector`.
 pub type Result<T> = std::result::Result<T, VectorError>;
 

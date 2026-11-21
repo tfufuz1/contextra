@@ -26,7 +26,6 @@ use contextra_ids::TxId;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-// ANCHOR[contextra-checkpoint:GRD-001]
 /// RAII-Guard für gepinnte Checkpoint-Sequenznummern (gemäß ADR-015).
 ///
 /// # Zweck
@@ -48,7 +47,6 @@ pub struct PinGuard<S: SnapshotSource> {
 }
 
 impl<S: SnapshotSource> PinGuard<S> {
-    // ANCHOR[contextra-checkpoint:GRD-002]
     /// Pinnt eine Sequenznummer in der Storage-Engine unter Verwendung der Clock aus der Orphan-Registry.
     ///
     /// # Parameter
@@ -64,7 +62,6 @@ impl<S: SnapshotSource> PinGuard<S> {
         Self::pin_with_clock(storage, seq_no, orphan_registry, clock).await
     }
 
-    // ANCHOR[contextra-checkpoint:GRD-003]
     /// Pinnt eine Sequenznummer mit explizit übergebenem Clock-Port.
     ///
     /// # Ablauf von `pin_with_clock`:
@@ -100,7 +97,6 @@ impl<S: SnapshotSource> PinGuard<S> {
         self.seq_no.take();
     }
 
-    // ANCHOR[contextra-checkpoint:GRD-004]
     /// Entpinnt die Sequenznummer explizit und asynchron bei einem abgefangenen Fehler.
     ///
     /// # Ablauf von `unpin`:
@@ -119,7 +115,6 @@ impl<S: SnapshotSource> PinGuard<S> {
 }
 
 impl<S: SnapshotSource> Drop for PinGuard<S> {
-    // ANCHOR[contextra-checkpoint:GRD-005]
     // Ablauf von `PinGuard::drop`:
     // Wenn `seq_no` noch gesetzt ist (Guard wurde nicht defused oder unpinned):
     // 1. Zeitstempel über Clock-Port lesen.
@@ -142,7 +137,6 @@ impl<S: SnapshotSource> Drop for PinGuard<S> {
     }
 }
 
-// ANCHOR[contextra-checkpoint:GRD-006]
 /// RAII Guard, der explizit über [`commit`](Self::commit) oder [`rollback`](Self::rollback) finalisiert werden MUSS.
 ///
 /// # RAII-Kontrakt und Betriebshinweise
@@ -267,7 +261,6 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         &self.clock
     }
 
-    // ANCHOR[contextra-checkpoint:GRD-007]
     /// Erstellt einen neuen CheckpointGuard für einen Agenten-Schritt mit SystemClock.
     pub async fn for_agent_step(storage: Arc<S>, tx: TxId) -> Result<Self> {
         let clock = Arc::new(SystemClock::new());
@@ -319,7 +312,6 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
             .ok_or_else(|| CheckpointError::Internal("Checkpoint already consumed".into()))
     }
 
-    // ANCHOR[contextra-checkpoint:GRD-008]
     /// Überführt den Guard in einen dauerhaften Zustand (Commit) und konsumiert ihn.
     ///
     /// # Ablauf von `commit`:
@@ -356,7 +348,6 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         Ok(cp)
     }
 
-    // ANCHOR[contextra-checkpoint:GRD-009]
     /// Führt ein manuelles, asynchrones Rollback des Checkpoints aus.
     /// Nach Aufruf von `rollback()` ist der Guard konsumiert, sodass beim Drop kein erneutes Rollback ausgelöst wird.
     ///
@@ -405,7 +396,6 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         }
     }
 
-    // ANCHOR[contextra-checkpoint:GRD-010]
     /// Führt ein synchrones, blockierendes Rollback des Checkpoints aus.
     ///
     /// # Einschränkung
@@ -464,7 +454,6 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
 }
 
 impl<S: SnapshotSource> Drop for CheckpointGuard<S> {
-    // ANCHOR[contextra-checkpoint:GRD-011]
     // Ablauf von `CheckpointGuard::drop`:
     // Wenn `checkpoint` noch vorhanden ist (kein explizites commit() oder rollback()):
     // 1. Rollback-Dauermetrik protokollieren.

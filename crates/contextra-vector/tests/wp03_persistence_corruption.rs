@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Korruptions-, Bit-Flip- und Trunkierungs-Tests fuer HNSW-Persistenzschicht (fail-closed, Zero-Panic).
-// INVARIANTEN: Jede Bit-Mutation, Verkuerzung oder unzulaessige Offset fuehrt zu Err(VectorError::Storage), niemals zu Panic.
-// HOTSPOTS: test_header_bit_flips_fail_closed, test_truncations_fail_closed
-// STAND: TS:2026-11-12T00:00:00Z
 
 use contextra_vector::persistence::{HnswHeader, MmapIndex, NodeRecord};
 use std::fs;

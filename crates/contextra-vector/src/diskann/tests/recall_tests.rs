@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Modularisierte Testsuiten für DiskANN (WP-VEC-07).
-// STAND: 2026-11-11
 
 use super::super::config::{DiskAnnConfig, DiskAnnFallbackPolicy};
 use super::super::format::{

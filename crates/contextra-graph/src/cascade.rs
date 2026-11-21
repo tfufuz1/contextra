@@ -4,10 +4,6 @@
 //! Wenn ein Quelldokument invalidiert oder aktualisiert wird, invalidiert dieses Modul
 //! alle daraus abgeleiteten Kanten und Hyperkanten atomar und kaskadierend (Fail-Closed).
 
-// FILE-CONTEXT
-// ZWECK: Cascading-Invalidation (Supersedes-Chunk -> Graph-Kanten-Tombstone)
-// INVARIANTEN: Jede tombstonierte Kante erhaelt einen Provenienz-Eintrag mit WAL-Seq (INV-GRAPH-PROV-1).
-// STAND: TS:2026-08-30T19:00:00Z
 
 use crate::csr::CsrGraph;
 use crate::error::{GraphError, Result};
@@ -15,18 +11,15 @@ use crate::types::{DocId, EntityId, TxId};
 
 /// Maximum number of hyperedges processed synchronously per cascade invalidation run
 /// to bound latency spikes. Any remaining hyperedges are returned in `deferred`.
-// ANCHOR[contextra-graph:SRC-CASCADE-001]
 
 // SECTION Cascade Core Implementation
 pub const MAX_HYPEREDGE_CASCADE_FANOUT: usize = 1_000;
 
 /// Default fan-out limit for hyperedge cascade invalidation per document (§6.8).
-// ANCHOR[contextra-graph:SRC-CASCADE-002]
 pub const DEFAULT_HYPEREDGE_CASCADE_FANOUT_LIMIT: usize = MAX_HYPEREDGE_CASCADE_FANOUT;
 
 /// Report summarizing the cascade invalidation of graph edges derived from a superseded document.
 #[derive(Debug, Clone, PartialEq, Eq)]
-// ANCHOR[contextra-graph:SRC-CASCADE-003]
 pub struct CascadeInvalidationReport {
     /// Number of edges tombstoned as a result of the superseded document.
     pub tombstoned_edge_count: usize,
@@ -77,12 +70,10 @@ pub async fn cascade_invalidate_edges_for_superseded_doc(
 }
 
 /// LSM-Key-Präfix für die persistent cascade queue (§6.6 / §6.8).
-// ANCHOR[contextra-graph:SRC-CASCADE-004]
 pub const CASCADE_QUEUE_PREFIX: &str = "__graph:cascade_queue:";
 
 /// Status tracking for a cascade invalidation ticket (§6.8).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-// ANCHOR[contextra-graph:SRC-CASCADE-005]
 pub enum CascadeStatus {
     /// Invalidation task is queued and pending.
     Pending,
@@ -96,7 +87,6 @@ pub enum CascadeStatus {
 
 /// Record of edge / hyperedge deletion during cascade invalidation (§6.8).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-// ANCHOR[contextra-graph:SRC-CASCADE-006]
 pub struct CascadeDeletionRecord {
     pub doc_id: DocId,
     pub tombstoned_count: usize,
@@ -105,7 +95,6 @@ pub struct CascadeDeletionRecord {
 
 /// Ticket tracking persistent cascade invalidation status (§6.8).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-// ANCHOR[contextra-graph:SRC-CASCADE-008]
 pub struct CascadeTicket {
     pub id: u64,
     pub doc_id: DocId,
@@ -114,7 +103,6 @@ pub struct CascadeTicket {
 }
 
 /// Garbage collection trait for sweeping orphaned hyperedge references (Anhang B §B.5.1.7).
-// ANCHOR[contextra-graph:SRC-CASCADE-009]
 pub trait GraphGarbageCollection {
     /// Sweeps orphaned hyperedges whose participants no longer exist or are fully tombstoned.
     fn sweep_orphans(&self, wal_tx: TxId) -> Result<usize>;
@@ -156,7 +144,6 @@ impl GraphGarbageCollection for CsrGraph {
 
 /// Report summarizing the cascade invalidation of hyperedges derived from a superseded document.
 #[derive(Debug, Clone, PartialEq, Eq)]
-// ANCHOR[contextra-graph:SRC-CASCADE-010]
 pub struct HyperedgeCascadeReport {
     /// Hyperedges tombstoned synchronously in this cascade run (up to MAX_HYPEREDGE_CASCADE_FANOUT).
     pub invalidated: Vec<crate::hyperedge::HyperEdgeId>,
@@ -167,7 +154,6 @@ pub struct HyperedgeCascadeReport {
 }
 
 /// Alias for [`HyperedgeCascadeReport`] (§6.8 specification alignment).
-// ANCHOR[contextra-graph:SRC-CASCADE-011]
 pub type CascadeReport = HyperedgeCascadeReport;
 
 /// Cascade invalidates hyperedges derived from `superseded_doc_id` with fan-out protection.
@@ -186,7 +172,6 @@ pub type CascadeReport = HyperedgeCascadeReport;
 /// # Crash Recovery Rationale
 /// Nach einem Absturz darf nie ein Kind tombstoniert, aber sein Vorfahre noch lebendig sein,
 /// weil der Vorfahre danach nicht mehr auffindbar wäre.
-// ANCHOR[contextra-graph:SRC-CASCADE-012]
 pub fn topological_sort_hyperedge_closure(
     graph: &CsrGraph,
     closure_nodes: &[crate::hyperedge::HyperEdgeId],
@@ -380,7 +365,6 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
 /// - `Ok(())` if zero active hyperedges directly or transitively reference `target_doc_id`.
 /// - `Err(ContextraError::InvalidInput)` if any active hyperedge or child hyperedge retains
 ///   a reference to `target_doc_id`.
-// ANCHOR[contextra-graph:SRC-CASCADE-013]
 pub fn verify_doc_hyperedge_deletion_completeness(
     graph: &CsrGraph,
     target_doc_id: DocId,
@@ -447,7 +431,6 @@ mod tests {
     use contextra_ports::GraphIndex;
     use crate::types::{Edge, Entity};
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-014]
     #[tokio::test]
     #[cfg(feature = "workspace")]
     async fn test_cascade_invalidation_tombstones_edges_of_superseded_doc() {
@@ -513,7 +496,6 @@ mod tests {
         assert_eq!(graph.neighbors(node2).await.unwrap().len(), 1);
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-015]
     #[tokio::test]
     async fn test_cascade_invalidation_is_idempotent() {
         let graph = std::sync::Arc::new(CsrGraph::new());
@@ -558,7 +540,6 @@ mod tests {
         assert!(report2.affected_node_ids.is_empty());
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-016]
     #[tokio::test]
     async fn test_pathrag_sufficiency_excludes_cascaded_tombstones() {
         let graph = std::sync::Arc::new(CsrGraph::new());
@@ -605,7 +586,6 @@ mod tests {
         assert!(paths_after.is_empty());
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-017]
     #[tokio::test]
     async fn test_cascade_invalidation_nonexistent_doc_returns_zero_count() {
         let graph = std::sync::Arc::new(CsrGraph::new());
@@ -619,7 +599,6 @@ mod tests {
         assert!(report.affected_node_ids.is_empty());
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-018]
     #[tokio::test]
     async fn test_cascade_invalidation_max_wal_seq() {
         let graph = std::sync::Arc::new(CsrGraph::new());
@@ -658,7 +637,6 @@ mod tests {
         assert_eq!(report.affected_node_ids.len(), 2);
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-019]
     #[tokio::test]
     async fn test_cascade_invalidation_multiple_edges_same_doc() {
         let graph = std::sync::Arc::new(CsrGraph::new());
@@ -697,7 +675,6 @@ mod tests {
         assert!(report.affected_node_ids.contains(&n3));
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-020]
     #[tokio::test]
     async fn test_cascade_invalidate_hyperedges_normal() {
         let graph = CsrGraph::new();
@@ -729,7 +706,6 @@ mod tests {
         }
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-021]
     #[tokio::test]
     async fn test_cascade_invalidate_hyperedges_high_fanout() {
         let graph = CsrGraph::new();
@@ -770,7 +746,6 @@ mod tests {
         assert_eq!(remaining.len(), report.deferred.len());
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-022]
     #[tokio::test]
     async fn test_cascade_invalidate_hyperedges_idempotency() {
         let graph = CsrGraph::new();
@@ -801,7 +776,6 @@ mod tests {
         assert!(report2.deferred.is_empty());
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-023]
     #[tokio::test]
     async fn test_cascade_invalidate_hyperedges_atomic_role_bindings() {
         let graph = CsrGraph::new();
@@ -846,7 +820,6 @@ mod tests {
         }
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-024]
     #[tokio::test]
     async fn test_cascade_invalidate_hyperedges_nonexistent_doc() {
         let graph = CsrGraph::new();
@@ -860,7 +833,6 @@ mod tests {
         assert!(report.deferred.is_empty());
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-025]
     #[tokio::test]
     async fn test_cascade_invalidate_hyperedges_mixed_docs() {
         let graph = CsrGraph::new();
@@ -912,7 +884,6 @@ mod tests {
         assert_eq!(graph.hyperedges_for_doc(doc_b), vec![id_b1]);
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-026]
     #[tokio::test]
     async fn test_sweep_orphans_sweeps_degenerated_hyperedges() {
         let graph = CsrGraph::new();
@@ -976,7 +947,6 @@ mod tests {
         assert!(graph.get_hyperedge(HyperEdgeId::new(3)).is_none());
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-027]
     #[tokio::test]
     async fn test_verify_deletion_completeness_multilevel_chain() {
         let graph = CsrGraph::new();
@@ -1049,7 +1019,6 @@ mod tests {
         );
     }
 
-    // ANCHOR[contextra-graph:SRC-CASCADE-028]
     #[test]
     fn test_verify_deletion_completeness_cycle_termination() {
         let graph = CsrGraph::new();

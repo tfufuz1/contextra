@@ -1,6 +1,5 @@
 //! # Group-Commit Pfad (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Leader- und Follower-Pfade fuer Gruppen-Commits
 //! // INVARIANTEN: ADR-0XX-P0A (Lock-Handoff), INV-LOCK-ORDER-1

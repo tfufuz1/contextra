@@ -1,6 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-// FILE-CONTEXT: Integration test verifying K-02 SSI search_at(seq) determinism under concurrent HNSW rebuild.
 // Spec v17 (Part 4.3, K-02; Part 6.5 "Pin-first").
 
 use contextra_ports::VectorIndex;

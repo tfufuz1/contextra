@@ -3,11 +3,6 @@
 //! # Zweck
 //! Definiert `CsrEdge`, `CsrGraphConfig`, `InternalIndex` und zugehörige Konstanten.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use crate::types::{DocId, EntityId, ResourceTracker, TxId};
@@ -27,7 +22,6 @@ pub(crate) const GRAPH_COMMUNITY_PREFIX: &[u8] = b"__graph:community:";
 /// Edge type representation for CSR edges.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-// ANCHOR[contextra-graph:SRC-CSR-TYPES-001]
 pub enum EdgeType {
     #[default]
     Default,
@@ -35,7 +29,6 @@ pub enum EdgeType {
 
 /// Edge structure in CSR graph representation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-graph:SRC-CSR-TYPES-002]
 pub struct CsrEdge {
     pub target: EntityId,
     pub weight: f32,
@@ -47,7 +40,6 @@ pub struct CsrEdge {
 }
 
 impl CsrEdge {
-    // ANCHOR[contextra-graph:SRC-CSR-TYPES-003]
     pub fn new(target: EntityId, weight: f32) -> Self {
         Self {
             target,
@@ -64,7 +56,6 @@ use std::sync::Arc;
 
 /// Persisted edge payload format for storage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// ANCHOR[contextra-graph:SRC-CSR-TYPES-004]
 pub struct PersistedEdgePayload {
     pub weight: f32,
     #[serde(default, alias = "valid_from")]
@@ -80,19 +71,15 @@ pub struct PersistedEdgePayload {
 }
 
 /// Score decay factor per hop (0.7^hop).
-// ANCHOR[contextra-graph:SRC-CSR-TYPES-005]
 pub const SCORE_DECAY: f32 = 0.7;
 
 /// Maximum traversal depth.
-// ANCHOR[contextra-graph:SRC-CSR-TYPES-006]
 pub const MAX_TRAVERSAL_HOPS: u8 = 3;
 
 /// Maximum visited nodes limit during BFS traversal to prevent intermediate hub-node memory explosion.
-// ANCHOR[contextra-graph:SRC-CSR-TYPES-007]
 pub const MAX_VISITED_NODES: usize = 10_000;
 
 #[derive(Debug, Clone)]
-// ANCHOR[contextra-graph:SRC-CSR-TYPES-008]
 pub struct CsrGraphConfig {
     pub rebuild_threshold: usize,
     pub max_compaction_peak_memory_mb: Option<usize>,

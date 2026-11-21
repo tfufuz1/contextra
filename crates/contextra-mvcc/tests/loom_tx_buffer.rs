@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-LOOM-TX-BUFFER]
 //! # Loom-Modell für `TxBuffer` (SPEC-v2 B11)
 #![allow(unexpected_cfgs)]
 

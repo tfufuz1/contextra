@@ -1,4 +1,3 @@
-// ANCHOR[PERF:BENCH-003] STATUS:DONE (TS:2026-09-03T00:00:00Z) — Contextra Competitive Benchmark Suite
 // ZIEL: Criterion-basierte Messung von Write-Durchsatz, Hybrid-Search-Latenz und Context-Compaction-Durchsatz
 
 use contextra_db::context_compaction::{CompactionStrategy, ContextCompactor};

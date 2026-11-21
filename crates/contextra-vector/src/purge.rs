@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: DSGVO-Löschkette Phase 4e: physische HNSW-Reparatur und Slot-Nullung (SPEC contextra-vector §3).
-// INVARIANTEN: INV-VEC-CONNECTIVITY-1 (Konnektivität nach Entfernung erhalten, sonst Fehler);
 //              INV-VEC-ZEROIZE-1 (Vektorslots sind nach Erfolg vollständig genullt);
 //              Fail-Closed: mmap-gestützte Knoten werden NICHT stillschweigend übersprungen.
 // NICHT-OFFENSICHTLICH: Die Validierung läuft vollständig vor der ersten Mutation; nach einem Fehler
@@ -20,7 +17,6 @@ use crate::error::{Result, VectorError};
 use crate::hnsw::{HnswIndex, VectorData};
 use crate::types::DocId;
 
-// ANCHOR[contextra-vector:PURGE-OUTCOME]
 /// Ergebnis einer physischen Vektor-Bereinigung.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct VectorPurgeOutcome {
@@ -55,7 +51,6 @@ impl VectorPurger {
     /// - `Unsupported`, wenn ein Knoten mmap-gestützt ist.
     /// - `Index`, wenn ein Slot nach dem Nullen nicht Null ist.
     /// - `Io`/`Storage` bei Persistenzfehlern.
-    // ANCHOR[contextra-vector:PURGE-VECTORS]
     pub fn purge_vectors(
         index: &mut HnswIndex,
         doc_ids: &[DocId],

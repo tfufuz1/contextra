@@ -1,9 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: 8-Bit Skalare Quantisierung (SQ8) mit pro-Dimension Min/Max Skalierung.
-// INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); Keine Panics bei unpassenden Eingaben; INV-SQ8-ERROR-BOUND-1.
-// NICHT-OFFENSICHTLICH: try_train prüft Vektor-Dimensionen vor Rekalibrierung der Min/Max-Grenzen.
-// HOTSPOTS: ScalarQuantizer
-// STAND: 2026-11-12
 
 //! Scalar Quantization (SQ8) for HNSW Index.
 //!
@@ -28,7 +22,6 @@ use std::sync::atomic::AtomicU64;
 
 // SECTION Quantisierungs-Konstanten
 
-// ANCHOR[contextra-vector:SQ8-CONSTANTS]
 /// Default low percentile for quantization scaling (0.5%).
 pub const DEFAULT_P_LOW: f32 = 0.005;
 /// Default high percentile for quantization scaling (99.5%).
@@ -40,7 +33,6 @@ pub const SQ8_MAX_ERROR_FACTOR_PER_DIM: f32 = 1.0 / 510.0;
 
 // SECTION ScalarQuantizer Struktur
 
-// ANCHOR[contextra-vector:SQ8-QUANTIZER-STRUCT]
 /// An 8-bit Scalar Quantizer (SQ8) with per-dimension scaling.
 ///
 /// Quantization reduces the memory footprint of vector storage by 4x.

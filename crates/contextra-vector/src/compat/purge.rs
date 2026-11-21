@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Fail-closed Hard-Purge für HNSW Vektor-Indizes (Welle 2/3).
-// INVARIANTEN: Zeroize von Vektoren (f32/u8) und Arena-Slots vor Slot-Freigabe; physische Bereinigung.
-// NICHT-OFFENSICHTLICH: Graph-Reparatur entfernt alle eingehenden/ausgehenden Kanten und wählt Entry-Point neu.
 
 #![cfg(feature = "ports-compat")]
 

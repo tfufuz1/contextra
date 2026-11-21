@@ -1,7 +1,6 @@
 // =========================================================================
 // SECTION: tools_crud
 // =========================================================================
-// ANCHOR[contextra-mcp:TOOLS-CRUD-001]
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;

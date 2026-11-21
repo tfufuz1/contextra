@@ -1,5 +1,4 @@
 //! Golden- und Orakel-Tests für contextra-text (TX6.1 / SPEC §5.1).
-// ANCHOR[contextra-text:TEST-195]
 
 use contextra_text::bm25::score_term;
 use contextra_text::contract::{Clock, DocKey};

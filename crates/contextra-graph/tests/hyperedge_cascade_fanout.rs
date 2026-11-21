@@ -11,7 +11,6 @@ use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::{DocId, EntityId};
 use std::time::Instant;
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-CASCADE-FANOUT-001]
 #[tokio::test]
 async fn test_hyperedge_cascade_fanout_limit_and_termination() {
     let graph = CsrGraph::new();

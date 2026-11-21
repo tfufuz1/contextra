@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Verify DeploymentTier presets auto_extraction defaults (Spec D.6 / J.16/B-08)
 
 //! # Integrationstest: `regulated_auto_extraction_default`
 //!
@@ -12,7 +10,6 @@ use contextra::collection_profile::{
     AutoExtractionMode, DeploymentTier, ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT,
 };
 
-// ANCHOR[contextra:TEST-RAE-001]
 // Prüft, dass EnterpriseRegulated standardmäßig die automatische Textübermittlung an LLMs deaktiviert hat.
 #[test]
 fn test_enterprise_regulated_auto_extraction_default_is_disabled() {
@@ -30,7 +27,6 @@ fn test_enterprise_regulated_auto_extraction_default_is_disabled() {
     );
 }
 
-// ANCHOR[contextra:TEST-RAE-002]
 // Verifiziert, dass alle anderen Tiers (EdgeMinimal, PowerUserLocal, EnterpriseShared) standardmäßig Enabled nutzen.
 #[test]
 fn test_other_deployment_tiers_auto_extraction_default_is_enabled() {

@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Testet den vollständigen Lösch-Konsistenz-Zyklus für HNSW (WP-41).
-// INVARIANTEN:
 // 1. Gelöschte IDs tauchen in Suchergebnissen niemals wieder auf.
 // 2. Recall der Restmenge bleibt >= 0.95 gegenüber dem Brute-Force-Orakel.
 // 3. Konnektivität und Graphintegrität bleiben nach Löschung und Rebuild vollständig gewahrt.

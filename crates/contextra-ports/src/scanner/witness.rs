@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Unveränderlicher LayerWitness für gemessene Restbestände nach einer Bereinigung (SPEC §12.7.4, INV-WITNESS-MINT-1).
-// INVARIANTEN: Der LayerWitness hat keinen öffentlichen Konstruktor außerhalb von `ScanSession::finish` in `contextra-ports/src/scanner`. Kein Default, kein Deserialize, kein From<usize>.
-// HOTSPOTS: [1-70]
 
 #![forbid(unsafe_code)]
 

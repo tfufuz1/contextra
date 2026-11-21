@@ -8,7 +8,6 @@ use contextra_types::{DocId, Result, ScoredDocument, TxId};
 use contextra_ports::TextIndex as _;
 use std::sync::Arc;
 
-// ANCHOR[contextra-text:INV-005]
 /// Invertierter Index mit morphologischer Zerlegung für deutsche Volltextsuche.
 pub struct BM25MorphIndex<S: StorageEngine> {
     inner: InvertedIndex<S>,
@@ -16,7 +15,6 @@ pub struct BM25MorphIndex<S: StorageEngine> {
 }
 
 impl<S: StorageEngine> BM25MorphIndex<S> {
-    // ANCHOR[contextra-text:INV-006]
     /// Erzeugt einen neuen morphologischen Index mit deutschem Standard-Tokenizer.
     pub fn new(
         storage: Arc<S>,
@@ -33,7 +31,6 @@ impl<S: StorageEngine> BM25MorphIndex<S> {
         }
     }
 
-    // ANCHOR[contextra-text:INV-007]
     /// Liefert eine Referenz auf den konfigurierten morphologischen Tokenizer.
     pub fn tokenizer(&self) -> &dyn MorphologicalTokenizer {
         self.tokenizer.as_ref()

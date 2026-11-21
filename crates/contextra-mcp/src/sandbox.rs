@@ -1,12 +1,6 @@
 // =========================================================================
 // SECTION: sandbox
 // =========================================================================
-// ANCHOR[contextra-mcp:SANDBOX-001]
-// FILE-CONTEXT
-// STAND:       2026-09-10T19:25:24Z (SESSION: ae8c2fb9)
-// ZWECK:       MCP Sandbox & Zero-Trust Tool Isolation Layer
-// INVARIANTEN: Opt-In Security; volatile_results nutzt Single-Lock (parking_lot::Mutex); keine geschachtelten Locks
-// HOTSPOTS:    validate_tool_call(), store_volatile(), execute_with_timeout()
 // SIEHE AUCH:  ADR-010, rules/detect_nested_locks.yml
 
 // contextra-mcp/src/sandbox.rs

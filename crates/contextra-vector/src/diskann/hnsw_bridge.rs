@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Isolierte Brücke für HNSW-Fallback und Konfigurationsableitung (WP-VEC-07 / S-80).
-// INVARIANTEN: Kapselt alle Zugriffe auf crate::hnsw::*; keine direkten HNSW-Imports im DiskANN-Kern.
-// HOTSPOTS: HnswFallbackBridge, create_hnsw_fallback, search_hnsw
-// STAND: 2026-11-11
 
 //! Brückenmodul für die Interaktion zwischen DiskANN und HNSW.
 //!
@@ -14,7 +9,6 @@ use std::sync::Arc;
 use crate::error::Result;
 use crate::types::{DistanceMetric, DocId, ScoredDocument};
 
-// ANCHOR[contextra-vector:W07-HNSW-001]
 /// Gekapselter HNSW-Fallback-Index.
 #[derive(Clone)]
 pub(crate) struct HnswFallbackBridge {
@@ -40,7 +34,6 @@ impl HnswFallbackBridge {
     }
 }
 
-// ANCHOR[contextra-vector:W07-HNSW-002]
 /// Erzeugt einen neuen HNSW-Index als Fallback basierend auf den Parametern.
 pub(crate) fn create_hnsw_fallback(
     dimension: usize,

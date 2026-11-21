@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Lokale Typ- und Traitabstraktionen für Vektorsuche und Indexierung (Klasse A).
-// INVARIANTEN: Zero-Panic, DocId-Breite konfigurierbar (64/128-Bit), deterministischer RNG.
-// HOTSPOTS: types.rs:41-59 (ScoredDocument), types.rs:69-75 (Maintain)
-// STAND: 2026-11-11
 
 //! `types` — Lokale Typ- und Traitabstraktionen für Vektorsuche und Indexierung (Klasse A).
 //!
@@ -19,7 +14,6 @@ pub use contextra_ids::{DocId, TxId};
 
 // SECTION Metriken & Suchergebnisse
 
-// ANCHOR[contextra-vector:TYPES-METRIC]
 /// Unterstützte Distanzmetriken für Vektorräume.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, Default,
@@ -34,7 +28,6 @@ pub enum DistanceMetric {
     DotProduct,
 }
 
-// ANCHOR[contextra-vector:TYPES-SCORED-DOC]
 /// Suchergebnis mit Dokument-ID und Relevanz-Score / Distanz.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ScoredDocument {
@@ -81,7 +74,6 @@ pub use contextra_env::{
     unix_ms, Clock, MetricsSink, NoopMetricsSink, Rng, SeededRng, SystemClock,
 };
 
-// ANCHOR[contextra-vector:TYPES-MAINTAIN]
 /// Neutraler Wartungs-Trait für Speicherfreigaben und Kompaktierung (SPEC §6.1).
 pub trait Maintain: Send + Sync {
     /// Führt physische Bereinigung und Slot-Freigaben durch.

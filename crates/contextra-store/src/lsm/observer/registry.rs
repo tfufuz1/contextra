@@ -1,6 +1,5 @@
 //! # Observer-Registry & Benachrichtigung (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Zentrale Verwaltung und synchrone Benachrichtigung registrierter Observer
 //! // INVARIANTEN: Fail-Open, Circuit-Breaker, INV-LOCK-ORDER-1

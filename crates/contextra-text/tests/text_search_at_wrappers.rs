@@ -200,7 +200,6 @@ impl StorageEngine for MVCCMockStorage {
     }
 }
 
-// ANCHOR[contextra-text:TEST-189]
 // Testfall `test_bm25_scorer_search_at_snapshot_isolation`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_bm25_scorer_search_at_snapshot_isolation() -> Result<()> {
@@ -246,7 +245,6 @@ async fn test_bm25_scorer_search_at_snapshot_isolation() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-190]
 // Testfall `test_bm25_morph_index_search_at_snapshot_isolation`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_bm25_morph_index_search_at_snapshot_isolation() -> Result<()> {
@@ -299,7 +297,6 @@ async fn test_bm25_morph_index_search_at_snapshot_isolation() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-191]
 // Testfall `test_wrappers_search_at_edge_cases`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_wrappers_search_at_edge_cases() -> Result<()> {
@@ -337,7 +334,6 @@ async fn test_wrappers_search_at_edge_cases() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-192]
 // Testfall `test_bm25_morph_index_compound_term_search_at`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_bm25_morph_index_compound_term_search_at() -> Result<()> {

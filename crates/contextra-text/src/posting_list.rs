@@ -1,5 +1,3 @@
-// FILE-CONTEXT: In-Memory Resident Posting List & Index (IP-10a).
-// ZWECK: Stellt kompakte, resident gehaltene Postinglisten pro Term bereit.
 // CONSISTENCY CONTRACT:
 // 1. Source of Truth ist und bleibt die LSM StorageEngine (Persistenz, Crash Recovery).
 // 2. Der ResidentPostingIndex dient als In-Memory Read-Cache zur Vermeidung teurer LSM scan_prefix_at Scans.
@@ -25,11 +23,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-// ANCHOR[contextra-text:POST-001]
 /// Magische Bytes für das kompakte V2-Posting-Listen-Format (`PL\x02\x00`).
 pub const POSTING_LIST_V2_MAGIC: &[u8; 4] = b"PL\x02\x00";
 
-// ANCHOR[contextra-text:POST-002]
 /// Blockgröße für die Block-Max-WAND-Zerlegung (64 Postings pro Block).
 pub const BLOCK_SIZE: usize = 64;
 
@@ -41,7 +37,6 @@ pub type DocIdRaw = u64;
 /// Primitiver Rohdatentyp für 128-Bit Dokument-IDs im Postings-Format.
 pub type DocIdRaw = u128;
 
-// ANCHOR[contextra-text:POST-003]
 /// Metadaten eines 64er-Posting-Blocks zur Berechnung oberer BM25-Schranken in Block-Max WAND.
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -54,7 +49,6 @@ pub struct PostingBlockInfo {
     pub min_doc_len: u32,
 }
 
-// ANCHOR[contextra-text:POST-004]
 /// Kompakte Repräsentation eines einzelnen Vorkommens (Posting) im Index.
 ///
 /// 8-Byte ausgerichtet (`repr(C, align(8))`) für optimale CPU-Cacheline-Ausnutzung (16 Bytes Gesamtgröße).
@@ -117,7 +111,6 @@ fn compute_blocks(postings: &[Posting]) -> Vec<PostingBlockInfo> {
     blocks
 }
 
-// ANCHOR[contextra-text:POST-005]
 /// Zusammenhängende, nach DocId sortierte Posting-Liste für einen Begriff.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PostingList {
@@ -126,7 +119,6 @@ pub struct PostingList {
 }
 
 impl PostingList {
-    // ANCHOR[contextra-text:POST-006]
     /// Erzeugt eine sortierte und deduplizierte Posting-Liste und berechnet die Block-Metadaten.
     pub fn new(mut postings: Vec<Posting>) -> Self {
         postings.sort_unstable_by_key(|p| p.doc_id);
@@ -135,7 +127,6 @@ impl PostingList {
         Self { postings, blocks }
     }
 
-    // ANCHOR[contextra-text:POST-007]
     /// Erzeugt eine leere Posting-Liste.
     pub fn empty() -> Self {
         Self {
@@ -144,35 +135,30 @@ impl PostingList {
         }
     }
 
-    // ANCHOR[contextra-text:POST-008]
     /// Liefert die Postings als Slice.
     #[inline]
     pub fn as_slice(&self) -> &[Posting] {
         &self.postings
     }
 
-    // ANCHOR[contextra-text:POST-009]
     /// Liefert die Block-Max-Metadaten.
     #[inline]
     pub fn blocks(&self) -> &[PostingBlockInfo] {
         &self.blocks
     }
 
-    // ANCHOR[contextra-text:POST-010]
     /// Liefert die Anzahl der Einträge in der Liste.
     #[inline]
     pub fn len(&self) -> usize {
         self.postings.len()
     }
 
-    // ANCHOR[contextra-text:POST-011]
     /// Prüft, ob die Liste leer ist.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.postings.is_empty()
     }
 
-    // ANCHOR[contextra-text:POST-012]
     /// Fügt ein Posting per Copy-On-Write (RCU) ein oder aktualisiert einen bestehenden Eintrag.
     pub fn upsert(&self, posting: Posting) -> Self {
         let mut new_postings = self.postings.clone();
@@ -193,7 +179,6 @@ impl PostingList {
         }
     }
 
-    // ANCHOR[contextra-text:POST-013]
     /// Entfernt ein Posting per Copy-On-Write (RCU).
     pub fn remove(&self, doc_id: DocId) -> Self {
         let mut new_postings = self.postings.clone();
@@ -207,7 +192,6 @@ impl PostingList {
         }
     }
 
-    // ANCHOR[contextra-text:POST-014]
     /// Kodiert die Posting-Liste in das kompakte Binärformat mit Delta-Varint-Kompression.
     pub fn encode_compact(&self) -> Result<Vec<u8>, TextError> {
         let mut buf = Vec::with_capacity(4 + 8 + self.postings.len() * 8);
@@ -229,7 +213,6 @@ impl PostingList {
         Ok(buf)
     }
 
-    // ANCHOR[contextra-text:POST-015]
     /// Dekodiert eine Posting-Liste aus dem Delta-Varint-Format mit Fallback auf Legacy-Bincode.
     ///
     /// # Defensives Verhalten
@@ -351,7 +334,6 @@ fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, TextError> {
     ))
 }
 
-// ANCHOR[contextra-text:POST-016]
 /// Speicherresidenter Lese-Cache für Posting-Listen mit RCU-Verwaltung.
 #[derive(Default)]
 pub struct ResidentPostingIndex {
@@ -359,7 +341,6 @@ pub struct ResidentPostingIndex {
 }
 
 impl ResidentPostingIndex {
-    // ANCHOR[contextra-text:POST-017]
     /// Erzeugt einen leeren residenten Posting-Index.
     pub fn new() -> Self {
         Self {
@@ -367,19 +348,16 @@ impl ResidentPostingIndex {
         }
     }
 
-    // ANCHOR[contextra-text:POST-018]
     /// Liefert eine referenzgezählte Posting-Liste für den Begriff, falls im Cache vorhanden.
     pub fn get(&self, term: &str) -> Option<Arc<PostingList>> {
         self.index.read().get(term).cloned()
     }
 
-    // ANCHOR[contextra-text:POST-019]
     /// Fügt eine Posting-Liste in den Index ein oder ersetzt sie.
     pub fn insert_list(&self, term: String, list: PostingList) {
         self.index.write().insert(term, Arc::new(list));
     }
 
-    // ANCHOR[contextra-text:POST-020]
     /// Fügt ein einzelnes Posting per RCU (Copy-On-Write) in die Posting-Liste des Begriffs ein.
     pub fn upsert_posting(&self, term: &str, posting: Posting) {
         let mut guard = self.index.write();
@@ -391,7 +369,6 @@ impl ResidentPostingIndex {
         guard.insert(term.to_string(), Arc::new(updated));
     }
 
-    // ANCHOR[contextra-text:POST-021]
     /// Entfernt eine Dokument-ID aus den Posting-Listen mehrerer Begriffe per RCU.
     pub fn remove_posting_from_terms(&self, terms: &[String], doc_id: DocId) {
         let mut guard = self.index.write();
@@ -407,7 +384,6 @@ impl ResidentPostingIndex {
         }
     }
 
-    // ANCHOR[contextra-text:POST-022]
     /// Entfernt die angegebenen Begriffe aus dem Cache (z. B. bei Rollback).
     pub fn remove_terms(&self, terms: &[String]) {
         let mut guard = self.index.write();
@@ -416,7 +392,6 @@ impl ResidentPostingIndex {
         }
     }
 
-    // ANCHOR[contextra-text:POST-023]
     /// Leert den gesamten Cache (z. B. bei vollständigem Index-Neuladen).
     pub fn clear(&self) {
         self.index.write().clear();
@@ -427,7 +402,6 @@ impl ResidentPostingIndex {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-text:TEST-POST-001]
     // Prüft, dass PostingList Eingaben automatisch nach DocId sortiert und Duplikate dedupliziert.
     #[test]
     fn test_posting_list_sorted_and_dedup() {

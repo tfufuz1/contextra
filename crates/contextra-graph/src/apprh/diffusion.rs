@@ -1,10 +1,5 @@
 //! Core diffusion operator for Averaging-based Personalized PageRank for Hypergraphs (APPRH).
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Adaptiver PageRank mit Hyperkanten-Expansion (APPRH).
-// INVARIANTEN: Deterministische Diffusion, budgetierte Iterationen.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::error::ApprhError;
@@ -26,7 +21,6 @@ use std::collections::VecDeque;
 ///
 /// # Errors
 /// Returns [`ApprhError`] if parameters are invalid, seed list is empty, or non-finite float is produced.
-// ANCHOR[contextra-graph:SRC-APPRH-DIFFUSION-001]
 
 // SECTION Diffusion Core Implementation
 pub fn run_apprh_push<G: PathGraph>(

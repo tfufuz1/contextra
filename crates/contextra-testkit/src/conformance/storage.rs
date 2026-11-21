@@ -18,7 +18,6 @@ use contextra_ports::StorageEngine;
 use contextra_types::TxId;
 use std::future::Future;
 
-// ANCHOR[contextra-testkit:CONF-STORAGE-SUITE-001]
 /// Führt die vollständige Konformitätsprüfung für eine [`StorageEngine`]-Implementierung durch.
 ///
 /// **Parameter:**

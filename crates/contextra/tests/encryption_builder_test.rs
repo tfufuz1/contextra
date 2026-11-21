@@ -15,7 +15,6 @@ use std::sync::{Arc, Mutex};
 use tracing_subscriber::layer::SubscriberExt;
 use zeroize::Zeroizing;
 
-// ANCHOR[contextra:TEST-ENC-001]
 // Verifiziert die Maskierung von Passphrasen ([REDACTED]) in Debug-Strings und prüft die Hilfsmethode is_encrypted.
 #[tokio::test]
 async fn test_encryption_mode_redaction_and_facade() {
@@ -43,7 +42,6 @@ async fn test_encryption_mode_redaction_and_facade() {
     assert!(!unencrypted_config.is_encrypted());
 }
 
-// ANCHOR[contextra:TEST-ENC-002]
 // Stellt sicher, dass der Versuch, eine leere Passphrase zu konfigurieren, fehlschlägt.
 #[tokio::test]
 async fn test_empty_passphrase_rejection() {
@@ -57,7 +55,6 @@ async fn test_empty_passphrase_rejection() {
     }
 }
 
-// ANCHOR[contextra:TEST-ENC-003]
 // Testet die Instanziierung einer Datenbank im explizit unverschlüsselten Modus.
 #[tokio::test]
 async fn test_explicit_unencrypted_mode_building() -> Result<(), Box<dyn std::error::Error>> {
@@ -80,7 +77,6 @@ async fn test_explicit_unencrypted_mode_building() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-ENC-004]
 // Fängt Tracing-Logs ab und prüft, ob beim Start ohne explizite Verschlüsselungsauswahl eine Warnung emittiert wird.
 #[tokio::test]
 async fn test_implicit_unencrypted_mode_warning() -> Result<(), Box<dyn std::error::Error>> {
@@ -127,7 +123,6 @@ async fn test_implicit_unencrypted_mode_warning() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-ENC-005]
 // Prüft den erfolgreichen Aufbau einer persistenten Datenbank mit gültiger Verschlüsselungs-Passphrase.
 #[tokio::test]
 async fn test_encrypted_storage_roundtrip() -> Result<(), Box<dyn std::error::Error>> {

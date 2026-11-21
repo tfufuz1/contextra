@@ -27,7 +27,6 @@ async fn add_edge(graph: &CsrGraph, tx: TxId, src: u64, dst: u64) {
         .expect("Failed to add edge");
 }
 
-// ANCHOR[contextra-graph:TESTS-DANGLING-NODES-AUDIT-TEST-001]
 #[tokio::test]
 async fn test_ppr_graph_1_single_dangling_node() {
     let graph = CsrGraph::new();
@@ -120,7 +119,6 @@ async fn test_ppr_graph_1_single_dangling_node() {
     );
 }
 
-// ANCHOR[contextra-graph:TESTS-DANGLING-NODES-AUDIT-TEST-002]
 #[tokio::test]
 async fn test_ppr_graph_2_extreme_90_percent_dangling_nodes() {
     let graph = CsrGraph::new();
@@ -204,7 +202,6 @@ async fn test_ppr_graph_2_extreme_90_percent_dangling_nodes() {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-DANGLING-NODES-AUDIT-TEST-003]
 #[tokio::test]
 async fn test_ppr_graph_3_group_of_dangling_nodes() {
     let graph = CsrGraph::new();

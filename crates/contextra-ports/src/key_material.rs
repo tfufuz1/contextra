@@ -7,14 +7,12 @@
 //! (vgl. `RngPort`). Fail-closed: Entropieerschöpfung oder OS-Fehler werden als
 //! harter Fehler propagiert, nie durch einen Fallback ersetzt.
 //!
-//! // ANCHOR[contextra-ports:KEY-MAT-001]
 //! // SECTION key-material-contracts
 //! // NOTE: Fail-Closed: Keine unsicheren Fallbacks bei Entropiemangel (ADR-098).
 
 use contextra_types::Result;
 use std::fmt::Debug;
 
-// ANCHOR[contextra-ports:KEY-MAT-TRAIT-001]
 /// Port-Trait für kryptografisch sichere Schlüssel- und Salt-Generierung.
 ///
 /// Implementierungen **müssen** fail-closed sein: Bei Entropieerschöpfung oder

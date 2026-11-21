@@ -1,6 +1,5 @@
 //! # WAL-Observer & Ereignisbeobachter (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Fassade fuer das WalObserver-Subsystem (Typen, Registry, Adapter, Worker)
 //! // INVARIANTEN: Fail-open Semantik, Circuit-Breaker, Non-blocking Commit

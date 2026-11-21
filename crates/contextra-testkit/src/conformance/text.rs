@@ -14,7 +14,6 @@ use contextra_ports::TextIndex;
 use contextra_types::{DocId, TxId};
 use std::future::Future;
 
-// ANCHOR[contextra-testkit:CONF-TEXT-SUITE-001]
 /// Führt die vollständige Konformitätsprüfung für eine [`TextIndex`]-Implementierung durch.
 ///
 /// **Parameter:**

@@ -3,11 +3,6 @@
 //! # Zweck
 //! Orchestriert Dense-, Forward-Push- und Schattenmodus-Verfahren zur Relevanzbewertung.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
-// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 
@@ -38,7 +33,6 @@ pub fn compute_ppr(
 }
 
 #[cfg(feature = "apprh-diffusion")]
-// ANCHOR[contextra-graph:SRC-PPR-MOD-001]
 pub fn compute_ppr_with_apprh_selector(
     inner: &GraphInner,
     seed_nodes: &[EntityId],

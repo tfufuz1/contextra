@@ -1,7 +1,6 @@
 //! # Block-Cache Trait-Abstraktion
 //!
 //! Zweck: Definiert das `BlockCacheBackend`-Trait fuer polymorphe Cache-Backends.
-// ANCHOR[contextra-store:SST-RDR-140]
 
 use bytes::Bytes;
 

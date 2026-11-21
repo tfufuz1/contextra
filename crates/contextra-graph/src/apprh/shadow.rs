@@ -1,10 +1,5 @@
 //! Shadow comparison module comparing Forward-Push PPR against APPRH.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Adaptiver PageRank mit Hyperkanten-Expansion (APPRH).
-// INVARIANTEN: Deterministische Diffusion, budgetierte Iterationen.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::diffusion::run_apprh_push;
@@ -16,7 +11,6 @@ use crate::types::EntityId;
 use std::cmp::Ordering;
 
 /// Formal default-flip gate trait evaluating whether APPRH can replace ForwardPush as default.
-// ANCHOR[contextra-graph:SRC-APPRH-SHADOW-001]
 
 // SECTION Shadow Core Implementation
 pub trait ApprhFlipGate {
@@ -26,7 +20,6 @@ pub trait ApprhFlipGate {
 
 /// Standard default flip gate evaluator for APPRH.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-// ANCHOR[contextra-graph:SRC-APPRH-SHADOW-002]
 pub struct DefaultApprhFlipGate;
 
 impl ApprhFlipGate for DefaultApprhFlipGate {
@@ -37,7 +30,6 @@ impl ApprhFlipGate for DefaultApprhFlipGate {
 
 /// Result structure of shadow mode comparison between Forward-Push PPR and APPRH.
 #[derive(Debug, Clone, PartialEq)]
-// ANCHOR[contextra-graph:SRC-APPRH-SHADOW-003]
 pub struct ApprhShadowComparison {
     /// Maximum absolute score difference across top-k union nodes.
     pub max_abs_diff: f32,
@@ -59,7 +51,6 @@ pub struct ApprhShadowComparison {
 ///
 /// # Errors
 /// Returns [`ApprhError`] if APPRH execution fails.
-// ANCHOR[contextra-graph:SRC-APPRH-SHADOW-004]
 pub fn shadow_compare_forward_push_vs_apprh<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],

@@ -1,7 +1,6 @@
 // =========================================================================
 // SECTION: server
 // =========================================================================
-// ANCHOR[contextra-mcp:SERVER-001]
 use crate::egress_gateway::{DefaultEgressClassifier, EgressClassifier};
 use crate::io::{read_line_bounded, MAX_RPC_BYTES};
 use crate::prompt_injection::PromptInjectionGuard;

@@ -1,6 +1,5 @@
 //! # MVCC- und Nebenlaeufigkeitstests (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Fassade fuer MVCC- und Nebenlaeufigkeitstests
 //!

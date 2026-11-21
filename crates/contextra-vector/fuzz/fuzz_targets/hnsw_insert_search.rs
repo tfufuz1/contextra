@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Fuzz-Target für beliebige Operationsfolgen (Insert, Search, Delete) auf dem HNSW-Index
-// INVARIANTEN: Reines fuzz_one ohne direkte libfuzzer-Laufzeitabhängigkeit für Smoke-Treiber
-// HOTSPOTS: 35-100
-// STAND: 2026-11-11
-// BEREICH: AGENTS §8, SPEC §11.4 — HNSW Zustandsübergänge, Tombstones und Suche
 
-// ANCHOR[contextra-vector:W11-FUZZ-006]
 
 #![no_main]
 

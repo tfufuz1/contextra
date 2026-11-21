@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-FORGET-AND-BOUNDS-ROOT]
 //! # Tests für SSI forget_from, Kapazitätsgrenzen und Phantom-Präfix-Konflikte
 //!
 //! Verifiziert das selektive Vergessen fehlgeschlagener Batches, die Einhaltung

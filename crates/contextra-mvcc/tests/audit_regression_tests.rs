@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-AUDIT-REGRESSION-ROOT]
 //! # Audit-Regressions-Tests für `contextra-mvcc`
 //!
 //! Stellt sicher, dass behobene Fehler aus Sicherheits- und Architektur-Audits

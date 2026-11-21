@@ -1,6 +1,5 @@
 //! # Commit-Pfade & Transaktionsabschluss (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Hilfsroutinen fuer Commit-Zustand, Intent-Locks, Backpressure und Sichtbarkeit
 //! // INVARIANTEN: ADR-0XX-P0A, INV-STORE-1, INV-LOCK-ORDER-1

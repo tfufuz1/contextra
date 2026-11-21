@@ -10,7 +10,6 @@
 
 // =========================================================================
 // SECTION: Module Declarations & Core Architecture
-// ANCHOR[id=env-modules,epic=env-core,seq=1]
 // NOTE: Alle Submodule sind autark und verwenden ausschließlich die Rust-Standardbibliothek.
 // LINK docs/crates/contextra-env.md §2
 // =========================================================================
@@ -48,7 +47,6 @@ pub mod manual_clock;
 
 // =========================================================================
 // SECTION: Public Re-exports & Convenience API
-// ANCHOR[id=env-reexports,epic=env-core,seq=2]
 // NOTE: Bietet direkten Zugriff auf alle kanonischen Typen an der Crate-Wurzel.
 // =========================================================================
 
@@ -66,7 +64,6 @@ pub use manual_clock::ManualClock;
 
 // =========================================================================
 // SECTION: Time Utility Functions
-// ANCHOR[id=env-time-utils,epic=clock,seq=1]
 // NOTE: Verbindliche Hilfsfunktion gemäß SPEC-v2 §4.2 / B02.
 // =========================================================================
 
@@ -90,7 +87,6 @@ pub fn unix_ms(c: &dyn Clock) -> u64 {
 
 // =========================================================================
 // SECTION: Unit Tests
-// ANCHOR[id=env-tests,epic=env-core,seq=3]
 // NOTE: Prüft die Zeit-Hilfsfunktion und die Arc-Delegation ohne Test-Features.
 // =========================================================================
 

@@ -1,5 +1,4 @@
 //! Typkonvertierungen zwischen lokalen Typen und `contextra-types`.
-// ANCHOR[contextra-text:COMPAT-TYPES-001]
 
 use crate::types::{DocId, TextHit};
 

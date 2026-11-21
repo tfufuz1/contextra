@@ -3,11 +3,6 @@
 //! # Zweck
 //! Verknüpft Knotenindizes mit identifizierten Community-Gruppen für globales Clustering.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::super::graph_write::CsrGraph;
@@ -19,7 +14,6 @@ use std::collections::HashMap;
 
 // SECTION Communities Core Implementation
 impl CsrGraph {
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-COMMUNITIES-001]
     pub fn set_communities_batch(&self, assignments: &[crate::CommunityAssignment]) {
         let mut inner = self.inner_write();
         for a in assignments {

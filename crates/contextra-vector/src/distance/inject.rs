@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: InjectedDistanceKernel zur Anbindung externer DistanceFn-Typen.
-// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); Propagiert NaN als Fehler.
-// HOTSPOTS: InjectedDistanceKernel
-// STAND: 2026-11-12
 
 //! # Injected Distance Kernel Module
 //!
@@ -14,7 +9,6 @@ use crate::contract::DistanceFn;
 use crate::error::{Result, VectorError};
 use crate::types::DistanceMetric;
 
-// ANCHOR[contextra-vector:DIST-INJECTED-KERNEL]
 /// Adapter, der einen [`DistanceFn`]-Typ in das [`DistanceKernel`]-Interface einbettet.
 #[derive(Debug, Clone)]
 pub struct InjectedDistanceKernel<D: DistanceFn> {

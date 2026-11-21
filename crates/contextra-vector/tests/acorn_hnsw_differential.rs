@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Differential-Testing & Recall-Regressionstests für HnswIndex::search_knn_acorn (Spec §8.5, §22.4).
-// INVARIANTEN: Zero Panic; Zero Cross-Contamination; Differential vs. NaiveReferenceIndex >= 95% Recall@k.
 
 use contextra_ports::VectorIndex;
 use contextra_types::{DistanceMetric, DocId, TxId};

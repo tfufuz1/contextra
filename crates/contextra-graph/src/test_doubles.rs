@@ -4,11 +4,6 @@
 //! Replaces internal dev-dependency on `contextra-testkit` with self-contained
 //! implementations compatible with `contextra_ports::StorageEngine`.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: In-Memory Testdoubles und Mocks für Algorithmen.
-// INVARIANTEN: Nur in Testumgebungen verwendet.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 #[cfg(feature = "types-compat")]

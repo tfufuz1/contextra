@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Varianten- und Display-Paritätstests für VectorError und contract::Error (WP-VEC-02).
-// INVARIANTEN: Zero-Panic, exakte Display-Musterprüfung, Send + Sync + 'static + Error.
-// HOTSPOTS: test_vector_error_display, test_contract_error_display
-// STAND: 2026-11-11
 
 use contextra_vector::contract::Error as ContractError;
 use contextra_vector::error::VectorError;

@@ -1,4 +1,3 @@
-// ANCHOR[id=contextra-mvcc-compat-root]
 //! # Kompatibilitätsmodul für Contextra-Workspace
 //!
 //! Re-exportiert Adapter und Konvertierungen für bestehende Workspace-Verbraucher.

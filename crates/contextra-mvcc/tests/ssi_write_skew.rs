@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-WRITE-SKEW-ROOT]
 //! # Write-Skew Isolations- und Konflikttests
 //!
 //! Demonstriert die klassische Write-Skew-Anomalie und stellt sicher, dass der

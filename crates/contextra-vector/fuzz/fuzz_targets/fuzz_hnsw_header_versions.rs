@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Fuzz-Target für HNSW-Header-Deserialisierung und Checksummen-Validierung
-// INVARIANTEN: Reines fuzz_one ohne direkte libfuzzer-Laufzeitabhängigkeit für Smoke-Treiber
-// HOTSPOTS: 15-30
-// STAND: 2026-11-11
-// BEREICH: AGENTS §8, SPEC §11.4 — HNSW-Header-Robustheit gegen korrupte Bytes
 
-// ANCHOR[contextra-vector:W11-FUZZ-003]
 
 #![no_main]
 

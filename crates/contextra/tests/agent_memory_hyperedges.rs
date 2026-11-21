@@ -11,7 +11,6 @@ use contextra_ports::BoxFuture;
 use contextra_types::error::Result;
 use std::sync::Arc;
 
-// ANCHOR[contextra:TEST-AMH-001]
 /// Test-Double für die Vektoreinbettung mit konstanter Dimension.
 struct MockEmbedder;
 
@@ -25,7 +24,6 @@ impl TextEmbeddingEngine for MockEmbedder {
     }
 }
 
-// ANCHOR[contextra:TEST-AMH-002]
 /// Initialisiert eine isolierte temporäre Datenbank mit `AgentMemory` für Hyperedge-Tests.
 async fn setup_agent_memory() -> (AgentMemory, tempfile::TempDir) {
     let tmp_dir = tempfile::tempdir().expect("tempdir");
@@ -41,7 +39,6 @@ async fn setup_agent_memory() -> (AgentMemory, tempfile::TempDir) {
     (AgentMemory::new(engine), tmp_dir)
 }
 
-// ANCHOR[contextra:TEST-AMH-003]
 // Prüft die erfolgreiche Erstellung von n-ären Relationen und stellt sicher, dass unterschiedliche Kanten eindeutige IDs erhalten.
 #[tokio::test]
 async fn test_relate_n_ary_success_and_unique_ids() {
@@ -75,7 +72,6 @@ async fn test_relate_n_ary_success_and_unique_ids() {
     assert_ne!(rel_id1, rel_id2, "Two relations must have distinct IDs");
 }
 
-// ANCHOR[contextra:TEST-AMH-004]
 // Verifiziert, dass ein Aufruf von relate_n_ary mit weniger als 2 Teilnehmern als InvalidInput abgewiesen wird.
 #[tokio::test]
 async fn test_relate_n_ary_insufficient_participants() {
@@ -98,7 +94,6 @@ async fn test_relate_n_ary_insufficient_participants() {
     );
 }
 
-// ANCHOR[contextra:TEST-AMH-005]
 // Stellt sicher, dass leere Prädikate oder leere Rollennamen abgewiesen werden.
 #[tokio::test]
 async fn test_relate_n_ary_empty_predicate_or_role() {
@@ -130,7 +125,6 @@ async fn test_relate_n_ary_empty_predicate_or_role() {
     );
 }
 
-// ANCHOR[contextra:TEST-AMH-006]
 // Prüft, dass Hyperedge-Erstellung mit validen Schlüsselstrings auch ohne vorherige Dokumenteinträge nicht abstürzt.
 #[tokio::test]
 async fn test_relate_n_ary_nonexistent_memory_id() {
@@ -155,7 +149,6 @@ async fn test_relate_n_ary_nonexistent_memory_id() {
     );
 }
 
-// ANCHOR[contextra:TEST-AMH-007]
 // Verifiziert, dass das Löschen einer beteiligten Erinnerung (forget) nach Erstellung einer Hyperedge panikfrei gelingt.
 #[tokio::test]
 async fn test_relate_n_ary_forget_participant_does_not_panic() {

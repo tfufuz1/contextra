@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Integrationstests für adaptives ef_search (Ada-ef) Recall, Determinismus, Performance- und Lösch-Invarianten.
-// INVARIANTEN: Zero-Panic in Produktion; Lints in Tests freigegeben.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 

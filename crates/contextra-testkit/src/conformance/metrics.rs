@@ -11,7 +11,6 @@
 use super::failure::{ConformanceFailure, ConformanceResult};
 use contextra_ports::MetricsSink;
 
-// ANCHOR[contextra-testkit:CONF-METRICS-SUITE-001]
 /// Führt die vollständige Konformitätsprüfung für eine [`MetricsSink`]-Implementierung durch.
 ///
 /// **Ablauf:**

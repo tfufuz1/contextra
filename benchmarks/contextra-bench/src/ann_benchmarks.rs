@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-15
-// ZWECK: ANN-Benchmarks kompatible Evaluation für Contextra HNSW-Index.
 
 use std::collections::HashSet;
 use std::path::Path;

@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-07
-// ZWECK: Parameter-Sweep für PathRAG sufficiency_threshold über LongMemEval und LoCoMo Datensätze.
-// INVARIANTEN: Misst Precision und Recall für Threshold-Werte ∈ {0.01, 0.1, 0.3, 0.6}.
 
 use crate::locomo::{load_locomo_dataset, LocomoQuestionCategory};
 use crate::long_mem_eval::{LongMemEvalQuestionType, RegressionSuite};

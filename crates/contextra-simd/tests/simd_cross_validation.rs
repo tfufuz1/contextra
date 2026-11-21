@@ -30,7 +30,6 @@ use contextra_simd::kernels::scalar::{
 use proptest::prelude::*;
 
 proptest! {
-    // ANCHOR[contextra-simd:TEST-CROSS-PROP-COSINE-F32]
     // Property-Test: Vergleicht SIMD- und Skalar-Kosinus-Distanz über beliebige Dimensionen (1..1024).
     #[test]
     fn simd_vs_scalar_cosine_f32(
@@ -53,7 +52,6 @@ proptest! {
         );
     }
 
-    // ANCHOR[contextra-simd:TEST-CROSS-PROP-EUCLIDEAN-F32]
     // Property-Test: Vergleicht SIMD- und Skalar-euklidische Distanz über beliebige Dimensionen (1..1024).
     #[test]
     fn simd_vs_scalar_euclidean_f32(
@@ -76,7 +74,6 @@ proptest! {
         );
     }
 
-    // ANCHOR[contextra-simd:TEST-CROSS-PROP-DOT-F32]
     // Property-Test: Vergleicht SIMD- und Skalarprodukt-Distanz über beliebige Dimensionen (1..1024).
     #[test]
     fn simd_vs_scalar_dot_product_f32(
@@ -99,7 +96,6 @@ proptest! {
         );
     }
 
-    // ANCHOR[contextra-simd:TEST-CROSS-PROP-COSINE-BYTES]
     // Property-Test: Vergleicht SIMD- und Skalar-Kosinus-Distanz auf Byte-Slices über Dimensionen 1..1024.
     #[test]
     fn simd_vs_scalar_cosine_f32_bytes(
@@ -122,7 +118,6 @@ proptest! {
         );
     }
 
-    // ANCHOR[contextra-simd:TEST-CROSS-PROP-EUCLIDEAN-BYTES]
     // Property-Test: Vergleicht SIMD- und Skalar-euklidische Distanz auf Byte-Slices über Dimensionen 1..1024.
     #[test]
     fn simd_vs_scalar_euclidean_f32_bytes(
@@ -145,7 +140,6 @@ proptest! {
         );
     }
 
-    // ANCHOR[contextra-simd:TEST-CROSS-PROP-DOT-BYTES]
     // Property-Test: Vergleicht SIMD- und Skalarprodukt auf Byte-Slices über Dimensionen 1..1024.
     #[test]
     fn simd_vs_scalar_dot_product_f32_bytes(
@@ -168,7 +162,6 @@ proptest! {
         );
     }
 
-    // ANCHOR[contextra-simd:TEST-CROSS-PROP-DOT-U8]
     // Property-Test: Vergleicht u8-Skalarprodukt zwischen SIMD und Skalar auf Gleichheit.
     #[test]
     fn simd_vs_scalar_dot_product_u8(
@@ -189,7 +182,6 @@ proptest! {
         );
     }
 
-    // ANCHOR[contextra-simd:TEST-CROSS-PROP-EUCLIDEAN-SQ-U8]
     // Property-Test: Vergleicht quadrierte u8-euklidische Distanz zwischen SIMD und Skalar auf Gleichheit.
     #[test]
     fn simd_vs_scalar_euclidean_sq_u8(
@@ -210,7 +202,6 @@ proptest! {
         );
     }
 
-    // ANCHOR[contextra-simd:TEST-CROSS-PROP-COSINE-PARTS-U8]
     // Property-Test: Vergleicht u8-Kosinus-Komponentensummen zwischen SIMD und Skalar.
     #[test]
     fn simd_vs_scalar_cosine_similarity_parts_u8(
@@ -232,7 +223,6 @@ proptest! {
     }
 }
 
-// ANCHOR[contextra-simd:TEST-CROSS-1000-PAIRS]
 // Prüft 1000 normalisierte Zufallsvektorpaare auf strikte Äquivalenz (Delta < 1e-4) bis Dimension 4097.
 #[test]
 fn test_s4_1000_pairs_equivalence_threshold() {
@@ -285,7 +275,6 @@ fn test_s4_1000_pairs_equivalence_threshold() {
     }
 }
 
-// ANCHOR[contextra-simd:TEST-CROSS-REMAINDER-F32]
 // Prüft Grenzdimensionen um SIMD-Registerbreiten (0 bis 65) auf exakte Restschleifen-Verarbeitung.
 #[test]
 fn test_simd_remainder_boundary_lengths_f32() {
@@ -372,7 +361,6 @@ fn test_simd_remainder_boundary_lengths_f32() {
     }
 }
 
-// ANCHOR[contextra-simd:TEST-CROSS-REMAINDER-U8]
 // Prüft Grenzdimensionen für u8-Vektoren (0 bis 130) auf fehlerfreie Vektorrest-Akkumulation.
 #[test]
 fn test_simd_remainder_boundary_lengths_u8() {
@@ -407,7 +395,6 @@ fn test_simd_remainder_boundary_lengths_u8() {
     }
 }
 
-// ANCHOR[contextra-simd:TEST-CROSS-ZERO-AND-L2]
 // Prüft mathematisches Axiom S1: Nullvektor-Kosinusdistanz ist 1.0 und L2-Norm ist 0.0.
 #[test]
 fn test_s1_zero_vector_and_l2_norm() {
@@ -429,7 +416,6 @@ fn test_s1_zero_vector_and_l2_norm() {
     );
 }
 
-// ANCHOR[contextra-simd:TEST-CROSS-L2-CORRECTNESS]
 // Prüft mathematisches Axiom S2: Euklidische Distanz erfüllt Dreiecksungleichung und Symmetrie.
 #[test]
 fn test_s2_l2_distance_correctness() {
@@ -442,7 +428,6 @@ fn test_s2_l2_distance_correctness() {
     );
 }
 
-// ANCHOR[contextra-simd:TEST-CROSS-OVERFLOW-BEHAVIOR]
 // Prüft mathematisches Axiom S3: Kein vorzeitiger Überlauf bei großen Werten innerhalb f32::MAX.
 #[test]
 fn test_s3_overflow_behavior() {

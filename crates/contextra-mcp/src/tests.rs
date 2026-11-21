@@ -2,7 +2,6 @@
 // =========================================================================
 // SECTION: tests
 // =========================================================================
-// ANCHOR[contextra-mcp:TESTS-001]
 
 #[cfg(test)]
 use crate::protocol::{JsonRpcRequest, JsonRpcResponse};

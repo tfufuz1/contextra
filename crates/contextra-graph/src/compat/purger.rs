@@ -12,11 +12,6 @@
 // SECTION Purger Core Implementation
 #![allow(deprecated)]
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Kompatibilitätsbrücke für Ports und Types (SPEC-v2 §4.3).
-// INVARIANTEN: Isolierte Workspace-Konvertierungen.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use std::sync::Arc;

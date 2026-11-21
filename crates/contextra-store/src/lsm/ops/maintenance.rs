@@ -1,6 +1,5 @@
 //! # Wartungsoperationen (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Behandelt Transaktions-Rollback, Checkpoint Pin/Unpin, Metadaten und Speicherstatistiken
 //! // INVARIANTEN: Fail-Closed, INV-STORE-1

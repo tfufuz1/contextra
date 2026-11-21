@@ -21,7 +21,6 @@ pub type Result<T> = std::result::Result<T, CryptoError>;
 // !SECTION
 
 // SECTION [epic=crypto-error,seq=2] Kanonische Fehlerdefinition
-// ANCHOR[contextra-crypto:ERR-001] CryptoError Enum
 // NOTE: Typisierte Fehler ohne PII- oder Schlüssel-Lecks (TS:2026-11-11)
 #[non_exhaustive]
 pub enum CryptoError {

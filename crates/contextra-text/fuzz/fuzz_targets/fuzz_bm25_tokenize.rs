@@ -10,7 +10,6 @@
 use libfuzzer_sys::fuzz_target;
 use contextra_text::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 
-// ANCHOR[contextra-text:FUZZ-001]
 // Fuzzing-Harnisch zur Prüfung der Robustheit von Standard- und deutschem Morphologie-Tokenizer.
 fuzz_target!(|data: &str| {
     // Arbiträre UTF-8-Strings an die reale Tokenizer-Einstiegsfunktion.

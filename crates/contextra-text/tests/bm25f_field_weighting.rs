@@ -3,12 +3,9 @@
 //! # Ring-Zuordnung
 //! Ring LAB / Testbereich.
 
-// FILE-CONTEXT: Integration tests for field-weighted BM25F scoring (§11.3).
-// ZWECK: Prüft Formel-Korrektheit, Degeneration zu einfeldigem BM25 und Zero-Panic Invarianten.
 
 use contextra_text::{score_term_bm25f, FieldId, FieldWeight, BM25F};
 
-// ANCHOR[contextra-text:TEST-150]
 // Testfall `test_bm25f_degeneration_exact_match_single_field`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25f_degeneration_exact_match_single_field() {
@@ -37,7 +34,6 @@ fn test_bm25f_degeneration_exact_match_single_field() {
     );
 }
 
-// ANCHOR[contextra-text:TEST-151]
 // Testfall `test_bm25f_title_body_context_prefix_weighting`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25f_title_body_context_prefix_weighting() {
@@ -91,7 +87,6 @@ fn test_bm25f_title_body_context_prefix_weighting() {
     );
 }
 
-// ANCHOR[contextra-text:TEST-152]
 // Testfall `test_bm25f_zero_weights_or_frequencies_return_zero`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25f_zero_weights_or_frequencies_return_zero() {
@@ -115,7 +110,6 @@ fn test_bm25f_zero_weights_or_frequencies_return_zero() {
     assert_eq!(score_zero_df, 0.0, "Zero DF must yield score 0.0");
 }
 
-// ANCHOR[contextra-text:TEST-153]
 // Testfall `test_bm25f_zero_panic_extreme_inputs`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25f_zero_panic_extreme_inputs() {
@@ -150,7 +144,6 @@ fn test_bm25f_zero_panic_extreme_inputs() {
     }
 }
 
-// ANCHOR[contextra-text:TEST-154]
 // Testfall `test_bm25f_struct_integration`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25f_struct_integration() {

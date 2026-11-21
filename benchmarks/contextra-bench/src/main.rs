@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-10-02
-// ZWECK: Reproduzierbarer Benchmark-Harness für Retrieval-Qualität & LongMemEval / LoCoMo Regressions-Suite mit echten Embeddings
-// INVARIANTEN: Standalone, reproduzierbar, synthetischer Korpus mit Ground-Truth-Annotationen.
 
 use contextra_bench::compare::{CombinedMetrics, LocomoMetricsSummary, LongMemEvalMetricsSummary};
 use contextra_bench::locomo::{load_locomo_dataset, run_locomo_eval};

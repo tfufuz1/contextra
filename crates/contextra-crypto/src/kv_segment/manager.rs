@@ -2,10 +2,6 @@
 //!
 //! Ermöglicht granulare Schlüsselverwaltung für KV-Segmente.
 
-// FILE-CONTEXT
-// ZWECK: Verwaltung von KV-Segment-Verschlüsselung mit KvDeleteMode.
-// INVARIANTEN: Verhalten des Segment-Caches unverändert.
-// STAND: TS:2026-11-09
 
 #![forbid(unsafe_code)]
 

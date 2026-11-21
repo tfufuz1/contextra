@@ -19,10 +19,6 @@
 //! - Mehrere Transaktionen können parallel stagen; beim Commit wird eine neue Sequenznummer
 //!   vergeben und die Daten atomar in den Hauptspeicher überführt.
 
-// FILE-CONTEXT
-// STAND: 2026-09-19T20:12:00Z (SESSION: 01c5be8b)
-// ZWECK: In-Memory StorageEngine implementation for fast, lightweight testing.
-// INVARIANTEN: Zero disk I/O, transactional staging & commit/rollback, zero unsafe.
 
 use bytes::Bytes;
 use parking_lot::RwLock;
@@ -33,7 +29,6 @@ use std::sync::Arc;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{Result, TxId};
 
-// ANCHOR[contextra-testkit:STAGED-OP-ENUM-001]
 /// Repräsentiert eine unbestätigte Operation innerhalb einer Transaktion.
 #[derive(Debug, Clone)]
 enum StagedOp {
@@ -48,7 +43,6 @@ type StoreDataMap = BTreeMap<Vec<u8>, (Vec<u8>, u64)>;
 /// Typalias für unbestätigte Transaktionen: Transaktions-ID -> (Schlüssel -> Operation).
 type StagedTxMap = BTreeMap<TxId, BTreeMap<Vec<u8>, StagedOp>>;
 
-// ANCHOR[contextra-testkit:IN-MEM-STORE-STRUCT-001]
 /// Thread-sichere In-Memory-Implementierung von `StorageEngine` für Tests.
 ///
 /// **Zweck:** Ermöglicht Unit- und Integrationstests von Engines und Abfrageschichten,
@@ -84,14 +78,12 @@ impl Default for InMemoryStorageEngine {
 }
 
 impl InMemoryStorageEngine {
-    // ANCHOR[contextra-testkit:IN-MEM-STORE-NEW-001]
     /// Erstellt eine neue, leere In-Memory-Speicher-Engine.
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-// ANCHOR[contextra-testkit:IN-MEM-STORE-TRAIT-IMPL-001]
 impl StorageEngine for InMemoryStorageEngine {
     /// Liest den aktuellsten bestätigten Wert eines Schlüssels aus.
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
@@ -340,7 +332,6 @@ impl StorageEngine for InMemoryStorageEngine {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-testkit:TEST-IN-MEM-STORE-COMMIT-001]
     // Prüft, dass gestagete Werte erst nach dem Commit sichtbar werden.
     #[tokio::test]
     async fn test_in_memory_store_put_get_commit() -> Result<()> {
@@ -359,7 +350,6 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-testkit:TEST-IN-MEM-STORE-ROLLBACK-001]
     // Prüft, dass ein Rollback unbestätigte Änderungen verwirft und diese nicht sichtbar werden.
     #[tokio::test]
     async fn test_in_memory_store_rollback() -> Result<()> {
@@ -374,7 +364,6 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-testkit:TEST-IN-MEM-STORE-COVERAGE-001]
     // Prüft get_at_seq, put_if_absent, last_seq_no, pin/unpin_checkpoint und scan.
     #[tokio::test]
     async fn test_in_memory_store_extended_api() -> Result<()> {

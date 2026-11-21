@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Initialisierung des HNSW-Fallbacks für DiskANN (WP-VEC-07).
-// INVARIANTEN: Gekapselte Erstellung über hnsw_bridge; saubere Fehlerweiterleitung.
-// STAND: 2026-11-11
 
 use super::super::hnsw_bridge::{create_hnsw_fallback, HnswFallbackBridge};
 use super::super::types::DiskAnnIndex;

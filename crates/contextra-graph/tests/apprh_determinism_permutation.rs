@@ -97,7 +97,6 @@ impl PathGraph for ConcreteGraph {
 }
 
 proptest! {
-// ANCHOR[contextra-graph:TESTS-APPRH-DETERMINISM-PERMUTATION-001]
     #[test]
     fn test_apprh_bit_identical_permutation_invariance(
         seed_id in 1u64..10u64,

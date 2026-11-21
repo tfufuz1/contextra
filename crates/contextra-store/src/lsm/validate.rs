@@ -1,6 +1,5 @@
 //! # Invarianten-Validierung (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Prueft Schluessel- und Wertgroessen auf Einhaltung der Systemgrenzen
 //! // INVARIANTEN: MAX_KEY_SIZE (65535 Bytes), MAX_VALUE_SIZE (128 MB), Nicht-leere Schluessel

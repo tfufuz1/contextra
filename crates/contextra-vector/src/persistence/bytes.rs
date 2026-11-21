@@ -1,9 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Read-only Dateiinhalt im Speicher; ersetzt das frühere mmap-Mapping ohne unsafe.
-// INVARIANTEN: Zero-Unsafe (#![forbid(unsafe_code)]); Inhalt ist nach dem Laden unveränderlich.
-// NICHT-OFFENSICHTLICH: Die Datei wird vollständig gelesen (kein Zero-Copy). Speicherbedarf = Dateigröße.
-// HOTSPOTS: FileBytes::from_file
-// STAND: 2026-11-19
 
 //! Unveränderlicher, vollständig gelesener Dateiinhalt.
 
@@ -13,7 +7,6 @@ use std::ops::Deref;
 
 use crate::error::{Result, VectorError};
 
-// ANCHOR[contextra-vector:PERSIST-FILE-BYTES]
 /// Unveränderlicher Dateiinhalt, per `Deref` als Byte-Slice zugänglich.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileBytes(Vec<u8>);

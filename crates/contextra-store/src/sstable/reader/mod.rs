@@ -220,7 +220,6 @@ pub(super) fn may_contain_key_in_block_bloom(
 }
 
 /// A reader for existing SSTables.
-// ANCHOR[contextra-store:SST-RDR-001]
 /// Liest SSTable-Dateien mit Block-Cache und Bloom-Filter-Unterstuetzung.
 pub struct SstableReader {
     pub(super) file: Arc<dyn VfsFile>,

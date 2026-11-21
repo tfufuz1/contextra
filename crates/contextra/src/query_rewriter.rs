@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: LLM-gestützter QueryRewriter für MultiStep-Retrieval in der Facade (Ring 4).
-// INVARIANTEN: Zero Panic; UTF-8-sichere Snippet-Kürzung; Prompt-Injection-Isolation via XML-Tags; keine Async Locks.
 
 //! # Modul: LLM-gestützter QueryRewriter für Multi-Step Retrieval (Ring 4)
 //!
@@ -32,7 +29,6 @@ use contextra_types::ScoredEntry;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-// ANCHOR[contextra:REW-001]
 /// LLM-unterstützter Abfrage-Umformulierer für iteratives oder mehrstufiges Retrieval (Multi-Step Retrieval).
 ///
 /// Sendet den aktuellen Suchkontext an ein LLM via [`LlmTextGenerator`], um alternative,
@@ -45,7 +41,6 @@ pub struct LlmQueryRewriter {
 }
 
 impl LlmQueryRewriter {
-    // ANCHOR[contextra:REW-002]
     /// Erstellt einen neuen `LlmQueryRewriter` mit Standardgrenzwerten:
     /// - `max_subqueries`: 3 alternative Abfragen
     /// - `max_context_results`: 3 Dokumente als Kontext
@@ -59,21 +54,18 @@ impl LlmQueryRewriter {
         }
     }
 
-    // ANCHOR[contextra:REW-003]
     /// Konfiguriert die maximale Anzahl an generierten Teilabfragen.
     pub fn with_max_subqueries(mut self, n: usize) -> Self {
         self.max_subqueries = n;
         self
     }
 
-    // ANCHOR[contextra:REW-004]
     /// Konfiguriert die maximale Anzahl an bestehenden Suchergebnissen, die als Kontext in den Prompt fließen.
     pub fn with_max_context_results(mut self, n: usize) -> Self {
         self.max_context_results = n;
         self
     }
 
-    // ANCHOR[contextra:REW-005]
     /// Konfiguriert die maximale Textlänge (in Zeichen) für Textausschnitte (Snippets) im Prompt.
     pub fn with_max_snippet_chars(mut self, n: usize) -> Self {
         self.max_snippet_chars = n;
@@ -91,7 +83,6 @@ impl LlmQueryRewriter {
 }
 
 impl QueryRewriter for LlmQueryRewriter {
-    // ANCHOR[contextra:REW-006]
     /// Führt die Umformulierung asynchron durch.
     ///
     /// # Ablauf von `rewrite`:
@@ -122,7 +113,6 @@ impl QueryRewriter for LlmQueryRewriter {
     }
 }
 
-// ANCHOR[contextra:REW-007]
 /// Schneidet einen String sicher an einer Zeichengrenze (Char-Boundary) ab.
 ///
 /// Verhindert Panics beim Slicen von UTF-8-Zeichenketten mit variabler Byte-Länge.
@@ -133,7 +123,6 @@ fn truncate_str_chars(s: &str, max_chars: usize) -> &str {
     }
 }
 
-// ANCHOR[contextra:REW-008]
 /// Extrahiert einen lesbaren Textausschnitt aus den Metadaten eines Treffers (`ScoredEntry`).
 ///
 /// Sucht bevorzugt nach Feldern `text` oder `content` und serialisiert andernfalls die Metadaten nach JSON.
@@ -153,7 +142,6 @@ fn extract_snippet(res: &ScoredEntry) -> String {
     String::new()
 }
 
-// ANCHOR[contextra:REW-009]
 /// Erstellt den Prompt für das LLM unter Beachtung von Sicherheitsisolationen.
 ///
 /// Umschließt nicht vertrauenswürdige Inhalte mit `<untrusted_context>`-Tags und weist
@@ -186,7 +174,6 @@ fn build_prompt(
     prompt
 }
 
-// ANCHOR[contextra:REW-010]
 /// Bereinigt eine einzelne Textzeile der LLM-Antwort.
 ///
 /// Entfernt Markdown-Listenzeichen (`-`, `*`, `•`, `+`), vorangestellte Nummerierungen (`1.`, `1)`)
@@ -215,7 +202,6 @@ fn clean_line(line: &str) -> &str {
     s
 }
 
-// ANCHOR[contextra:REW-011]
 /// Entfernt Markdown-Codeblöcke (Triple Backticks) aus dem Antworttext.
 fn strip_code_fences(input: &str) -> String {
     let trimmed = input.trim();
@@ -226,7 +212,6 @@ fn strip_code_fences(input: &str) -> String {
     lines.join("\n")
 }
 
-// ANCHOR[contextra:REW-012]
 /// Analysiert die Rohantwort des LLM und extrahiert gültige, deduplizierte Teilabfragen.
 ///
 /// Unterstützt sowohl JSON-Format (`["abfrage1", "abfrage2"]`) als auch zeilenbasierte Textausgaben.

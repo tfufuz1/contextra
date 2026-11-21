@@ -1,6 +1,5 @@
 //! # Commit-Pipeline & Transaktionsabschluss (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Orchestrierung des Commit-Ablaufs: Vorbereitung, Validierung und Pfadentscheidung
 //! // INVARIANTEN: ADR-0XX-P0A (Lock-Handoff), INV-LOCK-ORDER-1, INV-STORE-1

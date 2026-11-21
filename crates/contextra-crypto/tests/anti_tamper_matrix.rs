@@ -3,11 +3,6 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `anti_tamper_matrix`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// FILE-CONTEXT
-// ZWECK: Systematic WAL anti-tamper matrix, single bit-flip analysis, replay attack protection, and constant-time check.
-// INVARIANTEN: Every single byte flip in WAL entry payload/header MUST cause verification failure. Hash chain prevents replay.
-// NICHT-OFFENSICHTLICH: Verifies subtle::ConstantTimeEq usage in IntegrityVerifier via code inspection / behavioral tests.
-// STAND: TS:2026-08-30T19:45:00Z (SESSION: 20260830)
 
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot, WalHmac};
 

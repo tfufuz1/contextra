@@ -3,11 +3,6 @@
 //! # Zweck
 //! Definiert den Haupttyp `CsrGraph` und synchronisiert parallele Modifikationen über Mutexe.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 
@@ -31,7 +26,6 @@ use crate::types::{DocId, EntityId};
 use super::inner::{GraphInner, InnerWriteGuard, MemoryEstimate};
 use super::types::CsrGraphConfig;
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-001]
 pub struct CsrGraph {
     pub config: CsrGraphConfig,
     pub inner: Arc<ArcSwap<GraphInner>>,
@@ -45,12 +39,10 @@ pub struct CsrGraph {
 }
 
 impl CsrGraph {
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-002]
     pub fn new() -> Self {
         Self::with_config(CsrGraphConfig::default())
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-003]
     pub fn with_config(config: CsrGraphConfig) -> Self {
         let initial = Arc::new(GraphInner::new());
         Self {
@@ -66,13 +58,11 @@ impl CsrGraph {
         }
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-004]
     #[cfg(feature = "ports-compat")]
     pub fn with_storage(storage: Arc<dyn StorageEngine>) -> Self {
         Self::with_config_and_storage(CsrGraphConfig::default(), storage)
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-005]
     #[cfg(feature = "ports-compat")]
     pub fn with_config_and_storage(
         config: CsrGraphConfig,
@@ -91,7 +81,6 @@ impl CsrGraph {
         }
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-006]
     pub fn with_consistency_enforcer(suppression_threshold: u32) -> Self {
         let initial = Arc::new(GraphInner::new());
         Self {
@@ -121,43 +110,36 @@ impl CsrGraph {
         }
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-008]
     #[cfg(feature = "ports-compat")]
     pub fn set_storage(&mut self, storage: Arc<dyn StorageEngine>) {
         self.storage = Some(storage);
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-009]
     #[cfg(feature = "ports-compat")]
     pub fn storage(&self) -> Option<Arc<dyn StorageEngine>> {
         self.storage.clone()
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-010]
     pub fn estimate_memory(&self, presized: bool) -> MemoryEstimate {
         let inner = self.inner_read();
         (*inner).estimate_memory(presized)
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-011]
     pub fn estimate_memory_bytes(&self) -> usize {
         let inner = self.inner_read();
         (*inner).estimate_memory_bytes()
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-012]
     pub fn estimate_compaction_peak_bytes(&self) -> usize {
         let inner = self.inner_read();
         (*inner).estimate_compaction_peak_bytes()
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-013]
     pub fn get_source_doc_id(&self, index: usize) -> Option<DocId> {
         let inner = self.inner_read();
         inner.source_doc_id_at(index)
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-014]
     pub fn source_doc_id_at(&self, from: EntityId, to: EntityId) -> Option<DocId> {
         let inner = self.inner_read();
 
@@ -193,7 +175,6 @@ impl CsrGraph {
         None
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-015]
     pub fn edges_for_doc(&self, doc_id: DocId) -> Vec<(EntityId, EntityId)> {
         let inner = self.inner_read();
         let mut edges: HashSet<(EntityId, EntityId)> =

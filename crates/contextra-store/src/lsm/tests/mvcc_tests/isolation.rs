@@ -1,6 +1,5 @@
 //! # MVCC Snapshot-Isolation & Concurrency Tests
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Prueft Snapshot-Isolation, Flush-Parallelitaet und Single-Load-Invariante
 

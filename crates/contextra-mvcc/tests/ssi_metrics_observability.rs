@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-METRICS-OBSERVABILITY-ROOT]
 //! # Observability- und Metrik-Tests für SSI
 //!
 //! Verifiziert die Aufzeichnung von Kennzahlen an den MetricsSink-Port:

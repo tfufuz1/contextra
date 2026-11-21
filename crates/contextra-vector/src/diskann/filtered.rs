@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: DiskANN-gefilterte Vektorsuche via adaptivem Oversampling mit Post-Filter (Spec §7.3 / ADR-013).
-// INVARIANTEN: MAX_SEARCH_K Schranke; deterministische Ordnung (Score absteigend, DocId aufsteigend); kein unbegrenzter Loop.
 
 use super::types::DiskAnnIndex;
 use crate::error::{Result, VectorError};

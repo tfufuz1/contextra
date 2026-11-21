@@ -1,7 +1,4 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// FILE-CONTEXT
-// ZWECK: Vertikaler Pfad-Test 3 (Teil 14.3 v17), Bezug B-16: Schreiblast parallel zu einem langen offenen Snapshot darf SSI nicht beeinträchtigen oder ausfallen lassen.
-// INVARIANTEN: Greift ausschließlich über die öffentliche Facade (contextra::*) zu; Zero-Panic in Produktion; Timeout-geschützt.
 
 //! # Integrationstest: `vertical_path_ssi_under_write_load`
 //!
@@ -26,7 +23,6 @@ use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use tokio::time::timeout;
 
-// ANCHOR[contextra:TEST-VSS-001]
 /// Hilfsfunktion zur Klassifizierung dokumentierter, erwarteter SSI- und OCC-Konflikte (Optimistic Concurrency Control).
 fn is_expected_ssi_conflict(err: &ContextraError) -> bool {
     if err.is_occ_conflict() {
@@ -43,7 +39,6 @@ fn is_expected_ssi_conflict(err: &ContextraError) -> bool {
     }
 }
 
-// ANCHOR[contextra:TEST-VSS-002]
 /// Vertikaler Pfad-Test 3 (Teil 14.3 v17), Bezug B-16:
 /// Schreiblast parallel zu einem langen offenen Snapshot darf SSI nicht unbrauchbar machen.
 #[tokio::test]

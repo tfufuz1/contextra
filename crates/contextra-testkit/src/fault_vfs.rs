@@ -18,10 +18,6 @@
 //! - `fail_reads_after`: Simuliert Lesefehler von defekten Blöcken.
 //! - `crashed`: Simuliert einen sofortigen Systemabsturz (Power-Cut).
 
-// FILE-CONTEXT
-// STAND: 2026-09-19T20:12:00Z (SESSION: 01c5be8b)
-// ZWECK: Deterministic I/O error injector and Virtual File System test utility.
-// INVARIANTEN: Zero real data corruption, deterministic fault triggers based on operation count.
 
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
@@ -30,7 +26,6 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
-// ANCHOR[contextra-testkit:FAULT-CONFIG-STRUCT-001]
 /// Konfiguration für deterministische Fehlerinjektion in [`FaultVfs`].
 ///
 /// **Zweck:** Ermöglicht Test-Cases die exakte Vorgabe von Fehlerbedingungen,
@@ -47,7 +42,6 @@ pub struct FaultConfig {
     pub fail_all: bool,
 }
 
-// ANCHOR[contextra-testkit:FAULT-VFS-STRUCT-001]
 /// Simuliertes In-Memory-Dateisystem mit deterministischer Fehlerinjektion.
 ///
 /// **Zweck:** Dient als I/O-Testunterlage für Speichermodule (z. B. WAL und LSM-Storage),
@@ -74,13 +68,11 @@ pub struct FaultVfs {
 }
 
 impl FaultVfs {
-    // ANCHOR[contextra-testkit:FAULT-VFS-NEW-001]
     /// Erstellt eine neue, leere [`FaultVfs`]-Instanz ohne aktive Fehlerregeln.
     pub fn new() -> Self {
         Self::default()
     }
 
-    // ANCHOR[contextra-testkit:FAULT-VFS-SET-CONFIG-001]
     /// Aktualisiert die aktive Konfiguration für Fehlerinjektion.
     ///
     /// **Parameter:**
@@ -89,7 +81,6 @@ impl FaultVfs {
         *self.config.write() = config;
     }
 
-    // ANCHOR[contextra-testkit:FAULT-VFS-TRIGGER-CRASH-001]
     /// Simuliert einen abrupten Systemabsturz (Power-Cut).
     ///
     /// Nach diesem Aufruf schlagen alle folgenden Schreib-, Lese- und Sync-Operationen
@@ -98,7 +89,6 @@ impl FaultVfs {
         self.crashed.store(true, Ordering::SeqCst);
     }
 
-    // ANCHOR[contextra-testkit:FAULT-VFS-RESET-COUNTERS-001]
     /// Setzt die Operationszähler und den Crash-Status zurück.
     ///
     /// Die bestehenden Dateiinhalte in `files` bleiben dabei unverändert erhalten.
@@ -109,7 +99,6 @@ impl FaultVfs {
         self.crashed.store(false, Ordering::SeqCst);
     }
 
-    // ANCHOR[contextra-testkit:FAULT-VFS-CHECK-WRITE-001]
     /// Prüft vor einem Schreibvorgang, ob eine Fehlerbedingung erfüllt ist.
     ///
     /// **Ablauf:**
@@ -138,7 +127,6 @@ impl FaultVfs {
         Ok(())
     }
 
-    // ANCHOR[contextra-testkit:FAULT-VFS-CHECK-READ-001]
     /// Prüft vor einem Lesevorgang, ob eine Fehlerbedingung erfüllt ist.
     ///
     /// **Ablauf:**
@@ -167,7 +155,6 @@ impl FaultVfs {
         Ok(())
     }
 
-    // ANCHOR[contextra-testkit:FAULT-VFS-WRITE-FILE-001]
     /// Schreibt Bytes an den angegebenen Pfad unter Berücksichtigung der Fehlerrichtlinien.
     ///
     /// **Fehlerbehandlung:**
@@ -179,7 +166,6 @@ impl FaultVfs {
         Ok(())
     }
 
-    // ANCHOR[contextra-testkit:FAULT-VFS-READ-FILE-001]
     /// Liest Bytes vom angegebenen Pfad unter Berücksichtigung der Fehlerrichtlinien.
     ///
     /// **Fehlerbehandlung:**
@@ -194,7 +180,6 @@ impl FaultVfs {
             .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found in FaultVfs"))
     }
 
-    // ANCHOR[contextra-testkit:FAULT-VFS-SYNC-001]
     /// Simuliert einen `fsync`-Aufruf zur dauerhaften Bestätigung auf dem Speichermedium.
     ///
     /// **Ablauf:**
@@ -219,7 +204,6 @@ impl FaultVfs {
         Ok(())
     }
 
-    // ANCHOR[contextra-testkit:FAULT-VFS-COUNTS-001]
     /// Liefert die Anzahl der bisher versuchten Schreiboperationen.
     pub fn write_count(&self) -> usize {
         self.write_count.load(Ordering::SeqCst)
@@ -314,7 +298,6 @@ impl contextra_ports::Vfs for FaultVfs {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-testkit:TEST-FAULT-VFS-WRITE-LIMIT-001]
     // Prüft, dass nach Erreichen des konfigurierten Schreiblimits folgende Schreibvorgänge abgewiesen werden.
     #[test]
     fn test_fault_vfs_write_limit() {
@@ -335,7 +318,6 @@ mod tests {
         assert_eq!(res3.unwrap_err().kind(), ErrorKind::WriteZero);
     }
 
-    // ANCHOR[contextra-testkit:TEST-FAULT-VFS-SYNC-FAILURE-001]
     // Prüft, dass Sync-Aufrufe nach dem Schwellenwert fehlschlagen (fsync-Fehlersimulation).
     #[test]
     fn test_fault_vfs_sync_failure() {
@@ -348,7 +330,6 @@ mod tests {
         assert!(vfs.sync().is_ok());
         assert!(vfs.sync().is_err());
     }
-    // ANCHOR[contextra-testkit:TEST-FAULT-VFS-PORT-001]
     // Validiert die Vfs-Port-Implementierung unter normalem und fehlerhaftem Verhalten.
     #[test]
     fn test_fault_vfs_port_interface() -> contextra_types::Result<()> {
@@ -384,7 +365,6 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-testkit:TEST-FAULT-VFS-CRASH-MATRIX-001]
     // Prüft die deterministische Crash-Matrix: Crash-Zustand blockiert Lese-, Schreib-
     // und Sync-Operationen vollständig; Reset und fail_all steuern das System feingranular.
     #[test]

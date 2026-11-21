@@ -120,7 +120,6 @@ async fn compute_modularity(graph: &CsrGraph, assignments: &[CommunityAssignment
     q / two_m
 }
 
-// ANCHOR[contextra-graph:TESTS-LEIDEN-REFERENCE-VALIDATION-001]
 #[tokio::test]
 async fn leiden_on_karate_club_matches_reference() {
     let graph = load_karate_club_graph().await;
@@ -153,7 +152,6 @@ async fn leiden_on_karate_club_matches_reference() {
     );
 }
 
-// ANCHOR[contextra-graph:TESTS-LEIDEN-REFERENCE-VALIDATION-002]
 #[tokio::test]
 async fn leiden_is_deterministic_with_fixed_seed() {
     let graph = load_karate_club_graph().await;

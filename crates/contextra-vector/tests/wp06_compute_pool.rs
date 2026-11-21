@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Härtungstests für ComputePool (Determinismus, Threadbegrenzung, Drop-Verhalten).
-// INVARIANTEN: Deterministische Ausführung; Drop beendet alle Threads sauber ohne Lecks.
-// STAND: 2026-11-12
 
 use contextra_vector::compute_pool::ComputePool;
 use std::sync::atomic::{AtomicUsize, Ordering};

@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Tombstone-Set und WAL-Verwaltung für gelöschte Dokumente (WP-VEC-07).
-// INVARIANTEN: Zero-Panic bei WAL-Lesezugriff; HMAC-Integritätsprüfung.
-// STAND: 2026-11-11
 
 use std::io::Read;
 use subtle::ConstantTimeEq;

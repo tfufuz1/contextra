@@ -1,5 +1,4 @@
 //! Ports-Implementierung von `TextIndex` für `InvertedIndex` in `compat/` (SPEC §6.2 text, B04).
-// ANCHOR[contextra-text:INV-PORTS-001]
 
 use crate::inverted::{InvertedIndex, TextIndexMetadata};
 use crate::storage::PostingStore;

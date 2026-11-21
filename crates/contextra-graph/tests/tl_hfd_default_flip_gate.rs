@@ -8,7 +8,6 @@ use contextra_graph::{
     MIN_SHADOW_SAMPLES,
 };
 
-// ANCHOR[contextra-graph:TESTS-TL-HFD-DEFAULT-FLIP-GATE-001]
 #[test]
 fn test_default_flip_gate_threshold_constants() {
     assert_eq!(MIN_SHADOW_SAMPLES, 10_000);
@@ -24,7 +23,6 @@ struct TestCase {
     expected_flip: bool,
 }
 
-// ANCHOR[contextra-graph:TESTS-TL-HFD-DEFAULT-FLIP-GATE-002]
 #[test]
 fn test_tl_hfd_default_flip_gate_table() {
     let gate = TlHfdFlipGate;
@@ -178,7 +176,6 @@ fn test_tl_hfd_default_flip_gate_table() {
 struct CustomFlipGate;
 impl DefaultFlipGate for CustomFlipGate {}
 
-// ANCHOR[contextra-graph:TESTS-TL-HFD-DEFAULT-FLIP-GATE-003]
 #[test]
 fn test_custom_gate_trait_implementation() {
     let custom_gate = CustomFlipGate;

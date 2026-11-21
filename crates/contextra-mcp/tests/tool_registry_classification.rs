@@ -2,7 +2,6 @@
 // =========================================================================
 // SECTION: tool_registry_classification
 // =========================================================================
-// ANCHOR[contextra-mcp:ITEST-TOOL-REGIS-001]
 
 use contextra_mcp::sandbox::{McpSandbox, ToolCategory, TOOL_REGISTRY};
 use contextra_mcp::McpServer;

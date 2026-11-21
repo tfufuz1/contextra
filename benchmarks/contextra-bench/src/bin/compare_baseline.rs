@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-07
-// ZWECK: Standalone CLI Tooling für den Vergleich aktueller Benchmark-Ergebnisse mit der Baseline
-// INVARIANTEN: Exit-Code 1 bei Regression > Schwellwert, Exit-Code 0 bei Erfolg, klare Human-Readable Logs.
 
 use contextra_bench::compare::compare_metrics_files;
 use std::env;

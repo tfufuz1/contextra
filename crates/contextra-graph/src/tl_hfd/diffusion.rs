@@ -1,10 +1,5 @@
 //! Core diffusion loop and active region management for TL-HFD (Spec §21.1).
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Topologisches Lovász-High-Order-Diffusionsverfahren.
-// INVARIANTEN: Submodulare Optimierung, schattenmodus-fähig.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::error::TlHfdError;
@@ -33,7 +28,6 @@ struct ActiveEdge {
 ///
 /// # Complexity
 /// Time complexity $O(\text{max\_iterations} \cdot k \cdot |\text{Seeds}| \cdot \text{max\_edge\_size})$.
-// ANCHOR[contextra-graph:SRC-TL-HFD-DIFFUSION-001]
 pub fn run_diffusion<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],

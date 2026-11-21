@@ -25,7 +25,6 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing;
 
-// ANCHOR[contextra-store:COMP-ENG-001]
 /// Orchestriert die periodische Verdichtung und Bereinigung von SSTables.
 pub struct CompactionEngine {
     config: CompactionConfig,

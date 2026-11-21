@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Criterion-Benchmark für F-02 Partial HNSW Rebuild Recall-Regressionskurve über wachsende Tombstone-Raten
-// INVARIANTEN: Deterministische Vektorgenerierung via StdRng mit festem Seed (INV-INDEX-APPLY-1)
-// HOTSPOTS: 35-95
-// STAND: 2026-11-11
-// BEREICH: AGENTS §6, SPEC §11.4 — Wartungsprimitiven und Rebuild-Recall
 
-// ANCHOR[contextra-vector:W11-BENCH-009]
 
 mod common;
 

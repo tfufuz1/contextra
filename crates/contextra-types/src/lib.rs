@@ -26,31 +26,22 @@
 #![warn(missing_docs)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
-// ANCHOR[contextra-types:MOD-ERR]
 /// Fehlertypen und Fehler-Hierarchie für Contextra.
 pub mod error;
-// ANCHOR[contextra-types:MOD-DTO]
 /// Serialisierbare Data-Transfer-Objects (DTO) für fehlerresistente Schnittstellenübertragung.
 pub mod error_dto;
-// ANCHOR[contextra-types:MOD-FP]
 /// Kryptografische Modell-Fingerabdrücke zur Validierung von Embedding- und Inferenz-Konfigurationen.
 pub mod model_fingerprint;
-// ANCHOR[contextra-types:MOD-RET]
 /// Retrieval-Strategien und Routing-Optionen für die hybride Suche.
 pub mod retrieval_strategy;
-// ANCHOR[contextra-types:MOD-SCH]
 /// Manifest-Schemaversionen und Dokument-ID-Breitenkonfigurationen.
 pub mod schema;
-// ANCHOR[contextra-types:MOD-TS]
 /// Mandantenspezifische Wrapper-Typen zur Durchsetzung strikter Mandantenisolation.
 pub mod tenant_scope;
-// ANCHOR[contextra-types:MOD-TOMB]
 /// Bitmaskenbasierte Tombstones (Löschmarker) für Multi-Version-Concurrency-Control (MVCC).
 pub mod tombstone;
-// ANCHOR[contextra-types:MOD-TYP]
 /// Zentrale Domänentypen, Filter, Budgets, Scoring-Funktionen und SAOS-Suchstrukturen.
 pub mod types;
-// ANCHOR[contextra-types:MOD-WIT]
 /// Audit-Trails, Zeugnisse (Witnesses) und Saga-Transaktionsaufzeichnungen.
 pub mod erasure;
 pub mod ids;

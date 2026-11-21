@@ -1,6 +1,5 @@
 //! # Basis-Committests & Input Boundary Guards
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Prueft Roundtrip, Delete, Delete-Prefix, Delete-Many, Rollback und Input-Validierung
 

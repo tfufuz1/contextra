@@ -3,9 +3,6 @@
 //! Definiert [], um festzulegen, ob Bereinigung ueber regulaere
 //! LSM-Tombstones oder kryptografisches Shredding (Schluesselentwertung) erfolgen.
 
-// FILE-CONTEXT
-// ZWECK: Definition von KvDeleteMode (TombstoneOnly vs CryptoShred).
-// INVARIANTEN:
 // - INV-KV-DELETE-1: Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für -Segmente möglich, niemals für .
 
 use serde::{Deserialize, Serialize};

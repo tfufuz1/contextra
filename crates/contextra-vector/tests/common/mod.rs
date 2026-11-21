@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Gemeinsame Test-Helfer (Vektorgenerierung, Brute-Force-Oracle, Recall, Tempfile).
-// INVARIANTEN: Reiner Test-Code, deterministische Seeds (kein thread_rng), stabiler Tie-Break nach DocId.
-// HOTSPOTS: 25-140
-// STAND: 2026-11-11
 
 //! Gemeinsame Hilfsfunktionen für die Integrationstests von `contextra-vector`.
 
@@ -11,7 +6,6 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::cmp::Ordering;
 
-// ANCHOR[contextra-vector:W09-COMMON-001]
 /// Deterministischer Vektorgenerator mit festem Seed.
 pub fn generate_deterministic_vectors(count: usize, dim: usize, seed: u64) -> Vec<Vec<f32>> {
     let mut rng = StdRng::seed_from_u64(seed);
@@ -26,7 +20,6 @@ pub fn generate_deterministic_vectors(count: usize, dim: usize, seed: u64) -> Ve
     vectors
 }
 
-// ANCHOR[contextra-vector:W09-COMMON-002]
 /// Normalisiert einen Vektor auf Einheitslänge (für Cosine-Distanz).
 pub fn normalize_vector(v: &mut [f32]) {
     let norm_sq: f32 = v.iter().map(|x| x * x).sum();
@@ -38,7 +31,6 @@ pub fn normalize_vector(v: &mut [f32]) {
     }
 }
 
-// ANCHOR[contextra-vector:W09-COMMON-003]
 /// Berechnet die exakte Distanz zwischen zwei Vektoren gemäß Distanzmetrik.
 pub fn compute_exact_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> f32 {
     match metric {
@@ -77,7 +69,6 @@ pub fn compute_exact_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> f
     }
 }
 
-// ANCHOR[contextra-vector:W09-COMMON-004]
 /// Exakter Brute-Force k-NN Oracle mit deterministischem Tie-Break nach DocId.
 pub fn brute_force_knn(
     dataset: &[(DocId, Vec<f32>)],
@@ -100,7 +91,6 @@ pub fn brute_force_knn(
     scored
 }
 
-// ANCHOR[contextra-vector:W09-COMMON-005]
 /// Berechnet den Recall@k zwischen den Ground-Truth IDs und den tatsächlichen Resultaten.
 pub fn calculate_recall_at_k(ground_truth: &[DocId], actual: &[DocId]) -> f64 {
     if ground_truth.is_empty() {

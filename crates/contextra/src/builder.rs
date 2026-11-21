@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Contextra Composition Root Builder (Ring 4).
-// INVARIANTEN: Zero-panic in production code; orchestriert Subsystem-Konfiguration ohne Geschäftslogik.
 
 //! # Modul: Contextra Composition Root Builder (Ring 4)
 //!
@@ -37,7 +34,6 @@ use contextra_types::error::ContextraError;
 use contextra_types::DistanceMetric;
 use zeroize::Zeroizing;
 
-// ANCHOR[contextra:BLD-001]
 /// Konfiguration der Speicherverschlüsselung (Encryption at Rest) für persistente Datenbankschichten.
 ///
 /// Bestimmt, ob Schreib-Lese-Operationen auf Festplatte (LSM-Tree, WAL = Write-Ahead-Log)
@@ -59,7 +55,6 @@ impl std::fmt::Debug for EncryptionMode {
     }
 }
 
-// ANCHOR[contextra:BLD-002]
 /// Erweiterungstraits für [`ContextraConfig`] zur Abfrage des Verschlüsselungsstatus.
 pub trait ContextraConfigExt {
     /// Returns `true` if storage encryption is configured with a non-empty passphrase.
@@ -74,7 +69,6 @@ impl ContextraConfigExt for ContextraConfig {
     }
 }
 
-// ANCHOR[contextra:BLD-003]
 /// Ein Builder zur flexiblen Konfiguration und Instanziierung der Datenbank [`Contextra`].
 ///
 /// `ContextraBuilder` fungiert als primärer Einstiegspunkt (Composition Root) in Ring 4.
@@ -121,7 +115,6 @@ impl Clone for ContextraBuilder {
 }
 
 impl ContextraBuilder {
-    // ANCHOR[contextra:BLD-004]
     /// Erzeugt einen neuen `ContextraBuilder` mit der angegebenen Vektordimension.
     ///
     /// # Parameter
@@ -145,7 +138,6 @@ impl ContextraBuilder {
         }
     }
 
-    // ANCHOR[contextra:BLD-005]
     /// Setzt das Speicherverzeichnis für die Datenbankdateien (LSM-SSTables, WAL, Indizes).
     ///
     /// # Parameter
@@ -155,7 +147,6 @@ impl ContextraBuilder {
         self
     }
 
-    // ANCHOR[contextra:BLD-006]
     /// Begrenzt die maximale Anzahl an Vektorelementen im Index.
     ///
     /// # Parameter
@@ -165,7 +156,6 @@ impl ContextraBuilder {
         self
     }
 
-    // ANCHOR[contextra:BLD-007]
     /// Legt die Distanzmetrik für die Ähnlichkeitssuche fest.
     ///
     /// # Parameter
@@ -175,7 +165,6 @@ impl ContextraBuilder {
         self
     }
 
-    // ANCHOR[contextra:BLD-008]
     /// Konfiguriert den Verschlüsselungsmodus explizit.
     ///
     /// Validiert bei Passphrasen sofort, dass diese nicht leer sind oder nur aus Leerzeichen bestehen.
@@ -197,7 +186,6 @@ impl ContextraBuilder {
         self
     }
 
-    // ANCHOR[contextra:BLD-009]
     /// Bequeme Methode zum Setzen einer Passphrase für die Speicherverschlüsselung.
     ///
     /// Kapselt die Passphrase direkt in einem [`Zeroizing<String>`], um Rückstände im Speicher
@@ -207,20 +195,17 @@ impl ContextraBuilder {
         self.with_encryption(EncryptionMode::Passphrase(secret))
     }
 
-    // ANCHOR[contextra:BLD-010]
     /// Prüft, ob der Builder aktuell auf verschlüsselten Modus mit Passphrase eingestellt ist.
     pub fn is_encrypted(&self) -> bool {
         matches!(self.encryption_mode, Some(EncryptionMode::Passphrase(_)))
     }
 
-    // ANCHOR[contextra:BLD-011]
     /// Wählt das Backend für Text-Embeddings (z. B. intern via Candle oder externer Dienst).
     pub fn with_embedding_backend(mut self, backend: EmbeddingBackend) -> Self {
         self.config.embedding_backend = backend;
         self
     }
 
-    // ANCHOR[contextra:BLD-012]
     /// Konfiguriert die automatische Hintergrund-Konsolidierung (Memory Consolidation) von Erinnerungen.
     ///
     /// # Parameter
@@ -232,14 +217,12 @@ impl ContextraBuilder {
         self
     }
 
-    // ANCHOR[contextra:BLD-013]
     /// Bindet eine benutzerdefinierte Implementierung des [`TextEmbeddingEngine`]-Ports ein.
     pub fn with_embedder(mut self, embedder: Arc<dyn TextEmbeddingEngine>) -> Self {
         self.embedder = Some(embedder);
         self
     }
 
-    // ANCHOR[contextra:BLD-014]
     /// Injiziert ein beliebiges Lizenzgate ([`LicenseGate`]) zur Ring-Autorisierung.
     ///
     /// # Veraltet
@@ -249,7 +232,6 @@ impl ContextraBuilder {
         self
     }
 
-    // ANCHOR[contextra:BLD-016]
     /// Setzt ein vordefiniertes Performance-Profil ([`PerformanceProfile`]).
     ///
     /// Profile (wie `Compliance`, `Balanced`, `BareMetal`) steuern standardisierte
@@ -262,7 +244,6 @@ impl ContextraBuilder {
         self
     }
 
-    // ANCHOR[contextra:BLD-017]
     /// Überschreibt die Konfiguration vollständig mit einer bestehenden [`ContextraConfig`].
     ///
     /// Überträgt auch eventuell in `config` enthaltene Passphrasen in den abgesicherten `EncryptionMode`.
@@ -281,7 +262,6 @@ impl ContextraBuilder {
         self
     }
 
-    // ANCHOR[contextra:BLD-018]
     /// Baut und initialisiert die [`Contextra`]-Datenbankinstanz asynchron.
     ///
     /// # Ablauf von `build`:
@@ -387,7 +367,6 @@ impl Default for ContextraBuilder {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra:TEST-BLD-001]
     // Prüft, ob der Builder mit den erwarteten Default-Werten (Dimension 768, Standardpfad, keine Verschlüsselung) startet.
     #[test]
     fn test_builder_defaults() {
@@ -398,7 +377,6 @@ mod tests {
         assert!(!builder.is_encrypted());
     }
 
-    // ANCHOR[contextra:TEST-BLD-002]
     // Prüft das Setzen von benutzerdefinierten Parametern (Dimension, Pfad, Max-Elemente, Metrik, Passphrase, Konsolidierung).
     #[test]
     fn test_builder_custom_configuration() {
@@ -424,7 +402,6 @@ mod tests {
         );
     }
 
-    // ANCHOR[contextra:TEST-BLD-003]
     // Verifiziert die Maskierung von Passphrasen ([REDACTED]) in Debug-Ausgaben von EncryptionMode und ContextraBuilder.
     #[test]
     fn test_encryption_passphrase_redaction() {
@@ -440,7 +417,6 @@ mod tests {
         assert!(debug_builder_output.contains("[REDACTED]"));
     }
 
-    // ANCHOR[contextra:TEST-BLD-004]
     // Stellt sicher, dass leere oder reine Whitespace-Passphrasen beim Bauen abgelehnt werden.
     #[tokio::test]
     async fn test_empty_passphrase_rejected() {
@@ -464,7 +440,6 @@ mod tests {
         assert!(res_ws.is_err());
     }
 
-    // ANCHOR[contextra:TEST-BLD-005]
     // Prüft, dass der explizit unverschlüsselte Modus korrekt initialisiert werden kann.
     #[tokio::test]
     async fn test_explicit_unencrypted_mode() -> Result<(), Box<dyn std::error::Error>> {
@@ -485,7 +460,6 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra:TEST-BLD-006]
     // Testet einen vollständigen Durchlauf von Instanzerstellung, Initialisierung und Ressourcenfreigabe.
     #[tokio::test]
     async fn test_builder_build_roundtrip() -> Result<(), Box<dyn std::error::Error>> {

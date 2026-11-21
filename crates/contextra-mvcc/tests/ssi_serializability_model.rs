@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-SERIALIZABILITY-MODEL-ROOT]
 //! # Modellbasierter Beweis für Serializable Snapshot Isolation (SSI)
 //!
 //! Vergleicht zufällige Transaktionshistorien (`begin`, `read`, `write`, `commit`, `abort`)

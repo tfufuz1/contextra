@@ -16,7 +16,6 @@ use contextra_ports::StorageEngine;
 use contextra_types::{DocId, EntityId, TxId};
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-CASCADE-QUEUE-PERSISTENCE-001]
 #[tokio::test]
 async fn test_hyperedge_cascade_queue_persistence_and_drain() {
     let storage = Arc::new(InMemoryStorageEngine::new());

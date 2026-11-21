@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Dispatcher für Distanzberechnung (SIMD vs. Scalar) mit flexiblen Metrik-Parametern.
-// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); Saubere Feature-Trennung von contextra-simd.
-// HOTSPOTS: compute_distance, compute_distance_trusted, compute_distance_f32_bytes_trusted
-// STAND: 2026-11-12
 
 //! # Distance Dispatch Module
 //!
@@ -19,7 +14,6 @@ use crate::error::Result;
 use crate::error::VectorError;
 use crate::types::DistanceMetric;
 
-// ANCHOR[contextra-vector:DIST-COMPUTE-DISTANCE]
 /// Berechnet die Distanz zwischen zwei Vektoren nach Endlichkeitsvalidierung.
 #[inline]
 pub fn compute_distance<M: Into<DistanceMetric>>(a: &[f32], b: &[f32], metric: M) -> Result<f32> {
@@ -36,7 +30,6 @@ pub fn compute_distance<M: Into<DistanceMetric>>(a: &[f32], b: &[f32], metric: M
     }
 }
 
-// ANCHOR[contextra-vector:DIST-COMPUTE-TRUSTED]
 /// Berechnet die Distanz zwischen zwei vorvalidierten f32-Slices.
 #[inline]
 pub fn compute_distance_trusted<M: Into<DistanceMetric>>(
@@ -66,7 +59,6 @@ pub fn compute_distance_trusted<M: Into<DistanceMetric>>(
     }
 }
 
-// ANCHOR[contextra-vector:DIST-COMPUTE-BYTES-TRUSTED]
 /// Berechnet die Distanz zwischen vorvalidiertem f32-Slice und Little-Endian f32 Byte-Slice.
 #[inline]
 pub fn compute_distance_f32_bytes_trusted<M: Into<DistanceMetric>>(

@@ -1,7 +1,6 @@
 //! # QuickCache Backend
 //!
 //! Zweck: Hochperformantes Block-Cache-Backend hinter Feature `block-cache-v2`.
-// ANCHOR[contextra-store:SST-RDR-143]
 
 use super::traits::BlockCacheBackend;
 use bytes::Bytes;

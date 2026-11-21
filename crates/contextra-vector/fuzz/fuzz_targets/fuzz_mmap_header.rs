@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Fuzz-Target für Mmap-Header-Deserialisierung
-// INVARIANTEN: Reines fuzz_one ohne direkte libfuzzer-Laufzeitabhängigkeit für Smoke-Treiber
-// HOTSPOTS: 15-30
-// STAND: 2026-11-11
-// BEREICH: AGENTS §8, SPEC §11.4 — Mmap-Header-Robustheit gegen In-Place-Korruption
 
-// ANCHOR[contextra-vector:W11-FUZZ-004]
 
 #![no_main]
 

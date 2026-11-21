@@ -18,7 +18,6 @@ use contextra_types::{DocId, EntityId, TxId};
 use std::path::Path;
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-CASCADE-CRASH-RECOVERY-001]
 #[tokio::test]
 async fn test_hyperedge_cascade_crash_recovery() {
     let storage = Arc::new(InMemoryStorageEngine::new());

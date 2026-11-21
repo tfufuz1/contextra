@@ -1,5 +1,4 @@
 // =========================================================================
-// ANCHOR[id=sys-vault-main,epic=sys-vault,seq=0] Tresor-Speicherverwaltung
 // =========================================================================
 // LINK crates/contextra-sys/src/lib.rs
 // LINK crates/contextra-sys/src/mlock.rs
@@ -33,7 +32,6 @@ use crate::mlock::{
 };
 
 // SECTION Locked Regions Tracker
-// ANCHOR[id=sys-vault-tracker,epic=sys-vault,seq=1] LockedRegions
 
 /// Kapselt und verfolgt im RAM gesperrte Speicherbereiche (Adressen und Längen) für sensible Schlüsseldaten.
 #[derive(Debug, Default)]
@@ -118,7 +116,6 @@ impl Drop for LockedRegions {
 // !SECTION Locked Regions Tracker
 
 // SECTION Protected Vault Buffer
-// ANCHOR[id=sys-vault-buffer,epic=sys-vault,seq=2] VaultBuffer
 
 /// Ein im RAM verankerter, geschützter Speicherpuffer für hochsensible kryptografische Schlüsseldaten (INV-SYS-MEMLOCK-1).
 #[derive(Debug)]
@@ -203,7 +200,6 @@ impl std::ops::DerefMut for VaultBuffer {
     }
 }
 
-// ANCHOR[id=sys-vault-drop,epic=sys-vault,seq=3] RAII Drop-Säuberung
 // NOTE: Führt volatile zeroize vor munlock aus (INV-SYS-MEMLOCK-1).
 impl Drop for VaultBuffer {
     fn drop(&mut self) {
@@ -219,7 +215,6 @@ impl Drop for VaultBuffer {
 // !SECTION Protected Vault Buffer
 
 // SECTION Unit Tests
-// ANCHOR[id=sys-vault-tests,epic=sys-vault,seq=4] Vault-Modultests
 #[cfg(test)]
 mod tests {
     use super::*;

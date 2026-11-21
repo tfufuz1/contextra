@@ -1,9 +1,6 @@
 // =========================================================================
 // SECTION: egress_guard
 // =========================================================================
-// ANCHOR[contextra-mcp:EGRESS-GUA-001]
-// FILE-CONTEXT
-// ZWECK: Thin adapter re-exporting contextra_privacy::egress_guard and adapting contextra::Collection.
 
 pub use contextra_privacy::egress_guard::*;
 

@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Invarianten-Prüfung für Rebuild und Löschen (INV-VEC-ZEROIZE-1, INV-VEC-CONNECTIVITY-1, INV-HNSW-SLOT-1, INV-INDEX-APPLY-1).
-// INVARIANTEN: Bit-identischer Determinismus, Idempotenz, Ghost-Pointer-Freiheit, BFS-Konnektivität auf Layer 0.
-// STAND: TS:2026-11-11T02:00:00Z
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

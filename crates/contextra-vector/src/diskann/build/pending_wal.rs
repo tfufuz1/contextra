@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Pending-WAL für inkrementelle Vektor-Inserts in DiskANN (WP-VEC-07).
-// INVARIANTEN: Obergrenzenprüfung MAX_PENDING_WAL_DIM vor Vektor-Allokation; HMAC-Schutz.
-// STAND: 2026-11-11
 
 use std::io::Read;
 use subtle::ConstantTimeEq;

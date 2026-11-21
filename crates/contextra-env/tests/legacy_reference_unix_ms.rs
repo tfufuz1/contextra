@@ -4,7 +4,6 @@ use contextra_env::{unix_ms, Clock, ManualClock};
 
 // =========================================================================
 // SECTION: Legacy Reference Traits & Adapters
-// ANCHOR[id=differential-legacy-contracts,epic=clock,seq=10]
 // NOTE: Eingefrorene Legacy-Schnittstellen zur Sicherstellung exakter Bit-Parität (B02).
 // LINK docs/crates/contextra-env.md §2.1
 // =========================================================================
@@ -50,7 +49,6 @@ impl<C: Clock> VectorClock for VectorAdapter<C> {
 
 // =========================================================================
 // SECTION: Differential Parity Test
-// ANCHOR[id=differential-test-run,epic=clock,seq=11]
 // =========================================================================
 
 #[test]

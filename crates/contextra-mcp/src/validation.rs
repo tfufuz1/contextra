@@ -1,7 +1,6 @@
 // =========================================================================
 // SECTION: validation
 // =========================================================================
-// ANCHOR[contextra-mcp:VALIDATION-001]
 use crate::protocol::McpError;
 
 /// Checks whether database write access is explicitly enabled via environment variable `CONTEXTRA_MCP_ALLOW_WRITE`.

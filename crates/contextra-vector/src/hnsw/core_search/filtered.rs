@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Gefilterte Vektorsuche und Snapshot-Sichtbarkeit im HNSW-Index.
-// INVARIANTEN: Zero-Panic; Filter vor Distanz; Soft-Delete Respektierung.
-// HOTSPOTS: search_filtered_internal
-// STAND: 2026-11-12
 
 //! Gefilterte Vektorsuche und Traversierung im HNSW-Index.
 

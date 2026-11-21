@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Übernahme vorbereiteter Einfügungen (PreparedInsert) in Graph-Arena und HotState.
-// INVARIANTEN: Zero-Panic; Entry-Point Aktualisierung; Transaktionsatomarität.
-// HOTSPOTS: apply_insert, do_insert
-// STAND: 2026-11-12
 
 //! Übernahme (Apply) vorbereiteter Knoten in den HNSW-Index.
 
@@ -15,7 +10,6 @@ use super::super::batch::PreparedInsert;
 use super::super::types::{HnswIndexCore, HnswNode};
 
 impl HnswIndexCore {
-    // ANCHOR[contextra-vector:HNSW-APPLY-INSERT]
     pub fn apply_insert(&self, prepared: PreparedInsert, tx_id: u64) {
         let node = HnswNode {
             doc_id: prepared.doc_id,

@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Differenztest zwischen aktueller öffentlicher Distanzberechnung und gefrorener Legacy-Kopie (proptest und Randfälle).
 
 mod legacy_reference;
 

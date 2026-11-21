@@ -18,7 +18,6 @@ impl PathGraph for DummyGraph {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-DOCID-128-PATH-RAG-001]
 #[test]
 fn test_path_rag_to_rrf_signal_docid_conversion_and_sorting() {
     let engine = PathRAGEngine::new(DummyGraph, 4, 0.1);

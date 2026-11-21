@@ -1,9 +1,6 @@
 // =========================================================================
 // SECTION: egress_gateway
 // =========================================================================
-// ANCHOR[contextra-mcp:EGRESS-GAT-001]
-// FILE-CONTEXT
-// ZWECK:       Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries (Re-export from contextra-privacy)
 
 pub use contextra_privacy::egress_gateway::*;
 pub use contextra_privacy::egress_vault::{EgressClassification, EgressClassifier};

@@ -1,9 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Contextra cryptographic kernel - Layer 1 crate for AEAD block encryption, HKDF key derivation, and WAL integrity.
-// INVARIANTEN: Cryptographic primitives strictly isolated to this crate. All key operations zeroized on drop. Lock-free & I/O-free in src/.
-// NICHT-OFFENSICHTLICH: KeyManager uses AES-256-GCM-SIV with OsRng 8-byte random suffix + 4-byte prefix to prevent nonce-reuse key leakage.
-// HOTSPOTS: [1-25]
-// STAND: TS:2026-11-09
 
 #![forbid(unsafe_code)]
 #![cfg_attr(
@@ -66,7 +60,6 @@ pub mod wal_crypto;
 // !SECTION
 
 // SECTION [epic=crypto-core,seq=2] Re-Exports & Primäre Schnittstellen
-// ANCHOR[contextra-crypto:LIB-001] Zentraler Einstiegspunkt für Baustein-Nutzer
 pub use aead::*;
 pub use contract::*;
 pub use dek::{derive_dek, AncestorSalts, Dek, UnitKey};

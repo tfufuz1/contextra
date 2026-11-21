@@ -14,7 +14,6 @@ use contextra_text::tokenizer::{
 };
 use libfuzzer_sys::fuzz_target;
 
-// ANCHOR[contextra-text:FUZZ-002]
 // Fuzzing-Harnisch zur Prüfung der Regex-Validierung und Tokenizer-Stabilität.
 fuzz_target!(|data: &str| {
     // 1. Default Tokenizer execution with arbitrary string

@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Fuzz-Target für HNSW-Persistenz und Dateibeschädigung (Fail-Closed-Prüfung)
-// INVARIANTEN: Keine unbegrenzte Allokation, kein unwrap(), kontrollierte Testdateibereinigung
-// HOTSPOTS: 40-120
-// STAND: 2026-11-11
-// BEREICH: AGENTS §8, SPEC §11.4 — Zero-Panic und robuste Persistenz-Deserialisierung
 
-// ANCHOR[contextra-vector:W11-FUZZ-001]
 
 #![no_main]
 

@@ -32,7 +32,6 @@ pub enum StorageHealth {
 }
 
 /// LSM-Tree based storage engine.
-// ANCHOR[contextra-store:LSM-ENG-001]
 /// Primaere Schnittstelle fuer den LSM-Baum mit get, put, delete und scan.
 pub struct LsmStorage {
     pub(super) config: LsmConfig,

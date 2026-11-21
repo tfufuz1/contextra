@@ -1,13 +1,8 @@
-// ANCHOR[contextra-mvcc:TEST-CAMPAIGN-COV-TX-REAP-ROOT]
 //! # Kampagnen-Test für TxBuffer Orphan-Reaping und Obergrenzen
 //!
 //! Prüft die gezielte Testabdeckung von `reap_orphans_bounded` unter deterministischer
 //! Zeiteinspeisung über `ManualClock`.
 
-// FILE-CONTEXT
-// ZWECK: Campaign coverage test for TxBuffer reap_orphans_bounded and deterministic time injection.
-// INVARIANTEN: reap_orphans_bounded caps reaped orphan count to max and leaves remaining unexpired/unreaped transactions intact.
-// NICHT-OFFENSICHTLICH: Uses independent oracle (R4) validating set difference of staged vs reaped TxIDs.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

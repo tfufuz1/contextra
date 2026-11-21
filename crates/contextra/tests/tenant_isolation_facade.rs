@@ -11,7 +11,6 @@ use contextra_types::{ContextraError, TenantId};
 use serde_json::json;
 use tempfile::TempDir;
 
-// ANCHOR[contextra:TEST-TIF-001]
 // Prüft die vollständige Mandantentrennung für Get, Search, Scan, Delete und DropCollection zwischen zwei Mandanten.
 #[tokio::test]
 async fn tenant_a_cannot_read_tenant_b() -> Result<(), ContextraError> {
@@ -125,7 +124,6 @@ async fn tenant_a_cannot_read_tenant_b() -> Result<(), ContextraError> {
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-TIF-002]
 // Startet eine Datenbank und verifiziert den fehlerfreien Zugriff auf LsmStorage mit SSI-Tracking.
 #[tokio::test]
 async fn startup_ssi_tracking_check() -> Result<(), ContextraError> {

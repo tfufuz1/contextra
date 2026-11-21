@@ -12,7 +12,6 @@ use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-// ANCHOR[contextra-text:TEST-120]
 // Testfall `test_staged_insert_not_visible_before_commit`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_staged_insert_not_visible_before_commit() -> Result<()> {
@@ -43,7 +42,6 @@ async fn test_staged_insert_not_visible_before_commit() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-121]
 // Testfall `test_inverted_index_rollback_cleans_up`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_inverted_index_rollback_cleans_up() -> Result<()> {
@@ -74,7 +72,6 @@ async fn test_inverted_index_rollback_cleans_up() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-122]
 // Testfall `test_text_search_snapshot_isolation`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_text_search_snapshot_isolation() -> Result<()> {
@@ -106,7 +103,6 @@ async fn test_text_search_snapshot_isolation() -> Result<()> {
 
     Ok(())
 }
-// ANCHOR[contextra-text:TEST-123]
 // Testfall `test_avgdl_accuracy_incremental_updates`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
@@ -200,7 +196,6 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-124]
 // Testfall `test_idf_recalculation_with_rare_term_after_delete`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_idf_recalculation_with_rare_term_after_delete() -> Result<()> {
@@ -253,7 +248,6 @@ async fn test_idf_recalculation_with_rare_term_after_delete() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-125]
 // Testfall `test_text_index_search_at_snapshot_isolation`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_text_index_search_at_snapshot_isolation() -> Result<()> {
@@ -286,7 +280,6 @@ async fn test_text_index_search_at_snapshot_isolation() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-126]
 // Testfall `test_upsert_document_oversized_text_returns_error`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_upsert_document_oversized_text_returns_error() -> Result<()> {
@@ -312,7 +305,6 @@ async fn test_upsert_document_oversized_text_returns_error() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-127]
 // Testfall `test_text_index_metadata_bincode_roundtrip`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_text_index_metadata_bincode_roundtrip() {
@@ -329,7 +321,6 @@ fn test_text_index_metadata_bincode_roundtrip() {
     assert_eq!(meta.avg_doc_len_x1000, deserialized.avg_doc_len_x1000);
 }
 
-// ANCHOR[contextra-text:TEST-128]
 // Testfall `test_language_from_iso_case_iso_codes_and_fallback`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_language_from_iso_case_iso_codes_and_fallback() {
@@ -347,7 +338,6 @@ fn test_language_from_iso_case_iso_codes_and_fallback() {
     assert_eq!(Language::from_iso(""), Language::English);
 }
 
-// ANCHOR[contextra-text:TEST-129]
 // Testfall `test_bm25_morph_index_case_full_lifecycle`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_bm25_morph_index_case_full_lifecycle() -> Result<()> {
@@ -386,7 +376,6 @@ async fn test_bm25_morph_index_case_full_lifecycle() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-130]
 // Testfall `test_inverted_index_case_empty_and_unicode_inputs`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_inverted_index_case_empty_and_unicode_inputs() -> Result<()> {
@@ -431,7 +420,6 @@ async fn test_inverted_index_case_empty_and_unicode_inputs() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-131]
 // Testfall `test_staged_stats_limit_exceeded`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_staged_stats_limit_exceeded() -> Result<()> {
@@ -457,7 +445,6 @@ async fn test_staged_stats_limit_exceeded() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-132]
 // Testfall `test_load_stats_persistence`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_load_stats_persistence() -> Result<()> {
@@ -484,7 +471,6 @@ async fn test_load_stats_persistence() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-text:TEST-133]
 // Testfall `test_inverted_index_clone_sharing`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_inverted_index_clone_sharing() -> Result<()> {

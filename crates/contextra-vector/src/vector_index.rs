@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Normative k-NN-Schnittstelle `VectorIndex` mit Ausschlussfilter (SPEC contextra-vector §4).
-// INVARIANTEN: Zero-Panic; Ausgeschlossene Dokumente erscheinen nie im Ergebnis (fail-closed bei
 //              nicht abbildbaren IDs); deterministische Reihenfolge (Distanz aufsteigend, DocId aufsteigend).
 // NICHT-OFFENSICHTLICH: Die interne Suche ist `async`, verwendet aber keine echten Await-Punkte; sie wird
 //              hier mit einem No-op-Waker abgefragt. Ein `Pending` führt zu einem Fehler, nie zu einem Block.
@@ -18,7 +15,6 @@ use crate::error::{Result, VectorError};
 use crate::hnsw::HnswIndex;
 use crate::types::{DocId, MAX_SEARCH_K};
 
-// ANCHOR[contextra-vector:VIDX-HIT]
 /// Ein Treffer einer k-NN-Suche.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VectorSearchHit {
@@ -28,7 +24,6 @@ pub struct VectorSearchHit {
     pub distance: f32,
 }
 
-// ANCHOR[contextra-vector:VIDX-TRAIT]
 /// Normative Schnittstelle für Ähnlichkeitssuche.
 pub trait VectorIndex: Send + Sync {
     /// Führt eine k-NN-Suche aus. Ausgeschlossene Dokumente (ReadGate / Ausschlussmaske)
@@ -63,7 +58,6 @@ fn bitmap_key(doc_id: DocId) -> Option<u32> {
 }
 
 impl VectorIndex for HnswIndex {
-    // ANCHOR[contextra-vector:VIDX-SEARCH-KNN]
     fn search_knn(
         &self,
         query: &[f32],

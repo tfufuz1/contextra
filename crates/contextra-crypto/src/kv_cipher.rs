@@ -9,11 +9,6 @@
 //! - Format-Versionierungs-Header sichert Abwärtskompatibilität ab.
 //! - Nonce-Generierung schließt Kollisionen aus.
 
-// FILE-CONTEXT
-// ZWECK: Dedicated AEAD encryption and key isolation for KV-cache segments (contextra-crypto).
-// INVARIANTEN: Key derivation per (tenant_id, model_fingerprint) tuple via KeyManager HKDF-Expand.
-// NICHT-OFFENSICHTLICH: OsRng generates fresh 12-byte nonces per encrypt call. AES-256-GCM-SIV provides misuse-resistance.
-// STAND: TS:2026-09-08T00:00:00Z
 
 //! KV-Cache Segment Encryption Module (contextra-crypto).
 //!
@@ -120,7 +115,6 @@ impl KvCipher for KeyManager {
 
 /// High-level cipher engine for KV-cache segment encryption and decryption.
 /// Consolidates onto `KeyRegistry` envelope crypto-shredding as the single shredding path.
-// ANCHOR[contextra-crypto:KV-001]
 /// Chiffre für segmentweise verschlüsselte KV-Einträge.
 pub struct KvSegmentCipher {
     key_manager: KeyManager,

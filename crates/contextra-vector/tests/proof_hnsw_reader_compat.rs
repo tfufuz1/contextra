@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Verifiziert, dass bestehende v2-Dateien (hnsw_raw.bin, hnsw_sq8.bin) auch nach HNSW_VERSION-Bump auf 3 korrekt geladen und gesucht werden können (Reader-Kompatibilität).
 
 use std::path::PathBuf;
 use contextra_vector::persistence::MmapIndex;

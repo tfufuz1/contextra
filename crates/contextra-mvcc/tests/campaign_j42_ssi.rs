@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-CAMPAIGN-J42-SSI-ROOT]
 //! # Kampagne J-42: SSI Read-Set & Write-Skew Isolations-Audit
 //!
 //! Formale Prüfung des Write-Skew-Orakels und Gegenprüfung gegen fehlerhafte

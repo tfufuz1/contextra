@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 //! Gemeinsame Test-Hilfsmittel für die contextra-vector Qualitäts- und Integrationssuite.
 //!
-//! ANCHOR[contextra-vector:W10-COMMON-001]
 //!
 //! Beinhaltet deterministische PRNG-Generatoren, Vektorgenerierung, Ground-Truth-Distanzfunktionen
 //! und Recall@k-Berechnungen.

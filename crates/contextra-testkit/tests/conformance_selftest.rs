@@ -29,7 +29,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 // MUTANT IMPLEMENTATIONS FOR MUTATION PROOF TESTS
 // ============================================================================
 
-// ANCHOR[contextra-testkit:SELFTEST-MUTANT-STORE-001]
 /// Mutante StorageEngine, bei der Löschoperationen absichtlich ignoriert werden (No-Op).
 #[derive(Clone, Debug)]
 struct BuggyDeleteStorageEngine(InMemoryStorageEngine);
@@ -109,7 +108,6 @@ impl StorageEngine for BuggyDeleteStorageEngine {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-MUTANT-VECTOR-001]
 /// Mutante VectorIndex, bei dem Löschen eine No-Op ist.
 #[derive(Clone, Debug)]
 struct BuggyDeleteVectorIndex(InMemoryVectorIndex);
@@ -157,7 +155,6 @@ impl VectorIndex for BuggyDeleteVectorIndex {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-MUTANT-TEXT-001]
 /// Mutante TextIndex, bei dem Löschen eine No-Op ist.
 #[derive(Clone, Debug)]
 struct BuggyDeleteTextIndex(InMemoryTextIndex);
@@ -201,7 +198,6 @@ impl TextIndex for BuggyDeleteTextIndex {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-MUTANT-GRAPH-001]
 /// Mutante GraphIndex, bei dem `remove_edge` eine No-Op ist.
 #[derive(Clone, Debug)]
 struct BuggyRemoveEdgeGraphIndex(InMemoryGraphIndex);
@@ -262,7 +258,6 @@ impl GraphIndex for BuggyRemoveEdgeGraphIndex {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-MUTANT-CLOCK-001]
 /// Mutante Uhr, deren monotone Zeit bei jedem Abruf sinkt.
 #[derive(Debug)]
 struct DecreasingClock(AtomicU64);
@@ -278,7 +273,6 @@ impl Clock for DecreasingClock {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-MUTANT-RNG-001]
 /// Mutanter RNG, dessen `next_unit_f64` Werte außerhalb von [0.0, 1.0) liefert.
 #[derive(Debug)]
 struct OutOfBoundsRng(AtomicU64);
@@ -298,7 +292,6 @@ impl Rng for OutOfBoundsRng {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-MUTANT-METRICS-001]
 /// Mutante MetricsSink, die beim Zählen absichtlich panickt.
 #[derive(Debug)]
 struct PanickingMetricsSink;
@@ -317,7 +310,6 @@ impl MetricsSink for PanickingMetricsSink {
 // SELF-TESTS: REFERENCE GREEN & MUTANT RED
 // ============================================================================
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-STO-GREEN-001]
 // Prüft, dass die In-Memory-Speicher-Engine alle Verträge der StorageEngine-Suite besteht.
 #[tokio::test]
 async fn test_storage_engine_conformance_reference_green() {
@@ -328,7 +320,6 @@ async fn test_storage_engine_conformance_reference_green() {
     );
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-STO-RED-001]
 // Prüft, dass die Mutante mit defektem Delete zuverlässig als Fehler gemeldet wird.
 #[tokio::test]
 async fn test_storage_engine_conformance_mutant_red() {
@@ -345,7 +336,6 @@ async fn test_storage_engine_conformance_mutant_red() {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-VEC-GREEN-001]
 // Prüft, dass der In-Memory-Vektorindex alle Verträge der VectorIndex-Suite besteht.
 #[tokio::test]
 async fn test_vector_index_conformance_reference_green() {
@@ -356,7 +346,6 @@ async fn test_vector_index_conformance_reference_green() {
     );
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-VEC-RED-001]
 // Prüft, dass der Vektor-Mutant mit No-Op-Delete als ConformanceFailure erkannt wird.
 #[tokio::test]
 async fn test_vector_index_conformance_mutant_red() {
@@ -372,7 +361,6 @@ async fn test_vector_index_conformance_mutant_red() {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-TXT-GREEN-001]
 // Prüft, dass der In-Memory-Textindex alle Verträge der TextIndex-Suite erfüllt.
 #[tokio::test]
 async fn test_text_index_conformance_reference_green() {
@@ -383,7 +371,6 @@ async fn test_text_index_conformance_reference_green() {
     );
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-TXT-RED-001]
 // Prüft, dass der Text-Mutant mit No-Op-Delete als ConformanceFailure erkannt wird.
 #[tokio::test]
 async fn test_text_index_conformance_mutant_red() {
@@ -398,7 +385,6 @@ async fn test_text_index_conformance_mutant_red() {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-GRP-GREEN-001]
 // Prüft, dass der In-Memory-Graphindex alle Verträge der GraphIndex-Suite erfüllt.
 #[tokio::test]
 async fn test_graph_index_conformance_reference_green() {
@@ -409,7 +395,6 @@ async fn test_graph_index_conformance_reference_green() {
     );
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-GRP-RED-001]
 // Prüft, dass der Graph-Mutant mit fehlendem remove_edge als ConformanceFailure erkannt wird.
 #[tokio::test]
 async fn test_graph_index_conformance_mutant_red() {
@@ -425,7 +410,6 @@ async fn test_graph_index_conformance_mutant_red() {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-CLK-GREEN-001]
 // Prüft, dass die ManualClock alle Anforderungen der Clock-Suite besteht.
 #[test]
 fn test_clock_conformance_reference_green() {
@@ -437,7 +421,6 @@ fn test_clock_conformance_reference_green() {
     );
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-CLK-RED-001]
 // Prüft, dass eine Uhr mit rückläufiger Zeit die Suite fehlschlagen lässt.
 #[test]
 fn test_clock_conformance_mutant_red() {
@@ -452,7 +435,6 @@ fn test_clock_conformance_mutant_red() {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-RNG-GREEN-001]
 // Prüft, dass SeededRng alle Konformitätsprüfungen für Pseudozufall besteht.
 #[test]
 fn test_rng_conformance_reference_green() {
@@ -461,7 +443,6 @@ fn test_rng_conformance_reference_green() {
     assert!(res.is_ok(), "SeededRng must pass rng conformance: {res:?}");
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-RNG-RED-001]
 // Prüft, dass RNGs mit Werten außerhalb von [0, 1) als fehlerhaft erkannt werden.
 #[test]
 fn test_rng_conformance_mutant_red() {
@@ -476,7 +457,6 @@ fn test_rng_conformance_mutant_red() {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-MET-GREEN-001]
 // Prüft, dass TestMetricsSink die Konformitätsprüfung für Metriksenken besteht.
 #[test]
 fn test_metrics_sink_conformance_reference_green() {
@@ -488,7 +468,6 @@ fn test_metrics_sink_conformance_reference_green() {
     );
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-RUN-MET-RED-001]
 // Prüft, dass panickende Metriksenken als ConformanceFailure mit 'record_panic' diagnostiziert werden.
 #[test]
 fn test_metrics_sink_conformance_mutant_red() {

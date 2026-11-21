@@ -6,10 +6,6 @@
 //! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
 
-// FILE-CONTEXT
-// ZWECK: Bi-temporaler Validity-Filter für Post-RRF Fusion-Ergebnisse in Retrieval-Pipelines.
-// INVARIANTEN: Bi-temporale UND-Verknüpfung (System- & Businesszeit); [valid_from, valid_until) Intervallgrenzen; Fail-Open für Alt-Daten ohne Metadaten.
-// STAND: TS:2026-09-07T12:00:00Z
 
 //! Bi-temporal validity filtering module for search & fusion results.
 //!

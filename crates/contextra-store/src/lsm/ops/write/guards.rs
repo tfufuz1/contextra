@@ -1,6 +1,5 @@
 //! # Schreibpfad RAII-Guards (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: RAII-Guards zur Gewährleistung von Fail-Closed, Cancel-Safety und Rollback
 //! // INVARIANTEN: ADR-0XX-P0A, INV-STORE-1

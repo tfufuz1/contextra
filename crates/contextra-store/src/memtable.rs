@@ -3,10 +3,6 @@
 //! Verwaltet aktive Mutationen im Hauptspeicher mit sequenzbasierter
 //! Sortierung und MVCC-Unterstuetzung vor dem Schreiben auf Festplatte.
 
-// FILE-CONTEXT
-// STAND: 2026-08-30T15:00:19Z (SESSION: 283abf0f)
-// ZWECK: In-Memory BTreeMap MemTable-Sharding mit MVCC Snapshot-Isolation.
-// INVARIANTEN: Sharding per Range-Sharding über 2-Byte-Key-Präfixe für normale Keys, Hash-Sharding der Suffixe für reservierte Systempräfixe; tombstone via TOMBSTONE_BIT in seq_no.
 
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 

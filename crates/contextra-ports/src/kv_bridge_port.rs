@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: KvBridgeStorage Port-Trait (Ring 0) zur Abstraktion von Tier-2 KV-Cache Persistence für Ring-2 Adaptern.
-// INVARIANTEN: dyn-Safe vtable Layout via BoxFuture, Send + Sync Thread Safety, Zero-Panic.
 
 //! Key-Value Bridge Storage port trait for Tier 2 persistence decoupling.
 

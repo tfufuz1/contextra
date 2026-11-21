@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-HARDENING-ROOT]
 //! # Härtungs- und Concurrency-Tests für Serializable Snapshot Isolation (SSI)
 //!
 //! Prüft Pruning-Mechanik, atomares Validate-and-Record, Fail-Closed-Verhalten

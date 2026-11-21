@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Audit Benchmark Suite zur Ermittlung von Durchsatz, Speedup, Latenz-Perzentilen, Pareto-Front und RAM-Footprint
-// INVARIANTEN: Deterministische Eingaben via StdRng mit festen Seeds, keine Laufzeitzufallswerte im Benchmark-Setup
-// HOTSPOTS: 50-180
-// STAND: 2026-11-11
-// BEREICH: AGENTS §6, SPEC §11.4 — Empirische Leistungsprüfung des HNSW-Vektorindex
 
-// ANCHOR[contextra-vector:W11-BENCH-012]
 
 mod common;
 

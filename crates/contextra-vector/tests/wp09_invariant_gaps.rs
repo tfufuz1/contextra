@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Invarianten-Lücken-Tests für HNSW-Kern gemäß SPEC §11 & Root/Crate AGENTS.md §4.
-// INVARIANTEN: Zero-Panic, deterministische Seeds, Snapshot-Sichtbarkeit, k > N Handhabung, Wiederholtes Einfügen.
-// HOTSPOTS: 25-180
-// STAND: 2026-11-11
 
 //! Invarianten-Lücken-Suite für `contextra-vector`.
 //!
@@ -24,7 +19,6 @@ use contextra_vector::persistence::MmapIndex;
 use contextra_vector::types::DistanceMetric;
 use tempfile::tempdir;
 
-// ANCHOR[contextra-vector:W09-GAP-001]
 #[tokio::test]
 async fn test_gap_k_greater_than_index_size() {
     let config = HnswConfig {
@@ -68,7 +62,6 @@ async fn test_gap_k_greater_than_index_size() {
     assert_eq!(results[0].doc_id, DocId::new(1));
 }
 
-// ANCHOR[contextra-vector:W09-GAP-002]
 #[tokio::test]
 async fn test_gap_snapshot_visibility_mvcc() {
     let config = HnswConfig {
@@ -129,7 +122,6 @@ async fn test_gap_snapshot_visibility_mvcc() {
     );
 }
 
-// ANCHOR[contextra-vector:W09-GAP-003]
 #[tokio::test]
 async fn test_gap_duplicate_docid_reinsertion() {
     let config = HnswConfig {
@@ -162,7 +154,6 @@ async fn test_gap_duplicate_docid_reinsertion() {
     assert!(res[0].score > 0.99, "Updated vector score should match");
 }
 
-// ANCHOR[contextra-vector:W09-GAP-004]
 #[tokio::test]
 async fn test_gap_persistence_roundtrip_post_deletion() {
     let dir = tempdir().expect("tempdir");
@@ -203,7 +194,6 @@ async fn test_gap_persistence_roundtrip_post_deletion() {
     assert!(mmap.header.entry_point() >= 0);
 }
 
-// ANCHOR[contextra-vector:W09-GAP-005]
 #[test]
 fn test_gap_nan_validation() {
     let valid = vec![1.0, 2.0, 3.0];

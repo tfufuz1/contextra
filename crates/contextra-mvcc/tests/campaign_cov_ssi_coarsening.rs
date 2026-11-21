@@ -1,13 +1,8 @@
-// ANCHOR[contextra-mvcc:TEST-CAMPAIGN-COV-SSI-ROOT]
 //! # Kampagnen-Test für SSI-Coarsening und Pruning-Blocker-Diagnose
 //!
 //! Prüft die gezielte Testabdeckung des Schwellenwerts (80 % Kapazität) im
 //! `SequenceLogSsiValidator` und verifiziert die Diagnose aktiver Snapshot-Blocker.
 
-// FILE-CONTEXT
-// ZWECK: Campaign coverage test for SequenceLogSsiValidator coarsening and pruning blocker diagnostics.
-// INVARIANTEN: Coarsening occurs at 80% capacity limit without false negatives for write-skew detection.
-// NICHT-OFFENSICHTLICH: Uses independent oracle (R4) validating fail-closed conflict classification post-coarsening.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

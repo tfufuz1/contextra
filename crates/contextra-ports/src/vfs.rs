@@ -8,7 +8,6 @@
 //! all file system I/O operations in storage, engine, and index layers must interact
 //! exclusively through this abstract VFS interface.
 //!
-//! // ANCHOR[contextra-ports:VFS-001]
 //! // SECTION vfs-contracts
 //! // NOTE: Vfs ist synchron gehalten (SPEC §10 K1, B08), um Blockaden im async-Kontext
 //! // via spawn_blocking handhabbar zu machen und deterministische Durability zu sichern.
@@ -20,7 +19,6 @@ use crate::Result;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-// ANCHOR[contextra-ports:VFS-TYPES-001]
 /// Method via which medium verification was performed (SPEC D-113).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VerifiedVia {
@@ -68,7 +66,6 @@ impl VfsOpenOptions {
     }
 }
 
-// ANCHOR[contextra-ports:VFS-FILE-001]
 /// Abstract file handle providing positional I/O without modifying internal file offsets.
 pub trait VfsFile: Send + Sync {
     /// Reads data from byte offset `offset` into `buf` without moving the file pointer.
@@ -155,7 +152,6 @@ pub trait VfsFile: Send + Sync {
     fn sync_all(&self) -> std::io::Result<()>;
 }
 
-// ANCHOR[contextra-ports:VFS-TRAIT-001]
 /// Abstract object-safe Virtual File System interface.
 ///
 /// Implements required file operations for LSM storage engine, SSTables, WAL sidecars,

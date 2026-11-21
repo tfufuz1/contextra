@@ -1,6 +1,5 @@
 //! # Asynchroner WalObserver Adapter (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Non-blocking, bounded async wrapper fuer WalObserver
 //! // INVARIANTEN: Tokio Task Isolation

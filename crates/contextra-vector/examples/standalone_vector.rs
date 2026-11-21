@@ -1,16 +1,9 @@
-// FILE-CONTEXT
-// ZWECK: Eigenständiges Anwendungsbeispiel für contextra-vector (HNSW-Indexierung und Suche)
-// INVARIANTEN: Nur öffentliche API, deterministischer Ablauf, Zero-Panic
-// HOTSPOTS: 25-65
-// STAND: 2026-11-11
-// BEREICH: AGENTS §1.1, SPEC §2 — Autarker Einsatz des Vektorindex über öffentliche Schnittstellen
 
 //! Eigenständiges Beispiel für `contextra-vector`.
 //!
 //! Demonstriert die autarke Verwendung von HNSW-Indexierung und Vektorsuche
 //! über den standardisierten `VectorIndex`-Port.
 
-// ANCHOR[contextra-vector:W11-EXM-001]
 
 use contextra_ports::VectorIndex;
 use contextra_types::{DocId, TxId};

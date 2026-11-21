@@ -1,15 +1,9 @@
-// FILE-CONTEXT
-// ZWECK: Gemeinsame Hilfsfunktionen und deterministische Datensatzgeneratoren für Benchmarks
-// INVARIANTEN: Deterministische Pseudozufallserzeugung über feste Seeds (kein thread_rng, kein Instant::now im Setup)
-// HOTSPOTS: 20-80
-// STAND: 2026-11-11
 
 //! Gemeinsame Benchmark-Hilfsmittel für `contextra-vector`.
 //!
 //! Stellt deterministische Vektor- und ID-Generatoren mit festen Seeds bereit,
 //! um reproduzierbare Benchmark-Läufe zu garantieren.
 
-// ANCHOR[contextra-vector:W11-BENCH-001]
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};

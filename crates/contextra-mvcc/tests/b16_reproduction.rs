@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-B16-ROOT]
 //! # Regressionstests für Befund B-16 (Kapazitätserschöpfung und Coarsening)
 //!
 //! Verifiziert, dass das Erreichen von `DEFAULT_MAX_TRACKED_COMMIT_KEYS` nicht mehr

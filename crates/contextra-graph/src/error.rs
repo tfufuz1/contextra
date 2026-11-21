@@ -1,9 +1,4 @@
 //! Error taxonomy and Result types for `contextra-graph` (Klasse A, B4).
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Kanonische Fehler-Taxonomie GraphError und GraphMutationError.
-// INVARIANTEN: thiserror-basierte typisierte Fehlerbehandlung, zero-panic, bitgleiche Fehlermeldungen.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 
@@ -12,13 +7,11 @@ use thiserror::Error;
 // SECTION Error Core Implementation
 
 /// Crate-level Result type.
-// ANCHOR[contextra-graph:SRC-ERROR-001]
 pub type Result<T, E = GraphError> = std::result::Result<T, E>;
 
 /// Canonical error taxonomy for `contextra-graph`.
 #[derive(Debug, Error)]
 #[non_exhaustive]
-// ANCHOR[contextra-graph:SRC-ERROR-002]
 pub enum GraphError {
     /// Invalid input parameter or argument.
     #[error("Invalid input: {0}")]
@@ -68,7 +61,6 @@ impl From<contextra_ids::IdError> for GraphError {
 /// Detailed errors occurring during graph mutations.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
-// ANCHOR[contextra-graph:SRC-ERROR-003]
 pub enum GraphMutationError {
     /// Lock acquisition timed out.
     #[error("Lock acquisition timed out: {0}")]

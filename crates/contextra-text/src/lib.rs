@@ -1,12 +1,6 @@
 #![deny(missing_docs)]
 #![allow(deprecated)]
 #![deny(dead_code)]
-// FILE-CONTEXT: Layer 1 text search integration facade (contextra-text).
-// ZWECK: Exportiert Bm25Scorer, InvertedIndex, Morphologie-Tools und BM25-Modelle für DB-Hybrid-Suche.
-// INVARIANTEN: #![forbid(unsafe_code)], TextIndex-Trait Implementierung ist fully async & transaction-aware.
-// NICHT-OFFENSICHTLICH: Scorer delegiert direkt an InvertedIndex; MVCC & Lock-Free Storage durch StorageEngine.
-// HOTSPOTS: Bm25Scorer::search, Bm25Scorer::insert
-// STAND: TS:2026-09-09T13:22:45Z (SESSION: dc71d70)
 
 //! Hybrid Search Engine & BM25 Scoring (WP-2.1)
 //!

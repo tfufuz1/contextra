@@ -1,6 +1,5 @@
 //! # Einzelne Schreib- und Löschoperationen (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Einzelne Schreiboperationen put, put_if_absent, delete, delete_prefix
 //! // INVARIANTEN: INV-STORE-1, INV-STORE-5

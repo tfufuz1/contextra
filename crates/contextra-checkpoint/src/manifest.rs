@@ -28,7 +28,6 @@ use serde::{Deserialize, Serialize};
 /// Fault-Injection-Tests in
 /// tests/manifest_fault_injection.rs beweisen atomare Schreib-Semantik
 /// und Tamper-Erkennung via Blake3-Checksum.
-// ANCHOR[contextra-checkpoint:MAN-001]
 /// Kryptografisch gesichertes Manifest eines gespeicherten Checkpoints.
 ///
 /// # Zweck
@@ -50,7 +49,6 @@ pub struct CheckpointManifest {
 }
 
 impl CheckpointManifest {
-    // ANCHOR[contextra-checkpoint:MAN-002]
     /// Erzeugt ein neues [`CheckpointManifest`] und berechnet die BLAKE3-Prüfsumme.
     ///
     /// # Vorbedingungen
@@ -88,7 +86,6 @@ impl CheckpointManifest {
         })
     }
 
-    // ANCHOR[contextra-checkpoint:MAN-003]
     /// Verifiziert die Integrität des Manifests anhand der gespeicherten Prüfsumme.
     ///
     /// # Ablauf von `verify`:

@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-TX-BUFFER-BYTE-BUDGET-ROOT]
 //! # Byte-Budget- und Speichergrenzen-Tests für den `TxBuffer`
 //!
 //! Stellt sicher, dass das Überschreiten des Byte-Budgets pro Transaktion und

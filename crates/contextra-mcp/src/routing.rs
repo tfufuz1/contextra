@@ -1,7 +1,6 @@
 // =========================================================================
 // SECTION: routing
 // =========================================================================
-// ANCHOR[contextra-mcp:ROUTING-001]
 use crate::config::RouterConfig;
 use contextra::Contextra;
 use contextra_types::ContextraError;

@@ -1,9 +1,6 @@
 //! # Benchmark-Suite: Löschbeweis-Latenz (`benches/deletion_proof_latency_bench.rs`)
 //!
 //! Misst Erstellungs- und Verifikationszeiten für DSGVO-Löschzertifikate unter Last.
-// FILE-CONTEXT
-// ZWECK: Criterion benchmark for cryptographic deletion proof issuance and verification latency.
-// INVARIANTEN: Measures cryptographic portion only (proof creation + signature verification + audit export)
 //              without storage physical cleanup overhead.
 // STAND: TS:2026-09-25T15:10:00Z
 

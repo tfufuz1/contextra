@@ -1,14 +1,7 @@
-// FILE-CONTEXT
-// ZWECK: Prädikatsagnostischer Suchpfad (ACORN-Muster, Patel et al. 2024).
-// INVARIANTEN: FilteredIndex Trait; Zero Panic; Ring-0 Algorithmen.
-// HOTSPOTS: FilteredIndex::search_knn_acorn, AcornError
-// STAND: 2026-11-12
 
 // SECTION Submodule & Re-Exports
 
-// ANCHOR[contextra-vector:ACORN-MOD-GAMMA]
 pub mod gamma_augmentation;
-// ANCHOR[contextra-vector:ACORN-MOD-NAIVE]
 pub mod naive_reference;
 
 pub use gamma_augmentation::compute_gamma_edge_budget;
@@ -20,7 +13,6 @@ use thiserror::Error;
 
 // SECTION Trait & Fehler-Definitionen
 
-// ANCHOR[contextra-vector:ACORN-TRAIT-FILTERED-INDEX]
 /// Prädikatsagnostischer Suchpfad (ACORN-Muster, Patel et al. 2024).
 /// Im Gegensatz zu Post-Filtering wird das Prädikat WÄHREND der Graph-Traversal ausgewertet,
 /// mit erhöhter Kantenzahl (γ-Augmentierung) zur Konnektivitätssicherung bei hoher Selektivität.
@@ -36,7 +28,6 @@ pub trait FilteredIndex {
     ) -> Result<Vec<(DocId, f32)>, AcornError>;
 }
 
-// ANCHOR[contextra-vector:ACORN-ERROR]
 /// Errors occurring during ACORN search or graph traversal operations.
 #[derive(Debug, Error)]
 pub enum AcornError {

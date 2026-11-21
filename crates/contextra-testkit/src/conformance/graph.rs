@@ -14,7 +14,6 @@ use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::future::Future;
 
-// ANCHOR[contextra-testkit:CONF-GRAPH-SUITE-001]
 /// Führt die vollständige Konformitätsprüfung für eine [`GraphIndex`]-Implementierung durch.
 ///
 /// **Parameter:**

@@ -11,12 +11,6 @@
 //! - `FusionStrategy`: Fusionsalgorithmen (RRF = Reciprocal Rank Fusion, Score-Normalisierung).
 //! - `ContextChunk` & `ContextWindow`: Für LLMs aufbereitete Textsegmente inklusive Tokenzählung und Zettelkasten-Links.
 
-// FILE-CONTEXT
-// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
-// ZWECK: Multi-Signal HybridQuery, FusionWeights, ContextWindow und ContextChunk Repräsentation.
-// INVARIANTEN: FusionWeights::new normalisiert die Summe auf ~1.0 (Summe in [0.999, 1.001]).
-// HOTSPOTS: 30-320
-// NICHT-OFFENSICHTLICH: metadata signal weight ist in FusionWeights reserviert und liefert via pub fn metadata() 0.0 zurück.
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-021)
 
 #[allow(deprecated)]
@@ -27,7 +21,6 @@ use serde::{Deserialize, Serialize};
 
 /// Strategy used for search result signal fusion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-FUSIONSTRAT]
 pub enum FusionStrategy {
     /// Reciprocal Rank Fusion (default strategy per ADR-003).
     /// Robust against score scale mismatch and partial signal degradation.
@@ -40,7 +33,6 @@ pub enum FusionStrategy {
 
 /// Strategy configuration mapping per retrieval signal (vector, text, graph).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-// ANCHOR[contextra-types:SAOS-SIGNALSTRAT]
 pub struct SignalFusionStrategies {
     /// Strategy used for vector search signal fusion.
     pub vector: FusionStrategy,
@@ -123,7 +115,6 @@ impl<'de> Deserialize<'de> for SignalFusionStrategies {
 
 /// Strategy used for graph retrieval in hybrid search queries.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-GRAPHTRAV]
 pub enum GraphTraversalStrategy {
     /// Multi-hop BFS traversal with hop score decay (default max_hops = 3).
     Hops {
@@ -150,7 +141,6 @@ impl Default for GraphTraversalStrategy {
 
 /// Normalized fusion weights for hybrid search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-WEIGHTS]
 pub struct FusionWeights {
     vector: f32,
     text: f32,
@@ -228,7 +218,6 @@ impl FusionWeights {
 
 /// A chunk of context for LLM budget allocation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-CHUNK]
 pub struct ContextChunk {
     /// Document identifier associated with this chunk.
     pub doc_id: DocId,
@@ -287,7 +276,6 @@ impl ContextChunk {
 
 /// An aggregated context window constrained by a token budget.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-WINDOW]
 pub struct ContextWindow {
     /// List of included context chunks.
     pub chunks: Vec<ContextChunk>,
@@ -317,7 +305,6 @@ impl std::fmt::Display for ContextWindow {
 /// Im Gegensatz dazu ist `contextra_rank::fusion::types::Signal` eine interne Signal-Repräsentation
 /// der Rank-Engine zur Gewichtsmodulation und Z-Score/RRF-Kalibrierung.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-SIGNAL]
 pub enum Signal {
     /// Dense vector embedding search signal.
     Vector,
@@ -350,7 +337,6 @@ impl std::fmt::Display for Signal {
 /// *Note*: An empty but valid result from a signal (e.g. no documents matched lexical text or zero vector)
 /// is NOT a signal failure and does not trigger this behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-FAILPOLICY]
 pub enum OnSignalFailure {
     /// Abort hybrid search and return an error on signal failure (Default per Spec Teil 6.5 P1).
     #[default]
@@ -361,7 +347,6 @@ pub enum OnSignalFailure {
 
 /// Output of a query rewriter containing text, semantic, and graph anchor reformulations.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-REWRITE]
 pub struct QueryRewriteOutput {
     /// Textual reformulation intended for lexical keyword search.
     pub text_query: Option<String>,
@@ -408,7 +393,6 @@ impl QueryRewriteOutput {
 
 /// Evaluated result for hybrid/4-signal search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-SCOREDENTRY]
 pub struct ScoredEntry {
     /// Unique result identifier.
     pub id: String,
@@ -420,7 +404,6 @@ pub struct ScoredEntry {
 
 /// A unified query traversing multiple index signals.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-HYBRIDQUERY]
 pub struct HybridQuery {
     /// Optional full-text query string.
     pub text_query: Option<String>,
@@ -489,7 +472,6 @@ impl HybridQuery {
 /// an eine aktive `Collection`-Instanz mit Storage- und Vektorindex-Handles gebunden und führt
 /// die Abfrage über `.execute()` direkt auf der Datenbank aus.
 #[derive(Default)]
-// ANCHOR[contextra-types:SAOS-BUILDER]
 pub struct HybridQueryBuilder {
     text_query: Option<String>,
     vector_query: Option<Vec<f32>>,

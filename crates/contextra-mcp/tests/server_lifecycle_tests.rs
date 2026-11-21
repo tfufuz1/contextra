@@ -2,7 +2,6 @@
 // =========================================================================
 // SECTION: server_lifecycle_tests
 // =========================================================================
-// ANCHOR[contextra-mcp:ITEST-SERVER-LIF-001]
 
 use contextra::Contextra;
 use contextra_mcp::egress_gateway::DefaultEgressClassifier;

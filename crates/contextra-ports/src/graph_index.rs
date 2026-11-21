@@ -5,7 +5,6 @@
 //!
 //! Abstrakter Vertrag für CSR-basierte Entity-Relation-Graph-Operationen (z. B. in `contextra-graph`).
 //!
-//! // ANCHOR[contextra-ports:GRAPH-001]
 //! // SECTION graph-index-contracts
 //! // NOTE: Verwendet BoxFuture für dyn-Safety und vielseitige Traversierungsalgorithmen (BFS, PPR, PathRAG).
 //! // Invarianten:
@@ -17,7 +16,6 @@ use crate::types::{Edge, Entity, EntityId, PprConfig, TxId};
 use crate::Result;
 use ahash::AHashMap;
 
-// ANCHOR[contextra-ports:GRAPH-TRAIT-001]
 /// Graph-Index Trait — CSR-basierte Entity-Relation-Traversal.
 ///
 /// # Dyn-Kompatibilität
@@ -308,7 +306,6 @@ pub trait GraphIndex: Send + Sync + 'static {
     fn stats<'a>(&'a self) -> BoxFuture<'a, Result<GraphIndexStats>>;
 }
 
-// ANCHOR[contextra-ports:GRAPH-STATS-001]
 /// Statistics for the GraphIndex layer.
 #[derive(Debug, Clone)]
 pub struct GraphIndexStats {
@@ -320,7 +317,6 @@ pub struct GraphIndexStats {
     pub memory_usage_bytes: usize,
 }
 
-// ANCHOR[contextra-ports:COMMUNITY-RES-001]
 /// Contract for resolving graph community assignments for entities.
 pub trait CommunityResolver: Send + Sync {
     /// Resolves the optional community ID for a given entity.

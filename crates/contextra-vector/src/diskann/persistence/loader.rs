@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Laden des DiskANN-Indexes aus Speicherabbildung (WP-VEC-07).
-// INVARIANTEN: Zero-Panic bei korruptem Header/Footer; Bounds-Prüfungen vor Slice-Zugriff.
-// STAND: 2026-11-11
 
 use std::sync::Arc;
 use subtle::ConstantTimeEq;

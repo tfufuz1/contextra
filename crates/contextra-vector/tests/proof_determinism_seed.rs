@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Beweis für deterministische Grapherzeugung und Suchresultate bei gleichem Seed.
 
 use contextra_ports::VectorIndex;
 use contextra_types::{DistanceMetric, DocId, TxId};

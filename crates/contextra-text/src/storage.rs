@@ -1,5 +1,4 @@
 //! Lokales Trait `PostingStore` für Speicherung und Abruf von Posting-Listen und Metadaten (SPEC §6.2 text, B04).
-// ANCHOR[contextra-text:STORE-001]
 
 use bytes::Bytes;
 use contextra_ids::TxId;

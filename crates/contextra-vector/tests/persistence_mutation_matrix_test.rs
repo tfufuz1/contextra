@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Persistenz Mutationsmatrix-Test (Header- und Offset-Beschädigung).
 
 use contextra_vector::persistence::{write_atomic, HnswHeader};
 use tempfile::tempdir;

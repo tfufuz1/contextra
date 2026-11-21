@@ -8,7 +8,6 @@ use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::EntityId;
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-PAYLOAD-SHARING-001]
 #[test]
 fn test_hyperedge_payload_sharing_arc_ptr_eq() {
     let bindings: Arc<[RoleBinding]> = Arc::from(vec![

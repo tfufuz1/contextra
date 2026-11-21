@@ -1,10 +1,5 @@
 //! Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Topologisches Lovász-High-Order-Diffusionsverfahren.
-// INVARIANTEN: Submodulare Optimierung, schattenmodus-fähig.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::error::TlHfdError;
@@ -14,7 +9,6 @@ use super::error::TlHfdError;
 /// # Complexity
 /// Time complexity of parameter validation is $O(1)$.
 #[derive(Debug, Clone, PartialEq)]
-// ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-001]
 
 // SECTION Params Core Implementation
 pub struct TlHfdParams {
@@ -53,7 +47,6 @@ impl TlHfdParams {
     ///
     /// # Complexity
     /// Time complexity $O(1)$.
-    // ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-002]
     pub fn validate(&self) -> Result<(), TlHfdError> {
         if !self.sigma.is_finite() || self.sigma <= 0.0 {
             return Err(TlHfdError::InvalidParameter(format!(
@@ -99,14 +92,12 @@ impl TlHfdParams {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-003]
     #[test]
     fn test_default_params_valid() {
         let params = TlHfdParams::default();
         assert!(params.validate().is_ok());
     }
 
-    // ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-004]
     #[test]
     fn test_invalid_params() {
         let p = TlHfdParams {

@@ -2,11 +2,6 @@
 //!
 //! Parameter fuer Ebenengroessen, Multiplikatoren und Tombstone-Grenzwerte.
 
-// FILE-CONTEXT
-// STAND: 2026-09-11T10:21:34Z (SESSION: 31ada253)
-// ZWECK: Size-Tiered Compaction Strategy (STCS) für SSTables
-// INVARIANTEN: Compaction bereinigt nur Tombstones, die von keinem gepinnten Snapshot mehr benötigt werden
-// NICHT-OFFENSICHTLICH: Multi-Version-Merging behält die höchste Sequence Number
 // SIEHE AUCH: lsm.rs, sstable.rs, DECISIONS.md
 
 // Background compaction engine for the LSM-Tree.
@@ -30,11 +25,6 @@
 // Tombstones are garbage-collected during merge when no active snapshot
 // references them.
 
-// FILE-CONTEXT
-// STAND: 2026-08-30T21:49:55Z (SESSION: 283abf0f)
-// ZWECK:       STCS-Compaction-Engine (Size-Tiered Compaction Strategy)
-// INVARIANTEN: Compaction must not block concurrent reads, tombstone GC safe with active snapshot min_seqno, atomic SSTable swap
-// HOTSPOTS:    compact_sstables(), merge_sorted_iters()
 // SIEHE AUCH:  crates/contextra-store/AGENTS.md
 
 use serde::{Deserialize, Serialize};

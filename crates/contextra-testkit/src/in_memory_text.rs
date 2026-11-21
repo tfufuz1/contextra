@@ -17,7 +17,6 @@ use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-// ANCHOR[contextra-testkit:STAGED-TEXT-OP-ENUM-001]
 /// Unbestätigte Text-Operation innerhalb einer Transaktion.
 #[derive(Debug, Clone)]
 enum StagedTextOp {
@@ -32,7 +31,6 @@ type TextMap = BTreeMap<DocId, String>;
 /// Staging-Puffer: Transaktions-ID -> (Dokument-ID -> StagedTextOp).
 type StagedTextTxMap = BTreeMap<TxId, BTreeMap<DocId, StagedTextOp>>;
 
-// ANCHOR[contextra-testkit:IN-MEM-TEXT-STRUCT-001]
 /// Thread-sichere In-Memory-Referenzimplementierung von [`TextIndex`] für Tests.
 ///
 /// **Zweck:** Ermöglicht Volltext- und Stichwortsuchen in Tests ohne externe
@@ -58,13 +56,11 @@ impl Default for InMemoryTextIndex {
 }
 
 impl InMemoryTextIndex {
-    // ANCHOR[contextra-testkit:IN-MEM-TEXT-NEW-001]
     /// Erstellt einen neuen, leeren `InMemoryTextIndex`.
     pub fn new() -> Self {
         Self::default()
     }
 
-    // ANCHOR[contextra-testkit:IN-MEM-TEXT-NORM-001]
     /// Normalisiert Zeichenketten: Wandelt in Kleinbuchstaben um und ersetzt deutsche Umlaute.
     fn normalize_term(term: &str) -> String {
         term.to_lowercase()
@@ -75,7 +71,6 @@ impl InMemoryTextIndex {
     }
 }
 
-// ANCHOR[contextra-testkit:IN-MEM-TEXT-TRAIT-IMPL-001]
 impl TextIndex for InMemoryTextIndex {
     /// Stellt das Einfügen eines Textdokuments für Transaktion `tx` bereit.
     async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {
@@ -138,7 +133,6 @@ impl TextIndex for InMemoryTextIndex {
         Ok(*self.last_tx.read())
     }
 
-    // ANCHOR[contextra-testkit:IN-MEM-TEXT-SEARCH-001]
     /// Durchsucht den Index nach Dokumenten, die die Token der Suchanfrage enthalten.
     ///
     /// **Ablauf:**

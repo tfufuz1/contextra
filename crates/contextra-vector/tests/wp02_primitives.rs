@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Grenzwert-, Property- und Determinisums-Tests für Kern-Primitive (WP-VEC-02).
-// INVARIANTEN: Zero-Panic, deterministische FixedHasher-Golden-Hashes, Breitenverhalten DocId/TxId.
-// HOTSPOTS: test_casting_boundary_limits, test_fixed_hasher_determinism_golden_corpus, test_types_constants_and_ids
-// STAND: 2026-11-11
 
 use contextra_vector::casting::*;
 use contextra_vector::fixed_hasher::{fixed_hasher, new_fixed_hashmap, new_fixed_hashset};

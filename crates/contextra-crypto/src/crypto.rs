@@ -9,12 +9,6 @@
 //! - Bei Speicherfreigabe (`Drop`) werden alle Schlüsselmaterialien genullt (`Zeroize`).
 //! - Strikte Panic-Freiheit in allen Produktionspfaden.
 
-// FILE-CONTEXT
-// ZWECK: Key Management and AES-256-GCM-SIV authenticated encryption for Contextra data structures.
-// INVARIANTEN: Nonce prefix (4 bytes) + monotonic counter suffix (8 bytes) per encrypt_auto_nonce call. HKDF-Expand per file_id.
-// NICHT-OFFENSICHTLICH: AES-256-GCM-SIV provides nonce-misuse resistance (RFC 8452). Keys zeroized on drop. Lock-free & I/O-free.
-// HOTSPOTS: [50-150]
-// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 //! Encryption utilities for Contextra.
 //!
@@ -57,7 +51,6 @@ use std::sync::OnceLock;
 use zeroize::Zeroizing;
 
 /// Manager for encryption keys and block encryption.
-// ANCHOR[contextra-crypto:CRY-002]
 /// Zentraler kryptographischer Schlüsselmanager für symmetrische Verschlüsselung.
 ///
 /// Hält den Master-Key im RAM, leitet per HKDF-Expand datei- und mandantenspezifische
@@ -917,7 +910,6 @@ mod tests {
         );
     }
 
-    // ANCHOR[TEST:CRY-001] STATUS:DONE (TS:2026-08-31T21:13:05Z) (SESSION:8427f167) — Nonce-Uniqueness verification bei paralleler Verschlüsselung
     // REVIEW-PASS[1/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-08-30T19:00:00Z) (SESSION: b8e4f1a2)
     // PRÜFER-KONTEXT: FRESH
     // BEFUND: Parallel encryption nonce uniqueness verified across concurrent threads.

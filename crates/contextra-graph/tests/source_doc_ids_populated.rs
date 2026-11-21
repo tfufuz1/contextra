@@ -9,7 +9,6 @@ use contextra_ports::GraphIndex;
 use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:TESTS-SOURCE-DOC-IDS-POPULATED-001]
 #[tokio::test]
 async fn proof_source_doc_ids_set_after_compact() {
     let graph = Arc::new(CsrGraph::new());
@@ -60,7 +59,6 @@ async fn proof_source_doc_ids_set_after_compact() {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-SOURCE-DOC-IDS-POPULATED-002]
 #[tokio::test]
 async fn proof_source_doc_ids_empty_before_first_compact() {
     let graph = Arc::new(CsrGraph::new());
@@ -97,7 +95,6 @@ async fn proof_source_doc_ids_empty_before_first_compact() {
     assert_eq!(graph.source_doc_id_at(id_a, id_b), Some(doc_id));
 }
 
-// ANCHOR[contextra-graph:TESTS-SOURCE-DOC-IDS-POPULATED-003]
 #[tokio::test]
 async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
     let graph = Arc::new(CsrGraph::new());

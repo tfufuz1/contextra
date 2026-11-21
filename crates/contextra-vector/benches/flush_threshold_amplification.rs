@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Benchmark für Write-Amplification und p95-Latenz in DiskANN
-// INVARIANTEN: Deterministische Vektoren über festen Seed, kontrollierte I/O-Messung
-// HOTSPOTS: 60-150
-// STAND: 2026-11-11
-// BEREICH: AGENTS §6, SPEC §11.4 — Write-Amplification und Flush-Threshold-Trade-offs
 
-// ANCHOR[contextra-vector:W11-BENCH-011]
 
 #[cfg(feature = "experimental-diskann")]
 use std::fs;

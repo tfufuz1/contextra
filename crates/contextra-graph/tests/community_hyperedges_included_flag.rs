@@ -10,7 +10,6 @@ use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::collections::HashMap;
 
-// ANCHOR[contextra-graph:TESTS-COMMUNITY-HYPEREDGES-INCLUDED-FLAG-001]
 #[tokio::test]
 async fn test_community_hyperedges_included_flag_effect() {
     let graph = CsrGraph::new();

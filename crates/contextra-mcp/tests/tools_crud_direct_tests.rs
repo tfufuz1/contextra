@@ -2,7 +2,6 @@
 // =========================================================================
 // SECTION: tools_crud_direct_tests
 // =========================================================================
-// ANCHOR[contextra-mcp:ITEST-TOOLS-CRUD-001]
 
 use contextra::Contextra;
 use contextra_mcp::protocol::JsonRpcRequest;

@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Concurrency & Unveränderlichkeitstest für Quantisierer unter parallelem Zugriff.
 
 use contextra_vector::quantize::ScalarQuantizer;
 use std::sync::Arc;

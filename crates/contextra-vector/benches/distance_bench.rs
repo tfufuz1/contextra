@@ -1,11 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Criterion-Benchmark für Distanzfunktionen (Cosine, Euclidean, Dot Product; SIMD vs. Skalar)
-// INVARIANTEN: Deterministische Eingaben über festen Seed (INV-INDEX-APPLY-1), keine Laufzeitzufallswerte
-// HOTSPOTS: 25-65
-// STAND: 2026-11-11
-// BEREICH: AGENTS §6, SPEC §11.4 — Vektordistanzen mit Skalar-Fallback und SIMD-Beschleunigung
 
-// ANCHOR[contextra-vector:W11-BENCH-002]
 
 mod common;
 

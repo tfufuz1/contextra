@@ -1,5 +1,4 @@
 //! Kompatibilitätsmodul für Ports und Workspace-Integration (SPEC §6.2 text, B04).
-// ANCHOR[contextra-text:COMPAT-002]
 
 pub mod error;
 pub mod inverted_ports;

@@ -34,7 +34,6 @@ impl LlmTextGenerator for MockLlmTextGenerator {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-LLM-TEST-001]
 #[tokio::test]
 async fn test_validate_candidates_llm_budget_guard() {
     let doc = DocId::from_key("doc-1").unwrap();
@@ -70,7 +69,6 @@ async fn test_validate_candidates_llm_budget_guard() {
     );
 }
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-LLM-TEST-002]
 #[tokio::test]
 async fn test_validate_candidates_llm_success() {
     let doc = DocId::from_key("doc-1").unwrap();
@@ -108,7 +106,6 @@ async fn test_validate_candidates_llm_success() {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-LLM-TEST-003]
 #[tokio::test]
 async fn test_validate_candidates_llm_rejection() {
     let doc = DocId::from_key("doc-1").unwrap();

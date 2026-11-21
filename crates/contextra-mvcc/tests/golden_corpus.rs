@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-GOLDEN-CORPUS]
 //! # Golden- und Differenz-Korpus für `contextra-mvcc` (MV1.2, SPEC-v2 §5.1)
 #![allow(unexpected_cfgs)]
 #![allow(

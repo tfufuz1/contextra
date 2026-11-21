@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: DiskANN Tombstones mit 128-Bit DocId Validierung.
-// INVARIANTEN: DocIds mit unterschiedlichen oberen 64 Bits werden sauber getrennt und Tombstones persistiert.
-// HOTSPOTS: 25-80
-// STAND: 2026-11-12
 
 #![cfg(feature = "experimental-diskann")]
 #![forbid(unsafe_code)]

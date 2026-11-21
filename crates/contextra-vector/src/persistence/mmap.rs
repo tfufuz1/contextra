@@ -1,9 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: mmap-basiertes Lesen für HNSW Vektor-Indizes.
-// INVARIANTEN: Zero-Panic bei Deserialisierung; checked Arithmetik gegen Overflow und OOB; fail-closed.
-// NICHT-OFFENSICHTLICH: MmapIndex hält read-only FD; Schreibvorgänge laufen atomar über .tmp und Rename.
-// HOTSPOTS: persistence/mmap.rs (MmapIndex::open, get_node_record, get_vector, get_connections)
-// STAND: TS:2026-11-12T00:00:00Z
 
 use super::{HnswHeader, NodeRecord};
 use crate::error::{Result, VectorError};

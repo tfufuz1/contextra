@@ -7,7 +7,6 @@ use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use contextra_types::{Entity, EntityId, ResourceBudget, ResourceTracker};
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:TESTS-IP08-RESOURCE-TRACKER-TEST-001]
 #[tokio::test]
 async fn test_compact_async_resource_tracker_budget_exhaustion() {
     // 1. Create a ResourceTracker with 100 bytes memory limit

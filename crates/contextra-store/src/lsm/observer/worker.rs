@@ -1,6 +1,5 @@
 //! # Bounded Observer Worker & Hintergrund-Thread (Ring 1)
 //!
-//! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Bounded Channel & Circuit Breaker fuer WalObserver
 //! // INVARIANTEN: Fail-open Semantik, Panic-Isolation

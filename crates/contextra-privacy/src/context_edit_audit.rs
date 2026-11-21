@@ -19,7 +19,6 @@
 use crate::types::{Clock, TenantId};
 use serde::{Deserialize, Serialize};
 
-// ANCHOR[contextra-privacy:CEA-001]
 /// Art der Kontext-Änderung am temporären Agenten-Scratchpad.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ContextEditKind {
@@ -33,7 +32,6 @@ pub enum ContextEditKind {
     CheckpointReset,
 }
 
-// ANCHOR[contextra-privacy:CEA-002]
 /// Lokaler Fehlertyp für Audit-Ketten-Verifizierungsfehler.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ContextEditAuditError {
@@ -46,7 +44,6 @@ pub enum ContextEditAuditError {
     },
 }
 
-// ANCHOR[contextra-privacy:CEA-003]
 /// Eingabe-Parameter zur Erstellung eines Audit-Datensatzes für eine Kontext-Änderung.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContextEditInput {
@@ -64,7 +61,6 @@ pub struct ContextEditInput {
     pub subgoal_index: u64,
 }
 
-// ANCHOR[contextra-privacy:CEA-004]
 /// Nachvollziehbarer, kryptografisch verketteter Audit-Datensatz für eine Änderung am temporären Agenten-Kontext.
 ///
 /// **Sicherheitsgarantie:** Enthält keinen Klartext des Scratchpad-Inhalts (nur Längen, Hashes und Labels).
@@ -90,7 +86,6 @@ pub struct ContextEditAuditRecord {
     pub subgoal_index: u64,
 }
 
-// ANCHOR[contextra-privacy:CEA-005]
 /// Berechnet den deterministischen BLAKE3-Hash über alle Datenfelder eines Audit-Records.
 ///
 /// # Ablauf
@@ -160,7 +155,6 @@ pub fn compute_record_hash(
     *hasher.finalize().as_bytes()
 }
 
-// ANCHOR[contextra-privacy:CEA-006]
 /// Konstruiert deterministisch einen neuen [`ContextEditAuditRecord`] mit Hash-Verkettung.
 ///
 /// Der Zeitstempel wird ausschließlich über den injizierten `Clock`-Port bezogen (kein SystemTime::now()).
@@ -193,7 +187,6 @@ pub fn build_context_edit_audit_record(
     }
 }
 
-// ANCHOR[contextra-privacy:CEA-007]
 /// Verifiziert die Integrität und Hash-Verkettung einer Reihe von Audit-Records.
 ///
 /// # Ablauf
@@ -237,7 +230,6 @@ pub fn verify_audit_chain(chain: &[ContextEditAuditRecord]) -> Result<(), Contex
     Ok(())
 }
 
-// ANCHOR[contextra-privacy:CEA-008]
 /// Formatiert einen Audit-Datensatz in eine einzeilige, menschenlesbare Log-Zeile.
 ///
 /// ### Format
@@ -265,7 +257,6 @@ pub fn render_audit_line(record: &ContextEditAuditRecord) -> String {
     )
 }
 
-// ANCHOR[contextra-privacy:CEA-009]
 // Kodiert ein 32-Byte-Array in einen 64-Zeichen langen Kleinbuchstaben-Hex-String.
 fn hex_encode_32(bytes: &[u8; 32]) -> String {
     let mut s = String::with_capacity(64);
@@ -295,7 +286,6 @@ mod tests {
         }
     }
 
-    // ANCHOR[contextra-privacy:TEST-CEA-001]
     // Prüft alle Varianten von ContextEditKind und die korrekte Konstruktion einer 2-Glieder-Kette.
     #[test]
     fn test_all_context_edit_kind_variants_and_chain_construction() {
@@ -341,7 +331,6 @@ mod tests {
         assert!(verify_audit_chain(&chain).is_ok());
     }
 
-    // ANCHOR[contextra-privacy:TEST-CEA-002]
     // Prüft, dass Manipulationen an Datensätzen zuverlässig erkannt und mit dem exakten Index gemeldet werden.
     #[test]
     fn test_tampered_chain_detection() {

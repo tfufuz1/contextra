@@ -1,8 +1,4 @@
 #![cfg(feature = "experimental-diskann")]
-// FILE-CONTEXT
-// ZWECK: Empirische TOCTOU-Testreihen für Mmap Truncation & Unlink/Deletion Szenarien in DiskANN & HNSW.
-// INVARIANTEN: Nutzt Subprozess-Isolierung (`std::process::Command`) zur sicheren Erfassung von SIGBUS (Signal 7 / Exit-Code 135).
-// STAND: TS:2026-08-30T22:30:00Z (SESSION: 37b1d991)
 
 use std::env;
 use std::process::{Command, ExitStatus};

@@ -3,11 +3,6 @@
 //! # Zweck
 //! Identifiziert erklärende Pfade zwischen Entitäten für Retrieval-Augmented Generation.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::super::graph_write::CsrGraph;
@@ -19,7 +14,6 @@ use crate::types::{EntityId, TxId};
 
 // SECTION Path Rag Core Implementation
 impl CsrGraph {
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-PATH-RAG-001]
     pub fn path_rag_at<'a>(
         &'a self,
         start_nodes: &'a [EntityId],

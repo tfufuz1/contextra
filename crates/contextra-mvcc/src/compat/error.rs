@@ -1,4 +1,3 @@
-// ANCHOR[id=compat-error-root]
 //! # Workspace-Kompatibilitätsabbildung für Fehler
 //!
 //! LINK crates/contextra-mvcc/src/mvcc_error.rs
@@ -11,7 +10,6 @@ use crate::mvcc_error::MvccError;
 use contextra_types::ContextraError;
 
 // SECTION Error Conversion
-// ANCHOR[id=from-mvcc-error-for-contextra-error]
 impl From<MvccError> for ContextraError {
     fn from(err: MvccError) -> Self {
         // NOTE: Bit- und stringgleiche Abbildung gemäß SPEC-v2 §5.3 / SPEC-v3 §5.3

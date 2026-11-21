@@ -6,7 +6,6 @@ use contextra_crypto::crypto::KeyManager;
 use std::sync::Arc;
 
 #[derive(Clone)]
-// ANCHOR[contextra-store:WAL-CORE-101]
 /// Konfigurationsoptionen für das Write-Ahead-Log (WAL).
 ///
 /// Steuert Schlüsselmanager, Integritätsschlüssel-Rückfallebenen, Mindestversion

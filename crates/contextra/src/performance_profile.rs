@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: PerformanceProfile Presets for Contextra (Spec B.1.6, AP-P0-05)
-// INVARIANTEN: INV-PERF-PROFILE-1, INV-PERF-PROFILE-2
 
 //! # Modul: PerformanceProfile Presets (Ring 4)
 //!
@@ -95,7 +92,6 @@ impl DurabilityMode {
     }
 }
 
-// ANCHOR[contextra:PRF-010]
 /// Vordefinierte Leistungsprofile für Contextra-Instanzen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -112,7 +108,6 @@ impl Default for PerformanceProfile {
     }
 }
 
-// ANCHOR[contextra:PRF-011]
 /// Vollständig aufgelöste Konfigurationsparameter eines Performance-Profils.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResolvedProfileConfig {
@@ -122,7 +117,6 @@ pub struct ResolvedProfileConfig {
     pub feature_ring: FeatureRing,
 }
 
-// ANCHOR[contextra:PRF-012]
 /// Fehler bei der Validierung oder Lizenzierung eines Performance-Profils.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum PerformanceProfileError {
@@ -136,7 +130,6 @@ pub enum PerformanceProfileError {
 }
 
 impl PerformanceProfile {
-    // ANCHOR[contextra:PRF-013]
     /// Löst das Profil in konkrete Konfigurationsparameter auf.
     ///
     /// # Ablauf von `resolve`:
@@ -168,7 +161,6 @@ impl PerformanceProfile {
 }
 
 impl ResolvedProfileConfig {
-    // ANCHOR[contextra:PRF-014]
     /// Prüft den geforderten Feature-Ring gegen das übergebene [`LicenseGate`].
     ///
     /// # Veraltet
@@ -179,7 +171,6 @@ impl ResolvedProfileConfig {
         Ok(())
     }
 
-    // ANCHOR[contextra:PRF-015]
     /// Validiert die gegenseitige Kompatibilität der Profilparameter.
     ///
     /// Stellt sicher, dass Durability und Vektor-Bereinigung nicht in einen inkonsistenten Zustand geraten

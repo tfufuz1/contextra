@@ -1,12 +1,6 @@
 // =========================================================================
 // SECTION: config
 // =========================================================================
-// ANCHOR[contextra-mcp:CONFIG-001]
-// FILE-CONTEXT
-// STAND:       2026-10-31T00:00:00Z
-// ZWECK:       Dynamic Provider Construction for Embedding & LLM backends (Ollama, ONNX, Candle, Mock)
-// INVARIANTEN: No default mock provider in production; fail-closed explicit provider configuration; startup embedding probe
-// HOTSPOTS:    create_embedding_provider(), create_llm_text_generator(), verify_embedding_provider()
 // SIEHE AUCH:  ADR-010, contextra-ports/src/traits/mod.rs
 
 use contextra_ports::{EmbeddingProvider, LlmTextGenerator};

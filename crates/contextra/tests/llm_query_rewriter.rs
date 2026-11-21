@@ -1,6 +1,3 @@
-// FILE-CONTEXT
-// ZWECK: Integrationstests für LLM-gestützten QueryRewriter in contextra.
-// INVARIANTEN: Zero Panic; Fake-Generator ohne Netzzugriff.
 
 //! # Integrationstest: `llm_query_rewriter`
 //!
@@ -18,7 +15,6 @@ use contextra_types::error::ContextraError;
 use contextra_types::ScoredEntry;
 use std::sync::{Arc, Mutex};
 
-// ANCHOR[contextra:TEST-LQR-001]
 /// Test-Double für `LlmTextGenerator`, das vorgefertigte Antworten zurückgibt und den erzeugten Prompt aufzeichnet.
 struct FakeGenerator {
     response: Arc<Mutex<Option<Result<String, ContextraError>>>>,
@@ -66,7 +62,6 @@ impl LlmTextGenerator for FakeGenerator {
     }
 }
 
-// ANCHOR[contextra:TEST-LQR-002]
 // Prüft das Bereinigen und Parsen normaler nummerierter Textzeilen und Aufzählungspunkte.
 #[tokio::test]
 async fn test_a_plain_line_list_parsing() -> Result<(), Box<dyn std::error::Error>> {
@@ -86,7 +81,6 @@ async fn test_a_plain_line_list_parsing() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-LQR-003]
 // Verifiziert, dass ein in Markdown-Code-Fences eingebettetes JSON-Array erfolgreich extrahiert wird.
 #[tokio::test]
 async fn test_b_json_list_in_code_fence() -> Result<(), Box<dyn std::error::Error>> {
@@ -99,7 +93,6 @@ async fn test_b_json_list_in_code_fence() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-LQR-004]
 // Stellt sicher, dass nicht mehr Teilabfragen zurückgegeben werden als über with_max_subqueries konfiguriert.
 #[tokio::test]
 async fn test_c_more_lines_than_max_subqueries() -> Result<(), Box<dyn std::error::Error>> {
@@ -112,7 +105,6 @@ async fn test_c_more_lines_than_max_subqueries() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-LQR-005]
 // Verifiziert, dass Duplikate sowie Übereinstimmungen mit der Originalabfrage gefiltert werden.
 #[tokio::test]
 async fn test_d_duplicates_and_original_query_removed() -> Result<(), Box<dyn std::error::Error>> {
@@ -126,7 +118,6 @@ async fn test_d_duplicates_and_original_query_removed() -> Result<(), Box<dyn st
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-LQR-006]
 // Prüft, dass leere Antworten oder reine Whitespace-Antworten einen leeren Vektor (ohne Panic) liefern.
 #[tokio::test]
 async fn test_e_garbage_and_empty_response_yields_ok_empty_vec(
@@ -148,7 +139,6 @@ async fn test_e_garbage_and_empty_response_yields_ok_empty_vec(
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-LQR-007]
 // Verifiziert die fehlerfreie Weitergabe von Fehlern des LLM-Generators.
 #[tokio::test]
 async fn test_f_generator_error_propagates_as_err() -> Result<(), Box<dyn std::error::Error>> {
@@ -165,7 +155,6 @@ async fn test_f_generator_error_propagates_as_err() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-LQR-008]
 // Stellt sicher, dass Zeichenkettenkürzungen bei Multi-Byte-Unicode-Zeichen (z. B. Emojis) nicht mitten im Zeichen schneiden.
 #[tokio::test]
 async fn test_g_unicode_multi_byte_snippet_not_split_mid_char(
@@ -189,7 +178,6 @@ async fn test_g_unicode_multi_byte_snippet_not_split_mid_char(
     Ok(())
 }
 
-// ANCHOR[contextra:TEST-LQR-009]
 // Prüft die Isolation von Prompt-Injection-Versuchen innerhalb des <untrusted_context>-XML-Tags.
 #[tokio::test]
 async fn test_h_snippet_with_embedded_instruction_isolated_in_untrusted_context(
