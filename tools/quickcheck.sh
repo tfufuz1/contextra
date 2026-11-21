@@ -2,10 +2,13 @@
 # tools/quickcheck.sh — Einstiegspunkt für Sitzungen (siehe CLAUDE.md).
 #
 #   tools/quickcheck.sh build      cargo check --workspace (stable; 1.89-Download ist im Sandbox blockiert)
+#   tools/quickcheck.sh sync       SYNC-1: Anhänge D/E gegen budgets.toml/capabilities.toml
+#   tools/quickcheck.sh layering   G-03/SYNC-2: Schichtregeln mit Ratchet (layering_baseline.txt)
+#   tools/quickcheck.sh ratchet    G-13/SYNC-5b: unwrap/expect/panic im Produktcode (.unwrap-baseline.json)
 #   tools/quickcheck.sh gates      Build-Gates aus SPEC §11.6 per grep, mit Soll/Ist
 #   tools/quickcheck.sh lint       Dokumentations-Lint (G-08 / doc_lint.py) und LOC je Crate
 #   tools/quickcheck.sh coverage   Test-Matrix je Crate -> evidence/coverage/
-#   tools/quickcheck.sh all        build + gates + lint + coverage
+#   tools/quickcheck.sh all        alles oben
 #
 # Ausgaben landen ausschließlich in evidence/ (gitignored), nie in docs/ oder im Repo-Baum.
 set -u
@@ -60,6 +63,11 @@ cmd_layering() {
   RUSTUP_TOOLCHAIN="$TC" python3 tools/check_spec_sync.py layering --ratchet
 }
 
+cmd_ratchet() {
+  echo "== G-13 / SYNC-5b: unwrap/expect/panic im Produktcode (Ratchet) =="
+  python3 tools/unwrap_ratchet.py
+}
+
 cmd_coverage() {
   echo "== test_coverage_matrix -> $EVID/coverage =="
   python3 tools/test_coverage_matrix.py --workspace . --output-dir "$EVID/coverage" > "$EVID/coverage.log" 2>&1
@@ -78,11 +86,12 @@ run_one() {
     build)    cmd_build ;;
     sync)     cmd_sync ;;
     layering) cmd_layering ;;
+    ratchet)  cmd_ratchet ;;
     gates)    cmd_gates ;;
     lint)     cmd_lint ;;
     coverage) cmd_coverage ;;
-    all)      cmd_build; echo; cmd_sync; echo; cmd_layering; echo; cmd_gates; echo; cmd_lint; echo; cmd_coverage ;;
-    *) echo "Usage: $0 {build|sync|layering|gates|lint|coverage|all} [...]"; return 2 ;;
+    all)      cmd_build; echo; cmd_sync; echo; cmd_layering; echo; cmd_ratchet; echo; cmd_gates; echo; cmd_lint; echo; cmd_coverage ;;
+    *) echo "Usage: $0 {build|sync|layering|ratchet|gates|lint|coverage|all} [...]"; return 2 ;;
   esac
 }
 
