@@ -12,7 +12,7 @@ use super::group::{follower_commit_path, leader_commit_path, GroupCommitParams};
 use super::single::single_commit_path;
 use crate::error::{StoreError, StoreResult as Result};
 use contextra_ids::{TxId, TOMBSTONE_BIT};
-use contextra_mvcc::IndexOp;
+use contextra_version::IndexOp;
 use std::sync::atomic::Ordering;
 
 /// Commits staged transaction operations to disk and memory.

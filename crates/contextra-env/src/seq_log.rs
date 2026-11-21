@@ -1,8 +1,8 @@
 //! # Sequenz-Log (`SequenceLog`) für snapshot-isolierte Index-Suchen (`_at`-Familie)
 //!
-//! LINK crates/contextra-mvcc/src/lib.rs
-//! LINK crates/contextra-mvcc/src/snapshot.rs
-//! LINK crates/contextra-mvcc/src/ssi.rs
+//! LINK crates/contextra-version/src/lib.rs
+//! LINK crates/contextra-version/src/snapshot.rs
+//! LINK crates/contextra-version/src/ssi.rs
 //!
 //! Dieses Modul implementiert ein leichtgewichtiges, speicherinternes Versionsprotokoll
 //! für Dokumente. Es zeichnet auf, wann Dokumente eingefügt (`insert_seq`) und wann sie

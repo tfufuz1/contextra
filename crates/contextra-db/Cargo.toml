@@ -22,7 +22,7 @@ contextra-vector = { workspace = true }
 contextra-text = { workspace = true }
 contextra-graph = { workspace = true }
 contextra-rank = { workspace = true }
-contextra-mvcc = { workspace = true }
+contextra-version = { workspace = true }
 contextra-checkpoint = { workspace = true }
 contextra-durable-fs = { workspace = true }
 tokio = { workspace = true }

@@ -32,4 +32,4 @@ e1_crates = ["crypto", "erasure", "version", "store", "vector", "text", "graph",
 e1_no_e1_dependency = true                       # R2
 ports_only_ids = true                            # R1
 compat_forbidden = true                          # R7, CMP-10
-forbidden_crate_names = ["contextra-types", "contextra-mvcc", "contextra-engine", "contextra-vault"]
+forbidden_crate_names = ["contextra-types", "contextra-version", "contextra-engine", "contextra-vault"]

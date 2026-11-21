@@ -3,7 +3,7 @@
 //!
 //! # Zweck
 //! Stellt sicher, dass `contextra-vector` als autarker Baustein ohne interne Abhängigkeiten
-//! zu `contextra-ports`, `contextra-types` oder `contextra-mvcc` funktioniert (SPEC v4.0 §4, B1–B4).
+//! zu `contextra-ports`, `contextra-types` oder `contextra-version` funktioniert (SPEC v4.0 §4, B1–B4).
 //! Bei aktiviertem transitionalen Feature `ports-compat` stehen verlustfreie Konvertierungen
 //! zu den Workspace-Typen bereit.
 

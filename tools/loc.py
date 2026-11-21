@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 CORE_CRATES = [
-    'contextra-types', 'contextra-ports', 'contextra-mvcc', 'contextra-crypto',
+    'contextra-types', 'contextra-ports', 'contextra-version', 'contextra-crypto',
     'contextra-vector', 'contextra-text', 'contextra-store', 'contextra-durable-fs',
     'contextra-simd', 'contextra-sys', 'contextra-rank', 'contextra-erasure',
     'contextra-engine', 'contextra'

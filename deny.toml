@@ -53,7 +53,7 @@ deny = [
         "contextra-erasure", # nur Dev-Abhängigkeit (Tests). SPEC Anhang E prüft nur normale Abhängigkeiten (REM-27)
         "contextra-graph", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-mcp",
-        "contextra-mvcc", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-version", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-ports", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-privacy",
         "contextra-rank", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1

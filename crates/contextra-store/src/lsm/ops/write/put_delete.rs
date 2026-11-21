@@ -10,7 +10,7 @@ use super::super::super::engine::LsmStorage;
 use super::super::super::validate::{derive_doc_id, validate_key, validate_value};
 use crate::error::StoreResult as Result;
 use contextra_ids::TxId;
-use contextra_mvcc::IndexOp;
+use contextra_version::IndexOp;
 use std::sync::atomic::Ordering;
 
 /// Schreibt einen Schlüssel-Wert-Eintrag in den Staging-Puffer der Transaktion.

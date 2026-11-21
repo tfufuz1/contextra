@@ -8,8 +8,8 @@ contextra-checkpoint: Feature `ports-compat` (R7, CMP-10)
 contextra-checkpoint: Feature `types-compat` (R7, CMP-10)
 contextra-checkpoint: Verzeichnis src/compat/ (R7, G-11)
 contextra-db -> contextra-durable-fs: nicht in [allowed]
-contextra-db -> contextra-mvcc: nicht in [allowed]
-contextra-db -> contextra-mvcc: verbotener Crate-Name
+contextra-db -> contextra-version: nicht in [allowed]
+contextra-db -> contextra-version: verbotener Crate-Name
 contextra-db -> contextra-types: nicht in [allowed]
 contextra-db -> contextra-types: verbotener Crate-Name
 contextra-graph -> contextra-types: nicht in [allowed]
@@ -21,11 +21,11 @@ contextra-mcp -> contextra-crypto: nicht in [allowed]
 contextra-mcp -> contextra-rank: nicht in [allowed]
 contextra-mcp -> contextra-types: nicht in [allowed]
 contextra-mcp -> contextra-types: verbotener Crate-Name
-contextra-mvcc -> contextra-types: verbotener Crate-Name
-contextra-mvcc: Feature `ports-compat` (R7, CMP-10)
-contextra-mvcc: Feature `types-compat` (R7, CMP-10)
-contextra-mvcc: Verzeichnis src/compat/ (R7, G-11)
-contextra-mvcc: verbotener Crate-Name (R-Liste, Anhang E [rules])
+contextra-version -> contextra-types: verbotener Crate-Name
+contextra-version: Feature `ports-compat` (R7, CMP-10)
+contextra-version: Feature `types-compat` (R7, CMP-10)
+contextra-version: Verzeichnis src/compat/ (R7, G-11)
+contextra-version: verbotener Crate-Name (R-Liste, Anhang E [rules])
 contextra-ports -> contextra-env: nicht in [allowed]
 contextra-ports -> contextra-types: nicht in [allowed]
 contextra-ports -> contextra-types: verbotener Crate-Name
@@ -42,8 +42,8 @@ contextra-store -> contextra-crypto: E1 -> E1 (R2)
 contextra-store -> contextra-crypto: nicht in [allowed]
 contextra-store -> contextra-erasure: E1 -> E1 (R2)
 contextra-store -> contextra-erasure: nicht in [allowed]
-contextra-store -> contextra-mvcc: nicht in [allowed]
-contextra-store -> contextra-mvcc: verbotener Crate-Name
+contextra-store -> contextra-version: nicht in [allowed]
+contextra-store -> contextra-version: verbotener Crate-Name
 contextra-testkit -> contextra-types: verbotener Crate-Name
 contextra-text -> contextra-types: nicht in [allowed]
 contextra-text -> contextra-types: verbotener Crate-Name

@@ -15,7 +15,7 @@ use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::KeyManager;
 use crate::wal::Wal;
 use bytes::Bytes;
-use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_version::{SnapshotRegistry, TxBuffer};
 use crate::budget::ResourceTracker;
 use crate::error::StoreResult as Result;
 use contextra_ids::TxId;
@@ -72,8 +72,8 @@ pub struct LsmStorage {
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
     pub(super) observer_registry: ObserverRegistry,
     pub(super) clock: parking_lot::RwLock<Arc<dyn contextra_env::Clock>>,
-    pub ssi_validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
-    pub(super) sequence_log_ssi_validator: Option<Arc<contextra_mvcc::SequenceLogSsiValidator>>,
+    pub ssi_validator: Arc<dyn contextra_version::SsiValidator + Send + Sync>,
+    pub(super) sequence_log_ssi_validator: Option<Arc<contextra_version::SequenceLogSsiValidator>>,
     pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_env::MetricsSink>>>,
 }
 
@@ -247,19 +247,19 @@ impl LsmStorage {
         self
     }
 
-    /// Sets or replaces the [`contextra_mvcc::SsiValidator`] port for transaction conflict detection.
+    /// Sets or replaces the [`contextra_version::SsiValidator`] port for transaction conflict detection.
     pub fn set_ssi_validator(
         &mut self,
-        validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+        validator: Arc<dyn contextra_version::SsiValidator + Send + Sync>,
     ) {
         self.ssi_validator = validator;
         self.sequence_log_ssi_validator = None;
     }
 
-    /// Configures the [`contextra_mvcc::SsiValidator`] fluently on `self` and returns `self`.
+    /// Configures the [`contextra_version::SsiValidator`] fluently on `self` and returns `self`.
     pub fn with_ssi_validator(
         mut self,
-        validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+        validator: Arc<dyn contextra_version::SsiValidator + Send + Sync>,
     ) -> Self {
         self.set_ssi_validator(validator);
         self

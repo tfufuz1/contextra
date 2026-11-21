@@ -9,7 +9,7 @@ use super::super::super::validate::{derive_doc_id, validate_key};
 use super::super::super::MAX_BATCH_SIZE;
 use crate::error::{StoreError, StoreResult as Result};
 use contextra_ids::TxId;
-use contextra_mvcc::IndexOp;
+use contextra_version::IndexOp;
 
 /// Löscht mehrere Schlüssel in einem einzigen atomaren Staging-Schritt.
 pub(crate) async fn delete_many(

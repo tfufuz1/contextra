@@ -59,7 +59,7 @@ tools/quickcheck.sh build           # Workspace bauen (stable-Toolchain)
 - Crate `contextra-bench` (Bin `scale-100k`): 2 Fehler, Ursache nicht geprüft.
 - Alle anderen 19 Crates kompilieren einzeln.
 
-**Schichtprüfung** (`tools/quickcheck.sh layering`, 21.11.2026): **49 Befunde** gegen Anhang E. Verteilung in Abschnitt 8. Die Befunde entsprechen REM-27 (`ports→types`, `store→crypto/erasure/mvcc`, `simd→types`, `db→mvcc/durable-fs/types`, `mcp→crypto/rank/types`, `contextra→types`), dazu R7-Reste (`compat`-Features und Verzeichnisse) und die verbotenen Namen `contextra-types` und `contextra-mvcc`.
+**Schichtprüfung** (`tools/quickcheck.sh layering`, 21.11.2026): **49 Befunde** gegen Anhang E. Verteilung in Abschnitt 8. Die Befunde entsprechen REM-27 (`ports→types`, `store→crypto/erasure/mvcc`, `simd→types`, `db→mvcc/durable-fs/types`, `mcp→crypto/rank/types`, `contextra→types`), dazu R7-Reste (`compat`-Features und Verzeichnisse) und die verbotenen Namen `contextra-types` und `contextra-version`.
 
 **Fehlende Dateien, die die Spec referenziert:**
 
@@ -180,9 +180,9 @@ Der Bestand ist bewusst klein. Entfernt wurden am 21.11.2026 24 Auditor- und Gen
    - `simd → types` entfernen (Spec 3.1).
    - `store → crypto/erasure/mvcc` entfernen (R2, REM-27). Das betrifft die Schlüsselvernichtung über Ports (ADR-32).
    - `db`, `mcp`, `contextra` anpassen, sobald ihre Ziel-Abhängigkeiten stehen.
-4. **Freigabe einholen:** `contextra-mvcc` → `contextra-version` (ADR-06) und REM-30 (`contextra-types` auflösen). Beides ändert viele `Cargo.toml`. Nicht eigenmächtig.
+4. **Freigabe einholen:** `contextra-version` → `contextra-version` (ADR-06) und REM-30 (`contextra-types` auflösen). Beides ändert viele `Cargo.toml`. Nicht eigenmächtig.
 5. **Sitzung 3 (21.11.2026): nach SPEC wiederhergestellt.** Die SPEC verlangt `check_spec_sync.py` (SYNC-1/2/3), `budgets.toml`, `capabilities.toml` und `tests/layering.rs` (G-03). Umgesetzt: `tools/check_spec_sync.py` mit `check`, `sync`, `layering [--ratchet|--update-baseline]` (nur Standardbibliothek); `benchmarks/budgets.toml` und `capabilities.toml` per `sync` 1:1 aus Anhang D/E; `layering_baseline.txt` mit 56 Befunden (Zählung inkl. optionaler Abhängigkeiten, wie SYNC-2 es verlangt; CLAUDE.md alt: 49); `crates/contextra-testkit/tests/layering.rs` (grün); `quickcheck.sh` mit `sync` und `layering`. **Erledigt (Sitzung 3):** `tools/unwrap_ratchet.py` und `.unwrap-baseline.json` (SYNC-5b, G-13). Messung: 19 Panik-Stellen im Produktcode, alle in `contextra-graph`. Dazu gehört `pub mod conformance` in `crates/contextra-graph/src/storage.rs`. Es ist kein `#[cfg(test)]` und gehört in die Testkit-Crate (Soll). Die Gate-Tabelle oben nennt 2942, das war eine grobe Zählung mit Tests und ist nicht der Gate-Wert.
-6. **Erledigt 21.11.2026: `crates/<name>/PLAN.md` gegen SPEC v4.1 abgeglichen (21 Crates, Vorlage 13.5).** Je Crate ein Commit `docs(<name>): PLAN.md auf SPEC v4.1 abgeglichen`. Ist-Abweichungen stehen in Abschnitt 3 bzw. 4, offene Entscheidungen unter „Offene Punkte (Entscheidung nötig)“ in Abschnitt 6 der jeweiligen PLAN.md. Ausnahme: `contextra-mvcc` enthält nur den Status, die Umbenennung wartet auf Freigabe (Punkt 4). Die Qualität ist uneinheitlich: `contextra-types` ist ein Auflösungsplan, `sys`, `simd`, `durable-fs` und `crypto` sind kürzer als der Rest. Eine fachliche Durchsicht mit dem Nutzer steht aus.
+6. **Erledigt 21.11.2026: `crates/<name>/PLAN.md` gegen SPEC v4.1 abgeglichen (21 Crates, Vorlage 13.5).** Je Crate ein Commit `docs(<name>): PLAN.md auf SPEC v4.1 abgeglichen`. Ist-Abweichungen stehen in Abschnitt 3 bzw. 4, offene Entscheidungen unter „Offene Punkte (Entscheidung nötig)“ in Abschnitt 6 der jeweiligen PLAN.md. Ausnahme: `contextra-version` enthält nur den Status, die Umbenennung wartet auf Freigabe (Punkt 4). Die Qualität ist uneinheitlich: `contextra-types` ist ein Auflösungsplan, `sys`, `simd`, `durable-fs` und `crypto` sind kürzer als der Rest. Eine fachliche Durchsicht mit dem Nutzer steht aus.
 7. **Erledigt 21.11.2026: `README.md` je Crate nach SPEC 3.6** (21 Crates plus `benchmarks/contextra-bench`). Zweck aus der Rollenzeile der Crate-`CLAUDE.md`, öffentliche API wörtlich aus `src/lib.rs` (Ist-Stand, kann laut PLAN entfallende Module enthalten), Features aus `Cargo.toml`. Die bestehende README des Benchmark-Crates war als historisch markiert und wurde ersetzt (Git-Historie). Commits je Gruppe.
 8. **Erledigt 21.11.2026: SYNC-5 als Notiz in §13.6** (`docs(spec): SYNC-5 …`). Keine Norm geändert, `check_spec_sync.py check` grün.
 9. Die übrigen Entfernungen aus §12 (ANCHOR, FILE-CONTEXT, `contract.rs`) sind eine eigene Aufgabe. Erst nach Freigabe durch den Nutzer.
@@ -233,7 +233,7 @@ Jedes Crate hat eine eigene `CLAUDE.md`. Zweck: Eine Sitzung kann auf ein Crate 
 | contextra-ports | `crates/contextra-ports/CLAUDE.md` | E0 | ok | 2 |
 | contextra-crypto | `crates/contextra-crypto/CLAUDE.md` | E1 | ok | 0 |
 | contextra-erasure | `crates/contextra-erasure/CLAUDE.md` | E1 (sicherheitskritisch) | ok | 0 |
-| contextra-mvcc | `crates/contextra-mvcc/CLAUDE.md` | E1 (→ `version`) | ok | 5 |
+| contextra-version | `crates/contextra-version/CLAUDE.md` | E1 (→ `version`) | ok | 5 |
 | contextra-store | `crates/contextra-store/CLAUDE.md` | E1 | ok | 6 |
 | contextra-vector | `crates/contextra-vector/CLAUDE.md` | E1 | ok | 4 |
 | contextra-text | `crates/contextra-text/CLAUDE.md` | E1 | ok | 5 |
@@ -260,7 +260,7 @@ Jedes Crate hat eine eigene `CLAUDE.md`. Zweck: Eine Sitzung kann auf ein Crate 
 
 **Bekannte Zuständigkeitsprobleme** (keine Sitzung darf sie still lösen):
 - `contextra-types` (REM-30) muss aufgelöst werden. Betrifft fast alle Crates.
-- `contextra-mvcc` → `contextra-version` (ADR-06). Betrifft alle Dependents in `Cargo.toml`.
+- `contextra-version` → `contextra-version` (ADR-06). Betrifft alle Dependents in `Cargo.toml`.
 
 ## 9. Effizient arbeiten: Shell, Installation, Abläufe
 

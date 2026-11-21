@@ -426,7 +426,6 @@ dependencies = [
  "contextra-erasure",
  "contextra-graph",
  "contextra-ids",
- "contextra-mvcc",
  "contextra-ports",
  "contextra-privacy",
  "contextra-rank",
@@ -434,6 +433,7 @@ dependencies = [
  "contextra-text",
  "contextra-types",
  "contextra-vector",
+ "contextra-version",
  "proptest",
  "tempfile",
  "thiserror",
@@ -554,28 +554,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-mvcc"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "bincode",
- "bytes",
- "contextra-env",
- "contextra-ids",
- "contextra-ports",
- "contextra-types",
- "criterion",
- "loom",
- "parking_lot 0.12.5",
- "proptest",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "contextra-ports"
 version = "0.1.0"
 dependencies = [
@@ -657,8 +635,8 @@ dependencies = [
  "contextra-env",
  "contextra-erasure",
  "contextra-ids",
- "contextra-mvcc",
  "contextra-sys",
+ "contextra-version",
  "crc32fast",
  "criterion",
  "futures",
@@ -777,6 +755,28 @@ dependencies = [
  "tokio",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "contextra-version"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bincode",
+ "bytes",
+ "contextra-env",
+ "contextra-ids",
+ "contextra-ports",
+ "contextra-types",
+ "criterion",
+ "loom",
+ "parking_lot 0.12.5",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

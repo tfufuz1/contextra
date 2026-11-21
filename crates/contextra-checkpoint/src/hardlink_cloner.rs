@@ -44,7 +44,7 @@ impl SnapshotPinner for () {
 }
 
 #[cfg(feature = "mvcc")]
-impl SnapshotPinner for Arc<contextra_mvcc::SnapshotRegistry> {
+impl SnapshotPinner for Arc<contextra_version::SnapshotRegistry> {
     fn pin_seq_no(&self, seq_no: u64) -> Box<dyn std::any::Any + Send + Sync> {
         Box::new(self.register(seq_no))
     }

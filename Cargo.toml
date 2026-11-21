@@ -20,7 +20,7 @@ members = [
     "crates/contextra",
     "crates/contextra-types",
     "crates/contextra-ports",
-    "crates/contextra-mvcc",
+    "crates/contextra-version",
     "crates/contextra-rank",
     "crates/contextra-erasure",
 ]
@@ -35,7 +35,7 @@ default-members = [
     "crates/contextra-simd",
     "crates/contextra-types",
     "crates/contextra-ports",
-    "crates/contextra-mvcc",
+    "crates/contextra-version",
     "crates/contextra-crypto",
     "crates/contextra-vector",
     "crates/contextra-text",
@@ -114,7 +114,7 @@ contextra-testkit = { path = "crates/contextra-testkit" }
 contextra = { path = "crates/contextra" }
 contextra-types = { path = "crates/contextra-types" }
 contextra-ports = { path = "crates/contextra-ports" }
-contextra-mvcc = { path = "crates/contextra-mvcc" }
+contextra-version = { path = "crates/contextra-version" }
 contextra-rank = { path = "crates/contextra-rank" }
 contextra-erasure = { path = "crates/contextra-erasure" }
 

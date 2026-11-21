@@ -34,7 +34,7 @@ pub mod metrics;
 /// LINK rng.rs#rng-root
 pub mod rng;
 
-/// Versioniertes Sequenz-Log für snapshot-isolierte Suchen (ehemals contextra-mvcc).
+/// Versioniertes Sequenz-Log für snapshot-isolierte Suchen (ehemals contextra-version).
 pub mod seq_log;
 
 /// Controllable manual clock implementation for testing determinism.

@@ -3,7 +3,7 @@
 
 Pfad: `crates/contextra-store`
 
-Abhängigkeiten (direkt): contextra-ids, contextra-env, contextra-sys, contextra-durable-fs, contextra-erasure, contextra-crypto, contextra-mvcc, ahash, quick_cache, bytes, blake3, crc32fast, parking_lot, serde, tokio, memmap2, tracing, thiserror, rand, lru, tokio-util
+Abhängigkeiten (direkt): contextra-ids, contextra-env, contextra-sys, contextra-durable-fs, contextra-erasure, contextra-crypto, contextra-version, ahash, quick_cache, bytes, blake3, crc32fast, parking_lot, serde, tokio, memmap2, tracing, thiserror, rand, lru, tokio-util
 
 ### Module
 

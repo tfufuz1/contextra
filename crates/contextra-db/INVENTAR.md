@@ -2,7 +2,7 @@
 
 Pfad: `crates/contextra-db`
 
-Abhängigkeiten (direkt): contextra-ids, contextra-env, contextra-types, contextra-ports, contextra-privacy, contextra-erasure, contextra-crypto, contextra-store, contextra-vector, contextra-text, contextra-graph, contextra-rank, contextra-mvcc, contextra-checkpoint, contextra-durable-fs, tokio, thiserror
+Abhängigkeiten (direkt): contextra-ids, contextra-env, contextra-types, contextra-ports, contextra-privacy, contextra-erasure, contextra-crypto, contextra-store, contextra-vector, contextra-text, contextra-graph, contextra-rank, contextra-version, contextra-checkpoint, contextra-durable-fs, tokio, thiserror
 
 ### Module
 

@@ -23,7 +23,7 @@
 //! ## Ring-Hierarchie & Abhängigkeiten
 //! - **Ring 1 (E1):** Domänenbaustein. Kern-Closure: `ids`, `env`, `sys`, `durable-fs`, `crypto`.
 //! - **Ausgehende Abhängigkeiten:** `contextra-ids`, `contextra-env`, `contextra-sys`,
-//!   `contextra-durable-fs`, `contextra-crypto`, `contextra-mvcc`. Keine E2-/E3-Abhängigkeiten (R1, R2).
+//!   `contextra-durable-fs`, `contextra-crypto`, `contextra-version`. Keine E2-/E3-Abhängigkeiten (R1, R2).
 //! - **Eingehende Abhängigkeiten:** E2-Schicht (`contextra-db`) über die öffentliche API.
 
 #![forbid(unsafe_code)]

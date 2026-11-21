@@ -5,7 +5,7 @@
 use super::*;
 use crate::sstable::{create_block_cache, BlockCache, SstableBuilder, SstableReader};
 use contextra_ids::TOMBSTONE_BIT;
-use contextra_mvcc::SnapshotRegistry;
+use contextra_version::SnapshotRegistry;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;

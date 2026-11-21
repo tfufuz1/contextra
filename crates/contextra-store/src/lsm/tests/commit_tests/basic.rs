@@ -247,7 +247,7 @@ async fn test_commit_tracks_budget_drift_on_consume_memory_failure() {
     let key = b"drift_key";
     let value = vec![b'v'; 60000];
     let expected_entry_size =
-        (key.len() + value.len() + contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES) as u64;
+        (key.len() + value.len() + contextra_version::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES) as u64;
 
     let tx = TxId::new(1);
     storage.put(tx, key, &value).await.expect("put succeeds");

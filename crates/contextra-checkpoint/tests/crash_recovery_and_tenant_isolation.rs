@@ -24,7 +24,7 @@ use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
-/// Minimaler Mock für SnapshotPinner im Testkit-Stil ohne contextra-mvcc Abhängigkeit.
+/// Minimaler Mock für SnapshotPinner im Testkit-Stil ohne contextra-version Abhängigkeit.
 #[derive(Default)]
 struct MockSnapshotPinner {
     pinned: Mutex<Vec<u64>>,

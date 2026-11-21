@@ -12,7 +12,7 @@ use super::merge_operator::MergeOperator;
 use crate::io_seam::RealFs;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
-use contextra_mvcc::SnapshotRegistry;
+use contextra_version::SnapshotRegistry;
 use crate::stats::StorageStats;
 use crate::io_seam::Vfs;
 use crate::error::{StoreError, StoreResult as Result};

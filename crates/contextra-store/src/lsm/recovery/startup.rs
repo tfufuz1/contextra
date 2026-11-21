@@ -23,7 +23,7 @@ use crate::util::DirLock;
 use crate::wal::{KeyManager, Wal, WalOp};
 use bytes::Bytes;
 use contextra_ids::{TxId, TOMBSTONE_BIT};
-use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_version::{SnapshotRegistry, TxBuffer};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -474,7 +474,7 @@ impl LsmStorage {
         let ssi_max_tracked_keys = config.ssi_max_tracked_keys;
 
         let default_ssi_val = Arc::new(
-            contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(ssi_max_tracked_keys)
+            contextra_version::SequenceLogSsiValidator::new_with_bounds(ssi_max_tracked_keys)
                 .with_metrics_sink(Arc::clone(&metrics_sink_container)),
         );
 
@@ -515,7 +515,7 @@ impl LsmStorage {
             observer_registry: crate::lsm::observer::ObserverRegistry::new(),
             clock: parking_lot::RwLock::new(clock_arc),
             ssi_validator: Arc::clone(&default_ssi_val)
-                as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+                as Arc<dyn contextra_version::SsiValidator + Send + Sync>,
             sequence_log_ssi_validator: Some(default_ssi_val),
             metrics_sink: metrics_sink_container,
         };
