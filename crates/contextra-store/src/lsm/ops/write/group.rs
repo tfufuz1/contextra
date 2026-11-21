@@ -22,7 +22,6 @@ pub(super) struct GroupCommitParams {
     pub(super) tx_id: TxId,
     pub(super) wal_ops: Vec<(WalOp, u64)>,
     pub(super) mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
-    pub(super) first_seq: u64,
 }
 
 pub(super) async fn follower_commit_path(
@@ -40,7 +39,6 @@ pub(super) async fn follower_commit_path(
         }
     };
     let tx_id = params.tx_id;
-    let first_seq = params.first_seq;
     let _wal_queue_guard = WalQueueGuard::new(Arc::clone(&storage.wal_queue_depth));
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     let committed_flag = Arc::clone(&queue.committed_flag);
@@ -70,11 +68,6 @@ pub(super) async fn follower_commit_path(
             if committed_flag.load(Ordering::Acquire) {
                 Ok(())
             } else {
-                if first_seq > 0 {
-                    if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-                        seq_val.forget_from(first_seq);
-                    }
-                }
                 storage.cleanup_intent_locks_for_tx(tx_id);
                 Err(crate::error::StoreError::Storage(
                     "Commit failed at WAL append after leader cancellation".into(),
@@ -93,11 +86,6 @@ pub(super) async fn follower_commit_path(
                     queue.requests.retain(|r| r.tx_id != tx_id);
                 }
                 drop(queue_guard);
-                if first_seq > 0 {
-                    if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-                        seq_val.forget_from(first_seq);
-                    }
-                }
                 storage.cleanup_intent_locks_for_tx(tx_id);
                 Err(crate::error::StoreError::CommitTimeout {
                     tx_id: tx_id.inner(),
@@ -105,11 +93,6 @@ pub(super) async fn follower_commit_path(
             } else {
                 drop(queue_guard);
                 if !committed_flag.load(Ordering::Acquire) {
-                    if first_seq > 0 {
-                        if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-                            seq_val.forget_from(first_seq);
-                        }
-                    }
                     storage.cleanup_intent_locks_for_tx(tx_id);
                     Err(crate::error::StoreError::CommitTimeout {
                         tx_id: tx_id.inner(),
@@ -137,7 +120,6 @@ pub(super) async fn leader_commit_path(
     let leader_tx_id = params.tx_id;
     let leader_wal_ops = params.wal_ops;
     let leader_mem_updates = params.mem_updates;
-    let first_seq = params.first_seq;
 
     let notify_full = Arc::new(tokio::sync::Notify::new());
     let committed_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -152,7 +134,6 @@ pub(super) async fn leader_commit_path(
         storage,
         wal: &wal,
         leader_tx_id,
-        leader_first_seq: first_seq,
         pending_queue: None,
         prev_hmac: None,
         committed: false,
@@ -229,16 +210,6 @@ pub(super) async fn leader_commit_path(
         );
         if let Some(pending_queue) = leader_guard.pending_queue.take() {
             for r in pending_queue.requests {
-                let r_first_seq = r
-                    .mem_updates
-                    .first()
-                    .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
-                    .unwrap_or(0);
-                if r_first_seq > 0 {
-                    if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-                        seq_val.forget_from(r_first_seq);
-                    }
-                }
                 storage.cleanup_intent_locks_for_tx(r.tx_id);
                 let _ = r.sender.send(Err(crate::error::StoreError::Storage(err_msg.clone())));
             }

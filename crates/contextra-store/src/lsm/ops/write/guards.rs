@@ -27,7 +27,6 @@ pub(super) struct SingleCommitGuard<'a> {
     pub(super) storage: &'a LsmStorage,
     pub(super) wal: &'a Wal,
     pub(super) tx_id: TxId,
-    pub(super) first_seq: u64,
     pub(super) prev_hmac: [u8; 32],
     pub(super) committed: bool,
 }
@@ -39,11 +38,6 @@ impl<'a> Drop for SingleCommitGuard<'a> {
                 self.wal
                     .poison_with_cause(PoisonCause::HmacChainDiverged);
             }
-            if self.first_seq > 0 {
-                if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
-                    seq_val.forget_from(self.first_seq);
-                }
-            }
             self.storage.cleanup_intent_locks_for_tx(self.tx_id);
         }
     }
@@ -53,7 +47,6 @@ pub(super) struct LeaderCancelGuard<'a> {
     pub(super) storage: &'a LsmStorage,
     pub(super) wal: &'a Wal,
     pub(super) leader_tx_id: TxId,
-    pub(super) leader_first_seq: u64,
     pub(super) pending_queue: Option<PendingCommitQueue>,
     pub(super) prev_hmac: Option<[u8; 32]>,
     pub(super) committed: bool,
@@ -72,16 +65,6 @@ impl<'a> Drop for LeaderCancelGuard<'a> {
             }
             if let Some(pending_queue) = self.pending_queue.take() {
                 for r in pending_queue.requests {
-                    let r_first_seq = r
-                        .mem_updates
-                        .first()
-                        .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
-                        .unwrap_or(0);
-                    if r_first_seq > 0 {
-                        if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
-                            seq_val.forget_from(r_first_seq);
-                        }
-                    }
                     self.storage.cleanup_intent_locks_for_tx(r.tx_id);
                     let err_msg = if hmac_diverged {
                         "Leader cancelled group commit: WAL HMAC chain diverged (handle poisoned)"
@@ -93,16 +76,6 @@ impl<'a> Drop for LeaderCancelGuard<'a> {
             } else if let Ok(mut queue_guard) = self.storage.pending_commit_queue.try_lock() {
                 if let Some(pending_queue) = queue_guard.take() {
                     for r in pending_queue.requests {
-                        let r_first_seq = r
-                            .mem_updates
-                            .first()
-                            .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
-                            .unwrap_or(0);
-                        if r_first_seq > 0 {
-                            if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
-                                seq_val.forget_from(r_first_seq);
-                            }
-                        }
                         self.storage.cleanup_intent_locks_for_tx(r.tx_id);
                         let err_msg = if hmac_diverged {
                             "Leader cancelled group commit: WAL HMAC chain diverged (handle poisoned)"
@@ -111,11 +84,6 @@ impl<'a> Drop for LeaderCancelGuard<'a> {
                         };
                         let _ = r.sender.send(Err(crate::error::StoreError::Storage(err_msg.into())));
                     }
-                }
-            }
-            if self.leader_first_seq > 0 {
-                if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
-                    seq_val.forget_from(self.leader_first_seq);
                 }
             }
             self.storage.cleanup_intent_locks_for_tx(self.leader_tx_id);

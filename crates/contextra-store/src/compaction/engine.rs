@@ -12,7 +12,7 @@ use super::merge_operator::MergeOperator;
 use crate::io_seam::RealFs;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
-use contextra_version::SnapshotRegistry;
+use crate::snapshot_pins::SnapshotPins;
 use crate::stats::StorageStats;
 use crate::io_seam::Vfs;
 use crate::error::{StoreError, StoreResult as Result};
@@ -28,7 +28,7 @@ use tracing;
 /// Orchestriert die periodische Verdichtung und Bereinigung von SSTables.
 pub struct CompactionEngine {
     config: CompactionConfig,
-    pub(super) snapshot_registry: Arc<SnapshotRegistry>,
+    pub(super) snapshot_registry: Arc<SnapshotPins>,
     block_cache: Arc<BlockCache>,
     key_manager: Option<Arc<KeyManager>>,
     budget: Arc<crate::budget::ResourceTracker>,
@@ -46,7 +46,7 @@ impl CompactionEngine {
     /// Creates a new compaction engine.
     pub fn new(
         config: CompactionConfig,
-        snapshot_registry: Arc<SnapshotRegistry>,
+        snapshot_registry: Arc<SnapshotPins>,
         block_cache: Arc<BlockCache>,
         key_manager: Option<Arc<KeyManager>>,
         budget: Arc<crate::budget::ResourceTracker>,

@@ -15,7 +15,8 @@ use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::KeyManager;
 use crate::wal::Wal;
 use bytes::Bytes;
-use contextra_version::{SnapshotRegistry, TxBuffer};
+use crate::snapshot_pins::SnapshotPins;
+use crate::staging::TxStaging;
 use crate::budget::ResourceTracker;
 use crate::error::StoreResult as Result;
 use contextra_ids::TxId;
@@ -39,11 +40,11 @@ pub struct LsmStorage {
     pub(super) state: RwLock<LsmState>,
     /// SSTables stored separately for shared access with compaction engine.
     pub(super) sstables: Arc<RwLock<Vec<Arc<SstableReader>>>>,
-    pub(super) tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
+    pub(super) tx_staging: TxStaging,
     pub(super) budget: Arc<crate::budget::ResourceTracker>,
     pub(super) block_cache: Arc<BlockCache>,
     pub(super) wal: RwLock<Arc<Wal>>,
-    pub snapshot_registry: Arc<SnapshotRegistry>,
+    pub(crate) snapshot_registry: Arc<SnapshotPins>,
     /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
     /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).
     pub(super) compaction_engine: Arc<CompactionEngine>,
@@ -72,8 +73,6 @@ pub struct LsmStorage {
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
     pub(super) observer_registry: ObserverRegistry,
     pub(super) clock: parking_lot::RwLock<Arc<dyn contextra_env::Clock>>,
-    pub ssi_validator: Arc<dyn contextra_version::SsiValidator + Send + Sync>,
-    pub(super) sequence_log_ssi_validator: Option<Arc<contextra_version::SequenceLogSsiValidator>>,
     pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_env::MetricsSink>>>,
 }
 
@@ -245,68 +244,6 @@ impl LsmStorage {
     pub fn with_clock(self, clock: Arc<dyn contextra_env::Clock>) -> Self {
         self.set_clock(clock);
         self
-    }
-
-    /// Sets or replaces the [`contextra_version::SsiValidator`] port for transaction conflict detection.
-    pub fn set_ssi_validator(
-        &mut self,
-        validator: Arc<dyn contextra_version::SsiValidator + Send + Sync>,
-    ) {
-        self.ssi_validator = validator;
-        self.sequence_log_ssi_validator = None;
-    }
-
-    /// Configures the [`contextra_version::SsiValidator`] fluently on `self` and returns `self`.
-    pub fn with_ssi_validator(
-        mut self,
-        validator: Arc<dyn contextra_version::SsiValidator + Send + Sync>,
-    ) -> Self {
-        self.set_ssi_validator(validator);
-        self
-    }
-
-    /// Performs a tracked read for transaction `tx_id`.
-    ///
-    /// Evaluates `snapshot_seq = next_seq_no - 1` ONCE (K2), registers the read key in `TxBuffer`,
-    /// and reads the key at `snapshot_seq`.
-    ///
-    /// # SSI Protection Scope
-    /// ONLY keys read via `get_tracked` or `get_at_seq_tracked` within transaction `tx_id` are registered
-    /// in the transaction's `ReadSet` and receive Serializable Snapshot Isolation (SSI) conflict validation
-    /// during commit. Untracked reads via `StorageEngine::get()` or `LsmStorage::get()` perform point-in-time
-    /// snapshot reads without transaction tracking and do NOT receive SSI write-skew protection.
-    pub async fn get_tracked(&self, tx_id: TxId, key: &[u8]) -> Result<Option<Bytes>> {
-        read::get_tracked(self, tx_id, key).await
-    }
-
-    /// Performs a tracked read for transaction `tx_id` at an explicit `snapshot_seq`.
-    ///
-    /// Registers the read key in `TxBuffer` at `snapshot_seq` and reads the key at `snapshot_seq`.
-    ///
-    /// # SSI Protection Scope
-    /// ONLY keys read via `get_tracked` or `get_at_seq_tracked` within transaction `tx_id` are registered
-    /// in the transaction's `ReadSet` and receive Serializable Snapshot Isolation (SSI) conflict validation
-    /// during commit. Untracked reads via `StorageEngine::get()` or `LsmStorage::get()` perform point-in-time
-    /// snapshot reads without transaction tracking and do NOT receive SSI write-skew protection.
-    pub async fn get_at_seq_tracked(
-        &self,
-        tx_id: TxId,
-        key: &[u8],
-        snapshot_seq: u64,
-    ) -> Result<Option<Bytes>> {
-        read::get_at_seq_tracked(self, tx_id, key, snapshot_seq).await
-    }
-
-    /// Performs a tracked prefix scan for transaction `tx_id`.
-    ///
-    /// Evaluates `snapshot_seq = last_applied_seq` ONCE, scans all matching entries, and registers
-    /// each scanned key in transaction `tx_id`'s `ReadSet`.
-    pub async fn scan_prefix_tracked(
-        &self,
-        tx_id: TxId,
-        prefix: &[u8],
-    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        read::scan_prefix_tracked(self, tx_id, prefix).await
     }
 
     /// Returns the highest sequence number applied to the MemTable and published.

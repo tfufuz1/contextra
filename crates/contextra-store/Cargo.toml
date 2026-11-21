@@ -23,7 +23,6 @@ memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
 sieve-cache = []
-docid-128 = ["contextra-ids/docid-128"]
 legacy-wal-key = []
 
 [dependencies]
@@ -31,11 +30,7 @@ contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
 contextra-sys = { workspace = true }
 contextra-durable-fs = { workspace = true }
-# The erasure-chain contract is an explicit cross-ring contract, not part of
-# the store domain closure.
-contextra-erasure = { workspace = true }
 contextra-crypto = { workspace = true }
-contextra-version = { workspace = true }
 ahash = { workspace = true }
 quick_cache = { version = "0.6", optional = true }
 bytes = { workspace = true }

@@ -12,7 +12,7 @@ use super::group::{follower_commit_path, leader_commit_path, GroupCommitParams};
 use super::single::single_commit_path;
 use crate::error::{StoreError, StoreResult as Result};
 use contextra_ids::{TxId, TOMBSTONE_BIT};
-use contextra_version::IndexOp;
+use crate::staging::StagedOp;
 use std::sync::atomic::Ordering;
 
 /// Commits staged transaction operations to disk and memory.
@@ -48,32 +48,19 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     // LOCK ORDER (SPEC §3.5, INV-LOCK-ORDER-1, see lsm::lock_order::RANK_COMMIT_MUTEX):
     let commit_lock = storage.commit_mutex.lock().await;
 
-    // 1. ReadSet VOR drain_kv
-    let read_set = storage.tx_buffer.get_read_set(tx_id);
-
     // 2. Transaktions-Operationen aus TxBuffer entnehmen
-    let ops = storage.tx_buffer.drain_kv(tx_id);
+    let ops = storage.tx_staging.drain(tx_id);
     if ops.is_empty() {
         storage.cleanup_intent_locks_for_tx(tx_id);
         return Ok(());
     }
 
-    // 3. SSI ReadSet Validierung unter commit_mutex
-    if let Some(ref rs) = read_set {
-        if !rs.is_empty() {
-            if let Err(e) = storage.ssi_validator.validate(tx_id, rs) {
-                storage.cleanup_intent_locks_for_tx(tx_id);
-                return Err(e.into());
-            }
-        }
-    }
-
-    let (wal_ops, mem_updates, first_seq) = prepare_commit_ops(storage, tx_id, &ops)?;
+    let (wal_ops, mem_updates) = prepare_commit_ops(storage, tx_id, &ops)?;
 
     let wal = storage.wal.read().await.clone();
 
     if storage.config.group_commit_window_micros == 0 {
-        return single_commit_path(storage, tx_id, wal, wal_ops, mem_updates, first_seq).await;
+        return single_commit_path(storage, tx_id, wal, wal_ops, mem_updates).await;
     }
 
     let queue_guard = storage.pending_commit_queue.lock().await;
@@ -82,7 +69,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         tx_id,
         wal_ops,
         mem_updates,
-        first_seq,
     };
 
     if queue_guard.is_some() {
@@ -95,16 +81,15 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 fn prepare_commit_ops(
     storage: &LsmStorage,
     tx_id: TxId,
-    ops: &[IndexOp<(Vec<u8>, Vec<u8>)>],
-) -> Result<(Vec<(WalOp, u64)>, Vec<(Vec<u8>, Vec<u8>, u64)>, u64)> {
+    ops: &[StagedOp],
+) -> Result<(Vec<(WalOp, u64)>, Vec<(Vec<u8>, Vec<u8>, u64)>)> {
     let mut wal_ops = Vec::with_capacity(ops.len() + 1);
     let mut mem_updates = Vec::with_capacity(ops.len());
 
     for op in ops {
         let seq_no = storage.next_seq_no.fetch_add(1, Ordering::SeqCst);
         match op {
-            IndexOp::Insert { doc_id: _, data } => {
-                let (key, value) = data;
+            StagedOp::Put { key, value } => {
                 wal_ops.push((
                     WalOp::Put {
                         tx_id,
@@ -115,23 +100,15 @@ fn prepare_commit_ops(
                 ));
                 mem_updates.push((key.clone(), value.clone(), seq_no));
             }
-            IndexOp::Delete { doc_id: _, data } => {
-                if let Some((key, _)) = data {
-                    wal_ops.push((
-                        WalOp::Delete {
-                            tx_id,
-                            key: key.clone(),
-                        },
-                        seq_no,
-                    ));
-                    mem_updates.push((key.clone(), Vec::new(), seq_no | TOMBSTONE_BIT));
-                }
-            }
-            _ => {
-                storage.cleanup_intent_locks_for_tx(tx_id);
-                return Err(StoreError::InvalidInput(
-                    "Unsupported operation type staged in LSM commit".to_string(),
+            StagedOp::Delete { key } => {
+                wal_ops.push((
+                    WalOp::Delete {
+                        tx_id,
+                        key: key.clone(),
+                    },
+                    seq_no,
                 ));
+                mem_updates.push((key.clone(), Vec::new(), seq_no | TOMBSTONE_BIT));
             }
         }
     }
@@ -145,17 +122,7 @@ fn prepare_commit_ops(
         tx_end_seq_no,
     ));
 
-    for (key, _, seq_no) in &mem_updates {
-        let raw_seq = seq_no & !TOMBSTONE_BIT;
-        if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-            seq_val.record_commit_key(key, raw_seq);
-        }
-    }
 
-    let first_seq = mem_updates
-        .first()
-        .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
-        .unwrap_or(0);
 
-    Ok((wal_ops, mem_updates, first_seq))
+    Ok((wal_ops, mem_updates))
 }

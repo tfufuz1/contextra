@@ -8,7 +8,7 @@ use super::observer::WriteOrigin;
 use super::*;
 use crate::wal::WalEntry;
 use contextra_ids::{TxId, TOMBSTONE_BIT};
-use contextra_version::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
+use crate::staging::STAGING_ENTRY_OVERHEAD_BYTES;
 
 impl LsmStorage {
     /// Notifies registered observers of committed WAL entries for a transaction.

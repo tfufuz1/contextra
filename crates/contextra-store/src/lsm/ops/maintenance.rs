@@ -12,7 +12,7 @@ use std::sync::atomic::Ordering;
 
 /// Verwirft uncommittete Schreiboperationen einer Transaktion im Staging-Puffer und gibt Intent-Locks frei.
 pub(crate) async fn rollback(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
-    storage.tx_buffer.discard_kv(tx_id);
+    storage.tx_staging.discard(tx_id);
     storage.cleanup_intent_locks_for_tx(tx_id);
     Ok(())
 }

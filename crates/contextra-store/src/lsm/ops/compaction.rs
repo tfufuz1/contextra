@@ -252,14 +252,6 @@ pub(crate) async fn flush(storage: &LsmStorage) -> Result<()> {
             .budget_tracking_drift_bytes
             .store(0, std::sync::atomic::Ordering::Relaxed);
 
-        let prune_bound = storage
-            .tx_buffer
-            .min_read_snapshot()
-            .unwrap_or(u64::MAX)
-            .min(storage.snapshot_registry.min_active_seqno());
-        if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-            seq_val.prune_through(prune_bound);
-        }
 
         tracing::info!("Flushed memtable to SSTable: {} bytes", bytes_freed);
         Ok(())

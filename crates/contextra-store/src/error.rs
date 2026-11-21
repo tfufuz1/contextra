@@ -197,15 +197,3 @@ impl From<contextra_crypto::CryptoError> for StoreError {
 /// Ergebnis-Typ fuer Speicheroperationen.
 pub type StoreResult<T> = std::result::Result<T, StoreError>;
 
-impl From<contextra_version::MvccError> for StoreError {
-    fn from(err: contextra_version::MvccError) -> Self {
-        match err {
-            contextra_version::MvccError::Conflict(s) => StoreError::Conflict(s),
-            contextra_version::MvccError::Transaction(s) => StoreError::Transaction(s),
-            contextra_version::MvccError::LimitExceeded { limit, context } => StoreError::LimitExceeded { limit, context },
-            contextra_version::MvccError::Storage(s) => StoreError::Storage(s),
-            contextra_version::MvccError::InvalidInput(s) => StoreError::InvalidInput(s),
-            other => StoreError::Transaction(other.to_string()),
-        }
-    }
-}

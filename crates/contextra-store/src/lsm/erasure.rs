@@ -135,7 +135,7 @@ impl LsmStorage {
 
         if self.snapshot_registry.min_active_seqno() != u64::MAX {
             return Err(StoreError::Erasure(
-                "purge blocked by open snapshot in SnapshotRegistry".into(),
+                "purge blocked by open snapshot in SnapshotPins".into(),
             ));
         }
 

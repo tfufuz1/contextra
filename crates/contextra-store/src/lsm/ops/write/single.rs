@@ -20,7 +20,6 @@ pub(super) async fn single_commit_path(
     wal: Arc<Wal>,
     wal_ops: Vec<(WalOp, u64)>,
     mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
-    first_seq: u64,
 ) -> Result<()> {
     let (wal_entries, prev_hmac) = wal.prepare_batch(wal_ops).await?;
     let entries_for_observer = if storage.has_observers() {
@@ -34,7 +33,6 @@ pub(super) async fn single_commit_path(
         storage,
         wal: &wal,
         tx_id,
-        first_seq,
         prev_hmac,
         committed: false,
     };

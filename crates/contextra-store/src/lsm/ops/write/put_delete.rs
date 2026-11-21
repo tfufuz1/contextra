@@ -7,10 +7,10 @@
 //! Verwaltet atomare Staged-Writes im TxBuffer sowie TOCTOU-sicheres `put_if_absent`.
 
 use super::super::super::engine::LsmStorage;
-use super::super::super::validate::{derive_doc_id, validate_key, validate_value};
+use super::super::super::validate::{validate_key, validate_value};
 use crate::error::StoreResult as Result;
 use contextra_ids::TxId;
-use contextra_version::IndexOp;
+use crate::staging::StagedOp;
 use std::sync::atomic::Ordering;
 
 /// Schreibt einen Schlüssel-Wert-Eintrag in den Staging-Puffer der Transaktion.
@@ -23,14 +23,9 @@ pub(crate) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[
             "Memory budget exceeded (95%)".into(),
         ));
     }
-    let doc_id = derive_doc_id(key);
-
-    storage.tx_buffer.stage_kv(
+    storage.tx_staging.stage(
         tx_id,
-        IndexOp::Insert {
-            doc_id,
-            data: (key.to_vec(), value.to_vec()),
-        },
+        StagedOp::Put { key: key.to_vec(), value: value.to_vec() },
     )?;
     Ok(())
 }
@@ -52,10 +47,8 @@ pub(crate) async fn put_if_absent(
     }
 
     // 1. Staged write check across all active transactions
-    if let Some(is_insert) = storage.tx_buffer.staged_status(key) {
-        if is_insert {
-            return Ok(false);
-        }
+    if storage.tx_staging.is_put_staged(key) {
+        return Ok(false);
     }
 
     // 2. Intent Lock check and registration
@@ -101,14 +94,9 @@ pub(crate) async fn put_if_absent(
     }
 
     // 4. Stage operation in tx_buffer
-    let doc_id = derive_doc_id(key);
-
-    if let Err(e) = storage.tx_buffer.stage_kv(
+    if let Err(e) = storage.tx_staging.stage(
         tx_id,
-        IndexOp::Insert {
-            doc_id,
-            data: (key.to_vec(), value.to_vec()),
-        },
+        StagedOp::Put { key: key.to_vec(), value: value.to_vec() },
     ) {
         let mut locks = storage
             .intent_locks
@@ -117,7 +105,7 @@ pub(crate) async fn put_if_absent(
         if locks.get(key) == Some(&tx_id) {
             locks.remove(key);
         }
-        return Err(e.into());
+        return Err(e);
     }
 
     Ok(true)
@@ -132,14 +120,9 @@ pub(crate) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Res
             "Memory budget exceeded (95%) — delete staging rejected".into(),
         ));
     }
-    let doc_id = derive_doc_id(key);
-
-    storage.tx_buffer.stage_kv(
+    storage.tx_staging.stage(
         tx_id,
-        IndexOp::Delete {
-            doc_id,
-            data: Some((key.to_vec(), Vec::new())),
-        },
+        StagedOp::Delete { key: key.to_vec() },
     )?;
     Ok(())
 }

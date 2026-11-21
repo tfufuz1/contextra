@@ -23,7 +23,7 @@
 //! - **Compaction**: A background process that merges multiple SSTables into one,
 //!   deduplicating keys and garbage-collecting tombstones.
 //! - **MVCC (Multi-Version Concurrency Control)**: Supports snapshots and transactional
-//!   isolation via sequence numbers and the `SnapshotRegistry`.
+//!   isolation via sequence numbers and the `SnapshotPins`.
 //!
 //! ## Read Path
 //! 1. Check the active MemTable.

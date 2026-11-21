@@ -1,0 +1,1758 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index db031ae4e..a2c2022ff 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -633,10 +633,8 @@ dependencies = [
+  "contextra-crypto",
+  "contextra-durable-fs",
+  "contextra-env",
+- "contextra-erasure",
+  "contextra-ids",
+  "contextra-sys",
+- "contextra-version",
+  "crc32fast",
+  "criterion",
+  "futures",
+diff --git a/crates/contextra-store/Cargo.toml b/crates/contextra-store/Cargo.toml
+index b99810e5e..b6942c5be 100644
+--- a/crates/contextra-store/Cargo.toml
++++ b/crates/contextra-store/Cargo.toml
+@@ -23,7 +23,6 @@ memory-only-storage = []
+ fault-injection = []
+ block-cache-v2 = ["dep:quick_cache"]
+ sieve-cache = []
+-docid-128 = ["contextra-ids/docid-128"]
+ legacy-wal-key = []
+ 
+ [dependencies]
+@@ -31,11 +30,7 @@ contextra-ids = { workspace = true }
+ contextra-env = { workspace = true }
+ contextra-sys = { workspace = true }
+ contextra-durable-fs = { workspace = true }
+-# The erasure-chain contract is an explicit cross-ring contract, not part of
+-# the store domain closure.
+-contextra-erasure = { workspace = true }
+ contextra-crypto = { workspace = true }
+-contextra-version = { workspace = true }
+ ahash = { workspace = true }
+ quick_cache = { version = "0.6", optional = true }
+ bytes = { workspace = true }
+diff --git a/crates/contextra-store/src/compaction/engine.rs b/crates/contextra-store/src/compaction/engine.rs
+index b436a1037..64b120d8e 100644
+--- a/crates/contextra-store/src/compaction/engine.rs
++++ b/crates/contextra-store/src/compaction/engine.rs
+@@ -12,7 +12,7 @@ use super::merge_operator::MergeOperator;
+ use crate::io_seam::RealFs;
+ use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
+ use crate::wal::KeyManager;
+-use contextra_version::SnapshotRegistry;
++use crate::snapshot_pins::SnapshotPins;
+ use crate::stats::StorageStats;
+ use crate::io_seam::Vfs;
+ use crate::error::{StoreError, StoreResult as Result};
+@@ -28,7 +28,7 @@ use tracing;
+ /// Orchestriert die periodische Verdichtung und Bereinigung von SSTables.
+ pub struct CompactionEngine {
+     config: CompactionConfig,
+-    pub(super) snapshot_registry: Arc<SnapshotRegistry>,
++    pub(super) snapshot_registry: Arc<SnapshotPins>,
+     block_cache: Arc<BlockCache>,
+     key_manager: Option<Arc<KeyManager>>,
+     budget: Arc<crate::budget::ResourceTracker>,
+@@ -46,7 +46,7 @@ impl CompactionEngine {
+     /// Creates a new compaction engine.
+     pub fn new(
+         config: CompactionConfig,
+-        snapshot_registry: Arc<SnapshotRegistry>,
++        snapshot_registry: Arc<SnapshotPins>,
+         block_cache: Arc<BlockCache>,
+         key_manager: Option<Arc<KeyManager>>,
+         budget: Arc<crate::budget::ResourceTracker>,
+diff --git a/crates/contextra-store/src/compaction/tests.rs b/crates/contextra-store/src/compaction/tests.rs
+index 714a1a8d9..c15948030 100644
+--- a/crates/contextra-store/src/compaction/tests.rs
++++ b/crates/contextra-store/src/compaction/tests.rs
+@@ -5,7 +5,7 @@
+ use super::*;
+ use crate::sstable::{create_block_cache, BlockCache, SstableBuilder, SstableReader};
+ use contextra_ids::TOMBSTONE_BIT;
+-use contextra_version::SnapshotRegistry;
++use crate::snapshot_pins::SnapshotPins;
+ use std::path::PathBuf;
+ use std::sync::Arc;
+ use std::time::Duration;
+diff --git a/crates/contextra-store/src/compaction/tests/advanced.rs b/crates/contextra-store/src/compaction/tests/advanced.rs
+index 2c3fb0611..534f570e2 100644
+--- a/crates/contextra-store/src/compaction/tests/advanced.rs
++++ b/crates/contextra-store/src/compaction/tests/advanced.rs
+@@ -67,7 +67,7 @@ async fn test_compaction_stress_and_gc() {
+ 
+     // 3. Register a Snapshot [INV-C1]
+     let snapshot_seq = storage.last_seq_no().await.expect("last_seq_no"); // expect
+-    let _guard = storage.snapshot_registry.register(snapshot_seq);
++    storage.snapshot_registry.pin(snapshot_seq); // bleibt bis Testende gepinnt
+ 
+     // 4. Heavy Load: 10,000 Inserts to trigger churn and background compaction
+     for i in 0..10000 {
+@@ -147,7 +147,7 @@ async fn test_compaction_stress_and_gc() {
+ #[tokio::test]
+ async fn test_compaction_swap_maintains_shadowing_order_without_restart() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -271,7 +271,7 @@ async fn test_compaction_swap_maintains_shadowing_order_without_restart() {
+ #[tokio::test]
+ async fn test_phantom_data_after_partial_compaction() {
+     let tmp = TempDir::new().expect("temp dir"); // expect
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let engine = CompactionEngine::new(
+         CompactionConfig {
+@@ -388,7 +388,7 @@ async fn test_compaction_pressure_awareness() {
+     use crate::system_pressure::{PressureLevel, SystemPressure};
+ 
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -516,7 +516,7 @@ async fn test_compaction_pressure_awareness() {
+ 
+ #[tokio::test]
+ async fn test_compaction_cancellation() {
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = crate::sstable::create_block_cache(1024);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -670,7 +670,7 @@ async fn test_concurrent_flush_and_compact_is_safe() {
+ #[tokio::test]
+ async fn test_compaction_single_lock_candidate_selection_concurrency() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -746,7 +746,7 @@ async fn test_compaction_single_lock_candidate_selection_concurrency() {
+ #[tokio::test]
+ async fn test_mvcc_floor_version_retained_for_active_snapshot() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let engine = CompactionEngine::new(
+         CompactionConfig::default(),
+@@ -814,7 +814,7 @@ async fn test_mvcc_floor_version_retained_for_active_snapshot() {
+ #[tokio::test]
+ async fn test_chain_linkage_tier_grouping() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 3,
+@@ -881,7 +881,7 @@ async fn test_chain_linkage_tier_grouping() {
+ #[tokio::test]
+ async fn test_compaction_concurrent_rollback_flush_no_panic() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -977,7 +977,7 @@ async fn test_tombstone_retention_floor_with_active_snapshot() {
+             .await
+             .expect("manifest"),
+     );
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+ 
+     let mut config = CompactionConfig::default();
+     config.min_sstables_per_tier = 2;
+diff --git a/crates/contextra-store/src/compaction/tests/basic.rs b/crates/contextra-store/src/compaction/tests/basic.rs
+index 72bd1b514..192ae78be 100644
+--- a/crates/contextra-store/src/compaction/tests/basic.rs
++++ b/crates/contextra-store/src/compaction/tests/basic.rs
+@@ -45,7 +45,7 @@ fn test_prop_compaction_tombstone_masking_latest_operation_wins() {
+ 
+         rt.block_on(async {
+             let tmp = TempDir::new().unwrap();
+-            let registry = Arc::new(SnapshotRegistry::new());
++            let registry = Arc::new(SnapshotPins::new());
+             let bc = create_block_cache(1);
+             let engine = CompactionEngine::new(
+                 CompactionConfig::default(),
+@@ -134,7 +134,7 @@ fn test_prop_compaction_tombstone_masking_latest_operation_wins() {
+ #[tokio::test]
+ async fn test_compaction_candidate_selection_follows_chronological_order() {
+     let tmp = TempDir::new().expect("temp dir"); // expect
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -219,7 +219,7 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
+ #[tokio::test]
+ async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let engine = CompactionEngine::new(
+         CompactionConfig::default(),
+@@ -279,7 +279,7 @@ async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
+ #[tokio::test]
+ async fn test_mvcc_retention_older_versions_below_floor_discarded() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let engine = CompactionEngine::new(
+         CompactionConfig::default(),
+@@ -347,7 +347,7 @@ async fn test_mvcc_retention_older_versions_below_floor_discarded() {
+ #[tokio::test]
+ async fn test_merge_deduplication() {
+     let tmp = TempDir::new().expect("temp dir"); // expect
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let engine = CompactionEngine::new(
+         CompactionConfig::default(),
+@@ -400,7 +400,7 @@ async fn test_merge_deduplication() {
+ #[tokio::test]
+ async fn test_tombstone_gc_stream_advancement_preserves_subsequent_keys() {
+     let tmp = TempDir::new().expect("temp dir"); // expect
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let engine = CompactionEngine::new(
+         CompactionConfig::default(),
+@@ -460,7 +460,7 @@ async fn test_tombstone_gc_stream_advancement_preserves_subsequent_keys() {
+ #[tokio::test]
+ async fn test_tombstone_gc() {
+     let tmp = TempDir::new().expect("temp dir"); // expect
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let engine = CompactionEngine::new(
+         CompactionConfig::default(),
+@@ -504,7 +504,7 @@ async fn test_tombstone_gc() {
+ #[tokio::test]
+ async fn test_tombstone_preserved_with_active_snapshot() {
+     let tmp = TempDir::new().expect("temp dir"); // expect
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let engine = CompactionEngine::new(
+         CompactionConfig::default(),
+@@ -547,7 +547,7 @@ async fn test_tombstone_preserved_with_active_snapshot() {
+ #[tokio::test]
+ async fn test_maybe_compact_full_cycle() {
+     let tmp = TempDir::new().expect("temp dir"); // expect
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2, // Low threshold for testing
+@@ -616,7 +616,7 @@ async fn test_maybe_compact_full_cycle() {
+ #[tokio::test]
+ async fn test_no_compaction_below_threshold() {
+     let tmp = TempDir::new().expect("temp dir"); // expect
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 4,
+@@ -659,7 +659,7 @@ async fn test_no_compaction_below_threshold() {
+ #[tokio::test]
+ async fn test_compaction_aborts_on_concurrent_modification() {
+     let tmp = TempDir::new().expect("temp dir"); // expect
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -711,7 +711,7 @@ async fn test_compaction_aborts_on_concurrent_modification() {
+ #[tokio::test]
+ async fn test_compaction_removes_uuid_sidecar_files() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -795,7 +795,7 @@ async fn test_compaction_removes_uuid_sidecar_files() {
+ #[tokio::test]
+ async fn test_compaction_swap_restores_shadowing_order_without_restart() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -921,7 +921,7 @@ async fn test_compaction_swap_debug_assert_detects_unsorted_list() {
+ #[tokio::test]
+ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -985,7 +985,7 @@ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
+ #[tokio::test]
+ async fn test_compaction_succeeds_when_peak_memory_within_limit() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -1029,7 +1029,7 @@ async fn test_compaction_succeeds_when_peak_memory_within_limit() {
+ #[tokio::test]
+ async fn test_compaction_backpressure_timeout_exceeded() {
+     let tmp = TempDir::new().expect("temp dir");
+-    let registry = Arc::new(SnapshotRegistry::new());
++    let registry = Arc::new(SnapshotPins::new());
+     let bc = create_block_cache(1);
+     let config = CompactionConfig {
+         min_sstables_per_tier: 2,
+@@ -1087,7 +1087,7 @@ fn test_generate_sst_path_uniqueness() {
+     let tmp = TempDir::new().expect("temp dir"); // expect
+     let engine = CompactionEngine::new(
+         CompactionConfig::default(),
+-        Arc::new(SnapshotRegistry::new()),
++        Arc::new(SnapshotPins::new()),
+         create_block_cache(1),
+         None,
+         Arc::new(crate::budget::ResourceTracker::new(
+@@ -1113,7 +1113,7 @@ async fn test_compact_all_and_compact_range_neutral_maintenance() {
+             min_sstables_per_tier: 2,
+             ..Default::default()
+         },
+-        Arc::new(SnapshotRegistry::new()),
++        Arc::new(SnapshotPins::new()),
+         create_block_cache(10),
+         None,
+         Arc::new(crate::budget::ResourceTracker::new(
+diff --git a/crates/contextra-store/src/error.rs b/crates/contextra-store/src/error.rs
+index 8d72d1ad3..882515bfb 100644
+--- a/crates/contextra-store/src/error.rs
++++ b/crates/contextra-store/src/error.rs
+@@ -197,15 +197,3 @@ impl From<contextra_crypto::CryptoError> for StoreError {
+ /// Ergebnis-Typ fuer Speicheroperationen.
+ pub type StoreResult<T> = std::result::Result<T, StoreError>;
+ 
+-impl From<contextra_version::MvccError> for StoreError {
+-    fn from(err: contextra_version::MvccError) -> Self {
+-        match err {
+-            contextra_version::MvccError::Conflict(s) => StoreError::Conflict(s),
+-            contextra_version::MvccError::Transaction(s) => StoreError::Transaction(s),
+-            contextra_version::MvccError::LimitExceeded { limit, context } => StoreError::LimitExceeded { limit, context },
+-            contextra_version::MvccError::Storage(s) => StoreError::Storage(s),
+-            contextra_version::MvccError::InvalidInput(s) => StoreError::InvalidInput(s),
+-            other => StoreError::Transaction(other.to_string()),
+-        }
+-    }
+-}
+diff --git a/crates/contextra-store/src/lib.rs b/crates/contextra-store/src/lib.rs
+index e24e2a374..2d5374ecf 100644
+--- a/crates/contextra-store/src/lib.rs
++++ b/crates/contextra-store/src/lib.rs
+@@ -53,6 +53,8 @@ pub mod error;
+ pub mod traits;
+ pub use error::{StoreError, StoreResult};
+ pub mod budget;
++pub mod snapshot_pins;
++pub(crate) mod staging;
+ pub mod stats;
+ 
+ #[cfg(not(loom))]
+@@ -63,8 +65,6 @@ pub mod key_source;
+ #[cfg(not(loom))]
+ pub mod lsm;
+ #[cfg(not(loom))]
+-pub mod store_layer;
+-#[cfg(not(loom))]
+ pub mod manifest;
+ #[cfg(not(loom))]
+ pub mod memtable;
+@@ -78,6 +78,7 @@ pub mod tenant_codec;
+ pub mod util;
+ pub mod wal;
+ 
++pub use snapshot_pins::SnapshotPins;
+ pub use util::{RecordAuthenticator, RecordSealer, SealedEnvelope};
+ 
+ #[cfg(not(loom))]
+@@ -96,8 +97,6 @@ pub use lsm::{
+     DEFAULT_MAX_OBSERVER_LATENCY,
+ };
+ #[cfg(not(loom))]
+-pub use store_layer::StoreLayer;
+-#[cfg(not(loom))]
+ pub use manifest::{Manifest, ManifestEntry};
+ #[cfg(not(loom))]
+ pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
+diff --git a/crates/contextra-store/src/lsm/commit.rs b/crates/contextra-store/src/lsm/commit.rs
+index c52514f78..9eeef33f2 100644
+--- a/crates/contextra-store/src/lsm/commit.rs
++++ b/crates/contextra-store/src/lsm/commit.rs
+@@ -8,7 +8,7 @@ use super::observer::WriteOrigin;
+ use super::*;
+ use crate::wal::WalEntry;
+ use contextra_ids::{TxId, TOMBSTONE_BIT};
+-use contextra_version::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
++use crate::staging::STAGING_ENTRY_OVERHEAD_BYTES;
+ 
+ impl LsmStorage {
+     /// Notifies registered observers of committed WAL entries for a transaction.
+diff --git a/crates/contextra-store/src/lsm/config.rs b/crates/contextra-store/src/lsm/config.rs
+index 6ff2b23ff..a42e2d02b 100644
+--- a/crates/contextra-store/src/lsm/config.rs
++++ b/crates/contextra-store/src/lsm/config.rs
+@@ -91,9 +91,6 @@ pub struct LsmConfig {
+     pub block_cache_shards: usize,
+     /// Durability mode for WAL persistence and integrity checks.
+     pub durability_mode: DurabilityMode,
+-    /// Maximum capacity of committed write keys tracked in SSI validator before pruning or rejecting.
+-    /// Default is 1,000,000 keys.
+-    pub ssi_max_tracked_keys: usize,
+     /// Optional Vfs instance for file operations.
+     #[serde(skip)]
+     pub vfs: Option<crate::io_seam::StoreIo>,
+@@ -117,7 +114,6 @@ impl Default for LsmConfig {
+             group_commit_window_micros: 500,
+             block_cache_shards: 64,
+             durability_mode: DurabilityMode::default(),
+-            ssi_max_tracked_keys: 1_000_000,
+             vfs: None,
+             clock: default_clock(),
+             key_source: default_key_source(),
+diff --git a/crates/contextra-store/src/lsm/engine.rs b/crates/contextra-store/src/lsm/engine.rs
+index d60d519a4..8a1f654a2 100644
+--- a/crates/contextra-store/src/lsm/engine.rs
++++ b/crates/contextra-store/src/lsm/engine.rs
+@@ -15,7 +15,8 @@ use crate::sstable::{BlockCache, SstableReader};
+ use crate::wal::KeyManager;
+ use crate::wal::Wal;
+ use bytes::Bytes;
+-use contextra_version::{SnapshotRegistry, TxBuffer};
++use crate::snapshot_pins::SnapshotPins;
++use crate::staging::TxStaging;
+ use crate::budget::ResourceTracker;
+ use crate::error::StoreResult as Result;
+ use contextra_ids::TxId;
+@@ -39,11 +40,11 @@ pub struct LsmStorage {
+     pub(super) state: RwLock<LsmState>,
+     /// SSTables stored separately for shared access with compaction engine.
+     pub(super) sstables: Arc<RwLock<Vec<Arc<SstableReader>>>>,
+-    pub(super) tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
++    pub(super) tx_staging: TxStaging,
+     pub(super) budget: Arc<crate::budget::ResourceTracker>,
+     pub(super) block_cache: Arc<BlockCache>,
+     pub(super) wal: RwLock<Arc<Wal>>,
+-    pub snapshot_registry: Arc<SnapshotRegistry>,
++    pub(crate) snapshot_registry: Arc<SnapshotPins>,
+     /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
+     /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).
+     pub(super) compaction_engine: Arc<CompactionEngine>,
+@@ -72,8 +73,6 @@ pub struct LsmStorage {
+     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
+     pub(super) observer_registry: ObserverRegistry,
+     pub(super) clock: parking_lot::RwLock<Arc<dyn contextra_env::Clock>>,
+-    pub ssi_validator: Arc<dyn contextra_version::SsiValidator + Send + Sync>,
+-    pub(super) sequence_log_ssi_validator: Option<Arc<contextra_version::SequenceLogSsiValidator>>,
+     pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_env::MetricsSink>>>,
+ }
+ 
+@@ -247,68 +246,6 @@ impl LsmStorage {
+         self
+     }
+ 
+-    /// Sets or replaces the [`contextra_version::SsiValidator`] port for transaction conflict detection.
+-    pub fn set_ssi_validator(
+-        &mut self,
+-        validator: Arc<dyn contextra_version::SsiValidator + Send + Sync>,
+-    ) {
+-        self.ssi_validator = validator;
+-        self.sequence_log_ssi_validator = None;
+-    }
+-
+-    /// Configures the [`contextra_version::SsiValidator`] fluently on `self` and returns `self`.
+-    pub fn with_ssi_validator(
+-        mut self,
+-        validator: Arc<dyn contextra_version::SsiValidator + Send + Sync>,
+-    ) -> Self {
+-        self.set_ssi_validator(validator);
+-        self
+-    }
+-
+-    /// Performs a tracked read for transaction `tx_id`.
+-    ///
+-    /// Evaluates `snapshot_seq = next_seq_no - 1` ONCE (K2), registers the read key in `TxBuffer`,
+-    /// and reads the key at `snapshot_seq`.
+-    ///
+-    /// # SSI Protection Scope
+-    /// ONLY keys read via `get_tracked` or `get_at_seq_tracked` within transaction `tx_id` are registered
+-    /// in the transaction's `ReadSet` and receive Serializable Snapshot Isolation (SSI) conflict validation
+-    /// during commit. Untracked reads via `StorageEngine::get()` or `LsmStorage::get()` perform point-in-time
+-    /// snapshot reads without transaction tracking and do NOT receive SSI write-skew protection.
+-    pub async fn get_tracked(&self, tx_id: TxId, key: &[u8]) -> Result<Option<Bytes>> {
+-        read::get_tracked(self, tx_id, key).await
+-    }
+-
+-    /// Performs a tracked read for transaction `tx_id` at an explicit `snapshot_seq`.
+-    ///
+-    /// Registers the read key in `TxBuffer` at `snapshot_seq` and reads the key at `snapshot_seq`.
+-    ///
+-    /// # SSI Protection Scope
+-    /// ONLY keys read via `get_tracked` or `get_at_seq_tracked` within transaction `tx_id` are registered
+-    /// in the transaction's `ReadSet` and receive Serializable Snapshot Isolation (SSI) conflict validation
+-    /// during commit. Untracked reads via `StorageEngine::get()` or `LsmStorage::get()` perform point-in-time
+-    /// snapshot reads without transaction tracking and do NOT receive SSI write-skew protection.
+-    pub async fn get_at_seq_tracked(
+-        &self,
+-        tx_id: TxId,
+-        key: &[u8],
+-        snapshot_seq: u64,
+-    ) -> Result<Option<Bytes>> {
+-        read::get_at_seq_tracked(self, tx_id, key, snapshot_seq).await
+-    }
+-
+-    /// Performs a tracked prefix scan for transaction `tx_id`.
+-    ///
+-    /// Evaluates `snapshot_seq = last_applied_seq` ONCE, scans all matching entries, and registers
+-    /// each scanned key in transaction `tx_id`'s `ReadSet`.
+-    pub async fn scan_prefix_tracked(
+-        &self,
+-        tx_id: TxId,
+-        prefix: &[u8],
+-    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+-        read::scan_prefix_tracked(self, tx_id, prefix).await
+-    }
+-
+     /// Returns the highest sequence number applied to the MemTable and published.
+     pub fn last_applied_seq(&self) -> u64 {
+         self.last_applied_seq
+diff --git a/crates/contextra-store/src/lsm/erasure.rs b/crates/contextra-store/src/lsm/erasure.rs
+index f55195309..26f6b71c3 100644
+--- a/crates/contextra-store/src/lsm/erasure.rs
++++ b/crates/contextra-store/src/lsm/erasure.rs
+@@ -135,7 +135,7 @@ impl LsmStorage {
+ 
+         if self.snapshot_registry.min_active_seqno() != u64::MAX {
+             return Err(StoreError::Erasure(
+-                "purge blocked by open snapshot in SnapshotRegistry".into(),
++                "purge blocked by open snapshot in SnapshotPins".into(),
+             ));
+         }
+ 
+diff --git a/crates/contextra-store/src/lsm/mod.rs b/crates/contextra-store/src/lsm/mod.rs
+index 5a916a0b9..f4be7db70 100644
+--- a/crates/contextra-store/src/lsm/mod.rs
++++ b/crates/contextra-store/src/lsm/mod.rs
+@@ -23,7 +23,7 @@
+ //! - **Compaction**: A background process that merges multiple SSTables into one,
+ //!   deduplicating keys and garbage-collecting tombstones.
+ //! - **MVCC (Multi-Version Concurrency Control)**: Supports snapshots and transactional
+-//!   isolation via sequence numbers and the `SnapshotRegistry`.
++//!   isolation via sequence numbers and the `SnapshotPins`.
+ //!
+ //! ## Read Path
+ //! 1. Check the active MemTable.
+diff --git a/crates/contextra-store/src/lsm/ops/compaction.rs b/crates/contextra-store/src/lsm/ops/compaction.rs
+index e71d92f27..d3d8d231a 100644
+--- a/crates/contextra-store/src/lsm/ops/compaction.rs
++++ b/crates/contextra-store/src/lsm/ops/compaction.rs
+@@ -252,14 +252,6 @@ pub(crate) async fn flush(storage: &LsmStorage) -> Result<()> {
+             .budget_tracking_drift_bytes
+             .store(0, std::sync::atomic::Ordering::Relaxed);
+ 
+-        let prune_bound = storage
+-            .tx_buffer
+-            .min_read_snapshot()
+-            .unwrap_or(u64::MAX)
+-            .min(storage.snapshot_registry.min_active_seqno());
+-        if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
+-            seq_val.prune_through(prune_bound);
+-        }
+ 
+         tracing::info!("Flushed memtable to SSTable: {} bytes", bytes_freed);
+         Ok(())
+diff --git a/crates/contextra-store/src/lsm/ops/maintenance.rs b/crates/contextra-store/src/lsm/ops/maintenance.rs
+index a9ace0383..21560b0f3 100644
+--- a/crates/contextra-store/src/lsm/ops/maintenance.rs
++++ b/crates/contextra-store/src/lsm/ops/maintenance.rs
+@@ -12,7 +12,7 @@ use std::sync::atomic::Ordering;
+ 
+ /// Verwirft uncommittete Schreiboperationen einer Transaktion im Staging-Puffer und gibt Intent-Locks frei.
+ pub(crate) async fn rollback(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
+-    storage.tx_buffer.discard_kv(tx_id);
++    storage.tx_staging.discard(tx_id);
+     storage.cleanup_intent_locks_for_tx(tx_id);
+     Ok(())
+ }
+diff --git a/crates/contextra-store/src/lsm/ops/read.rs b/crates/contextra-store/src/lsm/ops/read.rs
+index 1b70e159d..efb7bd68d 100644
+--- a/crates/contextra-store/src/lsm/ops/read.rs
++++ b/crates/contextra-store/src/lsm/ops/read.rs
+@@ -15,60 +15,6 @@ use crate::error::StoreResult as Result;
+ use contextra_ids::TOMBSTONE_BIT;
+ use std::sync::atomic::Ordering;
+ 
+-pub(crate) async fn get_tracked(
+-    storage: &LsmStorage,
+-    tx_id: contextra_ids::TxId,
+-    key: &[u8],
+-) -> Result<Option<Bytes>> {
+-    validate_key(key)?;
+-    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+-    get_at_seq_tracked(storage, tx_id, key, snapshot_seq).await
+-}
+-
+-/// Retrieves a value by key at `snapshot_seq`, registering the read in the transaction's ReadSet.
+-///
+-/// # Invarianten & SSI ReadSet Clamping
+-/// `INV-MVCC-SSI-1`: A caller passing `snapshot_seq = u64::MAX` intends to read the latest state.
+-/// To accurately detect concurrent write conflicts during transaction commit, the registered
+-/// sequence number must reflect the actual sequence number observed at the time of the read,
+-/// rather than `u64::MAX`. Therefore, the registered sequence number is clamped to
+-/// `min(snapshot_seq, storage.last_applied_seq.load(Ordering::Acquire))`, captured *before* reading.
+-/// Registrieren eines Werts, der nicht größer ist als der tatsächlich gelesene, ist konservativ (im Zweifel ein Konflikt, nie ein übersehener).
+-/// Reading semantics remain unchanged and continue to query `storage.get_at_seq(key, snapshot_seq)`.
+-///
+-/// # Hinweis zu Phantomschutz
+-/// Note: `scan_prefix_tracked` currently does not offer phantom protection; phantom protection is
+-/// handled in a separate task.
+-pub(crate) async fn get_at_seq_tracked(
+-    storage: &LsmStorage,
+-    tx_id: contextra_ids::TxId,
+-    key: &[u8],
+-    snapshot_seq: u64,
+-) -> Result<Option<Bytes>> {
+-    validate_key(key)?;
+-    let current_seq = storage.last_applied_seq.load(Ordering::Acquire);
+-    let registered_seq = snapshot_seq.min(current_seq);
+-    storage
+-        .tx_buffer
+-        .register_read(tx_id, key.to_vec(), registered_seq);
+-    storage.get_at_seq(key, snapshot_seq).await
+-}
+-
+-pub(crate) async fn scan_prefix_tracked(
+-    storage: &LsmStorage,
+-    tx_id: contextra_ids::TxId,
+-    prefix: &[u8],
+-) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+-    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+-    let results = storage.scan_prefix_at(prefix, snapshot_seq).await?;
+-    for (k, _) in &results {
+-        storage
+-            .tx_buffer
+-            .register_read(tx_id, k.clone(), snapshot_seq);
+-    }
+-    Ok(results)
+-}
+-
+ pub(crate) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {
+     validate_key(key)?;
+     let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+diff --git a/crates/contextra-store/src/lsm/ops/write/batch.rs b/crates/contextra-store/src/lsm/ops/write/batch.rs
+index ec93ae22b..fb44bac3b 100644
+--- a/crates/contextra-store/src/lsm/ops/write/batch.rs
++++ b/crates/contextra-store/src/lsm/ops/write/batch.rs
+@@ -5,11 +5,11 @@
+ //! // INVARIANTEN: MAX_BATCH_SIZE Schranke, fail-closed
+ 
+ use super::super::super::engine::LsmStorage;
+-use super::super::super::validate::{derive_doc_id, validate_key};
++use super::super::super::validate::validate_key;
+ use super::super::super::MAX_BATCH_SIZE;
+ use crate::error::{StoreError, StoreResult as Result};
+ use contextra_ids::TxId;
+-use contextra_version::IndexOp;
++use crate::staging::StagedOp;
+ 
+ /// Löscht mehrere Schlüssel in einem einzigen atomaren Staging-Schritt.
+ pub(crate) async fn delete_many(
+@@ -38,17 +38,8 @@ pub(crate) async fn delete_many(
+         return Ok(0);
+     }
+ 
+-    let ops: Vec<IndexOp<(Vec<u8>, Vec<u8>)>> = keys
+-        .into_iter()
+-        .map(|key| {
+-            let doc_id = derive_doc_id(&key);
+-            IndexOp::Delete {
+-                doc_id,
+-                data: Some((key, Vec::new())),
+-            }
+-        })
+-        .collect();
++    let ops: Vec<StagedOp> = keys.into_iter().map(|key| StagedOp::Delete { key }).collect();
+ 
+-    storage.tx_buffer.stage_many(tx_id, ops)?;
++    storage.tx_staging.stage_many(tx_id, ops)?;
+     Ok(count)
+ }
+diff --git a/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs b/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs
+index 13b00e4b4..338d7c674 100644
+--- a/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs
++++ b/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs
+@@ -12,7 +12,7 @@ use super::group::{follower_commit_path, leader_commit_path, GroupCommitParams};
+ use super::single::single_commit_path;
+ use crate::error::{StoreError, StoreResult as Result};
+ use contextra_ids::{TxId, TOMBSTONE_BIT};
+-use contextra_version::IndexOp;
++use crate::staging::StagedOp;
+ use std::sync::atomic::Ordering;
+ 
+ /// Commits staged transaction operations to disk and memory.
+@@ -48,32 +48,19 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
+     // LOCK ORDER (SPEC §3.5, INV-LOCK-ORDER-1, see lsm::lock_order::RANK_COMMIT_MUTEX):
+     let commit_lock = storage.commit_mutex.lock().await;
+ 
+-    // 1. ReadSet VOR drain_kv
+-    let read_set = storage.tx_buffer.get_read_set(tx_id);
+-
+     // 2. Transaktions-Operationen aus TxBuffer entnehmen
+-    let ops = storage.tx_buffer.drain_kv(tx_id);
++    let ops = storage.tx_staging.drain(tx_id);
+     if ops.is_empty() {
+         storage.cleanup_intent_locks_for_tx(tx_id);
+         return Ok(());
+     }
+ 
+-    // 3. SSI ReadSet Validierung unter commit_mutex
+-    if let Some(ref rs) = read_set {
+-        if !rs.is_empty() {
+-            if let Err(e) = storage.ssi_validator.validate(tx_id, rs) {
+-                storage.cleanup_intent_locks_for_tx(tx_id);
+-                return Err(e.into());
+-            }
+-        }
+-    }
+-
+-    let (wal_ops, mem_updates, first_seq) = prepare_commit_ops(storage, tx_id, &ops)?;
++    let (wal_ops, mem_updates) = prepare_commit_ops(storage, tx_id, &ops)?;
+ 
+     let wal = storage.wal.read().await.clone();
+ 
+     if storage.config.group_commit_window_micros == 0 {
+-        return single_commit_path(storage, tx_id, wal, wal_ops, mem_updates, first_seq).await;
++        return single_commit_path(storage, tx_id, wal, wal_ops, mem_updates).await;
+     }
+ 
+     let queue_guard = storage.pending_commit_queue.lock().await;
+@@ -82,7 +69,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
+         tx_id,
+         wal_ops,
+         mem_updates,
+-        first_seq,
+     };
+ 
+     if queue_guard.is_some() {
+@@ -95,16 +81,15 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
+ fn prepare_commit_ops(
+     storage: &LsmStorage,
+     tx_id: TxId,
+-    ops: &[IndexOp<(Vec<u8>, Vec<u8>)>],
+-) -> Result<(Vec<(WalOp, u64)>, Vec<(Vec<u8>, Vec<u8>, u64)>, u64)> {
++    ops: &[StagedOp],
++) -> Result<(Vec<(WalOp, u64)>, Vec<(Vec<u8>, Vec<u8>, u64)>)> {
+     let mut wal_ops = Vec::with_capacity(ops.len() + 1);
+     let mut mem_updates = Vec::with_capacity(ops.len());
+ 
+     for op in ops {
+         let seq_no = storage.next_seq_no.fetch_add(1, Ordering::SeqCst);
+         match op {
+-            IndexOp::Insert { doc_id: _, data } => {
+-                let (key, value) = data;
++            StagedOp::Put { key, value } => {
+                 wal_ops.push((
+                     WalOp::Put {
+                         tx_id,
+@@ -115,23 +100,15 @@ fn prepare_commit_ops(
+                 ));
+                 mem_updates.push((key.clone(), value.clone(), seq_no));
+             }
+-            IndexOp::Delete { doc_id: _, data } => {
+-                if let Some((key, _)) = data {
+-                    wal_ops.push((
+-                        WalOp::Delete {
+-                            tx_id,
+-                            key: key.clone(),
+-                        },
+-                        seq_no,
+-                    ));
+-                    mem_updates.push((key.clone(), Vec::new(), seq_no | TOMBSTONE_BIT));
+-                }
+-            }
+-            _ => {
+-                storage.cleanup_intent_locks_for_tx(tx_id);
+-                return Err(StoreError::InvalidInput(
+-                    "Unsupported operation type staged in LSM commit".to_string(),
++            StagedOp::Delete { key } => {
++                wal_ops.push((
++                    WalOp::Delete {
++                        tx_id,
++                        key: key.clone(),
++                    },
++                    seq_no,
+                 ));
++                mem_updates.push((key.clone(), Vec::new(), seq_no | TOMBSTONE_BIT));
+             }
+         }
+     }
+@@ -145,17 +122,7 @@ fn prepare_commit_ops(
+         tx_end_seq_no,
+     ));
+ 
+-    for (key, _, seq_no) in &mem_updates {
+-        let raw_seq = seq_no & !TOMBSTONE_BIT;
+-        if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
+-            seq_val.record_commit_key(key, raw_seq);
+-        }
+-    }
+ 
+-    let first_seq = mem_updates
+-        .first()
+-        .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+-        .unwrap_or(0);
+ 
+-    Ok((wal_ops, mem_updates, first_seq))
++    Ok((wal_ops, mem_updates))
+ }
+diff --git a/crates/contextra-store/src/lsm/ops/write/group.rs b/crates/contextra-store/src/lsm/ops/write/group.rs
+index 89c90d489..5361ebe4e 100644
+--- a/crates/contextra-store/src/lsm/ops/write/group.rs
++++ b/crates/contextra-store/src/lsm/ops/write/group.rs
+@@ -22,7 +22,6 @@ pub(super) struct GroupCommitParams {
+     pub(super) tx_id: TxId,
+     pub(super) wal_ops: Vec<(WalOp, u64)>,
+     pub(super) mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
+-    pub(super) first_seq: u64,
+ }
+ 
+ pub(super) async fn follower_commit_path(
+@@ -40,7 +39,6 @@ pub(super) async fn follower_commit_path(
+         }
+     };
+     let tx_id = params.tx_id;
+-    let first_seq = params.first_seq;
+     let _wal_queue_guard = WalQueueGuard::new(Arc::clone(&storage.wal_queue_depth));
+     let (tx, mut rx) = tokio::sync::oneshot::channel();
+     let committed_flag = Arc::clone(&queue.committed_flag);
+@@ -70,11 +68,6 @@ pub(super) async fn follower_commit_path(
+             if committed_flag.load(Ordering::Acquire) {
+                 Ok(())
+             } else {
+-                if first_seq > 0 {
+-                    if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
+-                        seq_val.forget_from(first_seq);
+-                    }
+-                }
+                 storage.cleanup_intent_locks_for_tx(tx_id);
+                 Err(crate::error::StoreError::Storage(
+                     "Commit failed at WAL append after leader cancellation".into(),
+@@ -93,11 +86,6 @@ pub(super) async fn follower_commit_path(
+                     queue.requests.retain(|r| r.tx_id != tx_id);
+                 }
+                 drop(queue_guard);
+-                if first_seq > 0 {
+-                    if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
+-                        seq_val.forget_from(first_seq);
+-                    }
+-                }
+                 storage.cleanup_intent_locks_for_tx(tx_id);
+                 Err(crate::error::StoreError::CommitTimeout {
+                     tx_id: tx_id.inner(),
+@@ -105,11 +93,6 @@ pub(super) async fn follower_commit_path(
+             } else {
+                 drop(queue_guard);
+                 if !committed_flag.load(Ordering::Acquire) {
+-                    if first_seq > 0 {
+-                        if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
+-                            seq_val.forget_from(first_seq);
+-                        }
+-                    }
+                     storage.cleanup_intent_locks_for_tx(tx_id);
+                     Err(crate::error::StoreError::CommitTimeout {
+                         tx_id: tx_id.inner(),
+@@ -137,7 +120,6 @@ pub(super) async fn leader_commit_path(
+     let leader_tx_id = params.tx_id;
+     let leader_wal_ops = params.wal_ops;
+     let leader_mem_updates = params.mem_updates;
+-    let first_seq = params.first_seq;
+ 
+     let notify_full = Arc::new(tokio::sync::Notify::new());
+     let committed_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+@@ -152,7 +134,6 @@ pub(super) async fn leader_commit_path(
+         storage,
+         wal: &wal,
+         leader_tx_id,
+-        leader_first_seq: first_seq,
+         pending_queue: None,
+         prev_hmac: None,
+         committed: false,
+@@ -229,16 +210,6 @@ pub(super) async fn leader_commit_path(
+         );
+         if let Some(pending_queue) = leader_guard.pending_queue.take() {
+             for r in pending_queue.requests {
+-                let r_first_seq = r
+-                    .mem_updates
+-                    .first()
+-                    .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+-                    .unwrap_or(0);
+-                if r_first_seq > 0 {
+-                    if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
+-                        seq_val.forget_from(r_first_seq);
+-                    }
+-                }
+                 storage.cleanup_intent_locks_for_tx(r.tx_id);
+                 let _ = r.sender.send(Err(crate::error::StoreError::Storage(err_msg.clone())));
+             }
+diff --git a/crates/contextra-store/src/lsm/ops/write/guards.rs b/crates/contextra-store/src/lsm/ops/write/guards.rs
+index b64f3536c..5e26e35a4 100644
+--- a/crates/contextra-store/src/lsm/ops/write/guards.rs
++++ b/crates/contextra-store/src/lsm/ops/write/guards.rs
+@@ -27,7 +27,6 @@ pub(super) struct SingleCommitGuard<'a> {
+     pub(super) storage: &'a LsmStorage,
+     pub(super) wal: &'a Wal,
+     pub(super) tx_id: TxId,
+-    pub(super) first_seq: u64,
+     pub(super) prev_hmac: [u8; 32],
+     pub(super) committed: bool,
+ }
+@@ -39,11 +38,6 @@ impl<'a> Drop for SingleCommitGuard<'a> {
+                 self.wal
+                     .poison_with_cause(PoisonCause::HmacChainDiverged);
+             }
+-            if self.first_seq > 0 {
+-                if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
+-                    seq_val.forget_from(self.first_seq);
+-                }
+-            }
+             self.storage.cleanup_intent_locks_for_tx(self.tx_id);
+         }
+     }
+@@ -53,7 +47,6 @@ pub(super) struct LeaderCancelGuard<'a> {
+     pub(super) storage: &'a LsmStorage,
+     pub(super) wal: &'a Wal,
+     pub(super) leader_tx_id: TxId,
+-    pub(super) leader_first_seq: u64,
+     pub(super) pending_queue: Option<PendingCommitQueue>,
+     pub(super) prev_hmac: Option<[u8; 32]>,
+     pub(super) committed: bool,
+@@ -72,16 +65,6 @@ impl<'a> Drop for LeaderCancelGuard<'a> {
+             }
+             if let Some(pending_queue) = self.pending_queue.take() {
+                 for r in pending_queue.requests {
+-                    let r_first_seq = r
+-                        .mem_updates
+-                        .first()
+-                        .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+-                        .unwrap_or(0);
+-                    if r_first_seq > 0 {
+-                        if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
+-                            seq_val.forget_from(r_first_seq);
+-                        }
+-                    }
+                     self.storage.cleanup_intent_locks_for_tx(r.tx_id);
+                     let err_msg = if hmac_diverged {
+                         "Leader cancelled group commit: WAL HMAC chain diverged (handle poisoned)"
+@@ -93,16 +76,6 @@ impl<'a> Drop for LeaderCancelGuard<'a> {
+             } else if let Ok(mut queue_guard) = self.storage.pending_commit_queue.try_lock() {
+                 if let Some(pending_queue) = queue_guard.take() {
+                     for r in pending_queue.requests {
+-                        let r_first_seq = r
+-                            .mem_updates
+-                            .first()
+-                            .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+-                            .unwrap_or(0);
+-                        if r_first_seq > 0 {
+-                            if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
+-                                seq_val.forget_from(r_first_seq);
+-                            }
+-                        }
+                         self.storage.cleanup_intent_locks_for_tx(r.tx_id);
+                         let err_msg = if hmac_diverged {
+                             "Leader cancelled group commit: WAL HMAC chain diverged (handle poisoned)"
+@@ -113,11 +86,6 @@ impl<'a> Drop for LeaderCancelGuard<'a> {
+                     }
+                 }
+             }
+-            if self.leader_first_seq > 0 {
+-                if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
+-                    seq_val.forget_from(self.leader_first_seq);
+-                }
+-            }
+             self.storage.cleanup_intent_locks_for_tx(self.leader_tx_id);
+         }
+     }
+diff --git a/crates/contextra-store/src/lsm/ops/write/put_delete.rs b/crates/contextra-store/src/lsm/ops/write/put_delete.rs
+index de663f313..9246a1ec8 100644
+--- a/crates/contextra-store/src/lsm/ops/write/put_delete.rs
++++ b/crates/contextra-store/src/lsm/ops/write/put_delete.rs
+@@ -7,10 +7,10 @@
+ //! Verwaltet atomare Staged-Writes im TxBuffer sowie TOCTOU-sicheres `put_if_absent`.
+ 
+ use super::super::super::engine::LsmStorage;
+-use super::super::super::validate::{derive_doc_id, validate_key, validate_value};
++use super::super::super::validate::{validate_key, validate_value};
+ use crate::error::StoreResult as Result;
+ use contextra_ids::TxId;
+-use contextra_version::IndexOp;
++use crate::staging::StagedOp;
+ use std::sync::atomic::Ordering;
+ 
+ /// Schreibt einen Schlüssel-Wert-Eintrag in den Staging-Puffer der Transaktion.
+@@ -23,14 +23,9 @@ pub(crate) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[
+             "Memory budget exceeded (95%)".into(),
+         ));
+     }
+-    let doc_id = derive_doc_id(key);
+-
+-    storage.tx_buffer.stage_kv(
++    storage.tx_staging.stage(
+         tx_id,
+-        IndexOp::Insert {
+-            doc_id,
+-            data: (key.to_vec(), value.to_vec()),
+-        },
++        StagedOp::Put { key: key.to_vec(), value: value.to_vec() },
+     )?;
+     Ok(())
+ }
+@@ -52,10 +47,8 @@ pub(crate) async fn put_if_absent(
+     }
+ 
+     // 1. Staged write check across all active transactions
+-    if let Some(is_insert) = storage.tx_buffer.staged_status(key) {
+-        if is_insert {
+-            return Ok(false);
+-        }
++    if storage.tx_staging.is_put_staged(key) {
++        return Ok(false);
+     }
+ 
+     // 2. Intent Lock check and registration
+@@ -101,14 +94,9 @@ pub(crate) async fn put_if_absent(
+     }
+ 
+     // 4. Stage operation in tx_buffer
+-    let doc_id = derive_doc_id(key);
+-
+-    if let Err(e) = storage.tx_buffer.stage_kv(
++    if let Err(e) = storage.tx_staging.stage(
+         tx_id,
+-        IndexOp::Insert {
+-            doc_id,
+-            data: (key.to_vec(), value.to_vec()),
+-        },
++        StagedOp::Put { key: key.to_vec(), value: value.to_vec() },
+     ) {
+         let mut locks = storage
+             .intent_locks
+@@ -117,7 +105,7 @@ pub(crate) async fn put_if_absent(
+         if locks.get(key) == Some(&tx_id) {
+             locks.remove(key);
+         }
+-        return Err(e.into());
++        return Err(e);
+     }
+ 
+     Ok(true)
+@@ -132,14 +120,9 @@ pub(crate) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Res
+             "Memory budget exceeded (95%) — delete staging rejected".into(),
+         ));
+     }
+-    let doc_id = derive_doc_id(key);
+-
+-    storage.tx_buffer.stage_kv(
++    storage.tx_staging.stage(
+         tx_id,
+-        IndexOp::Delete {
+-            doc_id,
+-            data: Some((key.to_vec(), Vec::new())),
+-        },
++        StagedOp::Delete { key: key.to_vec() },
+     )?;
+     Ok(())
+ }
+diff --git a/crates/contextra-store/src/lsm/ops/write/single.rs b/crates/contextra-store/src/lsm/ops/write/single.rs
+index 45527cc1c..178a57957 100644
+--- a/crates/contextra-store/src/lsm/ops/write/single.rs
++++ b/crates/contextra-store/src/lsm/ops/write/single.rs
+@@ -20,7 +20,6 @@ pub(super) async fn single_commit_path(
+     wal: Arc<Wal>,
+     wal_ops: Vec<(WalOp, u64)>,
+     mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
+-    first_seq: u64,
+ ) -> Result<()> {
+     let (wal_entries, prev_hmac) = wal.prepare_batch(wal_ops).await?;
+     let entries_for_observer = if storage.has_observers() {
+@@ -34,7 +33,6 @@ pub(super) async fn single_commit_path(
+         storage,
+         wal: &wal,
+         tx_id,
+-        first_seq,
+         prev_hmac,
+         committed: false,
+     };
+diff --git a/crates/contextra-store/src/lsm/recovery/startup.rs b/crates/contextra-store/src/lsm/recovery/startup.rs
+index 7b04f7047..8dd9753f2 100644
+--- a/crates/contextra-store/src/lsm/recovery/startup.rs
++++ b/crates/contextra-store/src/lsm/recovery/startup.rs
+@@ -23,7 +23,8 @@ use crate::util::DirLock;
+ use crate::wal::{KeyManager, Wal, WalOp};
+ use bytes::Bytes;
+ use contextra_ids::{TxId, TOMBSTONE_BIT};
+-use contextra_version::{SnapshotRegistry, TxBuffer};
++use crate::snapshot_pins::SnapshotPins;
++use crate::staging::TxStaging;
+ use std::path::PathBuf;
+ use std::sync::atomic::{AtomicU64, Ordering};
+ use std::sync::Arc;
+@@ -285,7 +286,7 @@ impl LsmStorage {
+             }
+         }
+ 
+-        let tx_buffer = TxBuffer::new_with_config(16, config.tx_timeout);
++        let tx_staging = TxStaging::new();
+ 
+         let mut pending_rollbacks = Vec::new();
+         let mut entries = tokio::fs::read_dir(&config.path)
+@@ -407,7 +408,7 @@ impl LsmStorage {
+             manifest.append_batch(&add_entries).await?;
+         }
+ 
+-        let snapshot_registry = Arc::new(SnapshotRegistry::new());
++        let snapshot_registry = Arc::new(SnapshotPins::new());
+ 
+         let cancel_token = tokio_util::sync::CancellationToken::new();
+         let task_tracker = tokio_util::task::TaskTracker::new();
+@@ -471,13 +472,6 @@ impl LsmStorage {
+         let flush_notify = Arc::new(tokio::sync::Notify::new());
+         let health = Arc::new(parking_lot::RwLock::new(StorageHealth::Healthy));
+ 
+-        let ssi_max_tracked_keys = config.ssi_max_tracked_keys;
+-
+-        let default_ssi_val = Arc::new(
+-            contextra_version::SequenceLogSsiValidator::new_with_bounds(ssi_max_tracked_keys)
+-                .with_metrics_sink(Arc::clone(&metrics_sink_container)),
+-        );
+-
+         let clock_arc = Arc::clone(&config.clock);
+         let storage = Self {
+             config,
+@@ -487,7 +481,7 @@ impl LsmStorage {
+                 immutable_memtables: Vec::new(),
+             }),
+             sstables,
+-            tx_buffer,
++            tx_staging,
+             budget: resource_tracker,
+             block_cache,
+             wal: RwLock::new(Arc::new(wal)),
+@@ -514,9 +508,6 @@ impl LsmStorage {
+             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
+             observer_registry: crate::lsm::observer::ObserverRegistry::new(),
+             clock: parking_lot::RwLock::new(clock_arc),
+-            ssi_validator: Arc::clone(&default_ssi_val)
+-                as Arc<dyn contextra_version::SsiValidator + Send + Sync>,
+-            sequence_log_ssi_validator: Some(default_ssi_val),
+             metrics_sink: metrics_sink_container,
+         };
+ 
+diff --git a/crates/contextra-store/src/lsm/tests/commit_tests/basic.rs b/crates/contextra-store/src/lsm/tests/commit_tests/basic.rs
+index ed102869f..1b6c9accd 100644
+--- a/crates/contextra-store/src/lsm/tests/commit_tests/basic.rs
++++ b/crates/contextra-store/src/lsm/tests/commit_tests/basic.rs
+@@ -109,7 +109,7 @@ async fn test_lsm_storage_delete_many_uses_single_batch() {
+         .unwrap();
+     assert_eq!(count, 50);
+ 
+-    let staged_ops = storage.tx_buffer.get_ops(tx2).expect("ops staged");
++    let staged_ops = storage.tx_staging.peek(tx2).expect("ops staged");
+     assert_eq!(staged_ops.len(), 50);
+ 
+     storage.commit(tx2).await.unwrap();
+@@ -247,7 +247,7 @@ async fn test_commit_tracks_budget_drift_on_consume_memory_failure() {
+     let key = b"drift_key";
+     let value = vec![b'v'; 60000];
+     let expected_entry_size =
+-        (key.len() + value.len() + contextra_version::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES) as u64;
++        (key.len() + value.len() + crate::staging::STAGING_ENTRY_OVERHEAD_BYTES) as u64;
+ 
+     let tx = TxId::new(1);
+     storage.put(tx, key, &value).await.expect("put succeeds");
+diff --git a/crates/contextra-store/src/lsm/validate.rs b/crates/contextra-store/src/lsm/validate.rs
+index 1739d1d97..55c8cdc28 100644
+--- a/crates/contextra-store/src/lsm/validate.rs
++++ b/crates/contextra-store/src/lsm/validate.rs
+@@ -23,24 +23,6 @@ pub fn validate_key(key: &[u8]) -> Result<()> {
+     Ok(())
+ }
+ 
+-/// Derives a deterministic `DocId` from key bytes using BLAKE3.
+-#[cfg(not(feature = "docid-128"))]
+-pub fn derive_doc_id(key: &[u8]) -> DocId {
+-    let hash = blake3::hash(key);
+-    let mut bytes = [0u8; 8];
+-    bytes.copy_from_slice(&hash.as_bytes()[..8]);
+-    DocId::new(u64::from_le_bytes(bytes))
+-}
+-
+-/// Derives a deterministic 128-bit `DocId` from key bytes using BLAKE3.
+-#[cfg(feature = "docid-128")]
+-pub fn derive_doc_id(key: &[u8]) -> DocId {
+-    let hash = blake3::hash(key);
+-    let mut bytes = [0u8; 16];
+-    bytes.copy_from_slice(&hash.as_bytes()[..16]);
+-    DocId::new(u128::from_le_bytes(bytes))
+-}
+-
+ /// Validates that value bytes do not exceed `MAX_VALUE_SIZE`.
+ pub fn validate_value(value: &[u8]) -> Result<()> {
+     if value.len() > MAX_VALUE_SIZE {
+diff --git a/crates/contextra-store/src/memtable/mvcc.rs b/crates/contextra-store/src/memtable/mvcc.rs
+index f2734d255..b375993bd 100644
+--- a/crates/contextra-store/src/memtable/mvcc.rs
++++ b/crates/contextra-store/src/memtable/mvcc.rs
+@@ -4,7 +4,7 @@
+ 
+ use bytes::Bytes;
+ use contextra_ids::TxId;
+-use contextra_version::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
++use crate::staging::STAGING_ENTRY_OVERHEAD_BYTES;
+ use std::sync::atomic::Ordering;
+ 
+ use super::shard::shard_for;
+diff --git a/crates/contextra-store/src/snapshot_pins.rs b/crates/contextra-store/src/snapshot_pins.rs
+new file mode 100644
+index 000000000..e1a54f819
+--- /dev/null
++++ b/crates/contextra-store/src/snapshot_pins.rs
+@@ -0,0 +1,109 @@
++//! # Snapshot-Pins (Ring 1)
++//!
++//! Der Store kennt nur eine Frage der Versionierung: *Welche Sequenznummer darf die
++//! Kompaktion frühestens verwerfen?* Katalog, Sichtbarkeit und Snapshot-Verwaltung
++//! gehören `contextra-version` (SPEC 3.4, ADR-32). `SnapshotPins` ist der minimale
++//! Port-Ersatz: ein Referenzzähler je gepinnter Sequenznummer mit lock-frei lesbarem
++//! Minimum.
++
++use contextra_ids::TOMBSTONE_BIT;
++use parking_lot::Mutex;
++use std::collections::BTreeMap;
++use std::sync::atomic::{AtomicU64, Ordering};
++
++/// Referenzgezählte Menge gepinnter Sequenznummern.
++#[derive(Debug)]
++pub struct SnapshotPins {
++    pins: Mutex<BTreeMap<u64, u32>>,
++    min_pinned: AtomicU64,
++}
++
++impl Default for SnapshotPins {
++    fn default() -> Self {
++        Self::new()
++    }
++}
++
++impl SnapshotPins {
++    /// Erzeugt eine leere Pin-Menge (`min_active_seqno() == u64::MAX`).
++    #[must_use]
++    pub fn new() -> Self {
++        Self {
++            pins: Mutex::new(BTreeMap::new()),
++            min_pinned: AtomicU64::new(u64::MAX),
++        }
++    }
++
++    /// Pinnt `seq_no`. Jeder `pin` braucht genau einen [`SnapshotPins::unpin`].
++    pub fn pin(&self, seq_no: u64) {
++        let seq = seq_no & !TOMBSTONE_BIT;
++        let mut pins = self.pins.lock();
++        let count = pins.entry(seq).or_insert(0);
++        *count = count.saturating_add(1);
++        self.publish_min(&pins);
++    }
++
++    /// Gibt einen Pin frei. Ein `unpin` ohne passenden `pin` ist wirkungslos.
++    pub fn unpin(&self, seq_no: u64) {
++        let seq = seq_no & !TOMBSTONE_BIT;
++        let mut pins = self.pins.lock();
++        if let Some(count) = pins.get_mut(&seq) {
++            *count = count.saturating_sub(1);
++            if *count == 0 {
++                pins.remove(&seq);
++            }
++        }
++        self.publish_min(&pins);
++    }
++
++    /// Kleinste gepinnte Sequenznummer, `u64::MAX` wenn nichts gepinnt ist.
++    #[must_use]
++    #[inline]
++    pub fn min_active_seqno(&self) -> u64 {
++        self.min_pinned.load(Ordering::Acquire)
++    }
++
++    fn publish_min(&self, pins: &BTreeMap<u64, u32>) {
++        let min = pins.keys().next().copied().unwrap_or(u64::MAX);
++        self.min_pinned.store(min, Ordering::Release);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn empty_is_max() {
++        assert_eq!(SnapshotPins::new().min_active_seqno(), u64::MAX);
++    }
++
++    #[test]
++    fn min_follows_refcounts() {
++        let p = SnapshotPins::new();
++        p.pin(10);
++        p.pin(5);
++        p.pin(5);
++        assert_eq!(p.min_active_seqno(), 5);
++        p.unpin(5);
++        assert_eq!(p.min_active_seqno(), 5, "zweiter Pin hält die Marke");
++        p.unpin(5);
++        assert_eq!(p.min_active_seqno(), 10);
++        p.unpin(10);
++        assert_eq!(p.min_active_seqno(), u64::MAX);
++    }
++
++    #[test]
++    fn stray_unpin_is_harmless() {
++        let p = SnapshotPins::new();
++        p.unpin(7);
++        assert_eq!(p.min_active_seqno(), u64::MAX);
++    }
++
++    #[test]
++    fn tombstone_bit_is_masked() {
++        let p = SnapshotPins::new();
++        p.pin(3 | TOMBSTONE_BIT);
++        assert_eq!(p.min_active_seqno(), 3);
++    }
++}
+diff --git a/crates/contextra-store/src/staging.rs b/crates/contextra-store/src/staging.rs
+new file mode 100644
+index 000000000..7bce195f6
+--- /dev/null
++++ b/crates/contextra-store/src/staging.rs
+@@ -0,0 +1,198 @@
++//! # Staging-Puffer für Schreibstapel (Ring 1)
++//!
++//! Hält die noch nicht committeten Operationen je Schreibstapel. Es gibt kein SSI und
++//! kein ReadSet (SPEC ADR-06, REM-12): Isolation entsteht allein durch Sequenznummern
++//! und den atomaren Commit unter dem Commit-Lock. Alle Grenzen sind hart und liefern
++//! `LimitExceeded`, nie ein stilles Abschneiden.
++
++use crate::error::{StoreError, StoreResult};
++use contextra_ids::TxId;
++use parking_lot::Mutex;
++use std::collections::HashMap;
++
++/// Pauschaler Verwaltungsaufwand je gestagter Operation (Bytes) für die Budgetierung.
++pub const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32;
++/// Maximale Operationen je Schreibstapel.
++pub const MAX_OPS_PER_TX: usize = 10_000;
++/// Maximale gestagte Bytes je Schreibstapel.
++pub const MAX_STAGED_BYTES_PER_TX: usize = 16 * 1024 * 1024;
++/// Maximale gestagte Bytes über alle Schreibstapel.
++pub const MAX_STAGED_BYTES_TOTAL: usize = 256 * 1024 * 1024;
++
++/// Eine gestagte Operation.
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub(crate) enum StagedOp {
++    /// Schreibt `value` unter `key`.
++    Put { key: Vec<u8>, value: Vec<u8> },
++    /// Löscht `key` (Tombstone).
++    Delete { key: Vec<u8> },
++}
++
++impl StagedOp {
++    fn bytes(&self) -> usize {
++        match self {
++            Self::Put { key, value } => key.len() + value.len() + STAGING_ENTRY_OVERHEAD_BYTES,
++            Self::Delete { key } => key.len() + STAGING_ENTRY_OVERHEAD_BYTES,
++        }
++    }
++}
++
++#[derive(Default)]
++struct TxEntry {
++    ops: Vec<StagedOp>,
++    bytes: usize,
++}
++
++#[derive(Default)]
++struct Inner {
++    txs: HashMap<TxId, TxEntry>,
++    /// Anzahl aktiver Stapel, die `key` als Put gestaged haben (für `put_if_absent`).
++    staged_puts: HashMap<Vec<u8>, u32>,
++    total_bytes: usize,
++}
++
++/// Begrenzter Staging-Puffer. Alle kritischen Abschnitte sind kurz und enthalten kein `await`.
++#[derive(Default)]
++pub(crate) struct TxStaging {
++    inner: Mutex<Inner>,
++}
++
++impl TxStaging {
++    pub(crate) fn new() -> Self {
++        Self::default()
++    }
++
++    /// Stagt eine Operation. Prüft alle Grenzen vor der Mutation (atomar: alles oder nichts).
++    pub(crate) fn stage(&self, tx: TxId, op: StagedOp) -> StoreResult<()> {
++        self.stage_many(tx, std::iter::once(op))
++    }
++
++    /// Stagt mehrere Operationen atomar.
++    pub(crate) fn stage_many(
++        &self,
++        tx: TxId,
++        ops: impl IntoIterator<Item = StagedOp>,
++    ) -> StoreResult<()> {
++        let ops: Vec<StagedOp> = ops.into_iter().collect();
++        let add_bytes: usize = ops.iter().map(StagedOp::bytes).sum();
++        let mut g = self.inner.lock();
++        let (cur_ops, cur_bytes) = g.txs.get(&tx).map_or((0, 0), |e| (e.ops.len(), e.bytes));
++
++        if cur_ops.saturating_add(ops.len()) > MAX_OPS_PER_TX {
++            return Err(StoreError::LimitExceeded {
++                limit: MAX_OPS_PER_TX,
++                context: "Operationen je Schreibstapel".into(),
++            });
++        }
++        if cur_bytes.saturating_add(add_bytes) > MAX_STAGED_BYTES_PER_TX {
++            return Err(StoreError::LimitExceeded {
++                limit: MAX_STAGED_BYTES_PER_TX,
++                context: "gestagte Bytes je Schreibstapel".into(),
++            });
++        }
++        if g.total_bytes.saturating_add(add_bytes) > MAX_STAGED_BYTES_TOTAL {
++            return Err(StoreError::LimitExceeded {
++                limit: MAX_STAGED_BYTES_TOTAL,
++                context: "gestagte Bytes gesamt".into(),
++            });
++        }
++
++        for op in &ops {
++            if let StagedOp::Put { key, .. } = op {
++                let c = g.staged_puts.entry(key.clone()).or_insert(0);
++                *c = c.saturating_add(1);
++            }
++        }
++        g.total_bytes += add_bytes;
++        let entry = g.txs.entry(tx).or_default();
++        entry.bytes += add_bytes;
++        entry.ops.extend(ops);
++        Ok(())
++    }
++
++    /// Entnimmt alle Operationen des Stapels in Einfügereihenfolge und gibt sein Budget frei.
++    pub(crate) fn drain(&self, tx: TxId) -> Vec<StagedOp> {
++        let mut g = self.inner.lock();
++        Self::remove_locked(&mut g, tx)
++    }
++
++    /// Verwirft den Stapel.
++    pub(crate) fn discard(&self, tx: TxId) {
++        let mut g = self.inner.lock();
++        drop(Self::remove_locked(&mut g, tx));
++    }
++
++    /// `true`, wenn irgendein aktiver Stapel `key` als Put gestaged hat.
++    pub(crate) fn is_put_staged(&self, key: &[u8]) -> bool {
++        self.inner.lock().staged_puts.get(key).is_some_and(|c| *c > 0)
++    }
++
++    /// Kopie der gestagten Operationen (nur Tests).
++    #[cfg(test)]
++    pub(crate) fn peek(&self, tx: TxId) -> Option<Vec<StagedOp>> {
++        self.inner.lock().txs.get(&tx).map(|e| e.ops.clone())
++    }
++
++    fn remove_locked(g: &mut Inner, tx: TxId) -> Vec<StagedOp> {
++        let Some(entry) = g.txs.remove(&tx) else {
++            return Vec::new();
++        };
++        g.total_bytes = g.total_bytes.saturating_sub(entry.bytes);
++        for op in &entry.ops {
++            if let StagedOp::Put { key, .. } = op {
++                if let Some(c) = g.staged_puts.get_mut(key) {
++                    *c = c.saturating_sub(1);
++                    if *c == 0 {
++                        g.staged_puts.remove(key);
++                    }
++                }
++            }
++        }
++        entry.ops
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn put(k: &[u8], v: &[u8]) -> StagedOp {
++        StagedOp::Put { key: k.to_vec(), value: v.to_vec() }
++    }
++
++    #[test]
++    fn drain_preserves_order_and_releases_budget() {
++        let s = TxStaging::new();
++        let tx = TxId::new(1);
++        s.stage(tx, put(b"a", b"1")).unwrap();
++        s.stage(tx, StagedOp::Delete { key: b"b".to_vec() }).unwrap();
++        assert!(s.is_put_staged(b"a"));
++        let ops = s.drain(tx);
++        assert_eq!(ops.len(), 2);
++        assert_eq!(ops[0], put(b"a", b"1"));
++        assert!(!s.is_put_staged(b"a"));
++        assert_eq!(s.inner.lock().total_bytes, 0);
++    }
++
++    #[test]
++    fn op_limit_is_atomic() {
++        let s = TxStaging::new();
++        let tx = TxId::new(2);
++        let batch: Vec<_> = (0..=MAX_OPS_PER_TX).map(|i| put(&i.to_be_bytes(), b"")).collect();
++        assert!(matches!(
++            s.stage_many(tx, batch),
++            Err(StoreError::LimitExceeded { .. })
++        ));
++        assert!(s.peek(tx).is_none(), "keine Teilwirkung bei Fehler");
++        assert_eq!(s.inner.lock().total_bytes, 0);
++    }
++
++    #[test]
++    fn discard_clears_put_index() {
++        let s = TxStaging::new();
++        let tx = TxId::new(3);
++        s.stage(tx, put(b"k", b"v")).unwrap();
++        s.discard(tx);
++        assert!(!s.is_put_staged(b"k"));
++    }
++}
+diff --git a/crates/contextra-store/src/store_layer.rs b/crates/contextra-store/src/store_layer.rs
+deleted file mode 100644
+index ebbf46788..000000000
+--- a/crates/contextra-store/src/store_layer.rs
++++ /dev/null
+@@ -1,182 +0,0 @@
+-//! Erasure-chain adapter for the LSM and WAL persistence layer.
+-//!
+-//! This adapter deliberately owns no key material and never decrypts records.
+-//! It translates the coordinator's identity targets into the store's physical
+-//! tenant key prefixes, establishes the in-memory fence, runs the idempotent
+-//! rewrite, and performs an independent raw-file witness scan.
+-
+-use crate::lsm::LsmStorage;
+-use contextra_erasure::chain::{
+-    EraseTarget, ErasureLayer, LayerFuture, LayerScope, PurgeCx, PurgeOutcome,
+-};
+-use contextra_erasure::error::ErasureError;
+-use contextra_erasure::types_local::{Armed, KeyCoverage, LayerId, Scanner};
+-use parking_lot::Mutex;
+-use std::collections::BTreeMap;
+-use std::path::{Path, PathBuf};
+-use std::sync::Arc;
+-
+-/// Stable ID for the LSM/WAL storage erasure layer.
+-const STORE_LAYER_ID: LayerId = LayerId(*b"contextra-store!");
+-
+-/// Adapter implementing the erasure chain's S1/S1b responsibilities.
+-///
+-/// `LayerScope` intentionally carries only an opaque identifier. Prefixes are
+-/// retained in this in-process registry, so neither journals nor diagnostics
+-/// receive cleartext target keys.
+-pub struct StoreLayer {
+-    storage: Arc<LsmStorage>,
+-    scopes: Mutex<BTreeMap<[u8; 16], Vec<u8>>>,
+-}
+-
+-impl StoreLayer {
+-    /// Binds an LSM instance to the erasure chain.
+-    pub fn new(storage: Arc<LsmStorage>) -> Self {
+-        Self {
+-            storage,
+-            scopes: Mutex::new(BTreeMap::new()),
+-        }
+-    }
+-
+-    fn prefix_for(target: &EraseTarget) -> Result<Vec<u8>, ErasureError> {
+-        match target {
+-            EraseTarget::Document {
+-                tenant,
+-                collection,
+-                doc,
+-            } => Ok(format!("t:{}:{}:chunk:{doc}", tenant.inner(), collection.0).into_bytes()),
+-            EraseTarget::Collection { tenant, collection } => {
+-                Ok(format!("t:{}:{}:", tenant.inner(), collection.0).into_bytes())
+-            }
+-            EraseTarget::Tenant { tenant } => Ok(format!("t:{}:", tenant.inner()).into_bytes()),
+-            // P-record keys are deliberately opaque to Store. A subject purge
+-            // is resolved by db into the exact document keys after crypto
+-            // shredding; guessing a prefix here could erase another subject.
+-            EraseTarget::Subject { .. } => Err(ErasureError::Storage(
+-                "subject target requires db-resolved document scope".into(),
+-            )),
+-        }
+-    }
+-
+-    fn scope_id(prefix: &[u8]) -> [u8; 16] {
+-        let digest = blake3::hash(prefix);
+-        let mut id = [0u8; 16];
+-        id.copy_from_slice(&digest.as_bytes()[..16]);
+-        id
+-    }
+-
+-    fn prefix_for_scope(&self, scope: &LayerScope) -> Result<Vec<u8>, ErasureError> {
+-        self.scopes
+-            .lock()
+-            .get(&scope.scope_id)
+-            .cloned()
+-            .ok_or_else(|| ErasureError::Storage("unknown store erase scope".into()))
+-    }
+-
+-    fn files_below(root: &Path) -> Result<Vec<PathBuf>, ErasureError> {
+-        let mut result = Vec::new();
+-        let mut pending = vec![root.to_path_buf()];
+-        while let Some(dir) = pending.pop() {
+-            for entry in std::fs::read_dir(&dir)? {
+-                let entry = entry?;
+-                let ty = entry.file_type()?;
+-                if ty.is_dir() {
+-                    pending.push(entry.path());
+-                } else if ty.is_file() {
+-                    result.push(entry.path());
+-                }
+-            }
+-        }
+-        result.sort();
+-        Ok(result)
+-    }
+-
+-    /// Performs the store-owned, raw-byte part of a witness measurement.
+-    ///
+-    /// Completing a [`Scanner`] is deliberately left to the chain coordinator:
+-    /// the `ErasureLayer::witness` contract receives it by mutable reference so
+-    /// every participating layer can account for its files before the
+-    /// coordinator mints the final witness.  In particular, this scanner must
+-    /// never be consumed here.
+-    fn raw_witness(&self, prefix: &[u8], scanner: &mut Scanner<Armed>) -> Result<u64, ErasureError> {
+-        let mut matches = 0_u64;
+-        for path in Self::files_below(self.storage.data_path())? {
+-            let bytes = std::fs::read(path)?;
+-            let byte_count = u64::try_from(bytes.len()).map_err(|_| {
+-                ErasureError::Storage("store witness file length exceeds u64".into())
+-            })?;
+-            let file_matches = u64::try_from(
+-                bytes
+-                    .windows(prefix.len())
+-                    .filter(|window| *window == prefix)
+-                    .count(),
+-            )
+-            .map_err(|_| ErasureError::Storage("store witness match count exceeds u64".into()))?;
+-            scanner.record(1, byte_count);
+-            matches = matches.saturating_add(file_matches);
+-        }
+-        Ok(matches)
+-    }
+-}
+-
+-impl ErasureLayer for StoreLayer {
+-    fn id(&self) -> LayerId {
+-        STORE_LAYER_ID
+-    }
+-
+-    fn key_coverage(&self) -> KeyCoverage {
+-        // Individual record encryption is owned by db/crypto; Store only owns
+-        // ciphertext persistence and physical residue removal.
+-        KeyCoverage::None
+-    }
+-
+-    fn resolve<'a>(&'a self, target: &'a EraseTarget) -> LayerFuture<'a, LayerScope> {
+-        Box::pin(async move {
+-            let prefix = Self::prefix_for(target)?;
+-            let scope_id = Self::scope_id(&prefix);
+-            self.scopes.lock().insert(scope_id, prefix);
+-            Ok(LayerScope {
+-                scope_id,
+-                affected_units: Vec::new(),
+-            })
+-        })
+-    }
+-
+-    fn on_gate<'a>(&'a self, _scope: &'a LayerScope) -> LayerFuture<'a, ()> {
+-        Box::pin(async move {
+-            // Cache data must not outlive a gate. The actual ReadGate is owned
+-            // by db as the single read-path check site.
+-            self.storage.block_cache().clear();
+-            Ok(())
+-        })
+-    }
+-
+-    fn purge<'a>(
+-        &'a self,
+-        scope: &'a LayerScope,
+-        _cx: &'a PurgeCx,
+-    ) -> LayerFuture<'a, PurgeOutcome> {
+-        Box::pin(async move {
+-            let prefix = self.prefix_for_scope(scope)?;
+-            let report = self
+-                .storage
+-                .purge_prefix(&prefix)
+-                .await
+-                .map_err(|error| ErasureError::Storage(error.to_string()))?;
+-            Ok(PurgeOutcome {
+-                purged_units: report.purged_records,
+-            })
+-        })
+-    }
+-
+-    fn witness<'a>(
+-        &'a self,
+-        scope: &'a LayerScope,
+-        scanner: &'a mut Scanner<Armed>,
+-    ) -> LayerFuture<'a, u64> {
+-        Box::pin(async move {
+-            let prefix = self.prefix_for_scope(scope)?;
+-            self.raw_witness(&prefix, scanner)
+-        })
+-    }
+-}
+diff --git a/crates/contextra-store/tests/budget_drift.rs b/crates/contextra-store/tests/budget_drift.rs
+index 65a7107ac..b4d31096d 100644
+--- a/crates/contextra-store/tests/budget_drift.rs
++++ b/crates/contextra-store/tests/budget_drift.rs
+@@ -1,7 +1,7 @@
+ //! Proptest / drift test for MemTable budget accounting alignment (WP-16.3).
+ 
+ use bytes::Bytes;
+-use contextra_version::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
++const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32;
+ use contextra_store::memtable::MemTable;
+ use proptest::prelude::*;
+ 

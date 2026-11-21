@@ -15,60 +15,6 @@ use crate::error::StoreResult as Result;
 use contextra_ids::TOMBSTONE_BIT;
 use std::sync::atomic::Ordering;
 
-pub(crate) async fn get_tracked(
-    storage: &LsmStorage,
-    tx_id: contextra_ids::TxId,
-    key: &[u8],
-) -> Result<Option<Bytes>> {
-    validate_key(key)?;
-    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
-    get_at_seq_tracked(storage, tx_id, key, snapshot_seq).await
-}
-
-/// Retrieves a value by key at `snapshot_seq`, registering the read in the transaction's ReadSet.
-///
-/// # Invarianten & SSI ReadSet Clamping
-/// `INV-MVCC-SSI-1`: A caller passing `snapshot_seq = u64::MAX` intends to read the latest state.
-/// To accurately detect concurrent write conflicts during transaction commit, the registered
-/// sequence number must reflect the actual sequence number observed at the time of the read,
-/// rather than `u64::MAX`. Therefore, the registered sequence number is clamped to
-/// `min(snapshot_seq, storage.last_applied_seq.load(Ordering::Acquire))`, captured *before* reading.
-/// Registrieren eines Werts, der nicht größer ist als der tatsächlich gelesene, ist konservativ (im Zweifel ein Konflikt, nie ein übersehener).
-/// Reading semantics remain unchanged and continue to query `storage.get_at_seq(key, snapshot_seq)`.
-///
-/// # Hinweis zu Phantomschutz
-/// Note: `scan_prefix_tracked` currently does not offer phantom protection; phantom protection is
-/// handled in a separate task.
-pub(crate) async fn get_at_seq_tracked(
-    storage: &LsmStorage,
-    tx_id: contextra_ids::TxId,
-    key: &[u8],
-    snapshot_seq: u64,
-) -> Result<Option<Bytes>> {
-    validate_key(key)?;
-    let current_seq = storage.last_applied_seq.load(Ordering::Acquire);
-    let registered_seq = snapshot_seq.min(current_seq);
-    storage
-        .tx_buffer
-        .register_read(tx_id, key.to_vec(), registered_seq);
-    storage.get_at_seq(key, snapshot_seq).await
-}
-
-pub(crate) async fn scan_prefix_tracked(
-    storage: &LsmStorage,
-    tx_id: contextra_ids::TxId,
-    prefix: &[u8],
-) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
-    let results = storage.scan_prefix_at(prefix, snapshot_seq).await?;
-    for (k, _) in &results {
-        storage
-            .tx_buffer
-            .register_read(tx_id, k.clone(), snapshot_seq);
-    }
-    Ok(results)
-}
-
 pub(crate) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {
     validate_key(key)?;
     let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);

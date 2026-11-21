@@ -4,7 +4,7 @@
 
 use bytes::Bytes;
 use contextra_ids::TxId;
-use contextra_version::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
+use crate::staging::STAGING_ENTRY_OVERHEAD_BYTES;
 use std::sync::atomic::Ordering;
 
 use super::shard::shard_for;

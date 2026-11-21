@@ -5,11 +5,11 @@
 //! // INVARIANTEN: MAX_BATCH_SIZE Schranke, fail-closed
 
 use super::super::super::engine::LsmStorage;
-use super::super::super::validate::{derive_doc_id, validate_key};
+use super::super::super::validate::validate_key;
 use super::super::super::MAX_BATCH_SIZE;
 use crate::error::{StoreError, StoreResult as Result};
 use contextra_ids::TxId;
-use contextra_version::IndexOp;
+use crate::staging::StagedOp;
 
 /// Löscht mehrere Schlüssel in einem einzigen atomaren Staging-Schritt.
 pub(crate) async fn delete_many(
@@ -38,17 +38,8 @@ pub(crate) async fn delete_many(
         return Ok(0);
     }
 
-    let ops: Vec<IndexOp<(Vec<u8>, Vec<u8>)>> = keys
-        .into_iter()
-        .map(|key| {
-            let doc_id = derive_doc_id(&key);
-            IndexOp::Delete {
-                doc_id,
-                data: Some((key, Vec::new())),
-            }
-        })
-        .collect();
+    let ops: Vec<StagedOp> = keys.into_iter().map(|key| StagedOp::Delete { key }).collect();
 
-    storage.tx_buffer.stage_many(tx_id, ops)?;
+    storage.tx_staging.stage_many(tx_id, ops)?;
     Ok(count)
 }

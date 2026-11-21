@@ -23,7 +23,8 @@ use crate::util::DirLock;
 use crate::wal::{KeyManager, Wal, WalOp};
 use bytes::Bytes;
 use contextra_ids::{TxId, TOMBSTONE_BIT};
-use contextra_version::{SnapshotRegistry, TxBuffer};
+use crate::snapshot_pins::SnapshotPins;
+use crate::staging::TxStaging;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -285,7 +286,7 @@ impl LsmStorage {
             }
         }
 
-        let tx_buffer = TxBuffer::new_with_config(16, config.tx_timeout);
+        let tx_staging = TxStaging::new();
 
         let mut pending_rollbacks = Vec::new();
         let mut entries = tokio::fs::read_dir(&config.path)
@@ -407,7 +408,7 @@ impl LsmStorage {
             manifest.append_batch(&add_entries).await?;
         }
 
-        let snapshot_registry = Arc::new(SnapshotRegistry::new());
+        let snapshot_registry = Arc::new(SnapshotPins::new());
 
         let cancel_token = tokio_util::sync::CancellationToken::new();
         let task_tracker = tokio_util::task::TaskTracker::new();
@@ -471,13 +472,6 @@ impl LsmStorage {
         let flush_notify = Arc::new(tokio::sync::Notify::new());
         let health = Arc::new(parking_lot::RwLock::new(StorageHealth::Healthy));
 
-        let ssi_max_tracked_keys = config.ssi_max_tracked_keys;
-
-        let default_ssi_val = Arc::new(
-            contextra_version::SequenceLogSsiValidator::new_with_bounds(ssi_max_tracked_keys)
-                .with_metrics_sink(Arc::clone(&metrics_sink_container)),
-        );
-
         let clock_arc = Arc::clone(&config.clock);
         let storage = Self {
             config,
@@ -487,7 +481,7 @@ impl LsmStorage {
                 immutable_memtables: Vec::new(),
             }),
             sstables,
-            tx_buffer,
+            tx_staging,
             budget: resource_tracker,
             block_cache,
             wal: RwLock::new(Arc::new(wal)),
@@ -514,9 +508,6 @@ impl LsmStorage {
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: crate::lsm::observer::ObserverRegistry::new(),
             clock: parking_lot::RwLock::new(clock_arc),
-            ssi_validator: Arc::clone(&default_ssi_val)
-                as Arc<dyn contextra_version::SsiValidator + Send + Sync>,
-            sequence_log_ssi_validator: Some(default_ssi_val),
             metrics_sink: metrics_sink_container,
         };
 

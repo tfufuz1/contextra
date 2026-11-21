@@ -1,13 +1,14 @@
-# Contextra Spezifikation v4.1 (RAG-Edition, Soll-Zustand)
+# Contextra Spezifikation v4.2 (RAG-Edition, Soll-Zustand)
 
 **Datum:** 20. November 2026
 **Nachtrag v4.1.1:** 21. November 2026. Anhänge D und E liegen als `benchmarks/budgets.toml` und `capabilities.toml` im Repository, die Schichtprüfung läuft über `tools/check_spec_sync.py` (Abschnitt 13.6, SYNC-1 bis SYNC-4). Stand 21. November 2026 existieren alle genannten Dateien; der Befund H-31 des Reviews ist behoben. Inhalt der Normen unverändert.
+**Revision v4.2:** Auflösung der Review-Befunde K-01 bis K-20 und der Entscheidungen D1 bis D10 (Kapitel 16). Änderungsprotokoll in Anhang F. Anhänge D und E unverändert.
 **Überarbeitung v4.1.2:** 21. November 2026. Umgesetzt: N-07, H-31, M-05, M-11, M-12, M-13, M-14, M-27, K-19 aus dem Review `SPEC_Review_v4.1.1`. Die Entscheidungen D1 bis D10 sind **nicht** getroffen und stehen offen in Kapitel 16.
 **Status:** Final zur Umsetzung. Einzige normative Quelle für Produktumfang, Architektur, Löschkette, Betrieb, Crate-Verträge und Refactoring-Reihenfolge.
 **Geltung:** Gesamter Workspace `contextra`.
 **Ersetzt:** `docs/SPEC.md` v4.0 (Archiv: `docs/archive/SPEC_v4.0.md`). Die Löschspezifikation v2.2 und die Implementierungsspezifikation v3.0 sind Quellarchiv unter `docs/archive/`. Die Spezifikation v2.1 ist nicht archiviert.
 **Kennungen:** `ADR-n` Entscheidung, `REQ-<Bereich>-n` Anforderung, `INV-n` Invariante, `REM-n` Entfernung, `CMP-n` Compat-Auflösung, `F-n` Befund, `T-n` Test, `G-n` Build-Gate. MUSS, DARF NICHT, SOLL nach RFC 2119.
-**Offene Punkte:** Die Entscheidungen D1 bis D10 (Kapitel 16) sind offen. Sie betreffen Rechtsfolgen, Architekturgrenzen und Schutzziele und sind bis zu ihrer Entscheidung nicht umsetzungsreif. Die Befunde aus Kapitel 0.3 haben Entscheidungen in Kapitel 14, soweit sie nicht in Kapitel 16 aufgeführt sind.
+**Offene Punkte:** siehe Kapitel 16 und Anhang F. Die Entscheidungen D1 bis D10 sind getroffen. Werte, die nur der Verantwortliche setzen kann (Fristen, Speicherbudget, Aufbewahrung), sind als Pflichtschalter ohne Standardwert ausgewiesen.
 
 ---
 
@@ -122,7 +123,9 @@ Verbindlich:
 | S | 1 Mio. | 384 | ≥ 200 QPS | 16 vCPU, 64 GB RAM, NVMe |
 | L | 10 Mio. | 768 | ≥ 100 QPS | 16 vCPU, 128 GB RAM, NVMe |
 
-Referenz-Embedding (ADR-36): `multilingual-e5-small` (384 Dimensionen) für Stufe S, `multilingual-e5-base` (768) für Stufe L, beide als ONNX mit festem SHA-256. Bis 100 Mandanten je Prozess. Größere Bestände skalieren über mehrere Prozesse, aufgeteilt nach Mandant (8.7).
+Referenz-Embedding (ADR-36): `multilingual-e5-small` (384 Dimensionen) für Stufe S, `multilingual-e5-base` (768) für Stufe L, beide als ONNX mit festem SHA-256. Die Mandantenzahl je Prozess ist kein fester Wert, sondern ein Budget: Die Summe der Mandantenbudgets je Prozess liegt unter `memory_budget_bytes` (Pflichtschalter, D5, H-27). Die Referenzstufen gelten je Mandant. Größere Bestände skalieren über mehrere Prozesse, aufgeteilt nach Mandant (8.7).
+
+**Zielplattform (D9, H-23).** Linux auf x86_64. Die Unsafe-Insel `contextra-sys` (mlock, Dump-Schutz, Direct-IO) ist nur für Linux implementiert. Andere Betriebssysteme sind nicht Ziel dieser Version. Dateisysteme mit Copy-on-Write sind eine Betriebsgrenze nach 7.9.
 
 ### 1.3 Nicht-Ziele
 
@@ -152,7 +155,7 @@ Alle Entscheidungen sind final. Änderungen erfordern eine neue Spezifikationsve
 | ID | Entscheidung | Status | Begründung | Verworfen |
 |---|---|---|---|---|
 | ADR-01 | Löschung wirkt auf **Seals**, nicht auf Versionen. Version und Seal sind getrennte Systeme mit Einbahn-Schnittstelle. | bestätigt | Löschung darf nicht von Versionskette oder Zeitreise abhängen. | Gate-Mengen über Versionsordinale |
-| ADR-02 | **Keine Eigennachweise im Produkt**: keine Selbstmessung, keine signierten Berichte, kein Prüfwerkzeug, keine Messklassen. Journal, Ledger und Tests in CI. | bestätigt | Selbstprüfung mit denselben Annahmen ist wertlos und kostet Laufzeit. | Canary im Produkt, JCS/Ed25519 |
+| ADR-02 | **Keine Eigennachweise im Produkt**: keine Selbstmessung, keine signierten Berichte, kein Prüfwerkzeug, keine Messklassen. Journal, Ledger und Tests in CI. Präzisiert (D9): Integrität des eigenen Löschlogs per MAC mit Schlüssel `K_log` aus dem Anker ist zulässig; das Produkt erstellt weder Berichte noch führt es Prüfungen aus. | bestätigt | Selbstprüfung mit denselben Annahmen ist wertlos und kostet Laufzeit. | Canary im Produkt, JCS/Ed25519 |
 | ADR-03 | **Frühe Schlüsselvernichtung** für Seal-Schlüssel. Reihenfolge: Gate, Schlüssel, Arbeitsspeicher, dann gebündelter Scrub. | neu gefasst | Seal-Klartext ist nur über den Seal-Schlüssel erreichbar. Ausnahme für Segmentschlüssel: ADR-31. | Reihenfolge S3–S5 aus v3.0 |
 | ADR-04 | **HNSW mit SQ8** ist Standardindex. Exakte flache Suche bis 20.000 Vektoren je Shard und als Referenz im Test. DiskANN und RaBitQ entfallen. | bestätigt | Flache Suche ist ab 1 Mio. Vektoren zu langsam. | DiskANN |
 | ADR-05 | **Graph-Crate wird verkleinert und als optionaler Baustein geführt.** Details ADR-21 bis ADR-27. | neu gefasst | v4.0 hatte hier keine Entscheidung (Textfragment). | Vollbehalt, Entfernen ohne Abnahmegate |
@@ -165,10 +168,10 @@ Alle Entscheidungen sind final. Änderungen erfordern eine neue Spezifikationsve
 | ADR-12 | **Ingest-Crate und ONNX-Embedder aus der Historie zurückholen** (Abschnitt 13.2), beschneiden auf den Formatumfang aus ADR-35. | neu gefasst | Mengen korrigiert, siehe F-37. | Neuschreiben |
 | ADR-13 | **Embedding-Backends:** lokal (ONNX, Standard) und HTTP gegen interne Dienste (eigenes Crate, Feature). Kern netzfrei. | bestätigt | Unternehmen betreiben zentrale Inferenzdienste. | Nur lokal |
 | ADR-14 | **Zeitreise je Collection schaltbar, Standard aus.** Suchindizes enthalten nur die aktuelle Fassung. Gilt auch für den Graph. | bestätigt | Historie im Index vergrößert Speicher, Latenz und Löschaufwand. | Historie immer im Index |
-| ADR-15 | **Schlüsselwurzel:** K1 (Passphrase, Argon2id) und K1b (Schlüsseldatei) in v4.x. K3 (KMS) in M6. | bestätigt | Passphrase passt nicht zu unbeaufsichtigtem Serverbetrieb. | TPM |
+| ADR-15 | **Schlüsselwurzel:** K1 (Passphrase, Argon2id) und K1b (Schlüsseldatei) in v4.x. K3 (KMS) in M6. | bestätigt | Die Passphrase bleibt Wurzel (K1), wird aber über Datei (Rechte 0600) oder Umgebungsvariable geliefert, nicht interaktiv (D10). TPM scheidet aus, weil die Wurzel nicht an ein Gerät gebunden sein soll (H-24). | TPM |
 | ADR-16 | **Argon2id-Parameter** sind Konfiguration mit Mindestwerten (m ≥ 64 MiB, t ≥ 3, p ≥ 1). **Keine Laufzeitmessung beim Start.** Empfohlene Werte in der Betriebsdokumentation. | neu gefasst | Laufzeitmessung widerspricht ADR-02 und ist nicht reproduzierbar (F-14, F-16). | Mindestlaufzeit 250 ms |
 | ADR-17 | **Zugriffsfilter ist Kernfunktion.** ACL-Tags und Metadatenfilter laufen über Bitmaps und die ACORN-Traversierung. | bestätigt | Ohne Security Trimming nicht einsetzbar. | Filterung in der Anwendung |
-| ADR-18 | **Bulk-Ingest** darf mit gelockerter Dauerhaftigkeit laufen (Sync am Jobende). Löschvorgänge sind nie gelockert. | bestätigt | Importe von Millionen Dokumenten sind mit `fsync` je Gruppe zu langsam. | Immer volle Dauerhaftigkeit |
+| ADR-18 | **Bulk-Ingest** darf mit gelockerter Dauerhaftigkeit laufen (Sync am Jobende; präzisiert durch REQ-ING-9: zusätzlich alle 64 MiB oder 5 s, H-08). Löschvorgänge sind nie gelockert. | bestätigt | Importe von Millionen Dokumenten sind mit `fsync` je Gruppe zu langsam. | Immer volle Dauerhaftigkeit |
 | ADR-19 | **Selbstdeklarationen entfallen** (`contract.rs`, `ANCHOR`, `FILE-CONTEXT`, Auditor-Skripte). Verhalten prüft `contextra-testkit`. | bestätigt | Deklarationen veralten, Tests nicht. | Deklarationen pflegen |
 | ADR-20 | **Standard ist Klasse P.** Jede Collection gilt als personenbezogen, bis sie als K erklärt wird. Die Entity-Erkennung warnt, entscheidet nie. | bestätigt | Speicherweg darf nicht von Trefferquote abhängen. | Klassifikation entscheidet |
 | ADR-21 | **`contextra-graph` ist ein optionaler E1-Baustein** (Feature `graph` in `contextra-db`, Standard aus, je Collection `graph = true`). Er bleibt nur bestehen, wenn Gate G-GRAPH (11.5) erreicht wird. Sonst Entfernung in M5. | neu | PathRAG liefert erklärbare Belege. Der Nutzen ist nicht gemessen, daher Abnahmegate. | Vollbehalt, sofortige Entfernung |
@@ -193,14 +196,14 @@ Alle Entscheidungen sind final. Änderungen erfordern eine neue Spezifikationsve
 | ADR-40 | **Strukturschlüssel `K_ref` und `K_registry` sind Zufallsschlüssel**, im Anker unter dem Wurzelschlüssel gewrappt, nicht per HKDF aus der KEK abgeleitet und nicht rotiert. Sie sterben nur mit dem Mandanten. | neu | Behebt F-10. | HKDF aus KEK |
 | ADR-41 | **mlock-Pflicht für Schlüssel:** Der Start verweigert, wenn Schlüsselspeicher nicht gesperrt werden kann. Ausnahme `allow_unlocked_keys = true` nur für Entwicklung, im Betriebshandbuch verboten. Core-Dumps werden deaktiviert (`PR_SET_DUMPABLE = 0`). | neu | Schlüssel im Swap sind ein Lesepfad für die Vernichtung. | Warnung statt Verweigerung |
 | ADR-42 | **Checkpoints schließen `keys/` und `erasure/` aus.** Schlüssel gehen nur über die Schlüsselsicherung (7.11). Der Gate-Zustand wird nie aus einem Checkpoint zurückgesetzt. | neu | Behebt F-35. | Vollständige Kopie |
-| ADR-43 | **Latenzfenster in `db`:** 64 logarithmische Buckets, Schritt 1 s, Fenster 10 s, lock-frei geführt. p95 wird vom Scheduler jede Sekunde berechnet. Scrub-Pause nur über diese Größe. Messung im Produkt ist nur diese Steuergröße, kein Nachweis. | neu | Behebt F-22, F-23. | Messung in Testkit-Lasttests als Produktsignal |
+| ADR-43 | **Latenzfenster in `db`:** 10 Buckets zu je 1 s, Fenster 10 s, lock-frei geführt (H-28). p95 wird vom Scheduler jede Sekunde berechnet. Scrub-Pause nur über diese Größe. Messung im Produkt ist nur diese Steuergröße, kein Nachweis. | neu | Behebt F-22, F-23. | Messung in Testkit-Lasttests als Produktsignal |
 | ADR-44 | **Keine Migration.** Entwicklungsdaten im Format v4.0 werden verworfen. Ein Export-Werkzeug entsteht nur mit einer neuen Spezifikationsversion und einem Pilotkunden. | neu | Schließt OPEN-5. | Migrationswerkzeug auf Vorrat |
 | ADR-45 | **Keine rechtliche Bewertung im Produkt oder in der Spezifikation.** Dokumentation verwendet nur technische Aussagen (REQ-DOC-2). Die Einordnung trifft der Verantwortliche. | neu | Schließt OPEN-1. | Rechtliche Aussage in der Software |
 | ADR-46 | **Hochverfügbarkeit und Replikation sind in v4.x ausgeschlossen.** | neu | Schließt OPEN-3. | Replikation des Löschlogs in v4.x |
 | ADR-47 | **Erstes KMS-Backend (K3): HashiCorp Vault Transit**, selbst betrieben. Zweites Backend (AWS KMS) nur mit neuer Spezifikationsversion. | neu | Schließt OPEN-2. Passt zu on-premises-Unternehmen. | Mehrere Anbieter in M6 |
 | ADR-48 | **Entitäten und Relationen liefert der Aufrufer** (`SourceDoc.graph`). Der Kern extrahiert nichts. | neu | Regelbasierte Extraktion ist fehleranfällig und gehört in die Quellsysteme. | Regelbasierte Extraktion im Kern |
-| ADR-49 | **Hybridfusion-Gewichte:** Vektor 1,0, Text 1,0, Graph 0,0 (nur aktiv bei `GraphMode::PathRag`). RRF mit `k = 60`. | neu | Festlegung vor Benchmark, Änderung nur über Konfiguration. | Gewichte aus Trainingsdaten |
-| ADR-50 | **Dedup und Idempotenz über keyed Digest:** `digest = BLAKE3-keyed(K_ref, Quellbytes)`. Kein unkeyed Hash über Inhalte. | neu | Behebt F-33. Unkeyed Hashes von Personendaten sind Personenbezug. | Textvergleich |
+| ADR-49 | **Hybridfusion-Gewichte:** Vektor 1,0, Text 1,0, Graph 0,0 (nur aktiv bei `GraphMode::PathRag`). Der Produktstandard bleibt 0,0, bis ein Gewicht im Benchmark begründet ist (D6). RRF mit `k = 60`. | neu | Festlegung vor Benchmark, Änderung nur über Konfiguration. | Gewichte aus Trainingsdaten |
+| ADR-50 | **Dedup und Idempotenz über keyed Digest:** `digest = BLAKE3-keyed(K_ref, Quellbytes)`. Kein unkeyed Hash über Inhalte. | neu | Behebt F-33. Ein unkeyed Digest wäre außerhalb des Schlüsselbesitzes vergleichbar; der keyed Digest verhindert das ohne `K_ref` (H-04). | Textvergleich |
 | ADR-51 | **`compat/` wird vollständig aufgelöst.** Keine Bridge-Module, keine Doppelmodule, keine `*-compat`-, `workspace`- oder `types-compat`-Features. Ports werden direkt von Kernmodulen implementiert. Umfang und Zielpositionen: 12.5. | neu | Nutzeranforderung. Behebt F-09. | Bridge-Schicht behalten |
 | ADR-52 | **`MAX_SEARCH_K = 1_000`**, einzige Definition in `contextra-ids`. `k_cand` und `rerank_k` sind daraus abgeleitet und ebenfalls begrenzt. | neu | Behebt F-13. Ein Wert, eine Quelle. | Sechs abweichende Werte |
 | ADR-53 | **`unsafe`-Inseln:** `sys` und `simd` im Produktcode. Test-Targets dürfen einen globalen Test-Allocator mit `unsafe` enthalten. Liste in `tests/unsafe_islands.rs`, sonst verboten. | neu | Behebt F-28. | Verbot ohne Ausnahme |
@@ -329,7 +332,8 @@ Die Verdrahtung erfolgt in `contextra-db` (13.1 M2). Kein anderes Crate kennt an
 <data_dir>/
   LOCK                                   Prozesssperre
   tenants/<tenant>/
-    keys/keytable.cxkt                   Schlüsseltabelle, Seal- und Segment-Raum (5.5)
+    keys/keytable_seal.cxkt             Schlüsseltabelle, Seal-Raum (5.5)
+keys/keytable_seg.cxkt              Schlüsseltabelle, Segment-Raum (5.5)
     keys/anchor.cxan                     gewrappte KEK-Epochen, K_ref, K_registry (5.6)
     erasure/erasure.cxel                 Löschlog (7.8)
     erasure/gate.cxgs                    Gate-Snapshot, atomar ersetzt (7.8)
@@ -474,6 +478,8 @@ pub trait ScrubTarget: Send + Sync {
 **REQ-VER-6 (Zeitreise und Löschung).** Die Zeitreise prüft das Gate nach Seal gegen den **aktuellen** Stand. Die Version wählt aus, das Gate gibt frei. Ein gelöschter Seal liefert `Erased`.
 
 ### 4.6 Zusammensetzung im Lesepfad
+**`seal_of` (K-18).** Abbildung `ChunkSlot → SealOrd`, 4 Byte je Slot, als Segment der Art `seal_map` in Speicher und Platte, verschlüsselt mit `SegKey` (INV-9). Beim Ingest gesetzt. Bei Löschung bleibt die Zuordnung bestehen; der Zustand des Seals kommt aus dem Gate. Der Scrub entfernt Zuordnungen toter Seals zusammen mit den Chunk-Slots.
+
 
 ```
 live(Anfrage) = visible(Version) ∩ open(Gate) ∩ acl(Principal) ∩ meta(Filter)
@@ -499,9 +505,9 @@ Das Gate gehört dem Mandanten, nicht der Collection. Ein Löschauftrag mit Scop
 | Klasse | Inhalt | Verschlüsselung | Löschmechanismus |
 |---|---|---|---|
 | **P** | Dokumente, Chunks, Vektoren, Text, Graph-Labels einer Collection mit `personal_data = Possible` (Standard) | `DocKey` je Seal (Nutzdaten), `SegKey` je Segment (abgeleitete Dateien) | Gate, Schlüsselvernichtung (7.4), Scrub |
-| **K** | Collection mit `personal_data = None`, vom Betreiber erklärt | `SegKey` je Segment; Klartext nur mit `k_class_encryption = false` | Gate, Scrub durch Segmentersatz |
+| **K** | Collection mit `personal_data = None`, vom Betreiber erklärt | `SegKey` je Segment. Kein Klartext (D4, K-17) | Gate, Scrub durch Segmentersatz |
 | **D** | Abgeleitet: Postings, Graphstruktur, HNSW-Struktur, Caches | `SegKey` je Segment (INV-9), Caches nur im Speicher | Gate, Scrub, `SealScoped` |
-| **E** | Löschlog, Ledger, Schlüsseltabelle, Anker, Registry | eigene Schlüssel (5.4), Ledger ohne Schlüssel | Aufbewahrungsfrist des Ledgers |
+| **E** | Löschlog, Ledger, Schlüsseltabelle, Anker, Registry | eigene Schlüssel (5.4), Ledger ohne Schlüssel | Aufbewahrung des Ledgers: Pflichtschalter `ledger_retention`, kein Standard (D4, H-05) |
 
 **INV-9 (Keine Klartext-Ableitung).** Keine Datei unter `tenants/` enthält bei Klasse P oder D Klartext von Nutzdaten, Tokens, Namen oder Graphlabels. Test T-ENC-01 durchsucht das Datenverzeichnis nach Canaries (Testkit).
 
@@ -553,13 +559,13 @@ Wurzel (K1 Passphrase / K1b Schlüsseldatei / K3 Vault Transit)
 
 **REQ-KEY-2 (Wrap).** AES-256-GCM-SIV unter dem jeweiligen Umschlagschlüssel. Nonce 96 Bit aus `OsRng`. AD = `raum (u8) ‖ index (u32 LE) ‖ epoche (u32 LE) ‖ algo_id (u8)`.
 
-**REQ-KEY-7 (Wurzel).** Das Trait `RootKeyProvider` (Port) liefert den Wurzelschlüssel für die Anker-Entwrappung. Implementierungen: `Passphrase` (Argon2id, Parameter nach ADR-16), `KeyFile` (Rechte 0600 geprüft, Inhalt 32 Byte), `VaultTransit` (M6). Der Start verweigert (`Refused`) bei leerer Passphrase, Parametern unter den Mindestwerten, falschen Dateirechten, nicht gesperrtem Speicher (ADR-41).
+**REQ-KEY-7 (Wurzel).** Das Trait `RootKeyProvider` (Port) liefert den Wurzelschlüssel für die Anker-Entwrappung. Implementierungen: `Passphrase` (Argon2id, Parameter nach ADR-16; Eingabe nur über Datei mit Rechten 0600 oder Umgebungsvariable, D10), `KeyFile` (Rechte 0600 geprüft, Inhalt 32 Byte), `VaultTransit` (M6). Der Start verweigert (`Refused`) bei leerer Passphrase, Parametern unter den Mindestwerten, falschen Dateirechten, nicht gesperrtem Speicher (ADR-41).
 
 **REQ-KEY-8 (Wurzelrotation).** `contextra key rewrap-root` schreibt nur den Anker neu (atomar, 5.6). Keine Schlüssel in der KeyTable werden berührt.
 
-### 5.5 KeyTable (`keys/keytable.cxkt`)
+### 5.5 KeyTable (`keys/keytable_seal.cxkt`, `keys/keytable_seg.cxkt`)
 
-Zwei Räume in einer Datei. Der Seal-Raum ist indiziert mit `SealOrd`, der Segment-Raum mit `SegOrd`. Beide Räume haben feste Basisoffsets im Header.
+Zwei Räume, je in eigener Datei: `keys/keytable_seal.cxkt` (Seal-Raum, indiziert mit `SealOrd`) und `keys/keytable_seg.cxkt` (Segment-Raum, indiziert mit `SegOrd`). Jeder Raum hat einen Header von 4096 Byte, die Slots beginnen bei Offset 4096 (Offset = 4096 + 128 · Index). Die Obergrenze je Raum ist 2^32 − 1 Indizes (5.9). Feste Basisoffsets zwischen den Räumen entfallen damit (K-11).
 
 **Header (4096 Byte, Sektor- und Seitengröße):**
 
@@ -568,8 +574,8 @@ Zwei Räume in einer Datei. Der Seal-Raum ist indiziert mit `SealOrd`, der Segme
 | 0 | 4 | Magic `CXKT` |
 | 4 | 2 | Formatversion (1) |
 | 6 | 2 | Slot-Größe (128) |
-| 8 | 8 | Basisoffset Seal-Raum |
-| 16 | 8 | Basisoffset Segment-Raum |
+| 8 | 8 | `next_index` Seal-Raum (Zählwert, K-12) |
+| 16 | 8 | `next_index` Segment-Raum (Zählwert) |
 | 24 | 4 | Aktuelle Epoche |
 | 28 | 4 | CRC32C über Bytes 0–27 |
 | 32 | 4064 | reserviert (0) |
@@ -587,13 +593,13 @@ Zwei Räume in einer Datei. Der Seal-Raum ist indiziert mit `SealOrd`, der Segme
 | 68 | 4 | `crc32c` über Bytes 0–67 |
 | 72 | 56 | reserviert (0) |
 
-**REQ-KEY-3.** Slot-Index = `SealOrd` (Seal-Raum) bzw. `SegOrd` (Segment-Raum). Slots werden nie wiederverwendet, nur durch Epochen-Neuaufbau der Datei (REQ-KEY-5).
+**REQ-KEY-3.** Slot-Index = `SealOrd` (Seal-Raum) bzw. `SegOrd` (Segment-Raum). Slots werden nie wiederverwendet. Der Epochenwechsel schreibt Slots in place um (REQ-KEY-5) und vergibt keine neuen Indizes (K-11).
 
 **REQ-KEY-4 (Vernichtung, neu gefasst zu F-15).** Ablauf eines Vernichtungsstapels:
 1. Der Aufrufer hat das Gate bereits publiziert (7.4 E1).
 2. `KeyDestroyer` nimmt den **Schreib-Lock des Schlüssel-Caches**. Neue Leser warten, laufende Leser (Read-Lock) schließen ab. Dadurch ist kein Schlüssel im Cache, dessen Slot gleich verschwindet.
 3. Cache-Einträge der Seals werden entfernt, `SealScoped` wird aufgerufen.
-4. Slots werden per `pwrite` an Ort überschrieben: `wrapped` und `wrap_nonce` mit Nullen, `state = 2`, CRC neu. Die Slots sind nach Offset sortiert, alle Schreibvorgänge eines Stapels teilen einen `fdatasync`.
+4. Vor dem ersten `pwrite` schreibt `KeyDestroyer` den Eintrag `DestroyIntent` für alle Seals und Segmente des Stapels und führt `fdatasync` aus (K-03). Slots werden per `pwrite` an Ort überschrieben: `wrapped` und `wrap_nonce` mit Nullen, `state = 2`, CRC neu. Die Slots sind nach Offset sortiert, alle Schreibvorgänge eines Stapels teilen einen `fdatasync`.
 5. Cache-Lock wird freigegeben. Alle gehaltenen Kopien im Speicher werden mit `zeroize` gelöscht.
 
 **REQ-KEY-5 (Epochenwechsel).** Alle `epoch_len` (Standard 30 Tage) entsteht eine neue MandantenKEK. Ein Hintergrundlauf liest alle `Live`-Slots sequentiell und wrappt sie um. Gemischte Epochen sind zulässig. Wenn kein Slot mehr die alte Epoche trägt, wird die alte KEK aus dem Anker entfernt. Aufwand O(Seals + Segmente), sequentielle E/A. Bei 10 Mio. Seals rund 1,3 GB je Lauf (128-Byte-Slots). Das begrenzt den Zeitraum, in dem eine verbliebene Kopie eines gewrappten Schlüssels nutzbar wäre (Grenze für Copy-on-Write und Flash, 7.9).
@@ -604,12 +610,12 @@ Zwei Räume in einer Datei. Der Seal-Raum ist indiziert mit `SealOrd`, der Segme
 
 ```
 Header:  Magic "CXAN" (4) | Version u16 | Tenant-ID (16) | Anzahl Einträge u32 | CRC32C u32
-Eintrag: Art u8 (1 KEK, 2 K_ref, 3 K_registry) | Epoche u32 | Nonce 12 | Länge u16 | gewrappter Schlüssel n | CRC32C u32
+Eintrag: Art u8 (1 KEK, 2 K_ref, 3 K_registry, 4 K_log) | Epoche u32 | Nonce 12 | Länge u16 | gewrappter Schlüssel n | CRC32C u32
 ```
 
 - Gewrappt unter dem Wurzelschlüssel mit AES-256-GCM-SIV, AD = `art ‖ epoche ‖ tenant_id`.
 - **Schreiben atomar:** `tmp → fdatasync → rename → fsync(Verzeichnis)`. Das Entfernen einer alten KEK ist dasselbe Verfahren.
-- Mandanten-Offboarding (7.2): Anker wird ohne KEK-Einträge neu geschrieben, dann KeyTable und Verzeichnis entfernt.
+- Mandanten-Offboarding (7.2): Anker wird ohne alle Einträge neu geschrieben (KEK, `K_ref`, `K_registry`, `K_log`, K-13), dann KeyTables und Verzeichnis entfernt.
 
 ### 5.7 Seal-Registry
 
@@ -659,7 +665,7 @@ Jede abgeleitete Datei (Postings, Vektor-Struktur, SQ8-Codes, Filter-Bitmaps, Gr
 
 - `DocId`: zufällig, 128 Bit, nie aus Inhalt oder Pfad abgeleitet.
 - `chunk_id = BLAKE3(doc_id ‖ rev ‖ chunk_index)`, 128 Bit.
-- `SealOrd` und `SegOrd`: vergeben vom Schreib-Task, monoton, nie wiederverwendet. Bei Erreichen von `2^32 − 1` weist der Mandant neue Schreibstapel mit `Refused` ab (Zählwert im Anker-Header der KeyTable).
+- `SealOrd` und `SegOrd`: vergeben vom Schreib-Task, monoton, nie wiederverwendet. Bei Erreichen von `2^32 − 1` weist der Mandant neue Schreibstapel mit `Refused` ab (Zählwert `next_index` im KeyTable-Header (5.5, K-12)).
 - `tenant_id`: 16 Byte Zufall, nicht aus dem Verzeichnisnamen abgeleitet.
 
 ### 5.10 Handkodierte Plattenformate (REQ-FMT-4, neu gefasst)
@@ -712,7 +718,7 @@ Unbekannte Formate werden mit `Refused` abgewiesen, nie geraten. ODF, OLE und YA
 
 **REQ-ING-7 (Unterdrückung, neu gefasst zu F-19).** Der Schreib-Task prüft beim Commit jedes Dokuments die deklarierten Betroffenen-Tags gegen die Unterdrückungsliste. Ist **ein** deklarierter Tag unterdrückt, wird das gesamte Dokument mit `SubjectSuppressed` abgewiesen. Der Rest des Stapels läuft weiter. Die Prüfung und der Commit laufen unter dem Commit-Lock aus 8.4, dadurch ist eine Race mit einer gleichzeitigen Löschung ausgeschlossen.
 
-**REQ-ING-8 (Idempotenz).** `key = (collection, external_id)`, `digest = BLAKE3-keyed(K_ref, Quellbytes)`. Gleicher Schlüssel und gleicher Digest: `Unchanged`, keine neue Revision. Gleicher Schlüssel und neuer Digest: neue Revision mit neuem Seal, alte Revision wird `Superseded`.
+**REQ-ING-8 (Idempotenz).** `key = (collection, BLAKE3-keyed(K_ref, external_id))` (H-06), `digest = BLAKE3-keyed(K_ref, Quellbytes)`. Gleicher Schlüssel und gleicher Digest: `Unchanged`, keine neue Revision. Gleicher Schlüssel und neuer Digest: neue Revision mit neuem Seal, alte Revision wird `Superseded`.
 
 **REQ-ING-9 (Bulk).** `IngestMode::Bulk { sync_every }` synchronisiert alle 64 MiB oder 5 s und am Jobende. Bestätigt wird erst nach dem Sync. Ein Abbruch wiederholt den Job, REQ-ING-8 macht das sicher. Löschaufträge sind nie `Bulk`.
 
@@ -787,7 +793,7 @@ Der Start lädt die `vector_code`-Segmente parallel und entschlüsselt sie segme
 1. Snapshot pinnen (Version-Snapshot und Gate-Sequenz), Filterbitmap bilden (4.6). Principals aus Konfiguration.
 2. Vektorsuche (HNSW oder exakt) und Textsuche, je `k_cand = max(2·k, 50)`, begrenzt durch `MAX_SEARCH_K` (ADR-52).
 3. Endprüfung je Kandidat (REQ-FLT-5), Nachberechnung (REQ-VEC-3).
-4. Optional Graph-Signal (6.10), nur bei `GraphMode::PathRag`.
+4. Optional Graph-Signal (6.10), nur bei `GraphMode::PathRag`. Die Seeds stammen aus Stufe 1 (Vektor- und Textsignal ohne Graph), damit kein Zirkelbezug entsteht (K-06). Die Endfusion in Schritt 5 nimmt das Graph-Signal als drittes Signal mit seinem Gewicht auf.
 5. Fusion: gewichtete Reciprocal Rank Fusion, `k = 60`, Gewichte aus Konfiguration (ADR-49).
 6. Optional Reranker (REQ-EMB-5).
 7. Auswahl der Top-k. Tie-Break aufsteigend nach `DocId`, dann `chunk_id`.
@@ -828,7 +834,7 @@ Der Start lädt die `vector_code`-Segmente parallel und entschlüsselt sie segme
 | `plan_erasure(ErasureRequest)` | Trockenlauf ohne Nebenwirkung (7.3) | `erasure_admin` |
 | `erase(ErasureRequest)` | Löschauftrag (Kapitel 7) | `erasure_admin` |
 | `erase_status(TicketId)` | Status nach 7.10 | `erasure_admin` |
-| `resolve_review(TicketId, Decision)` | Entscheidung bei Mehrbetroffenen | `erasure_admin`, bei `four_eyes` zweiter Admin |
+| `resolve_review(TicketId, seals: Vec<SealOrd>, Decision)` | Entscheidung bei Mehrbetroffenen | `erasure_admin`, bei `four_eyes` zweiter Admin |
 | `set_hold(scope, reason, until)` | Aufbewahrung, Legal Hold | `erasure_admin` |
 | `health()` | Zustand, Gründe, Zähler | Prozess |
 
@@ -862,12 +868,12 @@ Dieses Kapitel ersetzt PLAN v2.1 des Crates und den Anhang der v4.0 (F-01 bis F-
 - Namen und Relationsbezeichnungen stehen **nur** als `GraphLabel`-Datensätze, verschlüsselt mit dem `DocKey` des Quell-Seals (ADR-23). Im Graph selbst liegt nie Klartext.
 - Zuordnung `chunk_slot → [EntityId]` für Belege (`mentions`).
 
-**REQ-GR-3 (Sichtbarkeit).** Eine Kante ist sichtbar, wenn mindestens ein Provenienz-Seal `Open` ist (ReadGate). Eine Entität ist sichtbar, wenn mindestens eine ihrer Provenienzen `Open` ist. Die Prüfung gilt beim Materialisieren, nicht beim Durchlaufen. Dadurch wirkt eine Löschung sofort, bevor der Scrub läuft.
+**REQ-GR-3 (Sichtbarkeit).** Eine Kante ist sichtbar, wenn mindestens ein Provenienz-Seal `Open` ist (ReadGate). Eine Entität ist sichtbar, wenn mindestens eine ihrer Provenienzen `Open` ist. Die Prüfung gilt je Kante beim Durchlaufen und erneut beim Materialisieren (K-05, Entscheidung (b)). Unsichtbare Kanten haben damit weder Expansion noch Ranking-Wirkung. Dadurch wirkt eine Löschung sofort, bevor der Scrub läuft.
 
 **REQ-GR-4 (Schreibpfad).** Graph-Änderungen gehören zum Schreibstapel (REQ-CON-6). Eine Revision, die superseded wird, entfernt die Provenienz ihres Seals im selben Stapel. Kanten mit leerer Provenienz werden tombstonet und im Scrub entfernt. Änderungen laufen als Delta-Segment (Art `graph_struct`). Basis-Segmente sind unveränderlich. Kompaktion des Deltas bei mehr als 10 % der Basis oder 1 Mio. Operationen, in einem Scrub-Stapel oder einem Schreibstapel.
 
 **REQ-GR-5 (Traversierung und PathRAG).**
-- Seeds: die Top-20 Chunks der Fusionsliste (Schritt 4 aus 6.6).
+- Seeds: die Top-20 Chunks der Stufe-1-Fusion aus Vektor- und Textsignal (6.6, Schritt 4; K-06).
 - Entitäten der Seeds über `mentions`. Expansion per BFS bis `max_hops ≤ 3`, nur über sichtbare Kanten.
 - Deterministische Reihenfolge: Frontier nach `EntityId` aufsteigend.
 - Begrenzung: `max_expansions = 10.000` je Anfrage. Erreichte Grenze markiert das Ergebnis als `truncated`, sie ist kein Zeitbudget (REQ-TIM-3).
@@ -934,7 +940,7 @@ pub enum Scope {
 
 **REQ-ER-1 (`plan_erasure`).** Ohne Nebenwirkung. Der Bericht nennt: Anzahl Seals je Klasse, Anzahl Chunks, Anzahl Dokumente mit weiteren Betroffenen (nur Anzahl), Aufbewahrungs- und Hold-Treffer (Anzahl und Grund), undeklarierte Treffer aus der Entdeckung (Anzahl). Nie Kennungen, nie Inhalte.
 
-**REQ-ER-2 (Klassifikation, neu gefasst zu F-17).** Jeder Seal des Auftrags wird genau einer Klasse zugeordnet, in dieser Reihenfolge:
+**REQ-ER-2 (Klassifikation, neu gefasst zu F-17).** Jeder Seal des Auftrags wird genau einer Klasse zugeordnet, in dieser Reihenfolge: Treffer der Entdeckung ohne Deklaration fallen nach `undeclared_hits` (Standard `Restrict`, D3) in Klasse Undeclared. Solange diese Seals nicht gelöscht sind, ist das Ergebnis des Auftrags `Partial` mit Anzahl und Grund (K-07).
 
 | Klasse | Bedingung | Weiterer Weg |
 |---|---|---|
@@ -957,7 +963,7 @@ Jeder Schritt ist idempotent. Das Löschlog ist die Wahrheit. Die Reihenfolge is
 |---|---|---|---|---|
 | **E0 Annahme** | Tenant-Koordinator | Berechtigung prüfen (ADR-38), Ticket, Log `Requested` (fdatasync). Gleicher Scope → bestehendes Ticket | Log | `Requested` |
 | **E1 Gate** | Tenant-Koordinator, unter dem **Erasure-Lock** des Mandanten | Klassifikation (7.3). Log `Gated`/`Restrict` für alle Seals. fdatasync. Gate-Datei atomar ersetzen (`tmp → fdatasync → rename`). `ArcSwap`-Publikation. Registry-Zustand `Gated`. LiveMask-Änderungen an die Shards senden (Warteschlange mit Grenze). | Log, Gate-Datei | `Gated` |
-| **E2 Schlüssel** | Tenant-Koordinator über `KeyDestroyer` | Für Klasse Erase: Schlüsselcache-Lock (REQ-KEY-4), `SealScoped`-Invalidierung, Slots überschreiben, ein fdatasync je Stapel, Registry `KeysDestroyed`. Routen-erhaltender Scrub der SQ8-Codes im Speicher (REQ-VEC-5). Log `KeysDestroyed`. | KeyTable, Log | `KeysDestroyed` |
+| **E2 Schlüssel** | Tenant-Koordinator über `KeyDestroyer` | Für Klasse Erase: Schlüsselcache-Lock (REQ-KEY-4), `SealScoped`-Invalidierung, `DestroyIntent` durabel schreiben, Slots überschreiben, ein fdatasync je Stapel, Registry `KeysDestroyed`. Routen-erhaltender Scrub der SQ8-Codes im Speicher (REQ-VEC-5). Log `KeysDestroyed`. | KeyTable, Log | `KeysDestroyed` |
 | **E3 Scrub** | Scrub-Scheduler, Ziele über `ScrubTarget` | Gebündelt nach 7.6. Neue Segmente veröffentlichen, dann alte `SegKey` vernichten (ADR-31). Log `Scrubbed` je Ziel. | Manifest je Teilschritt | `Scrubbing` |
 | **E4 Abschluss** | Tenant-Koordinator | Registry-Minimalform, Log `Completed`, Status. Überschreitet E3 `scrub_deadline`: Kennzeichen `Overdue`, Alarm über `MetricsSink`, weiterer Versuch. | Log | `Completed` |
 
@@ -984,7 +990,7 @@ jeder nicht-terminale Zustand → Pending{grund} → Fortsetzung
 
 Terminal: `Completed`, `Released`, `Refused`. Gründe für `Pending`: `DiskReserveLow`, `IoBackoff`, `ScrubRetry`, `AwaitReview`.
 
-**REQ-ER-6 (Fristen für Review, neu gefasst zu F-30).** `Restricted` ist kein stabiler Endzustand. Erinnerung nach `review_remind_after` (14 Tage), Eskalation nach `review_escalate_after` (30 Tage): Ledger-Eintrag, Metrik, Status `Overdue`. Keine automatische Löschung und keine automatische Freigabe. Der Status ist für den Verantwortlichen sichtbar, die Entscheidung liegt bei ihm.
+**REQ-ER-6 (Fristen für Review, neu gefasst zu F-30).** `Restricted` ist kein stabiler Endzustand. Erinnerung nach `review_remind_after` (14 Tage), Eskalation nach `review_escalate_after` (30 Tage): Ledger-Eintrag, Metrik, Status `Overdue`. Keine automatische Löschung und keine automatische Freigabe. Der Status ist für den Verantwortlichen sichtbar, die Entscheidung liegt bei ihm. Die Frist ist der Pflichtschalter `restricted_max_age` (D1, K-08): Ohne Wert startet Contextra nicht. Bei Ablauf wechselt der Auftrag in `Overdue`, der Ledger-Eintrag wird geschrieben. Es gibt keine automatische Löschung und keine automatische Freigabe.
 
 ### 7.6 Gebündelter Scrub
 
@@ -1017,9 +1023,9 @@ Terminal: `Completed`, `Released`, `Refused`. Gründe für `Pending`: `DiskReser
 | `Pending{…}` | beim nächsten Takt aufnehmen |
 | `Restricted` | Sperre erhalten, Review-Fristen fortführen |
 
-**REQ-REC-2 (Slot-Regeln, neu gefasst zu F-29).** Ein Slot wird beim Start nach dieser Tabelle bewertet:
+**REQ-REC-2 (Slot-Regeln, neu gefasst zu F-29).** Ein Slot wird beim Start nach dieser Tabelle bewertet: Bei `Destroyed` aus einem Intent wird E2 für den Slot wiederholt (K-03).
 
-| CRC des Slots | Log enthält `KeysDestroyed` für dessen Seal oder Segment | state | Ergebnis |
+| CRC des Slots | Log enthält `DestroyIntent` oder `KeysDestroyed` für dessen Seal oder Segment | state | Ergebnis |
 |---|---|---|---|
 | gültig | – | 2 | `Destroyed` |
 | gültig | – | 0 oder 1 | wie gespeichert |
@@ -1039,10 +1045,10 @@ Dateikopf: Magic `CXEL` (4), Version u16, Tenant-ID (16), CRC32C (4).
 Datensatz:
 
 ```
-[len u32 LE][seq u64 LE][ticket 16][op u8][payload n][crc32c u32 LE]
+[len u32 LE][seq u64 LE][ticket 16][op u8][payload n][mac 16][crc32c u32 LE]
 ```
 
-`len` zählt die Bytes von `seq` bis einschließlich `payload`, ohne `len` und `crc32c`. Die CRC deckt dieselben Bytes ab.
+`len` zählt die Bytes von `seq` bis einschließlich `mac`, ohne `len` und `crc32c`. Die CRC deckt dieselben Bytes ab. `mac` ist HMAC-SHA256 über `seq` bis `payload`, gekürzt auf 16 Byte, mit `K_log` aus dem Anker (D9, H-22).
 
 Op-Codes: 1 `Requested`, 2 `Gated`, 3 `KeysDestroyed`, 4 `ScrubQueued`, 5 `Scrubbed`, 6 `Restrict`, 7 `Release`, 8 `Refuse`, 9 `Pending`, 10 `Completed`, 11 `Hold`, 12 `Retire`, 13 `TenantErased`, 14 `RestoreReapplied`, 15 `AuthDenied`.
 
@@ -1054,7 +1060,7 @@ Kopf: Magic `CXGS`, Version u16, Tenant-ID, `seq u64`, `tenant_erased u8`. Körp
 
 Schreiben: `tmp → fdatasync → rename → fsync(Verzeichnis)`. Bei 10.000 Einträgen in Log oder wöchentlich.
 
-**REQ-GATE-1 (Veröffentlichung).** Gate-Log durabel, Gate-Datei atomar, dann `ArcSwap`. Leser greifen über `load()` zu. Schlägt `fdatasync` fehl, bleibt der alte Snapshot gültig, die Antwort ist `ReadOnly`, und der Mandant geht in `Quarantine`, bis das Log wieder schreibbar ist.
+**REQ-GATE-1 (Veröffentlichung).** Gate-Log durabel, Gate-Datei atomar, dann `ArcSwap`. Leser greifen über `load()` zu. Schlägt `fdatasync` fehl, bleibt der alte Snapshot gültig, der Shard geht in `ReadOnly` (`FsyncFailed`), und ein Löschauftrag wird mit `Refused(ReadOnly)` abgelehnt statt angenommen (K-01, D2). `Quarantine` tritt bei Gate-Log-Fehlern nicht ein (K-02). Nach dem durablen Log-Eintrag setzt der Prozess die Lesesperre im Speicher, bevor die Antwort an den Aufrufer geht. Diese Sperre ist nicht durabel und gilt bis zum Neustart mit Rekonstruktion des Gate-Snapshots aus dem Log (C3).
 
 **REQ-GATE-2 (Prüfreihenfolge).** `tenant_erased` vor `erased`, `erased` vor `restricted`. `Restricted` liefert nur mit Audit-Eintrag, im Standard gar nicht (`restricted_read = Deny`).
 
@@ -1069,7 +1075,7 @@ Diese Grenzen gelten unabhängig von der Implementierung und stehen im Betriebsh
 | SQ8-Codes toter Knoten | Arbeitsspeicher | 0 nach E2 (routen-erhaltend) | niemand |
 | Graphstruktur toter Knoten | Delta-Segment | bis Scrub, ≤ `scrub_deadline` | wie Segmentinhalte |
 | Kopien in Checkpoints | Kopie des Datenverzeichnisses | bis Rotation, `checkpoint_retention` (Standard 7 Tage) | Restore mit Schlüsselspur (ADR-42) |
-| Schlüsselsicherung | Sicherungsmedium | `key_backup_retention` (Standard 400 Tage) | Restore mit altem Schlüssel, Pflicht zu REQ-BAK-3 |
+| Schlüsselsicherung | Sicherungsmedium | `key_backup_max_age` (Standard 30 Tage) | Restore mit altem Schlüssel, Pflicht zu REQ-BAK-3 |
 | Auslagerung, Core-Dump | Swap, Speicherabbild | verhindert durch mlock und `PR_SET_DUMPABLE = 0` (ADR-41) | nur mit Root-Zugriff auf das Gerät |
 | Externe Ausleitung | Systeme außerhalb | nicht durch die Software kontrollierbar | nicht zuzuordnen |
 
@@ -1089,13 +1095,13 @@ Weitere Grenzen:
 
 ### 7.11 Datensicherung und Wiederherstellung
 
-**REQ-BAK-1 (zwei Spuren, neu gefasst zu F-35).** Datensicherungen des Datenverzeichnisses enthalten Chiffrat ohne `keys/` und ohne `erasure/` (ADR-42). Schlüsselsicherungen sind eine eigene Spur (`contextra key backup`): `keys/keytable.cxkt` und `keys/anchor.cxan` mit Zeitstempel im Kopf. `key_backup_max_age` (Standard 30 Tage) begrenzt die Gültigkeit. Abgelaufene Sicherungen werden beim Restore verweigert.
+**REQ-BAK-1 (zwei Spuren, neu gefasst zu F-35).** Datensicherungen des Datenverzeichnisses enthalten Chiffrat ohne `keys/` und ohne `erasure/` (ADR-42). Schlüsselsicherungen sind eine eigene Spur (`contextra key backup`): `keys/keytable_seal.cxkt`, `keys/keytable_seg.cxkt` und `keys/anchor.cxan`. Der Zeitstempel steht im Sicherungsmanifest `manifest.json` (`created_at`, Hash je Datei, Tenant-ID), nicht im Kopf der Formate; `CXKT` und `CXAN` bleiben unverändert (K-15). `key_backup_max_age` (Standard 30 Tage) begrenzt die Gültigkeit. Abgelaufene Sicherungen werden beim Restore verweigert.
 
-**REQ-BAK-2 (Senke, optional).** `erasure.sink` ist ein Port `ErasureSink` (Datei außerhalb von `data_dir`, Objektspeicher mit Aufbewahrungssperre, Syslog). Der Tenant-Koordinator hängt `Gated`- und `KeysDestroyed`-Einträge nach `fdatasync` des Löschlogs an die Senke an, asynchron mit begrenztem Rückstand (`sink_max_lag`, Standard 60 s, Alarm bei Überschreitung).
+**REQ-BAK-2 (Senke, Pflicht bei Löschungen, K-16).** `erasure.sink` ist ein Port `ErasureSink` (Datei außerhalb von `data_dir`, Objektspeicher mit Aufbewahrungssperre, Syslog). Der Tenant-Koordinator hängt `Gated`- und `KeysDestroyed`-Einträge nach `fdatasync` des Löschlogs an die Senke an, asynchron mit begrenztem Rückstand (`sink_max_lag`, Standard 60 s, Alarm bei Überschreitung). Zusätzlich gehen `ErasedSubj`-, `Restricted`- und `tenant_erased`-Ereignisse in die Senke, damit ein Restore sie rekonstruieren kann (K-16).
 
 **REQ-BAK-3 (Restore-Schritt).** `contextra restore --reapply` liest die Senke, vernichtet in der wiederhergestellten KeyTable alle dort als zerstört geführten Seals und Segmentschlüssel erneut, schreibt `RestoreReapplied` ins Ledger und stößt den Scrub an. Erst danach öffnen Lesepfade.
 
-**REQ-BAK-4 (Erkennung).** Ist die Senke weiter als das lokale Löschlog (höhere Sequenz), erkennt der Start einen Restore und verlangt REQ-BAK-3. Ohne Senke ist ein Restore nicht erkennbar. Das ist eine dokumentierte Grenze. Der Betriebsablauf führt `--reapply` nach jedem Restore aus. Optional `restore_without_sink = Quarantine`.
+**REQ-BAK-4 (Erkennung).** Ist die Senke weiter als das lokale Löschlog (höhere Sequenz), erkennt der Start einen Restore und verlangt REQ-BAK-3. Ohne Senke ist ein Restore nicht erkennbar. Für Mandanten mit Löschungen ist ein Restore ohne Senke `Quarantine`, bis `contextra restore --reapply` ausgeführt ist (K-16). Der Betriebsablauf führt `--reapply` nach jedem Restore aus. Der frühere Schalter `restore_without_sink` entfällt (K-16).
 
 **REQ-BAK-5 (Aufbewahrungshorizont).** `key_backup_retention ≥ restore_horizon`, und die Senke deckt mindestens `restore_horizon` ab. Die Prüfung erfolgt in C0.
 
@@ -1118,18 +1124,18 @@ Der Tenant-Koordinator ist eine Komponente von `db`. Er hält den Erasure-Lock, 
 | Zustand | Lesen | Schreiben | Löschen | Ursache |
 |---|---|---|---|---|
 | `Ready` | ja | ja | ja | Normalbetrieb |
-| `ReadOnly{grund}` | ja, letzter Snapshot | nein | Auftrag wird angenommen und nach Rückkehr ausgeführt, sofern Log und KeyTable schreibbar sind | `FsyncFailed`, `NoSpace`, `IoError` bei Datenschreibvorgängen |
+| `ReadOnly{grund}` | ja, letzter Snapshot | nein | Löschauftrag wird mit `Refused(ReadOnly)` abgelehnt; er ist nach Rückkehr neu zu stellen | `FsyncFailed`, `NoSpace`, `IoError` bei Datenschreibvorgängen |
 | `Rebuilding` | nein (`IndexUnavailable`) | ja, in den Store | ja | Index-Segment nicht lesbar (REQ-IDX-REBUILD) |
 | `Quarantine` | nein | nein | nein | Löschlog, Gate oder KeyTable inkonsistent, Integrität verletzt |
 | `Refused` | nein | nein | nein | Start verweigert (Konfiguration, Format, Schlüssel, mlock) |
 
-Der Zustand gilt je **Shard**, mit Ausnahme von `Quarantine`. Ein Fehler in einem Shard stoppt die anderen nicht. Ist das Löschlog eines Mandanten betroffen, gilt `Quarantine` für alle Collections dieses Mandanten.
+Der Zustand gilt je **Shard**, mit Ausnahme von `Quarantine`. Ein Fehler in einem Shard stoppt die anderen nicht. Ist das Löschlog oder die KeyTable eines Mandanten inkonsistent, gilt `Quarantine` für alle Collections dieses Mandanten.
 
-**INV-5.** Ein Schreib- oder Löschfehler führt nie zu `Quarantine`, außer er betrifft Löschlog, Gate oder KeyTable. Ein fehlgeschlagener `fsync` bei Daten führt zu `ReadOnly`.
+**INV-5.** Ein Schreib-, Lösch- oder `fsync`-Fehler führt zu `ReadOnly`. `Quarantine` tritt nur bei Integritätsverletzung in Löschlog, Gate oder KeyTable ein (Prüfsumme, Format, Widerspruch), nie bei reinem Schreibfehler.
 
 **REQ-OPS-1 (Rückkehr).** `ReadOnly → Ready` erfolgt ohne Neustart nach bestandener Strukturprüfung und einem erfolgreichen Probeschreibvorgang. `Quarantine → Ready` erfordert einen Neustart mit bestandener Prüfung von Log, Gate und KeyTable. Übergänge stehen im Ledger und im Health-Bericht.
 
-**INV-6 (Fail-closed).** Fehlt ein Schlüssel oder ist ein Gate-Zustand unbekannt, liefert der Lesepfad `Erased`, nie Klartext. AEAD-Fehler sind nach außen nicht unterscheidbar.
+**INV-6 (Fail-closed).** Fehlt ein Schlüssel oder ist ein Gate-Zustand unbekannt, liefert der Lesepfad `Erased`, nie Klartext. AEAD-Fehler sind nach außen nicht unterscheidbar. Abbildung (K-04): Fehlender Schlüssel und AEAD-Fehler ergeben auf dem Lesepfad `Erased`. `ContextraError::Integrity` wird auf Lesepfaden nicht zurückgegeben; Integritätsfehler in Log, Gate oder KeyTable zeigen `health()` und Quarantäne an.
 
 ### 8.2 Fehlerklassen
 
@@ -1146,7 +1152,7 @@ Jeder Fehler wird mit Art, Mandant, Zeitpunkt und Zustandsübergang protokollier
 
 ### 8.3 Startsequenz
 
-Je Prozess `C0`, `C1` einmal. Je Mandant `C2` bis `C6`. Mandanten und Collections werden **lazy** geöffnet: die erste Anfrage öffnet einen Shard, `eager_open` kann das ändern.
+Je Prozess `C0`, `C1` einmal. Je Mandant `C2` bis `C6`. Mandanten und Collections werden **lazy** geöffnet: die erste Anfrage öffnet einen Shard, `eager_open` kann das ändern. Mandanten mit offenen Löschaufträgen öffnen Gate, Schlüssel und Scrub-Planung bereits beim Start (C0 bis C4a, K-10). Die Frist `scrub_deadline` läuft ab dem Log-Eintrag `Gated`, nicht ab dem Öffnen.
 
 | Phase | Inhalt |
 |---|---|
@@ -1154,11 +1160,12 @@ Je Prozess `C0`, `C1` einmal. Je Mandant `C2` bis `C6`. Mandanten und Collection
 | `C1` | Datenverzeichnis, Prozesssperre, Plattenreserve ≥ `disk_reserve_bytes`. Schlüsselspeicher sperren (mlock, ADR-41), `PR_SET_DUMPABLE = 0`. |
 | `C2` | Wurzel und Anker öffnen. Wurzelschlüssel entwrappen. |
 | `C3` | **Löschlog und Gate-Snapshot wiedergeben**, KeyTable auf REQ-REC-2 prüfen. Erst danach sind Lesepfade dieses Mandanten zulässig (REQ-OPS-2). |
-| `C4` | Offene Löschaufträge fortsetzen (7.7). |
+| `C4a` | Offene Löschaufträge bis E2 fortsetzen: Gate, Schlüssel, Registry (7.7). Läuft vor `C5` (K-09). |
 | `C5` | Store: Manifest, WAL, Prüfsummen der Store-Dateien. Registry lesen. |
 | `C6` | Index laden: `vector_struct` und `vector_code` parallel, `text`-Segmente, `graph`-Segmente. LiveMask aus Registry, Visibility und Gate aufbauen. Zustand `Ready`, `Rebuilding` oder `ReadOnly` setzen. |
+| `C4b` | Index-Scrub und Scrub-Planung offener Aufträge fortsetzen (REQ-VEC-5, 7.6). Läuft nach `C6` (K-09). |
 
-**REQ-OPS-2.** Vor `C3` liefert jede Anfrage `Erased` oder einen typisierten Fehler. `C6` läuft nur, wenn `C3` und `C4` bestanden sind.
+**REQ-OPS-2.** Die Phase `C4` ist geteilt (K-09): `C4a` vor `C5`, `C4b` nach `C6`. Vor `C3` liefert jede Anfrage `Erased` oder einen typisierten Fehler. `C6` läuft nur, wenn `C3` und `C4` bestanden sind.
 
 ### 8.4 Nebenläufigkeit
 
@@ -1200,7 +1207,7 @@ Je Prozess `C0`, `C1` einmal. Je Mandant `C2` bis `C6`. Mandanten und Collection
 
 **REQ-TIM-3.** Zeitgrenzen im Produkt: `deadline` der Suche (kooperativ, Fehler statt Teilergebnis), Scrub-Fenster und -Frist, Fristen für Review, HTTP-Zeitgrenzen im Adapter. Es gibt keine Zeitbudgets, die Ranking oder Kandidatenmenge verändern.
 
-**ADR-43 (Latenzfenster).** `contextra-db` führt ein Fenster mit 64 logarithmischen Buckets, Schritt 1 s, Gesamtlänge 10 s, lock-frei. Der Scheduler berechnet p95 jede Sekunde. Dieses Fenster ist die einzige Quelle für die Scrub-Pause. Es ist keine Messung für einen Nachweis.
+**ADR-43 (Latenzfenster).** `contextra-db` führt ein Fenster mit 10 Buckets zu je 1 s, Gesamtlänge 10 s, lock-frei (H-28). Der Scheduler berechnet p95 jede Sekunde. Dieses Fenster ist die einzige Quelle für die Scrub-Pause. Es ist keine Messung für einen Nachweis.
 
 **INV-7 (Determinismus).** Siehe REQ-SRC-2.
 
@@ -1214,7 +1221,7 @@ Je Prozess `C0`, `C1` einmal. Je Mandant `C2` bis `C6`. Mandanten und Collection
 
 ## 9. Konfiguration
 
-Die Konfiguration wird vollständig in `C0` geprüft. Alle Fehler werden gesammelt gemeldet (`Refused`). Konfiguration ist die einzige Quelle für Principals, Berechtigungen und Vokabulare (ADR-38, REQ-GR-2).
+Die Konfiguration wird vollständig in `C0` geprüft. Alle Fehler werden gesammelt gemeldet (`Refused`). Konfiguration ist die einzige Quelle für Principals, Berechtigungen und Vokabulare (ADR-38, REQ-GR-2). Änderungen wirken nur nach Neustart (D10, H-26).
 
 ```rust
 pub struct ContextraConfig {
@@ -1242,7 +1249,7 @@ pub struct ErasureConfig {
     pub compaction_after_erase: bool,        // true
     pub epoch_len: Duration,                 // 30 Tage
     pub multi_subject: MultiSubjectPolicy,   // Restrict | DeleteAll | RedactReingest, Standard Restrict
-    pub undeclared_hits: UndeclaredPolicy,   // Report | Restrict, Standard Report
+    pub undeclared_hits: UndeclaredPolicy,   // Restrict | Report, Standard Restrict (D3)
     pub four_eyes: bool,                     // false
     pub restricted_read: RestrictedRead,     // Deny | Audit, Standard Deny
     pub review_remind_after: Duration,       // 14 Tage
@@ -1251,7 +1258,9 @@ pub struct ErasureConfig {
     pub sink: Option<SinkConfig>,
     pub sink_max_lag: Duration,              // 60 s
     pub key_backup_max_age: Duration,        // 30 Tage
-    pub key_backup_retention: Duration,      // 400 Tage
+    pub key_backup_retention: Duration,      // Aufbewahrung des Mediums, Standard 400 Tage (K-14)
+    pub ledger_retention: Duration,          // Pflicht, kein Standard (D4, H-05)
+    pub restricted_max_age: Duration,        // Pflicht, kein Standard; ohne Wert startet Contextra nicht (D1)
     pub restore_horizon: Duration,           // 30 Tage
     pub checkpoint_retention: Duration,      // 7 Tage
     pub disk_reserve_bytes: u64,             // ≥ 1 GiB
@@ -1284,7 +1293,7 @@ pub struct ErasureConfig {
 - `KeyFile` mit Rechten 0600.
 - `scrub_deadline ≥ 15 min`. `key_backup_retention ≥ restore_horizon`. `checkpoint_retention ≥ 1 Tag`.
 - `embedding.model_sha256` stimmt mit der Datei überein.
-- Verschlüsselung für P- und D-Collections ist nicht abschaltbar. `encryption = none` wird abgewiesen.
+- Verschlüsselung ist für alle Klassen nicht abschaltbar. Einen Schalter für Klartext gibt es nicht (D4, K-17).
 - `memory_budget_bytes` ≤ verfügbarer Speicher minus Reserve.
 - `index_history = true` nur mit ausdrücklicher Bestätigung der Kosten.
 - `graph.enabled = true` nur bei aktivem Feature `graph` und definiertem Typvokabular.
@@ -1368,7 +1377,7 @@ Die Prüfung der Löschung liegt in Testcode. Ein Test darf das Datenverzeichnis
 | T-ER-18 | Scrub-Stapel: jedes betroffene Segment einmal neu geschrieben. Frist eingehalten (mit `ManualClock`) |
 | T-ER-19 | Scrub pausiert bei p95-Überschreitung, läuft nach Fristablauf trotzdem |
 | T-ER-20 | Konsolidierung: Rückruf des Graphen nach Löschung von 10 % der Knoten ≥ Ziel |
-| T-ER-21 | Restore mit alter KeyTable und Senke: Seals werden erneut vernichtet. Ohne Senke und mit `restore_without_sink = Quarantine`: `Quarantine` |
+| T-ER-21 | Restore mit alter KeyTable und Senke: Seals werden erneut vernichtet. Ohne Senke bei Mandant mit Löschungen: `Quarantine` bis `--reapply` (K-16) |
 | T-ER-22 | K-Klasse: kein Schlüsselschritt, Segmentersatz, Ledger vermerkt `no_key_destruction` |
 | T-ER-23 | Ledger enthält keine Kennungen, Namen oder Inhalte (Property-Test mit Canary-Namen) |
 | T-ER-24 | `erase_status` und Ledger enthalten keine Wörter der verbotenen Liste (7.10, `doc_lint`) |
@@ -1445,7 +1454,7 @@ Die Prüfung der Löschung liegt in Testcode. Ein Test darf das Datenverzeichnis
 
 | Gate | Bedingung | Konsequenz bei Verfehlung |
 |---|---|---|
-| **G-GRAPH** | Auf `benchmarks/data/graph_gold` (≥ 500 Mehrschritt-Fragen, in M4b erstellt): nDCG@10 hybrid+graph ≥ hybrid + 0,03, p95 ≤ 1,5 × hybrid, Ingest-Durchsatz nach 10.2 | Feature `graph` und Crate werden in M5 entfernt (REM-31) |
+| **G-GRAPH** | Auf `benchmarks/data/graph_gold` (≥ 500 Mehrschritt-Fragen, in M4b erstellt): nDCG@10 hybrid+graph ≥ hybrid + 0,03 mit dem Graph-Gewicht aus dem Benchmark-Profil `graph_weight_bench` (D6; der Produktstandard 0,0 bleibt bis zur begründeten Festlegung), p95 ≤ 1,5 × hybrid, Ingest-Durchsatz nach 10.2 | Feature `graph` und Crate werden in M5 entfernt (REM-31) |
 | **G-INDEX** | Rückkehr von DiskANN oder RaBitQ nur bei einem Bestand, den HNSW im RAM-Budget nicht hält (> 50 Mio. Chunks je Prozess), mit Rückruf- und Latenzbenchmark | Verboten bis dahin |
 | **G-STORE** | Die eigene LSM bleibt, wenn sie in M1 auf Messhardware erreicht: Punktzugriff p99 ≤ 1 ms (warm), ≥ 50.000 Schreibvorgänge/s im Gruppen-Commit, Wiederanlauf nach Absturz in ≤ 10 s bei 10 GB | Sonst Ersatz hinter dem Port `KvStore` durch `redb` oder `fjall`. Entscheidung anhand der Messung |
 
@@ -1674,16 +1683,8 @@ Der Auftrag an die Entwickler ist damit vollständig, eine Rückfrage an diese S
 
 **SYNC-4 (Toolchain).** Für Produktion und Gate G-01 gilt weiterhin `rust-toolchain.toml` (1.89.0). Im Entwicklungs-Sandbox ist der Download dieser Toolchain blockiert. Dort gilt `RUSTUP_TOOLCHAIN=stable`. Gemessen wurde mit 1.97.0. Die Abweichung ist bis zur Verfügbarkeit einer lokalen 1.89.0-Toolchain ausdrücklich vermerkt.
 
-<<<<<<< HEAD
 **SYNC-5 (Ratchet und Gate-Vorbereitung, Notiz vom 21.11.2026).** Zwei Ratchets verhindern neue Befunde, ohne den Ist-Bestand sofort auf null zu verlangen. (a) G-03: `python3 tools/check_spec_sync.py layering --ratchet` vergleicht die Schichtbefunde mit `layering_baseline.txt`. Neue Befunde sind Fehler, bekannte nicht. `--update-baseline` schreibt die Baseline nur nach bewusstem Abbau. Der Test `crates/contextra-testkit/tests/layering.rs` ruft denselben Ratchet auf. (b) G-13: `tools/unwrap_ratchet.py` vergleicht die Zählung von `unwrap()`, `expect(`, `panic!(` je Crate mit `.unwrap-baseline.json`. Ein Anstieg ist ein Fehler, `--update` nur nach bewusstem Abbau. Vorbereitung für die Gates: Jedes Crate erhält eine `README.md` nach 3.6. Diese Notiz ändert keine Norm. Die Gates bleiben wie in 11.6 beschrieben.
 
-=======
-<<<<<<< HEAD
-=======
-**SYNC-5 (Ratchet und Gate-Vorbereitung, Notiz vom 21.11.2026).** Zwei Ratchets verhindern neue Befunde, ohne den Ist-Bestand sofort auf null zu verlangen. (a) G-03: `python3 tools/check_spec_sync.py layering --ratchet` vergleicht die Schichtbefunde mit `layering_baseline.txt`. Neue Befunde sind Fehler, bekannte nicht. `--update-baseline` schreibt die Baseline nur nach bewusstem Abbau. Der Test `crates/contextra-testkit/tests/layering.rs` ruft denselben Ratchet auf. (b) G-13: `tools/unwrap_ratchet.py` vergleicht die Zählung von `unwrap()`, `expect(`, `panic!(` je Crate mit `.unwrap-baseline.json`. Ein Anstieg ist ein Fehler, `--update` nur nach bewusstem Abbau. Vorbereitung für die Gates: Jedes Crate erhält eine `README.md` nach 3.6. Diese Notiz ändert keine Norm. Die Gates bleiben wie in 11.6 beschrieben.
-
->>>>>>> e75eff1ef (Shell-Commit)
->>>>>>> a9b569ed6 (Shell-Commit)
 ---
 
 ## 14. Nachweis der Befundauflösung
@@ -1753,7 +1754,7 @@ Jeder Befund aus 0.3 ist hier einem Abschnitt und einem Test zugeordnet. Eine Ä
 
 Jede Zeile ist eine Vorgabe für das Crate-`PLAN.md`. Ports sind in 3.4 und 4.4 definiert.
 
-**`contextra-ids`** (E0). Typen: `DocId`, `TenantId`, `CollectionId`, `SealOrd`, `SegOrd`, `ChunkSlot`, `TicketId`, `SubjectRef`, `PrincipalRef`. Limits: `MAX_SEARCH_K = 1_000` (einzige Definition, ADR-52), `MAX_CHUNKS_PER_DOC`, `MAX_BATCH_BYTES`. Abhängigkeiten: keine internen. Features: keine. Tests: Serialisierung, Ordinal-Monotonie, Limit-Konsistenz (G-04).
+**`contextra-ids`** (E0). Normalisierung von `SubjectRef` vor jeder Tag-Bildung (H-02): Unicode-NFC, Kleinschreibung, Entfernen von Leerraum und Trennzeichen bei Personalnummern, E-Mail-Adressen vollständig klein. Dieselbe Regel gilt für Registry-Tags, Entdeckung und Idempotenz; Testvektoren in T-NEW-11. Typen: `DocId`, `TenantId`, `CollectionId`, `SealOrd`, `SegOrd`, `ChunkSlot`, `TicketId`, `SubjectRef`, `PrincipalRef`. Limits: `MAX_SEARCH_K = 1_000` (einzige Definition, ADR-52), `MAX_CHUNKS_PER_DOC`, `MAX_BATCH_BYTES`. Abhängigkeiten: keine internen. Features: keine. Tests: Serialisierung, Ordinal-Monotonie, Limit-Konsistenz (G-04).
 
 **`contextra-env`** (E0). `Clock` (real, `ManualClock`), `SeededRng`, `MetricsSink`. Einzige Stelle mit `Instant::now`/`SystemTime::now` (G-12). Tests: Clock-Semantik, Zähler ohne Nutzdaten (T-LOG-01).
 
@@ -1789,7 +1790,7 @@ Jede Zeile ist eine Vorgabe für das Crate-`PLAN.md`. Ports sind in 3.4 und 4.4 
 
 **`contextra-embed`** (E2). `onnx/` (ort, Modellprüfung per SHA-256), `reranker/`, `provider` (`EmbeddingProvider`-Impl.). Abhängigkeiten: `ports`, `ids`. Features: keine. Tests: Modellhash, Batchgleichheit (`batch_equiv`), Modellwechsel.
 
-**`contextra-db`** (E2). Orchestrierung: Schreib-Task je Shard, Tenant-Koordinator, Commit-Lock, Erasure-Lock, Startsequenz (8.3), Scheduler, Latenzfenster (ADR-43), Verdrahtung der Ports (3.4, 7.13). Features: `graph`, `text`, `vector`, `embed`, `ingest` (Standard alle außer `graph`). Abhängigkeiten: alle E1-Crates, `ports`, `ids`, `env`, `ingest`, `embed`. Tests: T-OPS-01 bis T-OPS-10, T-SEC-03, T-RAG-11, T-ER-07.
+**`contextra-db`** (E2). Orchestrierung: Schreib-Task je Shard, Tenant-Koordinator, Commit-Lock, Erasure-Lock, Startsequenz (8.3), Scheduler, Latenzfenster (ADR-43), Verdrahtung der Ports (3.4, 7.13). Features: `graph`, `vector`, `embed`, `ingest` (Standard alle außer `graph`). `text` ist Pflicht (D8). Abhängigkeiten: alle E1-Crates, `ports`, `ids`, `env`, `ingest`, `embed`. Tests: T-OPS-01 bis T-OPS-10, T-SEC-03, T-RAG-11, T-ER-07.
 
 **`contextra`** (E2, Fassade). Öffentliche API nach 6.8, Konfigurationsladen, Fehlerabbildung. Entfernen: REM-02 (Profile), REM-24, REM-25. Abhängigkeiten: `db`, `ports`, `ids`, `privacy`. Tests: API-Oberflächentest, Konfigurationsfehler (T-OPS-03).
 
@@ -1818,7 +1819,7 @@ Jede Zeile ist eine Vorgabe für das Crate-`PLAN.md`. Ports sind in 3.4 und 4.4 
 | ER-6 Zeitreise gegen aktuellen Stand | folgt aus der Trennung (REQ-VER-6) |
 | ER-7/8 `fsync → Snapshot-Swap`, Quarantäne | beibehalten (REQ-GATE-1) |
 | ER-9 Gate-Log-Verdichtung | Gate-Snapshot `CXGS` (7.8) |
-| Gate-Log HMAC-Kette | entfällt, CRC und Sequenz (ADR-02) |
+| Gate-Log HMAC-Kette | entfällt, CRC und Sequenz (ADR-02); mit D9 wieder eingeführt als MAC-Kette mit Schlüssel `K_log` im Anker |
 | ER-10/11 Generationen, Epochen-Rewrap | Epochen, Rewrap in KeyTable (REQ-KEY-5) |
 | ER-12 KeyTable-Sharding | Slot-Datei mit Überschreiben an Ort (ADR-08), 128 Byte (ADR-29) |
 | ER-13 `DeleteAll` als Standard | `Restrict` als Standard (ADR-10) |
@@ -2029,17 +2030,64 @@ Diese Entscheidungen hat der Verantwortliche noch nicht getroffen. Sie sind nich
 
 | Nr. | Frage | Befunde | Empfehlung (Review) | Status |
 |---|---|---|---|---|
-| D1 | Wie lange darf ein Auftrag im Zustand `Restricted` bleiben, und was passiert bei Ablauf? | K-08 | Pflichtschalter ohne Standardwert. Bei Ablauf `Overdue` mit Ledger-Eintrag, keine automatische Freigabe und keine automatische Löschung. | offen |
-| D2 | Darf bei einem Fehler des Gate-Logs gelesen werden? | K-01, K-02 | Nein, für die betroffenen Seals. Lokale, nicht durabel gespeicherte Lesesperre, bis das Gate wieder durabel ist. | offen |
-| D3 | Was geschieht mit Treffern der Entdeckung, die nicht deklariert sind? | K-07 | `Restrict` für Treffer mit identifizierenden Bezeichnern als Mandantenstandard. `Report` nur mit Status `Partial`. | offen |
-| D4 | Klasse K ohne Verschlüsselung und unbefristetes Ledger? | K-17, H-05 | Keine Klartextoption. Ledger mit Aufbewahrungsfrist als Pflichtschalter. | offen |
-| D5 | Wie viele Mandanten pro Prozess, und welche Referenz gilt? | H-27 | Budget je Prozess statt fester Mandantenzahl. | offen |
-| D6 | Standardgewicht des Graph-Signals | K-20 | Kein Standardgewicht ohne Messung. Standard bleibt 0, bis ein Gewicht aus dem Benchmark begründet ist. | offen |
-| D7 | Werkzeuge für Synchronität (SYNC-1 bis SYNC-5) | H-30, H-31, M-01, M-24 | Sync-Werkzeuge wiederherstellen. Der Review-Befund H-31 ist mit dem Stand 21. November 2026 behoben; die Entscheidung über die Gate-Semantik (H-30) bleibt offen. | teilweise umgesetzt |
-| D8 | Ist `contextra-text` optional? | M-09 | Pflicht. Hybridsuche ist Kernfunktion (ADR-04, 6.4). | offen |
-| D9 | Zielplattform und Integrität des Löschlogs | H-22, H-23 | Zielplattform Linux (x86_64) benennen. Integritäts-MAC mit Schlüssel aus dem Anker, ADR-02 präzisieren. | offen |
-| D10 | Eingabe der Passphrase und Änderungen der Konfiguration zur Laufzeit | H-24, H-26 | Passphrase über Umgebungsvariable oder Datei mit Rechten 0600. Konfigurationsänderung nur mit Neustart. | offen |
+| D1 | Wie lange darf ein Auftrag im Zustand `Restricted` bleiben, und was passiert bei Ablauf? | K-08 | Entschieden: Pflichtschalter `restricted_max_age` ohne Standardwert. Ohne Wert startet Contextra nicht. Bei Ablauf `Overdue` mit Ledger-Eintrag, keine automatische Löschung und keine automatische Freigabe (REQ-ER-6). Der Wert ist vom Verantwortlichen festzulegen. | entschieden, Wert offen |
+| D2 | Darf bei einem Fehler des Gate-Logs gelesen werden? | K-01, K-02 | Entschieden: Gate-Log-Fehler führt zu `ReadOnly`, der Löschauftrag wird abgelehnt. Nach durablem Log-Eintrag gilt eine lokale, nicht durable Lesesperre im Speicher (REQ-GATE-1). `Quarantine` nur bei Integritätsverletzung (INV-5). | entschieden |
+| D3 | Was geschieht mit Treffern der Entdeckung, die nicht deklariert sind? | K-07 | Entschieden: `Restrict` als Mandantenstandard. `Report` nur bewusst gesetzt; das Ergebnis ist dann `Partial` mit Anzahl und Grund (REQ-ER-2, 9). | entschieden |
+| D4 | Klasse K ohne Verschlüsselung und unbefristetes Ledger? | K-17, H-05 | Entschieden: keine Klartextoption, weder für Klasse K noch sonst (5.1). Ledger-Aufbewahrung ist Pflichtschalter `ledger_retention` ohne Standardwert. Der Wert ist vom Verantwortlichen festzulegen. | entschieden, Wert offen |
+| D5 | Wie viele Mandanten pro Prozess, und welche Referenz gilt? | H-27 | Entschieden: Budget je Prozess (`memory_budget_bytes`, Pflichtschalter) statt fester Mandantenzahl. Referenzstufen gelten je Mandant (1.2). | entschieden, Budget offen |
+| D6 | Standardgewicht des Graph-Signals | K-20 | Entschieden: Produktstandard `graph.weight = 0,0` (ADR-49). G-GRAPH misst mit dem Gewicht aus dem Benchmark-Profil `graph_weight_bench` (11.5). | entschieden |
+| D7 | Werkzeuge für Synchronität (SYNC-1 bis SYNC-5) | H-30, H-31, M-01, M-24 | Geprüft: `check_spec_sync.py`, `budgets.toml`, `capabilities.toml` und `layering.rs` sind im Repository vorhanden. H-31 ist damit behoben. Offen bleibt nur die Gate-Semantik (H-30). | teilweise entschieden |
+| D8 | Ist `contextra-text` optional? | M-09 | Entschieden: Pflicht. Das Feature `text` entfällt (3.3, 15). | entschieden |
+| D9 | Zielplattform und Integrität des Löschlogs | H-22, H-23 | Entschieden: Zielplattform Linux auf x86_64 (1.3). Löschlog mit MAC-Kette, Schlüssel `K_log` im Anker (7.8). ADR-02 präzisiert. | entschieden |
+| D10 | Eingabe der Passphrase und Änderungen der Konfiguration zur Laufzeit | H-24, H-26 | Entschieden: Passphrase über Datei mit Rechten 0600 oder Umgebungsvariable, keine interaktive Eingabe (REQ-KEY-7). Konfigurationsänderung nur mit Neustart (Kapitel 9). | entschieden |
 
-**Weitere offene technische Punkte aus dem Review** (nicht als Entscheidung des Verantwortlichen klassifiziert, aber noch nicht in der Spezifikation geklärt): K-01 bis K-03 und K-09 bis K-18 (Zustandsmatrix, Startreihenfolge, Formatfelder, Lebenszyklus), H-01 bis H-04, H-10 bis H-21, H-24 bis H-26, H-28 (Latenzfenster: „64 Buckets“ und „10 s mit 1 s Schritt“ widersprechen sich). Sie bleiben bis zur Spezifikation v4.2 offen.
+**Umgesetzt in v4.2:** K-01 bis K-20 sowie H-02, H-05, H-06, H-08, H-12, H-22 bis H-24, H-26 bis H-28 und M-09 (Details in Anhang F). **Offen (ohne Entscheidung des Verantwortlichen, in v4.3 zu klären):** die übrigen Punkte aus Anhang F, z. B. Signaturenanhang (M-04), Byte-Tabellen (M-21), Bedrohungsmodell (H-21), Lebenszyklus (H-25), Gate-Semantik (H-30).
 
-*Ende der Spezifikation v4.1 (Überarbeitung v4.1.2).*
+## Anhang F: Änderungsprotokoll v4.2
+
+Befund-IDs nach dem Review `SPEC_Review_v4.1.1`. „umgesetzt“ bedeutet: Der Normtext ist in dieser Version geändert.
+
+| ID | Status | Ort in v4.2 |
+|---|---|---|
+| K-01 | umgesetzt | REQ-GATE-1, 8.1 |
+| K-02 | umgesetzt | REQ-GATE-1, 8.1, INV-5 |
+| K-03 | umgesetzt | REQ-REC-2, REQ-KEY-4 (`DestroyIntent`), 7.4 E2 |
+| K-04 | umgesetzt | INV-6 (Fehlerabbildung) |
+| K-05 | umgesetzt (Option b) | REQ-GR-3 |
+| K-06 | umgesetzt | REQ-SRC-1 Schritt 4, REQ-GR-5 |
+| K-07 | umgesetzt (D3) | REQ-ER-2, Kapitel 9 |
+| K-08 | umgesetzt (D1) | REQ-ER-6, Kapitel 9 |
+| K-09 | umgesetzt | 8.3 (`C4a`, `C4b`), REQ-OPS-2 |
+| K-10 | umgesetzt | 8.3 (Eager-Erasure-Pfad) |
+| K-11 | umgesetzt | 5.5 (zwei Dateien), REQ-KEY-3 |
+| K-12 | umgesetzt | 5.5 (`next_index`), 5.9 |
+| K-13 | umgesetzt | 5.6 (Offboarding) |
+| K-14 | umgesetzt | 7.9, Kapitel 9 |
+| K-15 | umgesetzt | REQ-BAK-1 (Manifest) |
+| K-16 | umgesetzt | REQ-BAK-2, REQ-BAK-4 |
+| K-17 | umgesetzt (D4) | 5.1, Kapitel 9 |
+| K-18 | umgesetzt | 4.6 (`seal_of`) |
+| K-19 | bereits in v4.1.2 | T-ER-10 |
+| K-20 | umgesetzt (D6) | ADR-49, G-GRAPH (11.5) |
+| H-02 | umgesetzt | Kapitel 15 (`contextra-ids`) |
+| H-05 | umgesetzt | 5.1, Kapitel 9 |
+| H-06 | umgesetzt | REQ-ING-8 |
+| H-08 | umgesetzt | ADR-18 |
+| H-12 | umgesetzt | 6.8 |
+| H-22 | umgesetzt (D9) | ADR-02, 5.6, 7.8, Anhang A |
+| H-23 | umgesetzt (D9) | 1.3 (Zielplattform) |
+| H-24 | umgesetzt (D10) | ADR-15, REQ-KEY-7 |
+| H-26 | umgesetzt (D10) | Kapitel 9 |
+| H-27 | umgesetzt (D5) | 1.2 |
+| H-28 | umgesetzt | ADR-43, 8.6 |
+| H-31 | bereits in v4.1.2, Werkzeuge geprüft | 13.6 |
+| M-09 | umgesetzt (D8) | 3.3, 15 |
+| H-04 | teilweise | ADR-50 (Begründung), Digest-Index offen |
+| M-14, M-12, M-13 | bereits in v4.1.2 | Anhang B, F-28 |
+| H-01, H-03, H-07, H-09, H-10, H-11, H-13 bis H-21, H-25, H-29, H-30 | offen | v4.3 |
+| M-01 bis M-08, M-10, M-11, M-15 bis M-27 | offen | v4.3 |
+| N-01 bis N-06 | offen | v4.3 |
+
+Offene Befunde werden nicht stillschweigend umgesetzt. Jeder davon ist mit Verweis auf den Review zu schließen.
+
+*Ende der Spezifikation v4.2.*

@@ -45,7 +45,7 @@ fn test_prop_compaction_tombstone_masking_latest_operation_wins() {
 
         rt.block_on(async {
             let tmp = TempDir::new().unwrap();
-            let registry = Arc::new(SnapshotRegistry::new());
+            let registry = Arc::new(SnapshotPins::new());
             let bc = create_block_cache(1);
             let engine = CompactionEngine::new(
                 CompactionConfig::default(),
@@ -134,7 +134,7 @@ fn test_prop_compaction_tombstone_masking_latest_operation_wins() {
 #[tokio::test]
 async fn test_compaction_candidate_selection_follows_chronological_order() {
     let tmp = TempDir::new().expect("temp dir"); // expect
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -219,7 +219,7 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
 #[tokio::test]
 async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
@@ -279,7 +279,7 @@ async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
 #[tokio::test]
 async fn test_mvcc_retention_older_versions_below_floor_discarded() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
@@ -347,7 +347,7 @@ async fn test_mvcc_retention_older_versions_below_floor_discarded() {
 #[tokio::test]
 async fn test_merge_deduplication() {
     let tmp = TempDir::new().expect("temp dir"); // expect
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
@@ -400,7 +400,7 @@ async fn test_merge_deduplication() {
 #[tokio::test]
 async fn test_tombstone_gc_stream_advancement_preserves_subsequent_keys() {
     let tmp = TempDir::new().expect("temp dir"); // expect
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
@@ -460,7 +460,7 @@ async fn test_tombstone_gc_stream_advancement_preserves_subsequent_keys() {
 #[tokio::test]
 async fn test_tombstone_gc() {
     let tmp = TempDir::new().expect("temp dir"); // expect
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
@@ -504,7 +504,7 @@ async fn test_tombstone_gc() {
 #[tokio::test]
 async fn test_tombstone_preserved_with_active_snapshot() {
     let tmp = TempDir::new().expect("temp dir"); // expect
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
@@ -547,7 +547,7 @@ async fn test_tombstone_preserved_with_active_snapshot() {
 #[tokio::test]
 async fn test_maybe_compact_full_cycle() {
     let tmp = TempDir::new().expect("temp dir"); // expect
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2, // Low threshold for testing
@@ -616,7 +616,7 @@ async fn test_maybe_compact_full_cycle() {
 #[tokio::test]
 async fn test_no_compaction_below_threshold() {
     let tmp = TempDir::new().expect("temp dir"); // expect
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 4,
@@ -659,7 +659,7 @@ async fn test_no_compaction_below_threshold() {
 #[tokio::test]
 async fn test_compaction_aborts_on_concurrent_modification() {
     let tmp = TempDir::new().expect("temp dir"); // expect
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -711,7 +711,7 @@ async fn test_compaction_aborts_on_concurrent_modification() {
 #[tokio::test]
 async fn test_compaction_removes_uuid_sidecar_files() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -795,7 +795,7 @@ async fn test_compaction_removes_uuid_sidecar_files() {
 #[tokio::test]
 async fn test_compaction_swap_restores_shadowing_order_without_restart() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -921,7 +921,7 @@ async fn test_compaction_swap_debug_assert_detects_unsorted_list() {
 #[tokio::test]
 async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -985,7 +985,7 @@ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
 #[tokio::test]
 async fn test_compaction_succeeds_when_peak_memory_within_limit() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -1029,7 +1029,7 @@ async fn test_compaction_succeeds_when_peak_memory_within_limit() {
 #[tokio::test]
 async fn test_compaction_backpressure_timeout_exceeded() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -1087,7 +1087,7 @@ fn test_generate_sst_path_uniqueness() {
     let tmp = TempDir::new().expect("temp dir"); // expect
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
-        Arc::new(SnapshotRegistry::new()),
+        Arc::new(SnapshotPins::new()),
         create_block_cache(1),
         None,
         Arc::new(crate::budget::ResourceTracker::new(
@@ -1113,7 +1113,7 @@ async fn test_compact_all_and_compact_range_neutral_maintenance() {
             min_sstables_per_tier: 2,
             ..Default::default()
         },
-        Arc::new(SnapshotRegistry::new()),
+        Arc::new(SnapshotPins::new()),
         create_block_cache(10),
         None,
         Arc::new(crate::budget::ResourceTracker::new(

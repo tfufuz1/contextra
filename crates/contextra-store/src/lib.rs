@@ -53,6 +53,8 @@ pub mod error;
 pub mod traits;
 pub use error::{StoreError, StoreResult};
 pub mod budget;
+pub mod snapshot_pins;
+pub(crate) mod staging;
 pub mod stats;
 
 #[cfg(not(loom))]
@@ -62,8 +64,6 @@ pub mod fsync;
 pub mod key_source;
 #[cfg(not(loom))]
 pub mod lsm;
-#[cfg(not(loom))]
-pub mod store_layer;
 #[cfg(not(loom))]
 pub mod manifest;
 #[cfg(not(loom))]
@@ -78,6 +78,7 @@ pub mod tenant_codec;
 pub mod util;
 pub mod wal;
 
+pub use snapshot_pins::SnapshotPins;
 pub use util::{RecordAuthenticator, RecordSealer, SealedEnvelope};
 
 #[cfg(not(loom))]
@@ -95,8 +96,6 @@ pub use lsm::{
     CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,
     DEFAULT_MAX_OBSERVER_LATENCY,
 };
-#[cfg(not(loom))]
-pub use store_layer::StoreLayer;
 #[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};
 #[cfg(not(loom))]

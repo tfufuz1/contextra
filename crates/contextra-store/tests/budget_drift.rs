@@ -1,7 +1,7 @@
 //! Proptest / drift test for MemTable budget accounting alignment (WP-16.3).
 
 use bytes::Bytes;
-use contextra_version::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
+const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32;
 use contextra_store::memtable::MemTable;
 use proptest::prelude::*;
 

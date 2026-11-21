@@ -67,7 +67,7 @@ async fn test_compaction_stress_and_gc() {
 
     // 3. Register a Snapshot [INV-C1]
     let snapshot_seq = storage.last_seq_no().await.expect("last_seq_no"); // expect
-    let _guard = storage.snapshot_registry.register(snapshot_seq);
+    storage.snapshot_registry.pin(snapshot_seq); // bleibt bis Testende gepinnt
 
     // 4. Heavy Load: 10,000 Inserts to trigger churn and background compaction
     for i in 0..10000 {
@@ -147,7 +147,7 @@ async fn test_compaction_stress_and_gc() {
 #[tokio::test]
 async fn test_compaction_swap_maintains_shadowing_order_without_restart() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -271,7 +271,7 @@ async fn test_compaction_swap_maintains_shadowing_order_without_restart() {
 #[tokio::test]
 async fn test_phantom_data_after_partial_compaction() {
     let tmp = TempDir::new().expect("temp dir"); // expect
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig {
@@ -388,7 +388,7 @@ async fn test_compaction_pressure_awareness() {
     use crate::system_pressure::{PressureLevel, SystemPressure};
 
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -516,7 +516,7 @@ async fn test_compaction_pressure_awareness() {
 
 #[tokio::test]
 async fn test_compaction_cancellation() {
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = crate::sstable::create_block_cache(1024);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -670,7 +670,7 @@ async fn test_concurrent_flush_and_compact_is_safe() {
 #[tokio::test]
 async fn test_compaction_single_lock_candidate_selection_concurrency() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -746,7 +746,7 @@ async fn test_compaction_single_lock_candidate_selection_concurrency() {
 #[tokio::test]
 async fn test_mvcc_floor_version_retained_for_active_snapshot() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
@@ -814,7 +814,7 @@ async fn test_mvcc_floor_version_retained_for_active_snapshot() {
 #[tokio::test]
 async fn test_chain_linkage_tier_grouping() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 3,
@@ -881,7 +881,7 @@ async fn test_chain_linkage_tier_grouping() {
 #[tokio::test]
 async fn test_compaction_concurrent_rollback_flush_no_panic() {
     let tmp = TempDir::new().expect("temp dir");
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
     let bc = create_block_cache(1);
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
@@ -977,7 +977,7 @@ async fn test_tombstone_retention_floor_with_active_snapshot() {
             .await
             .expect("manifest"),
     );
-    let registry = Arc::new(SnapshotRegistry::new());
+    let registry = Arc::new(SnapshotPins::new());
 
     let mut config = CompactionConfig::default();
     config.min_sstables_per_tier = 2;
