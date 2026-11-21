@@ -10,7 +10,13 @@ Das Projekt ist mitten im Umbau. Vieles in `docs/SPEC.md` beschreibt das Ziel, n
 
 - **Subagenten nur als Haiku.** Beim `Agent`-Tool immer `model: "haiku"` setzen. Sonnet nie verwenden. Opus/Fable nur, wenn der Nutzer es ausdrücklich verlangt.
 - **Sprache:** Antworten an den Nutzer und Kommentare/Doku im Repo auf Deutsch (Bestand ist deutsch; Rust-Bezeichner englisch).
-- **Push:** Wenn ein GitHub-Konnektor den Push erlaubt, Änderungen direkt nach GitHub pushen. Die Sitzung ist aus dem Webchat gestartet; Push geht nur über die Konnektoren.
+- **Push:** Nur über den GitHub-Zugang der Sitzung. Der Ablauf steht in Abschnitt 7 und hat am 21.11.2026 funktioniert.
+- **Commit-Trailer (Pflicht ab jetzt):** Jede Commit-Message endet mit
+  ```
+  Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+  Claude-Session: https://claude.ai/code/session_01BByRVn81CFexSvyN4AheTv
+  ```
+  Pull-Request-Beschreibungen enden mit `🤖 Generated with [Claude Code](https://claude.com/claude-code)` und dem Session-Link.
 - **Fallback ZIP:** Ist kein Push möglich, liefert du dem Nutzer im Chat eine ZIP-Datei mit allen Änderungen vom Repo-Root aus (`SendUserFile`). Müssen Dateien gelöscht werden, lieferst du sie im Paket als leere Hüllen zum Überschreiben.
 - **Bei Push-Fehler `access denied … not in this session's authorized repository set`:** Das Repo ist nicht freigegeben. Dann `mcp__claude-code-remote__add_repo` mit `access: "push"` aufrufen (nicht vorher per curl/gh prüfen, das liefert falsche 404/403).
 - **Keine Selbstdeklarationen neu anlegen** (ADR-19/REM-14): kein `ANCHOR[`-, `FILE-CONTEXT`-Kommentar, keine `contract.rs`, keine `INVENTAR.md`/`AGENTS.md`/`SPEC.md` in `crates/`.
@@ -143,3 +149,77 @@ tools/quickcheck.sh all
 2. Mit dem Nutzer klären, ob der Umbau der Facade `contextra` (Anpassung an `contextra-db`) Priorität hat, oder ob Stub/Feature-Gating gewünscht ist.
 3. Fehlende Artefakte (`capabilities.toml`, `budgets.toml`, `layering.rs`) anlegen oder die Spec anpassen. Das ist eine Entscheidung, keine Routine.
 4. Entfernungen aus §12 (REM-14 Selbstdeklarationen, Auditor-Skripte) nur nach Freigabe.
+
+## 7. Push-Workflow (verifiziert 21.11.2026)
+
+Ablauf, der funktioniert hat. Bitte in dieser Reihenfolge abarbeiten.
+
+1. **Klon prüfen, nicht blind neu klonen.**
+   `git -C /home/claude/contextra rev-parse HEAD`. Wenn das klappt, ist der Klon da und wird weiterverwendet. Ein Neu-Klon würde lokale Commits löschen.
+   Nur wenn der Klon fehlt: `git clone --depth 1 https://github.com/tfufuz1/contextra /home/claude/contextra`, mit langem Timeout (ca. 10 min). Ein Standard-Timeout von 2 min bricht den Pack-Download ab. Der Proxy erlaubt max. 2 parallele Git-Operationen pro Repo, bei 429 einmal nach 5 s wiederholen.
+2. **Freigabe prüfen.** Bei `access denied by the git proxy: … not in this session's authorized repository set` (HTTP 403) das Repo freigeben:
+   `mcp__claude-code-remote__add_repo` mit `owner: "tfufuz1"`, `repo: "contextra"`, `access: "push"`.
+   Die Antwort kann „Clone it NOW“ und „register_repo_root“ enthalten. Den Klon nur dann neu anlegen, wenn Schritt 1 fehlschlägt. `register_repo_root` war in dieser Sitzung nicht verfügbar. Dann CLAUDE.md direkt lesen.
+3. **Commit mit Trailer** (Abschnitt 0), dann pushen:
+   ```bash
+   cd /home/claude/contextra
+   git add <Dateien>            # nicht blind -A, wenn fremde Änderungen im Arbeitsbaum liegen
+   git -c user.name="Claude" -c user.email="claude@anthropic.invalid" commit -m "<Betreff>
+
+   Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+   Claude-Session: https://claude.ai/code/session_01BByRVn81CFexSvyN4AheTv"
+   git push -u origin HEAD
+   ```
+   Erfolgsmeldung im Test: `591e07e90..d554c5e39 HEAD -> main`.
+4. **Fehlerfälle:**
+   - `HTTP 413` (Pack zu groß, Klon ist flach): `git -c push.negotiate=true push -u origin HEAD`.
+   - Immer noch abgelehnt: `git fetch --depth=50 origin main`, dann `git rebase --onto origin/main <Start-Commit>`. Nicht ohne Tiefe fetchen, das lädt Gigabytes alter Historie.
+   - Tiefer-Klon prüfen: `git rev-parse --is-shallow-repository`.
+   - Ein Hook verweigert den Fetch: neues Verzeichnis anlegen, dort Patch per `git format-patch --stdout <Start> | git am` einspielen und von dort pushen.
+   - `push negotiation failed`-Warnung allein bedeutet nicht, dass der Push fehlgeschlagen ist.
+5. **Fallback ohne Push:** ZIP der Änderungen vom Repo-Root per `SendUserFile` (Abschnitt 0).
+
+**Hinweis:** Auf `main` liegt ein Commit `591e07e90 Shell-Commit`, den nicht diese Sitzung erzeugt hat. Vor Änderungen am Branch-Verlauf nicht umschreiben.
+
+## 8. Crate-Sitzungen und Konfliktvermeidung
+
+Jedes Crate hat eine eigene `CLAUDE.md` (Liste unten). Zweck: Eine Sitzung kann auf ein Crate beschränkt werden, ohne den ganzen Workspace zu laden.
+
+| Crate | Pfad | Ebene | Build (21.11.2026) |
+|---|---|---|---|
+| contextra-ids | `crates/contextra-ids/CLAUDE.md` | E0 | ok |
+| contextra-env | `crates/contextra-env/CLAUDE.md` | E0 | ok |
+| contextra-sys | `crates/contextra-sys/CLAUDE.md` | E0 (unsafe) | ok |
+| contextra-simd | `crates/contextra-simd/CLAUDE.md` | E0 (unsafe) | ok |
+| contextra-durable-fs | `crates/contextra-durable-fs/CLAUDE.md` | E0 | ok |
+| contextra-ports | `crates/contextra-ports/CLAUDE.md` | E0 | ok |
+| contextra-crypto | `crates/contextra-crypto/CLAUDE.md` | E1 | ok |
+| contextra-erasure | `crates/contextra-erasure/CLAUDE.md` | E1 (sicherheitskritisch) | ok |
+| contextra-mvcc | `crates/contextra-mvcc/CLAUDE.md` | E1 (→ `version`) | ok |
+| contextra-store | `crates/contextra-store/CLAUDE.md` | E1 | ok |
+| contextra-vector | `crates/contextra-vector/CLAUDE.md` | E1 | ok |
+| contextra-text | `crates/contextra-text/CLAUDE.md` | E1 | ok |
+| contextra-graph | `crates/contextra-graph/CLAUDE.md` | E1, optional | ok |
+| contextra-rank | `crates/contextra-rank/CLAUDE.md` | E1 | ok |
+| contextra-privacy | `crates/contextra-privacy/CLAUDE.md` | E1 | ok |
+| contextra-checkpoint | `crates/contextra-checkpoint/CLAUDE.md` | E1 | ok |
+| contextra-types | `crates/contextra-types/CLAUDE.md` | (REM-30) | ok |
+| contextra-testkit | `crates/contextra-testkit/CLAUDE.md` | E3, dev | ok |
+| contextra-db | `crates/contextra-db/CLAUDE.md` | E2 | ok (dünn, 412 Zeilen) |
+| contextra | `crates/contextra/CLAUDE.md` | E2 | **FEHLER** (20) |
+| contextra-mcp | `crates/contextra-mcp/CLAUDE.md` | E3 | **FEHLER** (transitiv) |
+| contextra-bench | `benchmarks/contextra-bench/CLAUDE.md` | E3, bench | **FEHLER** (2) |
+
+**Arbeitsregeln für parallele Sitzungen:**
+
+1. **Sitzung = ein Crate.** Startpunkt ist die Crate-`CLAUDE.md`, danach die Root-`CLAUDE.md` für übergreifende Regeln. Schreibzugriff nur auf das eigene Crate.
+2. **Notizen nur in „Sitzungsnotizen“ am Ende der eigenen Crate-Datei anhängen.** Nicht überschreiben, nicht in fremde Dateien schreiben. Format: `### YYYY-MM-DD · Branch · Kurzfassung · Offen: …`.
+3. **Root-`CLAUDE.md` nur durch die Koordinations-Sitzung ändern** (also durch den Nutzer bzw. eine dafür beauftragte Sitzung).
+4. **Schnittstellenänderungen** (Ports, Typen aus `ids`/`types`, `Clock`/`SeededRng` in `env`): In der eigenen Notiz unter „Offen:“ beschreiben und die betroffenen Dependents nennen (siehe Eckdaten in deren Datei). Fremde Crates nicht selbst anpassen, sondern dort als offen eintragen.
+5. **Branch pro Sitzung** (Konvention, noch nicht mit dem Nutzer bestätigt): `crate/<name>/<kurzthema>`, von `main` abzweigen, nur dieses Branch pushen. So kollidieren parallele Sitzungen nicht auf `main`. Vor dem Merge den Nutzer fragen.
+6. **Datei-Eigentum:** `contextra`, `contextra-db`, `contextra-mcp`, `contextra-bench` hängen am Build-Fehler. Solange er nicht behoben ist, nur daran arbeiten, wenn die Aufgabe genau das ist.
+
+**Bekannte Zuständigkeitsprobleme** (keine Sitzung darf sie still lösen):
+- `contextra-types` (REM-30) muss aufgelöst werden. Betrifft fast alle Crates.
+- `contextra-mvcc` → `contextra-version` (ADR-06). Betrifft alle Dependents in `Cargo.toml`.
+- `capabilities.toml` fehlt. Solange es fehlt, ist die Schichtprüfung (G1) rot.
