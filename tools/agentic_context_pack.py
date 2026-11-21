@@ -85,7 +85,8 @@ def main():
 
     if not args.crate:
         print("Notice: --crate was not specified. Generating context packs for core persistence and orchestration crates.")
-        target_crate_names = ["contextra-store", "contextra-ports", "contextra-types", "contextra-erasure", "contextra-engine"]
+        # contextra-engine wurde entfernt (SPEC REM-19); nur existierende Crates listen.
+        target_crate_names = [n for n in ["contextra-store", "contextra-ports", "contextra-types", "contextra-erasure"] if n in crates]
     else:
         if args.crate not in crates:
             print(f"Error: Crate '{args.crate}' not found.", file=sys.stderr)
