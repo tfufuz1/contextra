@@ -1,18 +1,14 @@
 //! Shadow comparison module comparing Forward-Push PPR against TL-HFD (AK-16).
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::diffusion::run_diffusion;
 use super::error::TlHfdError;
 use super::params::TlHfdParams;
 use crate::path_rag::{forward_push_ppr, PathGraph, PprParams};
 use ahash::AHashSet;
-use crate::types::EntityId;
+use contextra_types::EntityId;
 use std::cmp::Ordering;
 
 /// Minimum required sample count for shadow mode default flip evaluation.
-
-// SECTION Shadow Core Implementation
 pub const MIN_SHADOW_SAMPLES: u64 = 10_000;
 
 /// Minimum required mean top-k Jaccard agreement threshold for shadow mode default flip evaluation.
@@ -154,5 +150,3 @@ fn normalize_and_sort(map: &ahash::AHashMap<EntityId, f32>) -> Vec<(EntityId, f3
 
     vec
 }
-
-// !SECTION Shadow Core Implementation

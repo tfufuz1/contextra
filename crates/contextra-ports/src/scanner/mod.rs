@@ -1,12 +1,7 @@
-//! # Storage Layer Scanner & Maintenance Ports (Ring 0 / Class B)
-//!
-//! LINK crates/contextra-ports/src/lib.rs
-//! LINK crates/contextra-ports/src/scanner/layer.rs
-//! LINK crates/contextra-ports/src/scanner/witness.rs
-//! LINK crates/contextra-ports/src/scanner/session.rs
-//!
-//! // SECTION scanner-witness-contracts
-//! // NOTE: Verifiziert physische Bereinigungen und Restmengen-Messungen (SPEC §12.7.4, INV-WITNESS-MINT-1).
+// FILE-CONTEXT
+// ZWECK: Trait LayerScanner und Modul-Export für gesperrte Scanner-Messungen (SPEC §12.7.4, INV-WITNESS-MINT-1).
+// INVARIANTEN: LayerScanner::scan besitzt eine Default-Implementierung, die begin_scan, scan_units und finish ausführt.
+// HOTSPOTS: [1-120]
 
 #![forbid(unsafe_code)]
 
@@ -22,7 +17,7 @@ pub use session::*;
 pub use witness::*;
 
 use crate::clock::Clock;
-use crate::Result;
+use contextra_types::Result;
 
 /// Trait für Storage-Scanner zur Durchführung von Restmengen-Messungen.
 ///
@@ -56,20 +51,14 @@ use crate::Result;
 /// ```
 pub trait LayerScanner: Send + Sync {
     /// Gibt die von diesem Scanner bediente Schicht zurück.
-    ///
-    /// # Fehler
-    /// Keine; statische Schichtabfrage.
-    /// # Crash
-    /// Reiner Statusabruf ohne Mutation.
     fn layer(&self) -> WitnessLayer;
 
     /// Führt das Scannen von Einheiten auf der übergebenen `ScanSession` aus.
-    ///
-    /// # Fehler
-    /// Liefert `ContextraError` bei I/O- oder Verifizierungsfehlern.
-    /// # Crash
-    /// Reiner Lese- und Messzugriff auf Speicherschichten; verändert niemals persistente Daten.
-    fn scan_units(&self, session: &mut ScanSession, ctx: &crate::RequestContext) -> Result<()>;
+    fn scan_units(
+        &self,
+        session: &mut ScanSession,
+        ctx: &contextra_types::RequestContext,
+    ) -> Result<()>;
 
     /// Default-Implementierung von `scan`, die `begin`, `scan_units` und `finish` ausführt.
     fn scan(
@@ -84,13 +73,12 @@ pub trait LayerScanner: Send + Sync {
         session.finish(clock)
     }
 }
-// !SECTION scanner-witness-contracts
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::clock::SystemClock;
-    use crate::{RequestContext, TenantId, TxId};
+    use contextra_types::{RequestContext, TenantId, TxId};
 
     struct TestScanner;
 

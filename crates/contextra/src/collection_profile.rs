@@ -1,66 +1,21 @@
-
-//! # Modul: CollectionProfile & DeploymentTier Presets (Ring 4)
-//!
-//! Dieses Modul definiert standardisierte Betriebs-Profile (`CollectionProfile`) und
-//! Voreinstellungen (`DeploymentTier`) für Dokumentensammlungen (Collections).
-//!
-//! ## Ring-Zugehörigkeit & Zweck
-//! - **Ring 4 (Fassade)**: Bietet übergeordnete Konfigurationsbündel für typische
-//!   Betriebsumgebungen an, von ressourcenbeschränkten Edge-Geräten bis zu hochgradig
-//!   abgesicherten Unternehmensumgebungen (Compliance, Governance).
-//!
-//! ## Wichtigste Typen & Konstanten
-//! - [`DEFAULT_AUTO_EXTRACTION_MODE`]: Standardmodus für automatische Entitäten-Extraktion via LLM.
-//! - [`ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT`]: Abweichender Default für regulierte Umgebungen.
-//! - [`LsmTuning`]: Feineinstellung für LSM-Speicherstrukturen (Memtable, RAM, Group-Commit).
-//! - [`KvDeleteMode`]: Bestimmt das KV-Bereinigungsverfahren (TombstoneOnly oder CryptoShred).
-//! - [`CollectionProfile`]: Kombiniert Performance, KV-Bereinigungsmodus, LSM-Tuning und Extraktionsmodus.
-//! - [`DeploymentTier`]: Enumeration vordefinierter Betriebsstufen (`EdgeMinimal`, `PowerUserLocal`,
-//!   `EnterpriseShared`, `EnterpriseRegulated`).
-//!
-//! ## Invarianten
-//! - **INV-COLLECTION-PROFILE-1**: Wenn kryptografische Integritätsnachweise aktiv sind,
-//!   darf `kv_delete_mode` nicht auf `TombstoneOnly` stehen, da reine Tombstones keinen kryptografischen
-//!   Bereinigungsnachweis (Crypto-Shredding) erbringen können.
-//! - **INV-COLLECTION-PROFILE-2**: Alle Voreinstellungen in `DeploymentTier` müssen bei Aufruf von `resolve()`
-//!   stets valide sein (`validate().is_ok()`).
+// FILE-CONTEXT
+// ZWECK: CollectionProfile & DeploymentTier Presets for Contextra (Spec B.1.8, AP-P0-05)
+// INVARIANTEN: INV-COLLECTION-PROFILE-1, INV-COLLECTION-PROFILE-2
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
-#[allow(deprecated)]
+pub use contextra_core::types::domain::AutoExtractionMode;
 use contextra_ports::license::LicenseGate;
-pub use contextra_types::types::domain::AutoExtractionMode;
-use serde::{Deserialize, Serialize};
+use contextra_store::kv::delete_mode::KvDeleteMode;
 
-/// Mode specifying KV segment deletion behavior.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum KvDeleteMode {
-    TombstoneOnly,
-    CryptoShred,
-}
-
-impl Default for KvDeleteMode {
-    fn default() -> Self {
-        Self::CryptoShred
-    }
-}
-
-/// Standardmodus für die automatische LLM-gestützte Metadaten-/Entitäten-Extraktion bei Standard-Tiers.
-///
-/// Standardmäßig aktiviert (`AutoExtractionMode::Enabled`).
+/// Default auto extraction mode for standard deployment tiers.
 pub const DEFAULT_AUTO_EXTRACTION_MODE: AutoExtractionMode = AutoExtractionMode::Enabled;
 
-/// Standardmodus für `EnterpriseRegulated`.
-///
 /// In EnterpriseRegulated wird kein Dokumenttext automatisch an ein Extraktions-LLM
 /// gegeben, solange der Betreiber es nicht ausdrücklich aktiviert (Datenminimierung);
 /// explizite Aktivierung pro Collection bleibt möglich.
 pub const ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT: AutoExtractionMode =
     AutoExtractionMode::Disabled;
 
-/// Feineinstellungsparameter für die LSM-Speicher-Engine (Log-Structured Merge-Tree).
-///
-/// Regelt Speicherbudgets und Flush-Frequenzen, um Systemressourcen optimal auf die Hardware abzustimmen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LsmTuning {
     pub memtable_size_limit: u64,
@@ -69,9 +24,6 @@ pub struct LsmTuning {
     pub block_cache_shards: u16,
 }
 
-/// Vollständiges Profil zur Konfiguration einer Collection.
-///
-/// Bündelt Performance-, Persistenz- und Datenschutzaspekte für eine Sammlung.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CollectionProfile {
     pub performance: PerformanceProfile,
@@ -80,49 +32,35 @@ pub struct CollectionProfile {
     pub auto_extraction: AutoExtractionMode,
 }
 
-/// Mögliche Fehler bei der Validierung eines `CollectionProfile`.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum CollectionProfileError {
     #[error("performance profile invalid: {0}")]
     Performance(#[from] PerformanceProfileError),
-    #[error("integrity-proof active but KvDeleteMode::TombstoneOnly cannot satisfy a KV-side IntegrityProof")]
+    #[error("deletion-proof active but KvDeleteMode::TombstoneOnly cannot satisfy a KV-side DeletionProof")]
     KvDeleteMismatch,
 }
 
 impl CollectionProfile {
-    /// Validiert die interne Konsistenz des Profils.
-    ///
-    /// # Ablauf von `validate`:
-    /// 1. Performance-Profil auflösen und dessen Konfiguration prüfen (`resolved.validate()`).
-    /// 2. Prüfen, ob `integrity_proof_active` mit `KvDeleteMode::TombstoneOnly` kombiniert wurde (Invariante INV-COLLECTION-PROFILE-1).
-    ///
-    /// # Fehler
-    /// Gibt [`CollectionProfileError::KvDeleteMismatch`] zurück, falls Integritätsnachweise aktiv sind, aber nur Tombstones konfiguriert wurden.
     pub fn validate(&self) -> Result<(), CollectionProfileError> {
         let resolved = self.performance.resolve();
         resolved.validate()?;
-        if resolved.integrity_proof_active && self.kv_delete_mode == KvDeleteMode::TombstoneOnly {
+        if resolved.deletion_proof_active && self.kv_delete_mode == KvDeleteMode::TombstoneOnly {
             return Err(CollectionProfileError::KvDeleteMismatch);
         }
         Ok(())
     }
 
-    /// Validiert das Profil zusätzlich gegen ein Lizenzgate.
-    ///
-    /// # Veraltet
-    /// Die Lizenzprüfung wurde entfernt. Diese Methode ist ein No-op bezüglich des Lizenzgates
-    /// und validiert lediglich die Profilkonsistenz.
-    #[deprecated(note = "license gating was removed; no-op")]
     pub fn validate_with_license(
         &self,
-        _gate: &dyn LicenseGate,
+        gate: &dyn LicenseGate,
     ) -> Result<(), CollectionProfileError> {
         self.validate()?;
+        let resolved = self.performance.resolve();
+        resolved.enforce_license(gate)?;
         Ok(())
     }
 }
 
-/// Vordefinierte Betriebsstufen (Deployment Tiers) für typische Anwendungsszenarien.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum DeploymentTier {
@@ -133,9 +71,6 @@ pub enum DeploymentTier {
 }
 
 impl DeploymentTier {
-    /// Löst die Betriebsstufe in ein konkretes, vorkonfiguriertes [`CollectionProfile`] auf.
-    ///
-    /// Garantiert stets ein konsistentes Profil gemäß Invariante INV-COLLECTION-PROFILE-2.
     pub fn resolve(self) -> CollectionProfile {
         match self {
             Self::EdgeMinimal => CollectionProfile {

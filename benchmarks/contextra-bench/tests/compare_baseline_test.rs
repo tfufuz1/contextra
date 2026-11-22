@@ -1,3 +1,6 @@
+// FILE-CONTEXT
+// STAND: 2026-09-07
+// ZWECK: Unit-Tests für Baseline-Vergleichs-Engine (compare_metrics)
 
 use contextra_bench::compare::{
     compare_metrics, CombinedMetrics, LocomoMetricsSummary, LongMemEvalMetricsSummary,

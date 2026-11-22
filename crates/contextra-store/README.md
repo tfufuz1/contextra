@@ -1,48 +1,29 @@
 # contextra-store
 
-**Zweck:** LSM-Tree-Speicher-Engine: WAL, SST, Manifest, KV-Familien. Größtes Crate des Workspace. Spec: `G-STORE`, `CMP-4`, Kapitel 5 (Datenmodell, Segmente).
+LSM-Tree Storage Engine, WAL Durability und Compaction Engine.
 
-**Ebene:** E1
+Normativitätsklasse: **Kern `[K]`** (Ring 1, `stable`; §6.0, `capabilities.toml`).
 
-## Öffentliche API (`src/lib.rs`, Stand dieser README)
 
-Ist-Stand. Module oder Namen, die laut PLAN.md entfallen, können hier noch stehen.
+`contextra-store` ist die LSM-Tree Storage Engine von Contextra (Ring 1).
 
-```rust
-pub mod error
-pub mod traits
-pub use error::{StoreError, StoreResult}
-pub mod budget
-pub mod stats
-pub mod compaction
-pub mod fsync
-pub mod key_source
-pub mod lsm
-pub mod store_layer
-pub mod manifest
-pub mod memtable
-pub mod sstable
-pub mod system_pressure
-pub mod tenant_codec
-pub mod util
-pub mod wal
-pub use util::{RecordAuthenticator, RecordSealer, SealedEnvelope}
-pub use compaction::
-pub use key_source::{KeyMaterialSource, OsKeyMaterialSource, StaticKeyMaterialSource}
-pub use lsm::
-pub use store_layer::StoreLayer
-pub use manifest::{Manifest, ManifestEntry}
-pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor}
-pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage}
-pub mod io_seam
-pub use io_seam::{RealFs, RealFsFile, StoreIo, Vfs, VfsFile, VfsOpenOptions}
-```
+## Zweck
 
-## Features (`Cargo.toml`)
+Verwaltet persistenten Key-Value-Speicher mit Write-Ahead-Log (WAL), HMAC-Integritätskette, MemTable, SSTables, `KvKeyLocks` und Compaction.
 
-`default`, `workspace`, `test-hooks`, `inspect`, `memory-only-storage`, `fault-injection`, `block-cache-v2`, `sieve-cache`, `docid-128`, `legacy-wal-key`
+## Ring-Zugehörigkeit & Status
 
-## Dokumentation
+- **Ring:** Ring 1 (Persistenz-Engine)
+- **Status:** 🟢 Fertig
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 
-Implementierungsspezifikation: [`PLAN.md`](PLAN.md). Maßgeblich ist `docs/SPEC.md` v4.1.
+## Öffentliche API-Übersicht
 
+- **LSM & WAL:** `LsmStorage`, `LsmConfig`, `WalHandle`, `WalError`
+- **Key-Granulare Locks:** `KvKeyLocks`, `KeyGuard`, `MultiKeyGuard`
+- **Manifest & Compaction:** `Manifest`, `ManifestEntry`, `CompactionEngine`
+- **Pressure Monitoring:** `SystemPressure`, `SystemPressureMonitor`
+
+## Architektur & Verweise
+
+Details zur Storage-Engine und Lock-Hierarchie finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §5.

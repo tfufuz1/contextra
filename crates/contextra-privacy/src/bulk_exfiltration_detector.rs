@@ -1,61 +1,19 @@
-//! `bulk_exfiltration_detector` — Schutz vor Massendatenabfluss (Layer-4 Bulk-Exfiltration-Detektor).
-//!
-//! # Zweck
-//! Überwacht das ausgehende Datenvolumen in gleitenden Zeitfenstern (Sliding Window) pro Sitzung ([`SessionId`]).
-//! Verhindert, dass böswillige Akteure oder kompromittierte Agenten große Mengen sensibler Daten schrittweise
-//! über Cloud-Abfragen exfiltrieren (Data Loss Prevention, Schutz vor Datenverlust).
-//!
-//! # Ring-Zugehörigkeit
-//! Ring 3 (Domain-Sicherheit).
-//!
-//! # Invarianten
-//! - **Zero-Panic-Doctrine**: Kein `unwrap` oder `expect` im Produktionscode.
-//! - **Fail-Closed**: Bei Zeitanomalien (z. B. nicht-monotonen Zeitsprüngen in die Vergangenheit) wird sofort blockiert.
-//! - **Thread-Sicherheit**: Nebenläufiger, lock-armer Zugriff über `scc::HashMap` mit feingranularen Mutexen pro Sitzung.
-//! - **Port-Entkopplung**: Zeitstempel ausschließlich über den `Clock`-Port ([`crate::Clock`]) (INV-EGRESS-AUDIT-1).
+// FILE-CONTEXT
+// ZWECK:       Layer-4 Bulk-Exfiltration-Detektor (Volumen/Zeitfenster pro Session)
+// INVARIANTEN: Zero-Panic Doctrine: Keinem `.unwrap()` oder `.expect()` in Production Code.
+//              Fail-Closed Semantik bei Uhrzeitanomalien oder Fehlerzuständen.
+//              Thread-safe Sliding-Window-Zähler pro Session ohne Lock-Kontention via `scc::HashMap`.
+//              Zeitstempel ausschließlich über den Clock-Port aus contextra-ports (INV-EGRESS-AUDIT-1).
 
-use crate::types::{Clock, SystemClock};
+use contextra_ports::{Clock, SystemClock};
 use parking_lot::Mutex;
-use scc::HashMap; // ALLOW-DETERMINISM: Thread-safe map with explicit Blake3BuildHasher
+use scc::HashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::hash::{BuildHasher, Hasher};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Deterministischer, P28-konformer Hasher auf Basis von BLAKE3.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct DeterministicBlake3Hasher {
-    state: u64,
-}
-
-impl Hasher for DeterministicBlake3Hasher {
-    fn finish(&self) -> u64 {
-        self.state
-    }
-
-    fn write(&mut self, bytes: &[u8]) {
-        let hash = blake3::hash(bytes);
-        let hash_bytes = hash.as_bytes();
-        let mut chunk = [0u8; 8];
-        chunk.copy_from_slice(&hash_bytes[0..8]);
-        self.state = self.state.rotate_left(13) ^ u64::from_le_bytes(chunk);
-    }
-}
-
-/// Deterministischer BuildHasher für sessions in `BulkExfiltrationDetector`.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct DeterministicBuildHasher;
-
-impl BuildHasher for DeterministicBuildHasher {
-    type Hasher = DeterministicBlake3Hasher;
-
-    fn build_hasher(&self) -> Self::Hasher {
-        DeterministicBlake3Hasher::default()
-    }
-}
-
-/// Eindeutige Sitzungs-Kennung (SessionId) zur Gruppierung von Egress-Rate-Limiting-Buckets.
+/// Session identifier for grouping egress rate-limiting buckets.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SessionId(pub String);
 
@@ -71,21 +29,20 @@ impl From<&str> for SessionId {
     }
 }
 
-/// Ergebnis der Auswertung des ausgehenden Datenvolumens gegen die konfigurierten Sitzungslimits.
+/// Outcome of evaluating outbound bulk payload volume against session limits.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BulkExfiltrationOutcome {
-    /// Das kumulierte Datenvolumen liegt innerhalb der zulässigen Grenzen des aktiven Zeitfensters.
+    /// Request payload byte volume is within allowed limits for the active time window.
     Allow,
-    /// Das kumulierte Datenvolumen überschreitet das Limit im aktiven Zeitfenster; Abfrage wird blockiert.
+    /// Request cumulative payload byte volume exceeds maximum allowed limit in active window.
     Block {
-        /// Gesamte im Zeitfenster registrierte Bytes (inklusive des angefragten Payloads).
+        /// Total bytes recorded in active sliding time window (including candidate payload).
         window_bytes: usize,
-        /// Konfiguriertes maximales Byte-Limit pro Zeitfenster.
+        /// Configured maximum allowed bytes per window.
         limit: usize,
     },
 }
 
-// Interner Zähler mit gleitendem Zeitfenster (Sliding Window) für eine einzelne Sitzung.
 #[derive(Debug)]
 struct SlidingWindowCounter {
     records: VecDeque<(u64, usize)>,
@@ -100,12 +57,14 @@ impl SlidingWindowCounter {
         }
     }
 
-    // Entfernt abgelaufene Einträge außerhalb von `window_nanos` relativ zu `now_nanos`.
-    // Behandelt Zeitanomalien (`now_nanos < timestamp_nanos`) und liefert `false`, falls die Zeit rückwärts lief.
+    /// Prunes expired records outside `window_nanos` relative to `now_nanos`.
+    ///
+    /// Handles timestamp clock anomalies by checking `now_nanos < timestamp_nanos`.
+    /// Returns `false` if a clock anomaly (e.g. non-monotonic time regression) is detected.
     fn prune_and_sum(&mut self, now_nanos: u64, window_nanos: u64) -> bool {
         while let Some(&(timestamp_nanos, bytes)) = self.records.front() {
             if now_nanos < timestamp_nanos {
-                // Fail-Closed: Monotone Zeitanomalie erkannt (Zeitreise)
+                // Fail-Closed: Monotonic clock anomaly detected (time travel)
                 return false;
             }
             let elapsed = now_nanos.saturating_sub(timestamp_nanos);
@@ -119,7 +78,7 @@ impl SlidingWindowCounter {
         true
     }
 
-    // Registriert den Kandidaten-Payload und prüft, ob das Limit überschritten wird.
+    /// Records candidate payload and checks whether total exceeds `max_bytes_per_window`.
     fn record_and_check(
         &mut self,
         payload_len: usize,
@@ -128,7 +87,7 @@ impl SlidingWindowCounter {
         now_nanos: u64,
     ) -> BulkExfiltrationOutcome {
         if !self.prune_and_sum(now_nanos, window_nanos) {
-            // Bei Zeitanomalie sofort blockieren (Fail-Closed)
+            // Clock anomaly fail-closed block
             return BulkExfiltrationOutcome::Block {
                 window_bytes: usize::MAX, // UNBOUNDED-OK: sentinel value representing clock anomaly block
                 limit: max_bytes_per_window,
@@ -149,14 +108,12 @@ impl SlidingWindowCounter {
     }
 }
 
-/// Volumen- und Zeitfenster-basierter Rate-Limiter für Cloud-Egress-Anfragen (Layer 4).
+/// Volume and time-window based rate limiter for cloud egress requests (Layer 4).
 pub struct BulkExfiltrationDetector {
-    /// Maximal zulässige Bytes pro Zeitfenster.
     pub max_bytes_per_window: usize,
-    /// Dauer des gleitenden Zeitfensters.
     pub window: Duration,
     clock: Arc<dyn Clock>,
-    sessions: HashMap<SessionId, Arc<Mutex<SlidingWindowCounter>>, DeterministicBuildHasher>,
+    sessions: HashMap<SessionId, Arc<Mutex<SlidingWindowCounter>>>,
 }
 
 impl std::fmt::Debug for BulkExfiltrationDetector {
@@ -169,21 +126,12 @@ impl std::fmt::Debug for BulkExfiltrationDetector {
 }
 
 impl BulkExfiltrationDetector {
-    /// Erstellt einen neuen `BulkExfiltrationDetector` mit Standard-Systemzeit-Clock.
-    ///
-    /// # Parameter
-    /// * `max_bytes_per_window`: Maximale Byteanzahl im Fenster.
-    /// * `window`: Dauer des Fensters als [`Duration`].
+    /// Creates a new `BulkExfiltrationDetector` configured with `max_bytes_per_window` and `window` duration.
     pub fn new(max_bytes_per_window: usize, window: Duration) -> Self {
         Self::with_clock(max_bytes_per_window, window, Arc::new(SystemClock::new()))
     }
 
-    /// Erstellt einen neuen `BulkExfiltrationDetector` mit einem spezifischen [`Clock`]-Port.
-    ///
-    /// # Parameter
-    /// * `max_bytes_per_window`: Maximale Byteanzahl im Fenster.
-    /// * `window`: Dauer des Fensters.
-    /// * `clock`: Trait-Objekt für monotone Zeitmessung.
+    /// Creates a new `BulkExfiltrationDetector` configured with custom `Clock`.
     pub fn with_clock(
         max_bytes_per_window: usize,
         window: Duration,
@@ -193,16 +141,14 @@ impl BulkExfiltrationDetector {
             max_bytes_per_window,
             window,
             clock,
-            sessions: HashMap::with_hasher(DeterministicBuildHasher),
+            sessions: HashMap::new(),
         }
     }
 
-    /// Registriert `payload_len` Bytes für `session` und bewertet, ob das Limit im gleitenden Fenster überschritten wurde.
+    /// Registers `payload_len` bytes for `session` and evaluates whether the volume limit
+    /// in the current sliding time window was exceeded.
     ///
-    /// Thread-sicher für nebenläufige Anfragen über mehrere Sitzungen hinweg.
-    ///
-    /// # Nebenwirkungen
-    /// Liest monotone Zeit über den internen `Clock`-Port.
+    /// Thread-safe for concurrent MCP requests across multiple sessions or tasks.
     #[allow(clippy::disallowed_methods)] // ADR-098: Monotonic sliding window timestamp in BulkExfiltrationDetector
     pub fn record_and_check(
         &self,
@@ -212,7 +158,7 @@ impl BulkExfiltrationDetector {
         self.record_and_check_with_clock(session, payload_len, self.clock.as_ref())
     }
 
-    /// Registriert Bytes für eine Sitzung unter Verwendung einer explizit übergebenen [`Clock`].
+    /// Registers `payload_len` bytes for `session` using an explicit `Clock` implementation.
     pub fn record_and_check_with_clock(
         &self,
         session: SessionId,
@@ -222,13 +168,7 @@ impl BulkExfiltrationDetector {
         self.record_and_check_at_nanos(session, payload_len, clock.monotonic_nanos())
     }
 
-    /// Interner Hilfsablauf zur Auswertung an einem expliziten Nanosekunden-Zeitstempel.
-    ///
-    /// # Ablauf
-    /// 1. Sucht den Sitzungs-Eintrag in der `scc::HashMap` oder erzeugt ihn atomar.
-    /// 2. Konvertiert die Fensterdauer in Nanosekunden.
-    /// 3. Sperrt den Sitzungs-Mutex kurzzeitig.
-    /// 4. Führt `record_and_check` auf dem `SlidingWindowCounter` aus.
+    /// Internal deterministic helper accepting explicit timestamp in monotonic nanoseconds for testability.
     pub fn record_and_check_at_nanos(
         &self,
         session: SessionId,
@@ -257,40 +197,9 @@ impl BulkExfiltrationDetector {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use contextra_testkit::ManualClock;
     use std::sync::Arc;
 
-    struct TestManualClock {
-        nanos: AtomicU64,
-    }
-
-    impl TestManualClock {
-        fn new(initial_nanos: u64) -> Self {
-            Self {
-                nanos: AtomicU64::new(initial_nanos),
-            }
-        }
-
-        #[allow(clippy::cast_possible_truncation)]
-        fn advance(&self, duration: Duration) {
-            self.nanos.fetch_add(
-                u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX),
-                Ordering::SeqCst,
-            );
-        }
-    }
-
-    impl Clock for TestManualClock {
-        fn now_unix_nanos(&self) -> u64 {
-            self.nanos.load(Ordering::SeqCst)
-        }
-
-        fn monotonic_nanos(&self) -> u64 {
-            self.nanos.load(Ordering::SeqCst)
-        }
-    }
-
-    // Prüft, dass eine einzelne Anfrage unterhalb des Limits erlaubt wird.
     #[test]
     fn test_single_request_under_limit_allowed() {
         let detector = BulkExfiltrationDetector::new(1000, Duration::from_secs(60));
@@ -300,7 +209,6 @@ mod tests {
         assert_eq!(outcome, BulkExfiltrationOutcome::Allow);
     }
 
-    // Prüft, dass kumulierte Anfragen oberhalb des Limits blockiert werden.
     #[test]
     fn test_cumulative_requests_exceeding_limit_blocked() {
         let detector = BulkExfiltrationDetector::new(1000, Duration::from_secs(60));
@@ -321,10 +229,9 @@ mod tests {
         );
     }
 
-    // Prüft, dass das abgelaufene Zeitfenster das verbrauchte Datenvolumen wieder freigibt.
     #[test]
     fn test_sliding_window_expiry_resets_volume() {
-        let clock = Arc::new(TestManualClock::new(100_000_000));
+        let clock = Arc::new(ManualClock::new(100_000_000));
         let detector =
             BulkExfiltrationDetector::with_clock(1000, Duration::from_secs(10), clock.clone());
         let session = SessionId::from("session_1");
@@ -347,7 +254,6 @@ mod tests {
         assert_eq!(out3, BulkExfiltrationOutcome::Allow);
     }
 
-    // Prüft die strikte Trennung und Isolation verschiedener Sitzungs-Buckets.
     #[test]
     fn test_session_isolation() {
         let detector = BulkExfiltrationDetector::new(1000, Duration::from_secs(60));
@@ -377,7 +283,6 @@ mod tests {
         );
     }
 
-    // Prüft, dass nebenläufige parallele Anfragen kein Umgehen des Limits durch Race Conditions erlauben.
     #[tokio::test]
     async fn test_concurrent_requests_prevent_limit_bypass_race() {
         let detector = Arc::new(BulkExfiltrationDetector::new(1000, Duration::from_secs(60)));
@@ -405,7 +310,6 @@ mod tests {
         assert_eq!(blocked_count, 4);
     }
 
-    // Prüft das Fail-Closed-Verhalten bei einer Zeitregression (nicht-monotone Zeitänderung).
     #[test]
     fn test_time_regression_fails_closed() {
         let detector = BulkExfiltrationDetector::new(1000, Duration::from_secs(10));
@@ -416,25 +320,5 @@ mod tests {
         let outcome = detector.record_and_check_at_nanos(session, 100, 50_000);
 
         assert!(matches!(outcome, BulkExfiltrationOutcome::Block { .. }));
-    }
-
-    // Prüft Deterministischen Hasher und BuildHasher explizit (finish & build_hasher).
-    #[test]
-    fn test_deterministic_hasher_and_build_hasher() {
-        let build_hasher = DeterministicBuildHasher;
-        let mut hasher1 = build_hasher.build_hasher();
-        let mut hasher2 = build_hasher.build_hasher();
-
-        hasher1.write(b"deterministic-payload-test");
-        hasher2.write(b"deterministic-payload-test");
-
-        let h1 = hasher1.finish();
-        let h2 = hasher2.finish();
-
-        assert_eq!(
-            h1, h2,
-            "DeterministicBlake3Hasher must yield identical hashes for identical inputs"
-        );
-        assert_ne!(h1, 0, "Hash state should not be 0 for non-empty input");
     }
 }

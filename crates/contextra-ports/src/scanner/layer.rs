@@ -1,7 +1,11 @@
+// FILE-CONTEXT
+// ZWECK: Definition der Schichten, Scantechniken, Target-Deskriptoren und Purger-Traits (Vertrag V1, §12.7.4).
+// INVARIANTEN: Schichten und Scantechniken definieren typsichere Parameter für Nachweis-Sessions.
+// HOTSPOTS: [1-80]
 
 #![forbid(unsafe_code)]
 
-use crate::Result;
+use contextra_types::Result;
 use serde::Serialize;
 
 /// Identifikator für die physische Storage-Schicht.
@@ -101,7 +105,7 @@ impl ScanTarget {
 /// Statistiken über bereinigte Einheiten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
 pub struct PurgeStats {
-    /// Anzahl physisch bereinigter Einheiten.
+    /// Anzahl physisch gelöschter Einheiten.
     pub purged_units: u64,
     /// Anzahl freigegebener Bytes.
     pub bytes_freed: u64,
@@ -109,11 +113,10 @@ pub struct PurgeStats {
 
 /// Trait für physische Bereinigungsaktionen (Purger) einer Schicht.
 pub trait Purger: Send + Sync {
-    /// Führt die physische Bereinigung für das gegebene Ziel aus.
-    ///
-    /// # Fehler
-    /// Liefert `ContextraError` bei I/O- oder Freigabefehlern während der physischen Bereinigung.
-    /// # Crash
-    /// Idempotent; Teilausfälle hinterlassen konsistente Zwischenzustände ohne Datenverlust lebender Einheiten.
-    fn purge(&self, ctx: &crate::RequestContext, target: &ScanTarget) -> Result<PurgeStats>;
+    /// Führt die physische Löschung für das gegebene Ziel aus.
+    fn purge(
+        &self,
+        ctx: &contextra_types::RequestContext,
+        target: &ScanTarget,
+    ) -> Result<PurgeStats>;
 }

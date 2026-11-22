@@ -1,12 +1,17 @@
+// FILE-CONTEXT
+// STAND: 2026-10-02
+// ZWECK: Reproduzierbarer Benchmark-Harness für Retrieval-Qualität & LongMemEval / LoCoMo Regressions-Suite mit echten Embeddings
+// INVARIANTEN: Standalone, reproduzierbar, synthetischer Korpus mit Ground-Truth-Annotationen.
 
 use contextra_bench::compare::{CombinedMetrics, LocomoMetricsSummary, LongMemEvalMetricsSummary};
 use contextra_bench::locomo::{load_locomo_dataset, run_locomo_eval};
 use contextra_bench::long_mem_eval::{
     check_regression, load_from_jsonl, run_long_mem_eval, RegressionSuite, ScoredChunk,
 };
+use contextra_core::{EmbeddingProvider, Result};
 use contextra_db::{Contextra, ContextraConfig};
-use contextra_ports::EmbeddingProvider;
-use contextra_types::Result;
+#[cfg(feature = "onnx-bench")]
+use contextra_infer_onnx::{CrossEncoderReranker, RerankConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -787,7 +792,7 @@ async fn run_scenario_b(
     _queries: &[GroundTruthQuery],
 ) -> Result<ScenarioComparison> {
     eprintln!("[WARN] Scenario B (Cross-Encoder Reranking) requires the 'onnx-bench' feature.");
-    Err(contextra_types::ContextraError::CapabilityUnsupported {
+    Err(contextra_core::ContextraError::CapabilityUnsupported {
         capability: "onnx-bench".to_string(),
         reason: "Cross-Encoder Reranking benchmark requires 'onnx-bench' feature. Recompile with --features onnx-bench.".to_string(),
     })
@@ -1006,8 +1011,151 @@ async fn run_locomo_cmd(
     dataset_path: &Path,
     output_path: &Path,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let _ = (dataset_path, output_path);
-    Err("Candle embedding backend wurde im Rahmen des Legacy-Cleanups entfernt.".into())
+    println!("=== Executing LoCoMo Benchmark ===");
+    println!("Dataset: {}", dataset_path.display());
+    println!("Output : {}", output_path.display());
+
+    let start_time = std::time::Instant::now();
+    let dataset = load_locomo_dataset(dataset_path)?;
+    println!(
+        "Loaded {} evaluation cases (conversation index samples: {}).",
+        dataset.cases.len(),
+        dataset.conversation_index.len()
+    );
+
+    let embed_dir = Path::new("models/candle-embed");
+    let _ = fs::create_dir_all(embed_dir);
+    let embedder = std::sync::Arc::new(contextra_infer_candle::CandleEmbedClient::from_dir(
+        embed_dir,
+        contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
+    )?);
+    let dim = EmbeddingProvider::embedding_dim(embedder.as_ref());
+    println!(
+        "Initialized Candle embedding provider (dim={}, provider={}) in {:.2?}",
+        dim,
+        EmbeddingProvider::provider_name(embedder.as_ref()),
+        start_time.elapsed()
+    );
+
+    let db_cfg = ContextraConfig {
+        dimension: dim,
+        ..Default::default()
+    };
+    let temp_dir = TempDir::new()?;
+    let db = Contextra::open_with_config(temp_dir.path(), db_cfg).await?;
+    let col = db.collection("locomo_col").await?;
+
+    let mut batch = Vec::new();
+    let index_start = std::time::Instant::now();
+
+    if !dataset.conversation_index.is_empty() {
+        for (sample_id, turns_map) in &dataset.conversation_index {
+            for (dia_id, turn_text) in turns_map {
+                let doc_id = format!("locomo_{}_{}", sample_id, dia_id);
+                let vec = EmbeddingProvider::embed(embedder.as_ref(), turn_text)
+                    .await
+                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
+                let metadata = serde_json::json!({
+                    "text": turn_text,
+                    "dia_id": dia_id,
+                    "sample_id": sample_id,
+                });
+                batch.push((doc_id, vec, Some(metadata)));
+                if batch.len() >= 50 {
+                    col.insert_many(&batch).await?;
+                    batch.clear();
+                }
+            }
+        }
+    } else {
+        for (case_idx, case) in dataset.cases.iter().enumerate() {
+            for (ev_idx, ev) in case.evidence.iter().enumerate() {
+                let doc_id = format!("locomo_doc_{}_{}", case_idx, ev_idx);
+                let vec = EmbeddingProvider::embed(embedder.as_ref(), ev)
+                    .await
+                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
+                let metadata = serde_json::json!({
+                    "text": ev,
+                    "case_id": case.question_id,
+                    "sample_id": case.sample_id,
+                });
+                batch.push((doc_id, vec, Some(metadata)));
+                if batch.len() >= 50 {
+                    col.insert_many(&batch).await?;
+                    batch.clear();
+                }
+            }
+        }
+    }
+    if !batch.is_empty() {
+        col.insert_many(&batch).await?;
+    }
+    println!(
+        "Indexed conversation turn corpus in {:.2?}",
+        index_start.elapsed()
+    );
+
+    let col_ref = &col;
+    let embedder_ref = &embedder;
+    let report = run_locomo_eval(&dataset.cases, &dataset.conversation_index, |q| {
+        let q_owned = q.to_string();
+        Box::pin(async move {
+            let q_vec = EmbeddingProvider::embed(embedder_ref.as_ref(), &q_owned)
+                .await
+                .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
+            let res = col_ref
+                .query()
+                .text(&q_owned)
+                .embedding(&q_vec)
+                .k(5)
+                .execute()
+                .await?;
+            let chunks = res
+                .into_iter()
+                .map(|r| {
+                    let text = r
+                        .metadata
+                        .as_ref()
+                        .and_then(|m| m.get("text"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default()
+                        .to_string();
+                    ScoredChunk {
+                        id: r.id,
+                        text,
+                        score: r.score,
+                    }
+                })
+                .collect();
+            Ok(chunks)
+        })
+    })
+    .await?;
+
+    println!(
+        "\nLoCoMo Overall Recall@5: {:.2}%, Overall MRR: {:.3} ({} eval cases)",
+        report.overall_recall_at_5 * 100.0,
+        report.overall_mrr,
+        report.total_eval_cases
+    );
+
+    if let Some(parent) = output_path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+
+    let report_json = serde_json::to_string_pretty(&report)?;
+    fs::write(output_path, report_json)?;
+    println!("Saved report to `{}`.", output_path.display());
+
+    update_current_metrics_locomo(
+        report.overall_recall_at_5,
+        report.overall_mrr,
+        report.total_eval_cases,
+    )?;
+
+    Ok(())
 }
 
 async fn run_pathrag_sweep_cmd(

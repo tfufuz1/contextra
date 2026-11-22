@@ -1,19 +1,12 @@
-//! # DiBud-Treiber (`dibud::driver`)
-//!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
-//!
-//! Stellt synchrone und asynchrone Treiberfunktionen bereit, um den DiBud-Zustandsautomaten
-//! über konkrete Iterator- bzw. Stream-Kanäle bis zum Erreichen des Budgets auszuführen.
+//! Synchronous and std-only asynchronous drivers for DiBud fusion state machine.
 
-use crate::error::RankError;
-use crate::local_types::DocId;
+use contextra_types::{ContextraError, DocId};
 use core::future::Future;
 
 use super::state::{DiBudFusionState, DiBudStep};
 use super::types::{BudgetedChannel, DiBudOutcome, FusionBudget};
 
 /// Synchronously executes DiBud fusion using three channel iterators.
-/// Führt die DiBud-Streaming-Fusion synchron über Iterator-Kanäle aus.
 pub fn fuse_exact_prefix<I1, I2, I3>(
     mut state: DiBudFusionState,
     vector: &mut I1,
@@ -21,7 +14,7 @@ pub fn fuse_exact_prefix<I1, I2, I3>(
     graph: &mut I3,
     edge_reinforcement: impl Fn(DocId) -> f32,
     budget: &FusionBudget,
-) -> Result<DiBudOutcome, RankError>
+) -> Result<DiBudOutcome, ContextraError>
 where
     I1: Iterator<Item = DocId>,
     I2: Iterator<Item = DocId>,
@@ -46,16 +39,15 @@ where
 /// Asynchronously executes DiBud fusion using a channel poll closure returning a std `Future`.
 ///
 /// This function relies purely on `core::future::Future` and does not require an async runtime.
-/// Führt die DiBud-Streaming-Fusion asynchron aus.
 pub async fn fuse_exact_prefix_async<P, Fut>(
     mut state: DiBudFusionState,
     mut poll: P,
     edge_reinforcement: impl Fn(DocId) -> f32,
     budget: &FusionBudget,
-) -> Result<DiBudOutcome, RankError>
+) -> Result<DiBudOutcome, ContextraError>
 where
     P: FnMut(BudgetedChannel) -> Fut,
-    Fut: Future<Output = Result<Option<DocId>, RankError>>,
+    Fut: Future<Output = Result<Option<DocId>, ContextraError>>,
 {
     budget.validate()?;
     loop {

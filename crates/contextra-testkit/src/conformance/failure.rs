@@ -1,32 +1,18 @@
-//! # Fehlererfassung für Port-Konformitätsprüfungen (`conformance/failure`)
-//!
-//! Dieses Modul definiert Fehlerstrukturen zur genauen Diagnose von
-//! Vertragsverletzungen in Port-Implementierungen.
-//!
-//! ## Ring & Architektur-Einordnung
-//! - **Ring:** Werkzeug / Tooling
-//! - **Regel 10 (SPEC §3.2):** Fail-Closed: Vertragsabweichungen werden strukturiert
-//!   als Fehlerobjekte gemeldet, statt unkontrolliert zu panicken oder ignoriert zu werden.
-
 use std::fmt;
 
-/// Repräsentiert einen aufgetretenen Fehler während einer Konformitätsprüfung.
-///
-/// **Zweck:** Enthält den Suitenamen, den konkreten Testfall und eine menschenlesbare
-/// Beschreibung der Vertragsverletzung, um Junior-Entwicklern bei der Behebung
-/// von Adapter-Bugs sofort Klarheit zu verschaffen.
+/// Represents a failure encountered during a port conformance test execution.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConformanceFailure {
-    /// Name der ausgeführten Suite (z. B. "StorageEngine", "VectorIndex", "Clock").
+    /// Name of the suite (e.g. "StorageEngine", "VectorIndex", "TextIndex").
     pub suite_name: &'static str,
-    /// Name des spezifischen fehlgeschlagenen Testfalls (z. B. "delete_removes_key").
+    /// Name of the specific test case that failed (e.g. "delete_removes_key").
     pub test_case: &'static str,
-    /// Detaillierte Beschreibung der festgestellten Vertragsverletzung.
+    /// Detailed description of the contract violation.
     pub details: String,
 }
 
 impl ConformanceFailure {
-    /// Erstellt eine neue [`ConformanceFailure`]-Instanz.
+    /// Constructs a new [`ConformanceFailure`].
     pub fn new(
         suite_name: &'static str,
         test_case: &'static str,
@@ -41,7 +27,6 @@ impl ConformanceFailure {
 }
 
 impl fmt::Display for ConformanceFailure {
-    /// Formatiert den Konformitätsfehler übersichtlich mit Suite und Testfall.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -53,5 +38,5 @@ impl fmt::Display for ConformanceFailure {
 
 impl std::error::Error for ConformanceFailure {}
 
-/// Spezialisierter Result-Typ für Konformitätsläufe: `Ok(())` oder `Err(ConformanceFailure)`.
+/// Specialized result type for conformance test executions.
 pub type ConformanceResult = Result<(), ConformanceFailure>;

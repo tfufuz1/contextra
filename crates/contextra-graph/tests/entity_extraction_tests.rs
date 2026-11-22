@@ -1,8 +1,5 @@
-//! Integrationstests für die regelbasierte Entitäts- und Beziehungsextraktion.
-//!
-//! # Zweck
-//! Prüft Erkennungsgenauigkeit von Schlüsselbegriffen, Typzuweisungen und semantischen Kanten.
-
+// FILE-CONTEXT
+// ZWECK: Integrations- und Evaluationstests für die regelbasierte Entitäts- und Relations-Extraktion in contextra-graph.
 
 use contextra_graph::csr::CsrGraph;
 use contextra_graph::entity_extraction::{

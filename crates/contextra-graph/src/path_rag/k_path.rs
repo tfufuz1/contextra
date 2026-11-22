@@ -3,19 +3,14 @@
 //! Hard node-budgeted bidirectional Dijkstra path discovery to prevent memory explosion
 //! when traversing hub entities with high out-degree.
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-use crate::error::Result;
 use crate::path_rag::{PathGraph, PathRAGEngine};
 use ahash::AHashSet;
-use crate::types::EntityId;
+use contextra_types::EntityId;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 
 /// Configuration parameters for [`KPathDiffusion`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-
-// SECTION K Path Core Implementation
 pub struct KPathConfig {
     /// Target number of paths to discover.
     pub k: usize,
@@ -54,7 +49,7 @@ pub trait KPathDiffusion: Send + Sync {
         source: EntityId,
         target: EntityId,
         config: &KPathConfig,
-    ) -> Result<KPathResult>;
+    ) -> contextra_types::Result<KPathResult>;
 }
 
 #[derive(Debug, Clone)]
@@ -97,7 +92,7 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
         source: EntityId,
         target: EntityId,
         config: &KPathConfig,
-    ) -> Result<KPathResult> {
+    ) -> contextra_types::Result<KPathResult> {
         if config.k == 0 {
             return Ok(KPathResult {
                 paths: vec![],
@@ -324,5 +319,3 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
         })
     }
 }
-
-// !SECTION K Path Core Implementation

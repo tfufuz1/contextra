@@ -1,6 +1,5 @@
-// =========================================================================
-// SECTION: egress_guard
-// =========================================================================
+// FILE-CONTEXT
+// ZWECK: Thin adapter re-exporting contextra_privacy::egress_guard and adapting contextra::Collection.
 
 pub use contextra_privacy::egress_guard::*;
 
@@ -53,5 +52,3 @@ mod tests {
         assert_eq!(DEFAULT_EGRESS_GUARD_MIN_BYTES, 128);
     }
 }
-
-// !SECTION: egress_guard

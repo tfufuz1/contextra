@@ -1,8 +1,6 @@
-//! Testsuite `bm25_edge_cases.rs` für contextra-text.
-//!
-//! # Ring-Zuordnung
-//! Ring LAB / Testbereich.
-
+// FILE-CONTEXT: Integration tests for BM25 score edge cases.
+// ZWECK: Testet score_term_with_params und score_term mit degenerierten/Grenzfall-Eingaben.
+// INVARIANTEN: BM25-Scores dürfen niemals NaN oder Infinity sein und müssen für alle Kantenfälle definiert reagieren.
 
 use contextra_text::bm25::{score_term, score_term_with_params};
 

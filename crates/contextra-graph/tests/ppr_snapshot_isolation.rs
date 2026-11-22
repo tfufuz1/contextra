@@ -1,8 +1,3 @@
-//! Snapshot-Isolationstests für PageRank-Berechnungen unter Schreiblast.
-//!
-//! # Zweck
-//! Stellt sicher, dass parallele Schreibtransaktionen laufende PageRank-Iterationen nicht verfälschen.
-
 use contextra_graph::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, PprAlgorithm, PprConfig, TxId};

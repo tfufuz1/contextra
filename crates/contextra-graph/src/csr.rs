@@ -1,11 +1,6 @@
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 //! CSR-Graph-Implementierung für Entity-Relation-Traversal.
 
-
-// SECTION Csr Core Implementation
 pub(crate) mod graph_index;
-#[cfg(feature = "workspace")]
 pub(crate) mod graph_persist;
 pub(crate) mod graph_read;
 pub(crate) mod graph_write;
@@ -26,5 +21,3 @@ pub use types::{
 pub use visibility::{
     is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business, is_suspicious_tx_id,
 };
-
-// !SECTION Csr Core Implementation

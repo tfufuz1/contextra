@@ -1,27 +1,25 @@
-//! Präfixbaum (Trie) für effiziente Wörterbuchabfragen und Teilwortsuche.
-
-/// Knoten im Präfixbaum zur Repräsentation von Buchstabenfolgen deutscher Wörter.
+/// A prefix trie node for fast lookup and prefix matching of German dictionary words.
 #[derive(Default, Debug, Clone)]
 pub struct TrieNode {
-    /// Zeigt an, ob an diesem Knoten ein vollständiges Wort aus dem Wörterbuch endet.
+    /// Indicates if a word ends at this node.
     pub is_terminal: bool,
-    /// Kindknoten, indiziert nach Folgezeichen.
+    /// Child nodes keyed by character.
     pub children: std::collections::HashMap<char, TrieNode>,
 }
 
-/// Präfixbaum (Trie) für schnelle O(m)-Wörterbuchabfragen (m = Wortlänge).
+/// A prefix trie data structure for dictionary lookup.
 #[derive(Default, Debug, Clone)]
 pub struct Trie {
     root: TrieNode,
 }
 
 impl Trie {
-    /// Erzeugt einen leeren Präfixbaum.
+    /// Creates a new empty Trie.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Fügt ein Wort zeichenweise in den Baum ein und markiert den Endknoten als terminal.
+    /// Inserts a word into the Trie.
     pub fn insert(&mut self, word: &str) {
         let mut curr = &mut self.root;
         for ch in word.chars() {
@@ -30,7 +28,7 @@ impl Trie {
         curr.is_terminal = true;
     }
 
-    /// Prüft, ob ein Wort exakt als terminaler Eintrag im Baum enthalten ist.
+    /// Checks if a word exists in the Trie.
     pub fn contains(&self, word: &str) -> bool {
         let mut curr = &self.root;
         for ch in word.chars() {
@@ -43,7 +41,7 @@ impl Trie {
         curr.is_terminal
     }
 
-    /// Prüft, ob im Baum mindestens ein Wort existiert, das mit dem übergebenen Präfix beginnt.
+    /// Checks if any word in the Trie starts with the given prefix.
     pub fn starts_with(&self, prefix: &str) -> bool {
         let mut curr = &self.root;
         for ch in prefix.chars() {

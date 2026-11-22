@@ -1,26 +1,28 @@
-//! Typdefinitionen und Konfiguration für den invertierten Index.
-
 use serde::{Deserialize, Serialize};
 
-/// Unterstützte Sprachen und Tokenisierungsstrategien für den invertierten Index.
+/// Supported tokenizer languages for BM25 text indexing.
 ///
-/// Steuert, welcher Tokenizer für die Dokumentenindizierung und Suchabfragen verwendet wird.
+/// Controls which tokenizer is used for document indexing and query processing.
+/// Use `Language::from_iso()` to parse ISO-639-1 language codes.
+///
+/// **Important**: Language is configured explicitly — namespace names do NOT
+/// determine the tokenizer language.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum Language {
-    /// Englischer Standard-Tokenizer (Unicode-Wortgrenzen + Stoppwortfilterung).
+    /// English tokenizer (default, whitespace-based + stopword filtering).
     #[default]
     English,
-    /// Deutscher morphologischer Tokenizer (Komposita-Zerlegung + Umlaut-Normalisierung).
+    /// German morphology tokenizer (compound splitting + umlaut normalization).
     German,
-    /// Benutzerdefinierter Tokenizer — wird über `with_tokenizer()` injiziert.
+    /// Custom tokenizer — override via `with_tokenizer()`.
     Custom,
 }
 
 impl Language {
-    /// Parst einen ISO-639-1 Sprachcode ("de", "de-AT", "en", "en-US").
+    /// Parses an ISO-639-1 language code ("de", "de-AT", "en", "en-US").
     ///
-    /// Bewertet nur das primäre Subtag vor dem ersten Bindestrich.
-    /// Unbekannte Codes fallen sicher auf `Language::English` zurück.
+    /// Only the primary subtag (before the first '-') is evaluated.
+    /// Unknown codes fall back to `Language::English` (safe default).
     pub fn from_iso(code: &str) -> Self {
         let prefix = code.split('-').next().unwrap_or("").to_lowercase();
         match prefix.as_str() {
@@ -31,18 +33,14 @@ impl Language {
     }
 }
 
-/// Konsolidierte Metadaten des Textindex zur persistenten Speicherung im Schlüssel `meta:stats`.
+/// Consolidated metadata for the text index.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct TextIndexMetadata {
-    /// Gesamtzahl der aktiven Dokumente im Index.
     pub total_docs: u64,
-    /// Gesamtzahl aller indizierten Token über alle Dokumente.
     pub total_tokens: u64,
-    /// Festkomma-Repräsentation der durchschnittlichen Dokumentlänge multipliziert mit 1000.
     pub avg_doc_len_x1000: u64, // Fixed-point for BM25 caching (FIND-TXT-004)
 }
 
-/// Gepufferte statistische Änderungen einer uncommitted Transaktion.
 #[derive(Default, Clone, Copy, Debug)]
 pub(crate) struct StagedStatsChange {
     pub(crate) docs_delta: i64,

@@ -1,22 +1,15 @@
-//! `context_edit_audit` — Audit-Protokollierung von Änderungen am temporären Agenten-Kontext (CLM-Scratchpad).
-//!
-//! # Zweck
-//! Ermöglicht die manipulationssichere Auditierung von Änderungen an temporären Arbeitsdaten
-//! und Scratchpads von Agenten (CLM = Context Language Model). Dies verhindert Self-Poisoning
-//! (Selbstvergiftung des Agentenkontexts) und die unbemerkte Persistierung von Prompt-Injections.
-//!
-//! # Ring-Zugehörigkeit
-//! Ring 3 (Domain / Audit Services).
-//!
-//! # Invarianten
-//! - Deterministische Erzeugung von [`ContextEditAuditRecord`]-Strukturen mit kryptografischer Hash-Verkettung (BLAKE3).
-//! - Zeitstempel stammen ausschließlich über den `Clock`-Port ([`crate::Clock`]) (INV-EGRESS-AUDIT-1).
-//! - Zero-Panic: Kein `unwrap`, `expect` im Produktionspfad.
-//! - Kein Klartext-Inhalt im Record (Privacy-by-Design: nur Längen, Hashes, Typen und Labels).
+// FILE-CONTEXT
+// ZWECK: Audit-Protokollierung von Änderungen am temporären Agenten-Kontext (CLM-Scratchpad).
+// INVARIANTEN: Deterministische Erzeugung von ContextEditAuditRecord-Strukturen mit Hash-Verkettung;
+//              Zeitstempel ausschließlich über den Clock-Port aus contextra-ports (INV-EGRESS-AUDIT-1);
+//              Zero-Panic im Produktionscode; kein Klartext-Inhalt im Record.
+// LEISTUNG: Schutz gegen Self-Poisoning und Prompt-Injection-Persistenz über Agenten-Kontext-Edits hinweg.
+// SIEHE AUCH: crates/contextra-privacy/src/audit_trace.rs, contextra-agent::clm_scratchpad (Ring 3 / Ring 2 Entkopplung).
 
 #![forbid(unsafe_code)]
 
-use crate::types::{Clock, TenantId};
+use contextra_ports::Clock;
+use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
 
 /// Art der Kontext-Änderung am temporären Agenten-Scratchpad.
@@ -37,11 +30,7 @@ pub enum ContextEditKind {
 pub enum ContextEditAuditError {
     /// Manipulationserkennung: Die Audit-Kette ist ab dem angegebenen Index fehlerhaft oder manipuliert.
     #[error("Audit chain tampered or invalid at index {index}")]
-    /// Verifikationsfehler: Kette ab Index manipuliert.
-    ChainTampered {
-        /// Index des manipulierten Eintrags.
-        index: usize,
-    },
+    ChainTampered { index: usize },
 }
 
 /// Eingabe-Parameter zur Erstellung eines Audit-Datensatzes für eine Kontext-Änderung.
@@ -87,25 +76,6 @@ pub struct ContextEditAuditRecord {
 }
 
 /// Berechnet den deterministischen BLAKE3-Hash über alle Datenfelder eines Audit-Records.
-///
-/// # Ablauf
-/// 1. Hash-Initialisierung mit `blake3::Hasher`.
-/// 2. Hinzufügen von `previous_hash` (32 Bytes).
-/// 3. Längenpräfix und Bytes der `task_id`.
-/// 4. `tenant_id` als 64-Bit Little-Endian.
-/// 5. Operationsart (`kind`) als einzelnes Byte (1..=4).
-/// 6. Optionale Kennung `chunk_label` mit Vorhandenseins-Flag und Längenpräfix.
-/// 7. Anzahl `bytes_affected` als 64-Bit Little-Endian.
-/// 8. Zeitstempel `recorded_at_tx` als 64-Bit Little-Endian.
-/// 9. `subgoal_index` als 64-Bit Little-Endian.
-///
-/// # Parameter
-/// * `previous_hash`: BLAKE3-Hash des direkten Vorgängers.
-/// * `input`: Metadaten zur Kontext-Änderung.
-/// * `recorded_at_tx`: Transaktionszeitpunkt in Unix-Nanosekunden.
-///
-/// # Rückgabe
-/// 32-Byte Hashwert des Datensatzes.
 pub fn compute_record_hash(
     previous_hash: [u8; 32],
     input: &ContextEditInput,
@@ -122,7 +92,7 @@ pub fn compute_record_hash(
     hasher.update(task_id_bytes);
 
     // 3. Mandant (TenantId u64)
-    hasher.update(&input.tenant_id.as_u64().to_le_bytes());
+    hasher.update(&input.tenant_id.0.to_le_bytes());
 
     // 4. Operation (Kind)
     let kind_byte = match input.kind {
@@ -158,14 +128,6 @@ pub fn compute_record_hash(
 /// Konstruiert deterministisch einen neuen [`ContextEditAuditRecord`] mit Hash-Verkettung.
 ///
 /// Der Zeitstempel wird ausschließlich über den injizierten `Clock`-Port bezogen (kein SystemTime::now()).
-///
-/// # Ablauf
-/// 1. Bezieht aktuellen Zeitstempel über `clock.now_unix_nanos()`.
-/// 2. Berechnet den Hashwert via [`compute_record_hash`].
-/// 3. Gibt den fertig zusammengestellten Datensatz zurück.
-///
-/// # Nebenwirkungen
-/// Greift auf den injizierten `Clock`-Port zu.
 pub fn build_context_edit_audit_record(
     previous_hash: [u8; 32],
     input: ContextEditInput,
@@ -189,17 +151,8 @@ pub fn build_context_edit_audit_record(
 
 /// Verifiziert die Integrität und Hash-Verkettung einer Reihe von Audit-Records.
 ///
-/// # Ablauf
-/// 1. Initialisiert den erwarteten Vorgängerhash mit Nullen (`[0u8; 32]`).
-/// 2. Iteriert über alle Datensätze der Kette:
-///    a. Prüft, ob `record.previous_hash` dem erwarteten Hash entspricht.
-///    b. Rekonstruiert die Eingabedaten und berechnet den Soll-Hashwert neu.
-///    c. Prüft, ob `record.record_hash` mit dem Soll-Hashwert übereinstimmt.
-///    d. Setzt `expected_previous_hash` auf den aktuellen `record_hash`.
-/// 3. Bricht beim ersten Fehler mit `ContextEditAuditError::ChainTampered` ab (Fail-Closed).
-///
-/// # Rückgabe
-/// `Ok(())` bei intakter Kette oder `Err(ContextEditAuditError::ChainTampered { index })`.
+/// Gibt `Ok(())` zurück, wenn die Kette intakt ist, oder `Err(ContextEditAuditError::ChainTampered { index })`
+/// mit dem Index des ersten manipulierten oder fehlerhaften Datensatzes.
 pub fn verify_audit_chain(chain: &[ContextEditAuditRecord]) -> Result<(), ContextEditAuditError> {
     let mut expected_previous_hash = [0u8; 32];
 
@@ -234,11 +187,6 @@ pub fn verify_audit_chain(chain: &[ContextEditAuditRecord]) -> Result<(), Contex
 ///
 /// ### Format
 /// `"task={task_id} tenant={tenant_id} kind={kind:?} chunk_label={chunk_label} bytes={bytes_affected} recorded_at_tx={recorded_at_tx} subgoal={subgoal_index} prev_hash={prev_hash_hex} record_hash={record_hash_hex}"`
-///
-/// # Ablauf
-/// 1. Wandelt optionale Labels um (Fallback auf `"none"`).
-/// 2. Kodiert Vorgängerhash und Record-Hash in Hexadezimaldarstellung.
-/// 3. Formatiert alle Attribute in einen standardisierten Log-String.
 pub fn render_audit_line(record: &ContextEditAuditRecord) -> String {
     let label_str = record.chunk_label.as_deref().unwrap_or("none");
     let prev_hex = hex_encode_32(&record.previous_hash);
@@ -257,7 +205,6 @@ pub fn render_audit_line(record: &ContextEditAuditRecord) -> String {
     )
 }
 
-// Kodiert ein 32-Byte-Array in einen 64-Zeichen langen Kleinbuchstaben-Hex-String.
 fn hex_encode_32(bytes: &[u8; 32]) -> String {
     let mut s = String::with_capacity(64);
     for b in bytes {
@@ -271,7 +218,6 @@ fn hex_encode_32(bytes: &[u8; 32]) -> String {
 mod tests {
     use super::*;
 
-    // Hilfsstruktur: Feste Test-Uhr zur deterministischen Prüfung ohne Systemzeit.
     struct FixedTestClock {
         nanos: u64,
     }
@@ -286,7 +232,6 @@ mod tests {
         }
     }
 
-    // Prüft alle Varianten von ContextEditKind und die korrekte Konstruktion einer 2-Glieder-Kette.
     #[test]
     fn test_all_context_edit_kind_variants_and_chain_construction() {
         let tenant = TenantId(10);
@@ -331,7 +276,6 @@ mod tests {
         assert!(verify_audit_chain(&chain).is_ok());
     }
 
-    // Prüft, dass Manipulationen an Datensätzen zuverlässig erkannt und mit dem exakten Index gemeldet werden.
     #[test]
     fn test_tampered_chain_detection() {
         let tenant = TenantId(10);

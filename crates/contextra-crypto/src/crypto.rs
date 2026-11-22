@@ -1,14 +1,9 @@
-//! # Haupt-Verschlüsselungs- und Schlüsselverwaltungskomponente (`crypto.rs`)
-//!
-//! Stellt den zentralen [`KeyManager`] bereit, der Master-Schlüssel verwaltet,
-//! dateispezifische Unterschlüssel ableitet und AEAD-Operationen durchführt.
-//!
-//! ## Invarianten
-//! - Pro Datei/Segment wird via HKDF-Expand ein isolierter Teilschlüssel generiert.
-//! - Nonces bestehen aus Präfix und Zufalls-Suffix, um Nonce-Reuse auszuschließen.
-//! - Bei Speicherfreigabe (`Drop`) werden alle Schlüsselmaterialien genullt (`Zeroize`).
-//! - Strikte Panic-Freiheit in allen Produktionspfaden.
-
+// FILE-CONTEXT
+// ZWECK: Key Management and AES-256-GCM-SIV authenticated encryption for Contextra data structures.
+// INVARIANTEN: Nonce prefix (4 bytes) + monotonic counter suffix (8 bytes) per encrypt_auto_nonce call. HKDF-Expand per file_id.
+// NICHT-OFFENSICHTLICH: AES-256-GCM-SIV provides nonce-misuse resistance (RFC 8452). Keys zeroized on drop. Lock-free & I/O-free.
+// HOTSPOTS: [50-150]
+// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 //! Encryption utilities for Contextra.
 //!
@@ -51,18 +46,11 @@ use std::sync::OnceLock;
 use zeroize::Zeroizing;
 
 /// Manager for encryption keys and block encryption.
-/// Zentraler kryptographischer Schlüsselmanager für symmetrische Verschlüsselung.
-///
-/// Hält den Master-Key im RAM, leitet per HKDF-Expand datei- und mandantenspezifische
-/// Teilschlüssel ab und kapselt symmetrische AEAD-Ver- und Entschlüsselung.
 pub struct KeyManager {
     key: VolatileEncryptionKey,
     cipher_cache: OnceLock<Aes256GcmSiv>,
     nonce_prefix: [u8; 4],
     nonce_counter: AtomicU64,
-    /// Gesetzt durch [`KeyManager::emergency_wipe`]: Danach verweigert der Manager jede
-    /// kryptographische Operation (Fail-Closed, kein Weiterarbeiten mit dem Nullschlüssel).
-    wiped: bool,
 }
 
 impl std::fmt::Debug for KeyManager {
@@ -109,16 +97,13 @@ impl KeyManager {
         let _ = cipher_cache.set(cipher);
 
         let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut nonce_prefix)
-            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
+        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(key_raw),
             cipher_cache,
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
-            wiped: false,
         })
     }
 
@@ -136,25 +121,20 @@ impl KeyManager {
         let _ = cipher_cache.set(cipher);
 
         let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut nonce_prefix)
-            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
+        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(key_raw),
             cipher_cache,
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
-            wiped: false,
         })
     }
 
     /// Creates a new KeyManager with a cryptographically secure random salt.
     pub fn try_new_random_salt(passphrase: &str) -> Result<(Self, [u8; 32])> {
         let mut salt = [0u8; 32];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut salt)
-            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
+        rand::rngs::OsRng.fill_bytes(&mut salt);
         let km = Self::try_new(passphrase, &salt)?;
         Ok((km, salt))
     }
@@ -162,7 +142,6 @@ impl KeyManager {
     /// Derives a sub-key for a specific file or logical stream.
     /// This prevents nonce-reuse when multiple files use the same master key.
     pub fn derive_file_key(&self, file_id: &[u8]) -> Result<Self> {
-        self.ensure_live()?;
         if file_id.is_empty() {
             return Err(CryptoError::InvalidInput(
                 "file_id cannot be empty".to_string(),
@@ -197,22 +176,18 @@ impl KeyManager {
         let _ = cipher_cache.set(cipher);
 
         let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut nonce_prefix)
-            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
+        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),
             cipher_cache,
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
-            wiped: false,
         })
     }
 
     /// Derives a sub-key specifically for a KV-cache segment based on a versioned info string.
     pub fn derive_segment_key(&self, info: &str) -> Result<Self> {
-        self.ensure_live()?;
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
 
@@ -227,16 +202,13 @@ impl KeyManager {
         let _ = cipher_cache.set(cipher);
 
         let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut nonce_prefix)
-            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
+        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),
             cipher_cache,
             nonce_prefix,
             nonce_counter: AtomicU64::new(1),
-            wiped: false,
         })
     }
 
@@ -244,92 +216,18 @@ impl KeyManager {
     ///
     /// # Format Version
     /// Uses HKDF info string `"contextra-kv-layer-v2:"` with length-prefixed variable fields (S-2 fix).
-    /// Internal helper to expand HKDF info into a new volatile `KeyManager` instance.
-    fn derive_sub_key_from_info(&self, info: &[u8]) -> Result<Self> {
-        self.ensure_live()?;
-        let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
-            .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
-
-        let mut sub_key = [0u8; 32];
-        hk.expand(info, &mut sub_key)
-            .map_err(|e| CryptoError::Crypto(format!("HKDF KV sub-key expansion failed: {}", e)))?;
-
-        let cipher = Aes256GcmSiv::new_from_slice(&sub_key)
-            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
-        let cipher_cache = OnceLock::new();
-        let _ = cipher_cache.set(cipher);
-
-        let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut nonce_prefix)
-            .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
-
-        Ok(Self {
-            key: VolatileEncryptionKey::new(sub_key),
-            cipher_cache,
-            nonce_prefix,
-            nonce_counter: AtomicU64::new(1),
-            wiped: false,
-        })
-    }
-
-    /// Derives a sub-key for KV-cache segment encryption using raw 32-byte model fingerprint.
-    pub fn derive_kv_key_bytes(
-        &self,
-        tenant_id: contextra_ids::TenantId,
-        fingerprint: &[u8; 32],
-    ) -> Result<Self> {
-        let mut info = Vec::with_capacity(b"contextra-kv-layer-v2:".len() + 8 + 32);
-        info.extend_from_slice(b"contextra-kv-layer-v2:");
-        info.extend_from_slice(&tenant_id.inner().to_le_bytes());
-        info.extend_from_slice(fingerprint);
-        self.derive_sub_key_from_info(&info)
-    }
-
-    /// Derives a sub-key for KV-cache segment encryption with strict compile-time tenant scope enforcement
-    /// using raw 32-byte model fingerprint.
-    pub fn derive_kv_key_scoped_bytes(
-        &self,
-        scoped_fingerprint: contextra_ids::TenantScoped<&[u8; 32]>,
-        expected_tenant_id: &contextra_ids::TenantId,
-    ) -> Result<Self> {
-        let fingerprint = scoped_fingerprint
-            .into_inner_checked(expected_tenant_id)
-            .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        self.derive_kv_key_bytes(*expected_tenant_id, fingerprint)
-    }
-
-    /// Derives a tenant-isolated `KeyManager` instance for a specific `TenantId` with raw 32-byte fingerprint.
-    pub fn cipher_for_bytes(
-        &self,
-        tenant_id: contextra_ids::TenantId,
-        fingerprint: &[u8; 32],
-    ) -> Result<Self> {
-        self.derive_kv_key_bytes(tenant_id, fingerprint)
-    }
-
-    /// Derives a tenant-isolated `KeyManager` instance enforcing compile-time `TenantScoped` verification
-    /// with raw 32-byte fingerprint.
-    pub fn cipher_for_scoped_bytes<T>(
-        &self,
-        scoped_key: contextra_ids::TenantScoped<T>,
-        expected_tenant_id: &contextra_ids::TenantId,
-        fingerprint: &[u8; 32],
-    ) -> Result<Self> {
-        let _unpacked = scoped_key
-            .into_inner_checked(expected_tenant_id)
-            .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        self.cipher_for_bytes(*expected_tenant_id, fingerprint)
-    }
-
     /// All KV-cache segments encrypted before v2 are cryptographically unreadable under v2 keys
     /// and will fail at the `format_version` check in `KvSegmentCipher::decrypt()` with
     /// `CryptoError::KvFormatVersionMismatch` — never with a silent garbage-data result.
     pub fn derive_kv_key(
         &self,
-        tenant_id: contextra_ids::TenantId,
+        tenant_id: contextra_types::TenantId,
         model_fingerprint: &crate::kv_cipher::ModelFingerprint,
     ) -> Result<Self> {
+        let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
+            .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
+
+        let mut sub_key = [0u8; 32];
         // S-2 FIX: Length-prefix each variable field before concatenation.
         // RFC 5869 best practice: variable-length fields without separators are ambiguous.
         // Without length prefixes, ("abc", "def") and ("ab", "cdef") produce identical info strings.
@@ -353,7 +251,23 @@ impl KeyManager {
         info.extend_from_slice(&(quantization_bytes.len() as u32).to_le_bytes());
         info.extend_from_slice(quantization_bytes);
 
-        self.derive_sub_key_from_info(&info)
+        hk.expand(&info, &mut sub_key)
+            .map_err(|e| CryptoError::Crypto(format!("HKDF KV sub-key expansion failed: {}", e)))?;
+
+        let cipher = Aes256GcmSiv::new_from_slice(&sub_key)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+        let cipher_cache = OnceLock::new();
+        let _ = cipher_cache.set(cipher);
+
+        let mut nonce_prefix = [0u8; 4];
+        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
+
+        Ok(Self {
+            key: VolatileEncryptionKey::new(sub_key),
+            cipher_cache,
+            nonce_prefix,
+            nonce_counter: AtomicU64::new(1),
+        })
     }
 
     /// Derives a sub-key for KV-cache segment encryption with strict compile-time tenant scope enforcement.
@@ -362,8 +276,8 @@ impl KeyManager {
     /// Returns [`CryptoError::InvalidInput`] if a tenant scope violation occurs.
     pub fn derive_kv_key_scoped(
         &self,
-        scoped_fingerprint: contextra_ids::TenantScoped<&crate::kv_cipher::ModelFingerprint>,
-        expected_tenant_id: &contextra_ids::TenantId,
+        scoped_fingerprint: contextra_types::TenantScoped<&crate::kv_cipher::ModelFingerprint>,
+        expected_tenant_id: &contextra_types::TenantId,
     ) -> Result<Self> {
         let fingerprint = scoped_fingerprint
             .into_inner_checked(expected_tenant_id)
@@ -372,7 +286,7 @@ impl KeyManager {
     }
 
     /// Derives a tenant-isolated `KeyManager` instance for a specific `TenantId`.
-    pub fn cipher_for(&self, tenant_id: contextra_ids::TenantId) -> Result<Self> {
+    pub fn cipher_for(&self, tenant_id: contextra_types::TenantId) -> Result<Self> {
         let dummy_fp = crate::kv_cipher::ModelFingerprint {
             hash: [0u8; 32],
             model_id: "default_tenant_cipher".to_string(),
@@ -385,8 +299,8 @@ impl KeyManager {
     /// Unpacks `scoped_key` only if the bound `TenantId` matches `expected_tenant_id`.
     pub fn cipher_for_scoped<T>(
         &self,
-        scoped_key: contextra_ids::TenantScoped<T>,
-        expected_tenant_id: &contextra_ids::TenantId,
+        scoped_key: contextra_types::TenantScoped<T>,
+        expected_tenant_id: &contextra_types::TenantId,
     ) -> Result<Self> {
         let _unpacked = scoped_key
             .into_inner_checked(expected_tenant_id)
@@ -404,19 +318,19 @@ impl KeyManager {
         Ok(key)
     }
 
-    /// Fail-Closed-Guard: Ein gewipetes Schlüsselmaterial darf nie weiterverwendet werden.
-    fn ensure_live(&self) -> Result<()> {
-        if self.wiped {
-            return Err(CryptoError::KeyRevoked(
-                "key material was wiped by emergency_wipe".to_string(),
-            ));
-        }
-        Ok(())
+    /// Derives a deletion proof signing key for cryptographic deletion verification.
+    pub fn derive_deletion_proof_key(&self) -> Result<[u8; 32]> {
+        let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
+            .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
+        let mut key = [0u8; 32];
+        hk.expand(b"deletion-proof", &mut key).map_err(|e| {
+            CryptoError::Crypto(format!("HKDF deletion proof key expansion failed: {}", e))
+        })?;
+        Ok(key)
     }
 
     /// Internal accessor for instance-bound cached AES-256-GCM-SIV cipher.
     fn cipher(&self) -> Result<&Aes256GcmSiv> {
-        self.ensure_live()?;
         if let Some(c) = self.cipher_cache.get() {
             return Ok(c);
         }
@@ -470,14 +384,10 @@ impl KeyManager {
     }
 
     /// Emergency Trigger: Explicitly wipes the key from memory and clears cipher cache.
-    ///
-    /// Nach dem Wipe schlagen alle Ver-/Entschlüsselungen und Schlüsselableitungen mit
-    /// [`CryptoError::KeyRevoked`] fehl (kein stiller Nullschlüssel).
     pub fn emergency_wipe(&mut self) {
         self.key.emergency_wipe();
         self.cipher_cache.take();
         self.nonce_counter.store(0, Ordering::SeqCst);
-        self.wiped = true;
     }
 
     /// Exports the 32-byte raw Data Encryption Key (DEK) wrapped in [`Zeroizing<Vec<u8>>`].
@@ -584,32 +494,17 @@ mod tests {
     }
 
     #[test]
-    fn wiped_key_manager_fails_closed() {
-        let mut km = KeyManager::try_new("password", b"salt").expect("init");
-        let (ct, nonce) = km.encrypt_auto_nonce(b"before wipe").expect("encrypt");
+    fn test_derive_deletion_proof_key() {
+        let km = KeyManager::try_new("passphrase", b"salt").unwrap();
+        let deletion_key = km.derive_deletion_proof_key().unwrap();
+        assert_ne!(deletion_key, [0u8; 32]);
 
-        km.emergency_wipe();
-
-        assert!(matches!(
-            km.encrypt_auto_nonce(b"after wipe"),
-            Err(CryptoError::KeyRevoked(_))
-        ));
-        assert!(matches!(
-            km.decrypt_auto_nonce(&ct, &nonce),
-            Err(CryptoError::KeyRevoked(_))
-        ));
-        assert!(matches!(
-            km.derive_file_key(b"file"),
-            Err(CryptoError::KeyRevoked(_))
-        ));
-        assert!(matches!(
-            km.derive_segment_key("segment"),
-            Err(CryptoError::KeyRevoked(_))
-        ));
+        let integrity_key = km.integrity_key().unwrap();
+        assert_ne!(deletion_key, integrity_key);
     }
 
     #[test]
-    fn test_file_keys_are_distinct_per_path() {
+    fn file_keys_are_distinct_per_path() {
         let km = KeyManager::try_new("secret", b"salt").expect("init"); // expect
         let key1 = km.derive_file_key(b"segment_001.sst").expect("k1"); // expect
         let key2 = km.derive_file_key(b"segment_002.sst").expect("k2"); // expect
@@ -621,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn test_same_path_same_passphrase_same_key() {
+    fn same_path_same_passphrase_same_key() {
         let km1 = KeyManager::try_new("secret", b"salt").expect("km1"); // expect
         let km2 = KeyManager::try_new("secret", b"salt").expect("km2"); // expect
         let k1 = km1.derive_file_key(b"data.sst").expect("k1"); // expect
@@ -634,7 +529,7 @@ mod tests {
     }
 
     #[test]
-    fn test_same_passphrase_salt_path_gives_same_key() {
+    fn same_passphrase_salt_path_gives_same_key() {
         let km1 = KeyManager::try_new("secret", b"salt").expect("km1"); // expect
         let km2 = KeyManager::try_new("secret", b"salt").expect("km2"); // expect
         assert_eq!(
@@ -649,7 +544,7 @@ mod tests {
     }
 
     #[test]
-    fn test_key_manager_field_zeroizes_on_drop() {
+    fn key_manager_field_zeroizes_on_drop() {
         use zeroize::Zeroize;
         let mut raw: [u8; 32] = [0xFF; 32];
         raw.zeroize();
@@ -657,7 +552,7 @@ mod tests {
     }
 
     #[test]
-    fn test_key_manager_debug_redacts_key() {
+    fn key_manager_debug_redacts_key() {
         let (km, _) = KeyManager::try_new_random_salt("test-passphrase").unwrap(); // unwrap
         let debug_str = format!("{km:?}");
         assert!(!debug_str.contains("test-passphrase"));
@@ -797,7 +692,7 @@ mod tests {
     #[test]
     fn test_derive_kv_key_length_prefix_prevents_collision() -> Result<()> {
         use crate::kv_cipher::ModelFingerprint;
-        use contextra_ids::TenantId;
+        use contextra_types::TenantId;
 
         // Setup: Zwei ModelFingerprint-Instanzen mit gleichem hash, aber unterschiedlicher
         // Aufteilung von model_id/quantization die ohne Längenpräfix kollidieren würden.
@@ -829,7 +724,7 @@ mod tests {
     #[test]
     fn test_derive_kv_key_same_fingerprint_produces_same_key() -> Result<()> {
         use crate::kv_cipher::ModelFingerprint;
-        use contextra_ids::TenantId;
+        use contextra_types::TenantId;
 
         // Determinismus-Test: Gleiche Eingaben → gleicher Key (HKDF ist deterministisch)
         let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;
@@ -851,7 +746,7 @@ mod tests {
     #[test]
     fn test_derive_kv_key_scoped_enforces_tenant_isolation() -> Result<()> {
         use crate::kv_cipher::ModelFingerprint;
-        use contextra_ids::{TenantId, TenantScoped};
+        use contextra_types::{TenantId, TenantScoped};
 
         let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;
         let tenant_a =
@@ -910,6 +805,7 @@ mod tests {
         );
     }
 
+    // ANCHOR[TEST:CRY-001] STATUS:DONE (TS:2026-08-31T21:13:05Z) (SESSION:8427f167) — Nonce-Uniqueness verification bei paralleler Verschlüsselung
     // REVIEW-PASS[1/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-08-30T19:00:00Z) (SESSION: b8e4f1a2)
     // PRÜFER-KONTEXT: FRESH
     // BEFUND: Parallel encryption nonce uniqueness verified across concurrent threads.
@@ -1032,67 +928,4 @@ mod tests {
     }
 
     // REVIEW-PASS[8/3] STATUS:PASS (ID: AGT-CRYPTO-81653b64) (TS: 2026-09-13T01:35:00Z) (SESSION: dd990e1d) (PRÜFER-KONTEXT: FRESH)
-}
-
-#[cfg(test)]
-mod tests_cr42_differential {
-    use super::*;
-    use contextra_ids::{TenantId, TenantScoped};
-
-    #[test]
-    fn test_derive_kv_key_bytes_deterministic_and_matches_reference() -> Result<()> {
-        let km = KeyManager::try_new("master-passphrase-differential!!", b"salt42")?;
-        let tenant =
-            TenantId::try_new(101).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        let fp_bytes = [0x5Au8; 32];
-
-        let key_1 = km.derive_kv_key_bytes(tenant, &fp_bytes)?;
-        let key_2 = km.derive_kv_key_bytes(tenant, &fp_bytes)?;
-        assert_eq!(
-            key_1.inspect_key_bytes_for_test(),
-            key_2.inspect_key_bytes_for_test()
-        );
-
-        let scoped = TenantScoped::new(tenant, &fp_bytes);
-        let key_scoped = km.derive_kv_key_scoped_bytes(scoped, &tenant)?;
-        assert_eq!(
-            key_1.inspect_key_bytes_for_test(),
-            key_scoped.inspect_key_bytes_for_test()
-        );
-
-        let cipher_1 = km.cipher_for_bytes(tenant, &fp_bytes)?;
-        assert_eq!(
-            key_1.inspect_key_bytes_for_test(),
-            cipher_1.inspect_key_bytes_for_test()
-        );
-
-        let scoped_key = TenantScoped::new(tenant, ());
-        let cipher_scoped = km.cipher_for_scoped_bytes(scoped_key, &tenant, &fp_bytes)?;
-        assert_eq!(
-            key_1.inspect_key_bytes_for_test(),
-            cipher_scoped.inspect_key_bytes_for_test()
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_derive_kv_key_preserves_bit_level_compatibility() -> Result<()> {
-        let km = KeyManager::try_new("master-passphrase-differential!!", b"salt42")?;
-        let tenant =
-            TenantId::try_new(101).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        let fp = crate::kv_cipher::ModelFingerprint {
-            hash: [0x5Au8; 32],
-            model_id: "test-model-llama".to_string(),
-            quantization: "Q4_K_M".to_string(),
-        };
-
-        let key = km.derive_kv_key(tenant, &fp)?;
-        let pt = b"Test deterministic differential encryption payload";
-        let (ct, nonce) = key.encrypt_auto_nonce(pt)?;
-        let recovered = key.decrypt_auto_nonce(&ct, &nonce)?;
-        assert_eq!(recovered, pt);
-
-        Ok(())
-    }
 }

@@ -1,12 +1,8 @@
-
-
-mod common;
-
-use common::{generate_raw_vectors, DEFAULT_BENCH_SEED, DIM_MEDIUM};
 use contextra_ports::VectorIndex;
 use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use rand::Rng;
 
 fn bench_hnsw_delete_search(c: &mut Criterion) {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -14,12 +10,15 @@ fn bench_hnsw_delete_search(c: &mut Criterion) {
         .build()
         .expect("Tokio runtime required");
 
-    let dim = DIM_MEDIUM; // 128
+    let dim = 128;
     let num_docs = 1000;
+    let mut rng = rand::thread_rng();
 
-    let vectors = generate_raw_vectors(num_docs, dim, DEFAULT_BENCH_SEED);
-    let queries = generate_raw_vectors(1, dim, DEFAULT_BENCH_SEED ^ 0x9999);
-    let query = &queries[0];
+    let vectors: Vec<Vec<f32>> = (0..num_docs)
+        .map(|_| (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect())
+        .collect();
+
+    let query: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
 
     // 0% Deletes index
     let index_0_deletes = rt.block_on(async {
@@ -77,7 +76,7 @@ fn bench_hnsw_delete_search(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let res = index_0_deletes
-                    .search(black_box(query), black_box(10))
+                    .search(black_box(&query), black_box(10))
                     .await;
                 black_box(res).expect("Search failed");
             });
@@ -88,7 +87,7 @@ fn bench_hnsw_delete_search(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let res = index_30_deletes
-                    .search(black_box(query), black_box(10))
+                    .search(black_box(&query), black_box(10))
                     .await;
                 black_box(res).expect("Search failed");
             });

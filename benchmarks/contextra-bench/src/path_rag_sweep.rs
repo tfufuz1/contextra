@@ -1,8 +1,12 @@
+// FILE-CONTEXT
+// STAND: 2026-09-07
+// ZWECK: Parameter-Sweep für PathRAG sufficiency_threshold über LongMemEval und LoCoMo Datensätze.
+// INVARIANTEN: Misst Precision und Recall für Threshold-Werte ∈ {0.01, 0.1, 0.3, 0.6}.
 
 use crate::locomo::{load_locomo_dataset, LocomoQuestionCategory};
 use crate::long_mem_eval::{LongMemEvalQuestionType, RegressionSuite};
+use contextra_core::Result;
 use contextra_db::{Contextra, ContextraConfig, SearchStrategy};
-use contextra_types::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tempfile::TempDir;
@@ -97,7 +101,7 @@ pub async fn run_pathrag_sweep_long_mem_eval(
                 .await
             {
                 Ok(r) => r,
-                Err(contextra_types::ContextraError::SnapshotUnsupportedForSignal(_)) => Vec::new(),
+                Err(contextra_core::ContextraError::SnapshotUnsupportedForSignal(_)) => Vec::new(),
                 Err(e) => return Err(e),
             };
 
@@ -251,7 +255,7 @@ pub async fn run_pathrag_sweep_locomo(
                 .await
             {
                 Ok(r) => r,
-                Err(contextra_types::ContextraError::SnapshotUnsupportedForSignal(_)) => Vec::new(),
+                Err(contextra_core::ContextraError::SnapshotUnsupportedForSignal(_)) => Vec::new(),
                 Err(e) => return Err(e),
             };
 

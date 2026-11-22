@@ -1,8 +1,3 @@
-//! Snapshot-gebundene Pfadsuche im Path-RAG.
-//!
-//! # Zweck
-//! Beweist, dass Anfragen zu einem historischen `TxId`-Stand exakt isoliert bleiben.
-
 use contextra_graph::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
@@ -57,7 +52,7 @@ async fn test_path_rag_at_edge_visibility_by_seq() {
 
 #[tokio::test]
 async fn test_path_rag_at_deleted_edge_visibility() {
-    // (b) eine zum seq gelöschte Kante ist unsichtbar, vor der Entfernung sichtbar
+    // (b) eine zum seq gelöschte Kante ist unsichtbar, vor der Löschung sichtbar
     let graph = CsrGraph::new();
 
     let e1 = EntityId::new(10);

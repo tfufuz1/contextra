@@ -1,5 +1,3 @@
-//! Zerlegung deutscher Komposita mittels Dynamischer Programmierung (DP) und Wörterbuch-Trie.
-
 use super::stopwords::normalize_umlauts;
 use super::trie::Trie;
 use crate::domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
@@ -11,47 +9,69 @@ use std::collections::HashSet;
 /// Verhindert Hartcodierung im Quelltext und ermöglicht einfache Erweiterbarkeit.
 const DEFAULT_GERMAN_WORDS: &str = include_str!("../data/german_words.txt");
 
-/// Trait für morphologische Zerlegung von Wörtern in ihre Grundbestandteile.
+/// Trait for morphological tokenization.
 ///
-/// # Eingabevertrag
-/// Eingegebene Wörter MÜSSEN vor dem Aufruf von `decompose` in Kleinbuchstaben
-/// vorliegen und idealerweise mit [`normalize_umlauts`] vorbereitet sein.
-/// Bei Großbuchstaben oder ungültigen Zeichenfolgen wird das Token unzerlegt zurückgegeben.
+/// Decomposes compound words into constituent morphemes.
 ///
-/// Beispiel: "bundesverfassungsgericht" -> \["bundes", "verfassungs", "gericht"\]
+/// # Input Contract
+/// Input tokens MUST be lowercased before passing to `decompose`. Passing
+/// mixed-case or uppercase tokens causes silent dictionary misses and returns
+/// the original token without decomposition. Use `normalize_umlauts()` from
+/// this module to prepare input correctly.
+///
+/// Example: "bundesverfassungsgericht" -> ["bundes", "verfassungs", "gericht"]
 pub trait MorphologicalTokenizer: Send + Sync {
-    /// Zerlegt ein Token in morphologische Komponenten (Teilwörter).
+    /// Decomposes a token into its morphological components.
     fn decompose<'a>(&self, token: &'a str) -> Vec<&'a str>;
 
-    /// Liefert den Sprachcode (z. B. "de").
+    /// Returns the language code of this tokenizer (e.g. "de", "en").
     fn language(&self) -> &str;
 }
 
-/// Deutscher Komposita-Zerleger basierend auf Dynamischer Programmierung und Fugenanalyse.
+/// German compound word splitter (*Komposita-Zerleger*).
 ///
-/// # Funktionsweise & Algorithmus
-/// 1. **Eingebettetes Wörterbuch**: Tausende deutsche Stämme, Grundwörter und Affixe im [`Trie`].
-/// 2. **Dynamische Programmierung**: Sucht den optimalen Pfad durch das Wort mit minimaler
-///    Segmentanzahl und maximaler Mindestsegmentlänge.
-/// 3. **Fugenelemente**: Berücksichtigt Zwischenfugen (`-s-`, `-en-`, `-e-`, `-er-`, `-n-`, `-es-`).
+/// Uses dictionary-based recursive segmentation powered by Dynamic Programming (DP).
 ///
-/// Fallback: Bei unbekannten Wörtern oder fehlenden Treffern wird das Ursprungswort unzerlegt zurückgegeben.
+/// # Architecture & Algorithm
+/// - **Embedded Dictionary**: Thousands of common German stems, root words, prefixes, and KMU
+///   enterprise vocabulary loaded at compile time via `include_str!("../data/german_words.txt")`.
+/// - **Dynamic Programming (DP)**: Evaluates candidate segmentations of a token to find valid
+///   stem paths, preferring decompositions with fewer segments and longer constituent components.
+/// - **Interfix Candidates (Fugenelemente)**: Supports interfixes `-s-`, `-en-`, `-e-`, `-er-`,
+///   `-n-`, and `-es-` occurring strictly between dictionary-matched components.
+///
+/// # Explicit Linguistic Limitations
+/// 1. **Homograph Ambiguity**: Words with identical spellings that yield multiple valid split paths
+///    (e.g., *Wachstube* $\rightarrow$ *Wachs-Tube* vs. *Wach-Stube*) are resolved deterministically
+///    by segment count and stem length heuristic. Context-aware semantic disambiguation requires an
+///    upstream LLM/POS tagger.
+/// 2. **Unseen Stems & Proper Nouns**: Unknown company names, foreign loanwords, or unlisted stems
+///    will fail dictionary lookup and safely fall back to returning the full original token unsplit.
+/// 3. **Interfix Overgeneration Guard**: Interfixes are strictly constrained between recognized
+///    dictionary stems, preventing invalid splitting of non-compound words ending in `-es` or `-en`.
+///
+/// # Input Contract
+/// Input tokens MUST be lowercased (and ideally normalized with
+/// [`normalize_umlauts`]) before calling [`MorphologicalTokenizer::decompose`].
+/// Uppercase input triggers a `debug_assert!` panic in debug builds and
+/// causes silent dictionary misses (fallback: token returned unsplit) in
+/// release builds.
+///
+/// Fallback: returns the original token unsplit.
 pub struct GermanCompoundSplitter {
     /// Minimum component length for splitting.
     min_component_len: usize,
-    /// Maximum decomposition depth (number of segments).
-    max_depth: usize,
     /// Trie data structure for fast prefix checking and dictionary matching.
     trie: Trie,
 }
 
 impl GermanCompoundSplitter {
-    /// Erzeugt einen neuen Zerleger mit der Standard-Mindestlänge (3 Zeichen) und Basis-Wortschatz.
+    /// Creates a new German compound splitter loaded with the embedded German vocabulary.
     pub fn new() -> Self {
         Self::with_min_length(3)
     }
 
-    /// Erzeugt einen Zerleger mit konfigurierbarer Mindest-Segmentlänge.
+    /// Creates a splitter with custom minimum component length and default embedded vocabulary.
     pub fn with_min_length(min_len: usize) -> Self {
         let mut trie = Trie::new();
         for line in DEFAULT_GERMAN_WORDS.lines() {
@@ -66,12 +86,11 @@ impl GermanCompoundSplitter {
         }
         Self {
             min_component_len: min_len,
-            max_depth: 8,
             trie,
         }
     }
 
-    /// Erzeugt einen Zerleger mit benutzerdefiniertem Wörterbuch.
+    /// Creates a splitter with custom minimum component length and custom dictionary set.
     pub fn with_dictionary(min_len: usize, custom_words: HashSet<String>) -> Self {
         let mut trie = Trie::new();
         for word in custom_words {
@@ -82,12 +101,11 @@ impl GermanCompoundSplitter {
         }
         Self {
             min_component_len: min_len,
-            max_depth: 8,
             trie,
         }
     }
 
-    /// Erzeugt einen Zerleger erweitert um spezifische Fachvokabulare (z. B. Recht, Medizin).
+    /// Creates a splitter with the default vocabulary plus compound stems and protected terms from specific domain packages.
     pub fn with_domains(min_len: usize, domains: &[&dyn DomainVocabulary]) -> Self {
         let mut splitter = Self::with_min_length(min_len);
         for domain in domains {
@@ -107,14 +125,14 @@ impl GermanCompoundSplitter {
         splitter
     }
 
-    /// Erzeugt einen Zerleger mit allen eingebauten Fachdomänen (Recht & Medizin).
+    /// Creates a splitter loaded with default German vocabulary and all built-in domain vocabularies (Legal & Medical).
     pub fn new_with_all_domains() -> Self {
         let legal = LegalDomainVocabulary;
         let medical = MedicalDomainVocabulary;
         Self::with_domains(3, &[&legal, &medical])
     }
 
-    /// Erweitert das Wörterbuch des Zerlegers dynamisch um zusätzliche Begriffe.
+    /// Extends the splitter's dictionary with additional terms.
     pub fn extend_vocabulary(&mut self, words: impl IntoIterator<Item = impl AsRef<str>>) {
         for word in words {
             let norm = normalize_umlauts(word.as_ref());
@@ -124,23 +142,12 @@ impl GermanCompoundSplitter {
         }
     }
 
-    /// Liefert die Mindestlänge für Teilkomponenten.
+    /// Returns the minimum component length.
     pub fn min_component_len(&self) -> usize {
         self.min_component_len
     }
 
-    /// Setzt die maximale Rekursions-/Segmenttiefe für Zerlegungen.
-    pub fn with_max_depth(mut self, max_depth: usize) -> Self {
-        self.max_depth = max_depth;
-        self
-    }
-
-    /// Liefert die maximale Segmenttiefe.
-    pub fn max_depth(&self) -> usize {
-        self.max_depth
-    }
-
-    // Prüft, ob ein Teilabschnitt ein gültiges Wörterbuch-Wort oder Stamm + Fugenelement darstellt.
+    /// Checks if a slice is a valid dictionary stem or stem + interfix.
     fn is_valid_component(&self, sub: &str, is_last: bool) -> bool {
         let norm_sub = normalize_umlauts(sub);
         if norm_sub.len() < 2 {
@@ -190,12 +197,6 @@ struct PathNode {
 }
 
 impl MorphologicalTokenizer for GermanCompoundSplitter {
-    // Ablauf der Komposita-Zerlegung:
-    // 1. Validierung: Abbruch falls Großbuchstaben vorhanden, Token zu kurz (<= min_component_len) oder > 128 Bytes.
-    // 2. DP-Tabelle initialisieren (dp[i] speichert besten Pfad bis Byte-Offset i).
-    // 3. Vorwärts-Scanning über alle gültigen UTF-8-Zeichengrenzen.
-    // 4. Backtracking: Falls dp[n] mindestens 2 Segmente aufweist, Komponenten rekonstruieren.
-    // 5. Bei Misserfolg Rückgabe des unveränderten Tokens.
     fn decompose<'a>(&self, token: &'a str) -> Vec<&'a str> {
         // Fallback safely for non-lowercase or oversized single tokens
         if token.chars().any(|c| c.is_uppercase())
@@ -222,10 +223,6 @@ impl MorphologicalTokenizer for GermanCompoundSplitter {
                 Some(node) => node.clone(),
                 None => continue,
             };
-
-            if current_node.segment_count >= self.max_depth {
-                continue;
-            }
 
             for j in (i + 2)..=n {
                 if !token.is_char_boundary(j) {

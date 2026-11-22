@@ -1,21 +1,10 @@
-#![cfg(feature = "workspace")]
-//! Grundlegende Funktionsprüfungen für `CsrGraph`.
-//!
-//! # Zweck
-//! Testet Kantenhinzufügung, Gewichtsberechnung und Kantenentfernung in Standardfällen.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::super::*;
 use crate::csr::types::CsrGraphConfig;
 use crate::csr::visibility::is_suspicious_tx_id;
 use contextra_ports::GraphIndex;
-use crate::error::GraphError;
 use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
-
-// SECTION Basic Tests Core Implementation
 pub(super) async fn setup_test_graph() -> CsrGraph {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
@@ -122,25 +111,25 @@ async fn test_invalid_edge_weights_rejected() {
         .insert_edge_direct(id1, id2, f32::NAN)
         .await
         .unwrap_err();
-    assert!(matches!(err_nan, GraphError::InvalidInput(_)));
+    assert!(matches!(err_nan, ContextraError::InvalidInput(_)));
 
     // Infinity weight
     let err_inf = graph
         .insert_edge_direct(id1, id2, f32::INFINITY)
         .await
         .unwrap_err();
-    assert!(matches!(err_inf, GraphError::InvalidInput(_)));
+    assert!(matches!(err_inf, ContextraError::InvalidInput(_)));
 
     // Neg Infinity weight
     let err_neginf = graph
         .insert_edge_direct(id1, id2, f32::NEG_INFINITY)
         .await
         .unwrap_err();
-    assert!(matches!(err_neginf, GraphError::InvalidInput(_)));
+    assert!(matches!(err_neginf, ContextraError::InvalidInput(_)));
 
     // Negative weight
     let err_neg = graph.insert_edge_direct(id1, id2, -1.0).await.unwrap_err();
-    assert!(matches!(err_neg, GraphError::InvalidInput(_)));
+    assert!(matches!(err_neg, ContextraError::InvalidInput(_)));
 
     // add_edge with NaN
     let edge_nan = Edge::new(id1, id2, "rel").with_weight(f32::NAN);
@@ -765,5 +754,3 @@ async fn test_neighbors_hub_node_dedup() {
         "Neighbors returned must not contain duplicate EntityIds"
     );
 }
-
-// !SECTION Basic Tests Core Implementation

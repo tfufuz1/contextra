@@ -1,3 +1,6 @@
+// FILE-CONTEXT
+// ZWECK: Corruption detection and DiskAnnFallbackPolicy test (Pflichttest 2).
+// INVARIANTEN: Verifies that loading a corrupted/bit-flipped DiskANN file returns typed ContextraError for FailFast, and logs error & transparently falls back to HNSW for UseHnswOnFailure.
 
 #![cfg(feature = "experimental-diskann")]
 

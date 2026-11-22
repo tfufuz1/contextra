@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-09-15T16:07:56Z (SESSION: 5d958ef0)
+// ZWECK: Akkumuliert Co-Occurrence- und Traversal-Update-Signale für asynchronen Flush in CSR-Graph (F-03)
+// INVARIANTEN: Lock-Scopes minimal halten, nie Mutex über .await halten.
+// NICHT-OFFENSICHTLICH: Partial-Flush wird nicht unterstützt; flush_to_graph leert den Buffer komplett.
 // SIEHE AUCH: crates/contextra-graph/src/edge_reinforcement.rs
 
 //! F-03: EdgeReinforcementBuffer — Akkumuliert Co-Occurrence- und Traversal-
@@ -13,15 +18,13 @@ use crate::csr::CsrGraph;
 #[cfg(feature = "edge-reinforcement-learning")]
 use crate::edge_reinforcement::EdgeReinforcementConfig;
 #[cfg(feature = "edge-reinforcement-learning")]
-use crate::types::EntityId;
+use contextra_types::EntityId;
 #[cfg(feature = "edge-reinforcement-learning")]
 use parking_lot::Mutex;
 
 /// Ein gepufferter Co-Occurrence-Update: zwei ko-aktivierte Entitäten.
 #[cfg(feature = "edge-reinforcement-learning")]
 #[derive(Debug, Clone)]
-
-// SECTION Edge Reinforcement Buffer Core Implementation
 pub struct CooccurrenceSignal {
     pub from: EntityId,
     pub to: EntityId,
@@ -137,7 +140,7 @@ impl EdgeReinforcementBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::EntityId;
+    use contextra_types::EntityId;
 
     #[test]
     fn test_push_and_count() {
@@ -165,9 +168,8 @@ mod tests {
     async fn test_flush_with_populated_graph_edges() {
         use crate::csr::CsrGraph;
         use crate::edge_reinforcement::EdgeReinforcementConfig;
-        #[cfg(feature = "workspace")]
         use contextra_ports::GraphIndex;
-        use crate::types::{Edge, Entity, TxId};
+        use contextra_types::{Edge, Entity, TxId};
 
         let graph = CsrGraph::new();
         let tx = TxId::new(1);
@@ -202,5 +204,3 @@ mod tests {
         assert_eq!(buf.traversal_count(), 0);
     }
 }
-
-// !SECTION Edge Reinforcement Buffer Core Implementation

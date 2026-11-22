@@ -1,8 +1,5 @@
-//! Regelbasierte Entitäts- und Relationsextraktion ohne Machine-Learning-Laufzeit.
-//!
-//! # Zweck
-//! Extrahiert Eigennamen, numerische Codes und semantische Relationen aus Textdokumenten.
-
+// FILE-CONTEXT
+// ZWECK: Regelbasierte Entitäts- und Relations-Extraktion aus Freitext mit Graph-Ingestion-Anbindung.
 //
 // PRODUKTIV-AUFRUFER FUNDSTELLE:
 // Ein künftiger Produktiv-Aufrufer müsste im Ingestion-Commit-Pfad angesetzt werden:
@@ -13,14 +10,11 @@
 // kann an genau dieser Stelle durch Aufruf von `RuleBasedEntityExtractor::extract` und anschließender
 // Übergabe der extrahierten Relationen an `ingest_extracted_relations` eingehängt werden.
 
-
-// SECTION Entity Extraction Core Implementation
 #![forbid(unsafe_code)]
 
 use crate::csr::{CsrGraph, EdgeType};
-use crate::error::{GraphError, Result};
 use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
-use crate::types::{DocId, Entity, EntityId};
+use contextra_types::{DocId, Entity, EntityId, Result};
 
 /// Repräsentiert eine aus Freitext extrahierte Binärbeziehung zwischen zwei Entitäten.
 #[derive(Debug, Clone, PartialEq)]
@@ -301,7 +295,7 @@ pub fn ingest_extracted_relations(
                 ) {
                     created_edges.push(he);
                 } else {
-                    return Err(GraphError::Internal(format!(
+                    return Err(contextra_types::ContextraError::Internal(format!(
                         "Failed to convert ExtractedRelation to hyperedge: {e}"
                     )));
                 }
@@ -311,5 +305,3 @@ pub fn ingest_extracted_relations(
 
     Ok(created_edges)
 }
-
-// !SECTION Entity Extraction Core Implementation

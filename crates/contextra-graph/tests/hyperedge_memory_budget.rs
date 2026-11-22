@@ -1,8 +1,3 @@
-//! Budgetierungs- und Speichergrenzentests für Hyperkanten.
-//!
-//! # Zweck
-//! Überprüft die Einhaltung konfigurierter RAM-Limits und das Auslösen von Speicherwarnungen.
-
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::EntityId;

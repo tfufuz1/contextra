@@ -1,34 +1,31 @@
-//! Central module for file and directory synchronization operations (SPEC §3.5, INV-FSYNC-1).
-//!
-//! Enforces synchronous durability via fsync on files and parent directories.
-//! Fsync errors are fatal, never silently retried, and trigger handle poisoning.
+//! Central module for file and directory synchronization operations.
 
-use crate::error::{StoreError, StoreResult as Result};
+use contextra_types::{ContextraError, Result};
 use std::path::Path;
 
 /// Performs fsync on a single file at `path`.
 ///
 /// # Errors
-/// Returns `StoreError::Storage` on Unix if opening or syncing fails.
-/// Returns `StoreError::Io` with `ErrorKind::Unsupported` on Windows (E20).
+/// Returns `ContextraError::Storage` on Unix if opening or syncing fails.
+/// Returns `ContextraError::Io` with `ErrorKind::Unsupported` on Windows (E20).
 pub async fn sync_file(path: &Path) -> Result<()> {
     #[cfg(not(windows))]
     {
         let file = crate::wal::fs::File::open(path).await.map_err(|e| {
-            StoreError::Storage(format!(
+            ContextraError::Storage(format!(
                 "File open failed for fsync on {}: {e}",
                 path.display()
             ))
         })?;
         file.sync_all().await.map_err(|e| {
-            StoreError::Storage(format!("File fsync failed for {}: {e}", path.display()))
+            ContextraError::Storage(format!("File fsync failed for {}: {e}", path.display()))
         })?;
         Ok(())
     }
     #[cfg(windows)]
     {
         let _ = path;
-        Err(StoreError::Io(std::io::Error::new(
+        Err(ContextraError::Io(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "Windows file sync is unsupported under E20",
         )))
@@ -41,8 +38,8 @@ pub async fn sync_file(path: &Path) -> Result<()> {
 /// directory entries are durably persisted to disk.
 ///
 /// # Errors
-/// Returns `StoreError::Storage` on Unix if opening or syncing fails.
-/// Returns `StoreError::Io` with `ErrorKind::Unsupported` on Windows (E20).
+/// Returns `ContextraError::Storage` on Unix if opening or syncing fails.
+/// Returns `ContextraError::Io` with `ErrorKind::Unsupported` on Windows (E20).
 pub async fn sync_parent_dir(path: &Path) -> Result<()> {
     #[cfg(not(windows))]
     {
@@ -54,14 +51,14 @@ pub async fn sync_parent_dir(path: &Path) -> Result<()> {
         };
 
         let dir = crate::wal::fs::File::open(dir_path).await.map_err(|e| {
-            StoreError::Storage(format!(
+            ContextraError::Storage(format!(
                 "Directory open failed for fsync on {}: {e}",
                 dir_path.display()
             ))
         })?;
 
         dir.sync_all().await.map_err(|e| {
-            StoreError::Storage(format!(
+            ContextraError::Storage(format!(
                 "Directory fsync failed for {}: {e}",
                 dir_path.display()
             ))
@@ -72,7 +69,7 @@ pub async fn sync_parent_dir(path: &Path) -> Result<()> {
     #[cfg(windows)]
     {
         let _ = path;
-        Err(StoreError::Io(std::io::Error::new(
+        Err(ContextraError::Io(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "Windows directory sync is unsupported under E20",
         )))
@@ -112,17 +109,17 @@ mod tests {
     async fn test_sync_file_and_parent_dir_windows() {
         let path = std::path::Path::new("C:\\fake\\path");
         let err = sync_parent_dir(path).await.unwrap_err();
-        if let StoreError::Io(io_err) = err {
+        if let ContextraError::Io(io_err) = err {
             assert_eq!(io_err.kind(), std::io::ErrorKind::Unsupported);
         } else {
-            panic!("Expected StoreError::Io with ErrorKind::Unsupported");
+            panic!("Expected ContextraError::Io with ErrorKind::Unsupported");
         }
 
         let err_file = sync_file(path).await.unwrap_err();
-        if let StoreError::Io(io_err) = err_file {
+        if let ContextraError::Io(io_err) = err_file {
             assert_eq!(io_err.kind(), std::io::ErrorKind::Unsupported);
         } else {
-            panic!("Expected StoreError::Io with ErrorKind::Unsupported");
+            panic!("Expected ContextraError::Io with ErrorKind::Unsupported");
         }
     }
 }

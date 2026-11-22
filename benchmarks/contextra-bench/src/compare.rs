@@ -1,3 +1,7 @@
+// FILE-CONTEXT
+// STAND: 2026-09-07
+// ZWECK: Baseline-Vergleichs-Engine für Retrieval-Benchmark-Metriken (LongMemEval & LoCoMo)
+// INVARIANTEN: Zero Panic, relative Schwellwert-Prüfung, transparente Fehler- & Info-Protokollierung.
 
 use serde::{Deserialize, Serialize};
 use std::fs;

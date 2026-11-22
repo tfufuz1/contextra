@@ -1,4 +1,3 @@
-// SECTION Lib Core Implementation
 #![deny(dead_code)]
 //! Contextra Graph — CSR-Graph for Entity-Relation Traversal & Session DAG.
 //!
@@ -24,8 +23,6 @@
 //!   `nodes` MUST be acquired before `edges` or `active_head` to prevent deadlocks. No locks are
 //!   held across `.await` storage calls.
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 // INVARIANT: CSR-Graph für 5-Signal Fusion (WP-6.1)
 
 #![forbid(unsafe_code)]
@@ -39,8 +36,6 @@ pub mod apprh;
 pub mod arc_slice;
 pub mod cascade;
 pub mod community;
-#[cfg(any(feature = "types-compat", feature = "ports-compat"))]
-pub mod compat;
 pub mod consistency_enforcement;
 pub mod csr;
 #[cfg(feature = "edge-reinforcement-learning")]
@@ -55,20 +50,10 @@ pub mod path_rag;
 #[cfg(feature = "graph-connectivity-health")]
 pub mod percolation;
 pub mod ppr;
-#[cfg(feature = "workspace")]
 pub mod ppr_stream;
 pub mod provenance;
-pub mod provider;
-pub mod purger;
-#[cfg(feature = "experimental-graph")]
 pub mod session_dag;
-#[cfg(any(test, feature = "test-support"))]
-pub mod test_doubles;
-pub mod types;
 pub mod tl_hfd;
-pub mod storage;
-pub mod graph_view;
-pub mod text_gen;
 
 #[cfg(feature = "apprh-diffusion")]
 pub use apprh::{
@@ -77,10 +62,11 @@ pub use apprh::{
     ApprhShadowComparison, DefaultApprhFlipGate,
 };
 pub use arc_slice::ArcSlice;
+#[allow(deprecated)]
 pub use cascade::{
     cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
     CascadeDeletionRecord, CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket,
-    GraphGarbageCollection, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
+    DeletionProof, GraphGarbageCollection, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
 };
 pub use community::{
     detect_communities, CommunityAssignment, CommunityDetectionConfig, StarExpansionIterator,
@@ -101,19 +87,16 @@ pub use edge_reinforcement_buffer::{CooccurrenceSignal, EdgeReinforcementBuffer,
 pub use entity_extraction::{
     ingest_extracted_relations, EntityExtractor, ExtractedRelation, RuleBasedEntityExtractor,
 };
-pub use error::GraphError as Error;
-pub use error::{GraphError, GraphMutationError, Result};
+pub use error::GraphMutationError;
 pub use hyperedge::{
     sort_dedup_entities, star_weight, ConsolidationNodesGuard, HyperEdge, HyperEdgeId,
     HyperEdgeView, RoleBinding, RoleId, RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
 };
 pub use hyperedge_suggest::{
-    compute_co_occurrence_candidates, HyperEdgeCandidate,
+    compute_co_occurrence_candidates, validate_candidates_with_llm, HyperEdgeCandidate,
     HyperedgeSuggestError, ValidatedHyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,
 };
-#[cfg(feature = "workspace")]
-pub use hyperedge_suggest::validate_candidates_with_llm;
-pub use path_rag::{GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
+pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
 #[cfg(feature = "k-path-diffusion")]
 pub use path_rag::{KPathConfig, KPathDiffusion, KPathResult};
 #[cfg(feature = "graph-connectivity-health")]
@@ -123,17 +106,9 @@ pub use percolation::{
 };
 #[cfg(feature = "apprh-diffusion")]
 pub use ppr::compute_ppr_with_apprh_selector;
-pub use ppr::{compute_ppr, compute_ppr_at, DeletedView, PprContext};
-#[cfg(feature = "workspace")]
+pub use ppr::{DeletedView, PprContext};
 pub use ppr_stream::{PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};
-#[cfg(any(feature = "types-compat", feature = "ports-compat"))]
-pub use provider::{
-    compute_pagerank, detect_communities_on_provider, GraphProvider, InMemoryGraphProvider,
-};
-#[cfg(feature = "ports-compat")]
-pub use purger::{graph_purger, GraphPurger};
-#[cfg(feature = "experimental-graph")]
 pub use session_dag::{
     AgentStateNode, DagEdge, NodeIdx, NodesGuard, NodesWriteGuard, SessionBranchTree,
 };
@@ -143,12 +118,12 @@ pub use tl_hfd::{
     MIN_SHADOW_SAMPLES,
 };
 
-#[cfg(feature = "workspace")]
-pub use compat::graph_index_ext::GraphIndexExt;
-
-// !SECTION Lib Core Implementation
-
-pub use storage::{GraphFuture, GraphStorage, InMemoryGraphStorage};
-pub use graph_view::GraphView;
-pub use text_gen::TextGenerator;
-pub use types::{EntityId, PprAlgorithm, PprConfig};
+/// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.
+pub trait GraphIndexExt: contextra_ports::GraphIndex {
+    /// Removes an entity node and all its incident (outgoing and incoming) edges from the graph.
+    fn remove_entity<'a>(
+        &'a self,
+        tx: contextra_types::TxId,
+        entity: EntityId,
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>>;
+}

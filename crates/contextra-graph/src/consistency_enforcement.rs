@@ -8,22 +8,16 @@
 //! Consistency-Enforcement-Modul: lernt wiederkehrende, als fehlerhaft erkannte
 //! Muster (z. B. widersprüchliche oder sich gegenseitig aufhebende Kanten/Fakten
 //! im Wissensgraphen) und meldet sie als Kandidaten für Unterdrückung/Review.
-//! Implementiert reines Pattern-Signal — keine automatische Kanteninvalidierung (siehe
+//! Implementiert reines Pattern-Signal — keine automatische Löschung (siehe
 //! Abgrenzung unten).
 //!
 //! WICHTIGER HINWEIS ZUR TRENNUNG VON ERKENNUNG UND WIRKUNG:
-//! Dieses Modul implementiert KEINE automatische Bereinigung von Kanten. `ConsistencyEnforcer` liefert
+//! Dieses Modul implementiert KEINE automatische Löschung von Kanten. `ConsistencyEnforcer` liefert
 //! lediglich Kandidaten/Signale. Die tatsächliche Tombstone-Ausführung bleibt in der
 //! Verantwortung des Aufrufers.
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-/// Opaker Zählertyp für DAG-Knoten (entkoppelt von session_dag).
-
-// SECTION Consistency Enforcement Core Implementation
-pub type NodeIdx = u64;
-
-use crate::types::{EntityId, TxId};
+use crate::session_dag::NodeIdx;
+use contextra_types::{EntityId, TxId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -456,5 +450,3 @@ mod tests {
         assert_eq!(deserialized.get_pattern(&hash), enforcer.get_pattern(&hash));
     }
 }
-
-// !SECTION Consistency Enforcement Core Implementation

@@ -1,9 +1,3 @@
-//! Benchmark für Traversierungsoperationen im Compressed Sparse Row (CSR) Graphen.
-//!
-//! # Zweck
-//! Evaluiert Latenzen und Speichereffizienz bei BFS-Nachbarschaftsabfragen (1-Hop, 2-Hop)
-//! und Pfadprüfungen auf synthetischen und dichten Graphen.
-
 use contextra_graph::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{DocId, Entity, EntityId, TxId};

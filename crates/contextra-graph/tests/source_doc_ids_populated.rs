@@ -1,9 +1,3 @@
-#![cfg(not(feature = "docid-128"))]
-//! Verifikationstest für die lückenlose Erfassung von Quell-Dokument-IDs bei Kanten.
-//!
-//! # Zweck
-//! Verhindert den Verlust von Provenienz-Informationen bei Kantenmodifikationen.
-
 use contextra_graph::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{DocId, Edge, Entity, EntityId, TxId};

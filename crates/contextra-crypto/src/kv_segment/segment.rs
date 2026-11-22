@@ -1,15 +1,11 @@
-//! # Segment-Repräsentation (`kv_segment/segment.rs`)
-//!
-//! Kapselt ein verschlüsseltes oder geschütztes Datensegment im Speicher.
-//!
-//! ## Invarianten
-//! - Implementiert `ZeroizeOnDrop`, um Puffer im Heap bei Freigabe sicher zu überschreiben.
-//! - `#![forbid(unsafe_code)]` wird strikt eingehalten.
+// FILE-CONTEXT
+// ZWECK: KvSegment mit Zeroize-Garantie (ZeroizeOnDrop, nie unverschlüsselt auf Disk).
+// STAND: TS:2026-09-08T00:00:00Z (SESSION: a413a598)
 
-
-use contextra_ids::TenantId;
+use contextra_types::TenantId;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+#[cfg(feature = "kv-encryption")]
 use crate::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
 
 /// Aktuelle Version der KV-Segment-Schlüsselableitung.
@@ -17,6 +13,7 @@ use crate::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
 pub const CURRENT_KV_KEY_DERIVATION_VERSION: u8 = 1;
 
 /// Encrypted layer representation stored inside a KvSegment when encryption is active.
+#[cfg(feature = "kv-encryption")]
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct EncryptedSegmentPayload {
     /// Encrypted KV layer container from contextra-crypto. Zeroized on drop.
@@ -35,11 +32,6 @@ pub struct EncryptedSegmentPayload {
 /// - `encrypted`: Kennzeichen, ob die Tensor-Bytes verschlüsselt vorliegen
 /// - `data`: Rohe Tensor-Bytes oder Ciphertext-Bytes. WIRD gezeroized beim Drop.
 #[derive(Zeroize, ZeroizeOnDrop)]
-/// Repräsentiert ein einzelnes Datensegment mit automatischer Speicherbereinigung.
-#[deprecated(
-    since = "0.1.0",
-    note = "KV-Segment Logik ist veraltet und wird nicht mehr verwendet."
-)]
 pub struct KvSegment {
     #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten
     pub tenant_id: TenantId,
@@ -53,11 +45,13 @@ pub struct KvSegment {
     #[zeroize(skip)]
     pub encrypted: bool,
     #[zeroize(skip)]
+    #[cfg(feature = "kv-encryption")]
     pub model_fingerprint: Option<ModelFingerprint>,
     #[zeroize(skip)]
     pub rope_offset: Option<usize>,
     /// Rohe Tensor-Bytes (Klartext oder Ciphertext). WIRD gezeroized beim Drop.
     data: Vec<u8>,
+    #[cfg(feature = "kv-encryption")]
     encrypted_payload: Option<EncryptedSegmentPayload>,
 }
 
@@ -69,9 +63,11 @@ impl KvSegment {
             segment_id,
             key_derivation_version: CURRENT_KV_KEY_DERIVATION_VERSION,
             encrypted: false,
+            #[cfg(feature = "kv-encryption")]
             model_fingerprint: None,
             rope_offset: None,
             data,
+            #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
         }
     }
@@ -81,7 +77,7 @@ impl KvSegment {
         tenant_id: TenantId,
         segment_id: u64,
         data: Vec<u8>,
-        model_fingerprint: Option<ModelFingerprint>,
+        #[cfg(feature = "kv-encryption")] model_fingerprint: Option<ModelFingerprint>,
         rope_offset: Option<usize>,
     ) -> Self {
         Self {
@@ -89,14 +85,17 @@ impl KvSegment {
             segment_id,
             key_derivation_version: CURRENT_KV_KEY_DERIVATION_VERSION,
             encrypted: false,
+            #[cfg(feature = "kv-encryption")]
             model_fingerprint,
             rope_offset,
             data,
+            #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
         }
     }
 
     /// Erstellt ein verschlüsseltes KV-Cache-Segment aus einem Klartext-Tensor.
+    #[cfg(feature = "kv-encryption")]
     pub fn new_encrypted(
         cipher: &KvSegmentCipher,
         tenant_id: TenantId,
@@ -130,6 +129,7 @@ impl KvSegment {
 
     /// Entschlüsselt die Daten des Segments, falls es verschlüsselt ist.
     /// Gibt bei Klartext-Segmenten direkt einen Klon der `data`-Bytes zurück.
+    #[cfg(feature = "kv-encryption")]
     pub fn decrypt_data(&self, cipher: &KvSegmentCipher) -> Result<Vec<u8>, crate::CryptoError> {
         if !self.encrypted {
             return Ok(self.data.clone());
@@ -162,6 +162,7 @@ impl KvSegment {
 
     /// Serialisiert das Segment bzw. dessen verschlüsselte Layer für Tier-2-LSM-Spill.
     pub fn to_spill_bytes(&self) -> Vec<u8> {
+        #[cfg(feature = "kv-encryption")]
         if let Some(payload) = &self.encrypted_payload {
             if let Ok(bytes) = bincode::serialize(&payload.layer) {
                 return bytes;
@@ -237,7 +238,10 @@ mod tests {
         let tenant = TenantId::try_new(42).unwrap();
         let data = vec![1, 2, 3, 4, 5];
 
+        #[cfg(feature = "kv-encryption")]
         let segment = KvSegment::new_with_metadata(tenant, 100, data, None, Some(128));
+        #[cfg(not(feature = "kv-encryption"))]
+        let segment = KvSegment::new_with_metadata(tenant, 100, data, Some(128));
 
         assert_eq!(segment.tenant_id, tenant);
         assert_eq!(segment.segment_id, 100);
@@ -267,6 +271,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_v0_legacy_backward_compatibility() {
         let km = crate::crypto::KeyManager::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
@@ -299,7 +304,8 @@ mod tests {
     }
 
     #[test]
-    fn test_kv_segment_encrypted_roundtrip() {
+    #[cfg(feature = "kv-encryption")]
+    fn test_kv_segment_shredding_revocation() {
         let km = crate::crypto::KeyManager::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
         let tenant = TenantId::try_new(101).unwrap();
@@ -312,9 +318,20 @@ mod tests {
         // Roundtrip MUST succeed
         let decrypted = segment.decrypt_data(&cipher).unwrap();
         assert_eq!(decrypted, plaintext);
+
+        // Revoke key in single consolidated KeyRegistry
+        let revoked = cipher.registry().revoke_subkey(segment.segment_id);
+        assert!(revoked, "Subkey revocation must succeed");
+
+        let res = segment.decrypt_data(&cipher);
+        assert!(
+            res.is_err(),
+            "Decryption of segment after KeyRegistry subkey revocation MUST fail"
+        );
     }
 
     #[test]
+    #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_unsupported_version_error() {
         let km = crate::crypto::KeyManager::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);

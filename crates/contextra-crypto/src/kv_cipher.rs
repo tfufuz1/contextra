@@ -1,14 +1,8 @@
-//! # KV-Segment-Verschlüsselung (`kv_cipher.rs`)
-//!
-//! Stellt die Authenticated Encryption with Associated Data (AEAD) für Key-Value-Segmente
-//! im Cache und Speicher bereit.
-//!
-//! ## Invarianten
-//! - Tenant- und Model-Fingerprints fließen als Associated Data (AD) ein, um
-//!   mandantenübergreifende Vertauschungsangriffe zu verhindern.
-//! - Format-Versionierungs-Header sichert Abwärtskompatibilität ab.
-//! - Nonce-Generierung schließt Kollisionen aus.
-
+// FILE-CONTEXT
+// ZWECK: Dedicated AEAD encryption and key isolation for KV-cache segments (contextra-crypto).
+// INVARIANTEN: Key derivation per (tenant_id, model_fingerprint) tuple via KeyManager HKDF-Expand.
+// NICHT-OFFENSICHTLICH: OsRng generates fresh 12-byte nonces per encrypt call. AES-256-GCM-SIV provides misuse-resistance.
+// STAND: TS:2026-09-08T00:00:00Z
 
 //! KV-Cache Segment Encryption Module (contextra-crypto).
 //!
@@ -16,7 +10,7 @@
 //! - **Schritt 1 (Dieses Modul):** Erstellung des eigenständigen Krypto-Moduls `KvSegmentCipher`
 //!   mit kryptographischer Tenant-Isolation und Modell-Versionierungs-Trennung in `contextra-crypto`.
 //! - **Schritt 2:** Verdrahtung von `KvSegmentCipher` und `EncryptedKvLayer`
-//!   zur Erweiterung der `KvSegment`-Struktur.
+//!   in `contextra-kvcache` und `contextra-infer-candle` (kv_bridge) zur Erweiterung der `KvSegment`-Struktur.
 //!
 //! # Nonce-Sicherheit & Nonce-Misuse-Resistance (RFC 8452)
 //! Das Modul verwendet AES-256-GCM-SIV mit per-call `OsRng` generierten 12-Byte-Nonces.
@@ -29,35 +23,11 @@
 
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
-use contextra_ids::TenantId;
+use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-/// Uniquely identifies a model weight file and its quantization tier.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ModelFingerprint {
-    /// SHA-256 hash digest over model weight blob and quantization tier string.
-    pub hash: [u8; 32],
-    /// Model identifier or filename (e.g. "llama-3.2-3b-instruct").
-    pub model_id: String,
-    /// String representation of quantization tier (e.g. "Q4_K_M", "Q8_0", "F16").
-    pub quantization: String,
-}
-
-impl ModelFingerprint {
-    /// Creates a new `ModelFingerprint`.
-    pub fn new(
-        hash: [u8; 32],
-        model_id: impl Into<String>,
-        quantization: impl Into<String>,
-    ) -> Self {
-        Self {
-            hash,
-            model_id: model_id.into(),
-            quantization: quantization.into(),
-        }
-    }
-}
+pub use contextra_types::ModelFingerprint;
 
 /// Current serialized format version for [`EncryptedKvLayer`].
 /// Increment when the serialized layout changes in a breaking way.
@@ -88,42 +58,61 @@ pub struct EncryptedKvLayer {
 /// Abstract cipher trait for KV block encryption and seal/open operations.
 pub trait KvCipher: Send + Sync {
     /// Encrypts (seals) plaintext byte payload into authenticated ciphertext bytes.
-    fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>>;
+    fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>>;
     /// Decrypts (opens) authenticated ciphertext bytes back to plaintext byte payload.
-    fn open(&self, ciphertext: &[u8]) -> Result<Vec<u8>>;
+    fn open(&self, ciphertext: &[u8]) -> contextra_types::Result<Vec<u8>>;
 }
 
 impl KvCipher for KeyManager {
-    fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
-        let (ct, nonce) = self.encrypt_auto_nonce(plaintext)?;
+    fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>> {
+        let (ct, nonce) = self
+            .encrypt_auto_nonce(plaintext)
+            .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))?;
         let mut out = Vec::with_capacity(12 + ct.len());
         out.extend_from_slice(&nonce);
         out.extend_from_slice(&ct);
         Ok(out)
     }
 
-    fn open(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        let (nonce_bytes, ct) = ciphertext
-            .split_at_checked(12)
-            .ok_or_else(|| CryptoError::Crypto("Ciphertext too short for nonce payload".into()))?;
-        let nonce: &[u8; 12] = nonce_bytes
-            .try_into()
-            .map_err(|e: std::array::TryFromSliceError| CryptoError::InvalidInput(e.to_string()))?;
+    fn open(&self, ciphertext: &[u8]) -> contextra_types::Result<Vec<u8>> {
+        if ciphertext.len() < 12 {
+            return Err(contextra_types::ContextraError::Crypto(
+                "Ciphertext too short for nonce payload".into(),
+            ));
+        }
+        let nonce: &[u8; 12] =
+            ciphertext[..12]
+                .try_into()
+                .map_err(|e: std::array::TryFromSliceError| {
+                    contextra_types::ContextraError::ParseError(e.to_string())
+                })?;
+        let ct = &ciphertext[12..];
         self.decrypt_auto_nonce(ct, nonce)
+            .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))
     }
 }
 
+use crate::kv_shredding::KeyRegistry;
+
 /// High-level cipher engine for KV-cache segment encryption and decryption.
 /// Consolidates onto `KeyRegistry` envelope crypto-shredding as the single shredding path.
-/// Chiffre für segmentweise verschlüsselte KV-Einträge.
 pub struct KvSegmentCipher {
     key_manager: KeyManager,
+    registry: KeyRegistry,
 }
 
 impl KvSegmentCipher {
     /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager`.
     pub fn new(key_manager: KeyManager) -> Self {
-        Self { key_manager }
+        Self {
+            key_manager,
+            registry: KeyRegistry::new(),
+        }
+    }
+
+    /// Returns a reference to the consolidated `KeyRegistry` for crypto-shredding key management.
+    pub fn registry(&self) -> &KeyRegistry {
+        &self.registry
     }
 
     /// Encrypts KV-cache plaintext payload for a given `(tenant_id, model_fingerprint)` pair.
@@ -170,35 +159,53 @@ impl KvSegmentCipher {
         sub_km.decrypt_auto_nonce(&encrypted.ciphertext, &encrypted.nonce)
     }
 
-    /// Encrypts KV-cache plaintext payload for a given tenant, segment, and model fingerprint.
+    /// Encrypts KV-cache plaintext payload using consolidated `KeyRegistry` envelope crypto-shredding.
     pub fn encrypt_with_version(
         &self,
         tenant_id: TenantId,
-        _segment_id: u64,
+        segment_id: u64,
         _version: u8,
         model_fingerprint: ModelFingerprint,
         plaintext: &[u8],
     ) -> Result<EncryptedKvLayer> {
-        self.encrypt(tenant_id, model_fingerprint, plaintext)
+        let (ciphertext, nonce) =
+            self.registry
+                .encrypt_with_group(&self.key_manager, segment_id, plaintext)?;
+
+        Ok(EncryptedKvLayer {
+            format_version: CURRENT_KV_FORMAT_VERSION,
+            ciphertext,
+            nonce,
+            tenant_id,
+            model_fingerprint,
+        })
     }
 
-    /// Decrypts an `EncryptedKvLayer` for a given segment and version.
+    /// Decrypts an `EncryptedKvLayer` using consolidated `KeyRegistry` envelope crypto-shredding.
     pub fn decrypt_with_version(
         &self,
         encrypted: &EncryptedKvLayer,
-        _segment_id: u64,
+        segment_id: u64,
         _version: u8,
     ) -> Result<Vec<u8>> {
-        self.decrypt(encrypted)
+        if encrypted.format_version != CURRENT_KV_FORMAT_VERSION {
+            return Err(CryptoError::KvFormatVersionMismatch {
+                expected: CURRENT_KV_FORMAT_VERSION,
+                found: encrypted.format_version,
+            });
+        }
+
+        self.registry
+            .decrypt_with_group(segment_id, &encrypted.ciphertext, &encrypted.nonce)
     }
 }
 
 impl KvCipher for KvSegmentCipher {
-    fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
+    fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>> {
         self.key_manager.seal(plaintext)
     }
 
-    fn open(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
+    fn open(&self, ciphertext: &[u8]) -> contextra_types::Result<Vec<u8>> {
         self.key_manager.open(ciphertext)
     }
 }
@@ -206,7 +213,6 @@ impl KvCipher for KvSegmentCipher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CryptoError;
 
     fn dummy_fingerprint(id: &str) -> ModelFingerprint {
         ModelFingerprint::new([0x42u8; 32], id, "Q4_K_M")
@@ -340,6 +346,41 @@ mod tests {
                 }
             ),
             "Expected KvFormatVersionMismatch, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_single_shredding_path_consolidation_and_revocation() {
+        // PROOF OF CONSOLIDATION: KvSegmentCipher routes segment encryption through
+        // KeyRegistry envelope crypto-shredding (the single consolidated shredding path).
+        let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
+        let cipher = KvSegmentCipher::new(master_km);
+        let tenant_id = TenantId::try_new(101).unwrap();
+        let fp = dummy_fingerprint("model-v1");
+        let segment_id = 42;
+        let plaintext = b"Segment tensor data payload";
+
+        let encrypted = cipher
+            .encrypt_with_version(tenant_id, segment_id, 1, fp.clone(), plaintext)
+            .unwrap();
+
+        let decrypted = cipher
+            .decrypt_with_version(&encrypted, segment_id, 1)
+            .unwrap();
+        assert_eq!(decrypted, plaintext);
+
+        // Revoke sub-key in the consolidated KeyRegistry
+        let revoked = cipher
+            .registry()
+            .revoke_subkey(segment_id)
+            .expect("revoke_subkey");
+        assert!(revoked, "Sub-key revocation in KeyRegistry must succeed");
+
+        // Decryption now fails because the single shredding path has been revoked
+        let res = cipher.decrypt_with_version(&encrypted, segment_id, 1);
+        assert!(
+            res.is_err(),
+            "Decryption of segment after KeyRegistry revocation MUST fail"
         );
     }
 }

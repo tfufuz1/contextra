@@ -1,6 +1,8 @@
-// =========================================================================
-// SECTION: contextra-mcp-server
-// =========================================================================
+// FILE-CONTEXT
+// STAND:       2026-09-10T19:25:24Z (SESSION: ae8c2fb9)
+// ZWECK:       Binary Entry Point for Contextra MCP Stdio JSON-RPC Server
+// INVARIANTEN: Logs exclusively to stderr; stdout strictly reserved for JSON-RPC transport
+// HOTSPOTS:    main()
 // SIEHE AUCH:  ADR-010, crates/contextra-mcp/src/lib.rs
 
 use contextra::Contextra;
@@ -53,8 +55,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         contextra_mcp::is_write_allowed_by_env()
     };
 
-    // Router-Profiles-Konfiguration laden.
-    let router_config = RouterConfig::from_env();
+    let mut router_config = RouterConfig::from_env();
+    if let Some(i) = args.iter().position(|a| a == "--router-profiles-path") {
+        if let Some(val) = args.get(i + 1) {
+            let path = std::path::PathBuf::from(val);
+            if let Ok(bytes) = std::fs::read(&path) {
+                if let Ok(loaded) =
+                    serde_json::from_slice::<Vec<contextra_router::SlmProfile>>(&bytes)
+                {
+                    router_config.profiles = loaded;
+                }
+            }
+            router_config.profiles_path = Some(path);
+        }
+    }
 
     let db = Arc::new(Contextra::open(&db_path).await?);
     let routing = setup_routing(&db, &router_config).await?;
@@ -72,5 +86,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     server.run_stdio().await?;
     Ok(())
 }
-
-// !SECTION: contextra-mcp-server

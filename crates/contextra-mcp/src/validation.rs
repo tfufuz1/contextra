@@ -1,6 +1,3 @@
-// =========================================================================
-// SECTION: validation
-// =========================================================================
 use crate::protocol::McpError;
 
 /// Checks whether database write access is explicitly enabled via environment variable `CONTEXTRA_MCP_ALLOW_WRITE`.
@@ -30,5 +27,3 @@ pub fn validate_collection_name(name: &str) -> Result<(), McpError> {
     }
     Ok(())
 }
-
-// !SECTION: validation

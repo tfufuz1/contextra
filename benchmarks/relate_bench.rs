@@ -1,3 +1,4 @@
+// ANCHOR[PERF:BENCH-RELATE] STATUS:DONE (TS:2026-09-17T00:00:00Z) — Collection::relate() Benchmark
 // ZIEL: Criterion-basierte Messung von relate() Latenz und Durchsatz für AK-8 Regressionsnachweis
 
 use contextra_db::Contextra;

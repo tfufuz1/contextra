@@ -1,18 +1,8 @@
-#![cfg(feature = "workspace")]
-//! Golden-Master-Tests mit deterministischen Referenzergebnissen für PPR.
-//!
-//! # Zweck
-//! Erkennt schleichende numerische Drift oder Regressionen in Diffusionswerten.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use crate::csr::{CsrGraph, GraphInner};
 use crate::ppr::{compute_ppr, DeletedView};
 use contextra_types::{Entity, EntityId, PprConfig};
 use std::sync::Arc;
 
-
-// SECTION Golden Tests Core Implementation
 fn create_entity(id: u64) -> Entity {
     Entity::new(EntityId::new(id), "label", "type")
 }
@@ -353,5 +343,3 @@ async fn test_ppr_edge_cases_handling() {
     let ppr_empty = compute_ppr(&empty_inner, &[EntityId::new(1)], &config, &view);
     assert!(ppr_empty.is_empty());
 }
-
-// !SECTION Golden Tests Core Implementation

@@ -1,7 +1,4 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// =========================================================================
-// SECTION: campaign_j42_mcp_audit
-// =========================================================================
 
 use contextra::collection_profile::DeploymentTier;
 use contextra_crypto::AuditChain;
@@ -83,5 +80,3 @@ fn test_audit_chains_structural_isolation() {
         "Audit chains must remain separate, unlinked types across Ring 0 and Ring 3"
     );
 }
-
-// !SECTION: campaign_j42_mcp_audit

@@ -1,21 +1,17 @@
+// FILE-CONTEXT
+// STAND:       2026-09-10T19:25:24Z (SESSION: ae8c2fb9)
+// ZWECK:       MCP JSON-RPC 2.0 Protokoll-Typen & DTO-Abbildung für Contextra
+// INVARIANTEN: DTO-Konvertierung aus ContextraError muss saubere JSON-RPC 2.0 Codes und Error-Data tragen
+// HOTSPOTS:    McpError::from(ContextraError), JsonRpcResponse::from_error
+// SIEHE AUCH:  ADR-010, contextra-core/src/error_dto.rs
+
 //! MCP JSON-RPC 2.0 Protokoll-Typen (Model Context Protocol Spec v2024-11-05)
-//!
-//! Begrenzte und gehärtete Protokollstrukturen für JSON-RPC 2.0.
-// =========================================================================
-// SECTION: protocol
-// =========================================================================
 
 use serde_json::Value;
 use thiserror::Error;
 
-/// Maximale Rekursionstiefe für eingehende JSON-RPC Payloads (Schutz gegen Stack-Overflow).
-pub const MAX_JSON_DEPTH: usize = 32;
-
-/// Maximale Anzahl von Elementen in einem JSON-RPC Batch-Request (Schutz gegen Batch-DoS).
-pub const MAX_BATCH_SIZE: usize = 100;
-
 /// MCP Error representation matching standard JSON-RPC 2.0 error codes.
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Error)]
 pub enum McpError {
     #[error("{0}")]
     ParseError(String),
@@ -83,126 +79,9 @@ impl From<&str> for McpError {
     }
 }
 
-/// JSON-RPC 2.0 Error Object.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct JsonRpcError {
-    pub code: i32,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<serde_json::Value>,
-}
-
-/// JSON-RPC 2.0 Request Object.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct JsonRpcRequest {
-    pub jsonrpc: String,
-    pub method: String,
-    #[serde(default)]
-    pub params: serde_json::Value,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<serde_json::Value>,
-}
-
-/// JSON-RPC 2.0 Response Object.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct JsonRpcResponse {
-    pub jsonrpc: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<JsonRpcError>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<serde_json::Value>,
-}
-
-impl JsonRpcResponse {
-    pub fn ok(id: Option<serde_json::Value>, result: serde_json::Value) -> Self {
-        Self {
-            jsonrpc: "2.0".to_string(),
-            result: Some(result),
-            error: None,
-            id,
-        }
-    }
-
-    pub fn err(id: Option<serde_json::Value>, code: i32, message: impl Into<String>) -> Self {
-        Self {
-            jsonrpc: "2.0".to_string(),
-            result: None,
-            error: Some(JsonRpcError {
-                code,
-                message: message.into(),
-                data: None,
-            }),
-            id,
-        }
-    }
-}
-
-/// Ermittelt die Schachtelungstiefe eines JSON-Value.
-pub fn measure_json_depth(val: &Value) -> usize {
-    fn depth_recursive(val: &Value, current_depth: usize) -> usize {
-        match val {
-            Value::Array(arr) => {
-                let mut max_d = current_depth;
-                for item in arr {
-                    max_d = max_d.max(depth_recursive(item, current_depth.saturating_add(1)));
-                }
-                max_d
-            }
-            Value::Object(map) => {
-                let mut max_d = current_depth;
-                for item in map.values() {
-                    max_d = max_d.max(depth_recursive(item, current_depth.saturating_add(1)));
-                }
-                max_d
-            }
-            _ => current_depth,
-        }
-    }
-    depth_recursive(val, 1)
-}
-
-/// Validiert, dass ein JSON-Value die maximale Tiefe nicht überschreitet.
-pub fn validate_json_depth(val: &Value, max_depth: usize) -> Result<(), McpError> {
-    if measure_json_depth(val) > max_depth {
-        Err(McpError::invalid_request(format!(
-            "JSON depth exceeds maximum allowed limit of {max_depth}"
-        )))
-    } else {
-        Ok(())
-    }
-}
+pub use contextra_wire::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 
 /// Helper function to convert an `McpError` directly into a `JsonRpcResponse`.
 pub fn response_from_error(id: Option<Value>, err: McpError) -> JsonRpcResponse {
     JsonRpcResponse::err(id, err.code(), err.to_string())
 }
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_measure_json_depth() {
-        let v1 = json!(1);
-        assert_eq!(measure_json_depth(&v1), 1);
-
-        let v2 = json!({"a": 1});
-        assert_eq!(measure_json_depth(&v2), 2);
-
-        let v3 = json!({"a": [1, 2, {"b": 3}]});
-        assert_eq!(measure_json_depth(&v3), 4);
-    }
-
-    #[test]
-    fn test_validate_json_depth() {
-        let val = json!({"a": {"b": {"c": 1}}});
-        assert!(validate_json_depth(&val, 4).is_ok());
-        assert!(validate_json_depth(&val, 3).is_err());
-    }
-}
-
-// !SECTION: protocol

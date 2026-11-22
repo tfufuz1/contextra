@@ -1,16 +1,9 @@
-//! # WAL Replay & Wiederherstellung (Ring 1)
-//!
-//! Rekonstruiert den Zustand der MemTable beim Hochfahren des Stores aus dem WAL.
-//!
-//! ## Invarianten
-//! - **INV-WAL-REPLAY-1:** Idempotentes Streaming-Replay: Zweimaliges Abspielen erzeugt identischen Zustand.
-//! - **INV-WAL-REPLAY-2:** Fail-Closed bei Mittel-Beschädigung: Beschädigungen in der Mitte des WAL lösen hard `StoreError::Corrupt` aus.
-//! - **INV-WAL-REPLAY-3:** Clean Torn Write Tail Cutoff: Unvollständige Schreibabbrüche am Dateiende werden deterministisch abgeschnitten.
-
+#[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
-use crate::error::{StoreError, StoreResult as Result};
+use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
+#[cfg(feature = "wal-integrity")]
 use super::{legacy_integrity_key, WalOp};
 use super::{
     Wal, WalEntry, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
@@ -33,10 +26,10 @@ impl Wal {
         chunk_start_pos: u64,
         pos: u64,
         file_size: u64,
-    ) -> Option<StoreError> {
+    ) -> Option<ContextraError> {
         match e {
             WalParseError::CrcMismatch { stored, computed } => {
-                Some(StoreError::wal_corruption(
+                Some(ContextraError::wal_corruption(
                     chunk_start_pos,
                     format!(
                         "CRC validation failed: stored={:#010x}, computed={:#010x}",
@@ -53,7 +46,7 @@ impl Wal {
                     );
                     None
                 } else {
-                    Some(StoreError::wal_corruption(
+                    Some(ContextraError::wal_corruption(
                         chunk_start_pos,
                         format!("Deserialization failed: {}", e),
                     ))
@@ -81,7 +74,7 @@ impl Wal {
     pub async fn replay_stream(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
         let metadata = crate::wal::fs::metadata(&self.path)
             .await
-            .map_err(|e| StoreError::Storage(e.to_string()))?;
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
         let mut entries = Vec::new();
         let version = self
             .scan_entries_with_callback(metadata.len(), |seq, entry, pos| {
@@ -150,10 +143,10 @@ impl Wal {
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let std_file = std::fs::File::open(&self.path)
-            .map_err(|e| StoreError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
+            .map_err(|e| ContextraError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
         let metadata = std_file
             .metadata()
-            .map_err(|e| StoreError::Storage(format!("Failed to stat WAL for mmap: {e}")))?;
+            .map_err(|e| ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}")))?;
         let file_size = metadata.len();
 
         if file_size == 0 {
@@ -161,7 +154,7 @@ impl Wal {
         }
 
         let mmap = contextra_sys::mmap_readonly(&std_file)
-            .map_err(|e| StoreError::Storage(format!("WAL mmap failed: {e}")))?;
+            .map_err(|e| ContextraError::Storage(format!("WAL mmap failed: {e}")))?;
 
         self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
     }
@@ -185,7 +178,7 @@ impl Wal {
         let slice_len = (file_size as usize).min(mmap.len());
         let slice = mmap
             .get(..slice_len)
-            .ok_or_else(|| StoreError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
+            .ok_or_else(|| ContextraError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
         let mut entries = Vec::new();
         let version = self.scan_entries_from_slice(slice, file_size, |seq, entry, pos| {
             sink.on_entry_replayed(seq, None);
@@ -210,10 +203,10 @@ impl Wal {
         #[allow(clippy::type_complexity)]
         let mmap_res = (|| -> Result<(WalVersion, Vec<(u64, WalEntry, u64)>)> {
             let std_file = std::fs::File::open(&self.path).map_err(|e| {
-                StoreError::Storage(format!("Failed to open WAL file for mmap: {e}"))
+                ContextraError::Storage(format!("Failed to open WAL file for mmap: {e}"))
             })?;
             let mmap = contextra_sys::mmap_readonly(&std_file).map_err(|e| {
-                StoreError::Storage(format!(
+                ContextraError::Storage(format!(
                     "Failed to mmap WAL file {}: {e}",
                     self.path.display()
                 ))
@@ -222,7 +215,7 @@ impl Wal {
             let slice_len = (file_size as usize).min(mmap.len());
             let slice = mmap
                 .get(..slice_len)
-                .ok_or_else(|| StoreError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
+                .ok_or_else(|| ContextraError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
             let mut buffered_entries = Vec::new();
             let version = self.scan_entries_from_slice(slice, file_size, |seq, entry, pos| {
                 buffered_entries.push((seq, entry, pos));
@@ -250,6 +243,7 @@ impl Wal {
         }
     }
 
+    #[cfg(feature = "wal-integrity")]
     #[allow(deprecated)]
     fn verify_entry_snapshot(
         &self,
@@ -331,9 +325,11 @@ impl Wal {
             return Ok(version);
         }
 
+        #[cfg(feature = "wal-integrity")]
         let integrity_key = self.get_integrity_key()?;
+        #[cfg(feature = "wal-integrity")]
         let mut verifier = IntegrityVerifier::new(&integrity_key);
-        let mut using_legacy_key = false;
+        let mut _using_legacy_key = false;
 
         // Detect version from header
         if file_size >= 4 && slice_len >= 4 {
@@ -376,7 +372,7 @@ impl Wal {
             let len_bytes: [u8; 4] = match len_bytes_slice.try_into() {
                 Ok(b) => b,
                 Err(_) => {
-                    return Err(StoreError::wal_corruption(
+                    return Err(ContextraError::wal_corruption(
                         pos,
                         "Failed to parse WAL entry length header",
                     ));
@@ -387,7 +383,7 @@ impl Wal {
             if len > MAX_WAL_ENTRY_SIZE as usize {
                 if pos + 4 + len as u64 > file_size {
                     if entries_count == 0 && file_size > 64 {
-                        return Err(StoreError::wal_corruption(
+                        return Err(ContextraError::wal_corruption(
                             pos,
                             format!(
                                 "WAL entry length ({}) exceeds hard limit and file size",
@@ -398,7 +394,7 @@ impl Wal {
                     tracing::warn!("WAL tail corruption (huge len) at offset {}", pos);
                     break;
                 }
-                return Err(StoreError::wal_corruption(
+                return Err(ContextraError::wal_corruption(
                     pos,
                     format!("WAL entry too large ({} bytes)", len),
                 ));
@@ -406,7 +402,7 @@ impl Wal {
 
             if pos + 4 + len as u64 > file_size || (pos + 4 + len as u64) as usize > slice.len() {
                 if entries_count == 0 && file_size > 64 {
-                    return Err(StoreError::wal_corruption(
+                    return Err(ContextraError::wal_corruption(
                         pos,
                         format!(
                             "WAL entry length ({}) exceeds file size ({}) at start of file",
@@ -431,13 +427,14 @@ impl Wal {
             let chunk_start_pos = pos;
             pos += (4 + len) as u64;
 
+            #[cfg(feature = "wal-integrity")]
             {
                 if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some()
                 {
                     let km = match self.key_manager.as_ref() {
                         Some(km) => km,
                         None => {
-                            return Err(StoreError::Storage("Key manager missing".into()));
+                            return Err(ContextraError::Storage("Key manager missing".into()));
                         }
                     };
                     if entry_data_raw.len() < 12 {
@@ -448,7 +445,7 @@ impl Wal {
                             );
                             break;
                         }
-                        return Err(StoreError::Storage(
+                        return Err(ContextraError::Storage(
                             "WAL entry too short for nonce".into(),
                         ));
                     }
@@ -456,7 +453,7 @@ impl Wal {
                     let nonce_slice = match entry_data_raw.get(0..12) {
                         Some(s) => s,
                         None => {
-                            return Err(StoreError::wal_corruption(
+                            return Err(ContextraError::wal_corruption(
                                 chunk_start_pos,
                                 "Failed to read entry nonce",
                             ));
@@ -464,7 +461,7 @@ impl Wal {
                     };
                     nonce.copy_from_slice(nonce_slice);
                     let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
-                        StoreError::wal_corruption(
+                        ContextraError::wal_corruption(
                             chunk_start_pos,
                             "WAL entry missing ciphertext",
                         )
@@ -481,7 +478,7 @@ impl Wal {
                                 );
                                 break;
                             }
-                            return Err(StoreError::wal_corruption(
+                            return Err(ContextraError::wal_corruption(
                                 chunk_start_pos,
                                 format!("Decryption failed: {}", e),
                             ));
@@ -491,7 +488,7 @@ impl Wal {
                     let mut inner_slice = decrypted_data.as_slice();
                     while !inner_slice.is_empty() {
                         if inner_slice.len() < 4 {
-                            return Err(StoreError::wal_corruption(
+                            return Err(ContextraError::wal_corruption(
                                 chunk_start_pos,
                                 "Incomplete inner framing in decrypted batch",
                             ));
@@ -500,7 +497,7 @@ impl Wal {
                             match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
                                 Some(b) => b,
                                 None => {
-                                    return Err(StoreError::wal_corruption(
+                                    return Err(ContextraError::wal_corruption(
                                         chunk_start_pos,
                                         "Failed to extract inner WAL entry length",
                                     ));
@@ -508,7 +505,7 @@ impl Wal {
                             };
                         let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
                         if inner_slice.len() < 4 + inner_len {
-                            return Err(StoreError::wal_corruption(
+                            return Err(ContextraError::wal_corruption(
                                 chunk_start_pos,
                                 "Truncated inner WAL entry payload in decrypted batch",
                             ));
@@ -516,7 +513,7 @@ impl Wal {
                         let inner_entry_bytes = match inner_slice.get(4..4 + inner_len) {
                             Some(b) => b,
                             None => {
-                                return Err(StoreError::wal_corruption(
+                                return Err(ContextraError::wal_corruption(
                                     chunk_start_pos,
                                     "Truncated inner WAL entry payload in decrypted batch",
                                 ));
@@ -528,7 +525,7 @@ impl Wal {
                             Ok(e) => e,
                             Err(parse_err) => {
                                 // Policy: Authenticated data is never a tail!
-                                return Err(StoreError::wal_corruption(
+                                return Err(ContextraError::wal_corruption(
                                     chunk_start_pos,
                                     format!("Deserialization failed in authenticated batch: {parse_err}"),
                                 ));
@@ -571,7 +568,7 @@ impl Wal {
                     let decrypted_data;
                     let entry_data = if let Some(km) = &self.key_manager {
                         if entry_data_raw.len() < 12 {
-                            return Err(StoreError::Storage(
+                            return Err(ContextraError::Storage(
                                 "WAL entry too short for nonce".into(),
                             ));
                         }
@@ -579,14 +576,14 @@ impl Wal {
                         let nonce_slice = match entry_data_raw.get(0..12) {
                             Some(s) => s,
                             None => {
-                                return Err(StoreError::Storage(
+                                return Err(ContextraError::Storage(
                                     "WAL entry too short for nonce".into(),
                                 ));
                             }
                         };
                         nonce.copy_from_slice(nonce_slice);
                         let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
-                            StoreError::wal_corruption(
+                            ContextraError::wal_corruption(
                                 chunk_start_pos,
                                 "WAL entry missing ciphertext",
                             )
@@ -595,7 +592,7 @@ impl Wal {
                             Ok(data) => data,
                             Err(e) => {
                                 if version == WalVersion::V1 {
-                                    return Err(StoreError::Storage(format!(
+                                    return Err(ContextraError::Storage(format!(
                                         "WAL entry at {} claims V1/plaintext format while KeyManager is active for {} \
                                          (decryption failed: {}) — refusing potential downgrade attack. \
                                          Set allow_legacy_integrity_key_fallback / min_wal_version appropriately if \
@@ -613,7 +610,7 @@ impl Wal {
                                         );
                                         break;
                                     }
-                                    return Err(StoreError::wal_corruption(
+                                    return Err(ContextraError::wal_corruption(
                                         chunk_start_pos,
                                         format!("Decryption failed: {}", e),
                                     ));
@@ -629,7 +626,7 @@ impl Wal {
                         Ok(e) => e,
                         Err(parse_err) => {
                             if self.key_manager.is_some() && version != WalVersion::V1 {
-                                return Err(StoreError::wal_corruption(
+                                return Err(ContextraError::wal_corruption(
                                     chunk_start_pos,
                                     format!("Deserialization failed in authenticated entry: {parse_err}"),
                                 ));
@@ -677,6 +674,30 @@ impl Wal {
                     }
                 }
             }
+
+            #[cfg(not(feature = "wal-integrity"))]
+            {
+                let entry = match WalEntry::from_bytes_classified(entry_data_raw) {
+                    Ok(e) => e,
+                    Err(parse_err) => {
+                        if let Some(err) = Self::handle_wal_entry_parse_error(
+                            parse_err,
+                            chunk_start_pos,
+                            pos,
+                            file_size,
+                        ) {
+                            return Err(err);
+                        }
+                        break;
+                    }
+                };
+
+                entries_count += 1;
+                let seq = entry.seq_no;
+                if !callback(seq, entry, pos) {
+                    break 'scan_loop;
+                }
+            }
         }
 
         Ok(version)
@@ -708,7 +729,7 @@ pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> R
                     crate::wal::fs::copy(&bak_path, wal_path)
                         .await
                         .map_err(|e| {
-                            StoreError::Storage(format!("WAL backup recovery copy failed: {e}"))
+                            ContextraError::Storage(format!("WAL backup recovery copy failed: {e}"))
                         })?;
                     let _ = crate::wal::fs::remove_file(&bak_path).await;
                 }
@@ -719,7 +740,7 @@ pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> R
                 .await
             {
                 f.sync_all().await.map_err(|e| {
-                    StoreError::Storage(format!("WAL recovery sync_all failed: {e}"))
+                    ContextraError::Storage(format!("WAL recovery sync_all failed: {e}"))
                 })?;
             }
             return Ok(true);

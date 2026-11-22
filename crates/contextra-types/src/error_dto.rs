@@ -1,17 +1,11 @@
-#![allow(deprecated)]
-//! Serialisierbare DTO-Repräsentation von `ContextraError` für IPC- und FFI-Schnittstellen (ADR-028).
-//!
-//! # Zweck & Architektur-Rolle: Typen-Fundament (contracts)
-//!
-//! Bei der Übertragung von Fehlern über FFI-Grenzen (z. B. zu externen Clients oder
-//! Tauri/Web-Frontends via IPC) gehen bei einfachen String-Repräsentationen die Typinformationen
-//! und strukturierte Felder verloren.
-//!
-//! Dieses Modul stellt mit `ContextraErrorDto` ein Data-Transfer-Object bereit, das:
-//! - Den Fehlertyp (`kind`) als stabilen String erhält,
-//! - Die menschenlesbare Fehlermeldung (`message`) transportiert,
-//! - Spezifische Strukturdaten (`details`, z. B. Byte-Offsets oder Block-IDs) als JSON-Objekt abbildet.
+//! Serializable DTO representation of `ContextraError` for IPC and FFI boundaries (ADR-028).
 
+// FILE-CONTEXT
+// STAND: 2026-08-30T21:51:46Z (SESSION: a43b7682)
+// ZWECK: Serialisierbares Error-DTO für IPC/FFI-Schichten ohne Typverlust (ADR-028).
+// INVARIANTEN: Behält error kind, message und strukturierte JSON details verlustfrei über FFI.
+// HOTSPOTS: 20-80
+// NICHT-OFFENSICHTLICH: DTO erlaubt die Rekonstruktion strukturierter Fehler in FFI/Bindings und Python.
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-028)
 
 use crate::error::ContextraError;
@@ -89,10 +83,6 @@ impl From<&str> for ContextraErrorDto {
     }
 }
 
-// Ablauf der Konvertierung von &ContextraError in ContextraErrorDto:
-// 1. Jede Variante von ContextraError wird exakt gematcht.
-// 2. Einfache Fehlervarianten belegen kind und message.
-// 3. Strukturierte Fehlervarianten extrahieren Attribute in ein JSON-Objekt unter details.
 impl From<&ContextraError> for ContextraErrorDto {
     fn from(err: &ContextraError) -> Self {
         // NOTE: Strictly no catch-all `_ => ...` wildcard arm in this match expression.
@@ -366,16 +356,6 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "target_path": target_path,
                 })),
             },
-            ContextraError::Erased => Self {
-                kind: "Erased".to_string(),
-                message: err.to_string(),
-                details: None,
-            },
-            ContextraError::RestrictedReadAuditRequired => Self {
-                kind: "RestrictedReadAuditRequired".to_string(),
-                message: err.to_string(),
-                details: None,
-            },
         }
     }
 }
@@ -538,11 +518,6 @@ mod tests {
                     target_path: "/b".into(),
                 },
                 "CrossDeviceLink",
-            ),
-            (ContextraError::Erased, "Erased"),
-            (
-                ContextraError::RestrictedReadAuditRequired,
-                "RestrictedReadAuditRequired",
             ),
         ];
 

@@ -1,8 +1,3 @@
-//! Validierungstest für LLM-gestützte Filterung von Hyperkanten-Vorschlägen.
-//!
-//! # Zweck
-//! Mockt LLM-Antworten und stellt sicher, dass unplausible Kantenkandidaten verworfen werden.
-
 use contextra_graph::{validate_candidates_with_llm, GraphMutationError, HyperEdgeCandidate};
 use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::{DocId, EntityId};

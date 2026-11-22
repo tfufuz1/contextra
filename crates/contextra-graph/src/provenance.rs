@@ -1,22 +1,19 @@
-//! Provenienz- und Herkunftsverfolgung für Graph-Kanten und Relationen.
-//!
-//! # Zweck
-//! Verknüpft Kanten mit Quell-Dokumenten (`DocId`) und Transaktionen (`TxId`) für Rückverfolgbarkeit.
-
+// FILE-CONTEXT
+// STAND: 2026-09-10T00:00:00Z (SESSION: 61b93a6f)
+// ZWECK: Herkunftsnachweis für Graph-Kanten (DocEdgeIndex & EdgeProvenance)
+// INVARIANTEN: INV-GRAPH-PROV-1: Jede CSR-Kante ordnet sich ihren Quelldokumenten zu.
 // SIEHE AUCH: crates/contextra-graph/src/cascade.rs
 
 use crate::consistency_enforcement::EdgeId;
-use crate::types::{DocId, TxId};
 use ahash::{AHashMap, AHashSet};
+use contextra_types::{DocId, TxId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
-/// Herkunftsverfolgung für eine Graph-Kante.
+/// Herkunftsnachweis für eine Graph-Kante.
 /// INV-GRAPH-PROV-1: Jede aktive CSR-Kante trägt einen EdgeProvenance-Eintrag,
 /// der ihre Quell-Dokumente zurückverfolgbar macht.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-
-// SECTION Provenance Core Implementation
 pub struct EdgeProvenance {
     /// Identifikator der Kante (from_entity_id, to_entity_id).
     pub edge_id: EdgeId,
@@ -83,7 +80,7 @@ impl DocEdgeIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::EntityId;
+    use contextra_types::EntityId;
 
     #[test]
     fn test_doc_edge_index_record_and_retrieve() {
@@ -176,5 +173,3 @@ mod tests {
         assert_eq!(deserialized.created_at_tx, prov.created_at_tx);
     }
 }
-
-// !SECTION Provenance Core Implementation

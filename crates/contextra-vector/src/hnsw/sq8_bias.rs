@@ -1,3 +1,6 @@
+// FILE-CONTEXT
+// ZWECK: Quantisierungs-Bias-Kalibrierung (Sq8Bias) für SQ8-Quantisierung im HNSW Index Header.
+// INVARIANTEN: Zero-Panic Doctrine; Gemessener Quantisierungs-Bias im Index-Header.
 
 //! SQ8 quantization bias calibration module.
 
@@ -38,7 +41,7 @@ impl Sq8Bias {
     pub fn calibrate(
         batch: &[&[f32]],
         quantizer: &crate::quantize::ScalarQuantizer,
-        metric: crate::types::DistanceMetric,
+        metric: contextra_types::DistanceMetric,
     ) -> Self {
         if batch.len() < 2 {
             return Self::default();
@@ -86,7 +89,7 @@ impl Sq8Bias {
 mod tests {
     use super::*;
     use crate::quantize::ScalarQuantizer;
-    use crate::types::DistanceMetric;
+    use contextra_types::DistanceMetric;
 
     #[test]
     fn test_sq8_bias_calibration() {

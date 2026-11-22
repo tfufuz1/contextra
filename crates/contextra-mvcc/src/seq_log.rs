@@ -1,0 +1,684 @@
+//! Shared versioned sequence log for snapshot-isolated index searches (`_at` family).
+
+// FILE-CONTEXT
+// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
+// ZWECK: Shared Versioned Sequence Log für Snapshot-isolierte Index-Suchen (_at Familie).
+// INVARIANTEN: Sichtbarkeitsprüfung: insert_seq <= as_of && (delete_seq.is_none() || delete_seq > as_of).
+// HOTSPOTS: 20-75
+// NICHT-OFFENSICHTLICH: Compaction prunt Einträge erst wenn delete_seq < min_active_seqno.
+// SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-024)
+
+use std::sync::Arc;
+use std::time::Duration;
+
+use contextra_ports::{Clock, SystemClock};
+
+use crate::types::DocId;
+
+/// Default maximum pin duration (5 minutes) before diagnostic warnings are issued for expired pins.
+pub const DEFAULT_MAX_PIN_DURATION: Duration = Duration::from_secs(300);
+
+/// Versioned sequence log entry for snapshot isolation (`_at` family).
+///
+/// **Memory Overhead**: Each entry is 24 bytes (8 bytes `DocId` + 8 bytes `insert_seq` + 8 bytes `delete_seq: Option<u64>`).
+/// Entries where `delete_seq` is below `min_active_seqno` can be pruned via `compact`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SeqLogEntry {
+    /// Document ID.
+    pub doc_id: DocId,
+    /// Sequence number at which this document entry was inserted.
+    pub insert_seq: u64,
+    /// Sequence number at which this document entry was deleted (if deleted).
+    pub delete_seq: Option<u64>,
+}
+
+impl SeqLogEntry {
+    /// Returns `true` if this log entry is visible at snapshot sequence number `as_of`.
+    ///
+    /// # Visibility Rule
+    /// An entry is visible if `insert_seq <= as_of` AND (`delete_seq` is `None` OR `delete_seq > as_of`).
+    ///
+    /// # Complexity
+    /// $O(1)$ allocation-free, loop-free check using at most two integer comparisons.
+    #[inline]
+    pub fn is_visible(&self, as_of: u64) -> bool {
+        let as_of = as_of & !crate::types::TOMBSTONE_BIT;
+        let insert_seq = self.insert_seq & !crate::types::TOMBSTONE_BIT;
+        let delete_seq = self.delete_seq.map(|d| d & !crate::types::TOMBSTONE_BIT);
+        insert_seq <= as_of && delete_seq.is_none_or(|del| del > as_of)
+    }
+}
+
+/// Represents a historical sequence log change (insert or delete) for delta replaying.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SeqLogChange {
+    /// A document insertion at a specific sequence number.
+    Insert {
+        /// Document ID.
+        doc_id: DocId,
+        /// Sequence number of the insert.
+        seq: u64,
+    },
+    /// A document deletion at a specific sequence number.
+    Delete {
+        /// Document ID.
+        doc_id: DocId,
+        /// Sequence number of the delete.
+        seq: u64,
+    },
+}
+
+impl SeqLogChange {
+    /// Returns the sequence number associated with this change.
+    pub fn seq(&self) -> u64 {
+        match self {
+            Self::Insert { seq, .. } | Self::Delete { seq, .. } => *seq,
+        }
+    }
+
+    /// Returns the document ID associated with this change.
+    pub fn doc_id(&self) -> DocId {
+        match self {
+            Self::Insert { doc_id, .. } | Self::Delete { doc_id, .. } => *doc_id,
+        }
+    }
+}
+
+/// Helper structure managing sequence log tracking and visibility filtering for index implementations.
+#[derive(Clone)]
+pub struct SequenceLog {
+    entries: Vec<SeqLogEntry>,
+    pinned_snapshots: ahash::AHashMap<u64, Vec<u64>>,
+    compacted_below: Option<u64>,
+    deletions: ahash::AHashMap<DocId, u64>,
+    max_pin_duration: Duration,
+    clock: Arc<dyn Clock>,
+}
+
+impl std::fmt::Debug for SequenceLog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SequenceLog")
+            .field("entries", &self.entries)
+            .field("pinned_snapshots", &self.pinned_snapshots)
+            .field("compacted_below", &self.compacted_below)
+            .field("deletions", &self.deletions)
+            .field("max_pin_duration", &self.max_pin_duration)
+            .finish()
+    }
+}
+
+impl Default for SequenceLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SequenceLog {
+    /// Creates a new empty sequence log with default max pin duration (5 minutes) and [`SystemClock`].
+    pub fn new() -> Self {
+        Self::with_clock(Arc::new(SystemClock::new()))
+    }
+
+    /// Creates a new empty sequence log using the given [`Clock`] instance.
+    pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
+        Self {
+            entries: Vec::new(),
+            pinned_snapshots: ahash::AHashMap::default(),
+            compacted_below: None,
+            deletions: ahash::AHashMap::default(),
+            max_pin_duration: DEFAULT_MAX_PIN_DURATION,
+            clock,
+        }
+    }
+
+    /// Returns the active [`Clock`] instance associated with this sequence log.
+    pub fn clock(&self) -> &Arc<dyn Clock> {
+        &self.clock
+    }
+
+    /// Sets the active [`Clock`] instance for this sequence log.
+    pub fn set_clock(&mut self, clock: Arc<dyn Clock>) {
+        self.clock = clock;
+    }
+
+    /// Sets a custom maximum pin duration for diagnostics and returns `self`.
+    pub fn with_max_pin_duration(mut self, duration: Duration) -> Self {
+        self.max_pin_duration = duration;
+        self
+    }
+
+    /// Sets a custom maximum pin duration for diagnostics.
+    pub fn set_max_pin_duration(&mut self, duration: Duration) {
+        self.max_pin_duration = duration;
+    }
+
+    /// Returns the configured maximum pin duration.
+    pub fn max_pin_duration(&self) -> Duration {
+        self.max_pin_duration
+    }
+
+    /// Pins a historical sequence number to prevent rebuild from purging soft-deleted nodes active at this snapshot.
+    pub fn pin_snapshot(&mut self, seq_no: u64) {
+        let now_nanos = self.clock.monotonic_nanos();
+        self.pin_snapshot_at(seq_no, now_nanos);
+    }
+
+    /// Pins a historical sequence number at a specific monotonic nanosecond timestamp `at_nanos` for deterministic testing and lease tracking.
+    pub fn pin_snapshot_at(&mut self, seq_no: u64, at_nanos: u64) {
+        let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
+        self.pinned_snapshots
+            .entry(seq_no)
+            .or_default()
+            .push(at_nanos);
+    }
+
+    /// Unpins a historical sequence number.
+    pub fn unpin_snapshot(&mut self, seq_no: u64) {
+        let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
+        if let std::collections::hash_map::Entry::Occupied(mut entry) =
+            self.pinned_snapshots.entry(seq_no)
+        {
+            let timestamps = entry.get_mut();
+            timestamps.pop();
+            if timestamps.is_empty() {
+                entry.remove();
+            }
+        }
+    }
+
+    /// Returns all pinned sequence numbers whose active pin duration exceeds `max_pin_duration`
+    /// relative to the provided monotonic timestamp `now_nanos`.
+    pub fn expired_pins_at(&self, now_nanos: u64) -> Vec<u64> {
+        let max_nanos = u64::try_from(self.max_pin_duration.as_nanos()).unwrap_or(u64::MAX);
+        let mut expired = Vec::new();
+        for (&seq_no, timestamps) in &self.pinned_snapshots {
+            for &ts in timestamps {
+                if now_nanos.saturating_sub(ts) > max_nanos {
+                    expired.push(seq_no);
+                    break;
+                }
+            }
+        }
+        expired.sort_unstable();
+        expired
+    }
+
+    /// Returns all pinned sequence numbers whose active pin duration exceeds `max_pin_duration`.
+    pub fn expired_pins(&self) -> Vec<u64> {
+        self.expired_pins_at(self.clock.monotonic_nanos())
+    }
+
+    /// Reaps and unpins all snapshot pins exceeding `max_pin_duration` relative to monotonic timestamp `now_nanos`, returning the expired sequence numbers.
+    pub fn reap_expired_pins_at(&mut self, now_nanos: u64) -> Vec<u64> {
+        let expired = self.expired_pins_at(now_nanos);
+        for &seq in &expired {
+            self.unpin_snapshot(seq);
+        }
+        expired
+    }
+
+    /// Reaps and unpins all snapshot pins exceeding `max_pin_duration`, returning the expired sequence numbers.
+    pub fn reap_expired_pins(&mut self) -> Vec<u64> {
+        let now_nanos = self.clock.monotonic_nanos();
+        self.reap_expired_pins_at(now_nanos)
+    }
+
+    /// Calculates the minimum sequence number currently pinned for snapshot retention at monotonic timestamp `now_nanos`.
+    /// Returns `None` if no snapshot sequence numbers are pinned.
+    ///
+    /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
+    pub fn min_retention_seq_at(&self, now_nanos: u64) -> Option<u64> {
+        let min_seq = self.pinned_snapshots.keys().copied().min();
+        if let Some(seq) = min_seq {
+            if let Some(timestamps) = self.pinned_snapshots.get(&seq) {
+                let max_nanos = u64::try_from(self.max_pin_duration.as_nanos()).unwrap_or(u64::MAX);
+                for &ts in timestamps {
+                    let duration_nanos = now_nanos.saturating_sub(ts);
+                    if duration_nanos > max_nanos {
+                        tracing::warn!(
+                            seq_no = seq,
+                            max_pin_duration = ?self.max_pin_duration,
+                            elapsed_nanos = duration_nanos,
+                            "Snapshot pin active beyond max duration"
+                        );
+                        break;
+                    }
+                }
+            }
+        }
+        min_seq
+    }
+
+    /// Calculates the minimum sequence number currently pinned for snapshot retention.
+    /// Returns `None` if no snapshot sequence numbers are pinned.
+    ///
+    /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
+    pub fn min_retention_seq(&self) -> Option<u64> {
+        self.min_retention_seq_at(self.clock.monotonic_nanos())
+    }
+
+    /// Returns the deletion sequence number of the given document, if currently soft-deleted.
+    pub fn deletion_seq(&self, doc_id: DocId) -> Option<u64> {
+        self.deletions.get(&doc_id).copied()
+    }
+
+    /// Records an insert operation at the given sequence number `seq`.
+    pub fn record_insert(&mut self, doc_id: DocId, seq: u64) {
+        let seq = seq & !crate::types::TOMBSTONE_BIT;
+        if let Some(entry) = self
+            .entries
+            .iter_mut()
+            .rfind(|e| e.doc_id == doc_id && e.delete_seq.is_none())
+        {
+            entry.delete_seq = Some(seq);
+        }
+        self.deletions.remove(&doc_id);
+        self.entries.push(SeqLogEntry {
+            doc_id,
+            insert_seq: seq,
+            delete_seq: None,
+        });
+    }
+
+    /// Records a delete operation at the given sequence number `seq`.
+    pub fn record_delete(&mut self, doc_id: DocId, seq: u64) {
+        let seq = seq & !crate::types::TOMBSTONE_BIT;
+        if let Some(entry) = self
+            .entries
+            .iter_mut()
+            .rfind(|e| e.doc_id == doc_id && e.delete_seq.is_none())
+        {
+            entry.delete_seq = Some(seq);
+            self.deletions.insert(doc_id, seq);
+        }
+    }
+
+    /// Checks if `doc_id` was inserted at or before `seq_no` and not deleted at or before `seq_no`.
+    pub fn is_visible(&self, doc_id: DocId, seq_no: u64) -> bool {
+        let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
+        let mut inserted = false;
+        let mut deleted = false;
+        for entry in &self.entries {
+            let insert_seq = entry.insert_seq & !crate::types::TOMBSTONE_BIT;
+            if entry.doc_id == doc_id && insert_seq <= seq_no {
+                inserted = true;
+                if let Some(del) = entry.delete_seq {
+                    let del_seq = del & !crate::types::TOMBSTONE_BIT;
+                    deleted = del_seq <= seq_no;
+                } else {
+                    deleted = false;
+                }
+            }
+        }
+        inserted && !deleted
+    }
+
+    /// Compacts log entries where deletion sequence number is strictly less than `min_active_seqno`.
+    pub fn compact(&mut self, min_active_seqno: u64) {
+        let min_active_seqno = min_active_seqno & !crate::types::TOMBSTONE_BIT;
+        self.compacted_below = Some(
+            self.compacted_below
+                .map_or(min_active_seqno, |c| c.max(min_active_seqno)),
+        );
+        self.entries.retain(|entry| {
+            if let Some(del_seq) = entry.delete_seq {
+                let del_seq = del_seq & !crate::types::TOMBSTONE_BIT;
+                del_seq >= min_active_seqno
+            } else {
+                true
+            }
+        });
+        self.deletions
+            .retain(|_, &mut del_seq| (del_seq & !crate::types::TOMBSTONE_BIT) >= min_active_seqno);
+    }
+
+    /// Returns the number of entries in the sequence log.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if the sequence log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Returns all sequence log changes that occurred strictly after `snapshot_seq`,
+    /// ordered chronologically by sequence number.
+    pub fn changes_since(&self, snapshot_seq: u64) -> Vec<SeqLogChange> {
+        let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
+        let mut changes = Vec::new();
+        for entry in &self.entries {
+            let insert_seq = entry.insert_seq & !crate::types::TOMBSTONE_BIT;
+            if insert_seq > snapshot_seq {
+                changes.push(SeqLogChange::Insert {
+                    doc_id: entry.doc_id,
+                    seq: insert_seq,
+                });
+            }
+            if let Some(del_seq) = entry.delete_seq {
+                let del_seq = del_seq & !crate::types::TOMBSTONE_BIT;
+                if del_seq > snapshot_seq {
+                    changes.push(SeqLogChange::Delete {
+                        doc_id: entry.doc_id,
+                        seq: del_seq,
+                    });
+                }
+            }
+        }
+        changes.sort_by_key(|c| c.seq());
+        changes
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+mod tests {
+    use super::*;
+    use contextra_testkit::ManualClock;
+
+    #[test]
+    fn test_seq_log_entry_is_visible_o1() {
+        let doc = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
+
+        // Active entry (no delete)
+        let active_entry = SeqLogEntry {
+            doc_id: doc,
+            insert_seq: 10,
+            delete_seq: None,
+        };
+        assert!(!active_entry.is_visible(9));
+        assert!(active_entry.is_visible(10));
+        assert!(active_entry.is_visible(100));
+
+        // Deleted entry
+        let deleted_entry = SeqLogEntry {
+            doc_id: doc,
+            insert_seq: 10,
+            delete_seq: Some(20),
+        };
+        assert!(!deleted_entry.is_visible(9));
+        assert!(deleted_entry.is_visible(10));
+        assert!(deleted_entry.is_visible(19));
+        // Boundary case: delete_seq == as_of -> NOT visible (delete_seq > as_of is strict)
+        assert!(!deleted_entry.is_visible(20));
+        assert!(!deleted_entry.is_visible(21));
+    }
+
+    #[test]
+    fn test_sequence_log_insert_delete_visibility() {
+        let mut log = SequenceLog::new();
+        assert!(log.is_empty());
+        assert_eq!(log.len(), 0);
+
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
+        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // expect #[cfg(test)]
+
+        // Insert doc1 at seq 10, doc2 at seq 20
+        log.record_insert(doc1, 10);
+        log.record_insert(doc2, 20);
+        assert_eq!(log.len(), 2);
+        assert!(!log.is_empty());
+
+        // Visibility before insert
+        assert!(!log.is_visible(doc1, 5));
+        assert!(!log.is_visible(doc2, 15));
+
+        // Visibility at and after insert
+        assert!(log.is_visible(doc1, 10));
+        assert!(log.is_visible(doc1, 15));
+        assert!(log.is_visible(doc2, 20));
+
+        // Record delete for doc1 at seq 30
+        log.record_delete(doc1, 30);
+        assert_eq!(log.len(), 2);
+
+        // Visibility around delete seq
+        assert!(log.is_visible(doc1, 29));
+        assert!(!log.is_visible(doc1, 30));
+        assert!(!log.is_visible(doc1, 35));
+
+        // doc2 remains visible
+        assert!(log.is_visible(doc2, 35));
+    }
+
+    #[test]
+    fn test_sequence_log_reinsert_after_delete() {
+        let mut log = SequenceLog::new();
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
+
+        log.record_insert(doc1, 10);
+        log.record_delete(doc1, 20);
+        assert!(!log.is_visible(doc1, 25));
+
+        // Re-insert doc1 at seq 30
+        log.record_insert(doc1, 30);
+        assert_eq!(log.len(), 2);
+
+        // Visibility timelines
+        assert!(log.is_visible(doc1, 15));
+        assert!(!log.is_visible(doc1, 25));
+        assert!(log.is_visible(doc1, 30));
+        assert!(log.is_visible(doc1, 40));
+    }
+
+    #[test]
+    fn test_sequence_log_compact() {
+        let mut log = SequenceLog::new();
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
+        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // expect #[cfg(test)]
+
+        log.record_insert(doc1, 10);
+        log.record_delete(doc1, 20); // deleted at seq 20
+
+        log.record_insert(doc2, 15);
+        log.record_delete(doc2, 40); // deleted at seq 40
+
+        assert_eq!(log.len(), 2);
+
+        // Compact with min_active_seqno = 30
+        // doc1 (delete_seq = 20 < 30) should be purged.
+        // doc2 (delete_seq = 40 >= 30) should be retained.
+        log.compact(30);
+        assert_eq!(log.len(), 1);
+
+        // Compact with min_active_seqno = 50
+        // doc2 (delete_seq = 40 < 50) should be purged.
+        log.compact(50);
+        assert_eq!(log.len(), 0);
+        assert!(log.is_empty());
+    }
+
+    #[test]
+    fn test_sequence_log_edge_cases() {
+        let mut log = SequenceLog::new();
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
+
+        // Delete non-existent doc should not panic or add entry
+        log.record_delete(doc1, 10);
+        assert_eq!(log.len(), 0);
+
+        // Multiple deletes on same active insert updates delete_seq or ignores second?
+        log.record_insert(doc1, 5);
+        log.record_delete(doc1, 15);
+        log.record_delete(doc1, 25); // Should not overwrite existing delete_seq if already deleted
+        assert!(log.is_visible(doc1, 10));
+        assert!(!log.is_visible(doc1, 15));
+    }
+
+    #[test]
+    fn test_sequence_log_changes_since() {
+        let mut log = SequenceLog::new();
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
+        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // #[cfg(test)]
+
+        log.record_insert(doc1, 10);
+        log.record_insert(doc2, 20);
+        log.record_delete(doc1, 30);
+        log.record_insert(doc1, 40);
+
+        let changes_0 = log.changes_since(0);
+        assert_eq!(
+            changes_0,
+            vec![
+                SeqLogChange::Insert {
+                    doc_id: doc1,
+                    seq: 10
+                },
+                SeqLogChange::Insert {
+                    doc_id: doc2,
+                    seq: 20
+                },
+                SeqLogChange::Delete {
+                    doc_id: doc1,
+                    seq: 30
+                },
+                SeqLogChange::Insert {
+                    doc_id: doc1,
+                    seq: 40
+                },
+            ]
+        );
+
+        let changes_15 = log.changes_since(15);
+        assert_eq!(
+            changes_15,
+            vec![
+                SeqLogChange::Insert {
+                    doc_id: doc2,
+                    seq: 20
+                },
+                SeqLogChange::Delete {
+                    doc_id: doc1,
+                    seq: 30
+                },
+                SeqLogChange::Insert {
+                    doc_id: doc1,
+                    seq: 40
+                },
+            ]
+        );
+
+        let changes_35 = log.changes_since(35);
+        assert_eq!(
+            changes_35,
+            vec![SeqLogChange::Insert {
+                doc_id: doc1,
+                seq: 40
+            }]
+        );
+
+        let changes_50 = log.changes_since(50);
+        assert!(changes_50.is_empty());
+    }
+
+    #[test]
+    fn test_sequence_log_pinning_and_retention() {
+        let mut log = SequenceLog::new();
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
+
+        log.record_insert(doc1, 10);
+        log.record_delete(doc1, 20);
+
+        assert_eq!(log.deletion_seq(doc1), Some(20));
+        assert_eq!(log.min_retention_seq(), None);
+
+        // Pin snapshot at seq 5 (older than insert_seq 10)
+        log.pin_snapshot(5);
+        assert_eq!(log.min_retention_seq(), Some(5));
+
+        // Pin another snapshot at seq 15
+        log.pin_snapshot(15);
+        assert_eq!(log.min_retention_seq(), Some(5));
+
+        // Unpin seq 5
+        log.unpin_snapshot(5);
+        assert_eq!(log.min_retention_seq(), Some(15));
+
+        // Unpin seq 15
+        log.unpin_snapshot(15);
+        assert_eq!(log.min_retention_seq(), None);
+    }
+
+    #[test]
+    fn test_sequence_log_pin_ttl_and_expiration() {
+        let clock = Arc::new(ManualClock::new(100_000_000_000));
+        let mut log =
+            SequenceLog::with_clock(clock.clone()).with_max_pin_duration(Duration::from_secs(10));
+        assert_eq!(log.max_pin_duration(), Duration::from_secs(10));
+
+        let start_nanos = clock.now_nanos();
+        let past_5s_nanos = start_nanos.saturating_sub(5_000_000_000);
+        let past_15s_nanos = start_nanos.saturating_sub(15_000_000_000);
+
+        // Pin seq 100 at past_5s (not expired)
+        log.pin_snapshot_at(100, past_5s_nanos);
+        // Pin seq 200 at past_15s (expired relative to current clock)
+        log.pin_snapshot_at(200, past_15s_nanos);
+
+        let expired = log.expired_pins();
+        assert_eq!(expired, vec![200]);
+
+        // Pin seq 200 a second time at past_5s (now has 2 pins: 1 expired, 1 active)
+        log.pin_snapshot_at(200, past_5s_nanos);
+        assert_eq!(log.min_retention_seq(), Some(100));
+
+        // expired_pins should still report 200 because at least one pin on seq 200 is expired
+        assert_eq!(log.expired_pins(), vec![200]);
+
+        // Unpin newest pin on 200 (pops past_5s pin)
+        log.unpin_snapshot(200);
+        // past_15s pin remains for seq 200, so seq 200 is still reported as expired
+        assert_eq!(log.expired_pins(), vec![200]);
+
+        // Unpin second pin on 200 (pops past_15s pin) -> no pins left for seq 200
+        log.unpin_snapshot(200);
+        assert_eq!(log.expired_pins(), Vec::<u64>::new());
+        assert_eq!(log.min_retention_seq(), Some(100));
+
+        // Unpin seq 100 -> no pins left
+        log.unpin_snapshot(100);
+        assert_eq!(log.min_retention_seq(), None);
+    }
+
+    #[test]
+    fn test_sequence_log_pin_ttl_custom_duration() {
+        let clock = Arc::new(ManualClock::new(1_000_000_000));
+        let mut log = SequenceLog::with_clock(clock.clone());
+        assert_eq!(log.max_pin_duration(), DEFAULT_MAX_PIN_DURATION);
+
+        log.set_max_pin_duration(Duration::from_millis(50));
+        assert_eq!(log.max_pin_duration(), Duration::from_millis(50));
+
+        let now_nanos = clock.now_nanos();
+        let past_100ms_nanos = now_nanos.saturating_sub(100_000_000);
+
+        log.pin_snapshot_at(42, past_100ms_nanos);
+        assert_eq!(log.expired_pins_at(now_nanos), vec![42]);
+
+        // The pin is NOT automatically removed or forcibly unpinned by expired_pins
+        assert_eq!(log.min_retention_seq(), Some(42));
+        assert_eq!(log.expired_pins(), vec![42]);
+
+        // Calling reap_expired_pins explicitly unpins expired sequence numbers
+        let reaped = log.reap_expired_pins();
+        assert_eq!(reaped, vec![42]);
+        assert_eq!(log.min_retention_seq(), None);
+    }
+
+    #[test]
+    fn test_sequence_log_zero_panic_time_arithmetic() {
+        let clock = Arc::new(ManualClock::new(100_000_000));
+        let mut log = SequenceLog::with_clock(clock.clone());
+        let now_nanos = clock.now_nanos();
+        let future_nanos = now_nanos + 100_000_000_000;
+
+        // Pin in the future (clock skew edge case)
+        log.pin_snapshot_at(50, future_nanos);
+
+        // Checking expired pins with current clock should handle saturating duration without panic
+        let expired = log.expired_pins();
+        assert!(expired.is_empty());
+
+        assert_eq!(log.min_retention_seq(), Some(50));
+    }
+}

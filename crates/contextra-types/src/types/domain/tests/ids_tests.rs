@@ -1,6 +1,3 @@
-//! Unittests für Identifikatoren (TenantId, CollectionId, DocId, TxId, EntityId).
-//! Prüft deterministische Hashing-Eigenschaften, Boundaries und Serde-Roundtrips.
-
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use crate::error::{ContextraError, Result};
@@ -10,7 +7,6 @@ use crate::types::domain::*;
 use proptest::prop_assert;
 
 #[test]
-/// Prüft Standardwerte, Konstanten und Formatierung von `TenantId`.
 fn test_tenant_id_defaults_and_constants() {
     let default_tenant = TenantId::default();
     assert_eq!(default_tenant, TenantId::SYSTEM);
@@ -26,7 +22,6 @@ fn test_tenant_id_defaults_and_constants() {
 }
 
 #[test]
-/// Prüft Ordnungsrelationen und Nutzung von `TenantId` als Schlüssel in einer BTreeMap.
 fn test_tenant_id_collections_btreemap() {
     use std::collections::BTreeMap;
 
@@ -48,7 +43,6 @@ fn test_tenant_id_collections_btreemap() {
 }
 
 #[test]
-/// Prüft die JSON-Serialisierung und Deserialisierung von `TenantId`.
 fn test_tenant_id_serde_roundtrip() {
     let tenant = TenantId::try_new(987654321).unwrap();
     let serialized = serde_json::to_string(&tenant).expect("TenantId serialization failed");
@@ -60,7 +54,6 @@ fn test_tenant_id_serde_roundtrip() {
 }
 
 #[test]
-/// Stellt sicher, dass `DocId::from_key` für verschiedene Schlüssellängen nicht panikt und leere Schlüssel abweist.
 fn test_doc_id_from_key_no_panic() {
     assert!(DocId::from_key("").is_err());
     let keys = vec![
@@ -75,7 +68,6 @@ fn test_doc_id_from_key_no_panic() {
 }
 
 #[test]
-/// Verifiziert den strikten Determinismus der `DocId`-Generierung aus Schlüsseln.
 fn test_doc_id_determinism() {
     let key = "consistent_key";
     let id1 = DocId::from_key(key).unwrap(); // unwrap
@@ -84,7 +76,6 @@ fn test_doc_id_determinism() {
 }
 
 #[test]
-/// Prüft Validierung und Konstruktion von `TenantId` und `CollectionId`.
 fn test_tenant_and_collection_id() {
     let tenant = TenantId::try_new(1).unwrap();
     assert_eq!(tenant.inner(), 1);
@@ -98,7 +89,6 @@ fn test_tenant_and_collection_id() {
 }
 
 #[test]
-/// Testet die Ableitung von `DocId` und `EntityId` aus Multibyte-Unicode-Strings.
 fn test_doc_id_multibyte_unicode_keys() {
     let unicode_keys = vec![
         "🦀_crab_key",
@@ -116,7 +106,6 @@ fn test_doc_id_multibyte_unicode_keys() {
 }
 
 #[test]
-/// Prüft Hilfsmethoden und String-Konvertierungen von `EntityId`.
 fn test_entity_id_methods() {
     let entity_id = EntityId::new(12345);
     assert_eq!(entity_id.inner(), 12345);
@@ -138,27 +127,23 @@ fn test_entity_id_methods() {
 }
 
 #[test]
-/// Stellt sicher, dass ein gültiger Stringschlüssel eine positive `DocId` erzeugt.
 fn doc_id_valid_key_is_ok() {
     let id = DocId::from_key("valid-key-123").unwrap(); // unwrap
     assert!(id.inner() > 0);
 }
 
 #[test]
-/// Prüft, dass leere Schlüssel bei `DocId::from_key` abgewiesen werden.
 fn doc_id_from_empty_returns_err() {
     assert!(DocId::from_key("").is_err());
 }
 
 #[test]
-/// Prüft die Fehlerbehandlung von `EntityId::from_key` bei leeren Schlüsseln.
 fn test_entity_id_from_key_empty_err() {
     assert!(EntityId::from_key("").is_err());
     assert!(EntityId::from_key("node_1").is_ok());
 }
 
 #[test]
-/// Prüft Konsistenz und Transitivität der Ordnungsrelation von `TxId`.
 fn tx_id_ordering_is_consistent() {
     let t1 = TxId::new(1);
     let t2 = TxId::new(2);
@@ -168,7 +153,6 @@ fn tx_id_ordering_is_consistent() {
 }
 
 #[test]
-/// Prüft interne System-TxIds und Sentinel-Werte.
 fn test_tx_id_internal() {
     let tx = TxId::internal();
     assert_eq!(tx.inner(), TxId::INTERNAL_BASE);
@@ -181,7 +165,6 @@ fn test_tx_id_internal() {
 }
 
 #[test]
-/// Prüft die Gültigkeit von Transaktionsbereichen via `is_valid_origin`.
 fn test_tx_id_is_valid_origin() {
     // Collection-sequenced range [0, 10^12]
     assert!(TxId::new(0).is_valid_origin());
@@ -201,7 +184,6 @@ fn test_tx_id_is_valid_origin() {
 }
 
 #[test]
-/// Simuliert die Zähler-Erschöpfung an der `MAX_COLLECTION_SEQUENCE`-Grenze.
 fn test_tx_id_range_boundary_exhaustion_simulation() {
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -293,7 +275,6 @@ fn test_tx_id_range_boundary_exhaustion_simulation() {
 }
 
 #[test]
-/// Prüft Kollisionsfreiheit und Streuung von 10.000 abgeleiteten `DocId`s.
 fn test_doc_id_from_key_collisions_and_distribution() {
     use std::collections::BTreeSet;
 
@@ -313,7 +294,6 @@ fn test_doc_id_from_key_collisions_and_distribution() {
 }
 
 #[test]
-/// Prüft `DocId`- und `EntityId`-Ableitung bei verschiedenen internationalen Unicode-Schlüsseln.
 fn test_doc_id_and_entity_id_unicode_keys() {
     let unicode_keys = vec![
         "Gedächtnis_01",
@@ -336,7 +316,6 @@ fn test_doc_id_and_entity_id_unicode_keys() {
 }
 
 #[test]
-/// Testet Sentinel-Werte und Konvertierungen zwischen DocId und EntityId.
 fn test_tx_id_invalid_sentinel_and_conversion_boundary() {
     assert_eq!(TxId::INVALID.inner(), 0);
     assert!(TxId::INVALID.is_valid_origin());
@@ -349,7 +328,6 @@ fn test_tx_id_invalid_sentinel_and_conversion_boundary() {
 }
 
 #[test]
-/// Verifiziert die Bereichsüberprüfung für Collection-, System- und Gap-Transaktions-IDs.
 fn test_tx_id_ranges_and_internal_boundary_checks() {
     let valid_col_tx = TxId::new(500_000);
     assert!(valid_col_tx.is_valid_origin());
@@ -364,7 +342,6 @@ fn test_tx_id_ranges_and_internal_boundary_checks() {
 }
 
 #[test]
-/// Testet die Überlauf-Sicherheit bei der Zuweisung von internen System-TxIds.
 fn test_tx_id_system_range_wraparound_safety() {
     // Valid offsets within [0, 1_000_000]
     let tx0 = TxId::try_from_internal_offset(0).expect("Offset 0 should succeed"); // expect
@@ -383,14 +360,14 @@ fn test_tx_id_system_range_wraparound_safety() {
     assert!(tx_max.is_valid_origin());
 
     // Overflow attempt (offset > 1_000_000)
-    let err_overflow = TxId::try_from_internal_offset(max_offset + 1).map_err(ContextraError::from);
+    let err_overflow = TxId::try_from_internal_offset(max_offset + 1);
     assert!(
         matches!(err_overflow, Err(ContextraError::Transaction(ref msg)) if msg.contains("overflows u64::MAX")),
         "Expected controlled error on offset overflow, got: {:?}",
         err_overflow
     );
 
-    let err_huge = TxId::try_from_internal_offset(u64::MAX).map_err(ContextraError::from);
+    let err_huge = TxId::try_from_internal_offset(u64::MAX);
     assert!(
         matches!(err_huge, Err(ContextraError::Transaction(ref msg)) if msg.contains("overflows u64::MAX")),
         "Expected controlled error on u64::MAX offset, got: {:?}",
@@ -414,7 +391,6 @@ fn test_tx_id_system_range_wraparound_safety() {
 
 proptest::proptest! {
     #[test]
-        /// Property-Test: System-TxId-Offsets im Intervall [0, 1_000_000] bleiben immer im internen Systembereich.
     fn prop_tx_id_range_isolation(offset in 0u64..=1_000_000u64) {
         let tx = TxId::try_from_internal_offset(offset).unwrap(); // unwrap
         prop_assert!(tx.is_valid_origin());
@@ -423,7 +399,6 @@ proptest::proptest! {
     }
 
     #[test]
-        /// Property-Test: System-TxId-Offsets > 1_000_000 führen zuverlässig zu einem Überlauffehler.
     fn prop_tx_id_overflow_isolation(offset in 1_000_001u64..=u64::MAX) {
         let res = TxId::try_from_internal_offset(offset);
         prop_assert!(res.is_err());
@@ -431,13 +406,11 @@ proptest::proptest! {
 }
 
 #[test]
-/// Prüft, dass `TenantId(0)` via `try_new` abgelehnt wird (INV-TENANT-1).
 fn test_tenant_id_system_reserved() {
     assert!(TenantId::try_new(0).is_err());
 }
 
 #[test]
-/// Prüft die Erstellung einer regulären gültigen `TenantId`.
 fn test_tenant_id_valid() {
     let t = TenantId::try_new(42).expect("valid tenant_id");
     assert_eq!(t.inner(), 42);
@@ -446,21 +419,18 @@ fn test_tenant_id_valid() {
 }
 
 #[test]
-/// Prüft den Wert und Status der Konstante `TenantId::SYSTEM`.
 fn test_tenant_id_system_constant() {
     assert_eq!(TenantId::SYSTEM.inner(), 0);
     assert!(TenantId::SYSTEM.is_system());
 }
 
 #[test]
-/// Stellt sicher, dass `TenantId::try_new(0)` ohne Ausnahme fehlschlägt.
 fn test_tenant_id_hardening() {
     assert!(TenantId::try_new(0).is_err());
     assert_eq!(TenantId::SYSTEM.inner(), 0);
 }
 
 #[test]
-/// Prüft Grenzwerte bei der `TryFrom<u64>`-Konvertierung für `TenantId`.
 fn test_tenant_id_try_from_boundary_and_display() {
     assert!(TenantId::try_from(0u64).is_err());
     let t = match TenantId::try_from(u64::MAX) {

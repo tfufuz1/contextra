@@ -1,15 +1,11 @@
 //! PPR Cost Model, Strategy Selection, and ShadowMode Calibration.
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-use crate::types::{PprAlgorithm, PprConfig};
+use contextra_types::{PprAlgorithm, PprConfig};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
 /// CSR Graph structural statistics used for PPR cost estimation.
 #[derive(Debug, Clone, Copy, PartialEq)]
-
-// SECTION Cost Core Implementation
 pub struct GraphStats {
     /// Number of active/committed nodes |V|.
     pub node_count: usize,
@@ -248,5 +244,3 @@ mod tests {
         assert!((mult - 1.0).abs() < 1e-6);
     }
 }
-
-// !SECTION Cost Core Implementation

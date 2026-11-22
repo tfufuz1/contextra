@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // STAND: 2026-09-19T20:22:00Z (SESSION: 01c5be8b)
 // ZWECK: Unsafe Islands inventory verification (GESAMTSPEZIFIKATION §0.2, §0.4).
-// INVARIANTEN: Exactly 2 Unsafe Islands (contextra-simd, contextra-sys).
+// INVARIANTEN: Exactly 3 Unsafe Islands (contextra-simd, contextra-sys, contextra-wire).
 // Temporary transition allowance until Phase 1c for legacy store, index, db, and crypto test.
 
 use std::collections::HashSet;
@@ -12,6 +12,7 @@ use walkdir::WalkDir;
 pub const ALLOWED_UNSAFE_ISLANDS: &[&str] = &[
     "contextra-simd",
     "contextra-sys",
+    "contextra-wire",
 ];
 
 pub const TRANSITION_ALLOWED_CRATES: &[&str] = &[

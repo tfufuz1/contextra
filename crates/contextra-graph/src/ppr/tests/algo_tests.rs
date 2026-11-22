@@ -1,19 +1,9 @@
-#![cfg(feature = "workspace")]
-//! Algorithmische Vergleichstests zwischen Dense- und Forward-Push-PPR.
-//!
-//! # Zweck
-//! Stellt die Rangfolge-Äquivalenz der Top-K-Ergebnisse beider Algorithmen sicher.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
 
 #[tokio::test]
-
-// SECTION Algo Tests Core Implementation
 async fn test_ppr_context_reuse_when_graph_grows() {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
@@ -759,7 +749,7 @@ async fn test_ppr_hyperedge_expansion_dense_and_forward_push() {
 
 proptest::proptest! {
     #[test]
-    fn test_prop_ppr_rank_mass_conservation(
+    fn prop_ppr_rank_mass_conservation(
         node_count in 1..=20usize,
         edge_specs in proptest::collection::vec((0..20usize, 0..20usize, 0.1f32..5.0f32), 0..40),
         seed_idx in 0..20usize,
@@ -1176,5 +1166,3 @@ async fn test_auto_ppr_cost_model_crossover_boundary() {
         "Cost model must pick ForwardPush for 150 seeds when FP cost < PI cost, ignoring legacy 100 seed threshold"
     );
 }
-
-// !SECTION Algo Tests Core Implementation

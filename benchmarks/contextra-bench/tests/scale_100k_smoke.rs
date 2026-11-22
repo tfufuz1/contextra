@@ -1,3 +1,6 @@
+// FILE-CONTEXT
+// STAND: 2026-09-30
+// ZWECK: Integrationstest / Smoke Test fuer scale-100k Benchmark Binary
 
 use serde_json::Value;
 use std::process::Command;

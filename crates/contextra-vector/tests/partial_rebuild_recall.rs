@@ -1,7 +1,6 @@
 use contextra_ports::VectorIndex;
-use contextra_types::{DocId, TxId};
+use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
-use contextra_vector::types::DistanceMetric;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::collections::HashSet;
@@ -139,7 +138,7 @@ async fn test_partial_rebuild_recall_regression() {
     let recall_tombstoned_only = measure_recall_at_k(&index, &queries, &ground_truth, 10).await;
 
     // 5b. rebuild_region() aufrufen
-    index.rebuild_region(region_ids.clone()).unwrap();
+    index.rebuild_region(region_ids.clone()).await.unwrap();
     let recall_after_rebuild = measure_recall_at_k(&index, &queries, &ground_truth, 10).await;
 
     println!("Recall vor Löschung: {recall_before:.4}");

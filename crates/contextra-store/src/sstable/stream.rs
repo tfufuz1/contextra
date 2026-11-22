@@ -1,11 +1,6 @@
-//! # SSTable Streaming-Iteratoren (Ring 1)
-//!
-//! Erlaubt das Streamen grosser Datenbereiche aus SSTables mit minimalem
-//! Speicher-Footprint.
-
 use super::reader::SstableReader;
-use crate::error::{StoreError as ContextraError, StoreResult as Result};
 use bytes::Bytes;
+use contextra_types::{ContextraError, Result};
 use std::sync::Arc;
 
 pub struct SstableStream {
@@ -112,7 +107,7 @@ impl SstableStream {
                     let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
                         ContextraError::Storage("overflow calculating value position".into())
                     })?;
-                    if end_val > self.offsets_start {
+                    if end_val > block_data.len() {
                         return Err(ContextraError::Storage(
                             "malformed block: value length out of bounds".into(),
                         ));

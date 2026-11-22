@@ -12,27 +12,32 @@ description = "LSM-Tree storage engine for Contextra"
 [package.metadata.contextra]
 ring = "1"
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Threading",
+] }
+
 [features]
 default = []
-# DEPRECATED no-op alias: E2-Konsumenten (contextra-db, -engine, -checkpoint) fordern es noch an.
-# Entfernen zusammen mit der Migration dieser Crates.
-workspace = []
 test-hooks = []
-inspect = []
 memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
 sieve-cache = []
+docid-128 = ["contextra-types/docid-128"]
 legacy-wal-key = []
 
 [dependencies]
-contextra-ids = { workspace = true }
-contextra-env = { workspace = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }
-contextra-durable-fs = { workspace = true }
-contextra-crypto = { workspace = true }
+contextra-mvcc = { workspace = true }
 ahash = { workspace = true }
 quick_cache = { version = "0.6", optional = true }
+contextra-crypto = { workspace = true }
 bytes = { workspace = true }
 blake3 = { workspace = true }
 crc32fast = { workspace = true }
@@ -42,12 +47,21 @@ tokio = { workspace = true }
 memmap2 = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
+
 rand = { workspace = true }
 lru = "0.16.3"
+
+
+uuid = { version = "1", features = ["v4"] }
 tokio-util = { version = "0.7.18", features = ["rt"] }
 
+
 [dev-dependencies]
-contextra-env = { workspace = true, features = ["test-utils"] }
+contextra-store = { path = ".", features = ["test-hooks"] }
+contextra-testkit = { workspace = true }
+contextra-vector = { workspace = true }
+contextra-graph = { workspace = true }
+contextra-sandbox = { workspace = true }
 libc = "0.2"
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
@@ -59,14 +73,38 @@ futures = "0.3"
 redb = "2"
 
 [[test]]
-name = "wal_key_lifecycle"
-path = "tests/wal_key_lifecycle.rs"
-required-features = ["test-hooks"]
+name = "differential_redb"
+path = "tests/differential/redb_operation_sequence.rs"
 
 [[test]]
-name = "no_test_hooks_in_release_api"
-path = "tests/no_test_hooks_in_release_api.rs"
-required-features = ["test-hooks"]
+name = "hmac_legacy_key_migration"
+path = "tests/hmac_legacy_key_migration.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_legacy_key_forced_migration"
+path = "tests/wal_legacy_key_forced_migration.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_legacy_key_tests"
+path = "tests/wal_legacy_key_tests.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_legacy_migration_crash"
+path = "tests/wal_legacy_migration_crash.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_legacy_key_retirement_marker"
+path = "tests/wal_legacy_key_retirement_marker.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_truncation_and_legacy_isolation"
+path = "tests/wal_truncation_and_legacy_isolation.rs"
+required-features = ["legacy-wal-key"]
 
 [[bench]]
 name = "sstable_bench"
@@ -77,5 +115,17 @@ name = "memtable_bench"
 harness = false
 
 [[bench]]
+name = "wal_bench"
+harness = false
+
+[[bench]]
+name = "lsm_concurrency_bench"
+harness = false
+
+[[bench]]
 name = "block_cache_bench"
+harness = false
+
+[[bench]]
+name = "redb_comparative_bench"
 harness = false

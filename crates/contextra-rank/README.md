@@ -1,43 +1,14 @@
 # contextra-rank
 
-**Zweck:** Ergebnis-Fusion und Ranking: RRF (Reciprocal Rank Fusion), Top-k, Zeitgewichtung, Erklärung, Isotonic- und Platt-Kalibrierung (Wahrscheinlichkeiten sind kalibriert, README §1), Drift-Erkennung. SPEC §6.6, REM-18.
+Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen.
 
-**Ebene:** E1
+Normativitätsklasse: **Rand `[R]`** (Ring 0, `experimental`; §6.1, §6.9, §12, `capabilities.toml`).
 
-## Öffentliche API (`src/lib.rs`, Stand dieser README)
+## Rolle in einem Satz
+`contextra-rank` bietet Score-Kalibrierung (Platt, Isotonisch, Conformal) und Ergebnis-Anreicherungen zur Verfeinerung von Retrieval-Rankings.
 
-Ist-Stand. Module oder Namen, die laut PLAN.md entfallen, können hier noch stehen.
-
-```rust
-pub mod compat
-pub mod calibration
-pub mod contract
-pub mod drift
-pub mod error
-pub mod explain
-pub mod fusion
-pub mod local_types
-pub mod metrics
-pub mod temporal
-pub use error::{RankError, Result}
-pub use local_types::
-pub mod dibud
-pub use calibration::
-pub use dibud::
-pub use drift::{DriftDetector, DriftStatus}
-pub use explain::{explain, ExplanationEntry, RetrievalExplanation}
-pub use fusion::
-pub use metrics::{mean_reciprocal_rank, ndcg_at_k, precision_at_k, recall_at_k, reciprocal_rank}
-pub use temporal::
-pub use fusion::{apply_resonance_bonus, fuse_signals, ResonanceConfig}
-pub use fusion::ResonanceModifier
-```
-
-## Features (`Cargo.toml`)
-
-`default`, `std`, `workspace`, `types-compat`, `ports-compat`, `dibud`, `exp-dibud`, `exp-resonance`, `experimental-all`, `experimental-rank`
-
-## Dokumentation
-
-Implementierungsspezifikation: [`PLAN.md`](PLAN.md). Maßgeblich ist `docs/SPEC.md` v4.1.
-
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Ranking & Kalibrierung)
+- **Klasse:** Rand `[R]`
+- **Reifegrad:** `experimental` (abweichend in `capabilities.toml` als `stable` geführt, siehe `docs/status/ABW-L3.md`)
+- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)

@@ -1,8 +1,3 @@
-//! Ressourcentracker-Tests (IP-08) für Graphoperationen unter Budgetrestriktionen.
-//!
-//! # Zweck
-//! Verifiziert den vorzeitigen Abbruch bei Überschreitung zugewiesener CPU- oder Speichergrenzen.
-
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use contextra_types::{Entity, EntityId, ResourceBudget, ResourceTracker};
 use std::sync::Arc;

@@ -1,18 +1,15 @@
-
-//! # Integrationstest: `deletion_e2e`
-//!
-//! Prüft End-to-End-Löschanforderungen der Spezifikation (T-DEL-1 und T-DEL-3):
-//! - T-DEL-1: Physische Abwesenheit gelöschter Canary-Bytes auf Datenträgern nach Kompaktierung.
-//! - T-DEL-3: Verifikation eines kryptografischen Löschnachweises (DeletionProof) schlägt bei falschem Schlüssel fehl.
+// FILE-CONTEXT
+// ZWECK: E2E-Löschtests (T-DEL-1 und T-DEL-3) für Contextra Facade (Ring 4).
+// INVARIANTEN: Nutzt ausschließlich bestehende öffentliche Schnittstellen.
 
 use contextra::{open_with_config, ContextraConfig};
-use contextra_types::{ContextraError, TenantId};
+use contextra_core::{ContextraError, TenantId};
 use serde_json::json;
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
-/// Rekursive Hilfsfunktion zur Zählung von Canary-Byte-Treffern in allen Dateien eines Verzeichnisses.
+/// Helper function to recursively search a directory for a given byte slice.
 fn count_canary_occurrences(dir: &Path, canary: &[u8]) -> usize {
     let mut matches = 0;
     if let Ok(entries) = fs::read_dir(dir) {
@@ -79,9 +76,9 @@ async fn test_tdel_1_canary_bytes_erased_after_compaction() -> Result<(), Contex
     Ok(())
 }
 
-/// T-DEL-3: Droppen einer Collection löscht diese vollständig für den Tenant.
+/// T-DEL-3: Verifikation eines DeletionProof mit falschem Schlüssel muss Err liefern.
 #[tokio::test]
-async fn test_tdel_3_drop_collection_e2e() -> Result<(), ContextraError> {
+async fn test_tdel_3_proof_verification_fails_with_invalid_key() -> Result<(), ContextraError> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
     let config = ContextraConfig {
         dimension: 4,
@@ -91,12 +88,25 @@ async fn test_tdel_3_drop_collection_e2e() -> Result<(), ContextraError> {
     let db = open_with_config(tmp.path(), config).await?;
 
     let tenant_id = TenantId::try_new(100)?;
+    let correct_key = b"correct_secret_proof_key_32bytes";
+    let wrong_key = b"wrong_invalid_proof_key_32bytes_";
 
     // Erstelle eine Collection für Tenant
     let _col = db.collection_for_tenant("test_col", tenant_id).await?;
 
-    // Drop collection über 2-Argument API
-    db.drop_collection("test_col", tenant_id).await?;
+    // Generiere einen DeletionProof über drop_collection
+    let proof = db
+        .drop_collection("test_col", tenant_id, correct_key)
+        .await?;
+
+    // Verifikation mit falschem Schlüssel muss Err liefern
+    let verify_result = proof.verify(wrong_key);
+
+    assert!(
+        verify_result.is_err(),
+        "T-DEL-3: Verifikation eines DeletionProof mit falschem Schlüssel muss Err liefern, lieferte aber {:?}",
+        verify_result
+    );
 
     db.close().await?;
     Ok(())

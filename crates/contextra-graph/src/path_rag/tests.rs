@@ -1,15 +1,6 @@
-//! Unit-Tests für Pfadsuche und Heuristiken in der Path-RAG-Engine.
-//!
-//! # Zweck
-//! Testet Hinlänglichkeitsschwellen (`sufficiency_threshold`) und Hop-Begrenzungen.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::*;
 
 // Einfacher Test-Graph
-
-// SECTION Tests Core Implementation
 struct TestGraph {
     edges: HashMap<EntityId, Vec<(EntityId, f32)>>,
 }
@@ -556,5 +547,3 @@ fn test_forward_push_ppr_self_participant_filtered() {
     // Only 'a' should be in scores (no panic or spurious nodes)
     assert!(scores.get(&a).is_some());
 }
-
-// !SECTION Tests Core Implementation

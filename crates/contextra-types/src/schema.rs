@@ -1,11 +1,4 @@
-//! Schema-Versionierungsstrukturen und Hilfsfunktionen für SSTable- und WAL-Manifest-Übergänge (ADR-082).
-//!
-//! # Zweck & Architektur-Rolle: Typen-Fundament (contracts)
-//!
-//! Dieses Modul definiert Typen zur Identifikation und Aushandlung von Datenformatversionen
-//! in persistenten Manifesten von SSTable (Sorted String Table) und WAL (Write-Ahead-Log).
-//! Insbesondere wird hier die Bitbreite von Dokument-Identifikatoren (`DocIdWidth`: 64 vs. 128 Bit)
-//! typensicher modelliert, um Inkompatibilitäten frühzeitig abzufangen.
+//! Schema Versioning structures and utilities for Contextra SSTable/WAL Manifest transitions (ADR-082).
 
 use crate::error::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
@@ -13,7 +6,6 @@ use serde::{Deserialize, Serialize};
 /// Indicates the DocId bit-width expected or produced by a schema version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-/// Gibt die von einer Schemaversion erwartete oder erzeugte Bitbreite einer `DocId` an.
 pub enum DocIdWidth {
     /// 64-bit DocId format (8-byte BLAKE3 truncation).
     Bit64 = 64,
@@ -23,9 +15,6 @@ pub enum DocIdWidth {
 
 impl DocIdWidth {
     /// Returns the active compile-time `DocIdWidth`.
-    ///
-    /// # Ablauf
-    /// Prüft zur Compile-Zeit via `cfg!(feature = "docid-128")`, welche Breite gewählt ist.
     pub fn current() -> Self {
         if cfg!(feature = "docid-128") {
             Self::Bit128
@@ -48,7 +37,6 @@ impl DocIdWidth {
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
 )]
 #[repr(u8)]
-/// Schema-Versionskennung für SSTable- und WAL-Manifeste.
 pub enum ManifestSchemaVersion {
     /// Schema Version 1 (v0.x legacy 64-bit DocId layout).
     #[default]
@@ -72,9 +60,6 @@ impl ManifestSchemaVersion {
     }
 
     /// Parses a version from a numeric byte indicator.
-    ///
-    /// # Fehler
-    /// Liefert `ContextraError::Serialization`, falls das übergebene Byte keiner bekannten Version entspricht.
     pub fn from_u8(version_byte: u8) -> Result<Self> {
         match version_byte {
             1 => Ok(Self::V1),
@@ -96,7 +81,6 @@ impl ManifestSchemaVersion {
 mod tests {
     use super::*;
 
-    // NOTE: Prüft Konvertierung zwischen Byte und ManifestSchemaVersion sowie Fehler bei unbekannten Bytes.
     #[test]
     fn test_manifest_schema_version_roundtrip() {
         assert_eq!(
@@ -110,7 +94,6 @@ mod tests {
         assert!(ManifestSchemaVersion::from_u8(3).is_err());
     }
 
-    // NOTE: Prüft Bytegrößen von 64-Bit und 128-Bit DocIdWidth.
     #[test]
     fn test_doc_id_width_bytes_len() {
         assert_eq!(DocIdWidth::Bit64.bytes_len(), 8);

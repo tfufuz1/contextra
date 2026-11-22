@@ -1,15 +1,13 @@
-#![allow(deprecated)] // Testet bewusst den veralteten KV-Segment-Pfad.
-//! # Integrationstest: `kv_segment_integration.rs`
-//!
-//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `kv_segment_integration`.
-//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+// FILE-CONTEXT
+// ZWECK: Integrationstest für KvSegment-Verschlüsselung, Zeroize und Prozess-Speicherabbild-Prüfung (P9).
+// STAND: TS:2026-09-08T00:00:00Z
 
-
+#![cfg(feature = "kv-encryption")]
 #![forbid(unsafe_code)]
 
 use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
 use contextra_crypto::{CryptoKey, KvSegmentCipher, ModelFingerprint};
-use contextra_ids::TenantId;
+use contextra_types::TenantId;
 use zeroize::Zeroize;
 
 fn setup_cipher() -> KvSegmentCipher {
@@ -67,7 +65,7 @@ fn test_encrypted_segment_memory_inspection_and_decryption_roundtrip() {
     assert!(encrypted_seg.encrypted);
     assert_eq!(encrypted_seg.rope_offset, Some(256));
 
-    let raw_stored_bytes = encrypted_seg.as_bytes().to_vec();
+    let raw_stored_bytes = encrypted_seg.as_bytes();
 
     // Verify raw stored memory bytes DO NOT contain any plaintext substring (P9 requirement)
     let contains_plaintext = raw_stored_bytes

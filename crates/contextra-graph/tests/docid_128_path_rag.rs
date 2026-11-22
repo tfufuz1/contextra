@@ -1,8 +1,3 @@
-//! Kompatibilitätstest für 128-Bit-Dokument-IDs (`docid-128`) in Path-RAG.
-//!
-//! # Zweck
-//! Sichert die fehlerfreie Adressierung und Pfadbildung bei Verwendung breiter Dokumenten-Identifikatoren.
-
 use contextra_graph::path_rag::{GraphPath, PathGraph, PathRAGEngine};
 use contextra_types::{DocId, EntityId};
 use std::collections::HashMap;

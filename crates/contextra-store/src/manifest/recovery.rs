@@ -1,7 +1,3 @@
-//! # Manifest-Wiederherstellung (Ring 1)
-//!
-//! Liest vorhandene Manifest-Dateien beim Start und baut das aktive VersionSet auf.
-
 use super::MAX_MANIFEST_ENTRY_SIZE;
 
 /// Evaluates whether a truncated tail frame is a plausible tail truncation resulting from power loss,

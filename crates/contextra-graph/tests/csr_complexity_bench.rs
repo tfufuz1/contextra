@@ -1,8 +1,3 @@
-//! Laufzeitkomplexitäts- und Skalierungstests für den CSR-Graphen.
-//!
-//! # Zweck
-//! Bestätigt die theoretischen Komplexitätsgrenzen O(1) und O(deg) experimentell.
-
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use contextra_ports::GraphIndex;
 use contextra_types::{Entity, EntityId};

@@ -1,22 +1,77 @@
-//! # Asynchroner WAL-Flusher (Ring 1)
-//!
-//! Koordiniert Flush- und fsync-Aufrufe mit Timeout und Batching-Strategien.
-
-use crate::error::{StoreError, StoreResult as Result};
+use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
-use super::{PoisonCause, Wal, WalEntry, WalVersion, WAL_V3_HEADER};
+use super::{Wal, WalEntry, WalVersion, WAL_V3_HEADER};
 
 static WAL_SEAL_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 #[cfg(feature = "fault-injection")]
-pub static FAIL_SYNC_ONCE: std::sync::atomic::AtomicBool =
+pub(crate) static FAIL_SYNC_ONCE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-mod command;
-pub(crate) use command::WalCommand;
+pub(crate) enum WalCommand {
+    Append {
+        payload: Vec<u8>,
+        last_hmac_val: [u8; 32],
+        ack: tokio::sync::oneshot::Sender<Result<()>>,
+    },
+    Truncate {
+        offset: u64,
+        new_last_hmac: [u8; 32],
+        ack: tokio::sync::oneshot::Sender<Result<()>>,
+    },
+    Seal {
+        ack: tokio::sync::oneshot::Sender<Result<PathBuf>>,
+    },
+    Rewrite {
+        replayed_entries: Vec<(u64, WalEntry, u64)>,
+        integrity_key: [u8; 32],
+        ack: tokio::sync::oneshot::Sender<Result<()>>,
+    },
+    Scan {
+        file_size: u64,
+        item_tx: tokio::sync::mpsc::UnboundedSender<(u64, WalEntry, u64)>,
+        ack: tokio::sync::oneshot::Sender<Result<WalVersion>>,
+    },
+}
+
+impl std::fmt::Debug for WalCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Append {
+                payload,
+                last_hmac_val,
+                ..
+            } => f
+                .debug_struct("Append")
+                .field("payload_len", &payload.len())
+                .field("last_hmac_val", last_hmac_val)
+                .finish(),
+            Self::Truncate {
+                offset,
+                new_last_hmac,
+                ..
+            } => f
+                .debug_struct("Truncate")
+                .field("offset", offset)
+                .field("new_last_hmac", new_last_hmac)
+                .finish(),
+            Self::Seal { .. } => f.debug_struct("Seal").finish(),
+            Self::Rewrite {
+                replayed_entries, ..
+            } => f
+                .debug_struct("Rewrite")
+                .field("replayed_entries_len", &replayed_entries.len())
+                .finish(),
+            Self::Scan { file_size, .. } => f
+                .debug_struct("Scan")
+                .field("file_size", file_size)
+                .finish(),
+        }
+    }
+}
 
 /// Configuration for the WAL background flusher actor.
 ///
@@ -59,7 +114,7 @@ fn encode_encrypted_rewrite_chunks(
     for entry in v3_entries {
         let entry_bytes = entry.to_bytes()?;
         if OVERHEAD + entry_bytes.len() > max_frame_size {
-            return Err(StoreError::Storage(format!(
+            return Err(ContextraError::Storage(format!(
                 "Single WAL entry size {} exceeds MAX_WAL_ENTRY_SIZE frame limit {}",
                 entry_bytes.len(),
                 max_frame_size
@@ -69,7 +124,7 @@ fn encode_encrypted_rewrite_chunks(
         if OVERHEAD + current_batch_plaintext.len() + entry_bytes.len() > max_frame_size {
             let (encrypted, nonce) = km.encrypt_auto_nonce(&current_batch_plaintext)?;
             let chunk_len = u32::try_from(12 + encrypted.len())
-                .map_err(|e| StoreError::Storage(e.to_string()))?;
+                .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
             total_bytes.extend_from_slice(&chunk_len.to_le_bytes());
             total_bytes.extend_from_slice(&nonce);
@@ -84,7 +139,7 @@ fn encode_encrypted_rewrite_chunks(
     if !current_batch_plaintext.is_empty() {
         let (encrypted, nonce) = km.encrypt_auto_nonce(&current_batch_plaintext)?;
         let chunk_len = u32::try_from(12 + encrypted.len())
-            .map_err(|e| StoreError::Storage(e.to_string()))?;
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
         total_bytes.extend_from_slice(&chunk_len.to_le_bytes());
         total_bytes.extend_from_slice(&nonce);
@@ -102,7 +157,7 @@ impl Wal {
         config: WalFlusherConfig,
     ) -> Result<()> {
         if config.queue_capacity == 0 {
-            return Err(StoreError::invalid_input(
+            return Err(ContextraError::invalid_input(
                 "WAL queue_capacity must be greater than 0",
             ));
         }
@@ -117,7 +172,7 @@ impl Wal {
         let header_written = Arc::clone(&self.header_written);
         let size = Arc::clone(&self.size);
         let last_hmac = Arc::clone(&self.last_hmac);
-        let poison_state = Arc::clone(&self.poison_state);
+        let poisoned = Arc::clone(&self.poisoned);
         let key_manager = self.key_manager.clone();
         let fallback_integrity_key = self.fallback_integrity_key;
         let allow_legacy_integrity_key_fallback =
@@ -143,16 +198,15 @@ impl Wal {
                         last_hmac_val,
                         ack,
                     } => {
-                        let current_cause = poison_state.load(std::sync::atomic::Ordering::SeqCst);
-                        if current_cause != 0 {
-                            let cause_enum = PoisonCause::from_u8(current_cause);
-                            let err_msg = format!(
-                                "WAL handle poisoned ({cause_enum:?}); requires explicit recovery or reload before further appends"
-                            );
-                            let _ = ack.send(Err(StoreError::Storage(err_msg.clone())));
+                        if poisoned.load(std::sync::atomic::Ordering::SeqCst) {
+                            let _ = ack.send(Err(ContextraError::Storage(
+                                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+                            )));
                             while let Ok(next_cmd) = rx.try_recv() {
                                 if let WalCommand::Append { ack, .. } = next_cmd {
-                                    let _ = ack.send(Err(StoreError::Storage(err_msg.clone())));
+                                    let _ = ack.send(Err(ContextraError::Storage(
+                                        "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+                                    )));
                                 }
                             }
                             continue;
@@ -224,12 +278,6 @@ impl Wal {
                             }
                         }
 
-                        if acks.iter().all(|a| a.is_closed()) {
-                            // All waiting callers cancelled/timed out before physical write.
-                            // Discard this batch to maintain atomicity and prevent phantom commits.
-                            continue;
-                        }
-
                         let size_before = size.load(std::sync::atomic::Ordering::Acquire);
                         let write_header = !header_written
                             .load(std::sync::atomic::Ordering::Acquire)
@@ -238,7 +286,7 @@ impl Wal {
                         let write_res: Result<()> = async {
                             if write_header {
                                 file.write_all(&WAL_V3_HEADER).await.map_err(|e| {
-                                    StoreError::Storage(format!(
+                                    ContextraError::Storage(format!(
                                         "WAL flusher header write failed for {}: {}",
                                         path.display(),
                                         e
@@ -277,20 +325,20 @@ impl Wal {
                                     .store(0, std::sync::atomic::Ordering::SeqCst);
                                 crate::wal::FAIL_APPEND_PARTIAL_ONCE
                                     .store(false, std::sync::atomic::Ordering::SeqCst);
-                                return Err(StoreError::Storage(
+                                return Err(ContextraError::Storage(
                                     "Simulated WAL append partial write failure (FAIL_APPEND_PARTIAL_ONCE)".into(),
                                 ));
                             }
 
                             file.write_all(&batch_payload).await.map_err(|e| {
-                                StoreError::Storage(format!(
+                                ContextraError::Storage(format!(
                                     "WAL flusher write failed for {}: {}",
                                     path.display(),
                                     e
                                 ))
                             })?;
                             file.flush().await.map_err(|e| {
-                                StoreError::Storage(format!(
+                                ContextraError::Storage(format!(
                                     "WAL flusher flush failed for {}: {}",
                                     path.display(),
                                     e
@@ -302,22 +350,11 @@ impl Wal {
                         .await;
 
                         if let Err(write_err) = write_res {
-                            let cause =
-                                if write_err.to_string().contains("FAIL_APPEND_PARTIAL_ONCE") {
-                                    PoisonCause::TornWrite
-                                } else {
-                                    PoisonCause::WriteFailed
-                                };
-                            let _ = poison_state.compare_exchange(
-                                0,
-                                cause.to_u8(),
-                                std::sync::atomic::Ordering::SeqCst,
-                                std::sync::atomic::Ordering::SeqCst,
-                            );
+                            poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
 
                             for ack in acks {
                                 let _ =
-                                    ack.send(Err(StoreError::Storage(write_err.to_string())));
+                                    ack.send(Err(ContextraError::Storage(write_err.to_string())));
                             }
                             continue;
                         }
@@ -333,13 +370,13 @@ impl Wal {
                                 )
                                 .is_ok()
                             {
-                                return Err(StoreError::Storage(
+                                return Err(ContextraError::Storage(
                                     "WAL fsync failed, outcome unknown: simulated fsync failure (FAIL_SYNC_ONCE)".into(),
                                 ));
                             }
 
                             file.sync_all().await.map_err(|e| {
-                                StoreError::Storage(format!(
+                                ContextraError::Storage(format!(
                                     "WAL fsync failed, outcome unknown: {}",
                                     e
                                 ))
@@ -349,15 +386,10 @@ impl Wal {
                         .await;
 
                         if let Err(sync_err) = sync_res {
-                            let _ = poison_state.compare_exchange(
-                                0,
-                                PoisonCause::FsyncFailed.to_u8(),
-                                std::sync::atomic::Ordering::SeqCst,
-                                std::sync::atomic::Ordering::SeqCst,
-                            );
+                            poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
                             for ack in acks {
                                 let _ =
-                                    ack.send(Err(StoreError::Storage(sync_err.to_string())));
+                                    ack.send(Err(ContextraError::Storage(sync_err.to_string())));
                             }
                             continue;
                         }
@@ -385,12 +417,10 @@ impl Wal {
                         new_last_hmac,
                         ack,
                     } => {
-                        let current_cause = poison_state.load(std::sync::atomic::Ordering::SeqCst);
-                        if current_cause != 0 {
-                            let cause_enum = PoisonCause::from_u8(current_cause);
-                            let _ = ack.send(Err(StoreError::Storage(format!(
-                                "WAL handle poisoned ({cause_enum:?}); requires explicit recovery or reload before further appends"
-                            ))));
+                        if poisoned.load(std::sync::atomic::Ordering::SeqCst) {
+                            let _ = ack.send(Err(ContextraError::Storage(
+                                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+                            )));
                             continue;
                         }
 
@@ -405,13 +435,7 @@ impl Wal {
                                 )
                                 .is_ok()
                             {
-                                let _ = poison_state.compare_exchange(
-                                    0,
-                                    PoisonCause::TruncateFailed.to_u8(),
-                                    std::sync::atomic::Ordering::SeqCst,
-                                    std::sync::atomic::Ordering::SeqCst,
-                                );
-                                return Err(StoreError::Storage(
+                                return Err(ContextraError::Storage(
                                     "Simulated WAL truncate I/O failure (FAIL_TRUNCATE_ONCE)"
                                         .into(),
                                 ));
@@ -420,13 +444,7 @@ impl Wal {
                             size.store(offset, std::sync::atomic::Ordering::SeqCst);
 
                             if let Err(e) = file.set_len(offset).await {
-                                let _ = poison_state.compare_exchange(
-                                    0,
-                                    PoisonCause::TruncateFailed.to_u8(),
-                                    std::sync::atomic::Ordering::SeqCst,
-                                    std::sync::atomic::Ordering::SeqCst,
-                                );
-                                return Err(StoreError::Storage(format!(
+                                return Err(ContextraError::Storage(format!(
                                     "WAL truncate failed for {}: {}",
                                     path.display(),
                                     e
@@ -434,13 +452,8 @@ impl Wal {
                             }
 
                             if let Err(e) = file.sync_all().await {
-                                let _ = poison_state.compare_exchange(
-                                    0,
-                                    PoisonCause::FsyncFailed.to_u8(),
-                                    std::sync::atomic::Ordering::SeqCst,
-                                    std::sync::atomic::Ordering::SeqCst,
-                                );
-                                return Err(StoreError::Storage(format!(
+                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+                                return Err(ContextraError::Storage(format!(
                                     "WAL truncate fsync failed for {}: {}",
                                     path.display(),
                                     e
@@ -448,13 +461,8 @@ impl Wal {
                             }
 
                             if let Err(e) = file.seek(std::io::SeekFrom::Start(offset)).await {
-                                let _ = poison_state.compare_exchange(
-                                    0,
-                                    PoisonCause::TruncateFailed.to_u8(),
-                                    std::sync::atomic::Ordering::SeqCst,
-                                    std::sync::atomic::Ordering::SeqCst,
-                                );
-                                return Err(StoreError::Storage(format!(
+                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+                                return Err(ContextraError::Storage(format!(
                                     "WAL seek after truncate failed for {}: {}",
                                     path.display(),
                                     e
@@ -489,29 +497,19 @@ impl Wal {
                                 )
                                 .is_ok()
                             {
-                                let _ = poison_state.compare_exchange(
-                                    0,
-                                    PoisonCause::FsyncFailed.to_u8(),
-                                    std::sync::atomic::Ordering::SeqCst,
-                                    std::sync::atomic::Ordering::SeqCst,
-                                );
-                                return Err(StoreError::Storage(
+                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+                                return Err(ContextraError::Storage(
                                     "WAL fsync failed, outcome unknown: simulated fsync failure in seal".into(),
                                 ));
                             }
 
-                            if let Err(e) = file.sync_all().await {
-                                let _ = poison_state.compare_exchange(
-                                    0,
-                                    PoisonCause::FsyncFailed.to_u8(),
-                                    std::sync::atomic::Ordering::SeqCst,
-                                    std::sync::atomic::Ordering::SeqCst,
-                                );
-                                return Err(StoreError::Storage(format!(
+                            file.sync_all().await.map_err(|e| {
+                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+                                ContextraError::Storage(format!(
                                     "WAL fsync failed, outcome unknown: vor rotate_and_seal fehlgeschlagen: {}",
                                     e
-                                )));
-                            }
+                                ))
+                            })?;
 
                             let mut seq = WAL_SEAL_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             let sealed_path = loop {
@@ -528,7 +526,7 @@ impl Wal {
                                     }
                                     Ok(false) => break candidate_path,
                                     Err(e) => {
-                                        return Err(StoreError::Storage(format!(
+                                        return Err(ContextraError::Storage(format!(
                                             "WAL try_exists check failed during rotate_and_seal for {}: {}",
                                             candidate_path.display(),
                                             e
@@ -540,7 +538,7 @@ impl Wal {
                             crate::wal::fs::rename(&path, &sealed_path)
                                 .await
                                 .map_err(|e| {
-                                    StoreError::Storage(format!(
+                                    ContextraError::Storage(format!(
                                         "WAL rotate_and_seal rename {} → {} fehlgeschlagen: {}",
                                         path.display(),
                                         sealed_path.display(),
@@ -548,20 +546,12 @@ impl Wal {
                                     ))
                                 })?;
 
-                            if let Err(e) = crate::util::fsync_parent_dir(&sealed_path).await {
-                                let _ = poison_state.compare_exchange(
-                                    0,
-                                    PoisonCause::FsyncFailed.to_u8(),
-                                    std::sync::atomic::Ordering::SeqCst,
-                                    std::sync::atomic::Ordering::SeqCst,
-                                );
-                                return Err(StoreError::Storage(e.to_string()));
-                            }
+                            crate::util::fsync_parent_dir(&sealed_path).await?;
 
                             let mut perms = crate::wal::fs::metadata(&sealed_path)
                                 .await
                                 .map_err(|e| {
-                                    StoreError::Storage(format!(
+                                    ContextraError::Storage(format!(
                                         "WAL metadata nach seal fehlgeschlagen: {}",
                                         e
                                     ))
@@ -571,7 +561,7 @@ impl Wal {
                             crate::wal::fs::set_permissions(&sealed_path, perms)
                                 .await
                                 .map_err(|e| {
-                                    StoreError::Storage(format!(
+                                    ContextraError::Storage(format!(
                                         "WAL set_readonly fehlgeschlagen: {}",
                                         e
                                     ))
@@ -625,26 +615,14 @@ impl Wal {
 
                             let write_res: Result<()> = async {
                                 file.seek(std::io::SeekFrom::Start(0)).await.map_err(|e| {
-                                    let _ = poison_state.compare_exchange(
-                                        0,
-                                        PoisonCause::TruncateFailed.to_u8(),
-                                        std::sync::atomic::Ordering::SeqCst,
-                                        std::sync::atomic::Ordering::SeqCst,
-                                    );
-                                    StoreError::Storage(format!(
+                                    ContextraError::Storage(format!(
                                         "WAL seek failed during migration for {}: {}",
                                         path.display(),
                                         e
                                     ))
                                 })?;
                                 file.set_len(0).await.map_err(|e| {
-                                    let _ = poison_state.compare_exchange(
-                                        0,
-                                        PoisonCause::TruncateFailed.to_u8(),
-                                        std::sync::atomic::Ordering::SeqCst,
-                                        std::sync::atomic::Ordering::SeqCst,
-                                    );
-                                    StoreError::Storage(format!(
+                                    ContextraError::Storage(format!(
                                         "WAL truncate failed during migration for {}: {}",
                                         path.display(),
                                         e
@@ -652,26 +630,14 @@ impl Wal {
                                 })?;
 
                                 file.write_all(&total_bytes).await.map_err(|e| {
-                                    let _ = poison_state.compare_exchange(
-                                        0,
-                                        PoisonCause::WriteFailed.to_u8(),
-                                        std::sync::atomic::Ordering::SeqCst,
-                                        std::sync::atomic::Ordering::SeqCst,
-                                    );
-                                    StoreError::Storage(format!(
+                                    ContextraError::Storage(format!(
                                         "WAL migration write failed for {}: {}",
                                         path.display(),
                                         e
                                     ))
                                 })?;
                                 file.flush().await.map_err(|e| {
-                                    let _ = poison_state.compare_exchange(
-                                        0,
-                                        PoisonCause::WriteFailed.to_u8(),
-                                        std::sync::atomic::Ordering::SeqCst,
-                                        std::sync::atomic::Ordering::SeqCst,
-                                    );
-                                    StoreError::Storage(format!(
+                                    ContextraError::Storage(format!(
                                         "WAL migration flush failed for {}: {}",
                                         path.display(),
                                         e
@@ -688,25 +654,13 @@ impl Wal {
                                     )
                                     .is_ok()
                                 {
-                                    let _ = poison_state.compare_exchange(
-                                        0,
-                                        PoisonCause::FsyncFailed.to_u8(),
-                                        std::sync::atomic::Ordering::SeqCst,
-                                        std::sync::atomic::Ordering::SeqCst,
-                                    );
-                                    return Err(StoreError::Storage(
+                                    return Err(ContextraError::Storage(
                                         "WAL fsync failed, outcome unknown: simulated fsync failure in migration".into(),
                                     ));
                                 }
 
                                 file.sync_all().await.map_err(|e| {
-                                    let _ = poison_state.compare_exchange(
-                                        0,
-                                        PoisonCause::FsyncFailed.to_u8(),
-                                        std::sync::atomic::Ordering::SeqCst,
-                                        std::sync::atomic::Ordering::SeqCst,
-                                    );
-                                    StoreError::Storage(format!(
+                                    ContextraError::Storage(format!(
                                         "WAL migration fsync failed for {}: {}",
                                         path.display(),
                                         e
@@ -718,11 +672,12 @@ impl Wal {
                             .await;
 
                             if write_res.is_err() {
+                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
                                 return write_res;
                             }
 
                             let total_len_u64 = u64::try_from(total_bytes.len())
-                                .map_err(|e| StoreError::Storage(e.to_string()))?;
+                                .map_err(|e| ContextraError::Storage(e.to_string()))?;
                             size.store(total_len_u64, std::sync::atomic::Ordering::SeqCst);
                             header_written.store(true, std::sync::atomic::Ordering::Release);
                             flusher_last_hmac = last_hmac_val;

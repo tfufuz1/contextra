@@ -1,8 +1,12 @@
+// FILE-CONTEXT
+// ZWECK: Unveränderlicher LayerWitness für gemessene Restbestände nach einer Löschung (SPEC §12.7.4, INV-WITNESS-MINT-1).
+// INVARIANTEN: Der LayerWitness hat keinen öffentlichen Konstruktor außerhalb von `ScanSession::finish` in `contextra-ports/src/scanner`. Kein Default, kein Deserialize, kein From<usize>.
+// HOTSPOTS: [1-70]
 
 #![forbid(unsafe_code)]
 
 use super::layer::{ScanTechnique, WitnessLayer};
-use crate::ScanMethod;
+use contextra_types::ScanMethod;
 use serde::Serialize;
 
 /// Verifiziertes Messergebnis eines Storage-Scanners (SPEC §12.7.4).

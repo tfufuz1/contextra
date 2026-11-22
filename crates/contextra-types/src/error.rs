@@ -1,18 +1,11 @@
-#![allow(deprecated)]
-//! Fehlertypen für `Contextra`.
-//!
-//! # Architektur-Rolle: Typen-Fundament (Kanonische Fehlerdefinition)
-//!
-//! Dieses Modul stellt das zentrale `ContextraError`-Enum bereit.
-//! In Übereinstimmung mit dem Zero-Panic-Prinzip werden Fehler strukturiert modelliert
-//! und über den `?`-Operator im System propagiert.
-//!
-//! # Invarianten
-//! - Einzige Fehler-Enum: Im gesamten Workspace dient `ContextraError` als systemweiter Fehlertyp.
-//! - Abwärtskompatibilität: Durch `#[non_exhaustive]` können neue Varianten ergänzt werden,
-//!   ohne Downstream-Gleichheitsprüfungen (`match`) zu brechen.
-//! - Keine Panics: Alle Hilfs- und Konvertierungsmethoden sind panic-frei.
+//! Error types for `Contextra`.
 
+// FILE-CONTEXT
+// STAND: 2026-08-30T21:51:46Z (SESSION: a43b7682)
+// ZWECK: Kanonische unified ContextraError Enum für den gesamten Workspace.
+// INVARIANTEN: Zero-Panic via ? propagation; #[non_exhaustive] für binäre Abwärtskompatibilität. KEINE neue Error-Enum in anderen Crates anlegen.
+// HOTSPOTS: 20-180
+// NICHT-OFFENSICHTLICH: Neue Fehler-Varianten NUR unten anhängen; Downstream-Crates brauchen Wildcard-Match arm.
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md
 
 // INVARIANT: Einzige Error-Enum für den gesamten Workspace.
@@ -24,10 +17,6 @@ use thiserror::Error;
 
 /// Errors that can occur during HNSW graph deletion and repair operations.
 #[derive(Error, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[deprecated(
-    since = "0.1.0",
-    note = "Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
-)]
 pub enum HnswDeletionError {
     /// Target node with doc_id not found in graph.
     #[error("Node for doc_id {0:?} not found in HNSW index")]
@@ -109,7 +98,7 @@ pub type Result<T> = std::result::Result<T, ContextraError>;
 /// # Non-Exhaustive Variant Guarantee
 /// This enum is marked `#[non_exhaustive]` to allow appending new error variants
 /// in future minor releases without breaking downstream `match` statements across crate boundaries
-/// (such as `contextra-mcp`).
+/// (such as `contextra-py` and `contextra-mcp`).
 ///
 /// Downstream callers matching on `ContextraError` must include a wildcard arm (`_ => ...`).
 /// New variants are appended strictly to the bottom of the enum to preserve binary and FFI compatibility.
@@ -199,10 +188,6 @@ pub enum ContextraError {
     },
 
     /// HNSW graph degradation warning threshold reached.
-    #[deprecated(
-        since = "0.1.0",
-        note = "Indexspezifische Fehler gehören in das Crate contextra-vector"
-    )]
     #[error("HNSW graph connectivity degraded: {deleted_ratio:.1}% deleted nodes")]
     HnswConnectivityDegraded {
         /// Ratio of deleted tombstone nodes in graph.
@@ -328,7 +313,7 @@ pub enum ContextraError {
         tx_id: u64,
     },
 
-    /// KV-seitige `KvDeleteMode`-Konfiguration inkonsistent mit aktiven Invarianten.
+    /// KV-seitige `KvDeleteMode`-Konfiguration inkonsistent mit `deletion_proof_active`.
     #[error("KV delete mode configuration error: {0}")]
     KvDeleteModeConfig(&'static str),
 
@@ -349,10 +334,6 @@ pub enum ContextraError {
     PinBudgetExceeded(String),
 
     /// HNSW graph repair failure.
-    #[deprecated(
-        since = "0.1.0",
-        note = "Indexspezifische Fehler gehören in das Crate contextra-vector"
-    )]
     #[error("graph repair failed: {0}")]
     GraphRepairFailed(#[from] HnswDeletionError),
 
@@ -373,15 +354,6 @@ pub enum ContextraError {
         /// Path of target file.
         target_path: String,
     },
-
-    /// Read blocked by the erasure ReadGate (SPEC §6.2): the target was erased.
-    /// Fail-closed; not distinguishable from a never-existing target.
-    #[error("Erased: target is no longer readable")]
-    Erased,
-
-    /// Read of a restricted (Art. 18 DSGVO) target without an audit entry (SPEC §5.7, T-DEL-13).
-    #[error("Restricted read requires an audit entry")]
-    RestrictedReadAuditRequired,
 }
 
 impl ContextraError {
@@ -491,21 +463,6 @@ impl ContextraError {
 impl From<std::array::TryFromSliceError> for ContextraError {
     fn from(e: std::array::TryFromSliceError) -> Self {
         Self::ParseError(e.to_string())
-    }
-}
-
-
-impl From<contextra_ids::IdError> for ContextraError {
-    fn from(err: contextra_ids::IdError) -> Self {
-        match err {
-            contextra_ids::IdError::TxIdAllocationOverflow(offset) => {
-                ContextraError::Transaction(format!(
-                    "Internal TxId allocation offset {offset} overflows u64::MAX (INTERNAL_BASE={})",
-                    contextra_ids::TxId::INTERNAL_BASE
-                ))
-            }
-            other => ContextraError::InvalidInput(other.to_string()),
-        }
     }
 }
 

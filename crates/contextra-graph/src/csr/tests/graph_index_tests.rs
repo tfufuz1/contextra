@@ -1,27 +1,24 @@
-#![cfg(feature = "workspace")]
-//! Tests für die `GraphIndex`-Port-Schnittstelle auf `CsrGraph`.
-//!
-//! # Zweck
-//! Sichert die Einhaltung der Schnittstellenvereinbarungen gegen funktionale Regressionen ab.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::super::*;
 use super::basic_tests::setup_test_graph;
-use crate::csr::types::{CsrGraphConfig, EdgePayload, PersistedEdgePayload, MAX_VISITED_NODES};
+use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload, MAX_VISITED_NODES};
 use contextra_ports::{GraphIndex, StorageEngine};
-use crate::error::GraphError;
 use contextra_types::{ContextraError, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 #[tokio::test]
 #[allow(non_snake_case)]
+async fn set_storage_and_with_config_and_storage_CASE_initialization() {
+    use contextra_store::{LsmConfig, LsmStorage};
 
-// SECTION Graph Index Tests Core Implementation
-async fn test_set_storage_and_with_config_and_storage_CASE_initialization() {
-    use crate::test_doubles::InMemoryStorageEngine;
-
-    let storage: Arc<dyn StorageEngine> = Arc::new(InMemoryStorageEngine::new());
+    let dir = tempfile::tempdir().unwrap(); // unwrap allowed
+    let storage: Arc<dyn StorageEngine> = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap allowed
+    );
 
     let config = CsrGraphConfig {
         rebuild_threshold: 50,
@@ -31,7 +28,15 @@ async fn test_set_storage_and_with_config_and_storage_CASE_initialization() {
     assert!(graph.storage.is_some());
 
     // Replace storage via set_storage
-    let storage2: Arc<dyn StorageEngine> = Arc::new(InMemoryStorageEngine::new());
+    let dir2 = tempfile::tempdir().unwrap(); // unwrap allowed
+    let storage2: Arc<dyn StorageEngine> = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir2.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap allowed
+    );
 
     graph.set_storage(storage2);
     assert!(graph.storage.is_some());
@@ -39,7 +44,7 @@ async fn test_set_storage_and_with_config_and_storage_CASE_initialization() {
 
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn test_insert_entity_direct_and_edge_direct_CASE_and_boundaries() {
+async fn insert_entity_direct_and_edge_direct_CASE_and_boundaries() {
     let graph = Arc::new(CsrGraph::new());
 
     let id1 = EntityId::new(10);
@@ -67,10 +72,16 @@ async fn test_insert_entity_direct_and_edge_direct_CASE_and_boundaries() {
 
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn test_persist_entity_edge_delete_persistence_CASE_direct_calls() {
-    use crate::test_doubles::InMemoryStorageEngine;
+async fn persist_entity_edge_delete_persistence_CASE_direct_calls() {
+    use contextra_store::{LsmConfig, LsmStorage};
 
-    let storage = InMemoryStorageEngine::new(); // unwrap allowed
+    let dir = tempfile::tempdir().unwrap(); // unwrap allowed
+    let storage = LsmStorage::new(LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    })
+    .await
+    .unwrap(); // unwrap allowed
 
     let graph = CsrGraph::new();
     let tx = TxId::new(10);
@@ -105,10 +116,16 @@ async fn test_persist_entity_edge_delete_persistence_CASE_direct_calls() {
 
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn test_load_from_storage_CASE_legacy_f32_weight_and_invalid_key() {
-    use crate::test_doubles::InMemoryStorageEngine;
+async fn load_from_storage_CASE_legacy_f32_weight_and_invalid_key() {
+    use contextra_store::{LsmConfig, LsmStorage};
 
-    let storage = InMemoryStorageEngine::new(); // unwrap allowed
+    let dir = tempfile::tempdir().unwrap(); // unwrap allowed
+    let storage = LsmStorage::new(LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    })
+    .await
+    .unwrap(); // unwrap allowed
 
     let tx = TxId::new(1);
 
@@ -187,7 +204,7 @@ async fn test_traverse_max_hops_exceeded_emits_warning() {
 
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn test_traverse_at_time_CASE_saturating_max_hops() {
+async fn traverse_at_time_CASE_saturating_max_hops() {
     let graph = setup_test_graph().await;
 
     // Traverse with max_hops 100 (should saturate safely to MAX_TRAVERSAL_HOPS=3 without panic/OOM)
@@ -202,7 +219,7 @@ async fn test_traverse_at_time_CASE_saturating_max_hops() {
 
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn test_traverse_CASE_exceeds_max_hops_returns_invalid_input() {
+async fn traverse_CASE_exceeds_max_hops_returns_invalid_input() {
     let graph = setup_test_graph().await;
 
     let err = graph.traverse(EntityId::new(1), 101).await.unwrap_err();
@@ -217,7 +234,7 @@ async fn test_traverse_CASE_exceeds_max_hops_returns_invalid_input() {
 
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn test_pagerank_CASE_empty_graph_and_isolated_node() {
+async fn pagerank_CASE_empty_graph_and_isolated_node() {
     let empty_graph = CsrGraph::new();
     let ranks_empty = empty_graph.pagerank(0.85, 100, 1e-6).await;
     assert!(ranks_empty.is_empty());
@@ -235,7 +252,7 @@ async fn test_pagerank_CASE_empty_graph_and_isolated_node() {
 
 #[test]
 #[allow(non_snake_case)]
-fn test_serialization_roundtrip_CASE_persisted_edge_payload() {
+fn serialization_roundtrip_CASE_persisted_edge_payload() {
     let payload = PersistedEdgePayload {
         weight: 0.825,
         tx_valid_from: Some(TxId::new(10)),
@@ -260,7 +277,7 @@ fn test_serialization_roundtrip_CASE_persisted_edge_payload() {
 
 proptest::proptest! {
     #[test]
-    fn test_prop_csr_offset_array_structural_consistency(
+    fn prop_csr_offset_array_structural_consistency(
         node_count in 1..=30usize,
         edge_pairs in proptest::collection::vec((0..30usize, 0..30usize, 0.1f32..2.0f32), 1..100)
     ) {
@@ -563,7 +580,7 @@ async fn test_consistency_enforcer_contradiction_suppression() {
     );
     let err = res3.unwrap_err();
     assert!(
-        matches!(err, GraphError::PolicyViolation(ref msg) if msg.contains("Contradictory edge suppressed by consistency enforcer")),
+        matches!(err, ContextraError::PolicyViolation(ref msg) if msg.contains("Contradictory edge suppressed by consistency enforcer")),
         "Expected policy violation error, got: {:?}",
         err
     );
@@ -602,9 +619,17 @@ async fn test_default_csr_graph_no_consistency_check() {
 
 #[tokio::test]
 async fn test_csr_is_entity_deleted_returns_false_for_live_entity() {
-    use crate::test_doubles::InMemoryStorageEngine;
+    use contextra_store::{LsmConfig, LsmStorage};
 
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(),
+    );
     let graph = CsrGraph::with_storage(storage.clone());
     let entity_live = EntityId::new(10);
     let entity_deleted = EntityId::new(20);
@@ -672,5 +697,3 @@ fn test_edge_store_invalidated_after_compact() {
             "edge_store must be cleared by compact() so deleted/tombstoned edges are no longer returned"
         );
 }
-
-// !SECTION Graph Index Tests Core Implementation

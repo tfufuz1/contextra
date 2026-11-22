@@ -5,18 +5,16 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use crate::error::{Result, TextError};
-use crate::storage::PostingStore;
-use crate::types::MAX_SEARCH_K;
-use contextra_ids::{DocId, TxId};
-/// Persistenter invertierter Index über einer Kollektion im Storage-Backend.
+use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
+use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_SEARCH_K};
+/// An inverted index tied to a specific collection namespace.
 ///
-/// # Nebenläufigkeit & Sperrhierarchie:
-/// 1. `commit_lock` (`parking_lot::Mutex`): Serialisiert Transaktions-Commits auf den Statistiken (Single-Writer).
-/// 2. `staged_stats` (`parking_lot::Mutex`): Kurzlebiger Spinlock für ungecommittete Transaktionsänderungen im RAM.
+/// # Concurrency & Lock Hierarchy:
+/// 1. `commit_lock` (`parking_lot::Mutex`): Ensures single-writer serialization during transactional stats commits.
+/// 2. `staged_stats` (`parking_lot::Mutex`): Synchronous, short-lived spinlock guarding in-memory uncommitted transaction statistics.
 ///
-/// **Regel**: `commit_lock` muss IMMER vor `staged_stats` akquiriert werden. Niemals synchrone Sperren über `.await`-Punkte halten!
-pub struct InvertedIndex<S: PostingStore> {
+/// **Rule**: `commit_lock` must ALWAYS be acquired BEFORE acquiring `staged_stats`. Never hold synchronous lock guards across `.await` points.
+pub struct InvertedIndex<S: StorageEngine> {
     storage: Arc<S>,
     prefix: Vec<u8>,
     tokenizer: Arc<dyn Tokenizer>,
@@ -29,7 +27,7 @@ pub struct InvertedIndex<S: PostingStore> {
     pub(crate) resident_index: Arc<ResidentPostingIndex>,
 }
 
-impl<S: PostingStore> Clone for InvertedIndex<S> {
+impl<S: StorageEngine> Clone for InvertedIndex<S> {
     fn clone(&self) -> Self {
         Self {
             storage: self.storage.clone(),
@@ -46,14 +44,14 @@ impl<S: PostingStore> Clone for InvertedIndex<S> {
     }
 }
 
-impl<S: PostingStore> InvertedIndex<S> {
-    /// Maximale Textgröße pro Dokument (10 MiB) zur Begrenzung von Speicherverbrauch und DoS-Schutz.
+impl<S: StorageEngine> InvertedIndex<S> {
+    /// Maximum allowed document text size in bytes (10 MB).
     pub const MAX_TEXT_BYTES: usize = 10 * 1024 * 1024;
 
-    /// Maximale Anzahl gleichzeitig ungecommitteter Transaktionen (10.000).
+    /// Maximum allowed staged uncommitted transaction statistics changes (10,000).
     pub const MAX_STAGED_TRANSACTIONS: usize = 10_000;
 
-    /// Erzeugt einen neuen invertierten Index mit expliziter Sprachkonfiguration.
+    /// Creates a new InvertedIndex with explicit language configuration.
     ///
     /// # Language Selection
     /// Use `Language::from_iso("de")` for German,
@@ -86,12 +84,12 @@ impl<S: PostingStore> InvertedIndex<S> {
         }
     }
 
-    /// Erzeugt einen neuen invertierten Index mit englischem Standard-Tokenizer.
+    /// Creates a new InvertedIndex with English tokenizer (default).
     pub fn new(storage: Arc<S>, namespace: &str) -> Self {
         Self::new_with_language(storage, namespace, Language::English)
     }
 
-    /// Konfiguriert einen benutzerdefinierten Tokenizer.
+    /// Sets a custom tokenizer for the inverted index.
     pub fn with_tokenizer(mut self, tokenizer: Arc<dyn Tokenizer>) -> Self {
         self.tokenizer = tokenizer;
         self
@@ -112,12 +110,12 @@ impl<S: PostingStore> InvertedIndex<S> {
         &self.commit_lock
     }
 
-    /// Lädt die persistenten Statistiken (`meta:stats`) aus dem Storage in die atomaren In-Memory-Felder.
+    /// Loads index statistics from storage into the cache.
     pub async fn load_stats(&self) -> Result<()> {
         let meta_key = self.key("meta:stats");
         if let Some(bytes) = self.storage.get(&meta_key).await? {
             let meta: TextIndexMetadata = bincode::deserialize(&bytes)
-                .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?;
+                .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?;
             self.total_docs.store(meta.total_docs, Ordering::SeqCst);
             self.total_tokens.store(meta.total_tokens, Ordering::SeqCst);
             self.avg_doc_len_x1000
@@ -205,16 +203,16 @@ impl<S: PostingStore> InvertedIndex<S> {
 
                 if let Some(doc_id_raw) = parsed_doc_id {
                     if val_bytes.len() == 4 {
-                        let doc_id = DocId::new(doc_id_raw as _);
+                        let doc_id = DocId::new(doc_id_raw);
                         let tf =
                             u32::from_le_bytes((&val_bytes[..4]).try_into().map_err(|_| {
-                                TextError::Storage("Invalid posting tf length".into())
+                                ContextraError::Storage("Invalid posting tf length".into())
                             })?);
                         let dl_key = self.key_with_id("dl:", doc_id.inner());
                         let doc_len = match self.storage.get(&dl_key).await? {
                             Some(dl_bytes) if dl_bytes.len() == 4 => {
                                 u32::from_le_bytes((&dl_bytes[..]).try_into().map_err(|_| {
-                                    TextError::Storage("Invalid doc_len length".into())
+                                    ContextraError::Storage("Invalid doc_len length".into())
                                 })?)
                             }
                             _ => 0,
@@ -231,6 +229,16 @@ impl<S: PostingStore> InvertedIndex<S> {
     }
 
     /// Generates a tombstone storage key for document updating or deletion.
+    ///
+    /// # Tombstone Key & Value Schema
+    /// - **Key Format**: `__txt:{namespace}:tbs:{doc_id}:{term}`
+    /// - **Value Schema**: Empty byte slice (`&[]`).
+    /// - **Storage Layer**: Written to the transactional LSM `StorageEngine` during `upsert_document()` (updates)
+    ///   and `delete_document()` (deletions).
+    /// - **MVCC & Snapshot Isolation**: Evaluated during `search_bm25_at()` via `storage.get_at_seq(&tbs_key, seq)`.
+    ///   If a tombstone key exists at or before `seq`, the posting entry for `(term, doc_id)` is masked out.
+    /// - **Compaction Strategy**: Tombstone keys persist in storage until resolved via `resolve_tombstones()`
+    ///   or removed during background compaction when all snapshots prior to tombstone creation are no longer active.
     pub(crate) fn key_tombstone(&self, doc_id: DocId, term: &str) -> Vec<u8> {
         let mut itoa_buf = itoa::Buffer::new();
         let id_str = itoa_buf.format(doc_id.inner());
@@ -243,11 +251,10 @@ impl<S: PostingStore> InvertedIndex<S> {
         k
     }
 
-    /// Fügt ein Dokument in den Index ein oder aktualisiert ein bestehendes.
     #[tracing::instrument(skip(self, text))]
     pub async fn upsert_document(&self, tx: TxId, doc_id: DocId, text: &str) -> Result<()> {
         if text.len() > Self::MAX_TEXT_BYTES {
-            return Err(TextError::InvalidInput(format!(
+            return Err(ContextraError::InvalidInput(format!(
                 "Text length {} exceeds maximum allowed size {}",
                 text.len(),
                 Self::MAX_TEXT_BYTES
@@ -272,13 +279,13 @@ impl<S: PostingStore> InvertedIndex<S> {
                 old_len = u32::from_le_bytes(
                     (&bytes[..])
                         .try_into()
-                        .map_err(|_| TextError::Storage("Invalid doc_len length".into()))?,
+                        .map_err(|_| ContextraError::Storage("Invalid doc_len length".into()))?,
                 );
                 is_update = true;
 
                 if let Some(fw_bytes) = self.storage.get(&fw_key).await? {
                     let old_terms: Vec<String> = bincode::deserialize(&fw_bytes)
-                        .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?;
+                        .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?;
                     for term in old_terms {
                         if !tfs.contains_key(&term) {
                             let tbs_key = self.key_tombstone(doc_id, &term);
@@ -298,10 +305,10 @@ impl<S: PostingStore> InvertedIndex<S> {
 
         let unique_terms: Vec<&str> = tfs_vec.iter().map(|(k, _)| k.as_str()).collect();
         let fw_bytes = bincode::serialize(&unique_terms)
-            .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?;
+            .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?;
         self.storage.put(tx, &fw_key, &fw_bytes).await?;
 
-        // Stage stats changes
+        // Stage stats changes (Option B: Atomics as Source of Truth, no direct read-modify-write)
         let mut change = StagedStatsChange::default();
         if is_update {
             change.tokens_delta = (new_len as i64) - (old_len as i64);
@@ -328,32 +335,13 @@ impl<S: PostingStore> InvertedIndex<S> {
         Ok(())
     }
 
-    /// Schreibt Postinglisten für gegebene Terme neu (Maintenance / Rewrite API).
-    pub async fn rewrite_posting_lists(&self, tx: TxId, terms: &[&str]) -> Result<usize> {
-        let mut rewritten = 0;
-        for &term in terms {
-            self.ensure_term_loaded(term).await?;
-            let plb_key = self.key_batch_posting_list(term);
-            if let Some(plist) = self.resident_index.get(term) {
-                if !plist.is_empty() {
-                    let batch_bytes = plist.encode_compact()?;
-                    self.storage.put(tx, &plb_key, &batch_bytes).await?;
-                    rewritten += 1;
-                } else {
-                    self.storage.delete(tx, &plb_key).await?;
-                    rewritten += 1;
-                }
-            }
-        }
-        Ok(rewritten)
-    }
-
-    /// Kompaktiert Terme und bereinigt verwaiste Metadaten im Inverted Index (Maintenance / Compaction API).
-    pub async fn compact_terms(&self, tx: TxId) -> Result<u64> {
-        self.resolve_tombstones(tx).await
-    }
-
-    /// Bereinigt Tombstones im Inverted Index für gegebene Transaktion.
+    ///
+    /// For every document with a `tbs:{doc_id}` marker this method reads the
+    /// *current* forward index and removes posting-list entries for terms that
+    /// are no longer present.  Call this during background compaction or
+    /// whenever write throughput is low.
+    ///
+    /// Returns the number of tombstones that were resolved.
     pub async fn resolve_tombstones(&self, tx: TxId) -> Result<u64> {
         let tbs_prefix = {
             let mut k = Vec::with_capacity(self.prefix.len() + 4);
@@ -366,6 +354,7 @@ impl<S: PostingStore> InvertedIndex<S> {
         let mut resolved = 0u64;
 
         for (tbs_key, _) in tombstones {
+            // Format: {prefix}tbs:{doc_id}:{term}
             let suffix = &tbs_key[tbs_prefix.len()..];
             let parts: Vec<&[u8]> = suffix.split(|&b| b == b':').collect();
             if parts.len() < 2 {
@@ -381,18 +370,22 @@ impl<S: PostingStore> InvertedIndex<S> {
             let doc_id_raw_opt = std::str::from_utf8(parts[0])
                 .ok()
                 .and_then(|s| s.parse::<u128>().ok())
-                .map(|v| DocId::new(v as _));
+                .map(|v| DocId::new(v));
             let doc_id = match doc_id_raw_opt {
                 Some(v) => v,
                 None => continue,
             };
             let term = String::from_utf8_lossy(parts[1]).to_string();
 
+            // Read the *current* forward index to know which terms are live.
+            // DECISION-REF: Consistent with load_stats() (L92) — bincode errors must propagate,
+            // not be silently swallowed. Silent failure would cause phantom BM25 term deletion.
+            // AI-TAG[SPEC-DRIFT][MAJOR] RESOLVED: AGT-TXT-001 — replaced unwrap_or_default() with map_err (TS:2026-08-25T00:00:00Z)
             let fw_key = self.key_with_id("fw:", doc_id.inner());
             let is_live = if let Some(fw_bytes) = self.storage.get(&fw_key).await? {
                 let live_terms: Vec<String> = bincode::deserialize::<Vec<String>>(&fw_bytes)
                     .map_err(|e| {
-                        TextError::Storage(format!(
+                        ContextraError::Storage(format!(
                             "forward-index corrupt for doc {}: {}",
                             doc_id.inner(),
                             e
@@ -400,7 +393,7 @@ impl<S: PostingStore> InvertedIndex<S> {
                     })?;
                 live_terms.contains(&term)
             } else {
-                false
+                false // Document deleted — tombstone cleanup is safe
             };
 
             if !is_live {
@@ -425,7 +418,7 @@ impl<S: PostingStore> InvertedIndex<S> {
         Ok(resolved)
     }
 
-    /// Löscht ein Dokument logisch aus dem Index und markiert alle Terme mit Tombstones.
+    /// Deletes a document from the index.
     pub async fn delete_document(&self, tx: TxId, doc_id: DocId) -> Result<()> {
         let dl_key = self.key_with_id("dl:", doc_id.inner());
         let fw_key = self.key_with_id("fw:", doc_id.inner());
@@ -436,7 +429,7 @@ impl<S: PostingStore> InvertedIndex<S> {
                 doc_len = u32::from_le_bytes(
                     (&bytes[..])
                         .try_into()
-                        .map_err(|_| TextError::Storage("Invalid doc_len length".into()))?,
+                        .map_err(|_| ContextraError::Storage("Invalid doc_len length".into()))?,
                 );
             }
         } else {
@@ -445,6 +438,7 @@ impl<S: PostingStore> InvertedIndex<S> {
 
         self.storage.delete(tx, &dl_key).await?;
 
+        // Remove from posting lists using forward index and write tombstone markers
         if let Some(fw_bytes) = self.storage.get(&fw_key).await? {
             if let Ok(old_terms) = bincode::deserialize::<Vec<String>>(&fw_bytes) {
                 for term in &old_terms {
@@ -482,7 +476,7 @@ impl<S: PostingStore> InvertedIndex<S> {
     fn stage_stats_change(&self, tx: TxId, change: StagedStatsChange) -> Result<()> {
         let mut guard = self.staged_stats.lock();
         if guard.len() >= Self::MAX_STAGED_TRANSACTIONS && !guard.contains_key(&tx) {
-            return Err(TextError::InvalidInput(format!(
+            return Err(ContextraError::InvalidInput(format!(
                 "Staged stats limit ({}) exceeded for uncommitted transactions",
                 Self::MAX_STAGED_TRANSACTIONS
             )));
@@ -493,8 +487,7 @@ impl<S: PostingStore> InvertedIndex<S> {
         Ok(())
     }
 
-    /// Überträgt die gepufferten statistischen Änderungen einer Transaktion dauerhaft.
-    pub async fn commit_stats(&self, tx: TxId) -> Result<()> {
+    pub(crate) async fn commit_stats(&self, tx: TxId) -> Result<()> {
         let change = {
             let mut guard = self.staged_stats.lock();
             guard.remove(&tx).unwrap_or_default()
@@ -520,12 +513,7 @@ impl<S: PostingStore> InvertedIndex<S> {
             let docs = self.total_docs.load(Ordering::SeqCst);
             let tokens = self.total_tokens.load(Ordering::SeqCst);
             let avg_len = if docs > 0 {
-                let ratio = (tokens as f64) / (docs as f64);
-                if ratio.is_finite() && ratio >= 0.0 {
-                    (ratio * 1000.0).round().clamp(0.0, u64::MAX as f64) as u64
-                } else {
-                    0
-                }
+                (tokens as f64 / docs as f64 * 1000.0) as u64
             } else {
                 0
             };
@@ -544,25 +532,21 @@ impl<S: PostingStore> InvertedIndex<S> {
                 avg_doc_len_x1000: avg_len,
             };
             bincode::serialize(&meta)
-                .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?
+                .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?
         };
         let meta_key = self.key("meta:stats");
 
-        self.storage
-            .put(tx, &meta_key, &meta_bytes)
-            .await
-            .map_err(Into::into)
+        self.storage.put(tx, &meta_key, &meta_bytes).await
     }
 
-    /// Verwirft die gepufferten statistischen Änderungen einer Transaktion bei Rollback.
-    pub async fn rollback_stats(&self, tx: TxId) -> Result<()> {
+    pub(crate) async fn rollback_stats(&self, tx: TxId) -> Result<()> {
         let mut guard = self.staged_stats.lock();
         guard.remove(&tx);
         self.resident_index.clear();
         Ok(())
     }
 
-    /// Führt eine Volltextsuche mit BM25 aus.
+    /// Searches the inverted index using BM25.
     #[tracing::instrument(skip(self, query))]
     pub async fn search_bm25(
         &self,
@@ -573,7 +557,7 @@ impl<S: PostingStore> InvertedIndex<S> {
         self.search_bm25_at(query, k, max_seq).await
     }
 
-    /// Führt eine Volltextsuche mit BM25 zu einer bestimmten MVCC-Snapshot-Sequenznummer aus.
+    /// Searches the inverted index using BM25 at a specific snapshot version.
     #[tracing::instrument(skip(self, query))]
     pub async fn search_bm25_at(
         &self,
@@ -588,7 +572,7 @@ impl<S: PostingStore> InvertedIndex<S> {
         let k = k.min(MAX_SEARCH_K);
 
         if query.len() > Self::MAX_TEXT_BYTES {
-            return Err(TextError::InvalidInput(format!(
+            return Err(ContextraError::InvalidInput(format!(
                 "Query length {} exceeds maximum allowed size {}",
                 query.len(),
                 Self::MAX_TEXT_BYTES
@@ -625,31 +609,72 @@ impl<S: PostingStore> InvertedIndex<S> {
 
         Ok(wand_res.results)
     }
+}
 
-    /// Liefert die Anzahl aktiver Dokumente im Index.
-    pub fn len_sync(&self) -> usize {
-        self.total_docs.load(Ordering::Acquire) as usize
+impl<S: StorageEngine> TextIndex for InvertedIndex<S> {
+    async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {
+        let results = self.search_bm25(query, k, None).await?;
+        Ok(results
+            .into_iter()
+            .map(|(doc_id, score)| ScoredDocument { doc_id, score })
+            .collect())
     }
 
-    /// Delegiert das Commit auf der Storage-Engine nach `commit_stats`.
-    pub async fn commit(&self, tx: TxId) -> Result<()> {
+    /// Searches the inverted index at a specific MVCC sequence number snapshot.
+    ///
+    /// Snapshot isolation is preserved by delegating to `search_bm25_at()`, which uses
+    /// `scan_prefix_at()` and `get_at_seq()` on the underlying `StorageEngine`.
+    async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
+        let results = self.search_bm25(query, k, Some(seq_no)).await?;
+        Ok(results
+            .into_iter()
+            .map(|(doc_id, score)| ScoredDocument { doc_id, score })
+            .collect())
+    }
+
+    async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {
+        self.upsert_document(tx, id, text).await
+    }
+
+    async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
+        self.delete_document(tx, id).await
+    }
+
+    async fn commit(&self, tx: TxId) -> Result<()> {
         self.commit_stats(tx).await?;
         self.storage.commit(tx).await
     }
 
-    /// Delegiert das Rollback auf der Storage-Engine nach `rollback_stats`.
-    pub async fn rollback(&self, tx: TxId) -> Result<()> {
+    async fn rollback(&self, tx: TxId) -> Result<()> {
         self.rollback_stats(tx).await?;
         self.storage.rollback(tx).await
     }
 
-    /// Delegiert `rollback_to_tx` auf der Storage-Engine.
-    pub async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
+    async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
         self.storage.rollback_to_tx(tx_id).await
     }
 
-    /// Delegiert `last_tx_id` auf der Storage-Engine.
-    pub async fn last_tx_id(&self) -> Result<TxId> {
+    async fn last_tx_id(&self) -> Result<TxId> {
         self.storage.last_tx_id().await
+    }
+
+    async fn len(&self) -> usize {
+        self.total_docs.load(Ordering::Acquire) as usize
+    }
+
+    async fn stats(&self) -> Result<TextIndexStats> {
+        let meta_key = self.key("meta:stats");
+        let meta = if let Some(bytes) = self.storage.get(&meta_key).await? {
+            bincode::deserialize::<TextIndexMetadata>(&bytes)
+                .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?
+        } else {
+            TextIndexMetadata::default()
+        };
+
+        Ok(TextIndexStats {
+            num_documents: meta.total_docs as usize,
+            num_tokens: meta.total_tokens as usize,
+            memory_usage_bytes: 0,
+        })
     }
 }

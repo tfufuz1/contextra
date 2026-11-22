@@ -1,27 +1,24 @@
-
-
 #![no_main]
 
 use arbitrary::Arbitrary;
-use contextra_ports::VectorIndex;
-use contextra_types::{DistanceMetric, DocId, TxId};
-use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use libfuzzer_sys::fuzz_target;
+use contextra_types::{DistanceMetric, DocId, TxId};
+use contextra_ports::VectorIndex;
+use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom, Write};
 
 #[derive(Arbitrary, Debug)]
-pub struct HnswPersistInput {
-    pub n_vectors: u8,          // 1..=30 (klein halten für Geschwindigkeit)
-    pub dimension: u8,          // 4..=64 (mod 4 für SIMD-Alignment)
-    pub raw_floats: Vec<u8>,    // Rohdaten → reinterpret als f32-Vektoren
-    pub corrupt_offset_pct: u8, // Offset für Datei-Korruption nach persist()
-    pub corrupt_bytes: [u8; 8], // Zu injizierende Bytes
-    pub do_corrupt: bool,       // Ob überhaupt korrupt gemacht werden soll
+struct HnswPersistInput {
+    n_vectors: u8,           // 1..=30 (klein halten für Geschwindigkeit)
+    dimension: u8,           // 4..=64 (mod 4 für SIMD-Alignment)
+    raw_floats: Vec<u8>,     // Rohdaten → reinterpret als f32-Vektoren
+    corrupt_offset_pct: u8,  // Offset für Datei-Korruption nach persist()
+    corrupt_bytes: [u8; 8],  // Zu injizierende Bytes
+    do_corrupt: bool,        // Ob überhaupt korrupt gemacht werden soll
 }
 
-/// Reine Ausführungslogik für ein `HnswPersistInput`-Paket.
-pub fn fuzz_one_input(input: HnswPersistInput) {
+fuzz_target!(|input: HnswPersistInput| {
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -38,14 +35,12 @@ pub fn fuzz_one_input(input: HnswPersistInput) {
         // 2. n = (input.n_vectors as usize % 30) + 1 -> [1..30]
         let n = (input.n_vectors as usize % 30) + 1;
 
-        // Obergrenze für Rohdaten zur Vermeidung exzessiver Speicherallokation
-        let bounded_bytes = input.raw_floats.len().min(4096);
-        let float_chunks: Vec<f32> = input.raw_floats[..bounded_bytes]
+        // 3. Extract vectors from raw_floats: 4 bytes -> 1 f32, sanitize NaN/Inf -> 0.0
+        let float_chunks: Vec<f32> = input
+            .raw_floats
             .chunks_exact(4)
             .map(|chunk| {
-                let mut arr = [0u8; 4];
-                arr.copy_from_slice(chunk);
-                let f = f32::from_le_bytes(arr);
+                let f = f32::from_le_bytes(chunk.try_into().unwrap());
                 if f.is_nan() || f.is_infinite() {
                     0.0
                 } else {
@@ -84,7 +79,6 @@ pub fn fuzz_one_input(input: HnswPersistInput) {
             quantizer_recalibration_sample_size: 100,
             quantizer_drift_threshold: 0.10,
             compute_pool: None,
-            ..Default::default()
         };
 
         let index = match HnswIndex::try_new(config.clone()) {
@@ -104,7 +98,7 @@ pub fn fuzz_one_input(input: HnswPersistInput) {
         let path = temp_dir.join(format!("fuzz_hnsw_{}_{}.hnsw", std::process::id(), id));
 
         // 5. Save index
-        if index.save(&path).is_err() {
+        if index.save(&path).await.is_err() {
             let _ = std::fs::remove_file(&path);
             return;
         }
@@ -115,7 +109,7 @@ pub fn fuzz_one_input(input: HnswPersistInput) {
                 if let Ok(len) = file.metadata().map(|m| m.len()) {
                     if len > 0 {
                         let offset = (len * (input.corrupt_offset_pct as u64 % 100)) / 100;
-                        let _ = file.seek(SeekFrom::Start(offset));
+                        let _ = file.seek(SeekFrom::Start(offset)); // INTENTIONAL-DROP
                         let _res_write = file.write_all(&input.corrupt_bytes);
                         let _res_sync = file.sync_all();
                     }
@@ -133,16 +127,11 @@ pub fn fuzz_one_input(input: HnswPersistInput) {
         };
 
         // 8. Search on reloaded index if load succeeded - must not panic
-        if reloaded.load_mmap(&path).is_ok() {
+        if reloaded.load_mmap(&path).await.is_ok() {
             let query = vec![0.0f32; dim];
             let _ = reloaded.search(&query, 5).await;
         }
 
         let _ = std::fs::remove_file(&path);
     });
-}
-
-/// Fuzzing Einstiegspunkt für libFuzzer.
-fuzz_target!(|input: HnswPersistInput| {
-    fuzz_one_input(input);
 });

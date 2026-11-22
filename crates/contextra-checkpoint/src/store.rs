@@ -1,26 +1,4 @@
-//! # Persistente Checkpoint-Verwaltung und In-Memory-Index
-//!
-//! Dieses Modul stellt den zentralen Speicher für benannte Checkpoints ([`PersistentCheckpointStore`]) bereit.
-//!
-//! ## Ring & Rolle
-//! Gehört zu **Ring 1 (Persistenz)**. Verwaltet Metadaten und MVCC-Sequenznummern konsistent über Neustarts hinweg
-//! und synchronisiert diese mit der physischen Speicher-Engine ([`SnapshotSource`]).
-//!
-//! ## Hauptkomponenten
-//! - [`CheckpointRegistry`]: Trait für erweiterte Checkpoint-Operationen (Save, Load, Orphan-Recovery).
-//! - [`PersistentCheckpointStore`]: Thread-sicherer Checkpoint-Speicher mit In-Memory Caching (`parking_lot::RwLock`)
-//!   und automatischer TxId-Monotonie.
-//! - [`CheckpointIndex`]: Interne konsolidierte Map für O(1) Suchen nach Name und Sequenznummer (P-23).
-//!
-//! ## Nebenläufigkeit & Locks (P-23 Lock-Konsolidierung)
-//! - `write_lock`: Ein Tokio-Mutex serialisiert schreibende Modifikationen auf der Storage-Engine.
-//! - `index`: Schützt die Sequenz- und Namens-Mappings atomar unter einem einzigen `parking_lot::RwLock`,
-//!   um Deadlocks durch invertierte Sperr-Reihenfolgen auszuschließen.
-//! - `hwm_lock`: Schützt das Nachführen des High-Water-Marks für transaktionale Zähler.
-
-use crate::error::{CheckpointError, CheckpointResult as Result};
 use crate::guard::{CheckpointGuard, PinGuard};
-use crate::hardlink_cloner::SnapshotPinner;
 use crate::hardlink_cloner::{
     CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult,
 };
@@ -29,10 +7,9 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::{
     clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan, RecoveryReport,
 };
-use crate::snapshot_source::BoxFuture;
-use crate::snapshot_source::SnapshotSource;
-use contextra_env::{Clock, MetricsSink};
-use contextra_ids::TxId;
+use contextra_mvcc::SnapshotRegistry;
+use contextra_ports::BoxFuture;
+use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -40,33 +17,24 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-/// Trait für die erweiterte Checkpoint-Verwaltung inklusive Orphan-Recovery.
-///
-/// Definiert die Schnittstelle zum Speichern, Laden und Bereinigen von Checkpoints.
-pub trait CheckpointRegistry: Send + Sync {
-    /// Speichert die Metadaten eines Checkpoints asynchron ab.
+/// Trait für die Checkpoint-Verwaltung.
+pub trait CheckpointRegistry: contextra_ports::Checkpoint + Send + Sync {
     fn save_checkpoint<'a>(&'a self, meta: CheckpointMeta) -> BoxFuture<'a, Result<()>>;
-    /// Lädt die Metadaten eines Checkpoints anhand der Sequenznummer.
     fn load_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<Option<CheckpointMeta>>>;
-    /// Listet alle im Store registrierten Checkpoints auf.
     fn list_checkpoints<'a>(&'a self) -> BoxFuture<'a, Result<Vec<CheckpointMeta>>>;
 
-    /// Liefert eine Referenz auf die zugeordnete Orphan-Registry, falls vorhanden.
     fn orphan_registry(&self) -> Option<&Arc<InstanceOrphanRegistry>> {
         None
     }
 
-    /// Stellt verwaiste Pins wieder her und unpinnt sie in der Speicherengine.
     fn recover_orphaned_pins<'a>(&'a self) -> BoxFuture<'a, Result<Vec<PinId>>> {
         Box::pin(async move { Ok(Vec::new()) })
     }
 
-    /// Führt für alle verwaisten Checkpoints ein kontrolliertes Rollback aus.
     fn recover_orphaned_checkpoints<'a>(&'a self) -> BoxFuture<'a, Result<Vec<TxId>>> {
         Box::pin(async move { Ok(Vec::new()) })
     }
 
-    /// Schreibt ungespeicherte Orphan-Einträge auf die Festplatte.
     fn flush_orphan_registry<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
@@ -133,7 +101,7 @@ impl CheckpointIndex {
     }
 }
 
-/// Metadaten für den Transaktionszähler zur Sicherstellung monotoner TxIds über Neustarts hinweg.
+/// Counter metadata persisted to guarantee TxId monotonicity across restarts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TxCounterMeta {
     pub high_water_mark: u64,
@@ -141,8 +109,7 @@ struct TxCounterMeta {
 
 const TX_BATCH_SIZE: u64 = 100;
 
-/// Ermittelt beim Öffnen des Stores die Grenzen für den internen TxId-Zähler.
-async fn determine_tx_counter_bounds<S: SnapshotSource>(
+async fn determine_tx_counter_bounds<S: contextra_ports::StorageEngine>(
     storage: &Arc<S>,
     namespace: &str,
 ) -> Result<(u64, u64)> {
@@ -185,7 +152,7 @@ async fn determine_tx_counter_bounds<S: SnapshotSource>(
 
     if let (Some(persisted), Some(scanned)) = (persisted_val, scanned_max_raw) {
         if persisted < scanned {
-            return Err(CheckpointError::Internal(format!(
+            return Err(ContextraError::Internal(format!(
                 "TxId collision / regression detected in namespace '{namespace}': \
                  persisted tx_counter HWM ({persisted}) is strictly less than highest tx_id found in store ({scanned})"
             )));
@@ -201,8 +168,7 @@ async fn determine_tx_counter_bounds<S: SnapshotSource>(
     Ok((start_raw, initial_hwm))
 }
 
-/// Persistiert den neuen High-Water-Mark des TxId-Zählers synchron in der Storage-Engine.
-async fn persist_hwm_internal<S: SnapshotSource>(
+async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
     storage: &Arc<S>,
     namespace: &str,
     hwm: u64,
@@ -211,7 +177,7 @@ async fn persist_hwm_internal<S: SnapshotSource>(
         high_water_mark: hwm,
     };
     let bytes =
-        serde_json::to_vec(&meta).map_err(|e| CheckpointError::Serialization(e.to_string()))?;
+        serde_json::to_vec(&meta).map_err(|e| ContextraError::Serialization(e.to_string()))?;
     let key = format!("{namespace}:checkpoint:__sys_tx_counter__");
     let tx = TxId::new(TxId::INTERNAL_BASE + hwm);
     storage.put(tx, key.as_bytes(), &bytes).await?;
@@ -222,16 +188,12 @@ async fn persist_hwm_internal<S: SnapshotSource>(
 
 /// Registry für gespeicherte Checkpoints mit Thread-sicherem Zustand.
 ///
-/// # Zweck
-/// Verwaltet Checkpoint-Metadaten, koordiniert MVCC-Sequenznummern und stellt sicher,
-/// dass keine Ressourcenlecks oder TxId-Kollisionen auftreten.
-///
 /// # Invarianten
 /// - Alle Methoden sind durch `RwLock` thread-sicher
 /// - `StorageEngine`-Zugriffe nutzen atomare Transaktionen via `TxId`
 /// - Keine Panics (Zero-Panic Doctrine)
-pub struct PersistentCheckpointStore<S: SnapshotSource> {
-    pub(crate) storage: Arc<S>,
+pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
+    storage: Arc<S>,
     /// Registrierter Checkpoint-Index im Arbeitsspeicher — geschützt durch ein konsolidiertes RwLock (P-23)
     index: RwLock<CheckpointIndex>,
     /// Namespace-Präfix für Storage-Keys
@@ -251,20 +213,13 @@ pub struct PersistentCheckpointStore<S: SnapshotSource> {
     /// Instanz-spezifischer Zähler für verpasste Rollbacks
     skipped_rollbacks: Arc<AtomicU64>,
     /// Injizierbarer Zeitgeber (P28)
-    clock: Arc<dyn Clock>,
+    clock: Arc<dyn contextra_ports::Clock>,
     /// Injected metrics sink for operational monitoring
-    metrics_sink: Option<Arc<dyn MetricsSink>>,
+    metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
 }
 
-impl<S: SnapshotSource> PersistentCheckpointStore<S> {
+impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     /// Öffnet einen PersistentCheckpointStore und führt eine vollständige Orphan-Recovery für Pins und Checkpoints durch.
-    ///
-    /// # Ablauf von `open_and_recover`:
-    /// 1. Pfad zur instanzspezifischen Orphan-Registry ableiten.
-    /// 2. Registry laden und Store initialisieren.
-    /// 3. `recover_orphaned_pins()` ausführen (entpinnt verwaiste Sequenzen).
-    /// 4. `recover_orphaned_checkpoints()` ausführen (Rollback offener Transaktionen).
-    /// 5. Store-Instanz zusammen mit dem [`RecoveryReport`] zurückgeben.
     pub async fn open_and_recover(
         storage: Arc<S>,
         namespace: impl Into<String>,
@@ -328,7 +283,6 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         })
     }
 
-    /// Synchroner Konstruktor für Umgebungen ohne asynchronen Tokio-Einstiegspunkt.
     pub fn new(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self> {
         let ns = namespace.into();
         let orphan_path = std::path::PathBuf::from(format!("{ns}_orphaned_checkpoints.json"));
@@ -336,7 +290,6 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         Self::new_with_orphan_registry(storage, ns, orphan_registry)
     }
 
-    /// Synchroner Konstruktor mit injizierter Orphan Registry.
     pub fn new_with_orphan_registry(
         storage: Arc<S>,
         namespace: impl Into<String>,
@@ -361,7 +314,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
                     let rt = tokio::runtime::Builder::new_current_thread()
                         .enable_all()
                         .build()
-                        .map_err(|e| CheckpointError::Internal(e.to_string()))?;
+                        .map_err(|e| ContextraError::Internal(e.to_string()))?;
                     rt.block_on(Self::open_with_orphan_registry(
                         storage_clone,
                         ns_clone,
@@ -370,7 +323,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
                 })
                 .join()
                 .map_err(|_| {
-                    CheckpointError::Internal(
+                    ContextraError::Internal(
                         "Thread panic during PersistentCheckpointStore initialization".into(),
                     )
                 })
@@ -381,7 +334,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
                 .enable_all()
                 .build()
                 .map_err(|e| {
-                    CheckpointError::Internal(format!("Failed to create Tokio runtime: {e}"))
+                    ContextraError::Internal(format!("Failed to create Tokio runtime: {e}"))
                 })?;
             rt.block_on(Self::open_with_orphan_registry(
                 storage_clone,
@@ -391,7 +344,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         };
 
         res.map_err(|e| {
-            CheckpointError::Internal(format!(
+            ContextraError::Internal(format!(
                 "Failed to initialize PersistentCheckpointStore for namespace '{ns}': {e}"
             ))
         })
@@ -400,17 +353,10 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
     // INVARIANT: Checkpoint TxIds use INTERNAL_BASE+n range to avoid
     // collision with Collection-sequenced TxIds [1, ~10^12].
     // See: DECISIONS.md AGT-GRAPH-001, TxId::INTERNAL_BASE
-    /// Reserviert eine neue Transaktions-ID aus dem reservierten internen Bereich (`INTERNAL_BASE`).
-    ///
-    /// # Ablauf von `allocate_tx`:
-    /// 1. Atomaren Zähler `tx_counter` inkrementieren.
-    /// 2. Bei Überschreitung von 1.000.000 Fehler ausgeben (Überlaufschutz).
-    /// 3. Falls Zähler den HWM erreicht, unter `hwm_lock` neuen Batch im Storage persistieren.
-    /// 4. Neue `TxId(INTERNAL_BASE + raw)` zurückgeben.
     pub async fn allocate_tx(&self) -> Result<TxId> {
         let raw = self.tx_counter.fetch_add(1, Ordering::SeqCst);
         if raw >= 1_000_000 {
-            return Err(CheckpointError::Internal(
+            return Err(ContextraError::Internal(
                 "Checkpoint TxId counter overflow".to_string(),
             ));
         }
@@ -429,17 +375,14 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         Ok(TxId::new(TxId::INTERNAL_BASE + raw))
     }
 
-    /// Liefert die Anzahl übersprungener Rollbacks.
     pub fn skipped_rollback_count(&self) -> u64 {
         self.skipped_rollbacks.load(Ordering::Relaxed)
     }
 
-    /// Alias für `skipped_rollback_count`.
     pub fn checkpoint_guard_skipped_rollback_count(&self) -> u64 {
         self.skipped_rollback_count()
     }
 
-    /// Liefert den Zählerstand für Checkpoint-Zeitstempel.
     pub fn checkpoint_counter(&self) -> u64 {
         self.checkpoint_counter.load(Ordering::Relaxed)
     }
@@ -448,7 +391,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
     ///
     /// # Composition Root
     /// Der Composition Root setzt per `with_clock` eine injizierte Uhr (Default ist `SystemClock`).
-    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
         if let Some(reg) = Arc::get_mut(&mut self.orphan_registry) {
             reg.set_clock(clock.clone());
         }
@@ -456,23 +399,19 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         self
     }
 
-    /// Liefert den aktuellen Clock-Port.
-    pub fn clock(&self) -> &Arc<dyn Clock> {
+    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
         &self.clock
     }
 
-    /// Setzt die Metrik-Senke.
-    pub fn set_metrics_sink(&mut self, sink: Arc<dyn MetricsSink>) {
+    pub fn set_metrics_sink(&mut self, sink: Arc<dyn contextra_ports::MetricsSink>) {
         self.metrics_sink = Some(sink);
     }
 
-    /// Konfiguriert den Store mit einer Metrik-Senke.
-    pub fn with_metrics_sink(mut self, sink: Arc<dyn MetricsSink>) -> Self {
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
         self.metrics_sink = Some(sink);
         self
     }
 
-    /// Liefert einen monoton steigenden Zeitstempel in Millisekunden.
     pub fn monotonic_timestamp_ms(&self) -> u64 {
         let wall_ms = clock_timestamp_ms(self.clock.as_ref());
         self.checkpoint_counter
@@ -501,14 +440,6 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
     }
 
     /// Creates a new persistent checkpoint.
-    ///
-    /// # Ablauf von `create_checkpoint`:
-    /// 1. Bezeichner `name` und `collection_id` validieren.
-    /// 2. `write_lock` akquirieren für exklusive Schreibmutationen.
-    /// 3. Vorhandenen Checkpoint mit gleichem Namen prüfen.
-    /// 4. Mit [`PinGuard`] absichern und Metadaten über [`CheckpointManifest`] im Storage speichern.
-    /// 5. Vorherigen Checkpoint gleicher Benennung entpinnen (falls alte Sequenznummer abweicht).
-    /// 6. In-Memory Index aktualisieren und Dauer-Metrik protokollieren.
     pub async fn create_checkpoint(
         &self,
         name: &str,
@@ -528,7 +459,6 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
             tx_id,
             metadata,
             created_at: self.monotonic_timestamp_ms(),
-            id_width_bits: crate::meta::CURRENT_ID_WIDTH_BITS,
         };
 
         let _guard = self.write_lock.lock().await;
@@ -597,14 +527,6 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
     }
 
     /// Deletes a persistent checkpoint by name.
-    ///
-    /// # Ablauf von `drop_checkpoint`:
-    /// 1. Bezeichner validieren und `write_lock` holen.
-    /// 2. Checkpoint laden.
-    /// 3. Eindeutige interne TxId allozieren und Key aus Storage löschen.
-    /// 4. Transaktion committen (bei Fehlern Rollback).
-    /// 5. Sequenznummer im Storage entpinnen.
-    /// 6. Eintrag aus dem In-Memory-Index entfernen.
     pub async fn drop_checkpoint(&self, name: &str) -> Result<()> {
         validate_identifier("Checkpoint name", name)?;
         let _guard = self.write_lock.lock().await;
@@ -648,7 +570,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         let key = format!("{}:checkpoint:{}", self.namespace, meta.name);
         let manifest = CheckpointManifest::new(meta.clone(), vec!["storage".to_string()])?;
         let value = serde_json::to_vec(&manifest)
-            .map_err(|e| CheckpointError::Serialization(e.to_string()))?;
+            .map_err(|e| ContextraError::Serialization(e.to_string()))?;
 
         let tx = self.allocate_tx().await?;
         if let Err(e) = self.storage.put(tx, key.as_bytes(), &value).await {
@@ -686,7 +608,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
                         manifest.meta
                     } else {
                         serde_json::from_slice::<CheckpointMeta>(&bytes)
-                            .map_err(|e| CheckpointError::Serialization(e.to_string()))?
+                            .map_err(|e| ContextraError::Serialization(e.to_string()))?
                     };
                 self.index.write().insert(meta.clone());
                 Ok(Some(meta))
@@ -695,14 +617,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         }
     }
 
-    /// Listet alle persistent gespeicherten Checkpoints im konfigurierten Namespace auf.
-    ///
-    /// # Ablauf von `list_checkpoints`:
-    /// 1. Präfix-Scan auf der Storage-Engine für `{namespace}:checkpoint:` ausführen.
-    /// 2. System-Zähler-Schlüssel (`__sys_tx_counter__`) überspringen.
-    /// 3. Manifeste verifizieren und Metadaten deserialisieren.
-    /// 4. In-Memory Index mit den Ergebnissen synchronisieren.
-    /// 5. Aufsteigend nach Sequenznummer sortiert zurückgeben.
+    /// Public inherent methods for compatibility
     pub async fn list_checkpoints(&self) -> Result<Vec<CheckpointMeta>> {
         let prefix = format!("{}:checkpoint:", self.namespace);
         let entries: Vec<(Vec<u8>, Vec<u8>)> = self.storage.scan_prefix(prefix.as_bytes()).await?;
@@ -718,7 +633,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
                     manifest.meta
                 } else {
                     serde_json::from_slice::<CheckpointMeta>(&value_bytes)
-                        .map_err(|e| CheckpointError::Serialization(e.to_string()))?
+                        .map_err(|e| ContextraError::Serialization(e.to_string()))?
                 };
             result.push(meta);
         }
@@ -736,7 +651,6 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         Ok(result)
     }
 
-    /// Ruft einen Checkpoint nach Namen ab.
     pub async fn get_checkpoint(&self, name: &str) -> Result<Option<CheckpointMeta>> {
         validate_identifier("Checkpoint name", name)?;
         self.get_checkpoint_internal(name).await
@@ -755,11 +669,11 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         let meta = self
             .get_checkpoint_internal(name)
             .await?
-            .ok_or(CheckpointError::CheckpointNotFound)?;
+            .ok_or(ContextraError::CheckpointNotFound)?;
 
         let last_tx = self.storage.last_tx_id().await?;
         if last_tx > meta.tx_id {
-            return Err(CheckpointError::Transaction(format!(
+            return Err(ContextraError::Transaction(format!(
                 "Serialization barrier violation: Cannot restore checkpoint '{}' at TxId {} because newer committed transaction TxId {} exists in storage",
                 name,
                 meta.tx_id.inner(),
@@ -776,67 +690,48 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         Ok(meta)
     }
 
-    /// Liefert eine Referenz auf die Orphan-Registry.
-    /// Liefert eine Referenz auf die zugrundeliegende Speicher-Engine.
-    pub fn storage(&self) -> &Arc<S> {
-        &self.storage
-    }
-
-    /// Liefert eine Referenz auf die Orphan-Registry.
     pub fn orphan_registry(&self) -> &Arc<InstanceOrphanRegistry> {
         &self.orphan_registry
     }
 
-    /// Flusht die Orphan-Registry asynchron auf Platte.
     pub async fn flush_orphan_registry(&self) -> Result<()> {
         self.orphan_registry
             .flush_orphan_registry()
             .await
-            .map_err(|e| CheckpointError::Internal(format!("Failed to flush orphan registry: {e}")))
+            .map_err(|e| ContextraError::Internal(format!("Failed to flush orphan registry: {e}")))
     }
 
-    /// Führt einen expliziten Flush der Orphan-Registry beim Herunterfahren durch.
+    /// Performs an explicit shutdown flush of the orphan registry to disk.
     pub async fn shutdown(&self) -> Result<()> {
         self.flush_orphan_registry().await
     }
 
-    /// Alias für `shutdown()`. Führt einen kontrollierten Flush beim Schließen aus.
+    /// Alias for `shutdown()`. Performs an explicit graceful close flush.
     pub async fn close(&self) -> Result<()> {
         self.shutdown().await
     }
 
-    /// Registriert einen verwaisten Sequenz-Pin.
     pub fn register_pinned_seq_no_orphan(&self, orphan: PinnedSeqNoOrphan) {
         self.orphan_registry.register_orphan_sync(orphan);
     }
 
-    /// Registriert einen verwaisten Checkpoint.
     pub fn register_orphaned_checkpoint(&self, cp: StateCheckpoint) {
         self.orphan_registry.register_checkpoint_sync(cp);
     }
 
-    /// Liefert alle verwaisten Checkpoints.
     pub fn get_orphaned_checkpoints(&self) -> Vec<StateCheckpoint> {
         self.orphan_registry.get_orphaned_checkpoints()
     }
 
-    /// Löscht einen verwaisten Checkpoint anhand seiner Transaktions-ID.
     pub fn clear_orphaned_checkpoint(&self, tx_id: TxId) {
         self.orphan_registry.clear_orphaned_checkpoint(tx_id);
     }
 
-    /// Löscht alle verwaisten Checkpoints.
     pub fn clear_all_orphaned_checkpoints(&self) {
         self.orphan_registry.clear_all();
     }
 
     /// Recovers all registered/persisted orphaned sequence pins (ADR-052).
-    ///
-    /// # Ablauf von `recover_orphaned_pins`:
-    /// 1. Liste verwaister Pins aus der Orphan-Registry abrufen.
-    /// 2. Für jeden Pin `storage.unpin_checkpoint` aufrufen.
-    /// 3. Bei Erfolg aus der Registry entfernen.
-    /// 4. Liste der entpinnten Sequenznummern zurückliefern.
     pub async fn recover_orphaned_pins(&self) -> Result<Vec<PinId>> {
         let orphans = self.orphan_registry.get_orphan_pins();
         let mut recovered = Vec::new();
@@ -853,13 +748,6 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
 
     /// Recovers all registered/persisted orphaned checkpoints during controlled startup or recovery.
     /// Checks the serialization barrier (`last_tx <= cp.tx_id`) before executing rollback.
-    ///
-    /// # Ablauf von `recover_orphaned_checkpoints`:
-    /// 1. `write_lock` akquirieren.
-    /// 2. Verwaiste Checkpoints abfragen.
-    /// 3. Für jeden Checkpoint prüfen: `last_tx <= cp.tx_id`.
-    /// 4. Wenn zulässig, `storage.rollback_to_tx(cp.tx_id)` ausführen.
-    /// 5. Aus der Registry löschen.
     pub async fn recover_orphaned_checkpoints(&self) -> Result<Vec<TxId>> {
         let _guard = self.write_lock.lock().await;
         let orphans = self.get_orphaned_checkpoints();
@@ -896,16 +784,16 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         seq_no: u64,
         source_dir: &Path,
         target_dir: &Path,
-        snapshot_pinner: &(dyn SnapshotPinner + '_),
+        snapshot_registry: &Arc<SnapshotRegistry>,
     ) -> Result<HardlinkCloneResult> {
         let cloner = DefaultHardlinkCloner::new();
         cloner
-            .clone_sstable_hardlinks(seq_no, source_dir, target_dir, snapshot_pinner)
+            .clone_sstable_hardlinks(seq_no, source_dir, target_dir, snapshot_registry)
             .await
     }
 }
 
-impl<S: SnapshotSource> CheckpointRegistry for PersistentCheckpointStore<S> {
+impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpointStore<S> {
     fn save_checkpoint<'a>(&'a self, meta: CheckpointMeta) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let _guard = self.write_lock.lock().await;
@@ -942,6 +830,58 @@ impl<S: SnapshotSource> CheckpointRegistry for PersistentCheckpointStore<S> {
 
     fn flush_orphan_registry<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.flush_orphan_registry().await })
+    }
+}
+
+impl<S: contextra_ports::StorageEngine> contextra_ports::CheckpointCoordinator
+    for PersistentCheckpointStore<S>
+{
+    type Meta = CheckpointMeta;
+
+    async fn create_named_checkpoint(
+        &self,
+        name: &str,
+        collection_id: &str,
+        seq_no: u64,
+        tx_id: TxId,
+        metadata: serde_json::Value,
+    ) -> Result<Self::Meta> {
+        self.create_checkpoint(name, collection_id, seq_no, tx_id, metadata)
+            .await
+    }
+
+    async fn restore_named_checkpoint(&self, name: &str) -> Result<Self::Meta> {
+        self.restore_checkpoint(name).await
+    }
+
+    async fn drop_named_checkpoint(&self, name: &str) -> Result<()> {
+        self.drop_checkpoint(name).await
+    }
+
+    async fn list_named_checkpoints(&self) -> Result<Vec<Self::Meta>> {
+        self.list_checkpoints().await
+    }
+}
+
+impl<S: contextra_ports::StorageEngine> contextra_ports::Checkpoint
+    for PersistentCheckpointStore<S>
+{
+    fn take_snapshot<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<WorkflowState>> {
+        Box::pin(async move {
+            let seq_no = self.storage.last_seq_no().await?;
+            Ok(WorkflowState {
+                tx,
+                graph_hash: *blake3::hash(format!("seq-{}", seq_no).as_bytes()).as_bytes(),
+            })
+        })
+    }
+
+    fn restore<'a>(&'a self, state: &'a WorkflowState) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            self.storage.rollback_to_tx(state.tx).await?;
+            self.list_checkpoints().await?;
+            Ok(())
+        })
     }
 }
 

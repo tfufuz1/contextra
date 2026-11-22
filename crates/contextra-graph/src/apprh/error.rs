@@ -1,13 +1,9 @@
 //! Error types for Averaging-based Personalized PageRank for Hypergraphs (APPRH).
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use thiserror::Error;
 
 /// Error type for APPRH operations and parameter validations.
 #[derive(Error, Debug, Clone, PartialEq)]
-
-// SECTION Error Core Implementation
 pub enum ApprhError {
     /// Invalid parameter value provided to APPRH.
     #[error("Invalid parameter: {0}")]
@@ -22,18 +18,8 @@ pub enum ApprhError {
     NonFinite,
 }
 
-impl From<ApprhError> for crate::error::GraphError {
+impl From<ApprhError> for contextra_types::ContextraError {
     fn from(err: ApprhError) -> Self {
-        match err {
-            ApprhError::InvalidParameter(msg) => crate::error::GraphError::InvalidInput(msg),
-            ApprhError::EmptySeeds => {
-                crate::error::GraphError::InvalidInput(ApprhError::EmptySeeds.to_string())
-            }
-            ApprhError::NonFinite => {
-                crate::error::GraphError::Internal(ApprhError::NonFinite.to_string())
-            }
-        }
+        contextra_types::ContextraError::InvalidInput(err.to_string())
     }
 }
-
-// !SECTION Error Core Implementation

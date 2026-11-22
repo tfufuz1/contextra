@@ -1,23 +1,6 @@
-//! # MVCC-Referenzmodell für deterministisches Property-Testing (`reference_model`)
-//!
-//! Dieses Modul stellt mit [`ReferenceModel`] eine rein speicherbasierte, minimale
-//! und formale Referenzimplementierung für Multi-Version Concurrency Control (MVCC) bereit.
-//!
-//! ## Ring & Architektur-Einordnung
-//! - **Ring:** Werkzeug / Tooling
-//! - **Zweck:** Dient als mathematisch einfaches Orakel für differenzielles Testen
-//!   und zustandsbasiertes Property-Testing gegen komplexe Speicher-Engines (z. B. `contextra-store`).
-//! - **Frei von Nebenwirkungen:** Keine Zeit-, Zufalls- oder Dateisystemabhängigkeiten
-//!   (reine Standardbibliothek `std::collections::BTreeMap`).
-//!
-//! ## Funktionsweise
-//! Für jeden Schlüssel wird eine chronologische Versionshistorie gespeichert:
-//! `(commit_seq, Option<value>)`.
-//! - `Some(value)`: Ein aktiver Wert (Put).
-//! - `None`: Ein Löschmarker (Tombstone).
-//! Bei einer Leseoperation mit Sequenznummer `seq` wird die Historie rückwärts
-//! durchsucht, bis der jüngste Eintrag mit `version_seq <= seq` gefunden wird.
-
+// FILE-CONTEXT: Reference MVCC store model for deterministic property testing.
+// STAND: 2026-09-28
+// INVARIANTEN: Rein std, Ring-konform, deterministisch, zero time/rand dependencies.
 
 use std::collections::BTreeMap;
 use std::ops::Bound;
@@ -32,23 +15,11 @@ pub enum RefOp {
 }
 
 /// Deterministic, std-only MVCC reference model for Contextra store verification.
-///
-/// **Zweck:** Bietet eine überprüfbare "Ground Truth" für Transaktionsisolation,
-/// Snapshot-Isolation und Rollbacks.
-///
-/// **Ablauf von Schreibvorgängen:**
-/// 1. Operationen (`Put`, `Delete`) werden zunächst im unbestätigten Puffer `pending_writes` gesammelt.
-/// 2. `rollback()` verwirft alle Puffer-Einträge ohne Erhöhung der Sequenznummer.
-/// 3. `commit()` erhöht `current_seq` atomar um 1 und überträgt alle Puffer-Einträge
-///    in die `history`-Map.
 #[derive(Debug, Clone, Default)]
 pub struct ReferenceModel {
-    /// Versionshistorie: Schlüssel -> Liste von (Sequenznummer, Optionaler Wert).
     #[allow(clippy::type_complexity)]
     history: BTreeMap<Vec<u8>, Vec<(u64, Option<Vec<u8>>)>>,
-    /// Unbestätigte Staging-Operationen vor dem Commit.
     pending_writes: Vec<RefOp>,
-    /// Aktuelle High-Water-Mark-Sequenznummer (Beginnt bei 0).
     current_seq: u64,
 }
 
@@ -84,12 +55,6 @@ impl ReferenceModel {
     /// Commits all pending operations under a new sequence number.
     ///
     /// Returns the sequence number assigned to this commit batch.
-    ///
-    /// **Ablauf:**
-    /// 1. Ist der Puffer leer, bleibt die Sequenznummer unverändert.
-    /// 2. `current_seq` wird um 1 erhöht.
-    /// 3. Alle Puffer-Operationen werden entnommen (`drain`) und an die Historie
-    ///    des jeweiligen Schlüssels angehängt.
     pub fn commit(&mut self) -> u64 {
         if self.pending_writes.is_empty() {
             return self.current_seq;
@@ -132,11 +97,6 @@ impl ReferenceModel {
     /// Retrieves the value of `key` as visible at `seq`.
     ///
     /// Returns `Some(value)` if key exists and was active (not deleted) at `seq`, `None` otherwise.
-    ///
-    /// **Ablauf:**
-    /// 1. Sucht die Versionsliste zum Schlüssel in `history`.
-    /// 2. Iteriert rückwärts (`rev`), um die jüngste Version mit `version_seq <= seq` zu finden.
-    /// 3. Gibt `Some(bytes)` zurück, falls es ein aktiver Wert war, oder `None` bei Entfernung/Nichtexistenz.
     pub fn get_at(&self, key: &[u8], seq: u64) -> Option<Vec<u8>> {
         let versions = self.history.get(key)?;
         // Find latest version with version_seq <= seq
@@ -149,10 +109,6 @@ impl ReferenceModel {
     }
 
     /// Scans keys starting with `prefix` and returns key-value pairs visible at `seq`.
-    ///
-    /// **Ablauf:**
-    /// Nutzt `BTreeMap::range` ab dem Präfix und filtert gelöschte Einträge sowie
-    /// Versionen mit `version_seq > seq` heraus.
     pub fn scan_prefix_at(&self, prefix: &[u8], seq: u64) -> Vec<(Vec<u8>, Vec<u8>)> {
         let mut results = Vec::new();
         for (key, versions) in self.history.range(prefix.to_vec()..) {
@@ -226,7 +182,6 @@ impl ReferenceModel {
 mod tests {
     use super::*;
 
-    // Prüft MVCC-Snapshot-Isolation über mehrere Sequenznummern und Präfix-Scans.
     #[test]
     fn test_reference_model_mvcc_isolation() {
         let mut model = ReferenceModel::new();

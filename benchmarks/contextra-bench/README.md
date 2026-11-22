@@ -1,29 +1,65 @@
-# contextra-bench
+# Contextra Benchmark Harness (`contextra-bench`)
 
-**Zweck:** Reproduzierbares Benchmark-Harness für Retrieval-Genauigkeit und Leistung. SPEC §10.4 (Messmethodik) und Anhang D (`benchmarks/budgets.toml`).
+This crate provides a reproducible evaluation harness for retrieval quality, contextual retrieval, cross-encoder reranking, and standardized long-term conversational memory benchmarks.
 
-**Ebene:** E3, Benchmark-Crate (benchmarks/contextra-bench)
+---
 
-## Öffentliche API (`src/lib.rs`, Stand dieser README)
+## 1. Running the Standard Synthetic Benchmark
 
-Ist-Stand. Module oder Namen, die laut PLAN.md entfallen, können hier noch stehen.
+The built-in synthetic benchmark evaluates contextual retrieval prefixing and cross-encoder reranking over a synthetic multi-domain corpus.
 
-```rust
-pub mod adapters
-pub mod ann_benchmarks
-pub mod beir_eval
-pub mod compare
-pub mod matrix
-pub mod metrics
-pub mod path_rag_sweep
-pub mod regression_gate
+```bash
+cargo run -p contextra-bench -- synthetic
 ```
 
-## Features (`Cargo.toml`)
+Or simply run without arguments (defaults to synthetic):
 
-`datasets`, `default`, `external-benchmarks`
+```bash
+cargo run -p contextra-bench
+```
 
-## Dokumentation
+Output reports are written to `benchmarks/results/results.json` and `benchmarks/results/summary.md`.
 
-Das Dokument `PLAN.md` in diesem Verzeichnis ist historisch und nicht normativ (siehe `CLAUDE.md`). Maßgeblich sind `docs/SPEC.md` v4.1, §10.4 und Anhang D.
+---
 
+## 2. Running External Benchmarks
+
+### A. LongMemEval (ICLR 2025 / arXiv:2410.10813)
+
+[LongMemEval](https://github.com/xiaowu0162/longmemeval) benchmarks chat assistants on long-term interactive memory across multi-session histories and evaluates question categories including single-session user/assistant/preference recall, knowledge updates, temporal reasoning, multi-session reasoning, and abstention.
+
+#### How to Obtain the Dataset:
+1. Download the official `longmemeval_s.jsonl` or `longmemeval_m.json` file from the official repository:
+   - URL: `https://github.com/xiaowu0162/longmemeval`
+2. Save or copy the dataset file into `benchmarks/contextra-bench/data/longmemeval_s.jsonl` (or any custom path).
+
+#### Execution:
+```bash
+cargo run -p contextra-bench -- long-mem-eval --dataset path/to/longmemeval_s.jsonl
+```
+
+---
+
+### B. LoCoMo (Long Conversational Memory Benchmark)
+
+[LoCoMo](https://github.com/snap-research/locomo) (SNAP Research) evaluates memory systems over long multi-session dialogues across single-hop, multi-hop, temporal reasoning, open-domain, and adversarial question categories.
+
+#### How to Obtain the Dataset:
+1. Download `locomo10.json` from the official repository:
+   - URL: `https://github.com/snap-research/locomo`
+2. Save or copy the dataset file into `benchmarks/contextra-bench/data/locomo10.json` (or any custom path).
+
+#### Execution:
+```bash
+cargo run -p contextra-bench -- locomo --dataset path/to/locomo10.json
+```
+
+---
+
+## 3. Running Unit and Integration Tests
+
+To run all tests including fixture parsers and mock search metric evaluations:
+
+```bash
+cargo test -p contextra-bench
+```

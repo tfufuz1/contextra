@@ -1,8 +1,3 @@
-//! Test zur gemeinsamen Speichernutzung (Arc-Sharing) von Hyperkanten-Attributen.
-//!
-//! # Zweck
-//! Verifiziert Zero-Copy-Eigenschaften und Vermeidung redundanter Heap-Allokationen.
-
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::EntityId;

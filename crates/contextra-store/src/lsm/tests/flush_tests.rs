@@ -1,7 +1,3 @@
-//! # Flush-Tests (Ring 1)
-//!
-//! Validiert das Einfrieren und Persistieren voller MemTables.
-
 use super::*;
 use std::sync::atomic::Ordering;
 

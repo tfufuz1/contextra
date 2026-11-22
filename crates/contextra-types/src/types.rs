@@ -1,13 +1,4 @@
-//! Kern-Domänen-, Budget-, Filter-, Relevanz- und Suchabfragetypen.
-//!
-//! # Architektur-Rolle: Vertragsebene (contracts)
-//!
-//! Dieses Modul bündelt alle strukturellen Datentypen des Gesamtsystems:
-//! - `domain`: Fundamentale Identifikatoren (`DocId`, `TxId`, `TenantId`) und Wissensgraphen-Elemente.
-//! - `budget`: Token- und Ressourcen-Budgetierung für Inferenz und Abfrageverarbeitung.
-//! - `filter`: Strukturierte Metadaten-Filterausdrücke mit logischen Operatoren.
-//! - `importance`: Relevanzbewertung und zeitlicher Verfall (Decay) von Erinnerungen.
-//! - `saos`: Einheitliche 4-Signal-Suchabfragestrukturen (Semantik, lexikalischer Text, Graph, Recency).
+//! Core domain, budget, filter, importance, and search query data types.
 
 /// Memory and token resource budget management types.
 pub mod budget;

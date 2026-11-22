@@ -1,19 +1,12 @@
-#![cfg(feature = "types-compat")]
-//! Testsuite `audit_inspection.rs` für contextra-text.
-//!
-//! # Ring-Zuordnung
-//! Ring LAB / Testbereich.
-
 use contextra_text::morphology::{
     normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer,
 };
 use contextra_text::tokenizer::{GermanMorphTokenizer, Tokenizer};
 
-// Testfall `inspect_20_compounds`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn inspect_20_compounds() {
     let splitter = GermanCompoundSplitter::new();
-    let tokenizer = GermanMorphTokenizer::try_new().expect("try_new succeeds");
+    let tokenizer = GermanMorphTokenizer::new();
 
     let words = vec![
         "Datenschutzgrundverordnung",
@@ -49,10 +42,9 @@ fn inspect_20_compounds() {
     }
 }
 
-// Testfall `inspect_umlaut_bimap`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn inspect_umlaut_bimap() {
-    let tokenizer = GermanMorphTokenizer::try_new().expect("try_new succeeds");
+    let tokenizer = GermanMorphTokenizer::new();
 
     let pairs = vec![
         ("Bär", "Baer"),
@@ -84,7 +76,6 @@ fn inspect_umlaut_bimap() {
     }
 }
 
-// Testfall `test_b3_avgdl_consistency_100_insert_50_delete`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Result<()> {
     use contextra_ports::{StorageEngine, TextIndex};
@@ -303,7 +294,6 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
     Ok(())
 }
 
-// Testfall `test_b6_morphology_idempotency_and_proper_nouns`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_b6_morphology_idempotency_and_proper_nouns() {
     let splitter = GermanCompoundSplitter::new();
@@ -336,7 +326,6 @@ fn test_b6_morphology_idempotency_and_proper_nouns() {
     );
 }
 
-// Testfall `test_b5_wand_vs_bruteforce_1000_docs_3_terms`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_b5_wand_vs_bruteforce_1000_docs_3_terms() -> contextra_types::Result<()> {
     use contextra_ports::{StorageEngine, TextIndex};

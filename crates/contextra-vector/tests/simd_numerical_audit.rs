@@ -1,3 +1,6 @@
+// FILE-CONTEXT
+// ZWECK: Audit-Testsuite für numerische Korrektheit (SIMD vs Skalar vs f64-Referenz)
+// STAND: TS:2026-08-31T00:00:00Z
 
 use contextra_types::DistanceMetric;
 use contextra_vector::distance::*;

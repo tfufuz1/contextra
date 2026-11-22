@@ -1,33 +1,28 @@
 # contextra-checkpoint
 
-**Zweck:** Backup und Snapshots: Hartlink-Snapshot und Restore. Ausgeschlossen laut Spec: `keys/` und `erasure/` (ADR-42). Datensicherung und Wiederherstellung: SPEC §7.11.
+Persistent Checkpoint Engine und Blake3 Manifest-Verifikation.
 
-**Ebene:** E1
+Normativitätsklasse: **Kern `[K]`** (Ring 1, `stable`; §6.0, `capabilities.toml`).
 
-## Öffentliche API (`src/lib.rs`, Stand dieser README)
 
-Ist-Stand. Module oder Namen, die laut PLAN.md entfallen, können hier noch stehen.
+`contextra-checkpoint` verwaltet Time-Travel Checkpoints und Snapshots für Contextra (Ring 1).
 
-```rust
-pub mod compat
-pub mod contract
-pub use vfs::CheckpointVfs
-pub use error::{CheckpointError, CheckpointResult}
-pub use fs_seam::{FsSeam, StdFsSeam}
-pub use guard::{CheckpointGuard, PinGuard}
-pub use hardlink_cloner::
-pub use manifest::CheckpointManifest
-pub use meta::{CheckpointMeta, StateCheckpoint, CURRENT_ID_WIDTH_BITS}
-pub use orphan::
-pub use snapshot_source::{BoxFuture as LocalBoxFuture, SnapshotSource}
-pub use store::{CheckpointRegistry, PersistentCheckpointStore}
-```
+## Zweck
 
-## Features (`Cargo.toml`)
+Ermöglicht deterministische Wiederherstellung von Zuständen, Session-Snapshots und RAII-gesicherte Transaktions-Rollbacks über eine saubere Port-Schnittstelle ohne globalen Zustand.
 
-`default`, `workspace`, `types-compat`, `ports-compat`, `docid-128`
+## Ring-Zugehörigkeit & Status
 
-## Dokumentation
+- **Ring:** Ring 1 (Persistenz)
+- **Status:** 🟢 Fertig
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 
-Implementierungsspezifikation: [`PLAN.md`](PLAN.md). Maßgeblich ist `docs/SPEC.md` v4.1.
+## Öffentliche API-Übersicht
 
+- **Snapshot Guards:** `CheckpointGuard`, `PinGuard`
+- **Manifest & Metadaten:** `CheckpointManifest`, `CheckpointMeta`, `StateCheckpoint`
+- **Registry:** `PersistentCheckpointStore`
+
+## Architektur & Verweise
+
+Details zur Checkpoint-Architektur (gemäß ADR-011) finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §5.

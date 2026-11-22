@@ -401,10 +401,10 @@ async fn test_h5_ram_vs_mmap_mixed_precision_top_k() {
     }
     ram_index.commit(tx).await.unwrap();
 
-    ram_index.save(&index_path).unwrap();
+    ram_index.save(&index_path).await.unwrap();
 
     let loaded_mmap_index = HnswIndex::try_new(config.clone()).unwrap();
-    loaded_mmap_index.load_mmap(&index_path).unwrap();
+    loaded_mmap_index.load_mmap(&index_path).await.unwrap();
 
     let query = gen_vector(dim, 9999);
 
@@ -477,7 +477,7 @@ async fn test_h6_hnsw_persistence_corruption_and_bounds() {
     }
     index.commit(tx).await.unwrap();
 
-    index.save(&index_path).unwrap();
+    index.save(&index_path).await.unwrap();
 
     // Roundtrip verification
     let valid_mmap = MmapIndex::open(&index_path);

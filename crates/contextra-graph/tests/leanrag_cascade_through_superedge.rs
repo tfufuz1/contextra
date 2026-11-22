@@ -1,8 +1,3 @@
-//! Kaskadierungsprüfung über hierarchische Superedges im LeanRAG-Modus.
-//!
-//! # Zweck
-//! Stellt die korrekte Weiterleitung von Invalidierungen über Abstraktionsebenen sicher.
-
 #![allow(clippy::unwrap_used)]
 
 use contextra_graph::cascade::cascade_invalidate_hyperedges_for_superseded_doc;
@@ -97,7 +92,7 @@ async fn test_leanrag_cascade_recursive_through_superedges() {
 }
 
 #[tokio::test]
-async fn test_leanrag_cascade_conservative_multidoc_superedge() {
+async fn test_leanrag_cascade_conservative_gdpr_multidoc_superedge() {
     let graph = CsrGraph::new();
     let doc_a = DocId::from_key("doc-a").unwrap();
     let doc_b = DocId::from_key("doc-b").unwrap();

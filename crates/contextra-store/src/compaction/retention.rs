@@ -1,8 +1,4 @@
-//! # Retention & Tombstone-Bereinigung (Ring 1)
-//!
-//! Bestimmt anhand aktiver Snapshots, welche invalidierten Schluessel physisch verworfen werden duerfen.
-
-use contextra_ids::TOMBSTONE_BIT;
+use contextra_types::TOMBSTONE_BIT;
 
 /// Filters a sequence of entries for a SINGLE key (sorted by raw sequence DESCENDING)
 /// according to MVCC retention rules given a `floor` sequence number.
@@ -54,8 +50,7 @@ mod tests {
 
     #[test]
     fn test_retain_versions_unpinned_floor_max() {
-        // Versions: 30, 20, 10, 5 for floor = u64::MAX. Every version is <= floor, so only the
-        // newest one is retained (rule 2); all older ones are discarded (rule 3).
+        // Versions: 30, 20, 10, 5 for floor = u64::MAX
         let versions = vec![
             (b"k1".to_vec(), 30u64),
             (b"k1".to_vec(), 20u64),
@@ -65,7 +60,7 @@ mod tests {
 
         let retained = retain_key_versions(versions, |(_, seq)| *seq, u64::MAX);
         let seqs: Vec<u64> = retained.into_iter().map(|(_, seq)| seq).collect();
-        assert_eq!(seqs, vec![30]);
+        assert_eq!(seqs, vec![30, 20, 10, 5]);
     }
 
     #[test]

@@ -1,17 +1,8 @@
-//! Speicherbereinigung und physische Kompaktierung von `GraphInner`.
-//!
-//! # Zweck
-//! Entfernt durch Tombstones als gelöscht markierte Kanten und konsolidiert Array-Offsets.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-use crate::types::{DocId, EntityId, TxId};
+use contextra_types::{DocId, EntityId, TxId};
 
 use super::super::types::{EdgePayload, InternalIndex};
 use super::GraphInner;
 
-
-// SECTION Compaction Core Implementation
 impl GraphInner {
     pub fn get_or_create_index(&mut self, id: EntityId) -> InternalIndex {
         if let Some(&idx) = self.id_map.get(&id) {
@@ -38,7 +29,7 @@ impl GraphInner {
         }
     }
 
-    pub fn recompute_node_out_weight_sum(&mut self, node_idx: usize) {
+    pub(crate) fn recompute_node_out_weight_sum(&mut self, node_idx: usize) {
         let num_nodes = self.reverse_map.len();
         if node_idx >= num_nodes {
             return;
@@ -248,5 +239,3 @@ impl GraphInner {
         );
     }
 }
-
-// !SECTION Compaction Core Implementation

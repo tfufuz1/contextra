@@ -8,8 +8,6 @@ use contextra_ports::VectorIndex;
 use contextra_types::{DistanceMetric, DocId};
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
 use rand::Rng;
-use rand::SeedableRng;
-use rand::rngs::StdRng;
 use std::collections::HashSet;
 
 /// Independent brute-force Cosine distance calculation (anti-mirroring requirement).
@@ -74,7 +72,7 @@ async fn test_diskann_recall_at_10_above_95() {
 
     let index = DiskAnnIndex::try_new(config).expect("valid DiskAnnConfig");
 
-    let mut rng = StdRng::seed_from_u64(0xDEAD_BEEF_CAFE_BABE);
+    let mut rng = rand::thread_rng();
 
     // 1. Generate 10,000 synthetic random vectors
     let mut vectors = Vec::with_capacity(num_vectors);
@@ -150,7 +148,7 @@ async fn test_diskann_incremental_vs_full_rebuild_recall_parity() {
     let full_path = temp_dir.path().join("full_rebuild.idx");
     let inc_path = temp_dir.path().join("incremental.idx");
 
-    let mut rng = StdRng::seed_from_u64(0xDEAD_BEEF_CAFE_BABE);
+    let mut rng = rand::thread_rng();
 
     // 1. Generate base + incremental vectors
     let mut all_vectors = Vec::with_capacity(base_vectors + incremental_vectors);

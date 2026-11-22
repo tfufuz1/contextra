@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+// FILE-CONTEXT: Integration test verifying HNSW snapshot search consistency before, during, and after index rebuilds. (TS: 2026-09-11)
 
 use contextra_ports::VectorIndex;
 use contextra_ports::{Rng, SeededRng};
@@ -34,7 +35,7 @@ async fn run_hnsw_rebuild_snapshot_consistency_for_seed(seed: u64) {
         m: 16,
         ef_construction: 64,
         rebuild_threshold: 0.50,
-        distance_metric: contextra_vector::types::DistanceMetric::Euclidean,
+        distance_metric: contextra_types::DistanceMetric::Euclidean,
         ..Default::default()
     };
 
@@ -117,7 +118,7 @@ async fn run_hnsw_rebuild_snapshot_consistency_for_seed(seed: u64) {
     });
 
     // Explicitly trigger 2-phase rebuild
-    index.rebuild().expect("rebuild must succeed");
+    index.rebuild().await.expect("rebuild must succeed");
 
     // Await targeted search task
     let concurrent_search_runs = targeted_search_task

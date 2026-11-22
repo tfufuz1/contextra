@@ -1,8 +1,3 @@
-//! Stapelverarbeitungs- und Commit-Tests für die Graph-Senke in LeanRAG.
-//!
-//! # Zweck
-//! Prüft atomare Batch-Transaktionen und Konsistenz bei hohen Schreibvolumina.
-
 use contextra_graph::csr::EdgeType;
 use contextra_graph::error::GraphMutationError;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};

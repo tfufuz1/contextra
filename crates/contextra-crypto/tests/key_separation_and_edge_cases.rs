@@ -1,8 +1,8 @@
-//! # Integrationstest: `key_separation_and_edge_cases.rs`
-//!
-//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `key_separation_and_edge_cases`.
-//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
-
+// FILE-CONTEXT
+// ZWECK: Key separation and cryptographic edge cases test suite for contextra-crypto.
+// INVARIANTEN: HMAC integrity key and encryption key derived from same passphrase/salt must be distinct.
+// NICHT-OFFENSICHTLICH: Handles extreme passphrase lengths, unicode, truncated ciphertexts, and 100MB payloads without panics.
+// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

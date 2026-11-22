@@ -1,6 +1,3 @@
-#![cfg(feature = "workspace")]
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 //! Persistenz-Hilfsmethoden für CsrGraph.
 //!
 //! # Ring-0 Reinheit (R-03)
@@ -13,17 +10,13 @@ use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 
 use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, Result};
-use crate::types::{Entity, EntityId, TxId};
+use contextra_types::{ContextraError, Entity, EntityId, Result, TxId};
 
 use super::graph_write::CsrGraph;
 use super::types::{
-
     PersistedEdgePayload, GRAPH_COMMUNITY_PREFIX, GRAPH_EDGE_PREFIX, GRAPH_ENTITY_DELETED_PREFIX,
     GRAPH_ENTITY_PREFIX,
 };
-
-// SECTION Graph Persist Core Implementation
 
 impl CsrGraph {
     /// Persistiert eine einzelne Entity in den übergebenen Storage.
@@ -273,5 +266,3 @@ impl CsrGraph {
         Ok(graph)
     }
 }
-
-// !SECTION Graph Persist Core Implementation

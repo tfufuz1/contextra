@@ -1,20 +1,19 @@
-//! # Integrationstest: Deep-Tests für Kalibrierung (Isotonisch, Platt)
-//!
-//! **Crate:** `contextra-rank`
-//!
-//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
-
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// FILE-CONTEXT
+// STAND: 2026-09-09T12:37:35Z (SESSION: 20c1aaf4)
 // ZWECK: Deep integration, proptest, and adversarial test suite for contextra-rank calibration.
 // INVARIANTEN: INV-CAL-1 (no silent fallback before warmup), INV-CAL-2 (invalidation resets observations/weights), P8 compliance.
 
-use contextra_rank::ConfigFingerprint;
+use contextra_adapt::PidController;
 use contextra_rank::{IsotonicCalibrator, PlattScaler};
+use contextra_types::ConfigFingerprint;
 use proptest::prelude::*;
+use std::time::Duration;
 
 // ============================================================================
 // 1. ISOTONIC CALIBRATOR TESTS (PAVA & ECE)
 // ============================================================================
+
 #[test]
 fn test_isotonic_warmup_invariant_inv_cal1() {
     let mut cal = IsotonicCalibrator::new(20, 100);
@@ -31,7 +30,6 @@ fn test_isotonic_warmup_invariant_inv_cal1() {
     assert!(cal.calibrated_probability(0.5).is_some());
 }
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_isotonic_invalidation_invariant_inv_cal2() {
     let mut cal = IsotonicCalibrator::new(5, 100);
@@ -58,7 +56,6 @@ fn test_isotonic_invalidation_invariant_inv_cal2() {
     assert_eq!(cal.observation_count(), 5);
 }
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_isotonic_pava_monotonicity_and_bounds() {
     let mut cal = IsotonicCalibrator::new(10, 100);
@@ -95,7 +92,6 @@ fn test_isotonic_pava_monotonicity_and_bounds() {
     }
 }
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_isotonic_ece_calculation() {
     let mut cal = IsotonicCalibrator::new(20, 200);
@@ -116,7 +112,6 @@ fn test_isotonic_ece_calculation() {
     assert!(ece_val < 0.20, "ECE for well-behaved signal should be low");
 }
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_isotonic_nan_and_extreme_inputs() {
     let mut cal = IsotonicCalibrator::new(5, 50);
@@ -133,7 +128,6 @@ fn test_isotonic_nan_and_extreme_inputs() {
     assert!(prob_neg_inf.is_some());
 }
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_isotonic_duplicate_raw_score_pooling() {
     let mut cal = IsotonicCalibrator::new(4, 50);
@@ -154,7 +148,6 @@ fn test_isotonic_duplicate_raw_score_pooling() {
 // 2. PLATT SCALER TESTS
 // ============================================================================
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_platt_scaler_defaults_and_identity() {
     let scaler = PlattScaler::default();
@@ -168,7 +161,6 @@ fn test_platt_scaler_defaults_and_identity() {
     assert!((scaler.transform(0.0) - 0.5).abs() < 1e-6);
 }
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_platt_scaler_nan_logit_fallback() {
     let scaler = PlattScaler::new(2.0, 1.0);
@@ -176,7 +168,6 @@ fn test_platt_scaler_nan_logit_fallback() {
     assert_eq!(scaler.predict(f32::NAN), 0.5);
 }
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_platt_scaler_fit_behavior() {
     // Empty observations -> returns identity
@@ -194,7 +185,6 @@ fn test_platt_scaler_fit_behavior() {
     assert!(neg_scaler.predict(-0.8) < 0.5);
 }
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_platt_scaler_invalidation() {
     let mut scaler = PlattScaler::new(3.0, -1.0);
@@ -209,10 +199,81 @@ fn test_platt_scaler_invalidation() {
 }
 
 // ============================================================================
-// 3. EDGE-CASE & ANTI-MIRRORING HARDENING TESTS
+// 3. PID CONTROLLER TESTS
 // ============================================================================
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
+#[test]
+fn test_pid_controller_basic_regulation() {
+    let dt = Duration::from_millis(100);
+    let mut pid = PidController::new(150.0, 50, 200, Some(100));
+
+    // At target latency (150ms) -> pool size unchanged
+    let pool1 = pid.update(dt, 150.0);
+    assert_eq!(pool1, 100);
+
+    // Latency too high (300ms > 150ms) -> pool size decreases
+    let pool2 = pid.update(dt, 300.0);
+    assert!(pool2 < 100);
+
+    // Latency too low (50ms < 150ms) -> pool size increases
+    let pool3 = pid.update(dt, 50.0);
+    assert!(pool3 > pool2);
+}
+
+#[test]
+fn test_pid_controller_anti_windup_and_reset() {
+    let dt = Duration::from_millis(100);
+    let mut pid = PidController::new(150.0, 50, 200, Some(100));
+
+    // Saturate integral via large error
+    for _ in 0..500 {
+        pid.update(dt, 1000.0);
+    }
+    assert!(pid.current_pool_size.is_some());
+
+    pid.reset();
+    assert_eq!(pid.current_pool_size, None);
+
+    // After reset, at target latency pool size defaults to min_pool_size (50)
+    let pool_after_reset = pid.update(dt, 150.0);
+    assert_eq!(pool_after_reset, 50);
+}
+
+#[test]
+fn test_pid_controller_min_max_clamping() {
+    let dt = Duration::from_millis(100);
+    let mut pid = PidController::new(150.0, 50, 150, Some(100));
+
+    let min_clamped = pid.update(dt, 10000.0);
+    assert_eq!(min_clamped, 50);
+
+    let max_clamped = pid.update(dt, 0.0);
+    assert_eq!(max_clamped, 150);
+}
+
+#[test]
+fn test_pid_controller_non_finite_latency_safety() {
+    let dt = Duration::from_millis(100);
+    let mut pid = PidController::new(150.0, 50, 200, Some(100));
+    let pool_before = pid.update(dt, 150.0);
+
+    // Pass NaN latency
+    let pool_nan = pid.update(dt, f32::NAN);
+    assert_eq!(pool_nan, pool_before);
+
+    // Pass Infinity latency
+    let pool_inf = pid.update(dt, f32::INFINITY);
+    assert_eq!(pool_inf, pool_before);
+
+    // Subsequent normal measurement should function normally without state corruption
+    let pool_normal = pid.update(dt, 300.0);
+    assert!(pool_normal < pool_before);
+}
+
+// ============================================================================
+// 4. EDGE-CASE & ANTI-MIRRORING HARDENING TESTS
+// ============================================================================
+
 #[test]
 fn test_isotonic_pava_block_merging_fluctuating_sequence() {
     let mut cal = IsotonicCalibrator::new(6, 100);
@@ -244,7 +305,6 @@ fn test_isotonic_pava_block_merging_fluctuating_sequence() {
     );
 }
 
-// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_platt_scaler_gradient_clipping_and_extreme_logits() {
     let mut obs = Vec::new();
@@ -274,16 +334,40 @@ fn test_platt_scaler_gradient_clipping_and_extreme_logits() {
     );
 }
 
+#[test]
+fn test_pid_controller_hard_floor_50_enforcement_in_constructor() {
+    let pid = PidController::new(150.0, 10, 200, Some(100));
+    assert_eq!(
+        pid.min_pool_size, 50,
+        "Hard floor 50 must be enforced in constructor"
+    );
+}
+
 // ============================================================================
-// 4. PROPTEST PROPERTY TESTS
+// 5. PROPTEST PROPERTY TESTS
 // ============================================================================
 
 proptest! {
-    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_platt_scaler_bounded_output(logit in -100.0f32..100.0f32, a in -5.0f32..5.0f32, b in -5.0f32..5.0f32) {
         let scaler = PlattScaler::new(a, b);
         let prob = scaler.transform(logit);
         prop_assert!((0.0..=1.0).contains(&prob), "Probability out of bounds: {}", prob);
+    }
+
+    #[test]
+    fn prop_pid_output_within_bounds(
+        pool_size in 50usize..1000,
+        measured_lat in 0.0f32..2000.0f32,
+        steps in 1usize..20
+    ) {
+        let dt = Duration::from_millis(100);
+        let mut pid = PidController::new(150.0, 50, 500, Some(pool_size));
+
+        for _ in 0..steps {
+            let current_pool = pid.update(dt, measured_lat);
+            prop_assert!(current_pool >= 50, "Pool size {} below min 50", current_pool);
+            prop_assert!(current_pool <= 500, "Pool size {} above max 500", current_pool);
+        }
     }
 }

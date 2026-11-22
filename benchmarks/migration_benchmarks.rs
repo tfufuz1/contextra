@@ -1,3 +1,4 @@
+// ANCHOR[PERF:BENCH-001] STATUS:PARTIAL (TS:2026-08-29T00:00:00Z) — Benchmark Suite für LangGraph Migration
 // ZIEL: Latenz-Baseline für Contextra-interne Operationen — KEIN Cross-System-Vergleich
 // AGENT:09 DATE:2026-05-15 STATUS:PARTIAL
 

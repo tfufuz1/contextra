@@ -1,8 +1,7 @@
 use contextra_ports::VectorIndex;
-use contextra_types::{ContextraError, DocId, TxId};
+use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::MmapIndex;
-use contextra_vector::types::DistanceMetric;
 
 #[tokio::test]
 async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_types::Result<()> {
@@ -24,7 +23,7 @@ async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_types::Result<()> {
     index.insert(tx, doc_id, &vec).await?;
     index.commit(tx).await?;
 
-    index.save(&path)?;
+    index.save(&path).await?;
 
     let mmap_index = MmapIndex::open(&path)?;
     assert_eq!(mmap_index.header.node_count(), 1);
@@ -33,7 +32,7 @@ async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_types::Result<()> {
     assert_eq!(record.doc_id, doc_id.inner());
 
     let loaded_index = HnswIndex::try_new(config)?;
-    loaded_index.load_mmap(&path)?;
+    loaded_index.load_mmap(&path).await?;
 
     let search_results = loaded_index.search(&vec, 1).await?;
     assert_eq!(search_results.len(), 1);
@@ -60,7 +59,7 @@ async fn test_docid_format_mismatch_detection() -> contextra_types::Result<()> {
         .insert(tx, DocId::from(42u64), &[1.0, 2.0, 3.0, 4.0])
         .await?;
     index.commit(tx).await?;
-    index.save(&path)?;
+    index.save(&path).await?;
 
     let mut bytes = std::fs::read(&path).map_err(|e| ContextraError::Storage(e.to_string()))?;
 
@@ -70,11 +69,11 @@ async fn test_docid_format_mismatch_detection() -> contextra_types::Result<()> {
     let bad_vector_offset = 9999u64;
     bytes[vec_offset_start..vec_offset_start + 8].copy_from_slice(&bad_vector_offset.to_le_bytes());
 
-    std::fs::write(&path, &bytes).unwrap();
+    std::fs::write(&path, &bytes).map_err(|e| ContextraError::Storage(e.to_string()))?;
 
     let res = MmapIndex::open(&path);
     assert!(res.is_err(), "Expected storage error on format mismatch");
-    if let Err(contextra_vector::error::VectorError::Storage(msg)) = res {
+    if let Err(ContextraError::Storage(msg)) = res {
         assert!(
             msg.contains("mismatch") || msg.contains("size"),
             "Unexpected error message: {}",

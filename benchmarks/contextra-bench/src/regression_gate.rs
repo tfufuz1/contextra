@@ -1,3 +1,7 @@
+// FILE-CONTEXT
+// STAND: 2026-09-08 (SESSION: jules)
+// ZWECK: Regressions-Gate Evaluator für Benchmark-Baselines (LongMemEval & LoCoMo)
+// INVARIANTEN: Zero Panic, nachvollziehbare Toleranzband-Begründung, klare Exit-Codes für CI.
 
 use crate::compare::{compare_metrics_files, CombinedMetrics};
 use std::fs;

@@ -1,11 +1,3 @@
-#![cfg(feature = "workspace")]
-//! Tests für `PprContext` und Speicherpuffer-Wiederverwendung.
-//!
-//! # Zweck
-//! Verifiziert die Vermeidung wiederholter Heap-Allokationen in wiederkehrenden Aufrufen.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
@@ -13,8 +5,6 @@ use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-
-// SECTION Context Tests Core Implementation
 struct LogCaptureLayer(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
 impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for LogCaptureLayer {
     fn on_event(
@@ -192,11 +182,19 @@ async fn test_ppr_pathological_max_iterations_ceiling() {
 
 #[tokio::test]
 async fn test_ppr_ignores_deleted_entities() {
-    use crate::test_doubles::InMemoryStorageEngine;
     use contextra_ports::StorageEngine;
+    use contextra_store::{LsmConfig, LsmStorage};
     use std::sync::Arc;
 
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(),
+    );
     let graph = CsrGraph::with_storage(storage.clone());
     let tx = TxId::new(1);
 
@@ -260,11 +258,19 @@ async fn test_ppr_ignores_deleted_entities() {
 
 #[tokio::test]
 async fn test_ppr_phantom_node_no_rank_mass() {
-    use crate::test_doubles::InMemoryStorageEngine;
     use contextra_ports::StorageEngine;
+    use contextra_store::{LsmConfig, LsmStorage};
     use std::sync::Arc;
 
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let dir = tempfile::tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(),
+    );
     let graph = CsrGraph::with_storage(storage.clone());
     let tx = TxId::new(1);
 
@@ -358,11 +364,14 @@ fn test_deleted_view_methods() {
 
 #[tokio::test]
 async fn test_deleted_view_tombstone_filtering_all_entry_points() {
-    use crate::test_doubles::InMemoryStorageEngine;
     use contextra_ports::StorageEngine;
     use std::sync::Arc;
-
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let temp_dir = tempfile::tempdir().unwrap();
+    let config = contextra_store::LsmConfig {
+        path: temp_dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(contextra_store::LsmStorage::new(config).await.unwrap());
     let graph = CsrGraph::with_storage(storage.clone());
     let tx = TxId::new(1);
 
@@ -836,5 +845,3 @@ async fn test_ppr_tl_hfd_and_shadow_mode_context_dispatch() {
         "ShadowModeTlHfd should return non-empty PPR results"
     );
 }
-
-// !SECTION Context Tests Core Implementation

@@ -1,9 +1,7 @@
-//! Überwachungskomponente (`ApprhGateMonitor`) zur Serienbewertung von APPRH-Shadow-Vergleichen.
-//!
-//! # Zweck
-//! Verfolgt ein gleitendes Beobachtungsfenster von Hypergraph-Diffusionsergebnissen
-//! und schaltet bei stabiler Konvergenz automatisiert auf den Produktivmodus um.
-
+// FILE-CONTEXT
+// ZWECK: ApprhGateMonitor zur Serienbewertung von APPRH-Shadow-Vergleichen fuer Produktionsfreigabe (P1.3)
+// INVARIANTEN: Thread-sicheres gleitendes Fenster; Hysterese-Reset bei Ausreissern.
+// STAND: TS:2026-09-28T00:00:00Z
 
 use super::error::ApprhError;
 use super::shadow::{ApprhFlipGate, ApprhShadowComparison, DefaultApprhFlipGate};
@@ -12,8 +10,6 @@ use std::collections::VecDeque;
 
 /// Configuration for [`ApprhGateMonitor`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-
-// SECTION Gate Monitor Core Implementation
 pub struct ApprhGateMonitorConfig {
     /// Maximum capacity of the sliding window for historical observations.
     pub window_size: usize,
@@ -261,5 +257,3 @@ impl std::fmt::Debug for ApprhGateMonitor {
             .finish()
     }
 }
-
-// !SECTION Gate Monitor Core Implementation

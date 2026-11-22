@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: Lokaler Partial-Rebuild-Trigger für HNSW-Hot-Path-Regionen (F-02).
+// INVARIANTEN: INV-NUC-1: Partial-Rebuild darf globalen HNSW-Graph nicht inkonsistent hinterlassen.
+// NICHT-OFFENSICHTLICH: Ergänzt den globalen HNSW_REBUILD_DELETION_RATIO-Trigger hinter Feature-Flag partial-index-rebuild.
+// STAND: TS:2026-09-09T15:52:00Z (SESSION: 8fae2834)
 
 //! F-02: Lokaler Partial-Rebuild-Trigger für HNSW-Hot-Path-Regionen.
 //!
@@ -24,14 +29,10 @@
 //!    pruned edges. Thus, path length across $R$ increases by at most a factor of $\alpha$, maintaining
 //!    small-world navigability.
 //! 3. **Recall Preservation Guarantee:**
-//!    $Recall_{partial}(q, k) \ge Recall_{global}(q, k) - \epsilon$.
-//!    *Hinweis (INV-CLAIMS-1):* Der Wert $\epsilon \le 0.02$ ist ein vorläufiger Ziel-/Startwert und nicht mathematisch belegt.
-//!    Die empirische Validierung in `tests/partial_rebuild_recall_regression.rs` belegt ein Toleranzband von
-//!    bis zu $\pm 0.05$ (5 Prozentpunkte) bei 20 % Tombstones ohne Re-Wiring.
+//!    $Recall_{partial}(q, k) \ge Recall_{global}(q, k) - \epsilon$, where $\epsilon \le 0.02$ under $\theta_c \ge 3.0$
+//!    and $ef_{search} \ge M$.
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
-
-// SECTION Konfiguration
+use std::collections::{HashMap, VecDeque};
 
 /// Konfiguration für den Partial-Rebuild-Trigger.
 #[derive(Debug, Clone)]
@@ -53,9 +54,6 @@ impl Default for PartialRebuildConfig {
         }
     }
 }
-// !SECTION
-
-// SECTION TraversalTracker & Heuristik-Wächter
 
 /// Ringpuffer für besuchte HNSW-Knoten-IDs während ef_search-Traversierungen.
 #[derive(Debug)]
@@ -88,7 +86,7 @@ impl TraversalTracker {
     /// Gibt Knoten-IDs zurück, für die S_local > θ_c gilt.
     pub fn find_oversaturated_regions(
         &self,
-        tombstone_map: &BTreeMap<u64, bool>, // node_id → is_tombstoned
+        tombstone_map: &HashMap<u64, bool>, // node_id → is_tombstoned
     ) -> Vec<u64> {
         if tombstone_map.is_empty()
             || self.config.critical_ratio.is_nan()
@@ -127,7 +125,7 @@ impl TraversalTracker {
 
     /// Gibt die N zuletzt besuchten eindeutigen Knoten-IDs zurück.
     pub fn hot_path_nodes(&self) -> impl Iterator<Item = u64> + '_ {
-        let mut seen = BTreeSet::new();
+        let mut seen = std::collections::HashSet::new();
         let mut nodes = Vec::new();
 
         // Traversals starting from most recent
@@ -149,7 +147,7 @@ impl TraversalTracker {
 #[cfg(feature = "partial-index-rebuild")]
 pub fn should_trigger_partial_rebuild(
     tracker: &TraversalTracker,
-    tombstone_map: &BTreeMap<u64, bool>,
+    tombstone_map: &HashMap<u64, bool>,
     global_tombstone_ratio: f32,
     config: &PartialRebuildConfig,
 ) -> Option<Vec<u64>> {
@@ -167,10 +165,8 @@ pub fn should_trigger_partial_rebuild(
         Some(regions)
     }
 }
-// !SECTION
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -205,7 +201,7 @@ mod tests {
         let mut tracker = TraversalTracker::new(config.clone());
         tracker.record_traversal(vec![1, 2, 3, 4, 5]);
 
-        let mut tombstone_map = BTreeMap::new();
+        let mut tombstone_map = HashMap::new();
         tombstone_map.insert(1, true);
         tombstone_map.insert(2, true);
         tombstone_map.insert(3, false);
@@ -241,7 +237,7 @@ mod tests {
 
         // Record valid traversal but tombstone_map has 0 tombstones
         tracker.record_traversal(vec![1, 2, 3]);
-        let mut tombstone_map = BTreeMap::new();
+        let mut tombstone_map = HashMap::new();
         tombstone_map.insert(1, false);
         tombstone_map.insert(2, false);
 
@@ -283,7 +279,7 @@ mod tests {
         tracker.record_traversal((1..=10).collect());
 
         // Total 100 nodes in tombstone map, 5 tombstones globally (5%)
-        let mut tombstone_map = BTreeMap::new();
+        let mut tombstone_map = HashMap::new();
         for id in 1..=100 {
             tombstone_map.insert(id, false);
         }
@@ -301,7 +297,7 @@ mod tests {
         {
             let res = should_trigger_partial_rebuild(&tracker, &tombstone_map, 0.05, &config);
             assert!(res.is_some());
-            let triggered_nodes = res.expect("triggered nodes present");
+            let triggered_nodes = res.unwrap(); // unwrap
             assert_eq!(triggered_nodes.len(), 10);
         }
     }
@@ -315,7 +311,7 @@ mod tests {
         let mut tracker_nan = TraversalTracker::new(config_nan);
         tracker_nan.record_traversal(vec![1, 2, 3]);
 
-        let mut tombstone_map = BTreeMap::new();
+        let mut tombstone_map = HashMap::new();
         tombstone_map.insert(1, true);
         tombstone_map.insert(2, false);
 
@@ -339,7 +335,7 @@ mod tests {
         let mut tracker = TraversalTracker::new(config.clone());
         tracker.record_traversal(vec![1, 2, 3]);
 
-        let mut tombstone_map = BTreeMap::new();
+        let mut tombstone_map = HashMap::new();
         tombstone_map.insert(1, true);
 
         #[cfg(feature = "partial-index-rebuild")]

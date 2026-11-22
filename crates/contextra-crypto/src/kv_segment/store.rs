@@ -1,19 +1,13 @@
-//! # Geshardeter Segment-Store (`kv_segment/store.rs`)
-//!
-//! Bietet thread-sicheren Zugriff auf Segmente über konfigurierbare Shards,
-//! um Lock-Contention bei vielen parallelen Mandanten zu minimieren.
-//!
-//! ## Invarianten
-//! - Locks werden immer pro Shard genommen, niemals global über den gesamten Store.
-//! - LRU-Verdrängung rotiert fair über Mandanten, um Starvation zu verhindern.
-
+// FILE-CONTEXT
+// ZWECK: Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation).
+// STAND: TS:2026-09-13T00:00:00Z
 
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use ahash::AHashMap;
-use contextra_ids::TenantId;
+use contextra_types::TenantId;
 use lru::LruCache;
 use parking_lot::RwLock;
 
@@ -58,6 +52,7 @@ impl TenantState {
     }
 
     /// Mutabler Zugriff auf ein Segment mit LRU-Update.
+    #[cfg(feature = "kv-encryption")]
     fn get_segment_ref_mut(&mut self, id: u64) -> Option<&mut KvSegment> {
         self.cache.get_mut(&id)
     }
@@ -110,10 +105,6 @@ impl Shard {
 /// INV-TENANT-Analogon für KV-Bridge: Ein Tenant kann niemals Segmente
 /// eines anderen Tenants lesen. Strukturell erzwungen durch getrennte Maps
 /// und Sharding.
-#[deprecated(
-    since = "0.1.0",
-    note = "KV-Segment Logik ist veraltet und wird nicht mehr verwendet."
-)]
 pub struct TenantIsolatedKvStore {
     /// 32 cache-line-gepaddete RwLock-Shards. Box<[_]> für flexible Shard-Anzahl.
     shards: Box<[Shard]>,
@@ -176,28 +167,15 @@ impl TenantIsolatedKvStore {
     /// Deterministisches Shard-Mapping via Bitmask (Power-of-2).
     #[inline]
     fn shard_idx(&self, tenant: TenantId) -> usize {
-        (tenant.inner() as usize) & (self.shard_count.saturating_sub(1))
-    }
-
-    /// Liefert den Shard eines Tenants ohne Panic-Pfad.
-    ///
-    /// Der Konstruktor garantiert eine nicht-leere Zweierpotenz an Shards, der Index ist
-    /// daher stets gültig. Der `None`-Fall ist strukturell unerreichbar und wird von den
-    /// Aufrufern fail-closed behandelt (Cache-Miss bzw. Segment verwerfen).
-    #[inline]
-    fn shard_for(&self, tenant: TenantId) -> Option<&Shard> {
-        self.shards.get(self.shard_idx(tenant))
+        (tenant.inner() as usize) & (self.shard_count - 1)
     }
 
     /// Fügt ein Segment für einen bestimmten Tenant ein.
     pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment) {
-        let Some(slot) = self.shard_for(tenant) else {
-            // Unerreichbar; fail-closed: Segment wird verworfen (ZeroizeOnDrop).
-            return;
-        };
+        let idx = self.shard_idx(tenant);
         let capacity = self.segment_capacity;
         let evicted = {
-            let mut shard = slot.lock.write();
+            let mut shard = self.shards[idx].lock.write();
             let state = shard
                 .entry(tenant)
                 .or_insert_with(|| TenantState::new(capacity));
@@ -229,11 +207,9 @@ impl TenantIsolatedKvStore {
         if segment_ids.is_empty() {
             return;
         }
-        let Some(slot) = self.shard_for(tenant) else {
-            return;
-        };
+        let idx = self.shard_idx(tenant);
         let _deferred: Vec<KvSegment> = {
-            let mut shard = slot.lock.write();
+            let mut shard = self.shards[idx].lock.write();
             if let Some(state) = shard.get_mut(&tenant) {
                 let removed = segment_ids
                     .iter()
@@ -247,7 +223,6 @@ impl TenantIsolatedKvStore {
                 vec![]
             }
         }; // ← Lock freigegeben HIER, _deferred ZeroizeOnDrop läuft ausserhalb des Locks
-        #[cfg(feature = "tracing")]
         tracing::debug!(
             tenant_id = ?tenant,
             removed_segment_ids = ?segment_ids,
@@ -262,7 +237,8 @@ impl TenantIsolatedKvStore {
 
     /// Liefert unverschlüsselte Segment-Bytes für einen Tenant (Klartext-Modus).
     pub fn get_segment_bytes(&self, tenant: TenantId, segment_id: u64) -> Option<Vec<u8>> {
-        self.shard_for(tenant)?
+        let idx = self.shard_idx(tenant);
+        self.shards[idx]
             .lock
             .write()
             .get_mut(&tenant)?
@@ -270,6 +246,7 @@ impl TenantIsolatedKvStore {
     }
 
     /// Verschlüsselt einen Klartext-Tensor und fügt ein verschlüsseltes Segment ein.
+    #[cfg(feature = "kv-encryption")]
     pub fn insert_encrypted_segment(
         &self,
         cipher: &crate::KvSegmentCipher,
@@ -294,10 +271,9 @@ impl TenantIsolatedKvStore {
     /// INV-TENANT-Analogon für KV-Bridge: Ein Tenant kann niemals Segmente
     /// eines anderen Tenants lesen. Strukturell erzwungen durch getrennte Maps.
     pub fn get_segments(&self, tenant: TenantId) -> Vec<u64> {
-        let Some(slot) = self.shard_for(tenant) else {
-            return Vec::new();
-        };
-        slot.lock
+        let idx = self.shard_idx(tenant);
+        self.shards[idx]
+            .lock
             .read()
             .get(&tenant)
             .map(|state| state.segment_ids().collect())
@@ -305,16 +281,15 @@ impl TenantIsolatedKvStore {
     }
 
     /// Liest ein bestimmtes Segment eines Mandanten und entschlüsselt es falls nötig.
+    #[cfg(feature = "kv-encryption")]
     pub fn get_decrypted_segment(
         &self,
         cipher: &crate::KvSegmentCipher,
         tenant: TenantId,
         segment_id: u64,
     ) -> Result<Option<Vec<u8>>, crate::CryptoError> {
-        let Some(slot) = self.shard_for(tenant) else {
-            return Ok(None);
-        };
-        let mut shard = slot.lock.write();
+        let idx = self.shard_idx(tenant);
+        let mut shard = self.shards[idx].lock.write();
         if let Some(state) = shard.get_mut(&tenant) {
             if let Some(seg) = state.get_segment_ref_mut(segment_id) {
                 let decrypted = seg.decrypt_data(cipher)?;
@@ -326,10 +301,13 @@ impl TenantIsolatedKvStore {
 
     /// Gibt die Anzahl der gespeicherten Segmente für einen bestimmten Tenant zurück.
     pub fn get_tenant_segment_len(&self, tenant: TenantId) -> usize {
-        let Some(slot) = self.shard_for(tenant) else {
-            return 0;
-        };
-        slot.lock.read().get(&tenant).map(|s| s.len()).unwrap_or(0)
+        let idx = self.shard_idx(tenant);
+        self.shards[idx]
+            .lock
+            .read()
+            .get(&tenant)
+            .map(|s| s.len())
+            .unwrap_or(0)
     }
 
     /// Dies ist GLOBALES LRU ohne Tenant-Fairness. Für faire Multi-Tenant-Eviction siehe `evict_lru_fair()`.
@@ -374,15 +352,12 @@ impl TenantIsolatedKvStore {
                 if let Some((tenant, evicted)) = evicted_opt {
                     freed += evicted.len();
                     made_progress = true;
-                    #[cfg(feature = "tracing")]
                     tracing::debug!(
                         tenant_id = tenant.inner(),
                         segment_id = evicted.segment_id,
                         freed_bytes = evicted.len(),
                         "KV eviction worker: evicted segment"
                     );
-                    #[cfg(not(feature = "tracing"))]
-                    let _ = tenant;
                     drop(evicted); // ZeroizeOnDrop läuft hier, Lock ist bereits freigegeben
                 }
             }
@@ -446,33 +421,26 @@ impl TenantIsolatedKvStore {
                     }
 
                     let shard_idx = (start_shard + s_idx) % self.shard_count;
-                    let Some(slot) = self.shards.get(shard_idx) else {
-                        continue;
-                    };
                     let mut deferred_drop: Vec<KvSegment> = Vec::new();
                     #[cfg(test)]
                     let mut evicted_in_shard = false;
 
                     // Phase 1: Eviction unter Shard-Lock (1 Runde über Tenants des Shards)
                     {
-                        let mut shard = slot.lock.write();
+                        let mut shard = self.shards[shard_idx].lock.write();
                         if !shard.is_empty() {
                             let tenants: Vec<TenantId> = shard.keys().copied().collect();
                             let n = tenants.len();
                             if n > 0 {
-                                let offset = self
-                                    .eviction_round_offsets
-                                    .get(shard_idx)
-                                    .map_or(0, |o| o.fetch_add(1, Ordering::Relaxed))
+                                let offset = self.eviction_round_offsets[shard_idx]
+                                    .fetch_add(1, Ordering::Relaxed)
                                     % n;
 
                                 for i in (offset..n).chain(0..offset) {
                                     if freed >= target_free_bytes {
                                         break;
                                     }
-                                    let Some(&tenant) = tenants.get(i) else {
-                                        continue;
-                                    };
+                                    let tenant = tenants[i];
                                     if let Some(state) = shard.get_mut(&tenant) {
                                         if let Some(evicted) = state.pop_lru() {
                                             freed += evicted.len();
@@ -481,7 +449,6 @@ impl TenantIsolatedKvStore {
                                                 evicted_in_shard = true;
                                             }
                                             made_progress_in_pass = true;
-                                            #[cfg(feature = "tracing")]
                                             tracing::debug!(
                                                 tenant_id = tenant.inner(),
                                                 segment_id = evicted.segment_id,
@@ -526,7 +493,6 @@ impl TenantIsolatedKvStore {
         freed
     }
 
-    /// Leert alle Segmente aus allen Shards vollständig und löscht deren Speicher via Zeroize.
     pub fn clear_all(&self) {
         let mut all_segments: Vec<KvSegment> = Vec::new();
         for shard in self.shards.iter() {
@@ -538,7 +504,6 @@ impl TenantIsolatedKvStore {
             }
         } // ← Alle Shard-Locks freigegeben HIER
         drop(all_segments);
-        #[cfg(feature = "tracing")]
         tracing::warn!("KV emergency_wipe: all segments zeroized synchronously");
     }
 }

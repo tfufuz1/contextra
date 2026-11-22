@@ -1,16 +1,5 @@
-//! # Kryptographisches Fehlersystem (`error.rs`)
-//!
-//! Dieses Modul definiert den kanonischen Fehlertyp [`CryptoError`] für alle kryptographischen
-//! Operationen in Contextra (Ring 0).
-//!
-//! ## Invarianten
-//! - Keine Panics in Fehlertyp-Konvertierungen.
-//! - Fehler enthalten keine sensiblen Klartextdaten oder Schlüsselmaterialien.
-//! - Nahtlose Integration in `ContextraError` (Ring 0/Types).
-
 //! Error types for `contextra-crypto`.
 
-// SECTION [epic=crypto-error,seq=1] Imports
 use thiserror::Error;
 
 /// Result type alias for cryptographic operations in `contextra-crypto`.
@@ -18,10 +7,6 @@ pub type Result<T> = std::result::Result<T, CryptoError>;
 
 /// Standalone error type for all operations within `contextra-crypto`.
 #[derive(Debug, Error)]
-// !SECTION
-
-// SECTION [epic=crypto-error,seq=2] Kanonische Fehlerdefinition
-// NOTE: Typisierte Fehler ohne PII- oder Schlüssel-Lecks (TS:2026-11-11)
 #[non_exhaustive]
 pub enum CryptoError {
     #[error("key derivation failed: {0}")]
@@ -32,9 +17,6 @@ pub enum CryptoError {
 
     #[error("decryption failed: {0}")]
     Decryption(String),
-
-    #[error("AEAD operation failed: {0}")]
-    Aead(String),
 
     #[error("invalid nonce or key length: {0}")]
     InvalidLength(String),
@@ -64,60 +46,19 @@ pub enum CryptoError {
         reason: String,
     },
 
+    #[error("invalid deletion proof signature")]
+    InvalidProofSignature,
+
+    #[error("unsupported deletion proof version for external verification: {0}")]
+    UnsupportedProofVersion(u8),
+
     #[error("WAL truncation detected: tail HMAC mismatch")]
     WalTruncationDetected,
 
-    // --- Spec contextra-crypto v2.0 §4 (Schlüsselhierarchie / AEAD / Argon2id) ---
-    /// Passphrase darf nicht leer sein.
-    #[error("passphrase cannot be empty")]
-    EmptyPassphrase,
-
-    /// Argon2id-Parameter ungültig.
-    #[error("argon2 configuration error: {0}")]
-    Argon2Config(String),
-
-    /// Argon2id-Ableitung fehlgeschlagen.
-    #[error("argon2 key derivation failed: {0}")]
-    Argon2Derivation(String),
-
-    /// HKDF-Expansion fehlgeschlagen (Ausgabelänge ungültig).
-    #[error("HKDF expansion failed: output length invalid or key rejected")]
-    HkdfExpandFailed,
-
-    /// Cipher-Initialisierung fehlgeschlagen.
-    #[error("cipher initialization failed: {0}")]
-    CipherInit(String),
-
-    /// OS-CSPRNG lieferte keinen Zufall (Fail-Closed, kein Fallback).
-    #[error("OS CSPRNG failure: {0}")]
-    RngFailure(String),
-
-    /// AEAD-Verschlüsselung fehlgeschlagen.
-    #[error("AEAD encryption operation failed")]
-    EncryptionFailed,
-
-    /// AEAD-Entschlüsselung fehlgeschlagen: Tag-Mismatch, Korruption oder falscher AAD-Kontext.
-    #[error("AEAD decryption failed: tag mismatch, corrupted data, or invalid AAD context")]
-    DecryptionFailed,
-
-    /// Chiffretext kürzer als Nonce (12 Byte) + Tag (16 Byte).
-    #[error("ciphertext blob too short (missing 12-byte nonce or 16-byte tag)")]
-    CiphertextTooShort,
-
-    /// Schlüsselslot wurde nach Löschung nicht genullt.
-    #[error("key slot verification failed: slot is not zeroed")]
-    SlotNotZeroed,
-
     #[error("key or group has been revoked: {0}")]
     KeyRevoked(String),
-
-    #[error("storage or I/O error: {0}")]
-    Storage(String),
 }
 
-// !SECTION
-
-// SECTION [epic=crypto-error,seq=3] Konstruktionshilfen
 impl CryptoError {
     /// Helper to construct a `WalCorruption` error.
     pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self {
@@ -126,10 +67,64 @@ impl CryptoError {
             reason: reason.into(),
         }
     }
+}
 
-    /// Helper to construct a `Storage` error.
-    pub fn storage(reason: impl Into<String>) -> Self {
-        Self::Storage(reason.into())
+impl From<CryptoError> for contextra_types::ContextraError {
+    fn from(e: CryptoError) -> Self {
+        match e {
+            CryptoError::WalCorruption { offset, reason } => Self::wal_corruption(offset, reason),
+            CryptoError::InvalidInput(msg) => Self::InvalidInput(msg),
+            CryptoError::KvFormatVersionMismatch { expected, found } => Self::InvalidInput(
+                format!("KV cache format version mismatch: expected {expected}, found {found}"),
+            ),
+            other => Self::Crypto(other.to_string()),
+        }
     }
 }
-// !SECTION
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use contextra_types::ContextraError;
+
+    #[test]
+    fn test_from_crypto_error() {
+        let crypto_err = CryptoError::WalCorruption {
+            offset: 42,
+            reason: "bad hmac".to_string(),
+        };
+        let mf_err: ContextraError = crypto_err.into();
+        assert!(matches!(
+            mf_err,
+            ContextraError::WalCorruption {
+                offset: 42,
+                ref reason,
+                ..
+            } if reason == "bad hmac"
+        ));
+
+        let invalid_input = CryptoError::InvalidInput("bad key".to_string());
+        let mf_err_inv: ContextraError = invalid_input.into();
+        assert!(matches!(
+            mf_err_inv,
+            ContextraError::InvalidInput(ref msg) if msg == "bad key"
+        ));
+
+        let gen_crypto = CryptoError::Encryption("failed".to_string());
+        let mf_err_gen: ContextraError = gen_crypto.into();
+        assert!(matches!(
+            mf_err_gen,
+            ContextraError::Crypto(ref msg) if msg.contains("encryption failed")
+        ));
+
+        let version_mismatch = CryptoError::KvFormatVersionMismatch {
+            expected: 2,
+            found: 1,
+        };
+        let mf_err_version: ContextraError = version_mismatch.into();
+        assert!(matches!(
+            mf_err_version,
+            ContextraError::InvalidInput(ref msg) if msg.contains("expected 2, found 1")
+        ));
+    }
+}

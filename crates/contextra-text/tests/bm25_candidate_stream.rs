@@ -1,4 +1,3 @@
-#![cfg(feature = "types-compat")]
 //! SD-05-TEXT-002 — Integration tests for BM25 Candidate Stream (`Bm25CandidateStream`).
 //!
 //! Verifies pull-stream batching, geometric reloading, deduplication, prefix ordering,
@@ -183,7 +182,6 @@ async fn create_test_index_with_docs(
     Ok((index, storage))
 }
 
-// Testfall `test_stream_matches_full_search_ordering`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_stream_matches_full_search_ordering() -> Result<()> {
     let (index, _) = create_test_index_with_docs(100).await?;
@@ -207,7 +205,6 @@ async fn test_stream_matches_full_search_ordering() -> Result<()> {
     Ok(())
 }
 
-// Testfall `test_stream_batching_and_exact_sizes`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_stream_batching_and_exact_sizes() -> Result<()> {
     let (index, _) = create_test_index_with_docs(100).await?;
@@ -239,7 +236,6 @@ async fn test_stream_batching_and_exact_sizes() -> Result<()> {
     Ok(())
 }
 
-// Testfall `test_stream_deduplication_across_reloads`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_stream_deduplication_across_reloads() -> Result<()> {
     let (index, _) = create_test_index_with_docs(60).await?;
@@ -259,7 +255,6 @@ async fn test_stream_deduplication_across_reloads() -> Result<()> {
     Ok(())
 }
 
-// Testfall `test_stream_laziness_measurement`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_stream_laziness_measurement() -> Result<()> {
     let (index, storage) = create_test_index_with_docs(120).await?;
@@ -291,7 +286,6 @@ async fn test_stream_laziness_measurement() -> Result<()> {
     Ok(())
 }
 
-// Testfall `test_stream_depth_limit_max_search_k`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_stream_depth_limit_max_search_k() -> Result<()> {
     let (index, _) = create_test_index_with_docs(1050).await?;
@@ -319,7 +313,6 @@ async fn test_stream_depth_limit_max_search_k() -> Result<()> {
     Ok(())
 }
 
-// Testfall `test_stream_snapshot_isolation`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_stream_snapshot_isolation() -> Result<()> {
     let (index, storage) = create_test_index_with_docs(30).await?;
@@ -363,7 +356,6 @@ async fn test_stream_snapshot_isolation() -> Result<()> {
     Ok(())
 }
 
-// Testfall `test_stream_empty_query_and_no_hits`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_stream_empty_query_and_no_hits() -> Result<()> {
     let (index, _) = create_test_index_with_docs(10).await?;

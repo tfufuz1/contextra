@@ -1,6 +1,3 @@
-// =========================================================================
-// SECTION: server
-// =========================================================================
 use crate::egress_gateway::{DefaultEgressClassifier, EgressClassifier};
 use crate::io::{read_line_bounded, MAX_RPC_BYTES};
 use crate::prompt_injection::PromptInjectionGuard;
@@ -169,5 +166,3 @@ impl McpServer {
         Ok(())
     }
 }
-
-// !SECTION: server

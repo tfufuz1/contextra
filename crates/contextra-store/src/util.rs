@@ -1,12 +1,7 @@
-//! # Hilfswerkzeuge fuer den Store (Ring 1)
-//!
-//! Stellt universelle Hilfsfunktionen bereit, insbesondere fuer deterministische
-//! Hashberechnungen und Byte-Konvertierungen.
-
+// FILE-CONTEXT: Utility functions for contextra-store (fsync helpers, etc.) (TS: 2026-08-29T17:17:31Z) (SESSION: 8f882f1f)
 //! Utility functions for storage engine operations.
 
-use crate::error::{StoreError, StoreResult as Result};
-use std::fmt;
+use contextra_types::{ContextraError, Result};
 use std::path::Path;
 
 #[cfg(not(loom))]
@@ -16,66 +11,9 @@ use std::fs::{File, TryLockError};
 
 pub(crate) use crate::fsync::fsync_parent_dir;
 
-/// Kapselung eines versiegelten Datensatzes.
-#[derive(Clone, PartialEq, Eq)]
-pub struct SealedEnvelope {
-    payload: Vec<u8>,
-}
-
-impl SealedEnvelope {
-    /// Erzeugt einen neuen [`SealedEnvelope`].
-    #[must_use]
-    pub fn new(payload: Vec<u8>) -> Self {
-        Self { payload }
-    }
-
-    /// Liefert die Rohdaten des Umschlags.
-    #[must_use]
-    pub fn payload(&self) -> &[u8] {
-        &self.payload
-    }
-}
-
-impl fmt::Debug for SealedEnvelope {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "SealedEnvelope([REDACTED, len={}])", self.payload.len())
-    }
-}
-
-/// Lokaler Trait zur Versiegelung von Datensätzen (Ersatz für externe Krypto-Kopplungen).
-pub trait RecordSealer: Send + Sync {
-    /// Versiegelt Klartextdaten deterministisch oder mit Umschlag.
-    ///
-    /// # Errors
-    /// Liefert einen Fehler zurück, falls die Versiegelung fehlschlägt.
-    fn seal(&self, key: &[u8], plaintext: &[u8]) -> Result<SealedEnvelope>;
-
-    /// Öffnet einen versiegelten Datensatz.
-    ///
-    /// # Errors
-    /// Liefert einen Fehler zurück, falls die Entsiegelung fehlschlägt.
-    fn open(&self, key: &[u8], envelope: &[u8]) -> Result<Vec<u8>>;
-}
-
-/// Lokaler Trait zur Authentisierung von Datensätzen und Blöcken.
-pub trait RecordAuthenticator: Send + Sync {
-    /// Berechnet ein Authentisierungs-Tag über gegebene Daten.
-    ///
-    /// # Errors
-    /// Liefert einen Fehler zurück, falls das Tag nicht erzeugt werden kann.
-    fn authenticate(&self, key: &[u8], data: &[u8]) -> Result<[u8; 32]>;
-
-    /// Verifiziert ein Authentisierungs-Tag gegen gegebene Daten.
-    ///
-    /// # Errors
-    /// Liefert einen Fehler zurück, falls die Verifikation fehlschlägt.
-    fn verify(&self, key: &[u8], data: &[u8], expected_tag: &[u8; 32]) -> Result<bool>;
-}
-
 /// Handle for exclusive database directory locking.
 #[cfg(not(loom))]
 #[derive(Debug)]
-/// Handle fuer exklusive Datenverzeichnissperre.
 pub(crate) struct DirLock {
     _file: Option<File>,
 }
@@ -86,7 +24,7 @@ impl DirLock {
     pub(crate) fn acquire(dir: &Path, durability_mode: DurabilityMode) -> Result<Self> {
         let lock_path = dir.join("LOCK");
         let file = File::create(&lock_path).map_err(|e| {
-            StoreError::Storage(format!(
+            ContextraError::Storage(format!(
                 "Failed to open/create LOCK file at {}: {e}",
                 lock_path.display()
             ))
@@ -94,12 +32,12 @@ impl DirLock {
 
         match file.try_lock() {
             Ok(()) => Ok(Self { _file: Some(file) }),
-            Err(TryLockError::WouldBlock) => Err(StoreError::Storage(
+            Err(TryLockError::WouldBlock) => Err(ContextraError::Storage(
                 "Datenverzeichnis bereits in Benutzung".into(),
             )),
             Err(TryLockError::Error(e)) => {
                 if durability_mode == DurabilityMode::Full {
-                    Err(StoreError::Storage(format!(
+                    Err(ContextraError::Storage(format!(
                         "Dateisperre auf diesem Dateisystem nicht unterstützt: {e}"
                     )))
                 } else {
@@ -111,43 +49,5 @@ impl DirLock {
                 }
             }
         }
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct DummySealer;
-    impl RecordSealer for DummySealer {
-        fn seal(&self, _key: &[u8], plaintext: &[u8]) -> Result<SealedEnvelope> {
-            Ok(SealedEnvelope { payload: plaintext.to_vec() })
-        }
-        fn open(&self, _key: &[u8], envelope: &[u8]) -> Result<Vec<u8>> {
-            Ok(envelope.to_vec())
-        }
-    }
-
-    struct DummyAuthenticator;
-    impl RecordAuthenticator for DummyAuthenticator {
-        fn authenticate(&self, _key: &[u8], data: &[u8]) -> Result<[u8; 32]> {
-            Ok(*blake3::hash(data).as_bytes())
-        }
-        fn verify(&self, key: &[u8], data: &[u8], expected_tag: &[u8; 32]) -> Result<bool> {
-            let tag = self.authenticate(key, data)?;
-            Ok(&tag == expected_tag)
-        }
-    }
-
-    #[test]
-    fn test_sealer_and_authenticator_contract() {
-        let sealer = DummySealer;
-        let env = sealer.seal(b"k", b"payload").unwrap();
-        assert_eq!(sealer.open(b"k", &env.payload).unwrap(), b"payload");
-
-        let auth = DummyAuthenticator;
-        let tag = auth.authenticate(b"k", b"data").unwrap();
-        assert!(auth.verify(b"k", b"data", &tag).unwrap());
     }
 }

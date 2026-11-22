@@ -1,8 +1,3 @@
-//! Tests für Vorschlagsheuristiken neuer Hyperkanten aus Kookkurrenzen.
-//!
-//! # Zweck
-//! Prüft die mathematische Korrektheit der Kookkurrenzzählung und Schwellenwertfilterung.
-
 use contextra_graph::{
     compute_co_occurrence_candidates, validate_candidates_with_llm, GraphMutationError,
     HyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,

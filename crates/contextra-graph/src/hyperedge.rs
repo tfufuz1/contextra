@@ -3,12 +3,10 @@
 //! Implementiert n-äre Hyperkanten für komplexe Wissensrepräsentation (IP-20 / ADR-064).
 //! Persistenz erfolgt serde/bincode-kompatibel analog zu `PersistedEdgePayload`.
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use crate::arc_slice::ArcSlice;
 use crate::csr::EdgeType;
-use crate::error::{GraphError, GraphMutationError, Result};
-use crate::types::{DocId, EntityId, TxId};
+use crate::error::GraphMutationError;
+use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
 use scc::HashMap;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
@@ -16,8 +14,6 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 /// LSM-Key-Präfix für Hyperkanten.
-
-// SECTION Hyperedge Core Implementation
 pub const HYPEREDGE_PREFIX: &str = "__graph:hyperedge:";
 
 /// LSM-Key-Präfix für Hyperkanten-Index nach Entity.
@@ -36,8 +32,8 @@ pub fn star_weight(weight: f32, cardinality: usize) -> f32 {
     }
 }
 
-// Re-export core hyperedge identity and binding types from single source of truth in `types`.
-pub use crate::types::{HyperEdgeId, RoleBinding, RoleId};
+// Re-export core hyperedge identity and binding types from single source of truth in `contextra_ports`.
+pub use contextra_ports::graph::{HyperEdgeId, RoleBinding, RoleId};
 
 /// Eine n-äre Hyperkante zur Verbindung von 2 oder mehr Entitäten mit spezifischen Rollen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -184,7 +180,7 @@ impl HyperEdge {
     /// Serialisiert die Hyperkante via `bincode`.
     pub fn serialize(&self) -> Result<Vec<u8>> {
         bincode::serialize(self).map_err(|e| {
-            GraphError::Serialization(format!("Failed to serialize hyperedge {}: {e}", self.id))
+            ContextraError::Internal(format!("Failed to serialize hyperedge {}: {e}", self.id))
         })
     }
 
@@ -194,7 +190,7 @@ impl HyperEdge {
             return Ok(edge);
         }
         let legacy: LegacyHyperEdgeV1 = bincode::deserialize(bytes).map_err(|e| {
-            GraphError::Serialization(format!("Failed to deserialize hyperedge: {e}"))
+            ContextraError::Internal(format!("Failed to deserialize hyperedge: {e}"))
         })?;
         Ok(Self {
             id: legacy.id,
@@ -284,8 +280,11 @@ pub fn sort_dedup_entities(entities: &[EntityId]) -> Vec<EntityId> {
 
 /// Guard zur Erzwingung kanonischer Lock-Reihenfolge über mehrere Entitäten (H2 / §5.1.2).
 ///
+/// # Abgrenzung zu `contextra-cognition`
 /// Dieser Guard im CSR-Graph-Subsystem dient ausschließlich der lock-freien / deadlock-freien
 /// Akquisition von Entitätsmengen bei der Hyperkanten-Konsolidierung (H2 / §5.1.2).
+/// Er unterscheidet sich von `ConsolidationNodesGuard` in `contextra-cognition`, welcher
+/// den kognitiven Sleep-Cycle und Multi-Knoten-Re-Consolidations auf Transaktionsebene steuert.
 ///
 /// Stellt sicher, dass Entitäts-IDs vor dem Erwerb mehrerer Schlösser deterministisch
 /// sortiert und dedupliziert werden (`sort_dedup_entities`), um Deadlocks (Lock Order Inversions)
@@ -750,5 +749,3 @@ mod tests {
         }
     }
 }
-
-// !SECTION Hyperedge Core Implementation

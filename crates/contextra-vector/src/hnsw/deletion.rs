@@ -1,44 +1,13 @@
-//              INV-VEC-ZEROIZE-1: Deleted vector slots and arena connections are zeroized in memory.
-//              INV-HNSW-SLOT-1: Deleted slots are NOT reused before full index rebuild (rebuild_sync).
+// FILE-CONTEXT
+// ZWECK: Synchronous ghost-free node deletion with budgeted neighborhood repair for HNSW graph.
+// INVARIANTEN: INV-DELETION-2: After Ok(..) of remove_with_graph_repair(doc_id), no neighborhood pointer points to doc_id.
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
-// STAND: TS:2026-11-11T02:00:00Z
 
-use crate::error::{Result, VectorError};
-use crate::types::DocId;
-use std::collections::BTreeSet;
-use zeroize::Zeroize;
+use ahash::AHashSet;
+use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
 
 use super::batch::SearchContext;
-use super::types::{Candidate, HnswIndex, VectorData};
-
-// SECTION Hilfstraits (IntoDocId)
-
-/// Trait for types convertible to [`DocId`] for deletion APIs.
-pub trait IntoDocId {
-    /// Converts the type into a [`DocId`].
-    fn into_doc_id(self) -> DocId;
-}
-
-impl IntoDocId for DocId {
-    fn into_doc_id(self) -> DocId {
-        self
-    }
-}
-
-impl IntoDocId for u64 {
-    fn into_doc_id(self) -> DocId {
-        DocId::new(self.into())
-    }
-}
-
-impl IntoDocId for &u64 {
-    fn into_doc_id(self) -> DocId {
-        DocId::new((*self).into())
-    }
-}
-// !SECTION
-
-// SECTION Ghost-Free Deletion & Graph-Reparatur
+use super::types::{Candidate, HnswIndex};
 
 /// Statistics returned after a ghost-free node deletion and neighborhood repair.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,7 +53,9 @@ impl GhostFreeVectorIndex for HnswIndex {
             match doc_map.get(&doc_id.inner()).copied() {
                 Some(idx) => idx,
                 None => {
-                    return Err(VectorError::NotFound(format!("Node for doc_id {:?} not found in HNSW index", doc_id)));
+                    return Err(ContextraError::GraphRepairFailed(
+                        HnswDeletionError::NodeNotFound(doc_id),
+                    ))
                 }
             }
         };
@@ -97,7 +68,9 @@ impl GhostFreeVectorIndex for HnswIndex {
             .read()
             .contains(target_idx as u64)
         {
-            return Err(VectorError::NotFound(format!("Node for doc_id {:?} not found in HNSW index", doc_id)));
+            return Err(ContextraError::GraphRepairFailed(
+                HnswDeletionError::NodeNotFound(doc_id),
+            ));
         }
 
         let m = self.inner.cold.config.m;
@@ -181,7 +154,7 @@ impl GhostFreeVectorIndex for HnswIndex {
                             .collect();
 
                         // Collect 2nd-order candidates from remaining neighbors' connections
-                        let mut candidate_set: BTreeSet<u32> = BTreeSet::new();
+                        let mut candidate_set: AHashSet<u32> = AHashSet::new();
                         for &rem in &remaining {
                             if rem != target_idx as u32 && rem != neighbor_u32 {
                                 candidate_set.insert(rem);
@@ -241,7 +214,7 @@ impl GhostFreeVectorIndex for HnswIndex {
                             });
                         }
 
-                        // Use existing heuristic neighbor selection (deterministic by (distance, slot))
+                        // Use existing heuristic neighbor selection
                         let dummy_vec = super::types::VectorData::F32(Vec::new());
                         let updated_conns = if !cand_objs.is_empty() {
                             self.inner
@@ -280,35 +253,11 @@ impl GhostFreeVectorIndex for HnswIndex {
         let remaining_ghost_pointers = self.verify_no_ghost_pointers(target_idx as u32, budget);
 
         if remaining_ghost_pointers > 0 {
-            return Err(VectorError::Conflict(
-                "connectivity: residual ghost pointers after graph repair".to_string(),
+            return Err(ContextraError::GraphRepairFailed(
+                HnswDeletionError::VerificationFailed {
+                    remaining_pointers: remaining_ghost_pointers,
+                },
             ));
-        }
-
-        // Immediate Slot-Nullung (INV-VEC-ZEROIZE-1)
-        if target_idx >= mmap_node_count {
-            let ram_idx = target_idx - mmap_node_count;
-            let mut nodes_write = self.inner.hot.nodes.write();
-            if ram_idx < nodes_write.len() {
-                match &mut nodes_write[ram_idx].vector {
-                    VectorData::F32(ref mut v) => {
-                        v.fill(0.0f32);
-                        v.as_mut_slice().zeroize();
-                    }
-                    VectorData::U8(ref mut v) => {
-                        v.fill(0u8);
-                        v.as_mut_slice().zeroize();
-                    }
-                }
-                nodes_write[ram_idx].doc_id = DocId::MIN;
-            }
-            drop(nodes_write);
-
-            // Zeroize arena connection slots without releasing to free_list (INV-HNSW-SLOT-1)
-            self.inner
-                .hot
-                .arena
-                .zeroize_node_connections(ram_idx, target_max_layer, m);
         }
 
         // Mark doc_id as deleted in HNSW structure (updates doc_to_node, deleted_nodes, entry_point)
@@ -322,28 +271,8 @@ impl GhostFreeVectorIndex for HnswIndex {
         })
     }
 }
-// !SECTION
-
-// SECTION Öffentliche HnswIndex Löschmethoden & Verifikation
 
 impl HnswIndex {
-    /// Removes a document from the vector index by its 64-bit ID.
-    ///
-    /// Executes tombstone insertion, immediate slot zeroization (`INV-VEC-ZEROIZE-1`),
-    /// and budgeted neighborhood graph repair (`INV-VEC-CONNECTIVITY-1`).
-    ///
-    /// Returns `Ok(true)` if the document was found and removed, or `Ok(false)` if
-    /// it was not found or already deleted.
-    #[allow(deprecated)]
-    pub fn remove_with_repair<D: IntoDocId>(&mut self, id: D) -> Result<bool> {
-        let doc_id = id.into_doc_id();
-        match self.remove_with_graph_repair(doc_id) {
-            Ok(_) => Ok(true),
-            Err(VectorError::NotFound(_)) => Ok(false),
-            Err(e) => Err(e),
-        }
-    }
-
     /// Internal helper method to perform a verification scan across the 2nd-order neighborhood
     /// bounded by `budget` to ensure zero residual pointers to `target_idx` remain.
     fn verify_no_ghost_pointers(&self, target_idx_u32: u32, budget: usize) -> usize {
@@ -362,7 +291,7 @@ impl HnswIndex {
         let m = self.inner.cold.config.m;
 
         let total_nodes = mmap_node_count + nodes_read.len();
-        let mut visited = BTreeSet::new();
+        let mut visited = AHashSet::new();
         let mut ghost_pointers = 0usize;
         let mut inspected_nodes = 0usize;
 
@@ -421,45 +350,4 @@ impl HnswIndex {
 
         ghost_pointers
     }
-
-    /// O(1) Tombstone-Markierung gemäß VETO-F02 und INV-VEC-ZEROIZE-1.
-    ///
-    /// Markiert den Knoten deterministisch als inaktiv, nullt den Vektorspeicher im Slot
-    /// und entfernt die ID aus der Dokumentenzuordnung.
-    /// Gibt `Ok(true)` zurück, falls das Dokument existierte, andernfalls `Ok(false)`.
-    pub fn remove<D: IntoDocId>(&self, doc_id: D) -> Result<bool> {
-        let doc_id = doc_id.into_doc_id();
-        let _write_lock = self.inner.hot.write_mutex.lock();
-        let doc_map = self.inner.hot.doc_to_node.read();
-        let target_idx_opt = doc_map.get(&doc_id.inner()).copied();
-        drop(doc_map);
-
-        let Some(idx) = target_idx_opt else {
-            return Ok(false);
-        };
-
-        // INV-VEC-ZEROIZE-1: Vektorslot im Speicher mit Nullen überschreiben
-        let mmap_guard = self.inner.cold.mmap_index.read();
-        let mmap_count = mmap_guard
-            .as_ref()
-            .map(|m| m.header.node_count() as usize)
-            .unwrap_or(0);
-        drop(mmap_guard);
-
-        if idx >= mmap_count {
-            let ram_idx = idx - mmap_count;
-            let mut nodes = self.inner.hot.nodes.write();
-            if let Some(node) = nodes.get_mut(ram_idx) {
-                use zeroize::Zeroize;
-                match &mut node.vector {
-                    super::types::VectorData::F32(v) => v.as_mut_slice().zeroize(),
-                    super::types::VectorData::U8(v) => v.as_mut_slice().zeroize(),
-                }
-            }
-        }
-
-        self.inner.do_delete(doc_id)?;
-        Ok(true)
-    }
 }
-// !SECTION

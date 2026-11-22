@@ -1,21 +1,14 @@
-
-//! # Integrationstest: `llm_query_rewriter`
-//!
-//! Validiert die Funktionalität des `LlmQueryRewriter`:
-//! - Robustes Parsing verschiedener Antwortformate (Zeilenlisten, JSON in Codeblöcken).
-//! - Beachtung von Begrenzungen (`max_subqueries`).
-//! - Deduplizierung und Ausfiltern der Originalabfrage.
-//! - UTF-8-Zeichengrenzen bei Multi-Byte-Snippets (keine Panics).
-//! - Prompt-Injection-Isolation via `<untrusted_context>`.
+// FILE-CONTEXT
+// ZWECK: Integrationstests für LLM-gestützten QueryRewriter in contextra.
+// INVARIANTEN: Zero Panic; Fake-Generator ohne Netzzugriff.
 
 use contextra::LlmQueryRewriter;
+use contextra_core::error::ContextraError;
 use contextra_db::QueryRewriter;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
-use contextra_types::error::ContextraError;
 use contextra_types::ScoredEntry;
 use std::sync::{Arc, Mutex};
 
-/// Test-Double für `LlmTextGenerator`, das vorgefertigte Antworten zurückgibt und den erzeugten Prompt aufzeichnet.
 struct FakeGenerator {
     response: Arc<Mutex<Option<Result<String, ContextraError>>>>,
     captured_prompt: Arc<Mutex<Option<String>>>,
@@ -47,7 +40,7 @@ impl LlmTextGenerator for FakeGenerator {
     fn generate<'a>(
         &'a self,
         prompt: &'a str,
-    ) -> BoxFuture<'a, contextra_types::error::Result<String>> {
+    ) -> BoxFuture<'a, contextra_core::error::Result<String>> {
         let p = prompt.to_string();
         if let Ok(mut guard) = self.captured_prompt.lock() {
             *guard = Some(p);
@@ -62,7 +55,6 @@ impl LlmTextGenerator for FakeGenerator {
     }
 }
 
-// Prüft das Bereinigen und Parsen normaler nummerierter Textzeilen und Aufzählungspunkte.
 #[tokio::test]
 async fn test_a_plain_line_list_parsing() -> Result<(), Box<dyn std::error::Error>> {
     let resp = "1. rust ownership model\n2. borrow checker rules\n- lifetimes in rust\n• bullet point test";
@@ -81,7 +73,6 @@ async fn test_a_plain_line_list_parsing() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-// Verifiziert, dass ein in Markdown-Code-Fences eingebettetes JSON-Array erfolgreich extrahiert wird.
 #[tokio::test]
 async fn test_b_json_list_in_code_fence() -> Result<(), Box<dyn std::error::Error>> {
     let resp = "```json\n[\n  \"rust concurrency\",\n  \"tokio async runtime\"\n]\n```";
@@ -93,7 +84,6 @@ async fn test_b_json_list_in_code_fence() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-// Stellt sicher, dass nicht mehr Teilabfragen zurückgegeben werden als über with_max_subqueries konfiguriert.
 #[tokio::test]
 async fn test_c_more_lines_than_max_subqueries() -> Result<(), Box<dyn std::error::Error>> {
     let resp = "1. subquery one\n2. subquery two\n3. subquery three\n4. subquery four";
@@ -105,7 +95,6 @@ async fn test_c_more_lines_than_max_subqueries() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
-// Verifiziert, dass Duplikate sowie Übereinstimmungen mit der Originalabfrage gefiltert werden.
 #[tokio::test]
 async fn test_d_duplicates_and_original_query_removed() -> Result<(), Box<dyn std::error::Error>> {
     let orig = "Rust Memory Management";
@@ -118,7 +107,6 @@ async fn test_d_duplicates_and_original_query_removed() -> Result<(), Box<dyn st
     Ok(())
 }
 
-// Prüft, dass leere Antworten oder reine Whitespace-Antworten einen leeren Vektor (ohne Panic) liefern.
 #[tokio::test]
 async fn test_e_garbage_and_empty_response_yields_ok_empty_vec(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -139,7 +127,6 @@ async fn test_e_garbage_and_empty_response_yields_ok_empty_vec(
     Ok(())
 }
 
-// Verifiziert die fehlerfreie Weitergabe von Fehlern des LLM-Generators.
 #[tokio::test]
 async fn test_f_generator_error_propagates_as_err() -> Result<(), Box<dyn std::error::Error>> {
     let gen_err = Arc::new(FakeGenerator::with_error(ContextraError::Internal(
@@ -155,7 +142,6 @@ async fn test_f_generator_error_propagates_as_err() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-// Stellt sicher, dass Zeichenkettenkürzungen bei Multi-Byte-Unicode-Zeichen (z. B. Emojis) nicht mitten im Zeichen schneiden.
 #[tokio::test]
 async fn test_g_unicode_multi_byte_snippet_not_split_mid_char(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -178,7 +164,6 @@ async fn test_g_unicode_multi_byte_snippet_not_split_mid_char(
     Ok(())
 }
 
-// Prüft die Isolation von Prompt-Injection-Versuchen innerhalb des <untrusted_context>-XML-Tags.
 #[tokio::test]
 async fn test_h_snippet_with_embedded_instruction_isolated_in_untrusted_context(
 ) -> Result<(), Box<dyn std::error::Error>> {

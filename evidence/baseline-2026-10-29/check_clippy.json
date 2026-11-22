@@ -1,0 +1,146 @@
+{
+  "contextra-wire": {
+    "check": 0,
+    "clippy": 0
+  },
+  "contextra-sys": {
+    "check": 0,
+    "clippy": 0
+  },
+  "contextra-simd": {
+    "check": 0,
+    "clippy": 0
+  },
+  "contextra-types": {
+    "check": 0,
+    "clippy": 0
+  },
+  "contextra-core": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-mvcc": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-ports": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-store": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-crypto": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-testkit": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-graph": {
+    "check": 101,
+    "clippy": 101
+  },
+  "contextra-adapt": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-sandbox": {
+    "check": 0,
+    "clippy": 0
+  },
+  "contextra-vector": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-db": {
+    "check": 101,
+    "clippy": 101
+  },
+  "contextra-checkpoint": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-cognition": {
+    "check": 101,
+    "clippy": 101
+  },
+  "contextra-engine": {
+    "check": 101,
+    "clippy": 101
+  },
+  "contextra-rank": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-text": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-infer-candle": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-privacy": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-infer-onnx": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-mcp": {
+    "check": 101,
+    "clippy": 101
+  },
+  "contextra": {
+    "check": 101,
+    "clippy": 101
+  },
+  "contextra-audit-export": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-avv-generator": {
+    "check": 0,
+    "clippy": 0
+  },
+  "contextra-license": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-router": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-agent": {
+    "check": 101,
+    "clippy": 101
+  },
+  "contextra-infer-ollama": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-bench": {
+    "check": 101,
+    "clippy": 101
+  },
+  "contextra-py": {
+    "check": 101,
+    "clippy": 101
+  },
+  "contextra-kvcache": {
+    "check": 0,
+    "clippy": 101
+  },
+  "contextra-ingest": {
+    "check": 101,
+    "clippy": 101
+  },
+  "xtask": {
+    "check": 0,
+    "clippy": 101
+  }
+}

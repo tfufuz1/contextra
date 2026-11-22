@@ -1,9 +1,5 @@
 //! Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-
-// SECTION Mod Core Implementation
 pub mod diffusion;
 pub mod error;
 pub mod lovasz;
@@ -22,7 +18,7 @@ pub use shadow::{
 use crate::csr::CsrGraph;
 use crate::path_rag::PathGraph;
 use ahash::AHashMap;
-use crate::types::EntityId;
+use contextra_types::EntityId;
 
 /// Computes Thresholded Local Hyper-Flow Diffusion (TL-HFD) over a generic [`PathGraph`].
 ///
@@ -60,7 +56,7 @@ impl CsrGraph {
 mod tests {
     use super::*;
     use crate::csr::CsrGraph;
-    use crate::types::Entity;
+    use contextra_types::Entity;
 
     #[tokio::test]
     async fn test_thresholded_local_hfd_diagnostic_path() {
@@ -97,5 +93,3 @@ mod tests {
         assert!(scores.contains_key(&e1));
     }
 }
-
-// !SECTION Mod Core Implementation

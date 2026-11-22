@@ -1,37 +1,14 @@
 # contextra-simd
 
-**Zweck:** Vektor-Distanzfunktionen (L2, Dot, Cosine) mit SIMD-Kernen und Skalar-Referenz. **Zweite erlaubte `unsafe`-Insel** (neben `contextra-sys`). Die SIMD-Varianten müssen identische Ergebnisse liefern wie die Skalar-Referenz (Selbstprüfung).
+SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen.
 
-**Ebene:** E0 (unsafe-Insel)
+Normativitätsklasse: **Kern `[K]`** (Ring 0 Unsafe-Insel, `stable`; §6.1, §6.7, §6.9, `capabilities.toml`).
 
-## Öffentliche API (`src/lib.rs`, Stand dieser README)
+## Rolle in einem Satz
+`contextra-simd` kapselt hardwarenahe SIMD-Vektordistanzberechnungen in einer genau auditierten, sicheren API-Insel.
 
-Ist-Stand. Module oder Namen, die laut PLAN.md entfallen, können hier noch stehen.
-
-```rust
-pub mod contract
-pub mod dispatch
-pub mod error
-pub mod kernels
-pub mod metric
-pub mod compat
-pub use contract::{DistanceFn, MetricDistanceFn}
-pub use dispatch::
-pub use dispatch::{get_dispatch_override, set_dispatch_override, SimdPathOverride}
-pub use error::{Error, Result, SimdError}
-pub use kernels::scalar::
-pub use metric::DistanceMetric
-pub fn validate_vector(vec: &[f32]) -> Result<()>
-pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32>
-pub fn compute_distance_trusted(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32>
-pub fn compute_distance_f32_bytes_trusted(
-```
-
-## Features (`Cargo.toml`)
-
-`default`, `std`, `serde`, `workspace`, `types-compat`, `simd-avx512`
-
-## Dokumentation
-
-Implementierungsspezifikation: [`PLAN.md`](PLAN.md). Maßgeblich ist `docs/SPEC.md` v4.1.
-
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Unsafe-Insel 1 von 3, `#![deny(unsafe_code)]` ausgenommen)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types` (Spec §6.9, `capabilities.toml`)

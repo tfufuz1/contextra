@@ -24,9 +24,11 @@ fuzz_target!(|data: &[u8]| {
             return;
         }
 
-        let mut config = WalConfig::default();
-        config = config.with_legacy_fallback(true);
-        config.min_wal_version = WalVersion::V1;
+        let config = WalConfig {
+            allow_legacy_integrity_key_fallback: true,
+            min_wal_version: WalVersion::V1,
+            ..Default::default()
+        };
 
         if let Ok(wal) = Wal::open_with_config(&wal_path, config).await {
             let _ = wal.replay().await;

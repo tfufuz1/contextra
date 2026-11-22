@@ -1,101 +1,59 @@
+// FILE-CONTEXT
+// ZWECK: Begrenzter ComputePool für CPU-intensive Tasks (z. B. HNSW-Index-Rebuild).
+// INVARIANTEN: Zero-Panic Doctrine; feste Obergrenze an Worker-Threads (Resource Protection).
+// HOTSPOTS: compute_pool.rs (Job-Queue & Task-Dispatch)
 
-use crate::error::{Result as VectorResult, VectorError};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread;
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
-/// Standard-Kapazität für die synchrone Job-Warteschlange pro Worker-Thread.
-pub const DEFAULT_QUEUE_CAPACITY_PER_WORKER: usize = 128;
-
-// SECTION TaskHandle
-
-/// Handle zum Abwarten des Ergebnisses eines an den [`ComputePool`] übergebenen Tasks.
+/// Handle to await the outcome of a task submitted to [`ComputePool`].
 pub struct TaskHandle<T> {
-    rx: Receiver<VectorResult<T>>,
+    rx: Receiver<T>,
 }
 
 impl<T> TaskHandle<T> {
-    /// Wartet auf den Abschluss des Tasks. Panics im Task werden als [`VectorError`] propagiert.
-    pub fn join(self) -> VectorResult<T> {
-        match self.rx.recv() {
-            Ok(res) => res,
-            Err(_) => Err(VectorError::Internal(
-                "ComputePool worker channel disconnected before completion".to_string(),
-            )),
-        }
+    /// Waits for the task to complete and returns its result, or an error if the task failed or was dropped.
+    pub fn join(self) -> Result<T, std::sync::mpsc::RecvError> {
+        self.rx.recv()
     }
-}
-// !SECTION
-
-// SECTION Pool-Zustand & Implementierung
-
-struct WorkerShared {
-    active_jobs: AtomicUsize,
-    active_jobs_condvar: parking_lot::Condvar,
-    active_jobs_mutex: parking_lot::Mutex<()>,
 }
 
 struct PoolState {
-    job_tx: parking_lot::Mutex<Option<SyncSender<Job>>>,
-    shared: Arc<WorkerShared>,
+    job_tx: Sender<Job>,
+    active_jobs: AtomicUsize,
     max_workers: usize,
     is_shutdown: AtomicBool,
-    worker_handles: parking_lot::Mutex<Vec<thread::JoinHandle<()>>>,
 }
 
-/// Begrenzter Compute-Threadpool für Hintergrundberechnungen und rechenintensive Indizierung.
-/// Erzwingt eine strikte Obergrenze für Worker-Threads und eine beschränkte Auftragswarteschlange.
+/// Bounded compute thread pool for background index rebuilds and heavy CPU tasks.
+/// Enforces a hard ceiling on concurrent worker threads to prevent thread contention.
 #[derive(Clone)]
 pub struct ComputePool {
     inner: Arc<PoolState>,
 }
 
-impl Drop for PoolState {
-    fn drop(&mut self) {
-        self.is_shutdown.store(true, Ordering::SeqCst);
-        // Schließe den Sender; dadurch schlägt recv() bei allen Workern fehl und sie terminieren.
-        let mut tx_guard = self.job_tx.lock();
-        let _ = tx_guard.take();
-        drop(tx_guard);
-
-        // Alle Worker-Threads deterministisch joinen.
-        let mut handles = self.worker_handles.lock();
-        for handle in handles.drain(..) {
-            let _ = handle.join();
-        }
-    }
-}
-
 impl ComputePool {
-    /// Erzeugt einen neuen [`ComputePool`] mit fester Worker-Thread-Grenze und beschränktem Puffer.
+    /// Creates a new [`ComputePool`] with a fixed worker thread ceiling.
     pub fn new(max_workers: usize) -> Self {
-        Self::with_queue_capacity(
-            max_workers,
-            max_workers.max(1) * DEFAULT_QUEUE_CAPACITY_PER_WORKER,
-        )
-    }
-
-    /// Erzeugt einen neuen [`ComputePool`] mit konfigurierbarer Pufferkapazität (begrenzter Kanal).
-    pub fn with_queue_capacity(max_workers: usize, queue_capacity: usize) -> Self {
         let workers = max_workers.max(1);
-        let queue_cap = queue_capacity.max(1);
-        let (job_tx, job_rx) = sync_channel::<Job>(queue_cap);
+        let (job_tx, job_rx) = channel::<Job>();
         let job_rx = Arc::new(parking_lot::Mutex::new(job_rx));
 
-        let shared = Arc::new(WorkerShared {
+        let state = Arc::new(PoolState {
+            job_tx,
             active_jobs: AtomicUsize::new(0),
-            active_jobs_condvar: parking_lot::Condvar::new(),
-            active_jobs_mutex: parking_lot::Mutex::new(()),
+            max_workers: workers,
+            is_shutdown: AtomicBool::new(false),
         });
 
-        let mut handles = Vec::with_capacity(workers);
         for i in 0..workers {
             let rx = Arc::clone(&job_rx);
-            let shared_clone = Arc::clone(&shared);
-            let handle = thread::Builder::new()
+            let state_clone = Arc::clone(&state);
+            let _ = thread::Builder::new()
                 .name(format!("contextra-compute-{}", i))
                 .spawn(move || loop {
                     let job_opt = {
@@ -105,8 +63,13 @@ impl ComputePool {
 
                     match job_opt {
                         Some(job) => {
-                            shared_clone.active_jobs.fetch_add(1, Ordering::SeqCst);
+                            state_clone.active_jobs.fetch_add(1, Ordering::SeqCst);
 
+                            // SAFETY: `AssertUnwindSafe` is safe here because each job closure
+                            // submitted to `ComputePool` is self-contained and isolated. No shared
+                            // locks or mutable state are held across the job execution boundary
+                            // within the worker thread. Catching panics prevents worker threads
+                            // from terminating unexpectedly and guards against thread pool exhaustion.
                             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job));
                             if let Err(err) = result {
                                 let panic_msg = if let Some(s) = err.downcast_ref::<&str>() {
@@ -122,41 +85,27 @@ impl ComputePool {
                                 );
                             }
 
-                            shared_clone.active_jobs.fetch_sub(1, Ordering::SeqCst);
-                            let _lock = shared_clone.active_jobs_mutex.lock();
-                            shared_clone.active_jobs_condvar.notify_all();
+                            state_clone.active_jobs.fetch_sub(1, Ordering::SeqCst);
                         }
-                        None => break, // Kanal geschlossen, Worker beendet sich sauber.
+                        None => break, // Channel closed when PoolState is dropped
                     }
                 });
-
-            if let Ok(h) = handle {
-                handles.push(h);
-            }
         }
-
-        let state = Arc::new(PoolState {
-            job_tx: parking_lot::Mutex::new(Some(job_tx)),
-            shared,
-            max_workers: workers,
-            is_shutdown: AtomicBool::new(false),
-            worker_handles: parking_lot::Mutex::new(handles),
-        });
 
         Self { inner: state }
     }
 
-    /// Gibt die maximale Worker-Kapazität des Pools zurück.
+    /// Returns the maximum worker capacity of this pool.
     pub fn max_workers(&self) -> usize {
         self.inner.max_workers
     }
 
-    /// Gibt die Anzahl aktuell auf Worker-Threads aktiver Jobs zurück.
+    /// Returns the number of jobs currently executing in worker threads.
     pub fn active_jobs(&self) -> usize {
-        self.inner.shared.active_jobs.load(Ordering::Relaxed)
+        self.inner.active_jobs.load(Ordering::Relaxed)
     }
 
-    /// Reicht eine Fire-and-Forget-Closure ein. Blockiert bei voller Warteschlange (Backpressure).
+    /// Submits a fire-and-forget closure for execution on the pool.
     pub fn execute<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,
@@ -164,13 +113,10 @@ impl ComputePool {
         if self.inner.is_shutdown.load(Ordering::Relaxed) {
             return;
         }
-        let tx_guard = self.inner.job_tx.lock();
-        if let Some(ref tx) = *tx_guard {
-            let _ = tx.send(Box::new(f));
-        }
+        let _ = self.inner.job_tx.send(Box::new(f));
     }
 
-    /// Reicht eine Funktion ein und liefert ein [`TaskHandle`], um das Ergebnis abzuwarten.
+    /// Submits a function and returns a [`TaskHandle`] to wait for its return value.
     pub fn spawn<F, T>(&self, f: F) -> TaskHandle<T>
     where
         F: FnOnce() -> T + Send + 'static,
@@ -178,18 +124,8 @@ impl ComputePool {
     {
         let (tx, rx) = channel();
         let job = Box::new(move || {
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
-            let mapped = result.map_err(|err| {
-                let msg = if let Some(s) = err.downcast_ref::<&str>() {
-                    (*s).to_string()
-                } else if let Some(s) = err.downcast_ref::<String>() {
-                    s.clone()
-                } else {
-                    "Task panicked".to_string()
-                };
-                VectorError::Internal(format!("ComputePool task panic: {msg}"))
-            });
-            let _ = tx.send(mapped);
+            let res = f();
+            let _ = tx.send(res);
         });
         self.execute(job);
         TaskHandle { rx }
@@ -214,10 +150,8 @@ impl std::fmt::Debug for ComputePool {
             .finish()
     }
 }
-// !SECTION
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -259,7 +193,7 @@ mod tests {
             panic!("intentional task panic for resilience testing");
         });
 
-        // Joining the panicking task handle must return VectorError, not crash the process.
+        // Joining the panicking task handle must return RecvError (sender dropped on panic).
         assert!(handle_panic.join().is_err());
 
         // 2. Verify pool is still functional by submitting a second normal task.
@@ -267,19 +201,6 @@ mod tests {
         assert_eq!(handle_normal.join().unwrap(), 142);
 
         // 3. Verify active_jobs returns to 0 and max_workers capacity is unchanged.
-        {
-            let mut guard = pool.inner.shared.active_jobs_mutex.lock();
-            while pool.active_jobs() > 0 {
-                let res = pool
-                    .inner
-                    .shared
-                    .active_jobs_condvar
-                    .wait_for(&mut guard, std::time::Duration::from_secs(2));
-                if res.timed_out() {
-                    break;
-                }
-            }
-        }
         assert_eq!(pool.active_jobs(), 0);
         assert_eq!(pool.max_workers(), 1);
     }

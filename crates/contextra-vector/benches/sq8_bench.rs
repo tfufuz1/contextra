@@ -1,29 +1,31 @@
-
-
-mod common;
-
-use common::{generate_raw_vectors, DEFAULT_BENCH_SEED, DIM_LARGE};
-use contextra_vector::types::DistanceMetric;
+use contextra_types::DistanceMetric;
 use contextra_vector::quantize::ScalarQuantizer;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use rand::Rng;
 
 fn bench_sq8(c: &mut Criterion) {
-    let dim = DIM_LARGE; // 1536
-    let batch = generate_raw_vectors(10, dim, DEFAULT_BENCH_SEED);
+    let dim = 1536;
+    let mut rng = rand::thread_rng();
+
+    // Generate batch for training
+    let mut batch = Vec::new();
+    for _ in 0..10 {
+        let v: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        batch.push(v);
+    }
     let refs: Vec<&[f32]> = batch.iter().map(|v| v.as_slice()).collect();
     let quantizer = ScalarQuantizer::train(&refs, dim);
 
-    let test_vecs = generate_raw_vectors(2, dim, DEFAULT_BENCH_SEED ^ 0xFEED);
-    let a = &test_vecs[0];
-    let b = &test_vecs[1];
+    let a: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
+    let b: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
 
-    let a_q = quantizer.quantize(a).expect("quantize");
-    let b_q = quantizer.quantize(b).expect("quantize");
+    let a_q = quantizer.quantize(&a).expect("quantize");
+    let b_q = quantizer.quantize(&b).expect("quantize");
 
     let mut group = c.benchmark_group("SQ8");
 
     group.bench_function("quantize", |b_bench| {
-        b_bench.iter(|| quantizer.quantize(black_box(a)).unwrap())
+        b_bench.iter(|| quantizer.quantize(black_box(&a)).unwrap())
     });
 
     group.bench_function("dequantize", |b_bench| {
@@ -32,7 +34,7 @@ fn bench_sq8(c: &mut Criterion) {
 
     group.bench_function("asymmetric_dist_cosine", |b_bench| {
         b_bench.iter(|| {
-            quantizer.asymmetric_dist(black_box(a), black_box(&b_q), DistanceMetric::Cosine)
+            quantizer.asymmetric_dist(black_box(&a), black_box(&b_q), DistanceMetric::Cosine)
         })
     });
 

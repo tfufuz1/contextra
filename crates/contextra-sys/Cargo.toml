@@ -6,30 +6,11 @@ name = "contextra-sys"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version = "1.89"
+rust-version.workspace = true
 description = "Low-level unsafe system abstractions and FFI island for Contextra (Ring 0)"
-repository = "https://github.com/tfufuz1/contextra"
-readme = "README.md"
-keywords = ["posix", "mmap", "mlock", "durability", "fsync"]
-categories = ["os", "filesystem"]
-# Interner wiederverwendbarer Baustein im Kontext des Contextra-Ökosystems; Veröffentlichung auf crates.io vorerst deaktiviert.
-publish = false
-
-include = [
-    "src/**/*",
-    "tests/**/*",
-    "benches/**/*",
-    "examples/**/*",
-    "Cargo.toml",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE-APACHE",
-    "LICENSE-MIT",
-]
 
 [package.metadata.contextra]
 ring = "0"
-klasse = "A"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
@@ -46,13 +27,4 @@ libc = "0.2"
 
 [dependencies]
 memmap2 = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }
-
-[dev-dependencies]
-criterion = { version = "0.5", features = ["async_tokio"] }
-tempfile = "3"
-
-[[bench]]
-name = "sys_bench"
-harness = false

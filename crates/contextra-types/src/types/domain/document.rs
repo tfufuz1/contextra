@@ -1,14 +1,3 @@
-//! Dokumente, Chunks, Vektor-Embeddings und Distanzmetriken.
-//!
-//! # Architektur-Rolle: Typen-Fundament (Vektormatrizen & Ähnlichkeitsberechnung)
-//!
-//! Dieses Modul implementiert:
-//! - `DistanceMetric`: Mathematische Metriken zur Vektor-Distanzberechnung (Kosinus, Euklidisch, Skalarprodukt)
-//!   für Gleitkomma (`f32`) und quantisierte Vektoren (`u8`).
-//! - `Embedding`: Vektor-Container mit L2-Normierung und Schutz vor Division durch Subnormalwerte.
-//! - `ScoredDocument`: Ergebnis einer Ähnlichkeitsabfrage mit Dokument-ID und Score.
-//! - `RerankResult`: Kalibriertes Ergebnis nach einem Cross-Encoder-Reranking.
-
 use crate::error::{ContextraError, Result};
 use crate::types::domain::DocId;
 use serde::{Deserialize, Serialize};
@@ -102,7 +91,7 @@ impl DistanceMetric {
     ///   `compute()`'s `-dot` convention so that smaller return values consistently mean higher similarity.
     ///
     /// # Cross-Crate Caller Dependency Notice
-    /// Callers in vector indices or quantization layers expecting raw squared Euclidean distance or
+    /// Callers in `contextra-index` (such as `hnsw.rs` or `quantize.rs`) expecting raw squared Euclidean distance or
     /// non-inverted raw dot products must account for this unified "smaller = closer" distance metric semantics.
     // DECISION-REF: AGT-CORE-001 — Overflow-Schutz in compute_u8() bereits implementiert.
     // KONTEXT: Alle drei Zweige akkumulieren in u64 (Euclidean: diff²-Summe, DotProduct: Produkt-Summe)

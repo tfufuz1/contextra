@@ -1,2093 +1,1841 @@
-# Contextra Spezifikation v4.2 (RAG-Edition, Soll-Zustand)
+# SPEC.md — `contextra-storage` (Fundament-Crate des Contextra-Speichers)
 
-**Datum:** 20. November 2026
-**Nachtrag v4.1.1:** 21. November 2026. Anhänge D und E liegen als `benchmarks/budgets.toml` und `capabilities.toml` im Repository, die Schichtprüfung läuft über `tools/check_spec_sync.py` (Abschnitt 13.6, SYNC-1 bis SYNC-4). Stand 21. November 2026 existieren alle genannten Dateien; der Befund H-31 des Reviews ist behoben. Inhalt der Normen unverändert.
-**Revision v4.2:** Auflösung der Review-Befunde K-01 bis K-20 und der Entscheidungen D1 bis D10 (Kapitel 16). Änderungsprotokoll in Anhang F. Anhänge D und E unverändert.
-**Überarbeitung v4.1.2:** 21. November 2026. Umgesetzt: N-07, H-31, M-05, M-11, M-12, M-13, M-14, M-27, K-19 aus dem Review `SPEC_Review_v4.1.1`. Die Entscheidungen D1 bis D10 sind **nicht** getroffen und stehen offen in Kapitel 16.
-**Status:** Final zur Umsetzung. Einzige normative Quelle für Produktumfang, Architektur, Löschkette, Betrieb, Crate-Verträge und Refactoring-Reihenfolge.
-**Geltung:** Gesamter Workspace `contextra`.
-**Ersetzt:** `docs/SPEC.md` v4.0 (Archiv: `docs/archive/SPEC_v4.0.md`). Die Löschspezifikation v2.2 und die Implementierungsspezifikation v3.0 sind Quellarchiv unter `docs/archive/`. Die Spezifikation v2.1 ist nicht archiviert.
-**Kennungen:** `ADR-n` Entscheidung, `REQ-<Bereich>-n` Anforderung, `INV-n` Invariante, `REM-n` Entfernung, `CMP-n` Compat-Auflösung, `F-n` Befund, `T-n` Test, `G-n` Build-Gate. MUSS, DARF NICHT, SOLL nach RFC 2119.
-**Offene Punkte:** siehe Kapitel 16 und Anhang F. Die Entscheidungen D1 bis D10 sind getroffen. Werte, die nur der Verantwortliche setzen kann (Fristen, Speicherbudget, Aufbewahrung), sind als Pflichtschalter ohne Standardwert ausgewiesen.
-
----
-
-## 0. Zusammenfassung
-
-### 0.1 Grundentscheidungen
-
-Contextra ist eine **RAG-Engine für Unternehmensdaten** mit einer nachvollziehbar gestuften Löschung personenbezogener Daten (Löschkette, Kapitel 7). Sechs Grundentscheidungen tragen diese Spezifikation:
-
-1. **Löschung und Versionierung sind getrennte Systeme** (Kapitel 4). Die Löschung arbeitet auf *Seals* (verschlüsselte Inhaltseinheiten), die Versionierung verweist nur auf Seals.
-2. **Keine Eigennachweise im Produkt.** Die Löschkette führt Operationen aus und protokolliert sie. Prüfung geschieht in Tests und CI (ADR-02).
-3. **Schlüssel werden sofort vernichtet, Aufräumarbeit läuft gebündelt im Hintergrund** (Kapitel 7). Ausnahme für Segmentschlüssel, die erst nach dem Neuschreiben des Segments vernichtet werden (ADR-31).
-4. **Suche ist ANN-first.** HNSW mit SQ8 und exakter Nachberechnung. Exakte Suche für kleine Bestände und als Referenz (ADR-04).
-5. **Zugriffsrechte, Filter und Lösch-Sichtbarkeit sind eine Bitmap-Mechanik** (Kapitel 6.5).
-6. **Schichtung wird durch Ports erzwungen, nicht durch Konvention.** Kein E1-Crate kennt ein anderes E1-Crate. Verbindungen laufen über Traits in `contextra-ports` und die Verdrahtung in `contextra-db`. Kompatibilitätsschichten (`compat/`) existieren nicht mehr (ADR-51).
-
-Zusätzlich gilt für abgeleitete Daten: **Nichts liegt unverschlüsselt auf dem Datenträger** (INV-9). Das schließt Postings, Graph-Struktur und HNSW-Struktur ein.
-
-### 0.2 Änderungsprotokoll gegenüber v4.0
-
-| Thema | v4.0 | v4.1 | Grund |
-|---|---|---|---|
-| Graph | nicht in Crate-Tabelle, Anhang mit Vorschlag | `contextra-graph` als optionaler E1-Baustein, reduziert, sealed (ADR-21 bis ADR-27) | F-01 bis F-06 |
-| `contextra-types` | eigenes Crate, verschlankt | aufgelöst: IDs nach `ids`, DTOs nach `ports`, Rest zu Besitzern (ADR-33) | F-08 |
-| `contextra-mvcc` | wird `contextra-version` | Umbenennung vollzogen, Inhalt auf Katalog und Snapshots reduziert | ADR-06 |
-| `compat/` | v4.0: rund 5.800 Zeilen zu entfernen | Gemessen 7.465 Zeilen plus 120 bedingte Kompilierungen, vollständig aufgelöst (CMP-1 bis CMP-10) | Nutzeranforderung, F-09 |
-| Schlüsselslot | 80 Byte | 128 Byte, Sektor-ausgerichtet (ADR-29) | F-12 |
-| K_ref, K_registry | HKDF aus KEK | Zufallsschlüssel im Anker, nicht rotiert (ADR-40) | F-10 |
-| Segmentierte Persistenz | unklar, D-Klasse „wie Quelle“ | jede abgeleitete Datei segmentweise verschlüsselt (INV-9, ADR-30) | F-11 |
-| Schlüsselvernichtung | sofort für alles | sofort für Seals, Segmentschlüssel nach Neuschreiben (ADR-31) | F-11 |
-| Argon2-Prüfung | Mindestlaufzeit 250 ms messen | Parametergrenzen prüfen, keine Laufzeitmessung | F-16 |
-| Erase-Klasse | „einziger Betroffener ist der Antragsteller“ | „keine anderen deklarierten Betroffenen am Seal“ | F-18 |
-| Scheduler-Latenz | „Suchlatenz p95“ ohne Quelle | Latenzfenster in `db` (ADR-43) | F-23 |
-| Schichten | ports→types, store→crypto/erasure/mvcc, simd→types | alle Verletzungen beseitigt, G-03 verschärft | F-07 |
-| Testkit im Standard-Build | `default-members` enthält testkit | nicht mehr Standard-Member | F-27 |
-| Mehrfach-`MAX_SEARCH_K` | sechs Definitionen mit Werten 1.000 und 10.000 | eine Definition in `ids`, Wert 1.000 (ADR-52) | F-13 |
-| Zeit | `Instant::now` verboten | verboten, 77 Stellen werden migriert (G-12) | F-26 |
-| Unsafe in Tests | nicht geregelt | nur Test-Targets mit Allowlist (ADR-53) | F-28 |
-| Migration | Annahme | keine Migration, Entwicklungsdaten verworfen (ADR-44) | OPEN-5 |
-
-### 0.3 Befundregister (Architektur und Spezifikation)
-
-Jeder Befund ist mit der Quelle belegt (Dateiname, Zeile oder Messung in Anhang B). Entscheidungen stehen in der letzten Spalte.
-
-| ID | Ort | Befund | Entscheidung |
-|---|---|---|---|
-| F-01 | Crate-Tabelle 3.1 | `contextra-graph` (34.611 Zeilen, 153 Dateien, im Workspace) fehlt in der Tabelle. Die Gesamtsumme ist deshalb falsch. | ADR-21, 3.1 |
-| F-02 | Anhang v4.0 „contextra-graph“ | `ConsistencyEnforcer` als „zwingend für DSGVO-Löschung“ bezeichnet. Modul-Doku sagt: Mustererkennung, keine Kantenbereinigung. | ADR-25 (Entfernung) |
-| F-03 | Anhang v4.0 | `SessionBranchTree` als USP geführt, widerspricht Nicht-Ziel 1.3 und REM-24. | ADR-24 (Entfernung) |
-| F-04 | `graph/src/types.rs` | `Entity.name` und `Edge.label` sind `Arc<str>` im Klartext. Persistenz über `bincode` in den Store ohne Verschlüsselung. Widerspricht REQ-FMT-2. | ADR-23 |
-| F-05 | `graph/PLAN.md` v2.1 | Graph soll `ErasureLayer` aus `contextra-erasure` implementieren und Generationen unter `ArtKey` führen. Widerspricht R2 und ADR-01. | ADR-22, ADR-27 |
-| F-06 | `graph/src/csr/graph_write/tombstone.rs`, `cascade.rs` | Löschen ist Soft-Delete mit Transaktionszeitstempeln. Kein Schlüssel- und kein Scrub-Bezug. Ein gelöschter Knoten bleibt physisch bis zur Kompaktion. | ADR-22, 6.10 |
-| F-07 | `contextra-ports/Cargo.toml`, `store/Cargo.toml`, `simd/Cargo.toml` | Verletzungen von R1 (ports → types, 5 Fundstellen), R2 (store → crypto, 16 Fundstellen; store → mvcc und erasure), R7 (simd → types). | ADR-32, 3.3 |
-| F-08 | `contextra-types` (9.596 Zeilen) | Querschnitts-Crate, aus dem Ports und Module ihre Typen beziehen. Erzeugt Kopplung ohne Besitzer. | ADR-33, REM-30 |
-| F-09 | `compat/` in sieben Crates | Bridge-Schicht zwischen alten und neuen Typen, dazu Doppelmodule für denselben Kern (z. B. `vector/compat/hnsw_vector_index.rs` neben `vector/hnsw/`). Schafft zwei Codepfade, 120 bedingte Kompilierungen, `*-compat`- und `workspace`-Features. | ADR-51, Kapitel 12.5 |
-| F-10 | REQ-KEY-1 / REQ-KEY-5 | `K_ref` und `K_registry` werden per HKDF aus der MandantenKEK abgeleitet. Eine Epochenrotation ändert sie, dann stimmen alle Betroffenen-Tags nicht mehr. | ADR-40 |
-| F-11 | 5.1, INV-2, ADR-03 | D-Klasse „wie Quelle“ ist technisch nicht umsetzbar: Postings und Graph-Struktur mischen Seals. Schlüsselvernichtung und Rekonstruktion widersprechen sich. | ADR-30, ADR-31 |
-| F-12 | REQ-KEY-3 | Slot 80 Byte. Slots kreuzen 512-Byte-Sektoren und 4-KiB-Seiten. Torn Writes sind nicht ausgeschlossen. REQ-REC-2 setzt aber Atomarität voraus. | ADR-29 |
-| F-13 | Code: sechs `MAX_SEARCH_K` | Gleicher Name mit Werten 1.000 und 10.000 in sechs Crates. 86 Verwendungen. Verletzt R4. | ADR-52 |
-| F-14 | REQ-KEY-7 | Argon2-Parameter und Mindestlaufzeit „250 ms“ werden beim Start gemessen. Messung ist laufzeitabhängig und widerspricht ADR-02. | ADR-16 (Neufassung) |
-| F-15 | REQ-KEY-4 | Vernichtung „an Ort und Stelle“ ohne Angabe, wie Gleichzeitigkeit mit Lesern des Caches geregelt ist. | REQ-KEY-4 (neu gefasst, 5.5) |
-| F-16 | REQ-KEY-7 | Siehe F-14. | ADR-16 |
-| F-17 | REQ-ER-2 / 7.4 E1 | Klasse „Erase“ verlangt, dass der einzige Betroffene „der Antragsteller“ ist. Der Antragsteller ist ein Operator, kein Betroffener. Die Bedingung ist unbrauchbar. | 7.3 |
-| F-18 | 7.4 E1 vs. REQ-CON-1 | Gate läuft im Schreib-Task „des Mandanten“, Schreib-Tasks sind aber pro Shard (Mandant × Collection). | ADR-28, 8.4 |
-| F-19 | REQ-CON-4 | „Ingest nach Gated erhält SubjectSuppressed oder neuen Seal“ ist nicht eindeutig. | 7.4 / REQ-ING-7 |
-| F-20 | 5.4 vs. 7.4 E2 | Registry-Zustand „Active“ in 5.4, „Erased“ in 7.4. Zustandsmenge undefiniert. | 5.7 |
-| F-21 | 7.4, REQ-CON-6 | Gruppen-Commit und Gate-Publikation greifen nicht geordnet ineinander; Reihenfolge der Veröffentlichung fehlt. | 7.4, 8.4 |
-| F-22 | REQ-SCR-4 | Scrub-Pause bei Latenzüberschreitung ohne definierte Messgröße. | ADR-43 |
-| F-23 | 10.3 | „Suchlatenz p95 während Scrub ≤ +5 %“ ohne Messquelle im Produkt. Widerspricht ADR-02 (Messung im Produkt). | ADR-43 (Messung nur im Test- und Bench-Crate, Latenzfenster nur als Steuergröße) |
-| F-24 | REQ-VEC-4 | Start liest alle `VectorCode`-Datensätze entschlüsselt. Bei L ~7,7 GB, Startziel 60 s. Kein Pfad für Teilladen oder Wiederverwendung. | 6.3 (Persistenz mit Graph-Snapshot) |
-| F-25 | REQ-TXT-2 | `df(t)` wird beim Löschen nicht korrigiert. Ranking-Abweichung bis Scrub. Deterministisch, aber nicht exakt. | 6.4 (dokumentierte Abweichung mit Obergrenze) |
-| F-26 | Code: 77 Stellen | `Instant::now`/`SystemTime::now` außerhalb `contextra-env`. Verletzt REQ-TIM-1. | G-12 |
-| F-27 | `Cargo.toml` `default-members` | `contextra-testkit` und `contextra-graph` im Standard-Build, obwohl Testkit „nicht im Standard-Build“ laut 3.1. | 12.6 |
-| F-28 | `crates/contextra-text/tests/alloc_profiler.rs`, `crates/contextra-graph/tests/ppr_alloc_test.rs` | `unsafe impl GlobalAlloc` außerhalb `sys`/`simd`. G-02 erlaubt das nicht. Test-Allocatoren sind ein legitimer Sonderfall. | ADR-53 |
-| F-29 | REQ-REC-2 | Entscheidungsregel für halb geschriebene Slots ist mehrdeutig (Zustand `Destroyed` oder Integrity). | 7.7 (eindeutige Tabelle) |
-| F-30 | REQ-ER-3 | Review-Erinnerung ohne Konsequenz bei Ablauf. Ein offener Auftrag im Zustand `Restricted` ist für Art. 17 nicht abgeschlossen, die Spezifikation sagt das nicht. | 7.5 (Pending-Frist) |
-| F-31 | REQ-SRC-1 / 6.5 | Mandanten-Principals kommen laut Spezifikation aus der Anfrage. Im MCP-Kontext ist die Anfrage vom Modell beeinflussbar. | ADR-38 |
-| F-32 | Spezifikation 7.2 | Erasure-Scope `Subject` ohne Berechtigungsprüfung des Anforderers spezifiziert. | ADR-38, 7.2 |
-| F-33 | REQ-CTX-4 | Dedup per Textgleichheit ohne Angabe des Vergleichsverfahrens. Ein Klartext-Hash über Inhalt ist Personenbezug. | ADR-50 |
-| F-34 | Text, Vektor, Graph | Abgeleitete Persistenz ohne Festlegung, wie Segment-Schlüssel verwaltet werden. Dazu fehlt ein Kopfformat für Segmente. | 5.8 |
-| F-35 | 7.11 / Checkpoints | Checkpoints kopieren Datenverzeichnisse. Nicht festgelegt, ob `keys/` und `erasure/` mitgehen. Restore könnte Gate-Zustand zurücksetzen. | ADR-42 |
-| F-36 | ADR-17 / REQ-FLT-3 | Zwei Schwellen mit Wert 20.000 (`flat_below` und `brute_force_max`) mit unterschiedlichem Zweck, ohne Abgrenzung. | 6.3 / 6.5 |
-| F-37 | Anhang B v4.0 | 23 Workspace-Mitglieder (tatsächlich 22), Ist-Umfang 249.000 (tatsächlich 239.968 inkl. Bench), Ingest 21.000 Zeilen und 155 Dateien (tatsächlich 30.737 und 129). | Anhang B |
-| F-38 | 12.2 REM-19, REM-01 | `contextra-engine` und `contextra-vault` sind bereits als Verzeichnis entfernt. Die Einträge sind veraltet. Verbleibende Verweise in Kommentaren nicht gelistet. | REM-01, REM-19 |
-| F-39 | 12.2 REM-25, REM-15, REM-29 | Pfade falsch: `ports/src/ports/query_rewriter.rs` existiert nicht (richtig: `ports/src/query_rewriter.rs`), `store/src/compat` existiert nicht, `docs/crates` und Root-`AGENTS.md` fehlen. | 12 |
-| F-40 | Dokumentation | Crate-Dokumente (`PLAN.md`, `INVENTAR.md`, `SPEC.md`) referenzieren unterschiedliche Spezifikationsstände (v2.1, v2.2, v3, v4). | REM-14, 13.5 |
-| F-41 | `contextra-db` | `contextra-graph` ist nicht optional eingebunden, der Code im Orchestrator nutzt es nicht. Tote Abhängigkeit. | 3.3 / REM-31 |
-| F-42 | Graph-Features | `default` aktiviert `experimental-graph`, `hyperedge-suggest` (LLM-Validierung im Feature `workspace`). Default-Build enthält LLM-Pfad und Agentengedächtnis. | ADR-24 |
-| F-43 | `contextra-erasure` | Enthält `vault/`, `crypto_local.rs`, `types_local.rs`, Saga 2.0 mit `Armed`. Die Spezifikation v4.0 verbietet diese Typen (REM-10), der Code hat sie noch. Eine Crate-Neuaufbau-Anweisung fehlt. | 13.1 M2, 15 |
-| F-44 | REQ-ING-2 | Formatliste mit `fmt-ole`, `fmt-odf`, `fmt-structured` nicht eindeutig gegen OPEN-4 abgegrenzt. | ADR-35 |
-
----
-
-## 1. Produkt
-
-### 1.1 Ziel
-
-Contextra ist eine **eingebettete Rust-Bibliothek für Retrieval in RAG-Anwendungen** mit MCP-Schnittstelle (stdio) und optionalem Server-Binary. Sie nimmt Dokumente auf, zerlegt sie, erzeugt Embeddings über ein austauschbares Backend, indiziert Vektoren und Text, optional einen Entitätsgraph, beantwortet Hybridsuchen mit Zugriffsfilter und liefert Kontextpakete mit Quellenangabe innerhalb eines Token-Budgets. Textgenerierung liegt außerhalb.
-
-Verbindlich:
-
-- **Löschung personenbezogener Daten** nach Kapitel 7.
-- **Mandantentrennung** mit eigener Schlüsselhierarchie je Mandant.
-- **Zugriffsfilter** (Security Trimming) auf Dokument- und Chunk-Ebene.
-- **Versionierung** mit optionaler Zeitreise (Kapitel 4.5).
-- **Entitätsgraph** als optionaler Baustein je Collection (Kapitel 6.10).
-
-### 1.2 Referenzlast und Referenzmodelle
-
-| Stufe | Chunks je Mandant | Dimension | Anfragen | Betrieb |
-|---|---|---|---|---|
-| S | 1 Mio. | 384 | ≥ 200 QPS | 16 vCPU, 64 GB RAM, NVMe |
-| L | 10 Mio. | 768 | ≥ 100 QPS | 16 vCPU, 128 GB RAM, NVMe |
-
-Referenz-Embedding (ADR-36): `multilingual-e5-small` (384 Dimensionen) für Stufe S, `multilingual-e5-base` (768) für Stufe L, beide als ONNX mit festem SHA-256. Die Mandantenzahl je Prozess ist kein fester Wert, sondern ein Budget: Die Summe der Mandantenbudgets je Prozess liegt unter `memory_budget_bytes` (Pflichtschalter, D5, H-27). Die Referenzstufen gelten je Mandant. Größere Bestände skalieren über mehrere Prozesse, aufgeteilt nach Mandant (8.7).
-
-**Zielplattform (D9, H-23).** Linux auf x86_64. Die Unsafe-Insel `contextra-sys` (mlock, Dump-Schutz, Direct-IO) ist nur für Linux implementiert. Andere Betriebssysteme sind nicht Ziel dieser Version. Dateisysteme mit Copy-on-Write sind eine Betriebsgrenze nach 7.9.
-
-### 1.3 Nicht-Ziele
-
-- Keine Textgenerierung, kein Chat, keine Agentenlogik, **kein Agentengedächtnis** (ADR-24).
-- Keine LLM-Aufrufe im Kern. Keine LLM-basierte Klassifikation, Umformulierung oder Hyperkanten-Validierung (REQ-PRV-2, ADR-24).
-- Keine Echtzeit-, Regelungs- oder Hardwarefunktionen. Keine Zeitgarantien auf Suchantworten.
-- Keine interaktiven Mehrfachtransaktionen. Ein Schreibstapel ist atomar (REQ-CON-6).
-- Keine Replikation und kein Cluster im Kern in v4.x (ADR-46).
-- Keine automatische Entitätsextraktion im Kern. Entitäten und Relationen liefert der Aufrufer (ADR-48).
-- Keine Aussage über Kopien außerhalb des Systems (Kapitel 7.9).
-- Keine Aussage über die rechtliche Einordnung. Die Software führt Operationen aus, bewertet nicht und garantiert kein Compliance-Ergebnis (ADR-45, REQ-DOC-2).
-
-### 1.4 Entscheidungsfilter
-
-Jede Funktion wird gegen drei Fragen geprüft. Fällt eine Antwort negativ aus, wird sie entfernt oder zum optionalen Feature mit Abnahmegate.
-
-1. Hilft sie Qualität, Latenz oder Durchsatz einer Unternehmens-RAG, messbar im Benchmark?
-2. Ist sie für Löschung, Mandantentrennung oder Zugriffsschutz nötig?
-3. Ist ihr Mehraufwand im Normalbetrieb kleiner als ihr gemessener Nutzen?
-
----
-
-## 2. Entscheidungsregister
-
-Alle Entscheidungen sind final. Änderungen erfordern eine neue Spezifikationsversion. Die Spalte „Status“ zeigt, ob eine Entscheidung gegenüber v4.0 neu gefasst (**neu gefasst**), ergänzt (**neu**) oder unverändert (**bestätigt**) ist.
-
-| ID | Entscheidung | Status | Begründung | Verworfen |
-|---|---|---|---|---|
-| ADR-01 | Löschung wirkt auf **Seals**, nicht auf Versionen. Version und Seal sind getrennte Systeme mit Einbahn-Schnittstelle. | bestätigt | Löschung darf nicht von Versionskette oder Zeitreise abhängen. | Gate-Mengen über Versionsordinale |
-| ADR-02 | **Keine Eigennachweise im Produkt**: keine Selbstmessung, keine signierten Berichte, kein Prüfwerkzeug, keine Messklassen. Journal, Ledger und Tests in CI. Präzisiert (D9): Integrität des eigenen Löschlogs per MAC mit Schlüssel `K_log` aus dem Anker ist zulässig; das Produkt erstellt weder Berichte noch führt es Prüfungen aus. | bestätigt | Selbstprüfung mit denselben Annahmen ist wertlos und kostet Laufzeit. | Canary im Produkt, JCS/Ed25519 |
-| ADR-03 | **Frühe Schlüsselvernichtung** für Seal-Schlüssel. Reihenfolge: Gate, Schlüssel, Arbeitsspeicher, dann gebündelter Scrub. | neu gefasst | Seal-Klartext ist nur über den Seal-Schlüssel erreichbar. Ausnahme für Segmentschlüssel: ADR-31. | Reihenfolge S3–S5 aus v3.0 |
-| ADR-04 | **HNSW mit SQ8** ist Standardindex. Exakte flache Suche bis 20.000 Vektoren je Shard und als Referenz im Test. DiskANN und RaBitQ entfallen. | bestätigt | Flache Suche ist ab 1 Mio. Vektoren zu langsam. | DiskANN |
-| ADR-05 | **Graph-Crate wird verkleinert und als optionaler Baustein geführt.** Details ADR-21 bis ADR-27. | neu gefasst | v4.0 hatte hier keine Entscheidung (Textfragment). | Vollbehalt, Entfernen ohne Abnahmegate |
-| ADR-06 | `contextra-mvcc` wird `contextra-version`: Versionskatalog, Snapshots, Aufbewahrung. Kein SSI, kein TxBuffer. | bestätigt | RAG braucht atomare Schreibstapel und Snapshot-Lesen. | SSI, interaktive Transaktionen |
-| ADR-07 | **Ein Schreib-Task je Shard** (Mandant × Collection). Gate ist mandantenweit (ADR-28). Lesen sperrfrei über Snapshots. | neu gefasst | Trennt Schreibserialisierung und Gate-Konsistenz sauber. | Ein Schreiber je Prozess |
-| ADR-08 | **KeyTable als Slot-Datei mit Überschreiben an Ort** (Größe 128 Byte, ADR-29). | neu gefasst | Vernichtung ist ein Schreibvorgang statt Shard-Neuschreiben. | 256 Shards mit `tmp → rename` |
-| ADR-09 | **Gebündelte Bereinigung (Scrub)** gemeinsamer Strukturen mit Frist, Drosselung und Priorität unter dem Suchpfad. | bestätigt | Ein Stapel schreibt jedes betroffene Segment einmal. | Sofortige Bereinigung je Auftrag |
-| ADR-10 | **Mehrbetroffene: `Restricted` mit Review** als Standard. `DeleteAll` nur durch ausdrückliche Entscheidung. | bestätigt | Fremde Dokumente ohne Zustimmung zu vernichten ist nicht in jedem Fall verhältnismäßig. | `DeleteAll` als Standard |
-| ADR-11 | **Kein Cluster-Segmentieren personenbezogener Daten.** Jeder Seal hat eigenen Schlüssel. | bestätigt | Schlüssel je Seal macht Dateitrennung überflüssig. | Cluster-Segmente |
-| ADR-12 | **Ingest-Crate und ONNX-Embedder aus der Historie zurückholen** (Abschnitt 13.2), beschneiden auf den Formatumfang aus ADR-35. | neu gefasst | Mengen korrigiert, siehe F-37. | Neuschreiben |
-| ADR-13 | **Embedding-Backends:** lokal (ONNX, Standard) und HTTP gegen interne Dienste (eigenes Crate, Feature). Kern netzfrei. | bestätigt | Unternehmen betreiben zentrale Inferenzdienste. | Nur lokal |
-| ADR-14 | **Zeitreise je Collection schaltbar, Standard aus.** Suchindizes enthalten nur die aktuelle Fassung. Gilt auch für den Graph. | bestätigt | Historie im Index vergrößert Speicher, Latenz und Löschaufwand. | Historie immer im Index |
-| ADR-15 | **Schlüsselwurzel:** K1 (Passphrase, Argon2id) und K1b (Schlüsseldatei) in v4.x. K3 (KMS) in M6. | bestätigt | Die Passphrase bleibt Wurzel (K1), wird aber über Datei (Rechte 0600) oder Umgebungsvariable geliefert, nicht interaktiv (D10). TPM scheidet aus, weil die Wurzel nicht an ein Gerät gebunden sein soll (H-24). | TPM |
-| ADR-16 | **Argon2id-Parameter** sind Konfiguration mit Mindestwerten (m ≥ 64 MiB, t ≥ 3, p ≥ 1). **Keine Laufzeitmessung beim Start.** Empfohlene Werte in der Betriebsdokumentation. | neu gefasst | Laufzeitmessung widerspricht ADR-02 und ist nicht reproduzierbar (F-14, F-16). | Mindestlaufzeit 250 ms |
-| ADR-17 | **Zugriffsfilter ist Kernfunktion.** ACL-Tags und Metadatenfilter laufen über Bitmaps und die ACORN-Traversierung. | bestätigt | Ohne Security Trimming nicht einsetzbar. | Filterung in der Anwendung |
-| ADR-18 | **Bulk-Ingest** darf mit gelockerter Dauerhaftigkeit laufen (Sync am Jobende; präzisiert durch REQ-ING-9: zusätzlich alle 64 MiB oder 5 s, H-08). Löschvorgänge sind nie gelockert. | bestätigt | Importe von Millionen Dokumenten sind mit `fsync` je Gruppe zu langsam. | Immer volle Dauerhaftigkeit |
-| ADR-19 | **Selbstdeklarationen entfallen** (`contract.rs`, `ANCHOR`, `FILE-CONTEXT`, Auditor-Skripte). Verhalten prüft `contextra-testkit`. | bestätigt | Deklarationen veralten, Tests nicht. | Deklarationen pflegen |
-| ADR-20 | **Standard ist Klasse P.** Jede Collection gilt als personenbezogen, bis sie als K erklärt wird. Die Entity-Erkennung warnt, entscheidet nie. | bestätigt | Speicherweg darf nicht von Trefferquote abhängen. | Klassifikation entscheidet |
-| ADR-21 | **`contextra-graph` ist ein optionaler E1-Baustein** (Feature `graph` in `contextra-db`, Standard aus, je Collection `graph = true`). Er bleibt nur bestehen, wenn Gate G-GRAPH (11.5) erreicht wird. Sonst Entfernung in M5. | neu | PathRAG liefert erklärbare Belege. Der Nutzen ist nicht gemessen, daher Abnahmegate. | Vollbehalt, sofortige Entfernung |
-| ADR-22 | **Graph ist abgeleiteter Index** (Klasse D). Jede Kante und jeder Knoten trägt **Seal-Provenienz** (Menge von `SealOrd`). Löschen erfolgt über Gate, Tombstones und Scrub, nicht über eine eigene Saga. | neu | Vermeidet eine zweite Löschsaga und hält den Graph an Seals gebunden. | `ErasureLayer`-Generationen (PLAN v2.1) |
-| ADR-23 | **Keine Klartext-Entitäten oder Labels im Graph.** Namen und Kantenbezeichnungen liegen als verschlüsselte Records mit dem DocKey des Quell-Seals. `EntityId = BLAKE3-keyed(K_ref, Typ ‖ normalisierter Name)`, 128 Bit. | neu | Behebt F-04. | Klartext-Labels (`Arc<str>`) |
-| ADR-24 | **Entfernt aus dem Graph:** TL-HFD, Lovász, APPRH, Percolation, Dense PPR, PPR-Kostenmodell, Shadow-Hooks, `SessionBranchTree` (Agentengedächtnis), Edge-Reinforcement, Hyperkanten, LLM-Hyperkanten-Validierung, `text_gen`, Community-Erkennung, `cascade.rs`, `purger`, `provider`, `storage`, `compat/`. Liste 12.4. | neu | Widerspricht Nicht-Ziel 1.3 und Kern-Entscheidung 6. Behebt F-03, F-42. | Beibehalten |
-| ADR-25 | **`ConsistencyEnforcer` entfällt.** | neu | Erkennt Muster, bereinigt nicht. Keine Löschfunktion (F-02). | Beibehalten als „DSGVO-Baustein“ |
-| ADR-26 | **Graph folgt der Zeitreise der Versionen** (ADR-14). Bitemporale Felder (`tx_valid_from/to`, `business_valid_*`) entfallen. `as_of` auf Graph-Operationen liefert `HistoryNotIndexed`. | neu | Zwei Zeitmodelle widersprechen sich. | Bitemporaler Graph |
-| ADR-27 | **Graph-Scrub** durch Konsolidierung der Nachbarlisten und Neuaufbau ab 30 % toter Knoten. Kein Generationsmodell mit `ArtKey`. | neu | Gleiche Mechanik wie HNSW (REQ-VEC-5). | Generation `g+1` mit `ArtKey` je Generation |
-| ADR-28 | **Gate ist mandantenweit.** Eine Gate-Datei, ein `ArcSwap` je Mandant, geteilt von allen Collections. LiveMask-Änderungen gehen an die Shards. Die Leseprüfung (REQ-FLT-5) gilt sofort. | neu | Behebt F-18. Ein Löschauftrag wirkt über Collections hinweg in einem Schritt. | Gate je Shard |
-| ADR-29 | **KeyTable-Slots sind 128 Byte, Sektor-ausgerichtet.** Slot-Index ist `SealOrd` bzw. `SegOrd`. | neu | 128 Byte teilt 512-Byte-Sektoren und 4-KiB-Seiten ohne Kreuzung (F-12). | 80 Byte |
-| ADR-30 | **Alle abgeleiteten Dateien sind segmentweise verschlüsselt** (INV-9). Jedes Segment hat einen Segmentschlüssel `SegKey` in einem eigenen Slot-Raum der KeyTable. | neu | Behebt F-11. Keine Klartext-Postings, keine Klartext-Graphstruktur auf Platte. | Unverschlüsselte Segmente mit Gate-only |
-| ADR-31 | **ADR-03 gilt für Segmentschlüssel eingeschränkt (ADR-03a):** Ein Segmentschlüssel wird vernichtet, nachdem der Scrub das Segment ohne die toten Seals neu geschrieben und veröffentlicht hat. Restfenster ≤ `scrub_deadline`, im Betriebshandbuch ausgewiesen (7.9). | neu | Ein Segment mischt lebende und tote Seals. Früher Vernichten würde lebende Daten vernichten. | Segmentschlüssel-Vernichtung sofort |
-| ADR-32 | **Schichtentrennung über Ports:** `store ↛ crypto/erasure/version`, `erasure ↛ crypto`, `version ↛ erasure`. Schlüsselvernichtung über Port `KeyDestroyer` (Implementierung in `crypto`), Scrub über Port `ScrubTarget` (Implementierung in `vector`, `text`, `graph`, `store`). Orchestrierung in `db`. | neu | Behebt F-07. Macht Crate-Grenzen prüfbar (G-03). | Direkte Abhängigkeiten |
-| ADR-33 | **`contextra-types` wird aufgelöst:** IDs und Ordinale nach `contextra-ids`, DTOs und Ports-Typen nach `contextra-ports::dto`, Rest zum Besitzer. | neu | Behebt F-08. Kein Querschnitts-Crate ohne Besitzer. | Verschlanken |
-| ADR-34 | **Netzfreier Kern** (R8, REQ-NET-1). Netzwerkcode nur in `embed-http`, `server`, `kms`. | bestätigt | Auditierbarkeit. | — |
-| ADR-35 | **Ingest-Formatumfang fest:** Text, Markdown, HTML, DOCX, PPTX, XLSX/CSV, PDF (Text, kein OCR), EML/MBOX, JSON. ODF, OLE (`.doc`, `.ppt`, `.msg`) und YAML/TOML entfallen. | neu | Behebt F-44. Formate mit Nachfrage werden in einer neuen Spezifikationsversion aufgenommen. | Nachziehen bei Bedarf |
-| ADR-36 | **Embedding-Referenzmodelle:** `multilingual-e5-small` (384) Standard, `multilingual-e5-base` (768) Stufe L. Reranker `bge-reranker-v2-m3` ONNX, standardmäßig aus. Modell-SHA-256 ist verbindlich. | neu | Konkrete Referenzen für Benchmarks und Modellwechsel. | Modell offen lassen |
-| ADR-37 | **Suchtexte und Abfrage-Embeddings werden nie gespeichert, geloggt oder gecacht.** `MetricsSink` erhält nur Zähler und Zeiten. | neu | Suchanfragen enthalten häufig personenbezogene Daten. | Abfrage-Log für Debugging |
-| ADR-38 | **Principals und Berechtigungen kommen aus der Konfiguration des Hosts,** nie aus Tool-Argumenten oder Anfragefeldern, die ein Modell beeinflussen kann. Erasure-Anforderer müssen in der Konfiguration als `erasure_admin` geführt sein. | neu | Behebt F-31, F-32. | Principals aus Anfrage |
-| ADR-39 | **Plaintext-Caches:** nur der Schlüssel-Cache (REQ-KEY-6) ist standardmäßig aktiv. Der Chunk-Text-Cache ist optional, Standardgröße 0. Ergebniscaches entfallen. | neu | Jeder Plaintext-Cache braucht einen SealScoped-Eintrag und Löschtests. Minimieren. | Ergebniscache |
-| ADR-40 | **Strukturschlüssel `K_ref` und `K_registry` sind Zufallsschlüssel**, im Anker unter dem Wurzelschlüssel gewrappt, nicht per HKDF aus der KEK abgeleitet und nicht rotiert. Sie sterben nur mit dem Mandanten. | neu | Behebt F-10. | HKDF aus KEK |
-| ADR-41 | **mlock-Pflicht für Schlüssel:** Der Start verweigert, wenn Schlüsselspeicher nicht gesperrt werden kann. Ausnahme `allow_unlocked_keys = true` nur für Entwicklung, im Betriebshandbuch verboten. Core-Dumps werden deaktiviert (`PR_SET_DUMPABLE = 0`). | neu | Schlüssel im Swap sind ein Lesepfad für die Vernichtung. | Warnung statt Verweigerung |
-| ADR-42 | **Checkpoints schließen `keys/` und `erasure/` aus.** Schlüssel gehen nur über die Schlüsselsicherung (7.11). Der Gate-Zustand wird nie aus einem Checkpoint zurückgesetzt. | neu | Behebt F-35. | Vollständige Kopie |
-| ADR-43 | **Latenzfenster in `db`:** 10 Buckets zu je 1 s, Fenster 10 s, lock-frei geführt (H-28). p95 wird vom Scheduler jede Sekunde berechnet. Scrub-Pause nur über diese Größe. Messung im Produkt ist nur diese Steuergröße, kein Nachweis. | neu | Behebt F-22, F-23. | Messung in Testkit-Lasttests als Produktsignal |
-| ADR-44 | **Keine Migration.** Entwicklungsdaten im Format v4.0 werden verworfen. Ein Export-Werkzeug entsteht nur mit einer neuen Spezifikationsversion und einem Pilotkunden. | neu | Schließt OPEN-5. | Migrationswerkzeug auf Vorrat |
-| ADR-45 | **Keine rechtliche Bewertung im Produkt oder in der Spezifikation.** Dokumentation verwendet nur technische Aussagen (REQ-DOC-2). Die Einordnung trifft der Verantwortliche. | neu | Schließt OPEN-1. | Rechtliche Aussage in der Software |
-| ADR-46 | **Hochverfügbarkeit und Replikation sind in v4.x ausgeschlossen.** | neu | Schließt OPEN-3. | Replikation des Löschlogs in v4.x |
-| ADR-47 | **Erstes KMS-Backend (K3): HashiCorp Vault Transit**, selbst betrieben. Zweites Backend (AWS KMS) nur mit neuer Spezifikationsversion. | neu | Schließt OPEN-2. Passt zu on-premises-Unternehmen. | Mehrere Anbieter in M6 |
-| ADR-48 | **Entitäten und Relationen liefert der Aufrufer** (`SourceDoc.graph`). Der Kern extrahiert nichts. | neu | Regelbasierte Extraktion ist fehleranfällig und gehört in die Quellsysteme. | Regelbasierte Extraktion im Kern |
-| ADR-49 | **Hybridfusion-Gewichte:** Vektor 1,0, Text 1,0, Graph 0,0 (nur aktiv bei `GraphMode::PathRag`). Der Produktstandard bleibt 0,0, bis ein Gewicht im Benchmark begründet ist (D6). RRF mit `k = 60`. | neu | Festlegung vor Benchmark, Änderung nur über Konfiguration. | Gewichte aus Trainingsdaten |
-| ADR-50 | **Dedup und Idempotenz über keyed Digest:** `digest = BLAKE3-keyed(K_ref, Quellbytes)`. Kein unkeyed Hash über Inhalte. | neu | Behebt F-33. Ein unkeyed Digest wäre außerhalb des Schlüsselbesitzes vergleichbar; der keyed Digest verhindert das ohne `K_ref` (H-04). | Textvergleich |
-| ADR-51 | **`compat/` wird vollständig aufgelöst.** Keine Bridge-Module, keine Doppelmodule, keine `*-compat`-, `workspace`- oder `types-compat`-Features. Ports werden direkt von Kernmodulen implementiert. Umfang und Zielpositionen: 12.5. | neu | Nutzeranforderung. Behebt F-09. | Bridge-Schicht behalten |
-| ADR-52 | **`MAX_SEARCH_K = 1_000`**, einzige Definition in `contextra-ids`. `k_cand` und `rerank_k` sind daraus abgeleitet und ebenfalls begrenzt. | neu | Behebt F-13. Ein Wert, eine Quelle. | Sechs abweichende Werte |
-| ADR-53 | **`unsafe`-Inseln:** `sys` und `simd` im Produktcode. Test-Targets dürfen einen globalen Test-Allocator mit `unsafe` enthalten. Liste in `tests/unsafe_islands.rs`, sonst verboten. | neu | Behebt F-28. | Verbot ohne Ausnahme |
-| ADR-54 | **Ein Crate, eine Ebene, eine Verantwortung.** Kein E1-Crate hängt von einem anderen E1-Crate ab (R2). E2-Crates hängen nur von E0, E1 und den E2-Crates nach 3.3 ab, ohne Zyklus. Kein Crate führt einen Feature-Schalter, der einen zweiten Codepfad für denselben Kern einschaltet. | neu | Verhindert die Entstehung neuer Bridge-Schichten. | Feature-Varianten |
-
----
-
-## 3. Architektur
-
-### 3.1 Zielbestand der Crates
-
-Umfang alt = Zeilen laut Messung am HEAD `2fd0994` (inkl. Tests, Anhang B). Umfang Ziel ist eine **Schätzung** (±25 %).
-
-| Crate | Ebene | Entscheidung | Alt | Ziel | Hinweis |
-|---|---|---|---|---|---|
-| `contextra-ids` | E0 | behalten, Typen aus `types` aufnehmen, einzige Definition von Limits | 1.484 | 2.000 | ADR-33, ADR-52 |
-| `contextra-env` | E0 | behalten (`Clock`, `SeededRng`, `MetricsSink`) | 2.658 | 2.000 | R10 |
-| `contextra-sys` | E0 | behalten (unsafe-Insel: mlock, Direct-IO, Dumpable) | 2.987 | 2.500 | ADR-41 |
-| `contextra-simd` | E0 | behalten (unsafe-Insel), Abhängigkeit auf `types` entfernt, `compat/` aufgelöst | 6.461 | 3.500 | CMP-7 |
-| `contextra-durable-fs` | E0 | behalten, Fault-Injection und `Poisoned` raus | 3.491 | 2.500 | REM-13 |
-| `contextra-ports` | E0 | Traits und DTOs, nur Abhängigkeit `ids` | 7.208 | 3.000 | ADR-32, ADR-33 |
-| `contextra-crypto` | E1 | AEAD, KDF, KeyTable, Anker, `RecordSealer`, `SegmentSealer`, `KeyDestroyer`, Wurzel-Backends | 11.953 | 4.000 | Kapitel 5 |
-| `contextra-erasure` | E1 | Löschkette, Gate, Log, Ticket, Scrub-Planung. Neu aufgebaut | 6.708 | 4.500 | Kapitel 7, REM-10 |
-| `contextra-version` | E1 | aus `contextra-mvcc`. Versionskatalog, Snapshots, Aufbewahrung | 8.159 | 2.500 | ADR-06 |
-| `contextra-store` | E1 | LSM, WAL, SST, Manifest, KV-Familien. Keine Krypto-Abhängigkeit | 35.383 | 14.000 | G-STORE, CMP-4 |
-| `contextra-vector` | E1 | HNSW, SQ8, exakt, ACORN, Filter. DiskANN, RaBitQ raus | 34.675 | 11.000 | ADR-04 |
-| `contextra-text` | E1 | BM25, WAND, Tokenizer, Stemmer, Stoppwörter | 18.176 | 10.000 | 6.4 |
-| `contextra-graph` | E1 | Optional. Reduzierter CSR-Graph mit Seal-Provenienz und PathRAG | 34.611 | 6.000 | ADR-21 bis ADR-27 |
-| `contextra-rank` | E1 | RRF, Top-k, Zeitgewichtung, Erklärung | 10.809 | 4.000 | REM-18 |
-| `contextra-privacy` | E1 | Entity-Erkennung (Warnung), Egress-Guard, Verarbeitungsregister | 9.278 | 3.500 | REM-20 |
-| `contextra-checkpoint` | E1 | Hartlink-Snapshot und Restore, `keys/` und `erasure/` ausgeschlossen | 10.901 | 3.000 | ADR-42 |
-| `contextra-ingest` | E2 | aus Historie, beschnitten auf ADR-35 | – | 14.000 | ADR-12, 13.2 |
-| `contextra-embed` | E2 | ONNX-Embedder und Reranker-Adapter | – | 2.500 | ADR-36 |
-| `contextra-db` | E2 | Orchestrierung: Schreibpfad, Lesepfad, Scheduler, Wiederanlauf, Verdrahtung der Ports | 412 | 6.000 | 13.1 M2 |
-| `contextra` | E2 | Fassade, öffentliche API, Konfigurationsladen | 3.807 | 1.500 | 6.8 |
-| `contextra-mcp` | E3 | MCP über stdio | 7.815 | 2.500 | ADR-38 |
-| `contextra-testkit` | E3 | Prüfwerkzeuge für Tests (FaultVfs, Canary-Scanner, Mocks). Nur Dev-Abhängigkeit | 7.389 | 7.000 | F-27 |
-| `contextra-bench` | E3 | Benchmarks, Budgets, Basisvergleich. Verzeichnis `benchmarks/contextra-bench/` | 5.199 | 3.000 | 10.4 |
-| `contextra-embed-http` | E3 | HTTP-Embedder, Feature-Crate | – | 1.200 | ADR-13 |
-| `contextra-server` | E3 | Optional, HTTP/gRPC mit Auth (M6) | – | 2.500 | REQ-SRV-1 |
-| `contextra-kms` | E3 | Optional, Vault-Transit-Adapter (M6) | – | 1.000 | ADR-47 |
-
-Entfernt: `contextra-types` (REM-30), `contextra-engine` und `contextra-vault` (bereits nicht mehr vorhanden, REM-01, REM-19). Umbenannt: `contextra-mvcc` zu `contextra-version`.
-
-**Summe (Zielspalte):** Produktive Crates ohne `server` und `kms` rund 105.700 Zeilen. Mit `server` und `kms` rund 109.200. Testkit und Bench zusätzlich rund 10.000, gesamt rund 119.200. Gegenüber dem Ist-Stand von 239.968 Zeilen (Anhang B) sind das rund 50 % weniger (±25 %).
-
-### 3.2 Ebenen und Regeln
-
-```
-E3  mcp  embed-http  server  kms  testkit(dev)  bench(bench)
-E2  contextra (Fassade) ── db ──┬── ingest   (keine internen Abhängigkeiten)
-                                 └── embed
-E1  crypto  erasure  version  store  vector  text  graph(opt)  rank  privacy  checkpoint
-E0  ports  ids  env  sys  simd  durable-fs
-```
-
-- **R1** Abhängigkeiten zeigen abwärts. `ports` hängt nur von `ids` ab.
-- **R2** E1-Crates hängen nie von anderen E1-Crates ab. E2-Crates hängen nur von E0, E1 und anderen E2-Crates ab, ohne Zyklus (siehe 3.3).
-- **R3** `default = []` in jedem Crate. Ausnahme: `contextra-durable-fs`, `contextra-simd` und `contextra-rank` (Feature `std`), die in 12.6 begründet sind. Optionale Funktionen sind Features mit einer Zeile Dokumentation.
-- **R4** Jedes Konzept genau einmal definiert. Kryptoprimitive nur in `contextra-crypto`. Limits nur in `contextra-ids`.
-- **R5** `#![forbid(unsafe_code)]` in jedem Crate außer `sys` und `simd`. Test-Targets nach ADR-53.
-- **R6** Kein `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!` und keine Indexierung mit `[]` auf nicht geprüften Indizes außerhalb von Tests. Clippy-Lints auf `deny`.
-- **R7** Keine `compat`-Module, keine Features mit `compat`, `workspace` oder `types-compat` im Namen (ADR-51, ADR-54).
-- **R8** Kein Netzwerk im Kern (REQ-NET-1).
-- **R9** Ein Port-Trait wird genau in `contextra-ports` definiert. Implementiert wird es genau in dem Crate, das den Zustand besitzt (3.4).
-- **R10** Zeit nur über `Clock` aus `contextra-env`. Zufall nur über `OsRng` (Schlüssel, Nonces, IDs) oder `SeededRng` (Tests und Benchmarks).
-
-**REQ-NET-1.** Der Abhängigkeitsbaum der Kern-Crates (E0 bis E2 ohne `embed-http`) enthält keine Netzwerk-Crates (Sperrliste G-05). Adapter-Crates dürfen Netzwerk nutzen, nur hinter Features, nie als Default. Jeder ausgehende Endpunkt steht im Verarbeitungsregister (REQ-PRV-4) und läuft durch den Egress-Guard (REQ-PRV-3).
-
-### 3.3 Erlaubte Abhängigkeiten (normativ, geprüft in G-03)
-
-Die vollständige Matrix steht maschinenlesbar in Anhang E. Kurzfassung:
-
-| Crate | Erlaubte interne Abhängigkeiten |
+| | |
 |---|---|
-| `ids` | – |
-| `env` | `ids` |
-| `sys` | – |
-| `simd` | – |
-| `durable-fs` | `env`, `ids`, `sys` |
-| `ports` | `ids` |
-| `crypto` | `ports`, `ids`, `env`, `durable-fs` |
-| `erasure` | `ports`, `ids`, `env`, `durable-fs` |
-| `version` | `ports`, `ids`, `env` |
-| `store` | `ports`, `ids`, `env`, `sys`, `durable-fs` |
-| `vector` | `ports`, `ids`, `env`, `simd`, `durable-fs` |
-| `text` | `ports`, `ids`, `env`, `durable-fs` |
-| `graph` | `ports`, `ids`, `env`, `durable-fs` |
-| `rank` | `ports`, `ids` |
-| `privacy` | `ids`, `env` |
-| `checkpoint` | `ports`, `ids`, `env`, `durable-fs` |
-| `ingest` | – |
-| `embed` | `ports`, `ids` |
-| `db` | alle E1-Crates, `ports`, `ids`, `env`, `ingest`, `embed` |
-| `contextra` | `db`, `ports`, `ids`, `privacy` |
-| `mcp` | `contextra`, `ports`, `privacy` |
-| `embed-http` | `ports` |
-| `kms` | `ports` |
-| `server` | `contextra`, `ports` |
-| `testkit` (dev) | alle außer `bench`, `server`, `kms` |
-| `bench` (bench) | `contextra`, `db`, `vector`, `text`, `store`, `rank`, `graph` |
+| Status | **Final, normativ, Revision R2** (Änderungsliste: §22.4).  Löst `REFACTORING_PLAN.md` (v1), `REFACTORING_PLAN_v2.md` (bricht in §16 ab) und `REVIEW_contextra-storage_vs_mnemos.md` als Spezifikation ab. Das *Wie und Wann* der Umsetzung steht in `IMPLEMENTATION_SPEC.md`. |
+| Gegenstand | Neuer Kern `contextra-storage` samt `contextra-ports`. Ersetzt `crates/contextra-store` (Repository `tfufuz1/acta`, Stand `b001610`; Quelltext unverändert seit `47c9865`). |
+| Sprache | Prosa und Rustdoc deutsch, Bezeichner englisch (P-7). |
+| Geltung | Wer von dieser Datei abweicht, ändert zuerst diese Datei (§1.5). Jede Invariante (`INV-*`) wird in mindestens einem Test per ID zitiert (§18, §19). |
+| Verifikation | Die Spezifikation wurde durch Lesen von Konzepten und Altcode erstellt. **Es wurde nichts kompiliert oder gemessen** (kein Rust-Toolchain in der Erstellungsumgebung). Alle Leistungsangaben sind Hypothesen (`H-S*`, §20). Auch Revision R2 wurde weder kompiliert noch gemessen; neu eingeführte Formatfelder sind vor **G-F** durch Goldens zu belegen (Anhang A.8). Die Referenzvektoren in Anhang A wurden mit einem unabhängigen Python-Referenzcodierer aus dieser Spezifikation berechnet (CRC32C und XXH64 gegen bekannte Prüfwerte validiert), nicht aus Rust-Code. |
 
-`contextra-db` führt `graph` und `text` nur über Feature-Schalter (siehe Kapitel 9). Ohne Feature `graph` kompiliert `db` ohne Graph-Code (T-GR-12).
+---
 
-### 3.4 Besitz der Zustände und Port-Implementierungen
+## 1. Geltungsbereich und Konventionen
 
-| Zustand | Besitzer (Crate) | Port, den das Crate implementiert |
+### 1.1 Zweck
+
+`contextra-storage` ist ein **eingebetteter, synchroner, crash-sicherer Schlüssel-Wert-Kern** mit atomaren Mehr-Space-Änderungen, MVCC-Sichten, kontrollierter physischer Löschung und einer Wert-Trennung (Header im LSM, große Körper in Blob-Dateien). Er ist das Fundament für Speicher- und Retrieval-Schichten von Sprachmodell-Agenten (RAG-Speicherkerne), kennt aber **weder Tokenizer noch Embeddings, Hashes von Nutzdaten, Mandanten noch Branches**. Er liefert Primitive, aus denen diese Schichten korrekt gebaut werden (§7.6, Anhang C). Was er bewusst **nicht** baut und welche stabilen Flächen er aufsetzenden Schichten bereitstellt, regeln §2.3 und §7.8.
+
+### 1.2 Normsprache
+
+**MUSS / DARF NICHT** = zwingend, Verstoß ist ein Fehler. **SOLL / SOLL NICHT** = Regelfall, Abweichung braucht Begründung im Review. **KANN** = optional.
+
+### 1.3 Dokumentenhierarchie
+
+1. `SPEC.md` (diese Datei): normativ — Formate, Protokolle, Invarianten, API-Vertrag.
+2. `IMPLEMENTATION_SPEC.md`: operativ — Phasen, Gates, Migration, Risiken. Widerspruch ⇒ SPEC gilt.
+3. Alte Dokumente (`docs/archive/`): nur Herkunft. Sie sind **keine** Quelle für Anforderungen.
+
+### 1.4 Kennungen
+
+`Z-n` Ziel · `NZ-n` Nicht-Ziel · `P-n` Codierregel · `F-n` Fehlerklasse · `A-n` Angreifer (§5) und Annahme (§22; Kontext unterscheidet, Annahmen tragen immer `A-nn` zweistellig) · `SD-nn` Entscheidung (§21) · `INV-*` Invariante (§18) · `H-S*` Leistungshypothese (§20) · `O-n` offene Entscheidung (§22) · `G-*` Gate (Plan).
+
+### 1.5 Änderungsprozess
+
+Änderungen an Abschnitten 6–9, 13, 14 und 18 (Formate, Protokolle, Invarianten) erfordern zwei Reviewer, einen aktualisierten Referenzvektor (Anhang A) und, wenn ein Format betroffen ist, eine Prüfung gegen die Freeze-Liste (§9.8). Nach Gate **G-F** (Plan) ist jede Formatänderung ein Migrationswerkzeug (SD-04), nie ein Zweitpfad im Kern.
+
+---
+
+## 2. Ziele und Nicht-Ziele
+
+### 2.1 Ziele
+
+| ID | Ziel |
+|---|---|
+| Z-1 | Atomare Änderungen über mehrere Schlüssel **und Spaces** mit Vorbedingungen (Compare-and-Swap), crash-sicher. |
+| Z-2 | Konsistente Sichten (`View`) und Zeitreise auf Stamp-Ebene mit Halteregeln (`Hold`) und persistenten Konsumenten-Cursorn (`Consumer`). |
+| Z-3 | **Kontrollierte, atomare, nachweisbare physische Löschung** von Schlüsselbereichen und Spaces über **alle** Dateiarten (Runs, Blobs, Redo, Segmente). |
+| Z-4 | Autark: keine internen Abhängigkeiten, **keine** externen Laufzeit-Abhängigkeiten (nur `std`). Kryptografie kommt über Ports (§4), nie als Kern-Abhängigkeit. |
+| Z-5 | Einfach: wenige Konzepte, kleine Module, **ein** Format je Dateiart, **ein** Compaction-Verfahren. |
+| Z-6 | Beweisbar robust: deterministische Tests, Fehlerinjektion an **jedem** E/A-Schritt, Modelltests, Linearisierbarkeitsprüfung. |
+| Z-7 | Eignung für Agenten- und RAG-Daten: viele kleine atomare Schreibvorgänge, kurzlebige Sichten, strukturierte Fehler mit Handlungsanweisung, Idempotenz über `Guard::absent`, flüchtiges Arbeitsgedächtnis. |
+| Z-8 | Betreibbar: `verify`, konsistente Sicherung, Metriken, explizite Formatversion mit Pflicht-/optionalen Feature-Bits. |
+| Z-9 | **Budgetierte Ergebnislieferung** in Bytes und frei definierbaren Gewichten (typisch Token): vorab schätzen, seitenweise stabil fortsetzen, Filter auf dem Header ohne Körperzugriff. |
+| Z-10 | Erweiterbar ohne Formatbruch: Index-Blöcke je Run, entkoppelte Segmente, Blob-Ebene, kalter Speicherort. |
+| Z-11 | Robust unter dem Fehlermodell von §5, nicht nur unter Stromausfall (Bitfäule, verlorene/fehlgeleitete Schreibvorgänge, `EIO`, `ENOSPC`, Speicherdruck). |
+| Z-12 | Ressourcenschonend: begrenzter, vorhersagbarer Speicher- und Deskriptorbedarf, kein Thread je Instanz, Leerlauf nahe null, faire Teilung zwischen Instanzen. |
+| Z-13 | Feingranulare Sicherheit: drei Integritätsmodi, Verschlüsselung je Space, kryptografisches Löschen je Körper-Domäne, typisierte Zugriffsrechte, private Dateimodi, keine Datenlecks über Fehlertexte. |
+| Z-14 | Beweisbare Nebenläufigkeit: wenige Sperren mit fester Rangordnung, alle Synchronisationsprotokolle klein genug für `loom`, schriftlicher Beweis der Kernaussagen (§16). |
+
+### 2.2 Nicht-Ziele
+
+| ID | Nicht-Ziel | Wohin |
 |---|---|---|
-| Gate je Mandant | `erasure` | `ReadGate` |
-| Versionskatalog, Sichtbarkeit | `version` | `Visibility`, `ContentLifecycle` (Sender) |
-| Schlüsseltabelle, Anker | `crypto` | `RecordSealer`, `SegmentSealer`, `KeyDestroyer`, `RootKeyProvider` |
-| Seal-Registry | `store` (KV-Familie), Logik in `erasure` | `KvStore` (store), Registry-Port in `erasure` |
-| Löschlog, Ledger | `erasure` | `ErasureSink` (optionale Senke) |
-| LSM, WAL, SST | `store` | `KvStore`, `SegmentStore` |
-| HNSW, SQ8 | `vector` | `VectorIndex`, `ScrubTarget` |
-| Postings | `text` | `TextIndex`, `ScrubTarget` |
-| Entitätsgraph | `graph` | `GraphIndex`, `ScrubTarget` |
-| Checkpoints | `checkpoint` | `Checkpointer` |
-| Embedding | `embed` | `EmbeddingProvider`, `Reranker` |
+| NZ-1 | Verteilter Konsens, Replikation | obere Schicht |
+| NZ-2 | Mehrprozess-Zugriff auf eine Instanz (eine Instanz, ein Prozess, `LOCK`) | Daemon der oberen Schicht |
+| NZ-3 | Transaktionspuffer, SSI, Intent-Locks, Mandanten- und Dokument-ID-Kodierung | obere Schicht (Aufbau aus `Guard`, §7.6) |
+| NZ-4 | Merge-Operatoren (Tag-Kind reserviert, SD-12) | später, nur mit Formatentscheidung |
+| NZ-5 | Kompatibilität mit dem Altformat im Kern (SD-04) | optional separates Importer-Crate (A-01) |
+| NZ-6 | Windows mit voller Durability in Version 1 (A-02) | Port `Fs::sync_dir` für Windows |
+| NZ-7 | `mmap` im Leseweg | Leseweg über `read_at` |
+| NZ-8 | Inhaltsadressierung, Hashing von Nutzdaten, Dedup | obere Schicht |
+| NZ-9 | Tokenizer, Embeddings, ANN, Volltext- und Graph-Algorithmen | obere Schicht, über `Extension`/`Segment` |
+| NZ-10 | `O_DIRECT`, `io_uring`, Thread-per-Core im Kern | alternative `Fs`-Implementierung (SD-31) |
+| NZ-11 | Kompression in Version 1 (`codec`-Byte reserviert, SD-13) | spätere Formatentscheidung |
+| NZ-12 | Prolly-Tree/Merkle-DAG, Commit-DAG (Branches Stufe B) | obere Schicht; Stufe A (Overlay) siehe Anhang C |
+| NZ-13 | Transaktionspuffer, Lesemengen-Verwaltung, SSI-Validierung, Sequenzprotokoll je Dokument, Snapshot-Register (Verschärfung von NZ-3) | obere Schicht, gebaut aus `Guard`/`View`/`Hold` (§7.8.1) |
+| NZ-14 | Lösch-**Orchestrierung**: Saga über mehrere Schichten, anwendungsweite Lesesperre, Journal, Ledger, signierte Berichte, Restmessung mit Positivkontrolle | obere Schicht; der Kern liefert `Erase`, `ErasureReceipt`, `erase_status`, `scan_physical` (§7.8.4) |
+| NZ-15 | Schlüsselverwaltung: Tresor, Slot-Tabellen, Passphrase-Ableitung, Beschaffung der KEK, gesperrter Speicher | `KeyProvider`, `SecretAlloc` (§4, §7.8.5) |
+| NZ-16 | Kryptografische Primitive, SIMD, `unsafe`, `mlock`, `mmap`, Plattformhärtung (`F_FULLFSYNC`, ACL, Windows) | Ports und alternative `Fs`-Implementierungen mit `FsCaps` (§4) |
+| NZ-17 | Benannte Checkpoints über mehrere Komponenten, Wiederherstellungs-Koordination, Checkpoint-Registry | obere Schicht; der Kern liefert dauerhafte `Hold`s und `checkpoint(dest)` (§7.8.2) |
+| NZ-18 | Schlüsselcodierung für Mandanten, Kollektionen, Dokumente; Zugriffs-, Lizenz- und Richtlinienprüfung | obere Schicht (Anhang D) |
+| NZ-19 | Vergessens-, Zerfalls- und Konsolidierungs**politik**, Bewertungsmodelle | obere Schicht; der Kern liefert den Mechanismus `CompactionFilter` (§12.2) |
+| NZ-20 | `async`/`await`-Fassaden, Executor-Wahl | obere Schicht; der Kern liefert `submit` mit Fertigmeldung (§7.8.6) |
 
-Die Verdrahtung erfolgt in `contextra-db` (13.1 M2). Kein anderes Crate kennt andere Besitzer.
+### 2.3 Verantwortungsgrenze: Kern, Ports, aufsetzende Schichten
 
-### 3.5 Verzeichnisstruktur der Daten
+Der Kern löst Speicherung, Dauerhaftigkeit, Nebenläufigkeit und Löschung **vollständig** und liefert für alles darüber **Mechanismus statt Politik**. Was außerhalb liegt, baut der Kern **nicht**, auch nicht vorsorglich: aufsetzende Schichten existieren teils bereits, teils entstehen sie später. Der Kern kennt sie nicht und richtet sich nicht nach ihnen; er stellt die stabilen Flächen aus §7.8 bereit (SD-51, SD-52).
 
-```
-<data_dir>/
-  LOCK                                   Prozesssperre
-  tenants/<tenant>/
-    keys/keytable_seal.cxkt             Schlüsseltabelle, Seal-Raum (5.5)
-keys/keytable_seg.cxkt              Schlüsseltabelle, Segment-Raum (5.5)
-    keys/anchor.cxan                     gewrappte KEK-Epochen, K_ref, K_registry (5.6)
-    erasure/erasure.cxel                 Löschlog (7.8)
-    erasure/gate.cxgs                    Gate-Snapshot, atomar ersetzt (7.8)
-    erasure/ledger.jsonl                 Ledger, nur anhängen (7.10)
-    registry/                            Seal-Registry, KV-Familie im Store (5.7)
-    collections/<collection>/
-      store/                             LSM, WAL, SST, Manifest
-      vector/                            Graphstruktur, Deltas, Header, Segmente (verschlüsselt)
-      text/                              Postings-Segmente (verschlüsselt)
-      graph/                             optional, Segmente (verschlüsselt)
-      versions/                          Versionskatalog
-```
-
-Ein Mandant ist ein Verzeichnis und ein Schlüsselsatz. Mandanten-Offboarding ist O(1) in der Schlüsselarbeit (7.2).
-
-### 3.6 Repository-Struktur je Crate
-
-```
-crates/<name>/
-  Cargo.toml                 Features nach R3, keine compat-Features
-  README.md                  eine Seite: Zweck, öffentliche API, Verweis auf PLAN.md
-  PLAN.md                    Implementierungsspezifikation nach Vorlage 13.5
-  src/                       Module nach Kapitel 15, keine Bridge-Module
-  tests/                     Integrationstests, Fixtures in tests/fixtures/
-```
-
-Entfallen: `INVENTAR.md`, `SPEC.md`, `AGENTS.md` pro Crate, `contract.rs`, `clippy.toml` pro Crate (Lints kommen aus dem Workspace), `proptest-regressions`-Ordner außerhalb von `tests/` (REM-14).
+| Bereich | Im Kern (MUSS) | Über Port hereingereicht | Außerhalb (Kern baut es nicht) | Fläche |
+|---|---|---|---|---|
+| Transaktionen | `Change`, `Guard`, `Stamp`, `View`, `Hold` | – | Puffer, Lesemengen, SSI, Sequenzprotokoll, Snapshot-Register | §7.6, §7.8.1 |
+| Löschung | `Erase` (E0–E7), Marker, Blob-Sweep, `ErasureReceipt`, `verify_erasure`, `scan_physical` | `ColdTier::delete`, `KeyProvider` | Saga, Lesesperre der Anwendung, Journal, Ledger, Berichte, Restmessung | §14, §7.8.4 |
+| Schlüssel | Hierarchie in `KEYS`, Nonce-Protokoll, Epochen, Domänen-Versiegelung | `Cipher`, `Mac`, `Kdf`, `KeyProvider`, `Entropy`, `SecretAlloc` | Tresor, Slots, Passphrase, KEK-Beschaffung | §15, §7.8.5 |
+| Prüfsummen, Plattform | portables CRC32C und XXH64, `RealFs` (nur `std`) | beschleunigte `Checksum`, gehärtete `Fs` | SIMD, `unsafe`, `mlock`, `mmap` | §4 |
+| Index-Strukturen | `Extension`-Blöcke, Segment-Lebenszyklus, -Rahmen und -Siegel, `Consumer`, `history` | Segment-Inhaltsformate | Tokenizer, Postings-Format, Vektor- und Graphstrukturen | §12.4, §12.5, §7.8.3 |
+| Vergessen | `CompactionFilter`-Mechanismus | Entscheidungsfunktion | Zerfallsmodelle, Konsolidierung | §12.2 |
+| Zeitreise | `View`, `Hold` (flüchtig, dauerhaft), `checkpoint(dest)` | – | benannte Checkpoints über Komponenten, Registry | §7.8.2 |
+| Schlüsselcodierung | Bytes, Ordnung, Präfixfilter | – | Mandanten-/Kollektions-/Dokumentcodierung, Richtlinien | Anhang D |
+| Asynchronität | synchrone API, `submit` | – | Executor, `async`-Fassade | §7.8.6 |
 
 ---
 
-## 4. Entkopplung von Löschung und Versionierung
+## 3. Architektur und Codierregeln
 
-### 4.1 Problem im Altbestand
+### 3.1 Workspace
 
-In v2.1 bis v4.0 hängen beide Systeme aneinander: Der Schlüssel gehörte zur Version, das Gate führte Mengen über Versionsordinale, die Zeitreise brauchte eine Sonderregel, Lineage trug `source_version`, Löschen verlangte das Auflösen der Versionskette. Jede Änderung an einem System berührte das andere. Der Graph-Entwurf (PLAN v2.1) hätte ein drittes System mit eigener Generationskette hinzugefügt (F-05).
+```
+acta/                              Repository-Wurzel
+  Cargo.toml                       Workspace, resolver 3, MSRV in A-05 festgelegt
+  rust-toolchain.toml  rustfmt.toml  clippy.toml  deny.toml
+  SPEC.md  IMPLEMENTATION_SPEC.md
+  crates/contextra-ports/          Traits und kleine Wertetypen, KEINE Logik, keine Abhängigkeiten
+  crates/contextra-storage/        dieser Kern, nur std
+  legacy/contextra-store/          eingefrorener Altstand (nicht im Workspace-Build, nur Referenz)
+  docs/archive/                    alte Konzept- und Plandokumente
+```
 
-### 4.2 Das Seal-Modell
+`contextra-ports` ist ein eigenes, winziges Crate, damit beliebige Implementierer (Prüfsummen, Kryptografie, Plattform-`Fs`, Indexbau, Telemetrie) `Checksum`, `Cipher`, `Mac`, `Kdf`, `Weigher`, `Filter`, `Extension` implementieren können, ohne vom Kern abzuhängen. Der Kern hängt an `ports`, nie umgekehrt.
 
-Ein **Seal** ist eine unveränderliche Inhaltseinheit einer Dokumentrevision: Chunks, Texte, Vektoren, Original, Graph-Labels. Er hat:
+### 3.2 Modulschnitt von `contextra-storage`
 
-- eine dichte, nie wiederverwendete Ordinalzahl `SealOrd(u32)` je Mandant,
-- einen eigenen Zufallsschlüssel `DocKey` (32 Byte) im Schlüsselraum Seal,
-- einen Eintrag in der **Seal-Registry** (5.7) mit Zustand, Dokument, Collection, Chunk-Slots, Betroffenen-Tags und Klasse.
+```
+src/lib.rs            Re-Exports der öffentlichen API
+src/sync.rs           Fassade über std::sync (unter cfg(loom): loom::sync) — einzige Stelle mit cfg(loom)
+src/api/              storage.rs space.rs change.rs view.rs cursor.rs page.rs hold.rs consumer.rs
+                      listener.rs config.rs error.rs submit.rs inspect.rs segment.rs
+src/env/              env.rs real_fs.rs clock.rs entropy.rs runtime.rs governor.rs metrics.rs hooks.rs
+src/codec/            varint.rs crc32c.rs xxh64.rs bloom.rs tag.rs keyrange.rs bytes.rs limits.rs
+src/keys/             hierarchy.rs keyfile.rs domains.rs nonce.rs epoch.rs secret.rs      (Protokoll; Primitive über Ports)
+src/redo/             frame.rs segment.rs seal.rs writer.rs reader.rs recover.rs prealloc.rs
+src/run/              builder.rs reader.rs block.rs footer.rs filter.rs rangedel.rs extension.rs
+                      table_cache.rs block_cache.rs
+src/blob/             record.rs writer.rs reader.rs sweep.rs
+src/catalog/          edit.rs log.rs state.rs current.rs format.rs reserve.rs
+src/engine/           version.rs memtable.rs committer.rs flush.rs views.rs retention.rs registry.rs
+                      compaction/{plan.rs,retain.rs,exec.rs,blobgc.rs}
+                      maintenance.rs (Lanes, Claims) recovery.rs graveyard.rs
+src/erase/            plan.rs exec.rs registry.rs verify.rs physical_scan.rs
+src/testing/          (Feature `testing`) mem_fs.rs fault_fs.rs manual_runtime.rs hooks.rs
+                      model.rs oracle.rs linearize.rs conformance.rs
+```
 
-Die Versionierung speichert pro Revision nur einen undurchsichtigen `ContentRef = SealOrd`. Sie öffnet ihn nie.
+### 3.3 Schichtregeln (per Test erzwungen)
 
-| Frage | Besitzer |
+```
+ api ──► engine ──► { redo, run, blob, catalog } ──► { keys, codec, env }
+ api ──► erase  ──► engine
+ keys ──► { codec, env }                  redo/run/blob/catalog nutzen nur keys::*-Schnittstellen
+ testing (Feature) ──► alles; nichts hängt von testing ab
+```
+
+`tests/layering.rs` liest alle `use crate::…`-Zeilen und schlägt fehl, wenn eine Kante gegen diese Regel verstößt. Zusätzlich prüft `cargo tree -e normal` in CI, dass `contextra-storage` ausschließlich `contextra-ports` als Abhängigkeit hat.
+
+### 3.4 Features und Konfigurationsschalter
+
+- Cargo-Feature **`testing`** (einziges): aktiviert `src/testing/`. Release-API enthält keine Testhaken (Test `no_test_hooks_in_release_api`).
+- **`cfg(loom)`** und **`cfg(miri)`** sind zulässig, `cfg(loom)` nur in `src/sync.rs`.
+- Es gibt **kein** Feature `encryption`: Verschlüsselung und Authentisierung laufen über Ports (§4, SD-36). Ein Space oder eine Instanz nutzt sie nur, wenn `FORMAT.integrity_mode` oder `domain_sealed` es verlangen und `Env` die Ports liefert.
+- Alle Entwicklungs-Abhängigkeiten (`proptest`, `loom`, `arbitrary`) sind `dev-dependencies`; sie zählen nicht als Laufzeit-Abhängigkeiten.
+
+### 3.5 Codierregeln
+
+| ID | Regel |
 |---|---|
-| Welche Fassung gilt zum Zeitpunkt T? Wie lange wird sie aufbewahrt? | `contextra-version` |
-| Ist dieser Inhalt lesbar, eingeschränkt oder vernichtet? Wo liegt sein Schlüssel? | `contextra-erasure` (Zustand), `contextra-crypto` (Schlüssel) |
-| Welche Seals gehören zu einem Dokument oder Betroffenen? | Seal-Registry, Logik in `erasure` |
+| P-1 | Jede Datei auf der Platte hat **einen** Eigentümer-Mechanismus (§8) und wird nur über `Fs` berührt. |
+| P-2 | Zustandsänderung = **ein** Catalog-Edit. Wer „zwei Dinge atomar“ braucht, packt sie in einen Edit. |
+| P-3 | Reihenfolge ist Vertrag: *Datei dauerhaft (Datei + Verzeichnis) → Edit dauerhaft → erst dann sichtbar → erst dann alte Dateien löschen.* |
+| P-4 | Dekodierung ist **total**: jede Byte-Folge ergibt `Ok` oder `Err(Corrupt)`, nie `panic`, nie unbegrenzte Allokation (Längen werden vor `Vec::with_capacity` gegen §6.7 geprüft). |
+| P-5 | Keine globalen veränderlichen Variablen. Prüfpunkte für Tests laufen über `Env::hooks()` (Standard: leer). Keine `cfg(feature)` in Logik außer `testing`. |
+| P-6 | Dateien ≤ 400 Zeilen, Funktionen typisch ≤ 60 Zeilen, Modultiefe ≤ 3, keine Kommentarbanner. Invarianten stehen in dieser Datei und werden in Tests per ID zitiert. |
+| P-7 | Rustdoc deutsch, Bezeichner englisch. |
+| P-8 | **Fehler sind Daten:** jede Fehlerklasse aus §5 hat einen definierten Zustand danach (heil, vergiftet, korrupt) und einen Test. |
+| P-9 | **Kein Lock über E/A, außer dem Committer-Lock** (§16): Leser und Wartung warten nie auf Plattenzugriffe anderer. |
+| P-10 | **Kein Lock über Aufrufer-Code:** `Weigher`, `Filter`, `CompactionFilter`, `Extension`, `Listener`, `KeyProvider`, `Cipher` laufen ohne gehaltene Sperre. Einzige Ausnahme: `Cipher`/`Mac`/`Checksum` im Committer beim Kodieren eines Frames (reine Funktionen der Ports, ohne Rückruf in den Kern). |
+| P-11 | Jede Allokation im Heißpfad ist begründet: `apply` und `get` haben ein Allokationsbudget, das ein Test mit zählendem Allokator prüft (§17.5). |
+| P-12 | **Geheimnisse verlassen den Prozess nie unverschlüsselt** und erscheinen weder in `Debug`, Logs, Metriken noch `hint()` (§15.7). |
+| P-13 | `forbid(unsafe_code)`; `deny(unwrap_used, expect_used, panic, todo, unimplemented, unreachable, indexing_slicing)` in Produktionscode; `warn(missing_docs)` wird in CI zu Fehler. |
+| P-14 | Zahlen und Offsets werden mit `checked_*`/`try_from` verarbeitet; `as`-Umwandlungen zwischen Breiten sind per Lint verboten. |
 
-### 4.3 Einbahn-Schnittstelle
+---
 
-```
-Version ──(ContentRetired)──► Erasure         Aufbewahrung abgelaufen: Seal erledigen
-Erasure ──────────────────✗──► Version        keine Rückwirkung, nie
-```
-
-- Wenn die Versions-GC eine Revision entfernt und kein anderes Dokument den Seal nutzt, sendet sie `ContentRetired(seal, RetireReason::RetentionExpired)`. Die Löschseite vernichtet den Seal mit Grund `Retention` im Ledger (Ablauf wie 7.4 ab E1).
-- Eine Löschung nach Kapitel 7 ändert den **Versionskatalog nicht**. Revisionen mit vernichtetem Seal bleiben als Metadaten (Zeitstempel, Revisionsnummer). Ihr Inhalt liefert `Erased`.
-- Die Versionierung kennt keine Schlüssel, kein Gate, keine Betroffenen und keine Saga.
-
-### 4.4 Traits (in `contextra-ports`, Pfad `ports::erasure`, `ports::version`, `ports::crypto`)
+## 4. Ports (`contextra-ports`, semver-stabil)
 
 ```rust
-// SealOrd, ChunkSlot, SegOrd: einzige Definition in contextra-ids (Kapitel 15, R4, ADR-33).
-// In den Signaturen dieses Abschnitts werden sie nur verwendet.
+pub enum Perm { Private /* 0600 Dateien, 0700 Verzeichnisse bzw. restriktive ACL */, Inherit }
+pub enum OpenMode { Read, ReadWrite, CreateNew(Perm) }
+pub enum LockMode { Exclusive, Shared }                      // nicht blockierend
 
-pub enum SealState { Open, Restricted, Erased }          // Lesesicht, abgeleitet aus Registry und Gate
-pub enum RetireReason { RetentionExpired }
+pub trait Fs: Send + Sync + 'static {
+    fn create_dir_all(&self, p: &Path, perm: Perm) -> io::Result<()>;
+    fn open(&self, p: &Path, mode: OpenMode) -> io::Result<Box<dyn File>>;
+    fn rename(&self, from: &Path, to: &Path) -> io::Result<()>;
+    fn remove_file(&self, p: &Path) -> io::Result<()>;
+    fn remove_dir(&self, p: &Path) -> io::Result<()>;
+    fn list_dir(&self, p: &Path) -> io::Result<Vec<DirEntry>>;                // Name + Länge
+    fn sync_dir(&self, p: &Path) -> io::Result<()>;
+    fn lock(&self, p: &Path, mode: LockMode) -> io::Result<Box<dyn LockGuard>>;
+    fn caps(&self) -> FsCaps;                                                  // zugesicherte Eigenschaften (SD-57)
+    fn hard_link(&self, from: &Path, to: &Path) -> io::Result<()>;            // nur Checkpoint (Opt-in)
+}
+pub trait File: Send + Sync {
+    fn read_at(&self, buf: &mut [u8], off: u64) -> io::Result<usize>;
+    fn read_batch(&self, reqs: &mut [ReadReq]) -> io::Result<()> { /* Standard: Schleife über read_at */ }
+    fn write_all_at(&self, buf: &[u8], off: u64) -> io::Result<()>;
+    fn preallocate(&self, len: u64) -> io::Result<()> { /* Standard: Nullen in 1-MiB-Schritten */ }
+    fn len(&self) -> io::Result<u64>;
+    fn set_len(&self, len: u64) -> io::Result<()>;
+    fn sync_data(&self) -> io::Result<()>;
+    fn sync_all(&self) -> io::Result<()>;
+}
+pub struct FsCaps { pub durable_file_sync: bool, pub durable_dir_sync: bool, pub atomic_rename: bool,
+                    pub private_perm: bool, pub no_follow_root: bool }
+pub trait Clock:   Send + Sync { fn now_ms(&self) -> u64; fn monotonic_ns(&self) -> u64; }
+pub trait Entropy: Send + Sync { fn fill(&self, dst: &mut [u8]) -> io::Result<()>; }
+pub trait Checksum: Send + Sync { fn crc32c(&self, seed: u32, data: &[u8]) -> u32; }     // Standard: portabel, safe
+pub trait Metrics: Send + Sync { fn counter(&self, n: &'static str, v: u64);
+                                 fn gauge(&self, n: &'static str, v: i64);
+                                 fn observe(&self, n: &'static str, v: f64); }
+pub trait AccessSink: Send + Sync { fn sampled(&self, ev: AccessEvent); }   // (space, file, block_no, key_prefix, bytes); Standard: Null
+pub trait Hooks: Send + Sync { fn point(&self, p: HookPoint) {} }           // Standard: leer
+pub trait PressureSource: Send + Sync { fn level(&self) -> Pressure; }      // optional (cgroup/PSI in separater Impl.)
 
-/// Mandantenweite Lesesperre. Besitzer: contextra-erasure. Lesen ist O(1), keine E/A.
-pub trait ReadGate: Send + Sync {
-    fn state(&self, s: SealOrd) -> SealState;
-    fn seq(&self) -> u64;                                 // wächst bei jeder Gate-Änderung
+// Kryptografie: Primitive im Port, Protokoll im Kern (SD-36)
+pub trait Cipher: Send + Sync {                                              // AEAD, 32-Byte-Schlüssel, 12-Byte-Nonce, 16-Byte-Tag
+    fn seal(&self, key: &[u8; 32], nonce: &[u8; 12], aad: &[u8], plain: &[u8]) -> Vec<u8>;
+    fn open(&self, key: &[u8; 32], nonce: &[u8; 12], aad: &[u8], sealed: &[u8]) -> io::Result<Vec<u8>>;
+}
+pub trait Mac: Send + Sync { fn mac16(&self, key: &[u8; 32], parts: &[&[u8]]) -> [u8; 16];
+                             fn verify16(&self, key: &[u8; 32], parts: &[&[u8]], tag: &[u8; 16]) -> bool; } // konstante Zeit
+pub trait Kdf: Send + Sync { fn derive(&self, key: &[u8; 32], context: &[&[u8]]) -> [u8; 32]; }
+pub trait KeyProvider: Send + Sync {
+    fn kek(&self) -> io::Result<Secret32>;                                   // Schlüsselverschlüsselungsschlüssel
+    fn domain_key(&self, d: KeyDomain) -> io::Result<Option<Secret32>>;      // legt NIE an; None = dauerhaft vernichtet; nie angelegt ⇒ Err(NotFound)
+    fn domain_key_create(&self, d: KeyDomain) -> io::Result<Option<Secret32>>; // legt bei Bedarf an; None = vernichtet (SD-55)
+    fn make_durable(&self) -> io::Result<()>;                                // Barriere: alle bisher angelegten Schlüssel sind dauerhaft (INV-KEYP-1)
+}
+pub trait SecretAlloc: Send + Sync { fn alloc(&self, bytes: [u8; 32]) -> io::Result<Box<dyn SecretCell>>; }   // optional: geschützter Speicher (SD-56)
+pub trait SecretCell: Send + Sync { fn expose(&self) -> &[u8; 32]; }                                        // Drop nullt
+pub trait RollbackAnchor: Send + Sync {                                      // optional (F10, §15.5)
+    fn record(&self, catalog_generation: u64, head_mac: [u8; 32]) -> io::Result<()>;
+    fn latest(&self) -> io::Result<Option<(u64, [u8; 32])>>;
+}
+pub trait ColdTier: Send + Sync {                                            // Phase F10
+    fn upload(&self, f: FileRef) -> io::Result<()>;
+    fn read_range(&self, f: FileRef, off: u64, len: u32) -> io::Result<Vec<u8>>;
+    fn delete(&self, f: FileRef) -> io::Result<()>;
 }
 
-/// Sichtbarkeit nach Versionsstand. Besitzer: contextra-version.
-pub trait Visibility: Send + Sync {
-    fn is_current(&self, c: ChunkSlot) -> bool;
-    fn visible_at(&self, c: ChunkSlot, seq: u64) -> bool;  // nur bei index_history = true
-}
-
-/// Verschlüsselung je Seal. Besitzer: contextra-crypto.
-pub trait RecordSealer: Send + Sync {
-    fn seal(&self, s: SealOrd, kind: RecordKind, aad: &[u8], pt: &[u8], out: &mut Vec<u8>) -> Result<(), ContextraError>;
-    fn open(&self, s: SealOrd, kind: RecordKind, aad: &[u8], ct: &[u8], out: &mut Vec<u8>) -> Result<(), OpenError>;
-}
-
-/// Verschlüsselung je Segment (ADR-30). Besitzer: contextra-crypto.
-pub trait SegmentSealer: Send + Sync {
-    fn new_segment(&self) -> Result<SegOrd, ContextraError>;
-    fn seal_chunk(&self, seg: SegOrd, chunk_index: u32, pt: &[u8], out: &mut Vec<u8>) -> Result<(), ContextraError>;
-    fn open_chunk(&self, seg: SegOrd, chunk_index: u32, ct: &[u8], out: &mut Vec<u8>) -> Result<(), OpenError>;
-}
-
-/// Schlüsselvernichtung. Besitzer: contextra-crypto. Batch mit einem fdatasync (REQ-KEY-4).
-pub trait KeyDestroyer: Send + Sync {
-    fn destroy_seals(&self, seals: &[SealOrd]) -> Result<(), ContextraError>;
-    fn destroy_segments(&self, segs: &[SegOrd]) -> Result<(), ContextraError>;
-    fn destroy_tenant(&self) -> Result<(), ContextraError>; // MandantenKEK aller Epochen und Anker-Eintrag
-}
-
-pub enum OpenError { KeyAbsent, Integrity }   // beide werden auf dem Lesepfad zu Erased bzw. Fehler ohne Unterscheidung (INV-6)
-
-/// Einbahn-Ereignis Version → Löschung. Besitzer: contextra-version (Sender), Empfang in db.
-pub trait ContentLifecycle: Send + Sync {
-    fn content_retired(&self, s: SealOrd, why: RetireReason);
-}
-
-/// Zwischenspeicher mit Klartext oder abgeleitetem Inhalt müssen Seals entfernen (ADR-39).
-pub trait SealScoped: Send + Sync {
-    fn invalidate_seals(&self, seals: &roaring::RoaringBitmap);
-}
-
-/// Scrub-Ziel. Besitzer: jeweils das Crate mit dem Zustand (vector, text, graph, store).
-pub trait ScrubTarget: Send + Sync {
-    fn name(&self) -> &'static str;
-    fn plan(&self, dead: &roaring::RoaringBitmap) -> Result<ScrubPlan, ContextraError>;
-    fn execute(&self, plan: &ScrubPlan, io: &mut IoBudget) -> Result<ScrubProgress, ContextraError>;
-}
+// Aufrufer-Erweiterungen (Details §7.5, §12.2, §12.4)
+pub trait Weigher: Send + Sync { fn version(&self) -> u32; fn weigh(&self, key: &[u8], header: &[u8], out: &mut [u32; 4]); }
+pub trait Filter: Send + Sync { fn keep(&self, key: &[u8], header: &[u8]) -> bool; }
+pub trait CompactionFilter: Send + Sync { fn decide(&self, key: &[u8], header: &[u8], stamp: Stamp, now_ms: u64) -> Decision; }
+pub trait Extension: Send + Sync { fn id(&self) -> u16; fn build(..); fn merge(..); }
 ```
 
-`ScrubPlan`, `ScrubProgress`, `IoBudget` sind Werttypen in `ports::erasure`. `ContextraError` ist die einzige Fehlerart der öffentlichen API (6.8).
+**Verträge:**
 
-### 4.5 Versionierung
-
-**REQ-VER-1 (Katalog).** `contextra-version` führt je Dokument eine Kette `(rev, seq, valid_from, valid_to, content_ref, state)`. `state` ist `Current`, `Superseded` oder `Retired`.
-
-**REQ-VER-2 (Snapshots).** Lesen läuft gegen einen Snapshot mit Sequenznummer. Das Anheften verhindert die GC der Fassungen, die der Snapshot sieht. Es gibt keine Schreibtransaktionen, nur den atomaren Schreibstapel (REQ-CON-6).
-
-**REQ-VER-3 (Aufbewahrung je Collection).** `version_retention`: `LastN(n)` mit Standard `n = 3`, `Days(d)` oder `KeepAll`. Ausgelaufene Revisionen werden entfernt. Der Seal bekommt `ContentRetired`, sobald keine andere Revision ihn nutzt.
-
-**REQ-VER-4 (Löschen im Normalbetrieb).** `delete_document(doc)` setzt die aktuelle Revision auf `Retired`. Die Collection-Richtlinie `on_delete` ist `Retain` (Standard, Inhalt bleibt bis Aufbewahrungsende) oder `Shred` (sofort `ContentRetired`). Das ist **keine** Löschung nach Kapitel 7. Eine Löschung nach Kapitel 7 erfasst alle Seals des Dokuments, auch retained (Registry, 4.2).
-
-**REQ-VER-5 (Zeitreise, ADR-14).**
-- `index_history = false` (Standard): Suchindizes enthalten nur `Current`. Wechsel auf eine neue Revision setzt die Bits der alten Chunks in `Visibility` auf nicht current. Das ist kein Löschvorgang und erzeugt keinen Scrub. `as_of` bei `get` liest die Revision aus dem Store. `as_of` bei `search` wird mit `HistoryNotIndexed` abgewiesen.
-- `index_history = true`: Chunks tragen `seq_from, seq_to`. `Visibility::visible_at` filtert. Speicher und Latenz steigen mit der Revisionszahl, Benchmark weist das aus.
-- `valid_at` ist ein Bereichsfilter auf Attribute und von `as_of` unabhängig (6.5).
-
-**REQ-VER-6 (Zeitreise und Löschung).** Die Zeitreise prüft das Gate nach Seal gegen den **aktuellen** Stand. Die Version wählt aus, das Gate gibt frei. Ein gelöschter Seal liefert `Erased`.
-
-### 4.6 Zusammensetzung im Lesepfad
-**`seal_of` (K-18).** Abbildung `ChunkSlot → SealOrd`, 4 Byte je Slot, als Segment der Art `seal_map` in Speicher und Platte, verschlüsselt mit `SegKey` (INV-9). Beim Ingest gesetzt. Bei Löschung bleibt die Zuordnung bestehen; der Zustand des Seals kommt aus dem Gate. Der Scrub entfernt Zuordnungen toter Seals zusammen mit den Chunk-Slots.
-
-
-```
-live(Anfrage) = visible(Version) ∩ open(Gate) ∩ acl(Principal) ∩ meta(Filter)
-```
-
-Alle vier sind Bitmaps über Chunk-Slots oder Seal-Ordinale. Die Gate-Prüfung ist zusätzlich am Materialisierungspunkt (REQ-FLT-5). Die Löschung fügt keinen eigenen Pfad hinzu (REQ-SRC-3).
-
-**INV-1.** Kein Crate außer `db` kennt gleichzeitig `ReadGate` und `Visibility` als Implementierung.
-
-### 4.7 Mandantenweites Gate (ADR-28)
-
-Das Gate gehört dem Mandanten, nicht der Collection. Ein Löschauftrag mit Scope `Subject` oder `Tenant` wirkt in einem Schritt über alle Collections. Die Reihenfolge ist:
-
-1. Gate-Änderung ist durabel (`fdatasync` des Löschlogs und der Gate-Datei), dann `ArcSwap`-Publikation. Ab hier liefert `ReadGate::state` `Erased`.
-2. Jede Collection erhält die LiveMask-Änderung über ihren Schreib-Task. Das ist nur Optimierung, Korrektheit hängt an Schritt 1 und der Materialisierungsprüfung (REQ-FLT-5).
+- `Fs`-Verzeichnisoperationen (Anlegen, `rename`, `remove`) sind erst nach `sync_dir` dauerhaft. `write_atomic(path, bytes)` (Temp `.building` → `sync_all` → `rename` → `sync_dir`) ist eine **Hilfsfunktion über `Fs`**, kein Trait-Mitglied, damit `FaultFs` sie mitprüft.
+- `Perm::Private` MUSS unabhängig von der `umask` gelten (§15.6).
+- `RealFs` nutzt ausschließlich `std` (`FileExt::read_at/write_at`, `File::lock/try_lock`).
+- `Checksum::crc32c(seed, data)` setzt einen CRC-32C-Strom fort: Ergebnis = `!update(!seed, data)`; `seed = 0` liefert den üblichen CRC-32C (`"123456789"` → `0xE3069283`). Der Kern liefert eine **portable, sichere** Implementierung; beschleunigte Varianten (`unsafe`) kommen über denselben Port von außen und MÜSSEN die Goldens aus Anhang A.1 bestehen (SD-64).
+- `Mac::mac16` und `Cipher` hängen **keine** Länge an; der Kern kodiert Längen selbst (§9.1).
+- `Weigher::version()` ändert sich, wenn sich das Zählverfahren ändert (z. B. anderer Tokenizer); der Kern speichert sie je Run (§9.5).
+- `Env` bündelt alle Ports: `fs, clock, entropy, runtime, governor, metrics, hooks, access_sink, checksum` immer (mit Standardimplementierungen); `cipher, mac, kdf, key_provider, secret_alloc, rollback_anchor, cold_tier, pressure` optional. `Env::real(root)` liefert die Standardbelegung.
+- `Runtime` ist ein kleiner, **teilbarer** Thread-Pool (`spawn(Box<dyn FnOnce + Send>)`); `Runtime::manual()` führt Jobs nur auf `run_pending()` aus und macht jede Verschränkung in Tests deterministisch.
+- **`FsCaps` und Fail-Closed (SD-57, `INV-FS-1`).** Jede `Fs`-Implementierung erklärt ihre Zusicherungen. `Config::fs_policy` ist `Strict` (Standard) oder `Relaxed`. Unter `Strict` öffnet der Kern nur, wenn `durable_file_sync`, `durable_dir_sync`, `atomic_rename` und `private_perm` wahr sind, sonst `Err(Unsupported{fs_caps})`. `Relaxed` ist für Tests und Wegwerf-Instanzen und setzt `Receipt.durable = false`. Eine schwächere Plattform wird nie stillschweigend akzeptiert. Neue `Fs`-Implementierungen bestehen `testing::conformance::fs_suite` (§19.1).
+- **`KeyProvider`-Vertrag (SD-55, `INV-KEYP-1`).** (1) `domain_key_create` legt einen Schlüssel an, sobald er gebraucht wird. (2) `make_durable` kehrt erst zurück, wenn **alle** bis dahin angelegten Schlüssel dauerhaft sind; der Kern ruft es auf, **bevor** ein Frame mit einem so versiegelten Körper dauerhaft werden darf (§10.2 Schritt 1b). (3) `None` darf nur zurückkommen, wenn die Vernichtung dauerhaft und geprüft ist. (4) Aufrufe können blockieren und laufen ohne gehaltene Sperre (P-10). (5) Der Kern hält Domänenschlüssel nur im begrenzten Cache (§15.3).
+- **`Secret32`/`SecretAlloc` (SD-56).** `Secret32` ist ein undurchsichtiges Handle (`expose() -> &[u8; 32]`), ohne `Debug`/`Clone`/`Serialize`. Standard: Heap, beim `Drop` `fill(0)` + `black_box` (best-effort). `Env.secret_alloc` ersetzt den Speicher durch geschützten Speicher der Anwendung, ohne dass der Kern `unsafe` braucht.
+- `OpenMode::Direct` und `io_uring` sind **nicht** Teil des Ports in Version 1 (SD-31); der Port bleibt durch neue Enum-Varianten mit unverändertem Standardverhalten erweiterbar.
 
 ---
 
-## 5. Datenmodell und Speicher
+## 5. Fehler- und Bedrohungsmodell
 
-### 5.1 Datenklassen
+### 5.1 Fehlerklassen
 
-| Klasse | Inhalt | Verschlüsselung | Löschmechanismus |
-|---|---|---|---|
-| **P** | Dokumente, Chunks, Vektoren, Text, Graph-Labels einer Collection mit `personal_data = Possible` (Standard) | `DocKey` je Seal (Nutzdaten), `SegKey` je Segment (abgeleitete Dateien) | Gate, Schlüsselvernichtung (7.4), Scrub |
-| **K** | Collection mit `personal_data = None`, vom Betreiber erklärt | `SegKey` je Segment. Kein Klartext (D4, K-17) | Gate, Scrub durch Segmentersatz |
-| **D** | Abgeleitet: Postings, Graphstruktur, HNSW-Struktur, Caches | `SegKey` je Segment (INV-9), Caches nur im Speicher | Gate, Scrub, `SealScoped` |
-| **E** | Löschlog, Ledger, Schlüsseltabelle, Anker, Registry | eigene Schlüssel (5.4), Ledger ohne Schlüssel | Aufbewahrung des Ledgers: Pflichtschalter `ledger_retention`, kein Standard (D4, H-05) |
+| ID | Fehlerklasse | Erwartetes Verhalten | Zustand danach | Prüfnetz (§19) |
+|---|---|---|---|---|
+| F-1 | Stromausfall / Prozess-Kill (`kill -9`) | Recovery (§13) | Präfix der quittierten Changes; jede Quittung mit `durable=true` bleibt erhalten | Absturzmatrix |
+| F-2 | Zerrissener Schreibvorgang (Teil eines Sektors/Blocks) | Frame-/Block-/Record-Prüfsumme | Torn-Tail im **letzten ungesiegelten** Segment wird geheilt, sonst `Corrupt` | Absturzmatrix, Fuzz |
+| F-3 | Nicht synchronisierte Schreibvorgänge in beliebiger Reihenfolge übernommen | Reihenfolge-Vertrag (P-3) | nie ein Edit vor seiner Datei | `FaultFs` (Umordnung) |
+| F-4 | `fsync`-Fehler zur Laufzeit | **Poison**, kein Retry (`INV-LOG-5`) | Instanz tot; Neustart führt Recovery aus | `FaultFs` |
+| F-5 | `ENOSPC` beim Schreiben | Abschneiden auf den letzten guten Stand (§10.5); Vorallokation verlagert den Fehler nach vorn | heil und wiederholbar (`Busy{StorageFull}`) oder Poison, wenn Abschneiden scheitert | `FaultFs` |
+| F-6 | `EIO` beim **Lesen** | immer als Fehler melden, **nie als „leer“** | Operation scheitert; Instanz benutzbar; Datei als verdächtig markiert | `FaultFs` |
+| F-7 | Bitfäule im Ruhezustand | Prüfsumme je Block/Frame/Record; in `Authenticated/Encrypted` kryptografisch | `Corrupt{file,offset}`; nie falsche Daten | Bitflip-Test |
+| F-8 | Verlorener/fehlgeleiteter Schreibvorgang (Platte quittiert, schreibt nicht / falscher Ort) | Kettenprüfsumme im Redo, Block-AAD, **Redo-HWM** (`INV-LOG-8`), `verify` | erkannt, solange die Dateien intern inkonsistent werden; **nicht** erkennbar, wenn ein ganzer älterer, in sich stimmiger Stand zurückgespielt wird (→ F-10) | `FaultFs` (Lost/Misdirected), `verify` |
+| F-9 | Speicherdruck / Deskriptor-Erschöpfung | `Governor`: verlangsamen, Flush erzwingen, Cache verkleinern; `TableCache` begrenzt offene Dateien | keine Allokationsabbrüche im Kern; `Busy{retry_after}` statt OOM | Ressourcentests (§17.5) |
+| F-10 | Zurückspielen eines älteren Gesamtstands | nur mit **Rollback-Anker** (§15.5) erkennbar | ohne Anker nicht erkennbar, offen dokumentiert | Anker-Test |
+| F-11 | Uhrsprung | `Clock` nur für Ablauf (Holds, TTL, Intervall-`fsync`); Ordnung läuft ausschließlich über Stamps | nie Ordnungsfehler | `Clock`-Tests |
+| F-12 | Panic in Aufrufer-Code (`Weigher`, `Filter`, `CompactionFilter`, `Extension`, `Listener`) | `catch_unwind` an der Grenze in Wartung und Listener-Zustellung | Job schlägt fehl und wird gemeldet; Daten unverändert; Listener abgemeldet | Panic-Injektion |
+| F-13 | `std`-Sperre vergiftet (Thread starb im kritischen Abschnitt) | `PoisonError` ⇒ `Error::Poisoned{cause: LockPoison}` | Instanz tot, Neustart | Panic-Injektion |
+| F-14 | **Nonce-Wiederverwendung nach Absturz** (Datei mit ID *n* wurde angelegt, Zähler nicht dauerhaft) | ID-Reservierung im Catalog **vor** Nutzung (`INV-KEY-2`, §9.7) | kein `(Schlüssel, Nonce)`-Paar je doppelt | Property-Test + Absturzmatrix |
+| F-15 | Downgrade des Integritätsmodus (Angreifer schreibt `FORMAT` auf `Plain` um) | `Config` nennt den erwarteten Modus; Abweichung ⇒ `Unsupported{integrity_mode}` (§9.2) | Öffnen verweigert | Manipulationstest |
 
-**INV-9 (Keine Klartext-Ableitung).** Keine Datei unter `tenants/` enthält bei Klasse P oder D Klartext von Nutzdaten, Tokens, Namen oder Graphlabels. Test T-ENC-01 durchsucht das Datenverzeichnis nach Canaries (Testkit).
+### 5.2 Angreifermodell
 
-**ADR-20 (Standard ist P).** Der Standard verlässt sich **nicht** auf die Erkennung personenbezogener Daten. Die Erkennung (REQ-PRV-1) warnt bei Treffern in K-Collections und entscheidet nie über den Speicherweg.
+| ID | Angreifer | Fähigkeit | Verteidigung | Grenze |
+|---|---|---|---|---|
+| A-1 | Anderer lokaler Benutzer / Mandant im selben Host | liest Dateien, wenn Rechte es zulassen | private Modi (`0600`/`0700`), eigenes Verzeichnis je Instanz | Root, Hypervisor |
+| A-2 | Offline-Angreifer auf dem Datenträger (Diebstahl, Backup) | liest/verändert Dateien | `Encrypted`: Vertraulichkeit und Integrität | Rollback ganzer Stände (F-10) ohne Anker |
+| A-3 | Offline-Angreifer ohne Schlüssel, der verändern will | Bits kippen, Frames umordnen, Blöcke vertauschen | `Authenticated`/`Encrypted`: MAC/AEAD mit AAD-Bindung; erwarteter Modus im `Config` | Löschen ganzer Dateien/Zurückspielen (F-10) |
+| A-4 | Fehlerhafter oder bösartiger Aufrufer (obere Schicht, Agent) | ruft die API unzulässig auf, fälscht `ResumeToken` | typisierte Handles (§15.4), Limits, `Forbidden`, MAC-gesicherte Tokens | Vertrauen in die einbettende Anwendung |
+| A-5 | Prozess mit Speicherzugriff (Core-Dump, Swap) | liest Schlüssel/Klartext | nicht kontrollierbar (kein `unsafe`, kein `mlock`); Bereinigung best-effort | §15.7 |
 
-### 5.2 Datensatzarten
+**Konsequenz:** Ohne `Authenticated`/`Encrypted` schützt CRC32C **nur** gegen Zufallsfehler, nicht gegen Angreifer. Das steht in der Dokumentation und im `FORMAT`-Feld `integrity_mode`.
+---
 
-| Art | Klasse | Inhalt | Verschlüsselung |
-|---|---|---|---|
-| `DocBlob` | P | Originaldokument | `DocKey` (Seal) |
-| `ChunkText` | P | Text und Provenienz je Chunk | `DocKey` (Seal) |
-| `VectorFull` | P | fp32-Vektor je Chunk | `DocKey` (Seal) |
-| `SealedMeta` | P | `external_id`, Quellpfad, Metadaten außer Filterfeldern | `DocKey` (Seal) |
-| `GraphLabel` | P | Entitätsname, Relationsbezeichnung | `DocKey` des Quell-Seals (ADR-23) |
-| `VectorCode` | D | SQ8-Code je Chunk im Segment | `SegKey` (Segment) |
-| `Postings` | D | BM25-Postings je Segment | `SegKey` (Segment) |
-| `GraphStruct` | D | Knoten-Slots, Kanten, Seal-Provenienz als Ordinale | `SegKey` (Segment) |
+## 6. Datenmodell
 
-`VectorCode` ist eine abgeleitete Datei (D), kein Seal-Datensatz. Der Code-Inhalt ist eine Funktion des fp32-Vektors. Bei einem Scrub wird er neu aus `VectorFull` berechnet, solange der Seal lebt, oder aus dem Segment entfernt (6.3).
+### 6.1 Vokabular
 
-### 5.3 Datensatz-Umschlag für Seal-Datensätze
+Im Crate kommen weder Produkt- noch Fremdsystemnamen vor.
 
-Speicherwert im KV-Store (Schlüssel `(seal: u32 BE, kind: u8, chunk: u32 BE)`):
-
-```
-[ver u8 = 1][kind u8][chunk u32 LE][nonce 12][ciphertext n][tag 16]
-```
-
-- AEAD: AES-256-GCM, Nonce 96 Bit zufällig aus `OsRng`.
-- AD = `tenant_id (16) ‖ collection (u32 LE) ‖ seal (u32 LE) ‖ kind (u8) ‖ chunk (u32 LE) ‖ ver (u8)`.
-- Obergrenze je `DocKey`: `max_records_per_seal = 2^24`. Überschreitung ist `Refused` für den Schreibstapel, der Seal wird nicht erweitert, sondern neue Revision wird angelegt.
-- Der Schlüssel `seal` steht im Store-Schlüssel, nicht im Umschlag, damit die Registry-Zuordnung ohne Entschlüsselung funktioniert.
-
-**REQ-FMT-2 (kein Klartext in Metadaten).** Quellpfade, Dateinamen, `external_id` und Betroffenen-Kennungen liegen nur in `SealedMeta` bzw. als keyed Hash. Der Zugriff über `external_id` läuft über `BLAKE3-keyed(K_ref, external_id)`. Klartextmetadaten sind auf die deklarierten Filterfelder (6.5) begrenzt. Der Betreiber muss sie als nicht personenbezogen deklarieren, die Erkennung prüft das als Warnung.
-
-### 5.4 Schlüsselhierarchie
-
-```
-Wurzel (K1 Passphrase / K1b Schlüsseldatei / K3 Vault Transit)
-  └─ Anker (keys/anchor.cxan), gewrappt unter Wurzelschlüssel
-       ├─ MandantenKEK[epoche]        zufällig, Rotation nach epoch_len
-       │     ├─ DocKey je Seal         zufällig, in KeyTable gewrappt (Seal-Raum)
-       │     └─ SegKey je Segment      zufällig, in KeyTable gewrappt (Segment-Raum)
-       ├─ K_ref                        zufällig, nicht rotiert (ADR-40)
-       └─ K_registry                   zufällig, nicht rotiert (ADR-40)
-```
-
-**REQ-KEY-1.** `DocKey`, `SegKey`, `MandantenKEK`, `K_ref`, `K_registry` kommen aus `OsRng` und werden nie aus anderen Schlüsseln abgeleitet. Fehler der Zufallsquelle führen zu `Err`. HKDF ist nur für Schlüssel aus dem Wurzelschlüssel zulässig, zum Beispiel für die Trennung von Anker und Schlüsselsicherung.
-
-**REQ-KEY-2 (Wrap).** AES-256-GCM-SIV unter dem jeweiligen Umschlagschlüssel. Nonce 96 Bit aus `OsRng`. AD = `raum (u8) ‖ index (u32 LE) ‖ epoche (u32 LE) ‖ algo_id (u8)`.
-
-**REQ-KEY-7 (Wurzel).** Das Trait `RootKeyProvider` (Port) liefert den Wurzelschlüssel für die Anker-Entwrappung. Implementierungen: `Passphrase` (Argon2id, Parameter nach ADR-16; Eingabe nur über Datei mit Rechten 0600 oder Umgebungsvariable, D10), `KeyFile` (Rechte 0600 geprüft, Inhalt 32 Byte), `VaultTransit` (M6). Der Start verweigert (`Refused`) bei leerer Passphrase, Parametern unter den Mindestwerten, falschen Dateirechten, nicht gesperrtem Speicher (ADR-41).
-
-**REQ-KEY-8 (Wurzelrotation).** `contextra key rewrap-root` schreibt nur den Anker neu (atomar, 5.6). Keine Schlüssel in der KeyTable werden berührt.
-
-### 5.5 KeyTable (`keys/keytable_seal.cxkt`, `keys/keytable_seg.cxkt`)
-
-Zwei Räume, je in eigener Datei: `keys/keytable_seal.cxkt` (Seal-Raum, indiziert mit `SealOrd`) und `keys/keytable_seg.cxkt` (Segment-Raum, indiziert mit `SegOrd`). Jeder Raum hat einen Header von 4096 Byte, die Slots beginnen bei Offset 4096 (Offset = 4096 + 128 · Index). Die Obergrenze je Raum ist 2^32 − 1 Indizes (5.9). Feste Basisoffsets zwischen den Räumen entfallen damit (K-11).
-
-**Header (4096 Byte, Sektor- und Seitengröße):**
-
-| Offset | Länge | Feld |
+| Begriff | Bedeutung | Bisher (Altstand) |
 |---|---|---|
-| 0 | 4 | Magic `CXKT` |
-| 4 | 2 | Formatversion (1) |
-| 6 | 2 | Slot-Größe (128) |
-| 8 | 8 | `next_index` Seal-Raum (Zählwert, K-12) |
-| 16 | 8 | `next_index` Segment-Raum (Zählwert) |
-| 24 | 4 | Aktuelle Epoche |
-| 28 | 4 | CRC32C über Bytes 0–27 |
-| 32 | 4064 | reserviert (0) |
+| **Storage** | Handle einer geöffneten Instanz | `LsmStorage` |
+| **Space** | Benannter, physisch getrennter LSM-Baum (`SpaceId(u16)`) | Präfix-Reservierung |
+| **Change** | Atomare Menge von Schreibvorgängen plus `Guard`s | Transaktion + `TxBuffer` |
+| **Guard** | Vorbedingung innerhalb eines `Change` | `put_if_absent`, SSI-ReadSet |
+| **Stamp** | Monotone Zählung angenommener Changes (`u64` < 2^56) | `seq_no` + `TOMBSTONE_BIT` |
+| **Receipt** | Quittung eines `Change` (`stamp`, `durable`) | – |
+| **View** | Unveränderliche Sicht auf einen Stamp | Snapshot |
+| **Cursor** | Streaming-Iterator über einen Schlüsselbereich | `scan` (materialisiert) |
+| **Hold** | Befristete Halteregel gegen das Verwerfen alter Versionen, mit Eigentümer | `pin_checkpoint` |
+| **Consumer** | Benannter, persistenter Fortschrittszeiger eines abgeleiteten Index; zählt wie ein Hold, mit Maximalrückstand | – |
+| **Redo-Log** | Segmentiertes, gesiegeltes Wiederholungsprotokoll | WAL |
+| **Run** | Unveränderliche sortierte Datei mit Headern und Verweisen | SSTable |
+| **Blob** | Unveränderliche Datei mit großen Wertkörpern, vom Catalog verwaltet | – |
+| **BlobRef** | Verweis `(blob_no, offset, len, crc, domain)` im Run | – |
+| **Header** | Die ersten `header_len` Bytes eines Wertes; ohne Körper lesbar | – |
+| **Body** | Der Rest des Wertes | – |
+| **Weight** | Frei definierbare Zählgröße je Eintrag (k ≤ 4, typisch Token), in Blocksummen geführt | – |
+| **KeyDomain** | Verschlüsselungsdomäne eines Körpers (`u32`, z. B. ein Subjekt) | – |
+| **Segment** | Entkoppelte, vom Catalog verwaltete Datei einer oberen Schicht (z. B. Vektorgraph) | – |
+| **FileKind** | `Run`, `Blob`, `Segment(kind u16)`; Redo-Segmente sind **kein** `FileKind` (§8.2) | Pfadendung |
+| **Tier** | `Local` oder `Cold`; Attribut jeder `FileMeta` | – |
+| **Claim** | Reservierung von Dateien durch einen laufenden Wartungsjob | – |
+| **Catalog** | Einzige Wahrheit über lebendige Dateien und Zustand | Manifest |
+| **Erase / ErasureReceipt** | Löschauftrag mit physischer Garantie / Nachweis | Purger |
+| **Env** | Bündel der Ports (§4) | `Vfs`, verstreute Umgebungstypen |
+| **Graveyard** | Warteschlange für zu löschende, noch referenzierte Dateien | – |
+| **Page / ResumeToken** | Budgetierte Ergebnisseite und Fortsetzungsmarke | `LIMIT/OFFSET` |
 
-**Slot (128 Byte, ausgerichtet auf Offsets ganzzahlig teilbar durch 128):**
+### 6.2 Schlüssel, Tags, Reihenfolge, Stamp
 
-| Offset | Länge | Feld |
+- **Nutzerschlüssel:** beliebige Bytes, 1 ≤ Länge ≤ `max_key_bytes`; Ordnung **bytelexikografisch aufsteigend**. Der Space steckt nicht im Schlüssel, sondern in der Dateizuordnung (SD-07).
+- **Interner Schlüssel** = `user_key ‖ tag` mit `tag: u64 = (stamp << 8) | kind`. Sortierung: **Nutzerschlüssel aufsteigend, Tag absteigend** (neueste Version zuerst).
+- `kind`: `Put = 1`, `Delete = 2`, `RangeDelete = 3`, `EraseRange = 4`, `PutRef = 5`, `Merge = 6` (**reserviert**, nicht erzeugbar in Version 1; ein Decoder, der `6` sieht, meldet `Unsupported`). Der Löschmarker ist ein eigenes Typ-Byte, nicht Bit 63; alle 142 Maskierungsstellen des Altstands entfallen.
+- `PutRef` kommt **nur in Runs** vor (Körper ausgelagert, §9.5/§9.6). Redo und Memtable kennen nur `Put`.
+- **Stamp:** `u64`, streng monoton über die **angenommenen** Changes, lückenlos (`INV-STAMP-1`), erster Stamp ist 1, Wert 0 bedeutet „leerer Zustand“. Stamps sind auf `< 2^56` begrenzt; Überlauf ⇒ `Error::Exhausted`, nie Umbruch (`INV-STAMP-2`).
+- **Bereichsmarker** (`RangeDelete`, `EraseRange`): `(start, end, tag)` mit `end` exklusiv; fehlendes `end` bedeutet „bis zum Ende des Space“ (Flag `UNBOUNDED_END`). In Runs liegen sie im `RangeDelBlock`, nicht im DataBlock. Ein Marker mit Stamp `S` verdeckt für jede Sicht ≥ `S` alle Versionen mit Stamp < `S` im Bereich.
+
+### 6.3 Werte: Header und Körper
+
+Ein Wert besteht aus `header ‖ body`. `header_len` ist je Space fest (0…255). Der Kern liest den Header ohne Körper (§11), die Bedeutung des Headers kennt er nicht. Wer `Value::new(header, body)` übergibt, MUSS `header.len() == header_len` einhalten, sonst `Error::Limit{HeaderLen}`.
+
+Hat der Space `separate_body(t)` und gilt `body.len() ≥ t` (bzw. immer bei `domain_sealed`, sofern `body` nicht leer ist), wird der Körper **erst beim Flush** in eine Blob-Datei ausgelagert; der Run enthält dann `kind = PutRef` mit `value = header ‖ BlobRef` (§9.5). Bis dahin liegt der Körper im Redo-Frame und in der Memtable (SD-29).
+
+### 6.4 `SpaceOptions` (unveränderlich nach dem Anlegen, Teil von `spaces_add`)
+
+| Option | Wirkung | Gültigkeitsregel |
 |---|---|---|
-| 0 | 1 | `state`: 0 Frei, 1 Live, 2 Destroyed |
-| 1 | 1 | `flags` (0) |
-| 2 | 2 | reserviert |
-| 4 | 4 | `epoche` (LE) |
-| 8 | 12 | `wrap_nonce` |
-| 20 | 48 | `wrapped` (32 Byte Schlüssel + 16 Byte Tag) |
-| 68 | 4 | `crc32c` über Bytes 0–67 |
-| 72 | 56 | reserviert (0) |
+| `header_len(n)` | Erste `n` Wertbytes sind der Header (≤ 255 B). | – |
+| `weights(k)`, `k ≤ 4` | Index-Blöcke führen `k` `u32`-Summen; Gewicht 0 ist immer „Bytes“ (Header + Körper). Ein registrierter `Weigher` liefert die übrigen. | `k > 1` verlangt beim Öffnen einen registrierten `Weigher`, sonst `Error::Config{WeigherMissing}`. `k = 0` ist unzulässig (mindestens Bytes). |
+| `separate_body(t)` | Körper ab `t` Bytes liegen in Blob-Dateien (Vorschlag `t = 4096`). | `512 ≤ t ≤ max_value_bytes`. |
+| `domain_sealed()` | **Jeder** nichtleere Körper geht in Blob-Dateien und ist mit dem Schlüssel seiner `KeyDomain` versiegelt (§15.3). | verlangt `Env.cipher` und `Env.key_provider`, unabhängig vom Integritätsmodus; jedes `put` MUSS eine Domäne tragen (sonst `Forbidden`). |
+| `prefix_filter(n)` | Bloom-Filter über die ersten `n` Schlüsselbytes je Run. | `1 ≤ n ≤ 64`. **Standard für Haupt-Spaces**, weil Präfix-Scans Punktlesen im Verhältnis ≈ 5 : 1 überwiegen (Anhang B.3). |
+| `locality_prefix(n)` | Compaction teilt Ausgaben bevorzugt an Präfixgrenzen (±25 % der Zielgröße). | `1 ≤ n ≤ 64` |
+| `append_only()` | `Put` nur auf Schlüssel ohne lebende Version (sonst `Forbidden{PutExisting}`); `Delete`/`RangeDelete` verboten; `Erase` nur mit `Erase::admin()`. | – |
+| `forgetting()` | Erlaubt einen `CompactionFilter` (§12.2); Vergessen ist eine sichtbare Zustandsänderung (SD-48). | unvereinbar mit `append_only()` (Flag `16`, E-1). |
+| `ephemeral()` | Nur Memtable: kein Redo, keine Runs, verfällt beim Schließen. Ein `Change` darf **nicht** dauerhafte und flüchtige Spaces mischen (`Forbidden{MixedDurability}`). | unvereinbar mit `separate_body`, `domain_sealed`, `prefix_filter`, `locality_prefix`, `weights(k>1)`; begrenzt durch `Config::ephemeral_max_bytes` (darüber `Busy`). |
+| `merge()` (**reserviert**, SD-60) | In Version 1 **nicht erzeugbar**. Flag `32` in `spaces_add`, Pflicht-Bit `MERGE` und `kind = 6` sind reserviert, damit ein späterer Merge-Operator (assoziative, kommutative Deltas für Zähler und Kantengewichte) ohne neue Formatversion einführbar ist. | Ein Decoder, der Flag `32` sieht, meldet `Unsupported`. |
 
-**REQ-KEY-3.** Slot-Index = `SealOrd` (Seal-Raum) bzw. `SegOrd` (Segment-Raum). Slots werden nie wiederverwendet. Der Epochenwechsel schreibt Slots in place um (REQ-KEY-5) und vergibt keine neuen Indizes (K-11).
+### 6.5 `Change`, `Guard`, `Receipt`
 
-**REQ-KEY-4 (Vernichtung, neu gefasst zu F-15).** Ablauf eines Vernichtungsstapels:
-1. Der Aufrufer hat das Gate bereits publiziert (7.4 E1).
-2. `KeyDestroyer` nimmt den **Schreib-Lock des Schlüssel-Caches**. Neue Leser warten, laufende Leser (Read-Lock) schließen ab. Dadurch ist kein Schlüssel im Cache, dessen Slot gleich verschwindet.
-3. Cache-Einträge der Seals werden entfernt, `SealScoped` wird aufgerufen.
-4. Vor dem ersten `pwrite` schreibt `KeyDestroyer` den Eintrag `DestroyIntent` für alle Seals und Segmente des Stapels und führt `fdatasync` aus (K-03). Slots werden per `pwrite` an Ort überschrieben: `wrapped` und `wrap_nonce` mit Nullen, `state = 2`, CRC neu. Die Slots sind nach Offset sortiert, alle Schreibvorgänge eines Stapels teilen einen `fdatasync`.
-5. Cache-Lock wird freigegeben. Alle gehaltenen Kopien im Speicher werden mit `zeroize` gelöscht.
+- Ein `Change` enthält Operationen (`put`, `delete`, `delete_range`) über beliebige Spaces und beliebig viele `Guard`s. Doppelte Schlüssel innerhalb eines `Change` werden beim Aufbau zusammengelegt (letzter gewinnt). Ein `Change` erhält **einen** Stamp.
+- `Guard`-Varianten: `absent(space, key)`, `equals(space, key, expected)`, `unchanged_since(space, key, stamp)`, `range_unchanged_since(space, range, stamp)`. Guards werden unter der Schreibsperre gegen den **neuesten** Stand einschließlich früherer Changes derselben Gruppe geprüft (§10.2). `range_unchanged_since` arbeitet über `max_stamp` je Run/Block und ist **O(überlappende Blöcke)**, kein Vollscan.
+- `Change::durability(Always | Interval(d) | Never)` überschreibt `Config::durability` für diesen Change.
+- `Receipt { stamp: Stamp, durable: bool }`. `durable = true` bedeutet: Der Frame ist per `sync_data` gesichert.
 
-**REQ-KEY-5 (Epochenwechsel).** Alle `epoch_len` (Standard 30 Tage) entsteht eine neue MandantenKEK. Ein Hintergrundlauf liest alle `Live`-Slots sequentiell und wrappt sie um. Gemischte Epochen sind zulässig. Wenn kein Slot mehr die alte Epoche trägt, wird die alte KEK aus dem Anker entfernt. Aufwand O(Seals + Segmente), sequentielle E/A. Bei 10 Mio. Seals rund 1,3 GB je Lauf (128-Byte-Slots). Das begrenzt den Zeitraum, in dem eine verbliebene Kopie eines gewrappten Schlüssels nutzbar wäre (Grenze für Copy-on-Write und Flash, 7.9).
+### 6.6 Konfiguration (Standardwerte)
 
-**REQ-KEY-6 (Schlüssel-Cache).** Entwrappte `DocKey` und `SegKey` liegen in einem LRU-Cache (`key_cache_entries`, Standard 65.536) in gesperrtem Speicher (mlock). Kein `Clone`, `Debug`, `Serialize`. `Zeroizing` beim Verwerfen.
-
-### 5.6 Anker (`keys/anchor.cxan`)
-
-```
-Header:  Magic "CXAN" (4) | Version u16 | Tenant-ID (16) | Anzahl Einträge u32 | CRC32C u32
-Eintrag: Art u8 (1 KEK, 2 K_ref, 3 K_registry, 4 K_log) | Epoche u32 | Nonce 12 | Länge u16 | gewrappter Schlüssel n | CRC32C u32
-```
-
-- Gewrappt unter dem Wurzelschlüssel mit AES-256-GCM-SIV, AD = `art ‖ epoche ‖ tenant_id`.
-- **Schreiben atomar:** `tmp → fdatasync → rename → fsync(Verzeichnis)`. Das Entfernen einer alten KEK ist dasselbe Verfahren.
-- Mandanten-Offboarding (7.2): Anker wird ohne alle Einträge neu geschrieben (KEK, `K_ref`, `K_registry`, `K_log`, K-13), dann KeyTables und Verzeichnis entfernt.
-
-### 5.7 Seal-Registry
-
-KV-Familie `reg/` im Store. Schlüssel `seal: u32 BE`. Wert: AEAD mit `K_registry`, AD = `reg ‖ seal`.
-
-Inhalt: `seal_state`, `doc_id (16)`, `collection (u32)`, `first_slot (u32)`, `chunk_count (u32)`, `class (u8)`, `record_count (u32)`, `subject_tags (Liste aus 16-Byte-Tags)`.
-
-**Seal-Zustände (F-20, einzige Menge):**
-
-| Zustand | Bedeutung | Abgeleiteter `SealState` |
+| Parameter | Standard | Anmerkung |
 |---|---|---|
-| `Active` | Lebt, Inhalt gültig | `Open`, oder `Restricted` wenn im Gate eingeschränkt |
-| `Retired` | Revision entfernt, Seal wartet auf Aufbewahrungsende | `Open` nur für `get` mit `as_of` bis zum Aufbewahrungsende. Suche und aktuelles `get` sehen den Seal nicht |
-| `Gated` | Löschauftrag durabel, Schlüssel noch vorhanden | `Erased` |
-| `KeysDestroyed` | Schlüssel vernichtet, Scrub läuft | `Erased` |
-| `Erased` | Scrub abgeschlossen, nur Registry-Minimalform | `Erased` |
+| `integrity` | **muss angegeben werden** (`Plain`, `Authenticated`, `Encrypted`) | bei bestehender Instanz muss er dem `FORMAT` entsprechen (F-15) |
+| `durability` | `Always` | |
+| `memtable_bytes` (je Space) | 16 MiB | zählt Schlüssel, Header **und** Körper |
+| `max_frozen` | 4 | |
+| `l0_compaction_trigger` / `l0_slowdown` / `l0_stop` | 4 / 8 / 12 | §10.4 |
+| `level_multiplier` / `level1_target_bytes` / `max_levels` | 10 / 256 MiB / 7 | |
+| `target_run_bytes` | 64 MiB | |
+| `block_bytes` / `restart_interval` | 4 KiB / 16 | |
+| `bloom_bits_per_key` | 10 | |
+| `redo_segment_bytes` | 64 MiB | |
+| `max_redo_bytes` | 512 MiB | erzwingt Flush hinterherhinkender Spaces |
+| `blob_target_bytes` | 64 MiB | |
+| `blob_gc_live_ratio` / `blob_gc_max_age` | 0,4 / 7 Tage | §12.3 |
+| `blob_min_bytes` | 16 MiB (= `blob_target_bytes / 4`) | Konsolidierung kleiner Blobs (SD-43) |
+| `id_reserve_block` | 256 | ID-Reservierung (§9.7, `INV-KEY-2`) |
+| `max_open_files` | 512 | `TableCache` |
+| `stall_slice` / `stall_timeout` | 1 ms / 100 ms | §10.4 |
+| `ephemeral_max_bytes` | 64 MiB | |
+| `listener_queue` | 10 000 Ereignisse | §7.4 |
+| `consumer_check_interval` | 30 s | |
+| `fs_policy` | `Strict` | §4, `INV-FS-1` |
+| `listener_deadline` | 100 ms | §7.4 |
+| `domain_key_cache` | 4 096 Einträge, TTL 5 min | §15.3 |
+| `erase_receipt_keep` | 10 000 | §9.7 |
 
-Übergänge sind monoton. `Gated → Active` gibt es nicht. Ein Zurücksetzen ist nur durch `Restricted → Released` möglich, und `Restricted` ist kein Seal-Zustand, sondern eine Gate-Einschränkung (7.5).
+### 6.7 Limits (Fehlercode `Limit`, konfigurierbar)
 
-**Betroffenen-Index.** `subject_tag → RoaringBitmap<SealOrd>` in der Familie `sub/`. `subject_tag = BLAKE3-keyed(K_ref, SubjectRef)` (16 Byte). Die Betroffenen-Kennung im Klartext steht nirgends.
-
-**Dokument-Index.** `doc_id → [SealOrd]` in der Familie `doc/`.
-
-Chunks eines Seals liegen in **zusammenhängenden Slots**. Das macht LiveMask-Änderungen Bereichsoperationen.
-
-### 5.8 Segmente und Segmentschlüssel (ADR-30, F-34)
-
-Jede abgeleitete Datei (Postings, Vektor-Struktur, SQ8-Codes, Filter-Bitmaps, Graph-Struktur) besteht aus Segmenten. Ein Segment hat einen Segmentschlüssel `SegKey` im Segment-Raum der KeyTable.
-
-**Segment-Kopf (Klartext, 64 Byte):** Magic `CXSG`, Formatversion u16, `kind` u8 (`postings`, `vector_struct`, `vector_code`, `filter`, `graph_struct`), `seg_ord` u32, Chunkgröße u32 (65.536), Anzahl Chunks u32, CRC32C. Keine Nutzdaten, keine Identifikatoren außer `seg_ord`.
-
-**Segment-Körper:** Folge von Chunks, je Chunk:
-
-```
-[nonce 12][länge u32 LE][ciphertext n][tag 16]
-```
-
-- AEAD AES-256-GCM, Nonce zufällig, AD = `seg_ord ‖ kind ‖ chunk_index`.
-- Obergrenze je `SegKey`: `max_chunks_per_segkey = 2^24`.
-- Ein Segment wird nur durch Neuschreiben geändert (Copy-on-Write). Änderungen an Segmenten gehen ausschließlich über Stapel oder Scrub.
-
-**REQ-SEG-1 (Lesen).** Lesen eines Segments öffnet zuerst den Segment-Header, dann Chunks. Fehlt der Segmentschlüssel (`KeyAbsent`), gilt das Segment als nicht lesbar. Der Aufrufer behandelt es als Index-Fehler im Sinn von 8.2 und baut es aus den Quellen neu auf (REQ-IDX-REBUILD, 6.3).
-
-**REQ-SEG-2 (Schlüssel-Lebenszyklus).** Ein neues Segment bekommt einen neuen `SegKey`. Ein Segment ist ein Schlüssel-Lebenszyklus. Der Scrub (7.6) erzeugt ein neues Segment, veröffentlicht es und vernichtet danach den alten `SegKey` (ADR-31).
-
-### 5.9 IDs und Ordinale
-
-- `DocId`: zufällig, 128 Bit, nie aus Inhalt oder Pfad abgeleitet.
-- `chunk_id = BLAKE3(doc_id ‖ rev ‖ chunk_index)`, 128 Bit.
-- `SealOrd` und `SegOrd`: vergeben vom Schreib-Task, monoton, nie wiederverwendet. Bei Erreichen von `2^32 − 1` weist der Mandant neue Schreibstapel mit `Refused` ab (Zählwert `next_index` im KeyTable-Header (5.5, K-12)).
-- `tenant_id`: 16 Byte Zufall, nicht aus dem Verzeichnisnamen abgeleitet.
-
-### 5.10 Handkodierte Plattenformate (REQ-FMT-4, neu gefasst)
-
-Genau fünf Formate sind handkodiert mit geprüften Feldzugriffen und Fixture-Tests:
-
-| Format | Datei | Kapitel |
-|---|---|---|
-| `CXKT` | Schlüsseltabelle | 5.5 |
-| `CXAN` | Anker | 5.6 |
-| `CXEL` | Löschlog | 7.8 |
-| `CXGS` | Gate-Snapshot | 7.8 |
-| `CXSG` | Segment-Kopf und -Körper | 5.8 |
-
-Der Seal-Datensatz-Umschlag (5.3) ist ein Wert im KV-Store und nutzt das Store-Format. Alles andere (WAL, SST, Manifest) nutzt die bestehende Kodierung der Store-Crate mit Versionsfeld. Ungültige Längen führen zu `Integrity`. Jedes Format hat eine Version im Kopf.
-
-**REQ-FMT-3 (Version).** Unbekannte Versionen werden mit `Integrity` abgelehnt. Frühere Versionen werden nicht gelesen (ADR-44). Eine Formatänderung erhöht die Version und braucht eine neue Spezifikationsversion.
+Schlüssel ≤ 4 KiB (`max_key_bytes`), Header ≤ 255 B, Wert ≤ 1 MiB (`max_value_bytes`, konfigurierbar bis 16 MiB; größere Daten gehören in eine Objektschicht, A-03), Change ≤ 32 MiB (`= redo_segment_bytes / 2`) und ≤ 100 000 Ops, Redo-Frame ≤ 64 MiB, `weights` ≤ 4, Spaces ≤ 64 (Empfehlung ≤ 12, §7.6), Consumer ≤ 64, Holds je Instanz ≤ 10 000, Spacename ≤ 64 Byte aus `[a-z0-9._-]`, Segment-Dateien je `kind` ≤ 4 096, Segment-Block ≤ 16 MiB, `reference` genau 16 B, dauerhafte Holds ≤ 1 000. Alle Längenfelder in Dateien werden **vor** jeder Allokation gegen diese Grenzen und gegen die Restlänge der Datei geprüft (`INV-FMT-2`).
 
 ---
 
-## 6. RAG-Kernpipeline
+## 7. API-Vertrag
 
-### 6.1 Ingest
-
-**REQ-ING-1 (Pipeline).** `Parse → Chunk → Digest → Embed (Stapel) → Seal und Store → Index`. Jede Stufe hat eine begrenzte Warteschlange (64 Stapel) und eigene Parallelität. Rückstau pflanzt sich bis zum Aufrufer als `Backpressure` fort. Kein Blockieren.
-
-**REQ-ING-2 (Formate).** Feature je Format, Standard nur `ingest-text`:
-
-| Feature | Formate |
-|---|---|
-| `ingest-text` (Standard) | TXT, Markdown, JSON |
-| `ingest-web` | HTML |
-| `ingest-docx` | DOCX |
-| `ingest-pptx` | PPTX |
-| `ingest-sheets` | XLSX, CSV |
-| `ingest-pdf` | PDF (eingebetteter Text, kein OCR) |
-| `ingest-email` | EML, MBOX |
-
-Unbekannte Formate werden mit `Refused` abgewiesen, nie geraten. ODF, OLE und YAML/TOML sind nicht enthalten (ADR-35). Die Features `workspace`, `types-compat` und `fuzz` entfallen aus `ingest`. Fuzz-Ziele liegen unter `crates/contextra-ingest/fuzz/`, nicht als Feature.
-
-**REQ-ING-3 (Chunking).** Ziel 512 Token, Minimum 50, Trennung an Abschnitt, Absatz, Satz. Der Abschnittspfad (Breadcrumb) wird **vor** Embedding und BM25 dem Chunk-Text vorangestellt: `embed_text = breadcrumb + "\n" + text`.
-
-**Tokenschätzung (deterministisch, ohne Modell).** `tokens = ceil(W × 1,35)`, `W` = Anzahl Wortsegmente nach Unicode Word Boundaries (`unicode-segmentation`). Gilt für Chunking und Kontextbudget gleichermaßen.
-
-**REQ-ING-4 (Provenienz).** Jeder Chunk trägt `doc_id`, `rev`, `chunk_index`, Zeichenbereich, Seite, Abschnittspfad. Quellpfad und Dateiname liegen in `SealedMeta`.
-
-**REQ-ING-5 (Fehler je Dokument).** Ein defektes Dokument bricht den Stapel nicht ab. `IngestReport` führt je Dokument `Ok`, `Unchanged` (gleicher Digest, ADR-50), `Partial` mit Hinweisen oder `Failed` mit Fehlerart.
-
-**REQ-ING-6 (Betroffene deklarieren).** `SourceDoc.subjects` nimmt die vom Quellsystem bekannten Betroffenen auf (Tags werden im Aufrufer aus dem Quellschlüssel gebildet, nicht aus dem Inhalt). Die Entity-Erkennung läuft ohne Deklaration. Treffer erzeugen `UndeclaredPersonalData` im Report, nie eine automatische Zuordnung.
-
-**REQ-ING-7 (Unterdrückung, neu gefasst zu F-19).** Der Schreib-Task prüft beim Commit jedes Dokuments die deklarierten Betroffenen-Tags gegen die Unterdrückungsliste. Ist **ein** deklarierter Tag unterdrückt, wird das gesamte Dokument mit `SubjectSuppressed` abgewiesen. Der Rest des Stapels läuft weiter. Die Prüfung und der Commit laufen unter dem Commit-Lock aus 8.4, dadurch ist eine Race mit einer gleichzeitigen Löschung ausgeschlossen.
-
-**REQ-ING-8 (Idempotenz).** `key = (collection, BLAKE3-keyed(K_ref, external_id))` (H-06), `digest = BLAKE3-keyed(K_ref, Quellbytes)`. Gleicher Schlüssel und gleicher Digest: `Unchanged`, keine neue Revision. Gleicher Schlüssel und neuer Digest: neue Revision mit neuem Seal, alte Revision wird `Superseded`.
-
-**REQ-ING-9 (Bulk).** `IngestMode::Bulk { sync_every }` synchronisiert alle 64 MiB oder 5 s und am Jobende. Bestätigt wird erst nach dem Sync. Ein Abbruch wiederholt den Job, REQ-ING-8 macht das sicher. Löschaufträge sind nie `Bulk`.
-
-**REQ-ING-10 (Graph-Eingabe).** `SourceDoc.graph` (optional) enthält `entities` (Schlüssel des Aufrufers, Typ aus geschlossenem Vokabular, Name) und `relations` (Quell-Schlüssel, Ziel-Schlüssel, Relationstyp aus geschlossenem Vokabular, Gewicht in [0, 1]). Grenzen je Dokument: 10.000 Entitäten, 50.000 Relationen. Überschreitung ist `Refused` für das Dokument.
-
-### 6.2 Embedding
-
-**REQ-EMB-1 (Port).** `EmbeddingProvider { dim(), model_id(), embed_batch(&[&str]) }`. `model_id` und `dim` stehen im Index-Kopf. Batchgröße 64, maximale Eingabe 512 Token (das Chunking begrenzt die Eingabe auf dieses Maß; ein größerer Eingang ist `Refused`).
-
-**REQ-EMB-2 (Backends).** `contextra-embed`: lokales ONNX (`ort`), Modelldatei mit erwartetem SHA-256 (ADR-36), Abweichung führt zu `Refused`. `contextra-embed-http`: konfigurierter interner Dienst, TLS, Allowlist, Zeitgrenzen. Ohne Backend läuft die Fassade mit vorberechneten Vektoren (Aufrufer liefert sie).
-
-**REQ-EMB-3 (Datenabfluss).** Das HTTP-Backend sendet Chunk-Text nach außen. Das ist Datenabfluss im Sinne des Egress-Guards (REQ-PRV-3). Der Endpunkt muss im Verarbeitungsregister stehen, und für P-Collections muss `allow_personal = true` je Endpunkt gesetzt sein.
-
-**REQ-EMB-4 (Modellwechsel).** Ein Index gehört zu genau einer `model_id` und `dim`. Anfragen mit anderem Modell sind `ModelMismatch`. Ein Wechsel erfordert Neuberechnung aus `VectorFull` oder `DocBlob`. `drift` vergleicht Stichprobenstatistik und meldet Abweichung, ohne automatisch zu handeln.
-
-**REQ-EMB-5 (Reranker, optional).** `Reranker`-Port mit ONNX-Cross-Encoder (ADR-36), standardmäßig aus. Bewertet die besten `rerank_input` (Standard 50) Kandidaten, danach Auswahl der Top-k.
-
-### 6.3 Vektorindex
-
-**REQ-VEC-1 (HNSW).** `M = 16`, `ef_construction = 200`, `ef_search = clamp(max(128, 4·k), 128, 1024)`. SQ8 ab `index_flat_below` (Standard 20.000 Vektoren je Shard, ADR-04). Im Arbeitsspeicher liegen SQ8-Codes und Graph, **nicht** die fp32-Vektoren.
-
-**REQ-VEC-1a (SQ8-Kalibrierung).** Wertebereich je Dimension aus den ersten 20.000 Vektoren beim Übergang von exakt zu HNSW. Eingefroren bis zum vollständigen Neuaufbau. Kalibrierung steht im Index-Kopf.
-
-**REQ-VEC-2 (Exakt).** Bis `index_flat_below` Vektoren je Shard sucht der Index exakt mit SIMD-Kosinus. Der exakte Pfad ist auch die Referenz für Rückrufmessungen (T-RAG-04).
-
-**REQ-VEC-3 (Nachberechnung).** Die besten `rerank_k = min(4 · k_cand, 4000)` Kandidaten werden aus `VectorFull` gelesen, über `RecordSealer` entschlüsselt (Gate vorher geprüft, REQ-FLT-5) und in fp32 neu bewertet.
-
-**REQ-VEC-4 (Persistenz, neu gefasst zu F-24).** Auf Platte liegen nur Segmente (ADR-30):
-- `vector_struct`: Graphstruktur (Nachbarlisten, Knoten→Slot), Delta-Log als eigenes Segment,
-- `vector_code`: SQ8-Codes je Chunk,
-- Kalibrierung und Index-Kopf im Kopf des Struktursegments.
-
-Der Start lädt die `vector_code`-Segmente parallel und entschlüsselt sie segmentweise (kein Einzel-Datensatz-Lauf). `VectorFull` wird nicht beim Start gelesen. Ziel für L: unter 60 s bis `Ready` (10.1).
-
-**REQ-VEC-5 (Löschen im Index).** Kein Neuaufbau je Löschung.
-1. Sofort: `LiveMask`-Bits löschen. Knoten bleiben für die Navigation, nie in Ergebnissen.
-2. Sofort mit der Schlüsselvernichtung: **Routen-erhaltender Scrub** der SQ8-Codes toter Knoten im Speicher. Der Code wird durch den Mittelwert der Codes lebender Nachbarn ersetzt. Der Personenbezug verschwindet aus dem Arbeitsspeicher, die Navigation bleibt erhalten.
-3. Im Scrub-Stapel (7.6): **Konsolidierung.** Tote Nachbarn in Nachbarlisten werden durch deren lebende Nachbarn ersetzt. Segmente `vector_struct` und `vector_code` werden ohne tote Knoten neu geschrieben.
-4. Neuaufbau nur, wenn der Anteil toter Knoten nach Konsolidierung 30 % übersteigt (`tombstone_rebuild_ratio`).
-
-**REQ-IDX-REBUILD (neu, F-19-Folgefrage).** Ein Index-Segment, das nicht geöffnet werden kann (Schlüssel fehlt, Prüfsumme falsch), führt zum Zustand `Rebuilding` des Shards. Suchen auf dem Shard liefern `IndexUnavailable`, keine Teilergebnisse (REQ-SRC-4). Der Neuaufbau liest `VectorFull` lebender Seals. Eine Löschung erzeugt diesen Fall nie, weil Segmentschlüssel erst nach dem Neuschreiben vernichtet werden (ADR-31).
-
-**REQ-VEC-6 (Verboten).** DiskANN, RaBitQ, `partial_rebuild`, `purge` als eigener Pfad. Beide Algorithmen kehren nur über Gate G-INDEX (11.5) zurück.
-
-### 6.4 Textindex
-
-**REQ-TXT-1 (BM25).** `k1 = 1,2`, `b = 0,75`, konfigurierbar. Block-Max-WAND. Segmente höchstens `segment_max_bytes` (256 MiB). Speicherpuffer für frische Dokumente, Hintergrund-Merge. Segmente sind verschlüsselt (kind `postings`, ADR-30).
-
-**REQ-TXT-1a (Tokenizer).** NFKC-Normalisierung, Kleinschreibung, Unicode-Wortsegmentierung. Snowball-Stemmer für Deutsch und Englisch (`rust-stemmers`). Eingebaute Stoppwortlisten `de` und `en` in `contextra-text/data/`. **Keine Komposita-Zerlegung im Kern** (Wörterbuchabhängigkeit, entfernt; Rückruf-Effekt misst T-RAG-03). Domänenwörterbücher sind Konfiguration eines Adapters, nicht Teil des Kerns.
-
-**REQ-TXT-2 (Löschen im Textindex).** Treffer toter Seals werden im Lesepfad über die LiveMask gefiltert. Postings bleiben bis zum Scrub-Merge (7.6) physisch stehen. Zähler `N` und Längensumme werden beim Löschen exakt verringert (nicht personenbezogen, liegen im Index-Kopf mit CRC). `df(t)` wird beim Merge neu berechnet.
-
-**Dokumentierte Abweichung (F-25).** Bis zum Merge weicht `df(t)` für Terme ab, die im Wesentlichen nur in gelöschten Dokumenten vorkommen. Diese Dokumente erscheinen im Ergebnis nie. Die Abweichung ist deterministisch (REQ-SRC-2) und auf die Scrub-Frist begrenzt (7.9). Sie wird im Benchmark als Metrik ausgewiesen.
-
-**REQ-TXT-3 (Entdeckung).** Für `plan_erasure` (7.3) sucht der Textindex Bezeichner (Name, E-Mail, Personalnummer) als UND über Tokens. Kandidaten werden aus `ChunkText` entschlüsselt und exakt auf Teilzeichenfolge geprüft (NFKC, Kleinschreibung). Begrenzt durch `discovery_max_candidates` (Standard 10.000). Ergebnis: nur Zähler und Seal-Ordinale, nie Text.
-
-### 6.5 Filter, Zugriffsrechte, LiveMask
-
-**REQ-FLT-1 (Filterfelder).** Je Collection deklariert der Betreiber Filterfelder (`tags`, `dept`, `doc_type`, `valid_from`, `valid_to`, `acl`). Inverse Bitmaps (`Feld=Wert → RoaringBitmap<ChunkSlot>`) liegen im Arbeitsspeicher und als Segmente der Art `filter` auf Platte (verschlüsselt, INV-9). Bereichsfelder liegen spaltenweise.
-
-**REQ-FLT-2 (ACL, neu gefasst zu F-31).** Jeder Chunk trägt eine Menge von ACL-Tags. **Principals kommen aus der Konfiguration des Hosts (ADR-38)**, nie aus Anfrage oder Tool-Argumenten. MCP: `mcp.principals` in der Konfiguration. Server: Zuordnung von OIDC-Claims zu Principals über Konfiguration, Standard **verweigern**. Die Filterbitmap ist die Vereinigung der Bitmaps der Principals.
-
-**REQ-FLT-3 (Planer, neu gefasst zu F-36).** Selektivität `s = |Filter| / N`. Ist `|Filter| ≤ filter_exact_max` (Standard 20.000): exakte SIMD-Suche über die Filtermenge. Sonst ACORN-artige Traversierung mit Prädikat (`contextra-vector::acorn`). Die Wahl erfolgt aus Zählwerten, nicht aus Laufzeit (deterministisch). Die beiden Schwellen `index_flat_below` (Indexmodus) und `filter_exact_max` (Filtermodus) haben getrennte Namen und Zwecke.
-
-**REQ-FLT-4 (LiveMask).** Dichte Bitmap je Shard mit einem Bit je Chunk-Slot, atomar gelesen. Sie ist **abgeleitet** aus Registry, Visibility und Gate, und wird beim Start neu aufgebaut. Gate und Registry bleiben die Wahrheit.
-
-**REQ-FLT-5 (Autoritative Endprüfung).** Jedes materialisierte Ergebnis wird einmal gegen `ReadGate::state(seal)` geprüft, **bevor** Schlüsselmaterial angefasst wird. `Erased` und `Restricted` fallen heraus. Fallen Kandidaten heraus (die LiveMask hinkte hinterher), füllt die Suche in höchstens zwei Runden mit erhöhtem `k_cand` auf. Die Antwort kann dann weniger als k Treffer enthalten. Fehlt der Schlüssel (`KeyAbsent`), gilt das als `Erased`.
-
-### 6.6 Suche und Fusion
-
-**REQ-SRC-1 (Ablauf).**
-1. Snapshot pinnen (Version-Snapshot und Gate-Sequenz), Filterbitmap bilden (4.6). Principals aus Konfiguration.
-2. Vektorsuche (HNSW oder exakt) und Textsuche, je `k_cand = max(2·k, 50)`, begrenzt durch `MAX_SEARCH_K` (ADR-52).
-3. Endprüfung je Kandidat (REQ-FLT-5), Nachberechnung (REQ-VEC-3).
-4. Optional Graph-Signal (6.10), nur bei `GraphMode::PathRag`. Die Seeds stammen aus Stufe 1 (Vektor- und Textsignal ohne Graph), damit kein Zirkelbezug entsteht (K-06). Die Endfusion in Schritt 5 nimmt das Graph-Signal als drittes Signal mit seinem Gewicht auf.
-5. Fusion: gewichtete Reciprocal Rank Fusion, `k = 60`, Gewichte aus Konfiguration (ADR-49).
-6. Optional Reranker (REQ-EMB-5).
-7. Auswahl der Top-k. Tie-Break aufsteigend nach `DocId`, dann `chunk_id`.
-8. Ausgabe mit Provenienz, Signalrängen, optional Erklärung.
-
-**REQ-SRC-2 (Determinismus).** Gleiche Anfrage auf gleichem Snapshot und gleichem Gate-Stand liefert identische Trefferlisten. HNSW-Traversierung je Anfrage single-threaded. Zeit, Last und Zufall wirken nicht auf das Ergebnis.
-
-**REQ-SRC-3 (Löschung ohne Sonderpfad).** Das Gate wirkt über Filterbitmap und Endprüfung. Es gibt keinen zusätzlichen Suchdurchlauf.
-
-**REQ-SRC-4 (Frist).** `SearchOptions.deadline` ist optional. Bei Überschreitung liefert die Suche `DeadlineExceeded`. Es gibt nie ein verkürztes oder anders sortiertes Teilergebnis. Die Prüfung ist kooperativ an Traversierungsschritten.
-
-**REQ-SRC-5 (Trefferformat).** `chunk_id`, `doc_id`, `rev`, `score`, Provenienz ohne Quellpfad (nur bei Berechtigung), `signals`, optional Erklärung.
-
-**REQ-SRC-6 (Keine Abfragespur, ADR-37).** Der Suchtext und das Abfrage-Embedding werden nicht gespeichert, nicht geloggt und nicht gecacht. `MetricsSink` erhält nur Zähler, Dauern und Trefferzahlen.
-
-### 6.7 Kontext
-
-**REQ-CTX-1.** `assemble(response, TokenBudget) → ContextPack` wählt in Rangfolge bis zum Budget. Kürzung am Satzende. Quellen vollständig. Tokenzählung nach 6.1.
-
-**REQ-CTX-2.** `ContextPack` nennt verwendete Chunks und ausgelassene mit Grund (`Budget`, `Erased`, `Duplicate`, `Restricted`).
-
-**REQ-CTX-3 (Gate beim Zusammenstellen).** `SearchResponse` trägt die Gate-Sequenz. `assemble` prüft jeden Chunk erneut, wenn `gate_seq` inzwischen gewachsen ist.
-
-**REQ-CTX-4 (Duplikate, neu gefasst zu F-33).** Gleicher Inhalt aus mehreren Revisionen: nur die neueste Revision. Vergleich über den keyed Chunk-Digest `BLAKE3-keyed(K_ref, chunk_text)`. Ein unkeyed Hash über Inhalte wird nicht gespeichert.
-
-### 6.8 Fassade, Fehler und Schnittstellen
-
-**ContextraError (Port `ports::error`, einzige Fehlerart der öffentlichen API):** `Config(Vec<String>)`, `Refused(String)`, `Backpressure`, `DeadlineExceeded`, `NotFound`, `Erased`, `HistoryNotIndexed`, `SubjectSuppressed`, `ModelMismatch`, `IndexUnavailable`, `ReadOnly(Reason)`, `Quarantine(TenantId)`, `Integrity`, `Unsupported(&'static str)`, `Crypto` (ohne Unterscheidung nach außen, INV-6), `Io(ErrorKind)`.
-
-| Operation | Zweck | Berechtigung |
-|---|---|---|
-| `Contextra::open(config)` | Startsequenz (8.3) | Prozess |
-| `ingest(collection, SourceDoc, IngestOptions)`, `ingest_batch` | Aufnahme | Schreibrecht je Collection |
-| `search(SearchQuery)` | Hybridsuche mit Filter und optional `GraphMode` | Principals aus Konfiguration |
-| `assemble(SearchResponse, TokenBudget)` | Kontextpaket | wie Suche |
-| `get(doc_id, as_of?)` | Abruf, mit Gate | wie Suche |
-| `delete_document(doc_id)` | Normales Löschen mit Aufbewahrung (REQ-VER-4) | Schreibrecht |
-| `plan_erasure(ErasureRequest)` | Trockenlauf ohne Nebenwirkung (7.3) | `erasure_admin` |
-| `erase(ErasureRequest)` | Löschauftrag (Kapitel 7) | `erasure_admin` |
-| `erase_status(TicketId)` | Status nach 7.10 | `erasure_admin` |
-| `resolve_review(TicketId, seals: Vec<SealOrd>, Decision)` | Entscheidung bei Mehrbetroffenen | `erasure_admin`, bei `four_eyes` zweiter Admin |
-| `set_hold(scope, reason, until)` | Aufbewahrung, Legal Hold | `erasure_admin` |
-| `health()` | Zustand, Gründe, Zähler | Prozess |
-
-`remember`, `recall`, `forget` und der Query-Rewriter entfallen (REM-24, REM-25). Wer sie braucht, baut einen Adapter über `search` und `ingest`.
-
-**REQ-MCP-1.** Der MCP-Server bietet dieselben Operationen über stdio. Tool-Schemas werden aus den Fassadentypen erzeugt. Principals und Rollen kommen aus der Konfiguration (ADR-38). Es gibt keine Tier-Parameter. Fehlermeldungen für nicht eingebaute Backends nennen das Feature, das zu aktivieren ist. Löschoperationen sind nur mit `erasure_admin` aufrufbar, und die Konfiguration muss sie ausdrücklich freigeben (Standard aus).
-
-**REQ-SRV-1 (optional, M6).** `contextra-server` bietet HTTP/gRPC mit Authentifizierung (OIDC-Token, Prüfung gegen konfigurierte Schlüssel), bildet Claims auf Principals ab (Standard verweigern), exportiert Metriken im Prometheus-Format und begrenzt Anfragen über Backpressure. Eigenes Binary-Crate. Der Kern bleibt netzfrei.
-
-### 6.9 Datenschutzfilter am Ausgang
-
-**REQ-PRV-1.** Entity-Erkennung ist regelbasiert (Muster, Prüfziffern, Listen). Sie dient der Warnung bei Ingest und der Ausgabeprüfung. Unsicherheit wird als `Unclassified` markiert und führt nie zur automatischen Freigabe.
-
-**REQ-PRV-2.** Keine LLM-Klassifikation im Kern (ADR-24).
-
-**REQ-PRV-3 (Egress-Guard).** Jede Ausgabe über MCP, Server oder Export und jeder Aufruf des HTTP-Embedders läuft durch den Guard. Er arbeitet lokal, ohne E/A, fail-closed.
-
-**REQ-PRV-4 (Verarbeitungsregister).** Das Register (Art. 30 DSGVO) führt Zweck, Kategorien, Empfänger und externe Endpunkte. Es ist Konfigurationsdaten und kein Laufzeitnachweis.
-
-### 6.10 Entitätsgraph (`contextra-graph`, optional, neu)
-
-Dieses Kapitel ersetzt PLAN v2.1 des Crates und den Anhang der v4.0 (F-01 bis F-06, F-41, F-42).
-
-**REQ-GR-1 (Zweck).** Der Graph liefert Belege über Entitäten und Relationen, die Dokumente verbinden. Ausgabe sind Pfade mit Belegen (PathRAG), nicht nur Chunk-Listen. Er ist ein **abgeleiteter Index** (Klasse D, ADR-22). Die Quelle der Wahrheit bleiben die Seals.
-
-**REQ-GR-2 (Datenmodell).**
-- `EntityId`: 128 Bit, `BLAKE3-keyed(K_ref, typ_id ‖ normalisierter_name)`. Normalisierung: NFKC, Kleinschreibung, Leerraum zusammengeführt.
-- `typ_id`: Index in einem geschlossenen Vokabular der Collection (Konfiguration). Freie Typen sind `Refused`.
-- Entitäten tragen **Seal-Provenienz**: Menge der `SealOrd`, die sie nennen (sortiert, Obergrenze 64, darüber Bitmap).
-- Kanten: `(from, to, rel_typ_id, weight f32)`, Provenienz wie bei Entitäten. Relationstyp aus geschlossenem Vokabular.
-- Namen und Relationsbezeichnungen stehen **nur** als `GraphLabel`-Datensätze, verschlüsselt mit dem `DocKey` des Quell-Seals (ADR-23). Im Graph selbst liegt nie Klartext.
-- Zuordnung `chunk_slot → [EntityId]` für Belege (`mentions`).
-
-**REQ-GR-3 (Sichtbarkeit).** Eine Kante ist sichtbar, wenn mindestens ein Provenienz-Seal `Open` ist (ReadGate). Eine Entität ist sichtbar, wenn mindestens eine ihrer Provenienzen `Open` ist. Die Prüfung gilt je Kante beim Durchlaufen und erneut beim Materialisieren (K-05, Entscheidung (b)). Unsichtbare Kanten haben damit weder Expansion noch Ranking-Wirkung. Dadurch wirkt eine Löschung sofort, bevor der Scrub läuft.
-
-**REQ-GR-4 (Schreibpfad).** Graph-Änderungen gehören zum Schreibstapel (REQ-CON-6). Eine Revision, die superseded wird, entfernt die Provenienz ihres Seals im selben Stapel. Kanten mit leerer Provenienz werden tombstonet und im Scrub entfernt. Änderungen laufen als Delta-Segment (Art `graph_struct`). Basis-Segmente sind unveränderlich. Kompaktion des Deltas bei mehr als 10 % der Basis oder 1 Mio. Operationen, in einem Scrub-Stapel oder einem Schreibstapel.
-
-**REQ-GR-5 (Traversierung und PathRAG).**
-- Seeds: die Top-20 Chunks der Stufe-1-Fusion aus Vektor- und Textsignal (6.6, Schritt 4; K-06).
-- Entitäten der Seeds über `mentions`. Expansion per BFS bis `max_hops ≤ 3`, nur über sichtbare Kanten.
-- Deterministische Reihenfolge: Frontier nach `EntityId` aufsteigend.
-- Begrenzung: `max_expansions = 10.000` je Anfrage. Erreichte Grenze markiert das Ergebnis als `truncated`, sie ist kein Zeitbudget (REQ-TIM-3).
-- Pfadwert: `seed_score · Π(weight_e · 0,5^hop)`. Ausgabe: die Top-20 Pfade nach Wert, Tie-Break nach Pfadliste.
-- Belege je Pfad: Chunks aus `mentions` der Pfadentitäten, nur lebende Seals.
-
-**REQ-GR-6 (Scrub, ADR-27).** Die Scrub-Schritte für den Graph (7.6):
-1. Entitäten und Kanten ohne sichtbare Provenienz entfernen.
-2. Provenienzmengen toter Seals entfernen.
-3. `mentions` toter Chunk-Slots entfernen.
-4. Konsolidierung der Nachbarlisten. Neuaufbau ab 30 % toter Knoten.
-5. Neues Basis-Segment, alter `SegKey` nach Veröffentlichung vernichtet (ADR-31).
-
-**REQ-GR-7 (Zeitreise).** `as_of` auf Graph-Operationen ist `HistoryNotIndexed` (ADR-26).
-
-**REQ-GR-8 (Speicher).** Richtwert 96 Byte je Entität und 48 Byte je Kante ohne Labels. Limits je Collection: 5 Mio. Entitäten, 50 Mio. Kanten, Grad je Entität höchstens 512 (überzählige Relationen werden im Report als `Dropped` ausgewiesen).
-
-**REQ-GR-9 (Aktivierung und Gate).** Feature `graph` in `contextra-db` (Standard aus). Je Collection `graph = true`. Abnahme-Gate G-GRAPH (11.5). Wird es verfehlt, wird das Crate in M5 entfernt (REM-31), die Entscheidung ist mit Messung dokumentiert.
-
-**REQ-GR-10 (Was entfällt).** Hyperkanten, Relation-Suggest mit LLM, Community-Erkennung, Edge-Reinforcement, Agenten-DAG, bitemporale Felder, APPRH, TL-HFD, Percolation, Dense PPR, Forward-Push-PPR, `ConsistencyEnforcer`, Entitätsextraktion im Kern, `text_gen`. Liste in 12.4.
-
----
-
-## 7. Löschkette v4.1
-
-### 7.1 Ziele
-
-1. **Sofort unlesbar** nach bestätigtem Auftrag: Gate durabel, Lesen blockiert, Schlüssel vernichtet.
-2. **Ein Auftrag endet** in `Completed`, `Released`, `Refused` oder in einem benannten, fristgebundenen Rest.
-3. **Unauffällig im Betrieb:** Gate kostet im Suchpfad ein Bit und eine Endprüfung. Scrub läuft gebündelt, gedrosselt, unter der Priorität des Suchpfads.
-4. **Entkoppelt von der Versionierung** (Kapitel 4).
-5. **Keine Selbstbewertung** (ADR-02). Die Kette führt aus und protokolliert.
-
-### 7.2 Umfang eines Auftrags
+### 7.1 Überblick (Skizze, normativ in Semantik, nicht in Syntax)
 
 ```rust
-pub struct ErasureRequest {
-    pub scope: Scope,                       // Subject | Document | Collection | Tenant
-    pub reason: Reason,                     // Art17 | Withdrawal | Retention | Offboarding | Other
-    pub requester: PrincipalRef,            // muss erasure_admin sein (ADR-38)
-    pub urgency: Urgency,                   // Normal | Immediate
-    pub multi_subject: Option<MultiSubjectPolicy>,  // überschreibt Mandantenstandard
-}
-pub enum Scope {
-    Subject    { subjects: Vec<SubjectRef> },  // Aufrufer nennt die Betroffenen (keyed Tags werden berechnet)
-    Document   { doc: DocId },                 // alle Seals des Dokuments, auch retained
-    Collection { id: CollectionId },
-    Tenant,
-}
+let st = Storage::open(Config::new(Integrity::Plain), Env::real("/var/lib/app"))?;
+let admin: AdminCap = st.admin_cap().ok_or(...)?;     // genau einmal je Storage abrufbar
+// Typisierte Handles: Rd < Ap < Wr < Adm. Rechte lassen sich nur abschwächen.
+let facts: Space<Wr> = st.space("facts", SpaceOptions::default()
+                          .header_len(32).weights(2).separate_body(4096).prefix_filter(8))
+                          .weigher(my_weigher).open()?;
+let trace: Space<Ap> = st.space_append_only("trace", SpaceOptions::default().prefix_filter(8))?;
+let facts_adm: Space<Adm> = st.space_adm(&admin, "facts")?;
+let facts_ro: Space<Rd> = facts.read_only();
+
+let r: Receipt = st.apply(
+    Change::new()
+        .durability(Durability::Always)
+        .guard(Guard::absent(&idem, key_k))                          // Idempotenz
+        .guard(Guard::equals(&refs, b"main", old))                   // Compare-and-Swap
+        .guard(Guard::range_unchanged_since(&facts, KeyRange::prefix(b"a/"), s0))
+        .put(&facts, k, Value::new(header, body).domain(KeyDomain(42)))
+        .delete(&facts, k2)
+        .put(&refs, b"main", new))?;   // Err(Conflict{guard_index}) | Busy | Poisoned | Forbidden | Limit …
+
+let view = st.view();                                     // aktueller Stamp
+let old  = st.view_at(stamp)?;                            // nur ≥ Untergrenze (Views, Holds, Consumer)
+let e = view.get(&facts_ro, k)?;                          // Option<Entry>; e.header() ohne Körper-E/A, e.body()? lädt
+let es = view.get_many(&facts_ro, &keys)?;                // gebündelt über read_batch
+let bs = view.bodies(&entries)?;                          // Körper mehrerer Treffer, nach (blob_no, offset) sortiert und zusammengefasst
+for kv in view.scan(&facts_ro, KeyRange::prefix(b"a/"), Dir::Fwd)? { let (k, e) = kv?; }
+let page = view.scan_page(&facts_ro, KeyRange::prefix(b"a/"), Dir::Fwd,
+              PageLimit::weight(1, 6_000).bytes(256_000).entries(200),
+              Some(&my_filter), resume)?;                 // Page{ items, next: Option<ResumeToken>, oversized }
+let est  = view.estimate(&facts_ro, KeyRange::prefix(b"a/"))?;   // Estimate{ entries, bytes, weights[k], exact_weights }
+let hist = view.history(&facts_ro, KeyRange::prefix(b"a/"), StampRange::after(s0))?;
+
+let hold = st.hold(stamp, HoldOwner::new("branch/a1"), Some(Duration::from_secs(600)))?;
+let cons = st.consumer("vec-index", ConsumerOptions::max_lag_bytes(256 << 20))?;   // persistent
+cons.advance(applied_stamp)?;
+st.subscribe(listener);
+let q = st.erase(Erase::range(&facts_adm, KeyRange::prefix(b"subject/42/")).level(Physical)
+                      .views(ViewPolicy::wait(5.secs())).holds(HoldPolicy::Fail))?;
+st.erase_batch(vec![e1, e2, e3])?;                        // eine Flush-Barriere für mehrere Aufträge
+st.erase(Erase::domain(KeyDomain(42)))?;                  // nur nach Schlüsselvernichtung (§14.3)
+st.drop_space(facts_adm)?;
+st.checkpoint(dest_dir, CheckpointMode::Copy)?;
+st.verify(VerifyScope::Online)?;
+st.rotate_kek()?;                                         // O(1): schreibt nur KEYS neu (§15.2)
+st.hibernate()?; st.sync()?; st.close()?;
 ```
 
-| Scope | Wirkung |
+### 7.2 Eigenschaften
+
+- **Kein Teilzustand.** `apply` ist alles-oder-nichts.
+- **Rechte als Typen (SD-34).** `Change::put` akzeptiert nur `Space<Wr>` (bzw. `Space<Ap>` für append-only Spaces), `Erase`/`drop_space` nur `Space<Adm>`; `View::get/scan` jedes Handle. Eine Verletzung ist ein **Übersetzungsfehler**. Dynamische, delegierbare Berechtigungen (Macaroons, TTL) sind Sache der oberen Schicht, die abgeschwächte Handles ausgibt. `open_readonly` liefert nur `Rd`-Handles.
+- **Header-zuerst-Lesen.** `Entry::header()` kostet keinen Körperzugriff; `Entry::body()` lädt den Körper und prüft Prüfsumme/AEAD. Filter, Gewichte und Seitenbildung arbeiten ausschließlich auf Headern.
+- **`estimate`** summiert Einträge, Bytes und Gewichte aus den Index-Blöcken der Runs (Blockgranularität an den Rändern; zählt überschattete Versionen mit, ist also eine **obere Schranke**) und schätzt den Memtable-Anteil durch Abtasten (≤ 1 024 Einträge, `Weigher` ohne Sperre). Kosten O(Index), keine Datenblöcke. Weicht die `Weigher`-Version eines Runs ab, meldet `estimate` `exact_weights = false` und rechnet betroffene Runs über die Header nach.
+- **`history`** liefert alle Versionen (Puts, Deletes) mit Stamp in `(von, bis]`, gefiltert über `max_stamp` der Runs/Blöcke. Voraussetzung: Untergrenze ≤ `von`, sonst `Err(HistoryPruned{oldest_available})`.
+- **Seiten statt Offsets.** `scan_page` begrenzt nach Gewicht, Bytes und/oder Einträgen. Die Seite endet **vor** dem ersten Eintrag, der ein Limit überschreiten würde. **Fortschrittsgarantie:** Ist schon der erste Eintrag größer als ein Limit, wird er allein geliefert und `Page.oversized = true` gesetzt (kein Endlosschleifen-Risiko für Aufrufer). Die `ResumeToken` enthält `(space, last_key, stamp, range_hash, dir, chk)`; `chk` ist im Modus `Plain` CRC32C, sonst `Mac16` über den Token (A-4: Token sind nicht fälschbar). Bindung an **denselben Stamp** und **denselben Bereich**: ist der Stamp nicht mehr haltbar ⇒ `Err(Expired)`; passt der Bereich nicht ⇒ `Err(InvalidToken)`; nie eine stillschweigend andere Sicht.
+- **Konsumenten** sind persistent, zählen in die Untergrenze und werden bei Überschreiten von `max_lag_bytes` **verworfen** (nächster Zugriff `HistoryPruned`; die obere Schicht baut den Index neu). Der Rückstand wird als obere Schranke aus Run-Metadaten (Stamp-Bereiche und Bytes) und Redo-Länge geschätzt und von der Wartung alle `consumer_check_interval` geprüft; ein toter Indexbauer kann den Speicher damit nicht dauerhaft aufblähen.
+- **Strukturierte Fehler** mit handlungsleitendem, **datenfreiem** Text (§15.7, §7.7).
+- `Bytes` ist ein eigener, schlanker Typ (`Arc<[u8]>`-Ausschnitt mit `Deref<Target=[u8]>`), damit Blockdaten ohne Kopie geliefert werden.
+
+### 7.3 Durability
+
+`Durability::Always` quittiert nach `sync_data`; `Interval(d)` quittiert sofort mit `durable = false`, die `urgent`-Lane synchronisiert spätestens nach `d`; `Never` ist für Tests und Wegwerf-Instanzen. Redo ist ein gemeinsames Log: **ein `Always` in der Gruppe macht alle früheren Frames derselben Gruppe mit dauerhaft** (Präfix-Eigenschaft). `Storage::sync()` erzwingt. Die Quittung ist **nie** eine Aussage über andere Changes als den eigenen und seine Vorgänger im Log.
+
+### 7.4 Listener
+
+`subscribe(listener)` liefert `ChangeEvent { stamp, ops: [OpSummary{space, kind, key, header}] }` **nach** Durabilität und Sichtbarkeit, **in Stamp-Reihenfolge**, aus einem Dispatcher-Job ohne gehaltene Sperre (P-10). Körper werden nicht mitgeliefert (Abruf über `view_at(stamp)`). Die Warteschlange ist auf `listener_queue` Ereignisse begrenzt und jede Zustellung auf `listener_deadline`; läuft ein Listener über oder überschreitet er die Frist, wird er **abgemeldet** (nie blockiert der Dispatcher den Commit-Pfad; SD-62) und erhält beim nächsten Aufruf `ListenerLagged{missed_from}`. Er muss über `history` und seinen `Consumer` aufholen. Ereignisse sind höchstens-einmal nach einem Absturz; die Zustellgarantie **mindestens-einmal** ergibt sich nur über `Consumer` + `history`.
+
+### 7.5 Aufrufer-Erweiterungen
+
+- **`Weigher`:** rein, ohne Zustand außer `version()`; wird beim Run-Bau und bei `estimate`/`scan_page` aufgerufen, **nie** im Committer.
+- **`Filter`:** wird in `scan_page` **vor** dem Laden eines Körpers ausgewertet (Trust-Stufe, Gültigkeitszeit, Typ). Gefilterte Einträge zählen nicht gegen das Limit.
+- **`CompactionFilter`:** siehe §12.2. **`Extension`:** siehe §12.4.
+- Alle laufen ohne gehaltene Sperre und hinter `catch_unwind` in Wartung/Listenern (F-12). In `scan_page` führt eine Panik zu `Err(CallerPanic)`.
+
+### 7.6 Operationsmatrix: Was sich aus den Primitiven bauen lässt
+
+| Fähigkeit der oberen Schicht | Gebaut aus |
 |---|---|
-| `Subject` | Alle Seals mit passendem Betroffenen-Tag (Registry, 5.7). Bezeichner ohne Tag laufen über die Entdeckung (7.3), nicht automatisch. |
-| `Document` | Alle Seals des `DocId` aus `doc/`, ohne den Versionskatalog zu lesen. |
-| `Collection` | Alle Seals der Collection. Bei K-Collections Segmentersatz, bei P-Collections Schlüsselvernichtung. |
-| `Tenant` | **O(1) in der Schlüsselarbeit:** Anker ohne KEK-Einträge neu schreiben, dann `destroy_tenant`. Mandant wird im Gate als `tenant_erased` markiert, dadurch sind alle Lesevorgänge `Erased`. Verzeichnis-Entfernung danach asynchron. |
+| Referenz-Update mit Wiederholungssicherheit | `Guard::equals` auf Ref + `Guard::absent` auf Idempotenzschlüssel in **einem** `Change` |
+| Mehrere Tabellen, Index, Ref atomar | ein `Change` über mehrere Spaces |
+| Serialisierbare Sitzungen | `view_at(base)` + `Guard::unchanged_since` / `range_unchanged_since` |
+| Zeitreise bis Stamp | `view_at` + `Hold` mit Ablauf und Eigentümer |
+| Konsistenter Lesezugriff über Index und Daten | eine `View` über alle Spaces |
+| Abgeleitete Indizes folgen Änderungen und holen auf | `subscribe` + `Consumer` + `history` |
+| Datenschutz-Löschung eines Subjekts | `Erase::range` (§14) **oder** Vernichtung des Domänenschlüssels (§15.3) |
+| Mandant/Repository löschen | `drop_space` oder Instanz-Verzeichnis nach Schlüsselvernichtung löschen |
+| Backup, Test-Klon | `checkpoint` |
+| Token-/byte-budgetiertes Paketieren | `estimate` zur Planung, `scan_page` zur Auslieferung, `bodies` zum Nachladen, `ResumeToken` zur Fortsetzung |
+| Manipulationsarme Episoden-/Audit-Protokolle | append-only Space (+ Modus `Authenticated`) |
+| Zusammen Gebrauchtes liegt nebeneinander | Cluster-Präfix im Schlüssel, `prefix_filter`, `locality_prefix` |
+| Vertrauens-/Zeitfilter auf 10⁵ Kandidaten | `Filter` auf den Header (Trust, Gültigkeit, Typ) |
+| Vergessen/Verkürzen (Ablauf, „Zoom-Down“) | `CompactionFilter` (§12.2) |
+| Branches/Versuche (Stufe A, Overlay) | Overlay-Space + `Hold` (Eigentümer) + `range_unchanged_since` + `history` |
+| Zusätzliche Run-Indizes (Volltext, Zähler) | `Extension`-Blöcke (§12.4) |
+| Vektorgraphen, große Indizes | `Segment`-Dateien + `Consumer` (§12.5) |
+| Arbeitsgedächtnis ohne Disk | `ephemeral`-Space |
+| Dauerhafte Idempotenzschlüssel mit Ablauf | Space mit `CompactionFilter` (TTL im Header) |
 
-**Unterdrückungsliste (`ErasedSubj`).** Enthält die Betroffenen-Tags gelöschter Betroffener (16 Byte keyed). Sie verhindert die Wiederaufnahme (REQ-ING-7). Sie wächst nur. Sie steht im Gate-Snapshot (7.8).
+**Space-Budget:** Jeder Space hat eigene Memtable, ein eigenes Run-Verzeichnis und hält über das gemeinsame Redo den langsamsten Space fest (`redo_lag_bytes`). **Faustregel ≤ 12 Spaces je Instanz.** Mandanten sind keine Spaces. Eine `remember`-Operation einer oberen Schicht ist ein `Change` über wenige Spaces (Kopf+Körper, Idempotenz, Kanten), atomar und wiederholungssicher.
 
-**ADR-38 (Berechtigung).** Löschoperationen verlangen einen Principal mit `erasure_admin`, der in der Konfiguration steht. Der Standard lässt niemanden zu. Fehlende Berechtigung ist `Refused` und wird im Ledger als Versuch vermerkt.
+### 7.7 Fehler
 
-### 7.3 Trockenlauf und Entdeckung
+Ein einziges `Error`-Enum (kein `Storage(String)`). Jeder Fehler hat `code()` (stabil), `retryable()`, strukturierte Felder und `hint()`: kurzer, handlungsleitender, **datenfreier** Text, lesbar für Menschen und Sprachmodelle. Beispiele: „Space ‚trace‘ ist append-only; Schlüssel existiert bereits. Neuen Schlüssel wählen.“ — „Stamp 880 nicht mehr verfügbar; älteste verfügbare Sicht: 1 012.“
 
-**REQ-ER-1 (`plan_erasure`).** Ohne Nebenwirkung. Der Bericht nennt: Anzahl Seals je Klasse, Anzahl Chunks, Anzahl Dokumente mit weiteren Betroffenen (nur Anzahl), Aufbewahrungs- und Hold-Treffer (Anzahl und Grund), undeklarierte Treffer aus der Entdeckung (Anzahl). Nie Kennungen, nie Inhalte.
-
-**REQ-ER-2 (Klassifikation, neu gefasst zu F-17).** Jeder Seal des Auftrags wird genau einer Klasse zugeordnet, in dieser Reihenfolge: Treffer der Entdeckung ohne Deklaration fallen nach `undeclared_hits` (Standard `Restrict`, D3) in Klasse Undeclared. Solange diese Seals nicht gelöscht sind, ist das Ergebnis des Auftrags `Partial` mit Anzahl und Grund (K-07).
-
-| Klasse | Bedingung | Weiterer Weg |
+| Variante | Bedeutung | `retryable` |
 |---|---|---|
-| **Hold** | Aufbewahrungspflicht oder Legal Hold aktiv | `Refused` für diesen Seal, Ledger-Eintrag |
-| **Review** | Seal hat deklarierte Betroffene, die **nicht** alle im Auftrag stehen (ADR-10) | `Restricted(MultiSubject)` |
-| **Erase** | Alle deklarierten Betroffenen des Seals stehen im Auftrag. Keine Hold-Bedingung. | Gate und Vernichtung |
-| **Undeclared** | Treffer der Entdeckung ohne Deklaration | Standard `Report`, Mandantenoption `Restrict` |
-
-Ein Seal ohne deklarierte Betroffene und ohne Auftrag „Collection“ oder „Document“ kann nicht in Klasse Erase fallen, wenn der Scope `Subject` ist.
-
-**REQ-ER-3 (Entscheidung).** `resolve_review(ticket, seals, Decision)` mit `DeleteAll`, `Release` (Einschränkung aufheben) oder `RedactReingest(spans)`. Bei `four_eyes = true` muss der Entscheider vom Antragsteller verschieden sein und `erasure_admin` sein. Erinnerungen und Eskalation: 7.5.
-
-**REQ-ER-4 (RedactReingest).** Aus den angegebenen Spannen wird eine bereinigte Fassung erzeugt und über den normalen Ingest als **neue Revision mit neuem Seal** geschrieben. Erst nach deren Commit wird der alte Seal vernichtet. Dazwischen ist der alte Seal `Restricted`. Die Versionierung sieht nur eine reguläre neue Revision.
-
-### 7.4 Ablauf
-
-Jeder Schritt ist idempotent. Das Löschlog ist die Wahrheit. Die Reihenfolge ist fest: **Gate, Schlüssel, Arbeitsspeicher, Scrub**.
-
-| Schritt | Ausführender | Inhalt | Dauerhaft ab | Zustand danach |
-|---|---|---|---|---|
-| **E0 Annahme** | Tenant-Koordinator | Berechtigung prüfen (ADR-38), Ticket, Log `Requested` (fdatasync). Gleicher Scope → bestehendes Ticket | Log | `Requested` |
-| **E1 Gate** | Tenant-Koordinator, unter dem **Erasure-Lock** des Mandanten | Klassifikation (7.3). Log `Gated`/`Restrict` für alle Seals. fdatasync. Gate-Datei atomar ersetzen (`tmp → fdatasync → rename`). `ArcSwap`-Publikation. Registry-Zustand `Gated`. LiveMask-Änderungen an die Shards senden (Warteschlange mit Grenze). | Log, Gate-Datei | `Gated` |
-| **E2 Schlüssel** | Tenant-Koordinator über `KeyDestroyer` | Für Klasse Erase: Schlüsselcache-Lock (REQ-KEY-4), `SealScoped`-Invalidierung, `DestroyIntent` durabel schreiben, Slots überschreiben, ein fdatasync je Stapel, Registry `KeysDestroyed`. Routen-erhaltender Scrub der SQ8-Codes im Speicher (REQ-VEC-5). Log `KeysDestroyed`. | KeyTable, Log | `KeysDestroyed` |
-| **E3 Scrub** | Scrub-Scheduler, Ziele über `ScrubTarget` | Gebündelt nach 7.6. Neue Segmente veröffentlichen, dann alte `SegKey` vernichten (ADR-31). Log `Scrubbed` je Ziel. | Manifest je Teilschritt | `Scrubbing` |
-| **E4 Abschluss** | Tenant-Koordinator | Registry-Minimalform, Log `Completed`, Status. Überschreitet E3 `scrub_deadline`: Kennzeichen `Overdue`, Alarm über `MetricsSink`, weiterer Versuch. | Log | `Completed` |
-
-**Publikationsreihenfolge (F-21, verbindlich).** Für einen Schreibstapel: (1) Store-WAL mit Gruppen-Commit, (2) Segmente und Index-Dateien mit fsync, (3) Versionskatalog, (4) Registry, (5) Snapshot-Tausch für Leser. Für eine Löschung: (1) Gate-Log, (2) Gate-Datei, (3) Gate-Publikation, (4) Schlüsselvernichtung, (5) Scrub-Publikation je Segment, (6) Vernichtung des alten Segmentschlüssels.
-
-**INV-2 (Sichtbarkeit).** Ab `Gated` liefert kein Lesepfad Klartext des Seals. Ab `KeysDestroyed` gibt es keinen entschlüsselbaren Seal-Datensatz. Segmentschlüssel bleiben bis zum Scrub-Neuschreiben erhalten (ADR-31, 7.9).
-
-**INV-3 (Sperre bleibt).** Eine durable Sperre wird nie aufgehoben, außer durch `Restricted → Released`. Ein Löschauftrag kehrt nie in `Restricted` oder `Released` zurück.
-
-**REQ-ER-5 (K-Klasse).** Bei K-Collections gibt es keinen Seal-Schlüssel. E2 entfällt. E3 ersetzt die betroffenen Segmente. Der Ledger vermerkt `no_key_destruction`.
-
-**Begründung der Reihenfolge (ADR-03, ADR-31).** Seal-Nutzdaten (Text, Vektor, Original, Labels) liegen je Seal verschlüsselt. Abgeleitete Strukturen (Postings, Graph, HNSW) sind segmentweise verschlüsselt, ihre Segmente mischen aber lebende und tote Seals. Deshalb ist der Segmentschlüssel erst nach dem Neuschreiben vernichtbar. Die Gate-Sperre deckt das Restfenster ab.
-
-### 7.5 Zustandsautomat
-
-```
-Requested → Gated → KeysDestroyed → Scrubbing → Completed
-Requested → Restricted{grund, bis}              reversibel (Art. 18, Review)
-Restricted → Gated                              Eskalation zur Löschung
-Restricted → Released                           terminal
-Requested → Refused                             Aufbewahrungspflicht, terminal
-jeder nicht-terminale Zustand → Pending{grund} → Fortsetzung
-```
-
-Terminal: `Completed`, `Released`, `Refused`. Gründe für `Pending`: `DiskReserveLow`, `IoBackoff`, `ScrubRetry`, `AwaitReview`.
-
-**REQ-ER-6 (Fristen für Review, neu gefasst zu F-30).** `Restricted` ist kein stabiler Endzustand. Erinnerung nach `review_remind_after` (14 Tage), Eskalation nach `review_escalate_after` (30 Tage): Ledger-Eintrag, Metrik, Status `Overdue`. Keine automatische Löschung und keine automatische Freigabe. Der Status ist für den Verantwortlichen sichtbar, die Entscheidung liegt bei ihm. Die Frist ist der Pflichtschalter `restricted_max_age` (D1, K-08): Ohne Wert startet Contextra nicht. Bei Ablauf wechselt der Auftrag in `Overdue`, der Ledger-Eintrag wird geschrieben. Es gibt keine automatische Löschung und keine automatische Freigabe.
-
-### 7.6 Gebündelter Scrub
-
-**REQ-SCR-1 (Fenster).** Der erste Auftrag startet ein Fenster `scrub_window` (Standard 10 Minuten). Am Ende oder bei `scrub_batch_max_seals` (Standard 10.000) läuft **ein** Stapel über alle bis dahin angefallenen Seals. `Urgency::Immediate` startet den Stapel sofort.
-
-**REQ-SCR-2 (Frist).** `scrub_deadline` (Standard 24 Stunden ab `Gated`) ist die Obergrenze für E3. Mindestwert 15 Minuten.
-
-**REQ-SCR-3 (Inhalt eines Stapels).** Je Ziel genau ein Neuschreiben je betroffenem Segment pro Stapel.
-- **Textindex:** Segmente mit toten Seals ohne deren Postings neu schreiben. `df` neu berechnen (F-25).
-- **Vektorindex:** Konsolidierung (REQ-VEC-5), Neuschreiben von `vector_struct` und `vector_code` ohne tote Knoten.
-- **Graph:** REQ-GR-6.
-- **Store:** Records toter Seals (`ChunkText`, `VectorFull`, `DocBlob`, `SealedMeta`, `GraphLabel`) werden per Kompaktion entfernt. Standard `compaction_after_erase = true` (Begründung 7.9).
-- **Registry:** Einträge toter Seals auf Minimalform kürzen (Ordinal, Zustand `Erased`, Zeitpunkt). Betroffenen-Index bereinigen. Ordinale werden nie wiederverwendet.
-- **Zwischenspeicher:** `SealScoped` ist in E2 bereits gelaufen, im Stapel nochmals.
-
-**REQ-SCR-4 (Ressourcen).** `scrub_threads` (Standard 2), `scrub_io_limit` (Standard 64 MiB/s, über `Clock` gedrosselt, REQ-TIM-2). Der Scrub pausiert, solange der p95-Wert des Latenzfensters (ADR-43) über `scrub_pause_p95_ms` liegt (Standard 40 ms bei S). Die Frist hat Vorrang: Nach Ablauf von `scrub_deadline` läuft der Scrub weiter, unabhängig von der Latenz. Die Pause beeinflusst nur den Zeitpunkt, nie ein Suchergebnis.
-
-**REQ-SCR-5 (Fehler).** Ein Fehler führt zu `Pending{ScrubRetry}` mit exponentiellem Backoff (1 s bis 1 h), Alarm über `MetricsSink` und Ledger-Eintrag. Ein Fehler im Scrub gefährdet nie bereits erreichte Zustände, insbesondere nicht die Gate-Sperre.
-
-### 7.7 Wiederanlauf
-
-**REQ-REC-1.** Der Start spielt das Löschlog vor dem Öffnen der Lesepfade eines Mandanten ab (C3, 8.3).
-
-| Zustand beim Start | Aktion |
-|---|---|
-| `Requested` | E1 erneut auswerten |
-| `Gated` | ab E2 fortsetzen |
-| `KeysDestroyed` | ab E3 fortsetzen |
-| `Scrubbing` | Stapel fortsetzen |
-| `Pending{…}` | beim nächsten Takt aufnehmen |
-| `Restricted` | Sperre erhalten, Review-Fristen fortführen |
-
-**REQ-REC-2 (Slot-Regeln, neu gefasst zu F-29).** Ein Slot wird beim Start nach dieser Tabelle bewertet: Bei `Destroyed` aus einem Intent wird E2 für den Slot wiederholt (K-03).
-
-| CRC des Slots | Log enthält `DestroyIntent` oder `KeysDestroyed` für dessen Seal oder Segment | state | Ergebnis |
-|---|---|---|---|
-| gültig | – | 2 | `Destroyed` |
-| gültig | – | 0 oder 1 | wie gespeichert |
-| ungültig | ja | beliebig | `Destroyed` (Vernichtung war im Gang, die Teilschreibung ist nach AEAD nicht entschlüsselbar) |
-| ungültig | nein | beliebig | `Integrity`, Quarantäne des Mandanten |
-
-Der Slot ist 128 Byte und liegt auf 128-Byte-Grenzen (ADR-29). Eine Teilschreibung innerhalb eines Sektors ist daher nicht möglich, solange Sektoren atomar sind. Die Tabelle gilt trotzdem für Geräte, die das nicht garantieren.
-
-**INV-4.** Eine durable Sperre geht nie verloren. Die Zustände `Gated` und `KeysDestroyed` überleben jeden Absturz.
-
-### 7.8 Löschlog `CXEL` und Gate-Snapshot `CXGS`
-
-**Löschlog `CXEL` (`erasure/erasure.cxel`).**
-
-Dateikopf: Magic `CXEL` (4), Version u16, Tenant-ID (16), CRC32C (4).
-
-Datensatz:
-
-```
-[len u32 LE][seq u64 LE][ticket 16][op u8][payload n][mac 16][crc32c u32 LE]
-```
-
-`len` zählt die Bytes von `seq` bis einschließlich `mac`, ohne `len` und `crc32c`. Die CRC deckt dieselben Bytes ab. `mac` ist HMAC-SHA256 über `seq` bis `payload`, gekürzt auf 16 Byte, mit `K_log` aus dem Anker (D9, H-22).
-
-Op-Codes: 1 `Requested`, 2 `Gated`, 3 `KeysDestroyed`, 4 `ScrubQueued`, 5 `Scrubbed`, 6 `Restrict`, 7 `Release`, 8 `Refuse`, 9 `Pending`, 10 `Completed`, 11 `Hold`, 12 `Retire`, 13 `TenantErased`, 14 `RestoreReapplied`, 15 `AuthDenied`.
-
-Lesen: Sequenzlücken und CRC-Fehler sind `Integrity`, außer im letzten Datensatz am Dateiende (abgeschnittener Schreibvorgang). Diesen Rest schneidet der Start ab und vermerkt das im Log.
-
-**Gate-Snapshot `CXGS` (`erasure/gate.cxgs`).**
-
-Kopf: Magic `CXGS`, Version u16, Tenant-ID, `seq u64`, `tenant_erased u8`. Körper: `erased` als RoaringBitmap (portable Kodierung), `restricted` als Liste `(seal u32, reason u8, until_ms i64)`, `suppression` als Liste 16-Byte-Tags. Trailer: CRC32C.
-
-Schreiben: `tmp → fdatasync → rename → fsync(Verzeichnis)`. Bei 10.000 Einträgen in Log oder wöchentlich.
-
-**REQ-GATE-1 (Veröffentlichung).** Gate-Log durabel, Gate-Datei atomar, dann `ArcSwap`. Leser greifen über `load()` zu. Schlägt `fdatasync` fehl, bleibt der alte Snapshot gültig, der Shard geht in `ReadOnly` (`FsyncFailed`), und ein Löschauftrag wird mit `Refused(ReadOnly)` abgelehnt statt angenommen (K-01, D2). `Quarantine` tritt bei Gate-Log-Fehlern nicht ein (K-02). Nach dem durablen Log-Eintrag setzt der Prozess die Lesesperre im Speicher, bevor die Antwort an den Aufrufer geht. Diese Sperre ist nicht durabel und gilt bis zum Neustart mit Rekonstruktion des Gate-Snapshots aus dem Log (C3).
-
-**REQ-GATE-2 (Prüfreihenfolge).** `tenant_erased` vor `erased`, `erased` vor `restricted`. `Restricted` liefert nur mit Audit-Eintrag, im Standard gar nicht (`restricted_read = Deny`).
-
-### 7.9 Ehrliche Grenzen und Restfenster
-
-Diese Grenzen gelten unabhängig von der Implementierung und stehen im Betriebshandbuch. Sie werden nicht zur Laufzeit gemessen.
-
-| Restform | Ort | Obergrenze | Wer kann sie lesen |
-|---|---|---|---|
-| Seal-Klartext | Speicher, Platte | 0 nach E2 | niemand (Schlüssel vernichtet) |
-| Segmentinhalte toter Seals | Segment, verschlüsselt mit `SegKey` | bis Neuschreiben im Scrub, ≤ `scrub_deadline` (24 h) | Prozess mit `SegKey`. Gate blockiert Lesen. |
-| SQ8-Codes toter Knoten | Arbeitsspeicher | 0 nach E2 (routen-erhaltend) | niemand |
-| Graphstruktur toter Knoten | Delta-Segment | bis Scrub, ≤ `scrub_deadline` | wie Segmentinhalte |
-| Kopien in Checkpoints | Kopie des Datenverzeichnisses | bis Rotation, `checkpoint_retention` (Standard 7 Tage) | Restore mit Schlüsselspur (ADR-42) |
-| Schlüsselsicherung | Sicherungsmedium | `key_backup_max_age` (Standard 30 Tage) | Restore mit altem Schlüssel, Pflicht zu REQ-BAK-3 |
-| Auslagerung, Core-Dump | Swap, Speicherabbild | verhindert durch mlock und `PR_SET_DUMPABLE = 0` (ADR-41) | nur mit Root-Zugriff auf das Gerät |
-| Externe Ausleitung | Systeme außerhalb | nicht durch die Software kontrollierbar | nicht zuzuordnen |
-
-Weitere Grenzen:
-- **Überschreiben ist eine Annahme.** Auf Copy-on-Write-Dateisystemen und Flash hat das Überschreiben eines Slots keine verlässlich nachweisbare physische Wirkung. Die KEK-Rotation (REQ-KEY-5) begrenzt den Zeitraum. Mit K3 (Vault Transit) ist die Vernichtung der KEK im KMS die tragende Maßnahme.
-- **Kompaktion des Store (ADR-31, REQ-SCR-3).** Ciphertext ohne Schlüssel ist kryptografisch entfernt. Die Kompaktion entfernt ihn zusätzlich, damit keine Kopie stehen bleibt, die ein späterer Schlüssel-Fehler freilegen könnte. Das ist die Begründung für `compaction_after_erase = true`.
-- **Nicht deklarierte Mitbetroffene** werden nur über die Entdeckung gefunden, nie automatisch zugeordnet.
-- **Rechtliche Einordnung** der Schlüsselvernichtung als Löschung trifft der Verantwortliche (ADR-45).
-
-### 7.10 Ledger und Status
-
-**REQ-LED-1.** `ledger.jsonl` (nur anhängen, eine JSON-Zeile je Ereignis): `ts` (RFC 3339, UTC), `ticket`, `op`, `scope_kind`, `counts {erase, review, hold, undeclared, keys_destroyed, segments_rewritten}`, `requester_ref`, `decider_ref`. Betroffene erscheinen nur als `subject_ref_hash = BLAKE3-keyed(K_ref, SubjectRef)`. Keine Namen, keine Inhalte, keine Dateinamen.
-
-**REQ-LED-2 (`erase_status`).** Liefert `state`, Zeitstempel je Schritt, Zahlen je Klasse, offene Reste (`scrub_pending: seals, segments, deadline`), `overdue`, `review_age_days`. Der Status beschreibt **ausgeführte Operationen**, nie gemessene Eigenschaften.
-
-**REQ-DOC-2 (Formulierungen).** In Dokumentation, Oberflächen, Statustexten und Werbung gelten keine Aussagen wie „vollständig gelöscht“, „garantiert“, „unwiederbringlich“, „DSGVO-konform“, „zertifiziert“ (ADR-45). `tools/doc_lint.py` prüft das in CI.
-
-### 7.11 Datensicherung und Wiederherstellung
-
-**REQ-BAK-1 (zwei Spuren, neu gefasst zu F-35).** Datensicherungen des Datenverzeichnisses enthalten Chiffrat ohne `keys/` und ohne `erasure/` (ADR-42). Schlüsselsicherungen sind eine eigene Spur (`contextra key backup`): `keys/keytable_seal.cxkt`, `keys/keytable_seg.cxkt` und `keys/anchor.cxan`. Der Zeitstempel steht im Sicherungsmanifest `manifest.json` (`created_at`, Hash je Datei, Tenant-ID), nicht im Kopf der Formate; `CXKT` und `CXAN` bleiben unverändert (K-15). `key_backup_max_age` (Standard 30 Tage) begrenzt die Gültigkeit. Abgelaufene Sicherungen werden beim Restore verweigert.
-
-**REQ-BAK-2 (Senke, Pflicht bei Löschungen, K-16).** `erasure.sink` ist ein Port `ErasureSink` (Datei außerhalb von `data_dir`, Objektspeicher mit Aufbewahrungssperre, Syslog). Der Tenant-Koordinator hängt `Gated`- und `KeysDestroyed`-Einträge nach `fdatasync` des Löschlogs an die Senke an, asynchron mit begrenztem Rückstand (`sink_max_lag`, Standard 60 s, Alarm bei Überschreitung). Zusätzlich gehen `ErasedSubj`-, `Restricted`- und `tenant_erased`-Ereignisse in die Senke, damit ein Restore sie rekonstruieren kann (K-16).
-
-**REQ-BAK-3 (Restore-Schritt).** `contextra restore --reapply` liest die Senke, vernichtet in der wiederhergestellten KeyTable alle dort als zerstört geführten Seals und Segmentschlüssel erneut, schreibt `RestoreReapplied` ins Ledger und stößt den Scrub an. Erst danach öffnen Lesepfade.
-
-**REQ-BAK-4 (Erkennung).** Ist die Senke weiter als das lokale Löschlog (höhere Sequenz), erkennt der Start einen Restore und verlangt REQ-BAK-3. Ohne Senke ist ein Restore nicht erkennbar. Für Mandanten mit Löschungen ist ein Restore ohne Senke `Quarantine`, bis `contextra restore --reapply` ausgeführt ist (K-16). Der Betriebsablauf führt `--reapply` nach jedem Restore aus. Der frühere Schalter `restore_without_sink` entfällt (K-16).
-
-**REQ-BAK-5 (Aufbewahrungshorizont).** `key_backup_retention ≥ restore_horizon`, und die Senke deckt mindestens `restore_horizon` ab. Die Prüfung erfolgt in C0.
-
-### 7.12 Aufbewahrung und Einschränkung
-
-**REQ-RET-1.** Einschränkung (Art. 18, `Restricted`) und Löschung (Art. 17) sind getrennte Pfade. `Restricted` wird vor `Gated` entschieden und ist keine Rücknahme eines Löschauftrags.
-
-**REQ-RET-2.** `set_hold(scope, reason, until)` blockiert E1 für betroffene Seals (Klasse Hold, 7.3). Gesetzliche Aufbewahrungsfristen können je Collection als Regel hinterlegt sein. Ein Auftrag gegen gehaltene Seals wird für diese Seals `Refused` und im Ledger vermerkt.
-
-### 7.13 Verdrahtung in `contextra-db`
-
-Der Tenant-Koordinator ist eine Komponente von `db`. Er hält den Erasure-Lock, die Verweise auf `KeyDestroyer`, `ReadGate` (Impl. `erasure`), `ContentLifecycle` (Empfänger), `ScrubTarget` (Ziele aus `vector`, `text`, `graph`, `store`) und `ErasureSink`. Er ist die einzige Stelle, die diese Ports zusammenführt (ADR-32).
+| `Conflict{guard_index}` | Vorbedingung nicht erfüllt | nein (neu lesen) |
+| `Busy{retry_after, reason}` | Gegendruck, `StorageFull`, Governor | ja |
+| `Poisoned{cause}` | `fsync`-/E/A-/`LockPoison`-Fehler, Instanz vergiftet | nein (Neustart) |
+| `Corrupt{file, offset, what}` | Prüfsumme/Struktur falsch | nein |
+| `Erased{range, erased_at}` | Zugriff unterhalb eines Löschstamps | nein |
+| `Shredded{domain}` | Körper einer vernichteten Schlüsseldomäne | nein |
+| `Revoked` | View widerrufen | nein |
+| `HoldBlocked{holds}` / `Blocked{views}` | Löschung durch Halteregel blockiert | ja (nach Freigabe) |
+| `KeyStillPresent{domain}` | `Erase::domain` bei noch vorhandenem Schlüssel | nein (Schlüssel zuerst vernichten) |
+| `Limit{what, max}` | Schlüssel/Wert/Change zu groß | nein |
+| `Forbidden{space, op}` | Operation im Space nicht erlaubt | nein |
+| `Config{what}` | Konfiguration widerspricht Space-Optionen/Format | nein |
+| `Expired` / `InvalidToken` | `ResumeToken` oder Stamp nicht mehr haltbar / falsch gebunden | nein (neu beginnen) |
+| `HistoryPruned{oldest_available}` | Verlauf unterhalb der Untergrenze, verworfener Consumer | nein |
+| `ListenerLagged{missed_from}` | Listener-Warteschlange übergelaufen | nein (aufholen) |
+| `CallerPanic{what}` | Panik in Aufrufer-Code | nein |
+| `Rolledback{expected, found}` | Rollback-Anker verletzt (§15.5) | nein |
+| `Unsupported{feature}` | Pflicht-Feature oder Modus unbekannt/abweichend | nein |
+| `Locked`, `Closed`, `NotFound`, `Exhausted`, `Io(kind)` | | je nach Fall |
 
 ---
 
-## 8. Betrieb
+### 7.8 Stabile Flächen für aufsetzende Schichten (semver-stabil, SD-52)
 
-### 8.1 Zustände je Shard und Mandant
+Diese Flächen sind **Vertrag**. Der Kern implementiert sie vollständig; aufsetzende Schichten bauen darauf, ohne in den Kern greifen zu müssen. Jede Fläche hat einen Konformitätstest in `testing::conformance`.
 
-| Zustand | Lesen | Schreiben | Löschen | Ursache |
-|---|---|---|---|---|
-| `Ready` | ja | ja | ja | Normalbetrieb |
-| `ReadOnly{grund}` | ja, letzter Snapshot | nein | Löschauftrag wird mit `Refused(ReadOnly)` abgelehnt; er ist nach Rückkehr neu zu stellen | `FsyncFailed`, `NoSpace`, `IoError` bei Datenschreibvorgängen |
-| `Rebuilding` | nein (`IndexUnavailable`) | ja, in den Store | ja | Index-Segment nicht lesbar (REQ-IDX-REBUILD) |
-| `Quarantine` | nein | nein | nein | Löschlog, Gate oder KeyTable inkonsistent, Integrität verletzt |
-| `Refused` | nein | nein | nein | Start verweigert (Konfiguration, Format, Schlüssel, mlock) |
+**7.8.1 Transaktionsbausteine.** `view_at(stamp)` + `Guard::unchanged_since`/`range_unchanged_since` ersetzen Lesemengen und Validierung. Zusätzlich: `View::stamp()`, `Storage::visible_stamp()`, `Storage::durable_stamp()`, `Receipt{stamp, durable}`. Der Kern führt **keine** Lesemenge, keine Transaktionskennung und kein Rollback; ein verworfener Versuch ist ein nicht eingereichter `Change`. Verschachtelte Rücknahme (Teilziele) ist Sache der oberen Schicht (Overlay-Space, Anhang C).
 
-Der Zustand gilt je **Shard**, mit Ausnahme von `Quarantine`. Ein Fehler in einem Shard stoppt die anderen nicht. Ist das Löschlog oder die KeyTable eines Mandanten inkonsistent, gilt `Quarantine` für alle Collections dieses Mandanten.
+**7.8.2 Holds und Checkpoints.** `hold(stamp, owner, ttl)` ist flüchtig (Registry). `hold_durable(stamp, owner, ttl) -> HoldId` schreibt `hold_set` per Edit und überlebt Neustarts; `hold_drop(id)`, `holds(owner_prefix) -> Vec<HoldInfo>`. Dauerhafte Holds zählen in die Untergrenze (§10.3), werden bei der Recovery wiederhergestellt und von der Wartung nach Ablauf entfernt. `checkpoint(dest, mode)` (§12.8) liefert den konsistenten Stand; **benannte** Checkpoints, Verzeichnis über mehrere Komponenten und Wiederherstellung sind außerhalb (NZ-17). Wiederherstellung = Öffnen des Zielverzeichnisses als eigene Instanz (§15.2, Epoche).
 
-**INV-5.** Ein Schreib-, Lösch- oder `fsync`-Fehler führt zu `ReadOnly`. `Quarantine` tritt nur bei Integritätsverletzung in Löschlog, Gate oder KeyTable ein (Prüfsumme, Format, Widerspruch), nie bei reinem Schreibfehler.
+**7.8.3 Segmente.** `Segment` ist eine Datei der oberen Schicht mit **Kern-Rahmen** (SD-54, §12.5): `SegmentWriter` (über `Fs`, `.building`, Blöcke mit Prüfwert/AEAD je Modus, Siegel-Footer) und `SegmentReader` (`read_at`, Blockprüfung, optional `read_batch`). Der Kern kennt weder Inhalt noch Zerlegung der Blöcke; das 16-Byte-`reference` (Datenstand-Anker, z. B. Stamp-Tupel) ist opak. Besitzer können Segmentinhalte direkt aus dem Rahmen lesen, ohne `mmap` (NZ-7).
 
-**REQ-OPS-1 (Rückkehr).** `ReadOnly → Ready` erfolgt ohne Neustart nach bestandener Strukturprüfung und einem erfolgreichen Probeschreibvorgang. `Quarantine → Ready` erfordert einen Neustart mit bestandener Prüfung von Log, Gate und KeyTable. Übergänge stehen im Ledger und im Health-Bericht.
+**7.8.4 Lösch-Beobachtung.** `Receipt` von `erase` ist serialisierbar und stabil (`ErasureReceipt`, §14.3 E7). Zusätzlich: `erase_status(id) -> Pending | InProgress{phase} | Done{receipt} | Unknown` (Quelle: `erase_pending`/`erase_done`; `erase_done` wird `erase_receipt_keep`-begrenzt aufbewahrt) und der **rein lesende** Prüfer `scan_physical(ScanSpec{space?, range?, patterns: &[&[u8]]}) -> ScanReport` (§14.7): durchsucht Runs, Blobs aller Generationen, Redo, `.building` und Segmente nach Mustern und meldet je Datei **nur Anzahl und Dateikennung**, nie Fundstellen-Inhalt (P-12). Der Kern entscheidet nicht, was ein „Nachweis“ ist; Positivkontrolle, Signatur und Journal gehören der oberen Schicht (NZ-14).
 
-**INV-6 (Fail-closed).** Fehlt ein Schlüssel oder ist ein Gate-Zustand unbekannt, liefert der Lesepfad `Erased`, nie Klartext. AEAD-Fehler sind nach außen nicht unterscheidbar. Abbildung (K-04): Fehlender Schlüssel und AEAD-Fehler ergeben auf dem Lesepfad `Erased`. `ContextraError::Integrity` wird auf Lesepfaden nicht zurückgegeben; Integritätsfehler in Log, Gate oder KeyTable zeigen `health()` und Quarantäne an.
+**7.8.5 Schlüssel.** Siehe §4 (`KeyProvider`, `SecretAlloc`). `Erase::domain` und `domain_retired` sind die einzigen schlüsselbezogenen Löschprimitive; ein Tresor, der Schlüssel vernichtet, steht außerhalb und ruft `Erase::domain` danach auf (`INV-ERA-3`).
 
-### 8.2 Fehlerklassen
+**7.8.6 Fertigmeldung statt `async`.** `submit(change) -> Pending`; `Pending::poll() -> Option<Result<Receipt>>`, `Pending::wait()`, `Pending::on_ready(Box<dyn FnOnce(Result<Receipt>) + Send>)`. Der Callback läuft auf der `Runtime`, ohne gehaltene Sperre (P-10). Eine obere Schicht baut daraus beliebige `Future`-Fassaden; der Kern enthält keinen Executor (NZ-20). Dasselbe gilt für `Storage::flush_async`/`sync` (SD-59).
 
-| Klasse | Beispiel | Reaktion |
-|---|---|---|
-| `Transient` | I/O-Fehler beim Journalschreiben | Wiederholung mit Backoff, dann `ReadOnly` |
-| `Persistent` | `fsync` schlägt wiederholt fehl | `ReadOnly`, Alarm |
-| `Integrity` | Prüfsummenfehler in Log, Gate, KeyTable | `Quarantine` des Mandanten |
-| `Config` | Ungültige Konfiguration | `Refused` mit vollständiger Fehlerliste |
-| `Crypto` | AEAD-Fehler, `KeyAbsent` | einheitlicher Fehler, auf dem Lesepfad `Erased` |
-| `Backpressure` | Warteschlange voll | sofortige Abweisung, kein Blockieren |
+**7.8.7 Reservierungen.** `kind = 6`, Space-Flag `32`, Pflicht-Bit `MERGE`, `codec`-Byte, `BlockCodec`, optionale Feld-IDs `0x8000` (SD-12, SD-13, SD-60). Weitere Reservierungen brauchen einen Eintrag in §9.8.
 
-Jeder Fehler wird mit Art, Mandant, Zeitpunkt und Zustandsübergang protokolliert, bevor die Antwort erfolgt. Protokolle enthalten keine Nutzdaten (T-LOG-01).
+## 8. Dateilayout und Dateilebenszyklus
 
-### 8.3 Startsequenz
+### 8.1 Layout
 
-Je Prozess `C0`, `C1` einmal. Je Mandant `C2` bis `C6`. Mandanten und Collections werden **lazy** geöffnet: die erste Anfrage öffnet einen Shard, `eager_open` kann das ändern. Mandanten mit offenen Löschaufträgen öffnen Gate, Schlüssel und Scrub-Planung bereits beim Start (C0 bis C4a, K-10). Die Frist `scrub_deadline` läuft ab dem Log-Eintrag `Gated`, nicht ab dem Öffnen.
+```
+<root>/
+  FORMAT              Magic, Formatversion, required/optional Feature-Bits, integrity_mode, instance_id (§9.2)
+  LOCK                exklusive (oder geteilte, read-only) Sperre über Fs::lock
+  CURRENT             Zeiger auf aktive Catalog-Datei (atomar ersetzt)
+  CATALOG-000007      Snapshot-Record + Edit-Records (§9.7)
+  KEYS                (nur Authenticated/Encrypted) gesiegelte Schlüsselhierarchie (§9.3), atomar ersetzt
+  redo/
+    redo-0000000000000012.log        vorallokiert, am Ende gesiegelt (§9.4)
+  spaces/
+    0001/
+      0000000000000a3f.run
+      b0000000000000071.00000003.blob      Blob mit logischer Nummer 0x71, Generation 3 (§9.6)
+    0002/ …
+  segments/<kind:04x>/<id:016x>.seg        Dateien oberer Schichten (§12.5), vom Catalog verwaltet
+```
 
-| Phase | Inhalt |
-|---|---|
-| `C0` | Konfiguration vollständig prüfen (Kapitel 9). Gleichzeitig Parametergrenzen für Argon2 (ADR-16). |
-| `C1` | Datenverzeichnis, Prozesssperre, Plattenreserve ≥ `disk_reserve_bytes`. Schlüsselspeicher sperren (mlock, ADR-41), `PR_SET_DUMPABLE = 0`. |
-| `C2` | Wurzel und Anker öffnen. Wurzelschlüssel entwrappen. |
-| `C3` | **Löschlog und Gate-Snapshot wiedergeben**, KeyTable auf REQ-REC-2 prüfen. Erst danach sind Lesepfade dieses Mandanten zulässig (REQ-OPS-2). |
-| `C4a` | Offene Löschaufträge bis E2 fortsetzen: Gate, Schlüssel, Registry (7.7). Läuft vor `C5` (K-09). |
-| `C5` | Store: Manifest, WAL, Prüfsummen der Store-Dateien. Registry lesen. |
-| `C6` | Index laden: `vector_struct` und `vector_code` parallel, `text`-Segmente, `graph`-Segmente. LiveMask aus Registry, Visibility und Gate aufbauen. Zustand `Ready`, `Rebuilding` oder `ReadOnly` setzen. |
-| `C4b` | Index-Scrub und Scrub-Planung offener Aufträge fortsetzen (REQ-VEC-5, 7.6). Läuft nach `C6` (K-09). |
+### 8.2 Regeln
 
-**REQ-OPS-2.** Die Phase `C4` ist geteilt (K-09): `C4a` vor `C5`, `C4b` nach `C6`. Vor `C3` liefert jede Anfrage `Erased` oder einen typisierten Fehler. `C6` läuft nur, wenn `C3` und `C4` bestanden sind.
+- **Numerische IDs** benennen alle Dateien, nie Pfad-Strings im Catalog. Blobs tragen eine **logische Nummer** `blob_no` und eine **Generation**; der Catalog bildet `blob_no → (generation, bytes, live_bytes)` ab. Referenzen in Runs nennen nur `blob_no` und bleiben bei einer Neufassung gültig (§14.3).
+- **Redo-Segmente sind kein `FileKind`** (SD-44): Sie sind durch Namen (`segment_id`) und `redo_floor` bestimmt. Jedes Segment mit `segment_id ≥ redo_floor` ist lebendig (auch das vorallokierte Reservesegment, `INV-LOG-7`); jedes darunter ist verwaist. `FileKind` kennt nur `Run`, `Blob`, `Segment(kind)`. Kalter Speicher ist ein **Attribut** (`tier`), keine Dateiart.
+- Alle Dateien und Verzeichnisse entstehen mit `Perm::Private` (§15.6).
+- **Temporäre Dateien** tragen das Suffix `.building.<tmp_id>`; `tmp_id` stammt aus dem reservierten ID-Bereich (§9.7), nicht aus der Prozess-ID. Beim Öffnen werden alle `.building.*` entfernt.
+- **Verwaiste Dateien** (Run, Blob, Segment-Datei, nicht aktuelle Blob-Generation, Redo unterhalb `redo_floor`), die der Catalog nicht nennt, werden beim Öffnen und danach periodisch gelöscht. Das ist sicher, weil nur ein Catalog-Edit eine Datei lebendig macht (`INV-CAT-1`).
+- **Ein Space = ein Verzeichnis** inklusive seiner Blobs. Das Entfernen eines Spaces ist ein Edit plus `remove_dir` nach dem Löschen aller Dateien. Eine Blob-Datei gehört zu **genau einem** Space.
 
-### 8.4 Nebenläufigkeit
+### 8.3 Zustandsdiagramm einer Datei
 
-**REQ-CON-1 (Schreib-Task je Shard).** Jeder Shard (Mandant × Collection) hat genau einen Schreib-Task. Er serialisiert Ingest-Stapel, Versionsänderungen und Graph-Deltas. Ein Ingest-Stapel ist auf 4 MiB oder 5 ms Arbeitszeit begrenzt, damit ein Löschbefehl höchstens einen Stapel wartet (T-OPS-08).
+```
+(nicht vorhanden) ──create .building──► im Bau ──sync_all + sync_dir──► dauerhaft, UNREFERENZIERT
+      ▲                                                                       │ Edit(add) dauerhaft
+      │ Verwaisten-Suche                                                      ▼
+      └──────────── Unlink + sync_dir ◄── Graveyard ◄── obsolet ◄──────── LEBENDIG (Catalog nennt sie)
+                    (erst nach letzter Referenz)           ▲ Edit(remove) dauerhaft
+```
 
-**REQ-CON-1a (Mandanten-Koordinator, neu zu F-18).** Der Tenant-Koordinator besitzt den **Erasure-Lock** des Mandanten. Er führt E1 bis E4 aus (7.4) und sendet Befehle an die Shard-Tasks. Gate-Publikation braucht den Erasure-Lock.
-
-**REQ-CON-1b (Commit-Lock, neu zu F-19).** Ingest-Commits halten den **Commit-Lock** des Mandanten als Leser. Der Erasure-Lock nimmt den Commit-Lock als Schreiber, bevor er Gate-Änderung und Registry-Scan (E1) ausführt. Dadurch sind zwei Fälle ausgeschlossen: Ein Ingest prüft die Unterdrückungsliste vor der Löschung und committet danach einen Seal mit dem unterdrückten Tag, oder die Löschung scannt die Registry vor dem Commit eines Seals, dessen Tag sie erfassen müsste. Die Dauer des Schreiber-Locks ist auf eine Gate-Publikation begrenzt (T-SEC-03).
-
-**REQ-CON-2 (Snapshots).** Leser arbeiten auf unveränderlichen Snapshots (`ArcSwap`). Schreiber veröffentlichen erst nach der Dauerhaftigkeit (Gruppen-Commit).
-
-**REQ-CON-3 (Gruppen-Commit).** Ingest-Schreibvorgänge teilen sich einen `fdatasync` innerhalb von `group_commit_window` (Standard 2 ms oder 4 MiB). Löschaufträge nutzen ein eigenes Fenster von 0 bis 1 ms.
-
-**REQ-CON-4 (Einzelausführung).** Pro Scope höchstens eine Löschung. Ein Duplikat liefert das bestehende Ticket. Ein Scope `Document` und ein Scope `Subject` mit überlappenden Seals laufen seriell im Erasure-Lock.
-
-**REQ-CON-6 (Schreibstapel).** Ein Schreibstapel (ein oder mehrere Dokumente, Graph-Deltas, Versionsänderungen) wird atomar veröffentlicht: Store, Registry, Index und Versionskatalog erscheinen für Leser gemeinsam mit einem Snapshot-Tausch nach dem Gruppen-Commit (Reihenfolge 7.4). Ein Absturz vor dem Commit lässt keinen sichtbaren Teilzustand zurück.
-
-**REQ-CON-7 (Schlüssel-Cache).** Der Schlüssel-Cache hat einen Lese-Schreib-Lock. Leser (Entschlüsselung) halten den Read-Lock während eines `open`. `KeyDestroyer` nimmt den Write-Lock (REQ-KEY-4).
-
-**REQ-CON-5 (Rechenpool).** Ein gemeinsamer Rechenpool (`compute_threads`, Standard Kerne − 2) bedient Embedding-Nachbearbeitung, Indexaufbau, Merge und Scrub. Suchen laufen auf eigenem Suchpool (`search_threads`).
-
-### 8.5 Ressourcen
-
-**REQ-RES-1 (Speicherbudget).** `memory_budget_bytes` begrenzt Memtable, Blockcache, Textspeicherindex und Zwischenspeicher. SQ8-Codes und Graph zählen zum Index und werden beim Start gegen das Budget geprüft (`Refused` mit Rechnung, wenn sie nicht passen). Überschreitung löst Flush oder Evict aus, nie Abbruch.
-
-**REQ-RES-2 (Shard-Verdrängung).** Ungenutzte Shards werden nach `shard_idle_evict` (Standard 30 Minuten) entladen, sofern das Budget es erfordert, nie ein Shard mit laufendem Auftrag.
-
-**REQ-RES-3 (Warteschlangen).** Alle Warteschlangen sind begrenzt. Bei Erreichen: `Backpressure`.
-
-**REQ-RES-4 (Limits).** Trefferzahl, Dokumentgröße, Chunks je Dokument, Stapelgröße, Entitäts- und Relationsgrenzen stehen einmal in `contextra-ids` und sind über Konfiguration veränderbar, soweit die Konfiguration das vorsieht (9).
-
-**REQ-RES-5 (Löschlast).** Der Löschpfad darf die Suchlatenz im Normalfall nicht messbar verändern (Budget 10.3).
-
-### 8.6 Zeit und Determinismus
-
-**REQ-TIM-1.** Alle Zeitquellen laufen über `Clock`. Direkte Aufrufe von `Instant::now` und `SystemTime::now` sind außerhalb der `Clock`-Implementierungen in `contextra-env` verboten (G-12).
-
-**REQ-TIM-2.** Drosselung nutzt `Clock` und ist mit `ManualClock` testbar.
-
-**REQ-TIM-3.** Zeitgrenzen im Produkt: `deadline` der Suche (kooperativ, Fehler statt Teilergebnis), Scrub-Fenster und -Frist, Fristen für Review, HTTP-Zeitgrenzen im Adapter. Es gibt keine Zeitbudgets, die Ranking oder Kandidatenmenge verändern.
-
-**ADR-43 (Latenzfenster).** `contextra-db` führt ein Fenster mit 10 Buckets zu je 1 s, Gesamtlänge 10 s, lock-frei (H-28). Der Scheduler berechnet p95 jede Sekunde. Dieses Fenster ist die einzige Quelle für die Scrub-Pause. Es ist keine Messung für einen Nachweis.
-
-**INV-7 (Determinismus).** Siehe REQ-SRC-2.
-
-### 8.7 Betrieb über Prozessgrenzen
-
-- Ein Prozess hält die Sperre auf `data_dir`. Mehrere Prozesse teilen sich ein Verzeichnis nie.
-- Skalierung geschieht über Mandanten-Aufteilung auf mehrere Prozesse durch die Anwendung. Hochverfügbarkeit ist ausgeschlossen (ADR-46).
-- Metriken: `MetricsSink` schreibt lokal. Export (Prometheus, OpenTelemetry) liegt in `contextra-server`.
+Eine Datei wechselt nur in Pfeilrichtung, und jeder Wechsel zwischen „unreferenziert“ und „lebendig“ ist **ein** Catalog-Edit (P-2). Blob-Dateien werden zusätzlich durch die Lebendbilanz (`live_bytes`) zu „obsolet“, wenn sie null erreicht.
 
 ---
 
-## 9. Konfiguration
+## 9. Formate
 
-Die Konfiguration wird vollständig in `C0` geprüft. Alle Fehler werden gesammelt gemeldet (`Refused`). Konfiguration ist die einzige Quelle für Principals, Berechtigungen und Vokabulare (ADR-38, REQ-GR-2). Änderungen wirken nur nach Neustart (D10, H-26).
+### 9.1 Allgemeine Konventionen
+
+- Alle Zahlen **little-endian**. `varint` = LEB128 für `u64` (7-Bit-Gruppen, niedrigwertigste zuerst, höchstens 10 Bytes). **Nur kanonische** Kodierungen sind gültig (keine überflüssigen `0x80 … 0x00`-Fortsetzungen, das zehnte Byte darf nur `0x01` sein); alles andere ist `Corrupt` (`INV-FMT-1`). Beispiele in Anhang A.
+- Jede Dateiart hat **genau eine Version (`1`)** und Feature-Bits (SD-04). Unbekannte Version oder unbekanntes Pflicht-Bit ⇒ `Unsupported`.
+- **Hash für Filter:** XXH64 (öffentliche Spezifikation, Implementierung im Crate `codec/xxh64.rs`, Prüfwert `XXH64("", 0) = 0xEF46DB3751D8E999`).
+- **Prüfwert je Modus (`chk`):**
+
+| Modus | Frames/Records/Blöcke | Header und Footer |
+|---|---|---|
+| `Plain` | CRC32C (4 B), im Redo über die Kette (§9.4) | CRC32C (4 B) |
+| `Authenticated` | `Mac16` (16 B) über die Nutzbytes mit gebundenen Zusatzdaten (AAD) | CRC32C (4 B) |
+| `Encrypted` | AEAD (`Cipher`): Nutzdaten verschlüsselt, der 16-Byte-Tag **ersetzt** den separaten Prüfwert | CRC32C (4 B) |
+
+  Header und Footer tragen in allen Modi nur CRC32C (Schutz gegen Zufallsfehler). **Authentizität** entsteht, weil jeder Frame/Block/Record die Kennungen aus Header und Ort in seine AAD bindet (Dateiart, ID, Offset, Blockart, Space; im Redo `segment_id`, `frame_index`). Ein verändertes oder vertauschtes Header-/Footerfeld lässt die nachfolgenden Prüfungen scheitern.
+- **Schlüsselableitung** (`Kdf`, §15.2) und **Nonces** (§15.2) sind zentral in `keys/`; kein anderes Modul bildet Nonces.
+- Alle Längen werden vor Allokation gegen §6.7 und die Restlänge der Datei geprüft (`INV-FMT-2`).
+
+### 9.2 `FORMAT`
+
+```
+"CTXS" | version u16 | required u64 | optional u64 | integrity_mode u8 | instance_id [16] | created_ms u64 | chk
+chk = CRC32C über alle vorhergehenden Bytes (Plain, 4 B)  |  Mac16 mit KDF(root,"ctxs format v1") (Authenticated/Encrypted, 16 B)
+```
+
+Länge: **51 B** (`Plain`) bzw. 63 B. `integrity_mode ∈ {0 Plain, 1 Authenticated, 2 Encrypted}` steht an Offset 22, damit der Leser die Länge von `chk` vor der Prüfung kennt. Der Modus ist nach dem Anlegen **unveränderlich** (ein Wechsel ist ein Migrationswerkzeug, kein Betriebsschalter).
+
+Pflicht-Bits: `ENCRYPTED = 1<<0`, `AUTHENTICATED = 1<<1`, `DOMAIN_SEALED = 1<<2`, `COLD_TIER = 1<<3`; weitere Bits < 1<<32 sind für Pflichtfeatures reserviert, Bits ≥ 1<<32 für optionale. Unbekanntes Pflicht-Bit ⇒ `Unsupported{feature}`; unbekanntes optionales Bit wird ignoriert. Pflicht-Bits werden nur **hinzugefügt**, und zwar per `write_atomic` **bevor** der Catalog-Edit erfolgt, der das Feature nutzt (ein gesetztes, ungenutztes Bit ist harmlos).
+
+**Downgrade-Schutz (F-15):** `Config::integrity` ist beim Öffnen **verbindlich**. Weicht `FORMAT.integrity_mode` ab, ist das Ergebnis `Err(Unsupported{integrity_mode})`, bevor irgendeine andere Datei gelesen wird. Ein Angreifer ohne Schlüssel kann so keine Instanz „auf `Plain` umschreiben“.
+
+### 9.3 `KEYS` (nur `Authenticated`/`Encrypted`)
+
+```
+"CTXK" | version u16 | keys_generation u64 | nonce [12] | sealed_len u32 | sealed[sealed_len]
+sealed = Cipher.seal( key = Kdf(KEK, "ctxs keys v1"), nonce, aad = instance_id ‖ version ‖ keys_generation, plain )
+plain  = root_key [32] | count u16 | ( space u16 | dek_gen u32 | dek [32] ) × count
+```
+
+- Die Datei wird per `write_atomic` ersetzt. `nonce` kommt aus `Entropy` und ist je Schreibvorgang neu (Schlüssel wechselt bei KEK-Rotation, Schreibvorgänge sind selten).
+- **`root_key`** (zufällig, einmalig beim Anlegen) ist die Wurzel aller Datei- und Redo-Schlüssel (§15.2). Die KEK umhüllt nur `KEYS`; **KEK-Rotation ist deshalb O(1)** und fasst keine Daten an (SD-36).
+- **Space-DEKs** (zufällig) sind je Space unabhängig; das Entfernen eines DEK ist der Schritt „Schlüssel vor Datei“ der kryptografischen Löschung eines Spaces (§14.3, `INV-ERA-3`).
+- `keys_generation` zählt Schreibvorgänge hoch; `FORMAT` und `CURRENT` benennen die erwartete Generation nicht (sie stehen im Catalog: `keys_generation_min`, §9.7), sodass ein zurückgespielter alter `KEYS` auffällt.
+
+### 9.4 Redo-Log
+
+Segmentdatei (vorallokiert, §10.5), `redo/redo-<segment_id:016x>.log`.
+
+```
+Header (48 B): "CTXL" | version u16 | flags u16 | segment_id u64 | first_stamp u64 | chain_seed u32 (Entropy)
+               | prealloc_len u64 | reserved u64 | crc32c u32
+Frame        : len u32 | stamp u64 | op_count u32 | flags u8 | payload | chk
+               len   = 13 + |payload|            (zählt stamp … payload, nicht len selbst, nicht chk)
+               len == 0 beendet das Segment (vorallokierter Nullbereich)
+Seal-Frame   : op_count = 0xFFFF_FFFF, flags.SEAL = 1, payload = frame_count u64 ‖ final_chain u32, stamp = Stamp des letzten Frames
+Frame-flags  : Bits 0–1 Durability (0 Always, 1 Interval, 2 Never); Bit 7 SEAL; übrige Bits MÜSSEN 0 sein
+```
+
+**Prüfwert je Modus:**
+
+| Modus | Frame |
+|---|---|
+| `Plain` | `chk = crc32c(seed = chk_vorher, len ‖ stamp ‖ op_count ‖ flags ‖ payload)`; für den ersten Frame ist `chk_vorher = chain_seed`. Die Kette erkennt vertauschte oder aus einer früheren Dateinutzung stammende Frames. |
+| `Authenticated` | `chk = Mac16(len ‖ stamp ‖ op_count ‖ flags ‖ payload ‖ segment_id ‖ frame_index)` |
+| `Encrypted` | `payload_gespeichert = Cipher.seal(redo_key, nonce(0x02 ‖ frame_index), aad = len ‖ stamp ‖ op_count ‖ flags ‖ segment_id ‖ frame_index, payload)`; `len` zählt die gespeicherte Länge; kein separates `chk` |
+
+`frame_index` zählt Frames ab 0 je Segment, `redo_key = Kdf(root_key, "ctxs redo v1" ‖ segment_id)`. Im Modus `Encrypted` stehen `stamp`, `op_count` und `flags` im Klartext (sie sind keine Nutzdaten; `op_count` verrät die Operationszahl, das ist dokumentiert).
+
+**Operation** (Inhalt von `payload`, `op_count` Stück hintereinander):
+
+```
+kind u8 | space u16 | opflags u8 | [domain u32 wenn opflags.DOMAIN] | klen varint | key | vlen varint | value
+kind     : 1 Put, 2 Delete, 3 RangeDelete, 4 EraseRange
+opflags  : Bit 0 DOMAIN, Bit 1 SEALED (Körper mit Domänenschlüssel versiegelt), Bit 2 UNBOUNDED_END; übrige Bits 0
+value    : Put → header ‖ Körper (Körper bei SEALED: Cipher.seal(domain_key, nonce(0x03 ‖ segment_id ‖ frame_index ‖ op_index u24),
+                                                                   aad = space ‖ domain ‖ key, body));
+           Delete → leer;  RangeDelete/EraseRange → exklusives Ende des Bereichs (key = Anfang); leer bei UNBOUNDED_END
+```
+
+**Regeln:**
+
+- **Ein Frame = ein `Change`** (`INV-LOG-1`). Beim Replay ist ein Frame entweder vollständig gültig oder er beendet den Log (`INV-LOG-2`). Ein Gruppen-Schreibvorgang (mehrere Frames, ein `write_all_at`) kann zerreißen; jedes vollständig gültige **Präfix** ist zulässig (unquittiert, aber dauerhaft ist erlaubt).
+- **Stamps** in einem Log sind streng aufsteigend (`INV-LOG-3`), aber **nicht lückenlos**: rein flüchtige Changes verbrauchen Stamps ohne Frame.
+- **Körper reisen im Frame** (SD-29). Der Redo ist der einzige dauerhafte Ort eines Körpers bis zum Flush; dort wandert er in die Blob-Datei. Dadurch bleibt es bei **einem** `fsync` je Gruppe.
+- **Siegel statt Raten (`INV-LOG-6`).** Ein Segment ist *gesiegelt*, wenn sein letzter gültiger Frame ein Seal-Frame ist. **Jedes Segment außer dem neuesten Segment mit Frames ist gesiegelt.** Ein Defekt in einem gesiegelten Segment ist `Corrupt` (Mittendefekt, fail-closed). Ein ungesiegeltes Segment ist nur zulässig, solange alle späteren Segmente keine Frames enthalten. `frame_count` im Siegel MUSS zur Zahl der gelesenen Frames passen.
+- **Jede Prozessinstanz beginnt ein neues Segment** (`INV-LOG-4`); es wird nie an ein bestehendes angehängt.
+- **Reserve-Segment (`INV-LOG-7`):** Ein Segment ohne Frames, dessen Header gültig ist, ist die vorallokierte Reserve und **lebendig**. Die Recovery übernimmt es; die Verwaisten-Suche löscht nur Segmente mit `segment_id < redo_floor`.
+- **Rotation** bei `redo_segment_bytes` (64 MiB). Ein Segment ist löschbar, wenn **alle** Spaces `flushed_stamp ≥ max_stamp(segment)` haben und `redo_floor` es überschritten hat. Ein Frame (≤ 32 MiB) MUSS in ein Segment passen; die Gruppe wird vor dem Schreiben auf die Restgröße geprüft und notfalls das Segment gesiegelt und gewechselt.
+- **HWM-Verankerung (`INV-LOG-8`):** Jeder Catalog-Edit trägt `redo_hwm` = höchster Stamp, dessen Frame zum Zeitpunkt des Edits per `sync_data` gesichert war. Findet die Recovery danach Redo-Segmente, deren letzter gültiger Stamp **unter** `redo_hwm` liegt (und die Lücke nicht durch `redo_floor_stamp` erklärt ist), ist das Ergebnis `Corrupt{RedoTruncated}`: ein verlorener oder abgeschnittener Redo-Schwanz wird erkannt, statt still Daten zu verlieren (setzt die „High-Water-Mark-Verankerung“ der Altspezifikation um, siehe Anhang B).
+
+### 9.5 Run
+
+```
+Run    := DataBlock* ExtensionBlock* RangeDelBlock? FilterBlock PrefixFilterBlock? IndexBlock MetaBlock DirectoryBlock Footer
+Block  := stored_payload | codec u8 | chk                 (Encrypted: stored_payload = sealed, kein separates chk)
+          AAD (Authenticated/Encrypted) = 0x01 (Run) ‖ run_id ‖ block_offset ‖ block_kind ‖ space
+          block_kind: 0 Data, 1 Index, 2 Filter, 3 PrefixFilter, 4 RangeDel, 5 Meta, 6 Directory, 0x1000+id Extension
+Footer (28 B): "CTXR" | version u16 | flags u16 | directory_offset u64 | directory_len u32 | crc32c u32 | "CTXR"
+```
+
+**Öffnen:** Footer → Directory → Meta (liefert `weights_k`, `header_len`, `space`) → Index. Filter und Datenblöcke werden **lazy** geladen. Vor jedem Zugriff werden Offset + Länge gegen die Dateilänge und gegen Überlappung geprüft.
+
+- **DataBlock** (Ziel `block_bytes` = 4 KiB, ein einzelner größerer Eintrag erhält einen eigenen Block): präfixkomprimierte Einträge
+  `shared varint | unshared varint | vlen varint | tag u64 | key_suffix[unshared] | value[vlen]`, Neustartpunkt alle 16 Einträge (dort `shared = 0`), am Ende `restart_offsets u32[n] | n u32`. `value = header ‖ (Körper | BlobRef)` je nach `kind` (`Put` bzw. `PutRef`); `Delete` hat `vlen = 0`.
+- **BlobRef (28 B):** `blob_no u64 | offset u64 | len u32 | crc32c u32 | domain u32`. `len` ist die **logische** Körperlänge (vor Versiegelung), `crc32c` über die gespeicherten Bytes, `offset` der Anfang des Records in der Blob-Datei. Verweist auf die **logische** `blob_no`, nicht auf eine Datei. `blob_no = 0` bedeutet „Körper vernichtet“ (`Entry::body()` ⇒ `Err(Shredded{domain})`).
+- **IndexBlock:** `count varint`, je Datenblock `sep_len varint | separator | offset u64 | len u32 | entries u32 | weights[k] u64 | max_stamp u64`. Der Trenner ist der kürzeste Schlüssel ≥ letzter Schlüssel des Blocks und < erster des nächsten. **`weights[0]` sind die logischen Bytes** (Schlüssel + Header + Körperlänge, bei `PutRef` aus `BlobRef.len`), `weights[1..k]` stammen vom `Weigher`. Die Summen tragen `estimate`; `max_stamp` trägt `Guard::range_unchanged_since` und das Überspringen von Blöcken in `history`. Gewichte sind `u64` (ein Block aus `PutRef`-Einträgen kann > 4 GiB logische Bytes beschreiben, SD-28).
+- **DirectoryBlock:** `count varint`, je Eintrag `kind u16 | offset u64 | len u32 | required u8` für Index, Filter, PrefixFilter, RangeDel, Meta und jeden Extension-Block. Unbekannte optionale Blöcke werden ignoriert, unbekannte Pflichtblöcke (`required = 1`) verweigern das Öffnen.
+- **FilterBlock:** Bloom-Filter über **Nutzerschlüssel** (distinkt), `bits_per_key = 10`, Größe aus der **tatsächlichen** Schlüsselzahl (behebt den festen 100 000-Elemente-Filter des Altstands). Layout: `k u8 | nbits u64 | bits[nbits/8]`, `nbits = max(64, ⌈n · bits_per_key⌉)` aufgerundet auf ein Vielfaches von 64, `k = 7`. Positionen: `h1 = XXH64(key, 0)`, `h2 = XXH64(key, 0x9E3779B97F4A7C15) | 1`, `pos_i = (h1 + i·h2) mod nbits` für `i = 0..k` (Doppel-Hashing, Berechnung in `u64` mit Umlauf).
+- **PrefixFilterBlock** (`prefix_filter(n)`): gleiches Layout über die ersten `n` Bytes jedes Schlüssels (kürzere Schlüssel gehen vollständig ein). Ein Scan mit Präfix kürzer als `n` kann ihn nicht nutzen und überspringt ihn.
+- **RangeDelBlock:** `count varint`, je Marker `start (len varint + bytes) | end_flag u8 (0 begrenzt, 1 unbegrenzt) | [end (len varint + bytes)] | tag u64`; sortiert und fragmentiert; beim Öffnen vollständig im Speicher (klein). `EraseRange`-Marker liegen hier mit `kind = 4`.
+- **MetaBlock** (feste Reihenfolge, Version im Footer): `space_id u16 | run_id u64 | entries u64 | min_stamp u64 | max_stamp u64 | range_markers u32 | erase_markers u32 | created_ms u64 | header_len u16 | weights_k u8 | weigher_version u32 | feature_bits u64 | min_key | max_key | blob_count varint | (blob_no u64, bytes u64) × blob_count`. `min_key`/`max_key` (je `len varint + bytes`) umfassen **auch** die Bereichsmarker, damit Erase-Runs sicher überlappen.
+- **ExtensionBlock** (optional): von einer oberen Schicht über `Extension` je Run erzeugt (§12.4).
+- **Kompression:** `codec` ist 0 (keine). Ein `BlockCodec`-Trait ist reserviert (SD-13).
+- **Leseweg:** `read_at` über `Fs`, kein `mmap`.
+
+### 9.6 Blob-Datei
+
+```
+Header (48 B): "CTXB" | version u16 | flags u16 | blob_no u64 | generation u32 | space u16 | reserved [22] | crc32c u32
+Record*      : rlen u32 | content | chk
+               rlen = |content|;  content = kind u8 | domain u32 | stamp u64 | klen varint | key | body   (kind: 1 Body)
+Hole-Record  : rlen u32 | 0x02 | zeros[rlen-1] | tag                   (tag: Plain crc32c; Authenticated/Encrypted Mac16(blob_no ‖ offset ‖ rlen ‖ 0x02))
+Footer       : "CTXB" | record_count u32 | bytes u64 | crc32c u32       (20 B)
+```
+
+- **Selbstbeschreibend:** Jeder Record trägt `(domain, stamp, key)`. Dadurch kann `verify` Blobs ohne den Run prüfen, die GC Lebendigkeit prüfen und die Löschprüfung (§14.7) Reste finden.
+- **Prüfwert je Modus:** `Plain` = CRC32C über `content`. `Authenticated` = `Mac16(content ‖ blob_no ‖ offset)`. `Encrypted`: `content` wird mit dem Blob-Schlüssel `Kdf(space_dek, "ctxs blob v1" ‖ blob_no)` und Nonce `0x04 ‖ blob_no u56 ‖ offset u32` versiegelt, `AAD = space ‖ blob_no ‖ offset`; der Tag ersetzt `chk`. Der Schlüssel steht **innerhalb** des versiegelten Inhalts, ein vertauschter oder verschobener Record öffnet nicht.
+- **Domänenversiegelung** (`domain_sealed`): Der Körper (`body`) ist zusätzlich mit dem Domänenschlüssel versiegelt: `Cipher.seal(domain_key, nonce(0x04 ‖ blob_no u56 ‖ offset u32), aad = space ‖ domain ‖ key, body)`; bei `Encrypted` liegt das Ergebnis noch einmal unter dem Blob-Schlüssel. Wird der Domänenschlüssel vernichtet, ist der Körper für jeden unlesbar, auch mit dem Space-DEK.
+- **Append-only während des Baus, danach unveränderlich.** Blobs entstehen ausschließlich im Flush und in der Blob-GC/Konsolidierung (§12.3) über `.building` → `sync_all` → `sync_dir` → Catalog-Edit. Footer wird beim Abschluss geschrieben.
+- **Generation:** Eine Neufassung mit **gleichen Offsets** (Blob-Sweep bei `Erase`, §14.3) erzeugt Generation `g+1`: gelöschte Records werden zu **Hole-Records gleicher Länge mit Nullen**, die übrigen bleiben **byte-identisch**. Der Catalog tauscht `(blob_no, g) → (blob_no, g+1)` in einem Edit; Referenzen in Runs bleiben gültig.
+- **Hole-Records werden nie verschlüsselt** (`INV-BLOB-3`): Eine Verschlüsselung der Nullen unter demselben `(Schlüssel, Nonce)` wie der ursprüngliche Record würde `C_alt ⊕ C_neu = Klartext_alt` verraten. Der Tag der Hole-Records ist nur ein MAC, keine Chiffre. Ein `BlobRef`, der in ein Hole zeigt, liefert `Corrupt{HoleRef}`.
+- **Größe:** `blob_target_bytes` = 64 MiB; ein einzelner Record > Ziel erhält eine eigene Datei. Das begrenzt zugleich die Kosten eines Sweeps.
+- **Kein Teilen:** Jeder `BlobRef` zeigt auf **einen eigenen** Record (`INV-BLOB-2`). Es gibt kein Dedup; dadurch ist die Lebendbilanz exakt.
+- Die Lebendbytes je `blob_no` führt der Catalog (`blob_live_delta`), sodass die GC-Planung keine Datei öffnen muss.
+
+### 9.7 Catalog
+
+```
+Datei  : Header (20 B) "CTXC" | version u16 | flags u16 | catalog_no u64 | crc32c u32, dann Record*
+Record : len u32 | tag u8 (1 Snapshot, 2 Edit) | payload | chk            (len = 1 + |payload|; Encrypted: payload versiegelt, kein chk)
+chk    : Plain  crc32c(seed = chk_vorher, tag ‖ payload)      (erster Record: seed = catalog_no als u32 gefaltet)
+         Auth.  Mac16(chk_vorher ‖ len ‖ tag ‖ payload ‖ catalog_no ‖ record_index)
+         Encr.  Cipher.seal(Kdf(root_key,"ctxs cat v1" ‖ catalog_no), nonce = record_index u64 ‖ 0u32, aad = chk_vorher ‖ len ‖ catalog_no ‖ record_index)
+```
+
+Der **Snapshot** ist ein Edit, der vom leeren Zustand ausgeht (alle Listen vollständig). Das Lesen kennt damit nur eine Anwendungsregel. Ein **Edit** ist **ein einzelner Record** (P-2) aus TLV-Feldern `field_id u16 | len varint | bytes`; gesetztes Bit `0x8000` in `field_id` markiert ein **optionales** Feld (unbekannt ⇒ überspringen), unbekannte Pflichtfelder ⇒ `Unsupported`.
+
+| Feld-ID | Name | Inhalt |
+|---|---|---|
+| 0x0001 | `add_files` | `[FileMeta]`; `FileMeta = kind u8 (1 Run, 2 Blob, 3 Segment) \| id u64 \| space u16 \| level u8 \| tier u8 (0 Local, 1 Cold) \| flags u16 \| min_stamp u64 \| max_stamp u64 \| bytes u64 \| entries u64 \| generation u32 \| segment_kind u16 \| blob_no_min u64 \| blob_no_max u64 \| min_key \| max_key` (Schlüssel als `len varint + bytes`). Für Blobs ist `id = blob_no`. |
+| 0x0002 | `remove_files` | `[(kind u8, id u64)]` |
+| 0x0003 | `blob_live_delta` | `[(blob_no u64, delta i64)]`, im **selben** Edit wie die Compaction, die Versionen verwirft; `live_bytes == 0` ⇒ Blob im selben Edit entfernt |
+| 0x0004 | `blob_replace` | `[(blob_no, gen_alt u32, gen_neu u32)]` (Sweep, gleiche Offsets) |
+| 0x0005 | `space_flushed` | `[(space u16, stamp u64)]`: Memtable bis `stamp` ist in Runs |
+| 0x0006 | `redo` | `redo_floor u64 \| redo_floor_stamp u64 \| redo_hwm u64` (§9.4, `INV-LOG-8`) |
+| 0x0007 | `reserve` | `run_id_hwm u64 \| blob_no_hwm u64 \| segment_id_hwm u64 \| tmp_id_hwm u64 \| keys_generation_min u64`: **Hochwassermarken, nie zurück** (siehe unten, `INV-KEY-2`) |
+| 0x0008 | `spaces_add` | `[(id u16, name, options)]`, `options = header_len u8 \| weights_k u8 \| flags u16 (1 separate_body, 2 domain_sealed, 4 append_only, 8 ephemeral, 16 forgetting, 32 merge [reserviert]) \| separate_threshold u32 \| prefix_filter u8 \| locality_prefix u8` |
+| 0x0009 | `spaces_drop` | `[id u16]` |
+| 0x000A | `consumer_set` | `[(name, consumed_stamp u64, max_lag_bytes u64)]` |
+| 0x000B | `consumer_drop` | `[name]` |
+| 0x000C | `domain_retired` | `[(domain u32, stamp u64)]`: Nachweis einer Schlüsselvernichtung (§15.3) |
+| 0x000D | `erase_pending_add` | `[(id u64 (= S), space u16, range, level u8)]` |
+| 0x000E | `erase_done` | `[id u64]` |
+| 0x000F | `erase_swept` | `[id u64]` |
+| 0x0010 | `erased_ranges_add` | `[(space u16, range, S u64)]` |
+| 0x0011 | `erased_ranges_remove` | `[(space u16, range, S u64)]` |
+| 0x0012 | `hold_set` | `[(hold_id u64, stamp u64, owner, expires_ms u64)]`: **dauerhafte** Holds (§7.8.2, SD-58) |
+| 0x0013 | `hold_drop` | `[hold_id u64]` |
+| 0x0014 | `key_epoch` | `[(space u16, epoch u32)]`: Schlüsselepoche je Space; steigt bei beschreibbaren Kopien (§15.2, SD-63) |
+
+**ID-Reservierung (`INV-KEY-2`, schließt F-14).** `run_id`, `blob_no`, `segment_id` und `tmp_id` dürfen erst benutzt werden, wenn ein **dauerhafter** Edit eine Hochwassermarke über sie hinweg gesetzt hat. Die Wartung reserviert in Blöcken zu `id_reserve_block` (256), bevor der Vorrat erschöpft ist. Nach einem Absturz beginnt die Vergabe bei der Hochwassermarke; ungenutzte IDs verfallen. Damit wird **keine ID je nach einem Absturz mit anderem Inhalt wiederverwendet**; das ist Voraussetzung für Nonce-Eindeutigkeit (§15.2). `segment_id` und `blob_no` sind unabhängig von `run_id`; alle vier sind `< 2^56` (`segment_id < 2^32`) und überlaufen mit `Exhausted`.
+
+- Die Metadaten stehen **im Catalog**: Auswahl für Compaction, Blob-GC und Löschung läuft, ohne eine Datei zu öffnen (B-8 des Altstands). Die Reihenfolge der Level-0-Runs ergibt sich aus `max_stamp`.
+- **Rollover** (Größe > 8 MiB oder beim Öffnen mit > 1 000 Edits): neue Datei `CATALOG-(n+1)` mit einem Snapshot-Record schreiben, `sync_all`, `CURRENT` per `write_atomic` umhängen, `sync_dir`, alte Datei löschen. `CURRENT` enthält `catalog_no` als Text und `crc32c`.
+- **Lesen:** Ein beschädigter oder halber **letzter** Record wird verworfen (Torn Write), jeder frühere Defekt ist `Error::Corrupt` (`INV-CAT-3`, fail-closed, kein „Wiederauferstehen“ gelöschter Dateien).
+- Im Modus `Authenticated/Encrypted` ist `chk` des letzten Records der Kopf der Kette; `head_mac = Kdf(cat_key, [catalog_no, record_index, chk])` wird dem `RollbackAnchor` übergeben (§15.5).
+
+### 9.8 Format-v1-Freeze-Liste (Gate **G-F**, vor Phase F3)
+
+Jeder Punkt würde später eine Formatversion kosten, obwohl SD-04 genau eine je Dateiart verspricht. Sie werden in F0 als **Spezifikation durch Beispiel** (Goldens, Anhang A) festgeschrieben und von einem zweiten Reviewer abgenommen.
+
+| # | Eintrag | Ort |
+|---|---|---|
+| 1 | `weights[k]` als `u64`, `weigher_version`, `max_stamp` je IndexBlock-Eintrag | Run |
+| 2 | `header_len` je Space | Catalog, MetaBlock |
+| 3 | Tag-Kind `PutRef`, `BlobRef` (28 B) inkl. `domain`, `blob_no = 0` als „vernichtet“ | Run |
+| 4 | `FileKind`/`FileMeta` (Run/Blob/Segment) mit `tier`, `blob_no_min/max` | Catalog |
+| 5 | `blob_no`-Indirektion, `generation`, `blob_live_delta`, `blob_replace`, Hole-Records ohne Verschlüsselung | Blob, Catalog |
+| 6 | `consumer_set`, `max_lag_bytes` | Catalog |
+| 7 | Durability-Bits je Frame, `ephemeral`-Flag je Space | Redo, Catalog |
+| 8 | `integrity_mode`, Modus-Bits, Downgrade-Regel | FORMAT |
+| 9 | Redo-Seal-Frame, `prealloc_len`, `chain_seed`, `redo_hwm`, `redo_floor_stamp` | Redo, Catalog |
+| 10 | `domain` in Op und Blob-Record, `opflags.SEALED`, `domain_retired` | Redo, Blob, Catalog |
+| 11 | `reserve` (ID-Hochwassermarken), `keys_generation_min` | Catalog |
+| 12 | `KEYS`-Layout mit `root_key` und Space-DEKs | KEYS |
+| 14 | Catalog `hold_set`/`hold_drop`/`key_epoch`, Segment-Rahmen (`CTXG`), Epoche in der Schlüsselableitung | Catalog, Segment, KEYS |
+| 13 | Reservierte Werte: `kind = Merge (6)`, Codec-IDs, Bit-Bereiche für Pflicht-/optionale Features, optionale Feld-ID-Hälfte `0x8000` | alle |
+---
+
+## 10. Schreibpfad
+
+### 10.1 Zustandsmodell
+
+```
+Storage
+ ├─ committer: Mutex<CommitterState>        genau eine aktive Gruppe; als einziger Lock über E/A gehalten
+ ├─ intake:    Mutex<VecDeque<Ticket>>      Eingangswarteschlange (Haltezeit Nanosekunden)
+ ├─ state:     RwLock<Arc<Version>>         Haltezeit Nanosekunden (Arc klonen / austauschen)
+ ├─ memtable (je Memtable): RwLock<BTreeMap<InternalKey, Slot>>
+ ├─ registry:  Mutex<Registry>              Views, Holds, Consumer, Untergrenze, Claims (Blatt)
+ ├─ maint:     Mutex+Condvar je Lane        urgent / background (Blatt)
+ ├─ notify:    Mutex<ListenerQueue>         Listener-Warteschlange (Blatt)
+ ├─ visible_stamp: AtomicU64                Release beim Veröffentlichen, Acquire beim Lesen
+ ├─ durable_stamp: AtomicU64                höchster per sync_data gesicherter Stamp
+ └─ env: Env
+
+Version (unveränderlich)
+ └─ spaces: Map<SpaceId, SpaceState{ active: Arc<Memtable>, frozen: Vec<Arc<Memtable>>,
+                                      levels: Vec<Vec<Arc<FileHandle>>>, blobs: Map<blob_no, Arc<BlobHandle>>,
+                                      flushed_stamp, erased_ranges }>
+```
+
+Es gibt **sieben** Sperrränge (§16.1) und genau einen Lock über E/A (`committer`). Das vollständige Protokoll mit Beweis steht in §16. `InternalKey` ordnet nach Nutzerschlüssel aufsteigend, `tag` absteigend (§6.2). Die Memtable zählt `Schlüssel + Header + Körper` gegen `memtable_bytes`.
+
+### 10.2 `apply` (Flat-Combining Group-Fsync)
+
+```
+apply(change):
+  1. validate: Limits, Spaces vorhanden, Rechte (Typ), Mischverbot ephemeral/dauerhaft, append-only-Regeln, Duplikate   (ohne Sperre)
+     Guard-Vorwärmung (MUSS, SD-53; H-S2 prüft sie mit kaltem Cache und vielen Guards): Blöcke für Guards (Bloom, Index, Datenblock) vorab in den BlockCache laden (ohne Sperre)
+  1b. Schlüssel: Für jeden Change mit `domain_sealed`-Körpern `KeyProvider::domain_key_create(d)` (Cache), danach EINMAL `make_durable()`,
+      bevor das Ticket eingereiht wird (ohne Sperre, P-10). Fehler ⇒ `Err` an den Aufrufer, kein Frame (`INV-KEYP-1`).
+  2. Ticket in `intake`; danach committer.lock(): wer den Committer bekommt, wird Leiter (Ticket schon erledigt ⇒ zurück)
+Leiter:
+  3. Gegendruck-Prüfung (§10.4)
+  4. intake leeren (≤ 1 000 Changes / 8 MiB)
+  5. je Change in Reihenfolge: Guards gegen (neueste Version + Gruppen-Overlay) prüfen;
+       append-only: Existenzprüfung je Put;
+       Fehlschlag ⇒ nur dieser Change erhält Err(Conflict|Forbidden), verbraucht keinen Stamp
+       Erfolg    ⇒ Stamp = next_stamp++ ; Körper domänenversiegelter Spaces versiegeln ; Frame kodieren (MAC/AEAD je Modus)
+       rein flüchtige Changes ⇒ Stamp, aber kein Frame
+  6. Passt die Gruppe nicht in den Rest des Segments ⇒ siegeln und wechseln (§10.5)
+  7. alle Frames mit EINEM write_all_at an das Redo-Segment anhängen                       Hook: AfterRedoWrite
+  8. Sync nach der höchsten Anforderung der Gruppe: enthält sie ein Always ⇒ sync_data
+       Fehler ⇒ Poison, alle Tickets Err(Poisoned), NICHTS in Memtables                      Hook: AfterRedoSync
+       Erfolg ⇒ durable_stamp = höchster Stamp der Gruppe (bei Always)
+  9. Memtables in Stamp-Reihenfolge füllen, in Unterbatches (≤ 64 Ops je Schreibsperre)      Hook: BeforeVisible
+ 10. visible_stamp.store(letzter Stamp, Release)                                             ← Sichtbarkeitspunkt
+ 11. Tickets mit Receipt{stamp, durable} wecken; Listener-Warteschlange füttern
+ 12. Memtable über Grenze ⇒ rotieren (active → frozen), Flush-Job anmelden
+```
+
+Folgen:
+
+- **Memtables enthalten nur Daten aus erfolgreich geschriebenen Gruppen** (`INV-VIS-1`). Bei `Interval`/`Never` sind sie nicht zwingend dauerhaft; ein Fehler in Schritt 8 betrifft aber nur Gruppen, die nie in eine Memtable gelangten. Es gibt keinen Rückbau nach einem Fehler.
+- **Teilweises Füllen ist unsichtbar** (`INV-VIS-2`): Solange `visible_stamp` nicht veröffentlicht ist, filtern Leser Einträge mit größerem Stamp aus. Deshalb darf der Leiter die Schreibsperre zwischen Unterbatches freigeben; die Leser-Latenz wird durch **64 Ops** statt durch die Gruppengröße begrenzt.
+- Ein einziger `fsync` je Gruppe; die Gruppengröße ergibt sich aus der Last (kein Zeitfenster-Parameter).
+- Stamps sind lückenlos über die **angenommenen** Changes (`INV-STAMP-1`).
+- **Guards unter dem Committer-Lock** können Blockzugriffe auslösen (Cache-Fehlgriff): Das ist bewusst, weil Guards gegen den neuesten Stand geprüft werden müssen. Die Vorwärmung (Schritt 1) und Bloom-Filter halten das selten; H-S2 misst den Effekt.
+- **Ephemerale Spaces** laufen durch dieselbe Gruppe ohne Redo-Anteil (kein Mischen mit dauerhaften Spaces).
+- **Domänenversiegelung** (Schritt 5) ruft `Cipher` im Committer auf (P-10, Ausnahme). Fehlt der Domänenschlüssel (`None`), scheitert der `Change` mit `Shredded{domain}`; ein Schreibvorgang in eine vernichtete Domäne ist verboten.
+
+### 10.3 Sichtbarkeit, Views und Untergrenze
+
+`View` = `(Arc<Version>, stamp)`. Lesen ignoriert Einträge mit größerem Stamp. Die **Untergrenze** `retention_floor` ist **monoton nicht fallend** und wird unter dem Registry-Lock berechnet als `min(visible_stamp, Stamp aller lebenden Views, Stamp aller Holds, consumed_stamp aller Consumer)`. Registrierung einer View, die Prüfung `stamp ≥ retention_floor` bei `view_at` und die Berechnung der Untergrenze laufen unter **demselben** Registry-Lock; daraus folgt `INV-RET-1` (§16.4). Holds und Consumer haben Ablauf bzw. Maximalrückstand (`Clock`, `max_lag_bytes`); abgelaufene werden von der Wartung entfernt (keine Zombie-Holds). Ein Hold trägt einen **Eigentümer** (z. B. Branch-Name), damit ein verworfener Branch seine Halteregeln zuverlässig freigibt.
+
+### 10.4 Gegendruck
+
+Maßgeblich sind: eingefrorene Memtables, Level-0-Runs, ausstehende Compaction-Bytes, Redo-Rückstand (`redo_lag_bytes`) und der Speicherstand des `Governor`.
+
+| Stufe | Auslöser | Wirkung |
+|---|---|---|
+| Normal | unter Verlangsamung | keine |
+| Verlangsamt | L0 ≥ 8 oder frozen ≥ 2 oder Governor weich | Leiter wartet bis zu `stall_slice` je Gruppe; Governor verkleinert Caches |
+| Gestoppt | L0 ≥ 12 oder frozen ≥ 4 oder Governor hart | `apply` wartet höchstens `stall_timeout`, danach `Err(Busy{retry_after})` |
+
+`Busy` ist strukturiert und wiederholbar (wichtig für Agenten). Der Flush läuft auf der **urgent**-Lane (§12.1) und wird von Compaction nie verzögert; das verhindert den Zustand „gestoppt“ durch eine lange Compaction.
+
+### 10.5 Redo-Segment-Lebenszyklus, `ENOSPC` und Poison
+
+**Vorallokation.** Die `background`-Lane legt das *nächste* Segment im Voraus an: `.building` erzeugen, `preallocate(redo_segment_bytes)`, Header schreiben, `sync_all`, umbenennen, `sync_dir`. Eine Rotation im `apply` ist dann ein Wechsel auf eine fertige Datei: der Commit-Pfad enthält weder `create` noch `sync_dir`. Auf vorallokierten, beschriebenen Dateien muss `sync_data` keine Dateisystem-Metadaten schreiben (Hypothese H-S13). Nebeneffekt: `ENOSPC` tritt **bei der Vorallokation** auf, nicht mitten im Commit. Ist beim Rotieren keine Reserve vorhanden, legt der Leiter das Segment synchron an (seltener Pfad, `Busy` bei `ENOSPC`).
+
+**Ende-Erkennung.** Der vorallokierte Rest besteht aus Nullen; ein Frame mit `len == 0` beendet das Segment. Das zufällige `chain_seed` verhindert, dass Frames einer früheren Dateinutzung als gültig erkannt werden.
+
+**Fehlerregeln beim Anhängen:**
+
+| Fehler | Aktion | Zustand danach |
+|---|---|---|
+| `write_all_at` scheitert mit `ENOSPC` oder Kurzschreiben | **Abschneiden auf den letzten guten Offset** (`set_len(good)` + `sync_data`), Tickets der Gruppe `Err(Busy{StorageFull})` | heil, wiederholbar; Segment bleibt ungesiegelt-und-gültig |
+| Abschneiden scheitert **oder** anderer `write`-Fehler (`EIO` …) | **Poison** | tot; Neustart heilt das Segment in der Recovery |
+| `sync_data` scheitert | **Poison** (`INV-LOG-5`), nie wiederholen, nichts in die Memtable | tot; nach Neustart gilt das Frame, falls es dauerhaft wurde, sonst nicht |
+
+Ohne die erste Zeile würde `ENOSPC` nach Teilschreiben einen Torn-Tail mitten im Log hinterlassen, den die nächste Recovery wegen `INV-LOG-6` als `Corrupt` einstufen müsste.
+
+**Poison-Semantik.** Ein vergiftetes Handle verweigert alle Schreibvorgänge und Wartungsjobs mit `Error::Poisoned{cause}`. **Lesen bleibt erlaubt** (degradierter Betrieb): Memtables enthalten nur Daten aus erfolgreich synchronisierten Gruppen, Runs sind unverändert und der Catalog zeigt nur dauerhaft gemachte Dateien. Ein fehlgeschlagener `fsync` einer Run-Datei geschah vor dem Catalog-Edit; die Datei war nie lebendig. `Storage::health()` meldet `Healthy | Poisoned{cause}`.
+
+**Siegeln.** Beim Rotieren hängt der Leiter einen Seal-Frame an (`sync_data`), bevor das nächste Segment genutzt wird (`INV-LOG-6`).
+
+---
+
+## 11. Lesepfad
+
+- **`get`:** aktive Memtable → eingefrorene (neu nach alt) → Level 0 (neu nach alt, nur Runs mit passendem Schlüsselbereich) → je tieferes Level genau ein Run (Binärsuche über Catalog-Metadaten). Pro Run: Bloom-Filter, Index, **ein** Block. Bereichsmarker aus Memtables und berührten Runs werden gegen die Versionen geprüft. Der Wertkörper (`PutRef`) wird **erst bei `Entry::body()`** gelesen.
+- **`get_many`** bündelt die benötigten Blöcke je Run zu einem `read_batch`. **`bodies`** sortiert die Körperzugriffe nach `(blob_no, offset)` und fasst Lücken ≤ 16 KiB zu einem Lesevorgang zusammen (ein Recall mit 12 Gewinnern liest wenige, größere Bereiche statt zwölf Einzelzugriffe).
+- **`scan`** liefert einen `Cursor` (Streaming, mischend). Die Memtable wird in Blöcken zu 64 Einträgen mit erneutem Aufsetzen (`seek_after(last_key)`) gelesen, sodass keine Lesesperre über die Dauer eines Scans gehalten wird. Bereichsmarker des Scan-Bereichs werden einmal eingesammelt und als Intervallliste mit maximalem Stamp geprüft. Folge-Blöcke eines sequentiellen Scans werden per `read_batch` **vorgelesen** (Tiefe über `Governor` begrenzt).
+- **`scan_page`, `estimate`, `history`** nutzen dieselbe Zusammenführung. `estimate` liest nur Index-Blöcke (im Cache), `history` verwirft Runs und Blöcke, deren Stamp-Bereich `(von, bis]` nicht schneidet (`max_stamp`).
+- **Filter-Pushdown:** `Filter::keep(key, header)` wird **vor** dem Laden eines Körpers ausgewertet, im Scan ohne gehaltene Sperre auf einem Block-Snapshot.
+- **Präfix-Scans** fragen zuerst den `PrefixFilterBlock` der Runs ab.
+- **Leseordnung (`INV-VIS-3`):** Ein Leser lädt **zuerst** `visible_stamp` (Acquire) und **danach** die Version. Die umgekehrte Reihenfolge ist verboten (Beweis §16.3).
+- **Caches:** `TableCache` hält höchstens `max_open_files` offene Dateien (Runs und Blobs). `BlockCache`: genau **eine** Implementierung (CLOCK, geteilt über `Governor`, Quote je Instanz), Schlüssel `(file_id, block_no)`, `invalidate_file`. Körper werden **nicht** im `BlockCache` gehalten (Seitencache des Betriebssystems genügt; ein kleiner optionaler `BodyCache` ist Hypothese H-S15).
+- **`AccessSink`** erhält gesampelt `(space, file, block_no, key_prefix, bytes)`; Standard ist die Null-Senke.
+- **Fehler:** `Corrupt` und `Io` werden **immer** als Fehler gemeldet, nie als „leer“ (F-6, Gegenstück zu B-9a des Altstands). Liegt ein Lesepunkt in einem `erased_range` (§14.6), antwortet der Leser mit `Erased`.
+- **Körper vernichteter Domänen:** `Entry::body()` prüft das Register `domain_retired` **zuerst** und liefert `Shredded{domain}`, auch wenn der Körper noch als Klartext in einer Memtable steht (`INV-ERA-7`).
+
+---
+
+## 12. Wartung: Lanes, Flush, Compaction, Blob-GC
+
+### 12.0 Lanes, Claims, Prioritäten (SD-32, ändert SD-16)
+
+Zwei **Lanes**, je höchstens ein Job je Instanz, beide auf der geteilten `Runtime`:
+
+| Lane | Jobs (absteigende Priorität) | Eigenschaft |
+|---|---|---|
+| `urgent` | `Erase` (E2–E7) > `Flush` > Intervall-`fsync` | kurz, darf nie hinter Compaction warten |
+| `background` | `Compaction` (L0 zuerst) > Blob-GC/Konsolidierung > Segment-Bau > Redo-Vorallokation > ID-Reservierung > Cleanup (Graveyard, Verwaiste, abgelaufene Holds/Consumer) | lang, ratenbegrenzt, abbrechbar |
+
+**Claim-Tabelle (in der Registry).** Ein Job reserviert beim Planen **alle** Eingabedateien in **einem** kritischen Abschnitt (alles oder nichts). Der Planer ist eine reine Funktion `plan(&Version, &Params, floor, &Claims)` und überspringt beanspruchte Dateien. Ein Claim scheitert, wenn die Datei `obsolete` ist (§16.5, `INV-CLAIM-1`). Beanspruchen ein `urgent`- und ein `background`-Job dieselbe Datei (z. B. `Erase` und Compaction desselben Runs), setzt der `urgent`-Job ein `cancel`-Flag. Der `background`-Job prüft es an **Ausgabegrenzen** (spätestens alle 16 MiB Eingabe), verwirft seine `.building`-Ausgabe, gibt die Claims frei und beendet sich. Es gibt keinen Wartezyklus.
+
+**Drosselung.** Die `background`-Lane läuft unter Token-Buckets des `Governor` (Lese- und Schreibbytes je Sekunde, `Clock`-basiert); `urgent` ist nur durch Speicher begrenzt.
+
+### 12.1 Flush (je Space)
+
+```
+0. INV-FLUSH-1: Ist durable_stamp < max_stamp der Memtable, den Redo bis max_stamp per sync_data sichern
+   (Aufruf von Storage::sync() über den Committer). Gilt für Always, Interval und Never.
+1. frozen Memtable → Run bauen (.building): retain mit aktuellem floor, Einträge in Schlüsselreihenfolge;
+   bei separate_body/domain_sealed: Körper in derselben Reihenfolge in eine Blob-Datei (.building) schreiben,
+   Run enthält PutRef (Körper werden erstmals mit Blob-Nonce bzw. unter Domänenschlüssel mit Blob-Nonce versiegelt;
+   ist der Domänenschlüssel inzwischen vernichtet ⇒ BlobRef{blob_no=0}, Körper nicht schreiben)
+2. Run und Blob(s): sync_all ; Verzeichnis sync_dir
+3. Edit { add_files[Run, Blob(s)], blob_live_delta (+bytes), space_flushed(space, max_stamp), redo{floor, floor_stamp, hwm=durable_stamp}, reserve }
+   → Catalog append + sync_data                                                         ◄── Durability-Punkt
+4. neue Version veröffentlichen (frozen entfernen, Dateien hinzufügen)
+5. Redo-Segmente unterhalb redo_floor löschen (Graveyard)
+```
+
+**Warum Schritt 0:** Ein `Change` über Spaces A und B hat **einen** Frame. Würde A geflusht (Run dauerhaft), bevor der Frame dauerhaft ist, und ginge der Frame bei einem Absturz verloren (`Interval`/`Never`), wäre die Hälfte des `Change` dauerhaft und die andere weg: ein Verstoß gegen Z-1. `INV-FLUSH-1` verbietet das. Dasselbe gilt für die Flush-Barriere von `Erase` (§14.3) und für `checkpoint`.
+
+Körper in Schlüsselreihenfolge im Blob erhalten **Leselokalität**: Ein Präfix-Scan über Volltexte liest zusammenhängende Bereiche. `redo_floor` wird nur angehoben, wenn **alle** Spaces die Segmente abdecken. Hinkt ein selten beschriebener Space hinterher und übersteigt das Redo-Volumen `max_redo_bytes`, erzwingt die Wartung dessen Flush (auch mit kleinem Run); `stats()` zeigt `redo_lag_bytes`.
+
+### 12.2 Compaction (ein Verfahren: Leveled)
+
+- **Planer = reine Funktion**, property-testbar. Die adaptive, kostenbasierte Planung des Altstands entfällt (SD-11).
+- **Auslöser:** L0-Anzahl ≥ 4 ⇒ alle L0-Runs plus überlappende L1-Runs. Tiefere Level: Größe > `target(level)` (Faktor 10) ⇒ Run mit höchstem Score plus überlappende Runs des Zielniveaus. Ausgabe wird bei `target_run_bytes` (64 MiB) geteilt, bevorzugt an Präfixgrenzen (`locality_prefix`, §12.6). Level ≥ 1 sind je Space überlappungsfrei (Property-Test).
+- **Aufbewahrung (`retain.rs`, rein):** je Schlüssel alle Versionen mit Stamp > `floor` behalten, die neueste mit Stamp ≤ `floor` behalten, ältere verwerfen. Löschmarker (`Delete`) werden nur verworfen, wenn unterhalb kein Run den Schlüsselbereich überlappt (aus Catalog-Metadaten) **und** nichts unter der Untergrenze liegt. `RangeDelete`-Marker analog. `EraseRange`-Marker bleiben bis `erase_done` (§14).
+- **`CompactionFilter` (SD-41, SD-48):**
 
 ```rust
-pub struct ContextraConfig {
-    pub data_dir: PathBuf,
-    pub root: RootConfig,                    // Passphrase | KeyFile(path) | VaultTransit(...)
-    pub embedding: Option<EmbeddingConfig>,  // Backend, Modelldatei, SHA-256, dim
-    pub index: IndexConfig,                  // m, ef_construction, ef_search, index_flat_below, tombstone_rebuild_ratio
-    pub text: TextConfig,                    // k1, b, stemmer, stoppwörter
-    pub ingest: IngestConfig,                // chunk_target, min_tokens, Formate
-    pub filter: FilterConfig,                // Felder je Collection, filter_exact_max
-    pub versions: VersionConfig,             // je Collection: retention, index_history, on_delete
-    pub graph: GraphConfig,                  // je Collection: enabled, Vokabulare, Limits
-    pub access: AccessConfig,                // Principals, Rollen, erasure_admin, Zuordnung von Claims
-    pub resources: ResourceConfig,           // memory_budget_bytes, compute_threads, search_threads, ...
-    pub erasure: ErasureConfig,
+pub trait CompactionFilter: Send + Sync {
+    /// Nur für Versionen mit stamp <= floor_used. Rein: Ergebnis hängt nur von den Argumenten ab.
+    fn decide(&self, key: &[u8], header: &[u8], stamp: Stamp, now_ms: u64) -> Decision;
 }
+pub enum Decision { Keep, Drop, DropBody { new_header: Option<Vec<u8>> } }   // DropBody = „Zoom-Down“
+```
 
-pub struct ErasureConfig {
-    pub scrub_window: Duration,              // 10 min
-    pub scrub_batch_max_seals: u32,          // 10_000
-    pub scrub_deadline: Duration,            // 24 h, Minimum 15 min
-    pub scrub_threads: u16,                  // 2
-    pub scrub_io_limit: u64,                 // 64 MiB/s
-    pub scrub_pause_p95_ms: u32,             // 40
-    pub compaction_after_erase: bool,        // true
-    pub epoch_len: Duration,                 // 30 Tage
-    pub multi_subject: MultiSubjectPolicy,   // Restrict | DeleteAll | RedactReingest, Standard Restrict
-    pub undeclared_hits: UndeclaredPolicy,   // Restrict | Report, Standard Restrict (D3)
-    pub four_eyes: bool,                     // false
-    pub restricted_read: RestrictedRead,     // Deny | Audit, Standard Deny
-    pub review_remind_after: Duration,       // 14 Tage
-    pub review_escalate_after: Duration,     // 30 Tage
-    pub discovery_max_candidates: u32,       // 10_000
-    pub sink: Option<SinkConfig>,
-    pub sink_max_lag: Duration,              // 60 s
-    pub key_backup_max_age: Duration,        // 30 Tage
-    pub key_backup_retention: Duration,      // Aufbewahrung des Mediums, Standard 400 Tage (K-14)
-    pub ledger_retention: Duration,          // Pflicht, kein Standard (D4, H-05)
-    pub restricted_max_age: Duration,        // Pflicht, kein Standard; ohne Wert startet Contextra nicht (D1)
-    pub restore_horizon: Duration,           // 30 Tage
-    pub checkpoint_retention: Duration,      // 7 Tage
-    pub disk_reserve_bytes: u64,             // ≥ 1 GiB
+  Der Filter ist nur in Spaces mit `SpaceOptions::forgetting()` zulässig (Flag `16` in `spaces_add`); sonst `Error::Config`. Er ermöglicht Ablauf von Idempotenzschlüsseln, Arbeitsgedächtnis und Vergessen (Volltext weg, Zusammenfassung bleibt) ohne eigene Maschinerie. **Ehrliche Semantik (Korrektur gegenüber v2):** Vergessen ist eine **sichtbare Zustandsänderung**. Bestehende `View`s halten ihre `Version` (unveränderliche Dateien) und bleiben **unverändert**. **Neue** Sichten ab dem Installationszeitpunkt sehen die Entscheidung, auch `view_at(s)` mit `s ≥ floor`, und ein `Hold` schützt in `forgetting`-Spaces vergessene Daten **nicht**. Versionen mit Stamp > `floor_used` bleiben unberührt, `history` über Consumer-Stände ist daher exakt. Der Filter wird je Job mit einem einmal gelesenen `now_ms` aufgerufen, nimmt Bereichs- und Erase-Marker aus, läuft ohne gehaltene Sperre (P-10) und wird im Modelltest gegen das Referenzmodell mitgeprüft. Er ist kein Merge-Operator (SD-12), weil er nur entfernt oder verkürzt.
+- **`DropBody`:** Der Eintrag bleibt mit `new_header` (oder altem Header) als `Put` ohne Körper erhalten; ein vorhandener `BlobRef` wird entfernt und seine Bytes im selben Edit vom Lebendstand abgebucht.
+- **Extensions:** `Extension::merge` erhält die Überlebenden nach `retain` und Filter (§12.4).
+- **Installation:** Ausgabe-Runs `sync_all` + `sync_dir`, dann **ein** Edit `{add_files, remove_files, blob_live_delta, reserve}`, dann neue Version, dann Eingabedateien als `obsolete` markieren (§16.5) und per `Arc`-Drop ins Graveyard.
+- Verworfene Versionen mit `BlobRef` buchen ihre Bytes im selben Edit vom Lebendstand ab; ein Blob mit `live_bytes == 0` wird im selben Edit entfernt.
+
+### 12.3 Blob-GC und Konsolidierung (SD-43)
+
+**Blob-GC ist compaction-getrieben.** Runs sind unveränderlich und tragen den *Ort* eines Körpers; ihn zu verschieben heißt, den Run neu zu schreiben. Es gilt:
+
+1. **Berechtigte Menge `E`:** Blobs mit `live_bytes / bytes < blob_gc_live_ratio` (0,4), oder mit Alter > `blob_gc_max_age` und `live_bytes < bytes`, oder **kleine Blobs**: Datei < `blob_min_bytes` (16 MiB), sobald die Summe der kleinen Blobs eines Spaces ≥ `blob_min_bytes` erreicht (**Korrektur gegenüber v2:** Flushes erzeugen je Space eine Blob-Datei in Memtable-Größe, also typisch ≤ 16 MiB; ohne Konsolidierung wüchse die Dateizahl unbegrenzt, weil vollständig lebende Blobs nie unter 0,4 fallen und `TableCache` unter Druck gerät).
+2. Eine Compaction, die einen Eintrag mit `BlobRef ∈ E` verarbeitet, kopiert den Körper in die **neue Blob-Datei der Ausgabe** und setzt den `BlobRef` im Ausgabe-Run neu (neue `blob_no`, neuer Nonce, Stamp unverändert). Verschlüsselte Körper werden neu versiegelt (Domänenschlüssel nötig).
+3. Werden `E`-Blobs von der regulären Compaction nicht erreicht, plant der Planer eine **Umschreib-Compaction** (gleiches Level, gleiche Schlüssel) über die Runs, deren `[blob_no_min, blob_no_max]` `E` abdeckt (Kandidaten aus Catalog-Metadaten, Bestätigung über die Blob-Liste im MetaBlock).
+4. Ist der Domänenschlüssel eines Körpers **vernichtet** (`KeyProvider::domain_key → None`), wird der Körper nicht kopiert; der Eintrag erhält `BlobRef{blob_no = 0, domain}` („Körper vernichtet“).
+
+Das Verfahren verändert nie einen Stamp; `history`, `Consumer` und `ResumeToken` bleiben unberührt. Es nutzt dieselben Claims, Edits und Absturzregeln wie jede Compaction.
+
+**Graveyard.** `FileHandle`/`BlobHandle` führen ein `obsolete`-Flag. Beim Drop der letzten Referenz mit gesetztem Flag wird der Pfad in das Graveyard gelegt, **ohne E/A im Drop**. Die Wartung löscht per `Fs::remove_file`, danach `sync_dir`. Fehlschläge werden wiederholt und als Metrik gemeldet (B-9d des Altstands). Nach einem Absturz räumt die Verwaisten-Suche auf (`INV-CAT-4`).
+
+### 12.4 Extensions (zusätzliche Index-Blöcke je Run)
+
+```rust
+pub trait Extension: Send + Sync {
+    fn id(&self) -> u16;                                   // stabile Block-Art (≥ 0x1000 im Run)
+    fn build(&self, entries: &mut dyn Iterator<Item = Entry>) -> io::Result<Vec<u8>>;
+    fn merge(&self, inputs: &[&[u8]], survivors: &mut dyn Iterator<Item = Entry>) -> io::Result<Vec<u8>>;
 }
 ```
 
-**Standardwerte der wichtigsten Schalter (vollständig, keine stillen Defaults):**
+Der Kern liefert **keine** Implementierung. Er garantiert: Der Block entsteht im selben Run-Bau (Flush und Compaction), steht im `DirectoryBlock`, wird mit dem Run atomar lebendig und mit dem Run gelöscht. `merge` muss die Überlebenden (nach `retain` und `CompactionFilter`) berücksichtigen, damit gelöschte Einträge nicht über den Index sichtbar bleiben. Aufrufe laufen ohne gehaltene Sperre und hinter `catch_unwind` (F-12). **Eignung:** Strukturen, die mit den Daten zerlegt und zusammengeführt werden (Postings, Bloom, Zähler). Die Schnittstelle gilt bis Phase F10 als **instabil** (A-10).
 
-| Schalter | Standard | Grenze |
+### 12.5 Segmente (SD-30)
+
+Strukturen, die sich nicht mit den Runs zerlegen lassen (Vektorgraphen, Graph-Adjazenz, große Volltext-Segmente), liegen als `Segment`-Dateien (`FileKind::Segment(kind)`) mit eigenem Format in der Hand der oberen Schicht. Der Kern liefert Lebenszyklus (bauen → dauerhaft → Edit → sichtbar → Graveyard), Absturzsicherheit und Einbezug in `Erase`. `FileMeta.min_stamp/max_stamp` beschreiben den **Datenstand** des Segments. Ein Index liest `Segmente ∪ history(stamp_to, view.stamp]`; der Aufholzeiger ist ein `Consumer`.
+
+| Index | Mechanismus | Begründung |
 |---|---|---|
-| `index_flat_below` | 20.000 | ≥ 1.000 |
-| `filter_exact_max` | 20.000 | ≥ 1.000 |
-| `rerank_input` | 50 | ≤ 200 |
-| `rerank_k` | `min(4·k_cand, 4000)` | nicht konfigurierbar |
-| `key_cache_entries` | 65.536 | ≥ 1.024 |
-| `chunk_text_cache_bytes` | 0 | ADR-39 |
-| `max_records_per_seal` | 2^24 | nicht konfigurierbar, nur Test |
-| `max_chunks_per_segkey` | 2^24 | nicht konfigurierbar, nur Test |
-| `allow_unlocked_keys` | false | nur Entwicklung (ADR-41) |
-| `graph.enabled` (je Collection) | false | ADR-21 |
-| `graph.max_hops` | 3 | ≤ 3 |
-| `graph.max_expansions` | 10.000 | ≤ 100.000 |
-| `graph.max_degree` | 512 | ≤ 4.096 |
-| `access.default` | deny | nicht änderbar |
+| Postings, Bloom, Zähler | `Extension` je Run | billig, zerlegt mit den Daten |
+| Volltext (BM25) | Extension **oder** Segment | beides tragfähig; Start mit Extension |
+| Vektor (ANN) | **Segment** | Graphbau teuer, Lokalität folgt Cluster, nicht Schlüssel |
+| Graph (Adjazenz, PPR) | Space (Kanten); Segment nur für Mehrschritt-Abfragen | Adjazenz-Scan genügt zunächst |
 
-**Prüfungen in `C0`:**
+**`Erase`-Fähigkeit:** Ein Segment-Format muss `rewrite_without(range)` anbieten. Ohne diese Methode verwirft der Kern bei Überlappung das **ganze** Segment und verlangt den Neuaufbau durch den Besitzer (§14.3).
 
-- `data_dir` vorhanden, beschreibbar, nicht auf Netzwerkdateisystem ohne ausdrückliche Option.
-- Argon2-Parameter: m ≥ 64 MiB, t ≥ 3, p ≥ 1. Keine Laufzeitmessung (ADR-16).
-- `KeyFile` mit Rechten 0600.
-- `scrub_deadline ≥ 15 min`. `key_backup_retention ≥ restore_horizon`. `checkpoint_retention ≥ 1 Tag`.
-- `embedding.model_sha256` stimmt mit der Datei überein.
-- Verschlüsselung ist für alle Klassen nicht abschaltbar. Einen Schalter für Klartext gibt es nicht (D4, K-17).
-- `memory_budget_bytes` ≤ verfügbarer Speicher minus Reserve.
-- `index_history = true` nur mit ausdrücklicher Bestätigung der Kosten.
-- `graph.enabled = true` nur bei aktivem Feature `graph` und definiertem Typvokabular.
-- Principals: jeder Principal in Rollen existiert. `erasure_admin` ist nicht leer, wenn Löschoperationen freigegeben sind.
-- mlock gelingt, sonst `Refused` (außer `allow_unlocked_keys`).
+### 12.6 Lokalität
+
+Die Reihenfolge ist die Schlüsselreihenfolge. Wer zusammen gelesen wird, liegt zusammen, wenn die obere Schicht dem Schlüssel einen Cluster-Präfix voranstellt. `locality_prefix(n)` lässt die Compaction Ausgaben bevorzugt an Präfixgrenzen teilen (±25 %). Ein Umordnen nach Zugriffsmustern ist eine **Re-Key-Operation der oberen Schicht** (Hysterese, Lastfenster) auf Basis der `AccessSink`-Spur; der Kern ordnet **nie** nach Zugriff um (SD-26).
+
+### 12.7 Kalter Speicher (Phase F10)
+
+`FileMeta.tier ∈ {Local, Cold}` gilt für **alle** Dateiarten (Run, Blob, Segment). Ein `ColdTier`-Port wird als `File`-Implementierung hinter `TableCache` eingebunden; Dateien sind unveränderlich und deshalb ohne Koordination hochladbar. **Folge für die Löschung:** E6 schließt `ColdTier::delete` ein; `Physical` ist für kalte Dateien nur so weit zusagbar, wie der Port Löschung garantiert; belastbar bleibt `Cryptographic` (A-11).
+
+### 12.8 Betrieb
+
+- **`verify(Online | Offline)`.** *Online:* Catalog ↔ Dateien (Existenz, Länge, Footer), Stichproben-Prüfsummen, `blob_live_delta`-Bilanz gegen die Runs, Consumer-/Hold-Stände. *Offline:* alle Blöcke und Records, jeder `BlobRef` löst auf einen Record gleichen Schlüssels/Stamps auf, jede Blob-Datei ist von mindestens einem Run referenziert oder Hole, Redo-Kette und Siegel, `redo_hwm`. Befund je Datei, nie nur Ja/Nein.
+- **`checkpoint(dest, Copy | Hardlink)`.** Eine `View` plus `Hold` legt den Stand fest; Flush-Barriere mit `INV-FLUSH-1`; die Wartung beansprucht die Dateien (Claims); Dateien sind unveränderlich und werden kopiert, Redo bis zum Stand und ein Catalog-Snapshot werden geschrieben. Das Ergebnis ist ein normal öffenbares Verzeichnis. `Hardlink` ist Opt-in mit Warnung (ein Hardlink hält Dateien nach einem Unlink am Leben und verletzt `INV-ERA-2` für die Kopie).
+- **`open_readonly`.** Geteilte Sperre, keine Heilung, keine Wartung; nur `Rd`-Handles; geeignet für `verify`, Sicherung, Inspektion.
+- **`stats()` und Metriken** (über `Metrics`): `redo_lag_bytes`, `held_bytes`, `blob_live_ratio`, Schreib- und Platzverstärkung, Zustand der Lanes, Claims, `stall`-Zeiten, Cache-Trefferquoten, Gegendruckstufe, `health`. Metriken enthalten keine Schlüssel/Werte (P-12).
+- **Lebenszyklus.** `hibernate()` flusht, gibt Memtable und Caches frei und hält nur Catalog-Zustand und `LOCK`. `close()` flusht optional, siegelt das Redo-Segment, gibt die Sperre frei.
+- **Formatentwicklung.** Neue Fähigkeiten kommen über optionale Feature-Bits; ein Pflicht-Bit verweigert alten Lesern das Öffnen. Eine neue Dateiversion ist ein eigenes Migrationswerkzeug (SD-04).
 
 ---
 
-## 10. Leistungsziele
-
-Startwerte. **INV-8:** Ein Wert gilt erst als erreicht, wenn der Benchmark ihn misst und `benchmarks/budgets.toml` ihn enthält (Anhang D). Messhardware laut 1.2.
-
-### 10.1 Suche
-
-| Größe | S (1 Mio.) | L (10 Mio.) | Bedingung |
-|---|---|---|---|
-| Hybridsuche p50 | ≤ 15 ms | ≤ 30 ms | k = 10, ohne Filter, ohne Reranker, ohne Graph |
-| Hybridsuche p95 | ≤ 40 ms | ≤ 80 ms | gleiche Bedingung, Last bei 50 % der Spitze |
-| Mit Filter (Selektivität 10 %) p95 | ≤ 1,5 × ungefiltert | ≤ 1,5 × ungefiltert | ACORN-Pfad |
-| Mit Graph (`PathRag`) p95 | ≤ 25 ms zusätzlich | ≤ 50 ms zusätzlich | 3 Hops, `max_expansions` |
-| Rückruf@10 gegen exakt | ≥ 0,95 | ≥ 0,95 | Referenzdatensatz |
-| Durchsatz | ≥ 200 QPS | ≥ 100 QPS | 16 Kerne |
-| RAM je Chunk (ohne Graph) | ≤ 1,5 KB | ≤ 1,5 KB | 768 Dimensionen, ohne Blockcache |
-| Kaltstart bis `Ready` | ≤ 10 s | ≤ 60 s | lazy Shards, Segmente parallel |
-
-### 10.2 Ingest
-
-| Größe | Ziel | Bedingung |
-|---|---|---|
-| Store und Index | ≥ 2.000 Chunks/s je Shard | ohne Embedding |
-| Chunker | ≥ 5 MB Text/s je Kern | |
-| Bulk-Modus | ≥ 1,5 × normaler Ingest | ADR-18 |
-| Graph-Ingest | ≥ 20.000 Relationen/s je Shard | nur bei `graph.enabled` |
-
-### 10.3 Löschung und Kosten der Löschung
-
-| Größe | Ziel |
-|---|---|
-| Auftrag bis Gate-Publikation (E1), bis 1.000 Seals | ≤ 5 ms p99 |
-| Auftrag bis Schlüsselvernichtung (E2), bis 1.000 Seals | ≤ 1 s p99 |
-| Mandanten-Offboarding (Schlüsselarbeit) | ≤ 100 ms |
-| Scrub-Abschluss | ≤ `scrub_deadline` |
-| Suchlatenz p95 mit Seal- und Gate-Schicht gegen Basislinie | ≤ +3 % |
-| Ingest-Durchsatz mit Seal-Schicht gegen Basislinie | ≥ 95 % |
-| Suchlatenz p95 während Scrub gegen ruhig | ≤ +5 % (Pausenregel REQ-SCR-4 erfüllt das nur bis zur Frist, danach gilt die Frist) |
-| RAM-Aufschlag der Schicht (4 B `seal_of` je Chunk, 1 Bit LiveMask) | ≤ 1 % |
-
-**Basislinie.** Derselbe Build mit `bench_baseline = true` (nur im Bench-Crate, Seal-Schicht als Durchleitung). Die Basislinie existiert nur zur Messung der Mehrkosten und hat keinen Produktionspfad.
-
-### 10.4 Messmethodik
-
-Jeder Wert hat Datensatz (`benchmarks/data/de_mini` plus synthetisch für S und L, `benchmarks/data/graph_gold` für den Graph), Hardware, Warmlauf, Wiederholungen und Konfidenzangabe. Die Messung ist ein CI-Lauf (nächtlich), kein Laufzeitmerkmal des Produkts (ADR-02).
-
----
-
-## 11. Tests und Gates
-
-Die Prüfung der Löschung liegt in Testcode. Ein Test darf das Datenverzeichnis nach bekannten Klartextmustern durchsuchen. Diese Fähigkeit existiert nur in `contextra-testkit` und nie im Produkt. Die Testkit-Dienste (FaultVfs, Canary-Scanner, Mock-Uhr, Mock-Store) liegen in `contextra-testkit`. Die bisherigen Fehlerinjektionen in `durable-fs` und `store` entfallen (REM-13).
-
-### 11.1 Löschtests
-
-| ID | Prüft |
-|---|---|
-| T-ER-01 | Nach Ingest und Flush: kein Klartext-Canary der P-Collection in den Datenverzeichnisdateien (Testwerkzeug) |
-| T-ER-02 | Nach E1: Suche, `get`, `assemble` liefern den Inhalt nicht. Auch vor E2 |
-| T-ER-03 | Nach E2: `open` liefert `KeyAbsent`. SQ8-Code des toten Knotens enthält den ursprünglichen Code nicht |
-| T-ER-04 | Neustart nach jedem Zustand: Gate bleibt, Aufträge setzen fort (Absturzmatrix an jedem `fdatasync`-Punkt, mit `FaultVfs`) |
-| T-ER-05 | Halb geschriebener Slot: korrekte Behandlung nach Tabelle REQ-REC-2 |
-| T-ER-06 | Zwei gleichzeitige Aufträge, gleicher Scope: ein Ticket |
-| T-ER-07 | Gleichzeitiger Ingest und Erase desselben Betroffenen: serialisiert nach REQ-CON-1b, kein Seal bleibt unerfasst (Schedule-Exploration mit `loom`) |
-| T-ER-08 | Jeder Lesepfad prüft das Gate: Suche (Vektor, Text), `get`, Zeitreise, Graph, Export, `assemble`, Ingest-Duplikat |
-| T-ER-09 | Jeder Zwischenspeicher implementiert `SealScoped` und wird bei E2 geleert (Registrierungstest über alle Cache-Typen) |
-| T-ER-10 | Zeitreise auf gelöschten Seal: `Erased` ohne Sonderregel (REQ-VER-6) |
-| T-ER-11 | **Entkopplung:** Löschung ändert den Versionskatalog nicht. Versions-GC ohne `erasure`-Crate kompiliert und läuft. `erasure` ohne `version`-Crate kompiliert und läuft |
-| T-ER-12 | `ContentRetired` vernichtet den Seal mit Grund `Retention` |
-| T-ER-13 | Mehrbetroffene: Standard `Restrict`, keine automatische Löschung. `RedactReingest` legt neuen Seal an, alter wird erst danach vernichtet |
-| T-ER-14 | Unterdrückungsliste verhindert Wiederaufnahme (`SubjectSuppressed`), auch bei Mischung mit nicht unterdrückten Tags |
-| T-ER-15 | `Hold` blockiert E1 für betroffene Seals |
-| T-ER-16 | Mandanten-Scope: nach `destroy_tenant` ist keine `DocKey` mehr entwrappbar, alle Lesevorgänge `Erased` |
-| T-ER-17 | Epochenwechsel: gemischte Epochen lesbar, alte KEK erst nach vollständigem Rewrap entfernt, Absturz mitten im Rewrap |
-| T-ER-18 | Scrub-Stapel: jedes betroffene Segment einmal neu geschrieben. Frist eingehalten (mit `ManualClock`) |
-| T-ER-19 | Scrub pausiert bei p95-Überschreitung, läuft nach Fristablauf trotzdem |
-| T-ER-20 | Konsolidierung: Rückruf des Graphen nach Löschung von 10 % der Knoten ≥ Ziel |
-| T-ER-21 | Restore mit alter KeyTable und Senke: Seals werden erneut vernichtet. Ohne Senke bei Mandant mit Löschungen: `Quarantine` bis `--reapply` (K-16) |
-| T-ER-22 | K-Klasse: kein Schlüsselschritt, Segmentersatz, Ledger vermerkt `no_key_destruction` |
-| T-ER-23 | Ledger enthält keine Kennungen, Namen oder Inhalte (Property-Test mit Canary-Namen) |
-| T-ER-24 | `erase_status` und Ledger enthalten keine Wörter der verbotenen Liste (7.10, `doc_lint`) |
-| T-ER-25 | Review-Frist: Erinnerung und Eskalation nach Konfiguration, keine automatische Aktion (REQ-ER-6) |
-| T-ER-26 | Segmentschlüssel: Vernichtung erst nach Veröffentlichung des neuen Segments (T-SEG-02) |
-
-### 11.2 Betriebstests
-
-| ID | Prüft |
-|---|---|
-| T-OPS-01 | `fsync`-Fehler bei Daten: `ReadOnly`, Suche liefert weiter. Rückkehr nach Probeschreibvorgang |
-| T-OPS-02 | Fehler im Löschlog oder KeyTable: `Quarantine` nur für den Mandanten |
-| T-OPS-03 | Ungültige Konfiguration: `Refused` mit vollständiger Fehlerliste |
-| T-OPS-04 | Speicherbudget erreicht: Flush, kein Abbruch |
-| T-OPS-05 | Warteschlange voll: `Backpressure`, kein Blockieren |
-| T-OPS-06 | Gleiche Anfrage unter verschiedener Last: identische Trefferliste |
-| T-OPS-07 | Netzfreier Lauf des Kernbaums (`unshare -n`) |
-| T-OPS-08 | Löschauftrag wartet höchstens einen Ingest-Stapel (REQ-CON-1) |
-| T-OPS-09 | mlock nicht möglich: `Refused` (außer `allow_unlocked_keys`) |
-| T-OPS-10 | `Rebuilding`-Zustand: `IndexUnavailable`, Schreiben in den Store läuft, Neuaufbau erzeugt identischen Rückruf (T-IDX-01) |
-
-### 11.3 RAG-Tests
-
-| ID | Prüft |
-|---|---|
-| T-RAG-01 | Chunker: Offsets zeigen auf den Quelltext, Golden-Dateien |
-| T-RAG-02 | Parser: Beispiele je Format, defekte Dateien brechen den Stapel nicht ab, Fuzz-Ziele |
-| T-RAG-03 | Hybridsuche: Rückruf gegen Referenzdatensatz `de_mini`, mit und ohne Stemming |
-| T-RAG-04 | HNSW gegen exakt: Rückruf@10 ≥ Ziel, mit und ohne Filter |
-| T-RAG-05 | Filterplaner wählt Pfad nach Zählwerten, Ergebnis gleich bei beiden Pfaden |
-| T-RAG-06 | ACL: Ergebnis enthält nie Chunks ohne passenden Tag (Property-Test) |
-| T-RAG-07 | Kontextbudget: Tokensumme ≤ Budget, Quellen vollständig, Tokenschätzung nach 6.1 |
-| T-RAG-08 | Modellwechsel wird abgewiesen (`ModelMismatch`) |
-| T-RAG-09 | Breadcrumb-Vorsatz verbessert Rückruf auf dem Kontextpräfix-Szenario |
-| T-RAG-10 | Idempotenter Ingest (REQ-ING-8), Wiederholung eines abgebrochenen Bulk-Jobs |
-| T-RAG-11 | Unterdrückungs-Race: REQ-CON-1b unter Schedule-Exploration |
-
-### 11.4 Sicherheits-, Verschlüsselungs- und Graphtests
-
-| ID | Prüft |
-|---|---|
-| T-ENC-01 | Canary-Scan des Datenverzeichnisses nach Ingest, Flush, Scrub: null Treffer für P- und D-Klasse (INV-9) |
-| T-ENC-02 | Format-Prüfung: keine unverschlüsselten Dateien unter `tenants/` außer Kopfdaten nach 5.5, 5.6, 5.8 |
-| T-ENC-03 | Obergrenzen `max_records_per_seal` und `max_chunks_per_segkey` werden erzwungen (Testparameter klein) |
-| T-LOG-01 | Canary in Ingest, Suche und Löschung: kein Klartext in Tracing- und Metrikausgabe |
-| T-SEC-01 | Principals nur aus Konfiguration: Anfrage mit fremdem Principal-Feld wird ignoriert |
-| T-SEC-02 | `erasure_admin` erforderlich. Versuch ohne Berechtigung ist `Refused` und im Ledger als `AuthDenied` |
-| T-SEC-03 | Ingest und Erase gleichzeitig: Commit-Lock serialisiert, kein Seal mit unterdrücktem Tag entsteht (Schedule-Exploration) |
-| T-SEC-04 | MCP-Tool-Argument mit Principal-Feld wird ignoriert |
-| T-SEG-01 | Segment-Umschlag Roundtrip, falscher `seg_ord` führt zu `Integrity` |
-| T-SEG-02 | Scrub-Reihenfolge: neues Segment veröffentlicht, bevor der alte `SegKey` vernichtet wird (Trace) |
-| T-SEG-03 | Segment ohne `SegKey`: `IndexUnavailable` und Zustand `Rebuilding` |
-| T-KEY-01 | Slot-Layout 128 Byte, Offsets und CRC (Fixture, Golden-Datei) |
-| T-KEY-02 | Vernichtungsstapel: ein `fdatasync`, Offsets sortiert (Zähler im FaultVfs) |
-| T-KEY-03 | Cache-Lock: parallele Leser während Vernichtung, danach kein Schlüssel des Stapels im Cache |
-| T-KEY-04 | Anker-Atomarität: Absturz vor und nach `rename` |
-| T-KEY-05 | Wurzelrotation ändert nur den Anker |
-| T-KEY-06 | Argon2-Parametergrenzen: zu schwach ist `Refused`, im Startpfad kein Aufruf von `Clock` für Schlüsselarbeit |
-| T-GR-01 | Keine Klartextlabels in Dateien (Canary über Graph-Segmente) |
-| T-GR-02 | PathRAG deterministisch: gleiche Pfade bei Permutation der Eingabereihenfolge |
-| T-GR-03 | Löschung eines Seals: Kanten mit ausschließlicher Provenienz sofort unsichtbar, nach Scrub entfernt. Entitäten ohne Provenienz entfernt |
-| T-GR-04 | Kante mit zwei Provenienzen überlebt die Löschung eines der beiden Seals |
-| T-GR-05 | Konsolidierung und Neuaufbau: Rückruf der Traversierung nach 10 % Löschung ≥ Ziel |
-| T-GR-06 | ReadGate wird bei jeder Kantenmaterialisierung geprüft (instrumentierter Zähler) |
-| T-GR-07 | Snapshot-Isolation: Traversierung auf einem gepinnten Snapshot sieht keine späteren Änderungen |
-| T-GR-08 | Graph-Änderung im Schreibstapel: atomar bei Absturz (Crash-Matrix) |
-| T-GR-09 | Persistenzformat Roundtrip mit CRC. Beschädigte Datei führt zu `Integrity` |
-| T-GR-10 | Gate G-GRAPH (11.5) |
-| T-GR-11 | `as_of` auf Graph-Operationen liefert `HistoryNotIndexed` |
-| T-GR-12 | Build ohne Feature `graph`: `db` enthält keinen Graph-Code (Symbolprüfung) |
-| T-IDX-01 | Neuaufbau aus `VectorFull` lebender Seals liefert Rückruf ≥ Ziel gegen Vorzustand |
-
-### 11.5 Entscheidungs-Gates (Verbleib von Modulen)
-
-| Gate | Bedingung | Konsequenz bei Verfehlung |
-|---|---|---|
-| **G-GRAPH** | Auf `benchmarks/data/graph_gold` (≥ 500 Mehrschritt-Fragen, in M4b erstellt): nDCG@10 hybrid+graph ≥ hybrid + 0,03 mit dem Graph-Gewicht aus dem Benchmark-Profil `graph_weight_bench` (D6; der Produktstandard 0,0 bleibt bis zur begründeten Festlegung), p95 ≤ 1,5 × hybrid, Ingest-Durchsatz nach 10.2 | Feature `graph` und Crate werden in M5 entfernt (REM-31) |
-| **G-INDEX** | Rückkehr von DiskANN oder RaBitQ nur bei einem Bestand, den HNSW im RAM-Budget nicht hält (> 50 Mio. Chunks je Prozess), mit Rückruf- und Latenzbenchmark | Verboten bis dahin |
-| **G-STORE** | Die eigene LSM bleibt, wenn sie in M1 auf Messhardware erreicht: Punktzugriff p99 ≤ 1 ms (warm), ≥ 50.000 Schreibvorgänge/s im Gruppen-Commit, Wiederanlauf nach Absturz in ≤ 10 s bei 10 GB | Sonst Ersatz hinter dem Port `KvStore` durch `redb` oder `fjall`. Entscheidung anhand der Messung |
-
-### 11.6 Build-Gates
-
-| ID | Gate |
-|---|---|
-| G-01 | `cargo check --workspace`, `cargo test --workspace`, `cargo test --no-default-features` pro Crate, `cargo clippy --workspace -- -D warnings` grün. Toolchain 1.89.0 laut `rust-toolchain.toml` |
-| G-02 | `unsafe_code = "forbid"` in allen Crates außer `contextra-sys` und `contextra-simd` (gemessen: nur dort Produktcode mit `unsafe`). Test-Targets mit eigenem Allocator liegen in `tests/unsafe_islands.rs` (ADR-53) |
-| G-03 | Schichtprüfung R1, R2, R7, R9 über `cargo metadata` gegen Anhang E. Prüfer: `python3 tools/check_spec_sync.py layering` (SYNC-2). Zusätzlich `crates/contextra-testkit/tests/layering.rs` (M0), der dieselben Regeln als Rust-Test prüft |
-| G-04 | Genau eine Definition von `MAX_SEARCH_K` (`grep -rn "const MAX_SEARCH_K" crates \| wc -l` = 1) |
-| G-05 | `cargo tree -e normal` der Kern-Crates enthält keine Netzwerk-Crates (Sperrliste: `reqwest`, `hyper`, `ureq`, `tonic`, `h2`, `native-tls`, `openssl`, `rustls`) |
-| G-06 | `default = []` in jedem Crate außer den in R3 begründeten Ausnahmen |
-| G-07 | Keine Erwähnung entfernter Crates oder Symbole im Produktcode (Liste 12) |
-| G-08 | Dokumentationslint (REQ-DOC-2 und REQ-DOC-3) |
-| G-09 | Keine Selbstdeklarationsdateien (REM-14): `grep -rln "ANCHOR\[\|FILE-CONTEXT"` leer, keine `contract.rs`, keine `INVENTAR.md`/`SPEC.md`/`AGENTS.md` in `crates/` |
-| G-10 | `benchmarks/budgets.toml` vorhanden und identisch zu Anhang D (`python3 tools/check_spec_sync.py check`, SYNC-1). Verweise auf fehlende Dateien sind Fehler |
-| G-11 | Compat-Auflösung: `find crates benchmarks -type d -name compat` leer. `grep -rn "compat\|workspace\|types-compat\|ports-compat" crates/*/Cargo.toml` leer, außer dem Feature-Namen `workspace` in keinem Crate |
-| G-12 | `grep -rn "Instant::now\|SystemTime::now" crates --include=*.rs` außerhalb `crates/contextra-env/` leer |
-| G-13 | `grep` auf `unwrap()`, `expect(`, `panic!(`, `todo!(`, `unimplemented!(`, `unreachable!(` in Produktcode außerhalb `#[cfg(test)]` leer. Clippy-Lints auf `deny` |
-| G-14 | CI-Lauf von T-ENC-01 und T-LOG-01 grün |
-
----
-
-## 12. Entfernungen und Compat-Auflösung
-
-Je Entfernung ein Commit. Nach jedem Commit `cargo check --workspace`. Keine Verhaltensänderung im selben Commit. Pfade sind am HEAD `2fd0994` geprüft (Anhang B). Abnahme ist der angegebene Befehl.
-
-### 12.1 Robotik, Profile, Lizenz
-
-| ID | Entfernen | Ort | Abnahme |
-|---|---|---|---|
-| REM-01 | Eintrag `crates/contextra-vault` in `[workspace] exclude` (Verzeichnis existiert nicht mehr) | `Cargo.toml` | `grep -n "contextra-vault" Cargo.toml` leer |
-| REM-02 | Profile `BareMetal`, `EdgeMinimal`, `PowerUserLocal`, Modi `MemoryOnly`, `WalNoHmac`, Löschmodus `TombstoneOnly` | `contextra/src/performance_profile.rs`, `contextra/src/collection_profile.rs`, `contextra-store/src/lsm/ops/write/`, `contextra-crypto/src/kv_segment/delete_mode.rs`, MCP-Schema | `grep -rn "BareMetal\|MemoryOnly\|WalNoHmac\|TombstoneOnly\|EdgeMinimal"` leer |
-| REM-03 | Lizenzreste: `LicenseGate`, `FeatureRing`, `VectorDeleteMode` | `contextra-ports/src/license.rs`, `contextra-ports/src/builder.rs` | `grep -rn "License\|FeatureRing\|BackgroundRepair"` leer |
-| REM-04 | Hardware-Sensorik und Anti-Tamper | `contextra-crypto/src/anti_tamper.rs` | Datei fehlt |
-| REM-05 | Observer-Subsystem mit Latenzfrist und Circuit-Breaker | `contextra-store/src/lsm/observer/`, `contextra-store/src/lsm/observer.rs` | Verzeichnis und Datei fehlen |
-| REM-06 | Zeitbudget im Ranking | `contextra-rank/src/dibud/` | Verzeichnis fehlt |
-| REM-07 | `thread::sleep`-Drosselung ohne `Clock` | `contextra-durable-fs/src/scrub.rs` | nur `Clock`-Drosselung (G-12) |
-| REM-08 | Kostenbasierte Kompaktionsplanung | `contextra-store/src/compaction/adaptive/` | einfache Größenschwelle |
-
-### 12.2 Eigennachweise und Altlöschung
-
-| ID | Entfernen | Ort | Abnahme |
-|---|---|---|---|
-| REM-09 | DiskANN, RaBitQ, `partial_rebuild.rs`, `purge.rs` als eigener Pfad, Feature `experimental` | `contextra-vector/src/diskann/`, `quantize_rabitq.rs`, `partial_rebuild.rs`, `purge.rs` | Dateien fehlen. `grep -rn "diskann\|rabitq"` leer außer in Entfernungsnachweis |
-| REM-10 | Altes Erasure: `vault/`, `types_local.rs`, `crypto_local.rs`, `chain/saga.rs` (Saga 2.0), `gate/saga_gate.rs`, `Armed`, `ControlEvidence`, `MeasureClass`, `KeyCoverage`, `LayerWitness`, `CommitBarrier`, `BarrierExclusive`. Crate wird nach Kapitel 7 neu aufgebaut | `contextra-erasure/src/` | `pub mod vault`, die Typen und Dateien fehlen |
-| REM-11 | Messen, Signieren, Berichten: `audit_chain.rs`, `wal_completeness.rs`, `wal_crypto.rs`, `kv_segment/`, `kv_cipher.rs`, `dek.rs` (ersetzt durch `DocKey`-Modul) | `contextra-crypto/src/` | Dateien fehlen. Kein `ed25519`, kein JCS im Workspace |
-| REM-12 | SSI, TxBuffer, ReadSet | `contextra-mvcc/src/ssi.rs`, `contextra-mvcc/src/tx_buffer.rs` | Dateien fehlen |
-| REM-13 | `Poisoned`, Fault-Injection im Produktcode | `contextra-durable-fs/src/health.rs`, `contextra-durable-fs/src/fault_injector.rs`, `contextra-store/src/io_seam.rs`, `contextra-store/src/io_seam/` | Fault-Injection nur in `contextra-testkit` |
-| REM-14 | Selbstdeklarationen: `contract.rs` (9 Dateien), `ANCHOR`-Kommentare (460 Dateien), `FILE-CONTEXT` (415 Dateien), `INVENTAR.md`, `SPEC.md`, `AGENTS.md` pro Crate, Auditor-Skripte (`port_contract_auditor.py`, `contract_diff_detector.py`, `type_registry_sync.py`, `isolation_proof.py`, `erasure_leak_prober.py`, `fsync_durability_tracer.py`, `error_topology_mapper.py`, `concurrency_lock_auditor.py`, `unsafe_boundary_tracer.py`, `crate_inventory.py`, `generate_function_inventory.py`, `generate_interface_spec.py`, `dead_code_microprobe.py`, `feature_audit.py`, `abhaengigkeits_budget.py`, `gate_dependencies.py`, `test_matrix_advisor.py`, `orchestrate_diagnostics.py`, `pattern_diagnostic.py`, `agentic_context_pack.py`, `rust_ast_inspector.py`, `async_boundary_scanner.py`, `zero_panic_analyzer.py`, `determinism_guard.py`, `contract_diff_detector.py`) | `crates/*/src/`, `crates/*/`, `tools/` | G-09 grün. `tools/` enthält nur `doc_lint.py`, `loc.py`, `test_coverage_matrix.py`, `check_spec_sync.py`, `quickcheck.sh`, `agent_tooling_common.py` (Bibliothek) und `baseline/` (Stand v4.1.1, siehe 13.6) |
-| REM-15 | Alle `compat/`-Module und `compat.rs`. Umfang 7.465 Zeilen, Auflösung nach 12.5 | siehe 12.5 | G-11 grün |
-| REM-16 | Altmodell-Texte: Berichte, Bescheinigung, Satzbibliothek, Annahmen- und Residuenkataloge | `contextra-erasure`, Dokumente | `grep -rn "Bescheinigung\|Satzbibliothek\|A-FLASH\|R-GROUP-LINK"` leer außer in 7.9 |
-| REM-17 | Feature `experimental` und alle Feature-Namen mit Präfix `exp-` in allen Crates (`exp-dibud`, `exp-resonance`, `experimental-rank`, `experimental-graph`) | `Cargo.toml` aller Crates | `grep -rn "experimental\|exp-" crates --include=Cargo.toml` leer |
-
-### 12.3 Funktionsumfang
-
-| ID | Entfernen | Ort | Abnahme |
-|---|---|---|---|
-| REM-18 | Kalibrierung, Resonanz-, Ext-, Global-, Normalized-Fusion | `contextra-rank/src/calibration/`, `contextra-rank/src/fusion/{resonance,ext,global,normalized}.rs` | Dateien fehlen |
-| REM-19 | Verweise auf `contextra-engine` in Kommentaren und Dokumenten. Das Crate selbst fehlt bereits (F-38) | `contextra-mvcc/src/lib.rs`, `contextra-testkit/src/lib.rs`, `contextra-checkpoint/src/lib.rs`, `contextra-text/src/lib.rs`, `contextra-rank/src/lib.rs`, `contextra-rank/src/temporal.rs`, `contextra-rank/tests/legacy_reference/`, `contextra-crypto/src/lib.rs`, `contextra-graph/src/entity_extraction.rs`, `contextra-types/src/types/saos.rs`, `crates/contextra/PLAN.md`, `crates/contextra-db/PLAN.md` | `grep -rn "contextra-engine\|contextra_engine"` leer |
-| REM-20 | LLM-Klassifikation, Egress-Vault, Egress-Gateway, Bulk-Exfiltration, Kontext-Edit-Audit | `contextra-privacy/src/{egress_vault,egress_gateway,bulk_exfiltration_detector,context_edit_audit}.rs` | Dateien fehlen. Verbleibend: `entity_recognizer`, `data_class`, `egress_guard`, `processing_registry`, `guarded_payload` |
-| REM-21 | MCP-Sandbox, Prompt-Injection-Stub, Reexport-Modul | `contextra-mcp/src/{sandbox,prompt_injection,bulk_exfiltration_detector}.rs` | Dateien fehlen |
-| REM-22 | Ollama-, Candle- und ONNX-Konfiguration ohne Implementierung | `contextra-mcp/src/config.rs` (Datei bleibt, Schlüssel entfallen) | ersetzt durch 9 und REQ-EMB-2 |
-| REM-23 | Duplizierte Distanzkerne in `contextra-vector/src/distance/` (nur noch Dispatch auf `contextra-simd`), Abhängigkeit `simd → types` | `contextra-vector/src/distance/`, `contextra-simd/Cargo.toml` | ein Kernel-Satz |
-| REM-24 | Agentengedächtnis: `contextra/src/agent_memory.rs`, Zettelkasten-Typen, `WorkflowState`, `MemoryType`, Zerfallskonstanten, `contextra-types/src/types/domain/misc.rs` | `contextra/src/agent_memory.rs`, `contextra-types` (REM-30) | Dateien und Typen fehlen |
-| REM-25 | Query-Rewriter (LLM): `contextra/src/query_rewriter.rs`, `contextra-ports/src/query_rewriter.rs`, `contextra-ports/src/inference.rs`, `contextra/tests/llm_query_rewriter.rs` | genannte Pfade | Dateien fehlen. `grep -rn "LlmTextGenerator\|QueryRewriter"` leer |
-| REM-26 | Tenant-Präfix-Codec im Store (ersetzt durch Verzeichnis je Mandant) | `contextra-store/src/tenant_codec.rs`, `contextra-store/src/tenant_codec/` | Dateien fehlen |
-| REM-27 | Verletzungen der Regeln R1, R2, R7: `ports → types`, `store → crypto`, `store → mvcc`, `store → erasure`, `simd → types`, `checkpoint → testkit` außerhalb von dev-dependencies | `Cargo.toml` der betroffenen Crates, Quellen mit `use contextra_types`/`use contextra_crypto` in `store` | G-03 grün |
-| REM-28 | Duplizierte Kryptoabhängigkeiten (`sha2`, `hmac` in `erasure`, `engine`, `types`). Nur `contextra-crypto` führt Krypto-Crates | `Cargo.toml` | `grep -rln "sha2\|hmac" crates/*/Cargo.toml` nur `crypto` |
-| REM-29 | Verweise auf entfernte Dokumente: `README.md` (Root), `CLAUDE.md`, `benchmarks/README.md`, `benchmarks/contextra-bench/AGENTS.md`, Crate-READMEs. `docs/crates/` und Root-`AGENTS.md` existieren nicht (F-39) | genannte Dateien | G-07 und G-08 grün |
-| REM-30 | **`contextra-types` als Crate** (9.596 Zeilen). Inhalt: IDs und Ordinale nach `contextra-ids`, DTOs nach `contextra-ports::dto`, Rest zum Besitzer (ADR-33) | `crates/contextra-types/` | Verzeichnis fehlt, `grep -rn "contextra_types\|contextra-types"` leer |
-| REM-31 | **Graph-Entfernung (nur bei G-GRAPH verfehlt).** Sonst Reduktion nach 12.4 | `crates/contextra-graph/` | Verzeichnis fehlt, oder G-GRAPH grün |
-| REM-32 | `contextra-ingest`: `fmt-odf`, `fmt-ole`, `fmt-structured`, `compat/`, `canonical.rs` (Pipeline nutzt `ir.rs`), Features `workspace`, `types-compat` | `crates/contextra-ingest/` (zurückgeholt, 13.2) | Abnahme: Features entfallen, `grep -rn "canonical"` leer |
-| REM-33 | Nicht zurückholen: `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-wire`, `contextra-py`, `contextra-prompt-guard` (in Commit `e5ec76c28` eingefroren) | Historie | nicht im Workspace |
-| REM-34 | Verbleib im Workspace-`Cargo.toml`: `[workspace.dependencies]` mit Ollama, Candle, Frozen-Zone-Kommentaren. `[workspace.lints]` bleibt | `Cargo.toml` | `grep -n "Frozen\|ollama\|candle"` leer |
-| REM-35 | `contextra-crypto/src/dek.rs` durch `DocKey`-Modul ersetzt | `contextra-crypto/src/dek.rs` | Datei fehlt |
-| REM-36 | Duplikat `StorageEngine` (Port) und `KvStore` (Port). Nur `KvStore` bleibt | `contextra-ports/src/` | `grep -rn "StorageEngine"` leer |
-| REM-37 | Zwei bedingte Kompilierungen für `graph`-Persistenz hinter Feature `workspace`. Ersetzt durch Segmentpersistenz (6.10) | `contextra-graph/src/csr/graph_persist.rs` | Datei fehlt |
-
-### 12.4 Graph-Reduktion (nur wenn G-GRAPH grün, REM-31)
-
-**Behalten** (werden neu geschrieben, nicht verschoben):
-- `src/csr/` (Basis-Segmente, Delta, Snapshot, Konsolidierung, Tombstones als Provenienz),
-- `src/path_rag/` (PathRAG nach REQ-GR-5),
-- `src/provenance.rs` (Seal-Provenienz),
-- `src/types.rs` (reduziert auf IDs, Entitäts- und Kantenwerte ohne Klartext),
-- `src/error.rs`, `src/graph_view.rs` nur als interne Lesesicht.
-
-**Neu:** `src/label.rs` (GraphLabel-Records), `src/seal.rs` (Sealing über `RecordSealer`, `SegmentSealer`), `src/index.rs` (Implementierung `GraphIndex`), `src/scrub.rs` (`ScrubTarget`).
-
-**Entfernen:**
-
-| Pfad | Grund (ADR) |
-|---|---|
-| `src/tl_hfd/` | TL-HFD mit Lovász-Erweiterung, ohne Kundennutzen (ADR-24) |
-| `src/apprh/` | APPRH, Gate-Monitor, Shadow-Vergleich im Hot-Path (ADR-24) |
-| `src/percolation.rs` | Konstruiert neue Zusammenhänge nach Löschungen (ADR-24) |
-| `src/ppr/` (vollständig, inkl. Forward-Push) | Zweiter Algorithmus neben PathRAG; Wiedereinführung nur über G-GRAPH (ADR-24) |
-| `src/session_dag.rs` | Agentengedächtnis, widerspricht 1.3 (ADR-24) |
-| `src/edge_reinforcement.rs`, `src/edge_reinforcement_buffer.rs`, `src/csr/inner/reinforcement.rs` | Adaptives Gedächtnis (ADR-24) |
-| `src/hyperedge.rs`, `src/hyperedge_suggest.rs`, `src/csr/graph_write/hyperedge.rs`, `src/cascade.rs` | Hyperkanten und LLM-Validierung (ADR-24), Kaskade durch Gate ersetzt (ADR-22) |
-| `src/consistency_enforcement.rs` | Musterlerner, keine Löschfunktion (ADR-25) |
-| `src/community.rs`, `src/community/` | Community-Erkennung ohne Anforderung (ADR-24) |
-| `src/entity_extraction.rs` | Extraktion liegt beim Aufrufer (ADR-48) |
-| `src/text_gen.rs` | LLM-Port (ADR-24, REM-25) |
-| `src/csr/visibility.rs`, `src/csr/tests/bitemporal_tests.rs`, `tx_id`-Felder in Kanten | bitemporale Felder (ADR-26) |
-| `src/csr/path_graph.rs`, `src/path_rag/k_path.rs` | Zweiter Pfadalgorithmus (`k_path`) |
-| `src/provider.rs`, `src/storage.rs`, `src/purger.rs`, `src/ppr_stream.rs`, `src/arc_slice.rs` | Ports und Bridges (CMP-5), Ersatz durch `KvStore` und `ScrubTarget` |
-| `src/compat/`, `src/compat.rs` | CMP-5 |
-| `src/test_doubles.rs` | nach `contextra-testkit` |
-| `benches/`, `fuzz/`, `examples/`, `clippy.toml`, `proptest-regressions/`, `INVENTAR.md`, `PLAN.md`, `Cargo.toml`-Features `workspace`, `types-compat`, `ports-compat`, `session-dag`, `experimental-graph`, `hyperedge-suggest`, `entity-extraction`, `apprh-diffusion`, `k-path-diffusion`, `graph-connectivity-health`, `physio-percolation`, `ppr-forward-push`, `edge-reinforcement-learning`, `test-support` | ADR-24, R3, ADR-54 |
-| Tests unter `tests/` außer `persistence`, `path_rag_at_snapshot`, `reader_writer_concurrency`, `ppr`-frei Golden-Dateien | Die übrigen Tests testen entfernte Funktionen |
-
-**Cargo-Abhängigkeiten nach der Reduktion:** `contextra-ids`, `contextra-env`, `contextra-ports`, `contextra-durable-fs`, `blake3`, `roaring`, `thiserror`. `arc-swap` bleibt (Snapshots). `scc`, `bincode`, `serde`, `serde_json`, `ahash`, `tracing`, `parking_lot` entfallen, soweit nicht von `ids` oder `ports` benötigt. `contextra-types` entfällt (REM-30).
-
-### 12.5 Compat-Auflösung (ADR-51)
-
-Jedes `compat/`-Modul hat eine Zielposition. Die Bridge-Logik wird gelöscht, Port-Implementierungen werden direkt im Kernmodul geschrieben. Umfang gemessen am HEAD (Anhang B).
-
-| ID | Verzeichnis | Zeilen | Zielposition für jeden Inhalt |
-|---|---|---|---|
-| CMP-1 | `contextra-mvcc/src/compat/` | 82 | `error.rs` → `contextra-version/src/error.rs`. `mod.rs` entfällt. |
-| CMP-2 | `contextra-checkpoint/src/compat/` | 247 | `ports_impl.rs` → `checkpoint/src/port.rs` (Impl. `Checkpointer`). `snapshot_bridge.rs` entfällt (Duplikat von `snapshot.rs`). `error.rs` → `checkpoint/src/error.rs`. |
-| CMP-3 | `contextra-text/src/compat/` | 3.060 | `morph_index.rs` → `text/src/index.rs`. `scorer.rs` → `text/src/bm25.rs`. `types.rs` → `text/src/types.rs`. `inverted_ports.rs` → `text/src/inverted.rs`. `scanner.rs` und `purge.rs` → `text/src/scrub.rs` (`ScrubTarget`). `storage.rs` (`StorageBridge`) entfällt, Text nutzt `KvStore` direkt. `mock.rs` → `contextra-testkit`. `tests.rs`, `search_tests.rs` → `text/tests/`. `tx_tests.rs` entfällt (SSI). `error.rs` → `text/src/error.rs`. |
-| CMP-4 | `contextra-store` | – | Kein `compat/`-Verzeichnis (F-39). Abhängigkeiten zu `crypto`, `mvcc`, `erasure` werden gelöst (REM-27). |
-| CMP-5 | `contextra-graph/src/compat/` und `compat.rs` | 1.688 | Komplett entfernt. Inhalte werden im Neuaufbau nach 12.4 geschrieben: `purger.rs` → `scrub.rs`, `graph_index_ext.rs` → `index.rs`, `collection_mutation.rs` und `mutations.rs` → `write.rs`, `traversal.rs` → `traverse.rs`, `error.rs` → `error.rs`. `provider.rs`, `storage_bridge.rs`, `inherent_shims.rs`, `algo_error_bridge.rs` entfallen. |
-| CMP-6 | `contextra-rank/src/compat/` | 327 | `clock.rs` entfällt (`Clock` aus `env`). `types.rs` → `rank/src/types.rs`. `error.rs` → `rank/src/error.rs`. `mod.rs` entfällt. |
-| CMP-7 | `contextra-simd/src/compat/` | 144 | `mod.rs` entfällt. Dispatch liegt in `simd/src/kernel.rs` (zusammen mit REM-23). |
-| CMP-8 | `contextra-vector/src/compat/` | 1.917 | `hnsw_vector_index.rs` → `vector/src/hnsw/index.rs` (Impl. `VectorIndex`), Duplikate zu `vector/src/hnsw/` werden zusammengeführt. `diskann_vector_index.rs` entfällt (REM-09). `scanner.rs`, `purge.rs` → `vector/src/scrub.rs` (`ScrubTarget`). `candidate_stream.rs` → `vector/src/stream.rs`, nur wenn der Filterplaner ihn braucht, sonst entfällt. `types.rs` → `vector/src/types.rs`. `error.rs` → `vector/src/error.rs`. |
-| CMP-9 | `contextra-ingest/compat/` (Historie) | 96 | Nicht zurückgeholt. Die Logik wird mit dem Pipeline-Code neu geschrieben (ADR-12). |
-| CMP-10 | Bedingte Kompilierungen mit `types-compat`, `ports-compat`, `workspace` (120 Stellen laut Messung) | – | Alle Schalter entfallen. Verbleibende `cfg(feature)` nur für Features aus der Liste in Kapitel 15. |
-
-**Summe gemessen:** 7.443 Zeilen in `compat/`-Verzeichnissen und 22 Zeilen in `compat.rs`, zusammen 7.465. Der Wert in v4.0 (rund 5.800) war zu niedrig.
-
-**Regel für die Auflösung (verbindlich, G-11):** Ein Port wird im Besitzer-Crate implementiert. Doppelmodule für denselben Kern werden zusammengeführt, bevor sie gelöscht werden. Test-Mocks wandern nach `contextra-testkit`. Kein Feature darf einen zweiten Codepfad für denselben Kern einschalten (ADR-54).
-
-### 12.6 Workspace und Build
-
-- `default-members` ohne `contextra-testkit` und `contextra-bench` (F-27). Standard-Build: alle produktiven Crates.
-- `contextra-graph` ist Mitglied des Workspace, aber nur über `db`-Feature `graph` gebaut.
-- `default = []` in allen Crates, außer den drei aus R3:
-  - `contextra-durable-fs`: `default = ["std"]` (Standardbibliothek, `crc` entfällt).
-  - `contextra-simd`: `default = ["std"]`.
-  - `contextra-rank`: `default = ["std"]`. Die Experimental-Features `exp-dibud`, `exp-resonance`, `experimental-rank` entfallen (REM-18).
-- Keine Feature-Namen mit `compat`, `workspace`, `types-compat`, `ports-compat`, `experimental`.
-- `rust-toolchain.toml` bleibt auf 1.89.0. Das Sandbox-Netz erreicht `static.rust-lang.org` nicht. Entwicklung ist auf jedem Rust ab 1.89 erlaubt, CI prüft mit 1.89.0.
-
----
-
-## 13. Umsetzung
-
-### 13.1 Meilensteine
-
-Aufwand grob als S (≤ 1 Woche), M (2–3 Wochen), L (4–6 Wochen), XL (über 6 Wochen), jeweils für ein Zweierteam, Schätzung ±50 %.
-
-| M | Inhalt | Aufwand | Abnahme |
-|---|---|---|---|
-| **M0 Basis** | Alte Dokumente archivieren (`docs/archive/`). Build repariert (Fassade kompiliert). `MAX_SEARCH_K` vereinheitlicht (ADR-52). Workspace-Lint `forbid`. `budgets.toml` angelegt. `layering.rs` angelegt (G-03). `default-members` bereinigt. Alle `Instant::now`/`SystemTime::now` durch `Clock` ersetzt (G-12). | M | G-01, G-02, G-03, G-04, G-10, G-12 |
-| **M1 Bereinigung** | REM-01 bis REM-37 in Reihenfolge 12.1, 12.2, 12.3. `compat/` nach 12.5. `contextra-types` aufgelöst (ADR-33). `store` von `crypto`, `erasure`, `mvcc` gelöst (REM-27). `mvcc` zu `version` umbenannt. Benchmark für G-STORE. | L | G-03, G-07, G-08, G-09, G-11, G-13. G-STORE entschieden |
-| **M2 Seal und Löschkette** | `contextra-crypto` (KeyTable 128 Byte, Anker, `RecordSealer`, `SegmentSealer`, `KeyDestroyer`, Wurzel-Backends). `contextra-erasure` neu (Log, Gate mandantenweit, Koordinator, Scrub-Planung). `contextra-version` (Katalog, Visibility, `ContentLifecycle`). Seal-Registry. Verdrahtung in `contextra-db` (Tenant-Koordinator, Commit-Lock, Erasure-Lock). Absturzmatrix ab dem ersten schreibenden Schritt | XL | T-ER-01 bis T-ER-26, T-KEY, T-SEG, T-SEC-01 bis T-SEC-04, T-ENC-01 bis T-ENC-03 grün |
-| **M3 Ingest und Embedding** | `contextra-ingest` aus Historie (13.2), beschnitten. `contextra-embed` (ONNX, Referenzmodelle nach ADR-36). Pipeline mit Backpressure, Bulk-Modus | L | T-RAG-01, 02, 10 grün. G-14 vorbereitet |
-| **M4 Suche** | HNSW mit SQ8 und Nachberechnung, Segmentpersistenz (verschlüsselt), Filter und ACL, Planer, Fusion, Reranker-Port, Kontext, Fassade, MCP. Scrub-Ziele vector, text, store | L | T-RAG-03 bis 09, T-RAG-11, T-ER-08, T-IDX-01, T-OPS-10, T-LOG-01 grün |
-| **M4b Graph (optional)** | `contextra-graph` nach 12.4. Feature `graph` in `db`. Graph-Gold-Korpus erstellen. | L | T-GR-01 bis T-GR-12 grün. G-GRAPH gemessen |
-| **M5 Betrieb und Leistung** | Zustände, Startsequenz mit Lazy-Laden, Ressourcenregeln, Latenzfenster (ADR-43), Scrub-Drosselung, `embed-http`, Benchmarks gegen Basislinie, `budgets.toml` befüllt. G-GRAPH-Entscheidung umgesetzt (REM-31 bei Verfehlung) | M | T-OPS-01 bis 09, T-PERF grün. G-GRAPH und G-INDEX entschieden |
-| **M6 Enterprise** | `contextra-kms` (Vault Transit, ADR-47), `contextra-server` (Auth, Metriken), Betriebshandbuch mit Grenzen (7.9), Restore-Ablauf (7.11), Schlüsselsicherung (`contextra key backup`) | L | Ende-zu-Ende-Lauf: Ingest, Suche, Löschung, Schlüsselsicherung, Restore mit `--reapply`. G-01 bis G-14 grün |
-
-**Reihenfolge.** M0 vor M1. M2 vor M3 und M4, weil der Seal-Schreibpfad Voraussetzung ist. M3 und M4 sind danach parallel möglich. M4b ist optional und hängt nur an M4. Kein Meilenstein startet, bevor der Vorgänger seine Abnahme hat.
-
-**Refactoring-Reihenfolge innerhalb von M1 (verbindlich):**
-1. `contextra-ids` übernimmt IDs aus `types` (kein Verhalten).
-2. `ports` von `types` lösen: DTOs nach `ports::dto`, dann `types` ohne Verwendung (REM-27, REM-30).
-3. `simd` von `types` lösen (REM-23).
-4. `store` von `crypto`, `erasure`, `mvcc` lösen. Verschlüsselung über Port `RecordSealer` (ist in M2 implementiert, bis dahin Test-Impl.).
-5. `compat/` je Crate nach CMP-1 bis CMP-8. Reihenfolge: `simd`, `mvcc`, `rank`, `checkpoint`, `graph`, `vector`, `text`.
-6. Features `*-compat`, `workspace` entfernen (CMP-10).
-7. Verbleibende Entfernungen aus 12.1 bis 12.3.
-8. Jeder Schritt ist ein eigener Commit mit `cargo check --workspace` grün.
-
-### 13.2 Wiederverwendung aus der Git-Historie
-
-Die Historie ist am HEAD `2fd0994` mit einem Fetch der Tiefe 400 verfügbar. Ältere Commits fehlen, die genannten Hashes sind vorhanden. Die Commit-Hashes wurden geprüft (Anhang B). Zurückgeholt wird per `git checkout <commit>^ -- <pfad>` in einen Arbeitszweig, dann Compilerfehler beheben, auf neue Ports umstellen, Tests laufen lassen, erst dann in den Hauptzweig.
-
-| Bestandteil | Fundstelle | Umfang (gemessen) | Maßnahme |
-|---|---|---|---|
-| Ingest-Crate | `e5ec76c28^:crates/contextra-ingest/` | 129 Quelldateien, 30.737 Zeilen (mit Tests und Fuzz) | Zurückholen. Entfernen nach REM-32. Ziel 14.000 Zeilen. Feature-Matrix nach ADR-35 |
-| Markdown-Chunker | `ae524bedf^:crates/contextra-db/src/chunker/` | 8 Dateien | Nur falls `ingest` ihn nicht abdeckt. Test `embedding_dimension_switch.rs` übernehmen |
-| ONNX-Embedder und Reranker | `e5ec76c28^:crates/contextra-infer-onnx/` | 14 Dateien, 1.176 Zeilen | Als `contextra-embed`. `reqwest`-Pfad entfällt (kein Netz im Kern, ADR-13) |
-| Candle-Embedder | `e5ec76c28^:crates/contextra-infer-candle/` | 47 Dateien, 8.910 Zeilen | Nicht zurückholen (REM-33, ADR-36) |
-| Audit-Export | `dd895a253^:crates/contextra-audit-export/` | 34 Einträge | Nicht zurückholen (ADR-02) |
-
-### 13.3 Migration
-
-**Entscheidung (ADR-44):** Keine Migration. Entwicklungsdaten im Format v4.0 werden verworfen. Es gibt keine produktiven Daten. Ein Exportwerkzeug entsteht nur mit einer neuen Spezifikationsversion und einem Pilotkunden.
-
-### 13.4 Dokumentation
-
-**REQ-DOC-3 (Dokumentationslint).** `tools/doc_lint.py` prüft vor jedem Merge: keine Verweise auf entfernte Dokumente, Crates, Symbole und Features (Liste 12), keine verbotenen Begriffe in Ledger- und Statusausgaben (7.10), jede Referenz `REQ-`, `ADR-`, `INV-`, `REM-`, `CMP-`, `T-`, `G-` ist definiert. Das Skript ist der einzige Prüfer dieser Regeln (G-08).
-
-**REQ-DOC-1.** Auf v4.1 gebracht oder entfernt: `docs/SPEC.md` (dieses Dokument), `CLAUDE.md`, `README.md` (Root), `benchmarks/README.md`, Crate-READMEs nach 3.6. Veraltete Angaben (6- und 9-Schritt-Saga, `SubjectKey`, `m = 256 MB`, `Poisoned`, Profile, Erfüllungsklassen, Siegel, PLAN v2.1 des Graphen) fallen weg.
-
-### 13.5 Vorlage für `crates/<name>/PLAN.md`
-
-Jedes Crate erhält genau eine Implementierungsspezifikation. Sie wird aus diesem Dokument abgeleitet und verweist nur auf Kapitel und IDs dieser Spezifikation. Abschnitte:
-
-1. **Zweck und Ebene** (aus Kapitel 3.1 und 3.2).
-2. **Vertrag:** Ports, die implementiert werden (Kapitel 3.4), öffentliche Typen (Kapitel 15).
-3. **Abhängigkeiten:** erlaubte Liste aus 3.3, Cargo-Auszug.
-4. **Module:** Dateiliste mit Verantwortung je Datei. Keine Datei namens `compat*`.
-5. **Entfernungen:** IDs aus Kapitel 12, mit Abnahme-Befehl.
-6. **Umbau:** Schritte in Reihenfolge, je Schritt ein Commit.
-7. **Tests:** IDs aus Kapitel 11, zusätzliche crate-lokale Tests mit Begründung.
-8. **Abnahme:** Gates aus 11.6, die das Crate betreffen.
-
-Der Auftrag an die Entwickler ist damit vollständig, eine Rückfrage an diese Spezifikation ist nicht vorgesehen. Fragen zur Umsetzung klärt der Verantwortliche per Änderung dieses Dokuments.
-
----
-
-### 13.6 Werkzeuge und Synchronität
-
-**SYNC-1 (Anhänge sind Quelle).** Die TOML-Blöcke in Anhang D und Anhang E sind normativ. `benchmarks/budgets.toml` und `capabilities.toml` sind 1:1-Kopien davon. Änderungen erfolgen zuerst in der Spec, danach `python3 tools/check_spec_sync.py sync`. Spec und Dateien gehören in denselben Commit. `check` muss grün sein, bevor ein Merge erfolgt. Von Hand wird keine der beiden Dateien geändert.
-
-**SYNC-2 (Schichtprüfung).** `tools/check_spec_sync.py layering` ruft `cargo metadata` auf und prüft die normalen Abhängigkeiten der Workspace-Crates gegen Anhang E: erlaubte Kanten (R1 und Tabelle), E1 → E1 (R2), `compat`-Features und `src/compat/`-Verzeichnisse (R7), verbotene Crate-Namen (`contextra-types`, `contextra-mvcc`, `contextra-engine`, `contextra-vault`). Dev-Abhängigkeiten werden nicht geprüft, dies entspricht REM-27 („außerhalb von dev-dependencies“). Exit-Code 1 bei Verletzung. Der aktuelle Befund (Stand 21.11.2026) ist rot. Er zeigt die offenen Punkte aus REM-27 und die Umbenennung nach ADR-06 und wird mit deren Umsetzung grün.
-
-**SYNC-3 (Einstieg).** `tools/quickcheck.sh` ist der einheitliche Einstieg: `build`, `sync`, `layering`, `gates`, `lint`, `coverage`, `all`. Ausgaben liegen ausschließlich unter `evidence/` (gitignored). Neue Prüfungen kommen in diese Struktur, nicht als eigenständige Skripte. Ausnahmen sind Gates aus 11.6, die ein eigenes Werkzeug verlangen.
-
-**SYNC-4 (Toolchain).** Für Produktion und Gate G-01 gilt weiterhin `rust-toolchain.toml` (1.89.0). Im Entwicklungs-Sandbox ist der Download dieser Toolchain blockiert. Dort gilt `RUSTUP_TOOLCHAIN=stable`. Gemessen wurde mit 1.97.0. Die Abweichung ist bis zur Verfügbarkeit einer lokalen 1.89.0-Toolchain ausdrücklich vermerkt.
-
-**SYNC-5 (Ratchet und Gate-Vorbereitung, Notiz vom 21.11.2026).** Zwei Ratchets verhindern neue Befunde, ohne den Ist-Bestand sofort auf null zu verlangen. (a) G-03: `python3 tools/check_spec_sync.py layering --ratchet` vergleicht die Schichtbefunde mit `layering_baseline.txt`. Neue Befunde sind Fehler, bekannte nicht. `--update-baseline` schreibt die Baseline nur nach bewusstem Abbau. Der Test `crates/contextra-testkit/tests/layering.rs` ruft denselben Ratchet auf. (b) G-13: `tools/unwrap_ratchet.py` vergleicht die Zählung von `unwrap()`, `expect(`, `panic!(` je Crate mit `.unwrap-baseline.json`. Ein Anstieg ist ein Fehler, `--update` nur nach bewusstem Abbau. Vorbereitung für die Gates: Jedes Crate erhält eine `README.md` nach 3.6. Diese Notiz ändert keine Norm. Die Gates bleiben wie in 11.6 beschrieben.
-
----
-
-## 14. Nachweis der Befundauflösung
-
-Jeder Befund aus 0.3 ist hier einem Abschnitt und einem Test zugeordnet. Eine Änderung ohne Eintrag hier gilt als unvollständig.
-
-| Befund | Auflösung in | Nachweis |
-|---|---|---|
-| F-01 | 3.1, ADR-21, 6.10 | G-GRAPH, T-GR-01 bis T-GR-12 |
-| F-02 | ADR-25, 12.4 | G-07 |
-| F-03 | ADR-24, 1.3 | G-07 |
-| F-04 | ADR-23, REQ-FMT-2, 5.2 | T-GR-01, T-LOG-01 |
-| F-05 | ADR-22, ADR-27, 6.10 | T-GR-03 |
-| F-06 | ADR-22, REQ-GR-4, REQ-GR-6 | T-GR-03, T-GR-04 |
-| F-07 | ADR-32, 3.3, REM-27 | G-03 |
-| F-08 | ADR-33, REM-30 | G-07 |
-| F-09 | ADR-51, 12.5 | G-11 |
-| F-10 | ADR-40, REQ-KEY-1 | T-KEY-05 |
-| F-11 | ADR-30, ADR-31, INV-9, 7.4 | T-ENC-01, T-SEG-02 |
-| F-12 | ADR-29, 5.5, REQ-REC-2 | T-KEY-01, T-ER-05 |
-| F-13 | ADR-52, REQ-RES-4 | G-04 |
-| F-14 | ADR-16, C0 | T-KEY-06 |
-| F-15 | REQ-KEY-4, REQ-CON-7 | T-KEY-03 |
-| F-16 | ADR-16 | T-KEY-06 |
-| F-17 | 7.3 (REQ-ER-2) | T-SEC-02, T-ER-12 |
-| F-18 | ADR-28, REQ-CON-1a, 4.7 | T-ER-07 |
-| F-19 | REQ-ING-7, REQ-CON-1b | T-ER-14, T-SEC-03, T-RAG-11 |
-| F-20 | 5.7 | T-ER-11 |
-| F-21 | 7.4 (Publikationsreihenfolge) | T-ER-04 |
-| F-22 | ADR-43, REQ-SCR-4 | T-ER-19 |
-| F-23 | ADR-43, 10.3 | ADR-02, G-14 |
-| F-24 | REQ-VEC-4 | T-IDX-01 |
-| F-25 | REQ-TXT-2 | Metrik in T-RAG-03 |
-| F-26 | REQ-TIM-1 | G-12 |
-| F-27 | 12.6 | G-01 |
-| F-28 | ADR-53 | G-02 |
-| F-29 | REQ-REC-2 | T-ER-05 |
-| F-30 | REQ-ER-6 | T-ER-25 |
-| F-31 | ADR-38, REQ-FLT-2 | T-SEC-01, T-SEC-04 |
-| F-32 | ADR-38, 7.2 | T-SEC-02 |
-| F-33 | ADR-50, REQ-CTX-4 | T-RAG-10, T-ENC-02 |
-| F-34 | 5.8 | T-SEG-01 |
-| F-35 | ADR-42, REQ-BAK-1 | Abnahme Ende-zu-Ende (M6) |
-| F-36 | REQ-FLT-3, 9 | T-RAG-05 |
-| F-37 | Anhang B | Messung in Anhang B |
-| F-38 | REM-01, REM-19 | `grep` in 12.1, 12.3 |
-| F-39 | 12 (Pfade korrigiert) | Abnahmebefehle in 12 |
-| F-40 | REQ-DOC-1, 13.5 | G-09 |
-| F-41 | 3.3, REM-31 | G-03 |
-| F-42 | ADR-24, 12.6 | G-06 |
-| F-43 | REM-10, 13.1 M2 | T-ER-11, G-09 |
-| F-44 | ADR-35, REQ-ING-2 | T-RAG-02 |
-
----
-
-### 14.1 Offene Punkte aus v4.0
-
-| Punkt | Frage | Entscheidung | Ort |
-|---|---|---|---|
-| OPEN-1 | Rechtliche Einordnung des Produkts | Keine Bewertung im Produkt und in der Spezifikation. Die Einordnung trifft der Verantwortliche | ADR-45, REQ-DOC-2 |
-| OPEN-2 | Erstes KMS-Backend | HashiCorp Vault Transit, selbst betrieben. AWS KMS nur mit neuer Spezifikationsversion | ADR-47 |
-| OPEN-3 | Hochverfügbarkeit und Replikation | Ausgeschlossen in v4.x | ADR-46 |
-| OPEN-4 | Formatliste des Ingest (`fmt-ole`, `fmt-odf`, `fmt-structured`) | Entfallen nach REM-32. Unterstützt nach REQ-ING-2: TXT, Markdown, JSON, HTML, DOCX, PPTX, XLSX, CSV, PDF (ohne OCR), EML, MBOX. ODF, OLE und YAML/TOML entfallen | ADR-35, REQ-ING-2 |
-| OPEN-5 | Migration der Entwicklungsdaten | Keine Migration. Daten im Format v4.0 werden verworfen | ADR-44 |
-
-## 15. Crate-Verträge
-
-Jede Zeile ist eine Vorgabe für das Crate-`PLAN.md`. Ports sind in 3.4 und 4.4 definiert.
-
-**`contextra-ids`** (E0). Normalisierung von `SubjectRef` vor jeder Tag-Bildung (H-02): Unicode-NFC, Kleinschreibung, Entfernen von Leerraum und Trennzeichen bei Personalnummern, E-Mail-Adressen vollständig klein. Dieselbe Regel gilt für Registry-Tags, Entdeckung und Idempotenz; Testvektoren in T-NEW-11. Typen: `DocId`, `TenantId`, `CollectionId`, `SealOrd`, `SegOrd`, `ChunkSlot`, `TicketId`, `SubjectRef`, `PrincipalRef`. Limits: `MAX_SEARCH_K = 1_000` (einzige Definition, ADR-52), `MAX_CHUNKS_PER_DOC`, `MAX_BATCH_BYTES`. Abhängigkeiten: keine internen. Features: keine. Tests: Serialisierung, Ordinal-Monotonie, Limit-Konsistenz (G-04).
-
-**`contextra-env`** (E0). `Clock` (real, `ManualClock`), `SeededRng`, `MetricsSink`. Einzige Stelle mit `Instant::now`/`SystemTime::now` (G-12). Tests: Clock-Semantik, Zähler ohne Nutzdaten (T-LOG-01).
-
-**`contextra-sys`** (E0). mlock, Dumpable, Direct-IO. Einzige `unsafe`-Insel neben `simd`. Tests: mlock-Verweigerung führt zu `Refused` (T-OPS-09).
-
-**`contextra-simd`** (E0). Distanzkerne SIMD und Skalar, Dispatch (CMP-7, REM-23). Abhängigkeiten: keine. Features: `std`. Tests: Kernel gegen Skalar (Property-Test).
-
-**`contextra-durable-fs`** (E0). Atomares Schreiben (`tmp → fsync → rename → fsync(Verzeichnis)`), Gruppen-Sync, Dateisperre. Entfernen: REM-07, REM-13. Tests: Absturzmatrix mit `FaultVfs` aus testkit.
-
-**`contextra-ports`** (E0). Alle Traits aus 4.4, 3.4 und 6.2 (`EmbeddingProvider`, `Reranker`), `KvStore`, `SegmentStore`, `VectorIndex`, `TextIndex`, `GraphIndex`, `Checkpointer`, `RootKeyProvider`, `ErasureSink`, `ContextraError`, DTO-Modul `dto` (`SourceDoc`, `SearchQuery`, `SearchResponse`, `ContextPack`, `ErasureRequest`, `ScrubPlan`, `ScrubProgress`, `IoBudget`). Abhängigkeit: `ids`, `roaring`. Entfernen: REM-03, REM-25, REM-30 (Import), REM-36. Tests: Objektsicherheit der Traits (Compile-Test), DTO-Roundtrip.
-
-**`contextra-crypto`** (E1). `aead` (AES-256-GCM, AES-256-GCM-SIV), `kdf` (Argon2id, HKDF nur aus Wurzel), `keytable` (5.5), `anchor` (5.6), `sealer` (`RecordSealer`, `SegmentSealer`), `destroyer` (`KeyDestroyer`, REQ-KEY-4), `root` (`Passphrase`, `KeyFile`, `VaultTransit` in M6), `cache` (REQ-KEY-6, REQ-CON-7), `secret` (zeroize-Typen ohne `Debug`). Entfernen: REM-04, REM-11, REM-35. Abhängigkeiten: `ports`, `ids`, `env`, `durable-fs`. Tests: T-KEY-01 bis T-KEY-06, T-ENC-03.
-
-**`contextra-erasure`** (E1). `log` (CXEL, 7.8), `gate` (CXGS, `TenantGate: ReadGate`, 7.8), `ticket`, `classify` (7.3), `chain` (E0 bis E4 mit Ports, 7.4), `state` (7.5), `scrub_plan` (7.6, reine Planung), `review` (REQ-ER-3, REQ-ER-6), `hold` (REQ-RET-2), `ledger` (7.10). Entfernen: REM-10, REM-16. Abhängigkeiten: `ports`, `ids`, `env`, `durable-fs`. Tests: T-ER-01 bis T-ER-26 (Anteile), T-LOG-01.
-
-**`contextra-version`** (E1, aus `mvcc`). `catalog` (REQ-VER-1), `snapshot` (REQ-VER-2), `retention` (REQ-VER-3), `visibility` (`Visibility`, `ContentLifecycle`-Sender), `error`. Entfernen: REM-12. Tests: T-ER-10, T-ER-11, REQ-VER-5 (Zeitreise mit `index_history`).
-
-**`contextra-store`** (E1). `lsm/` (Memtable, SST, Manifest, WAL), `kv` (`KvStore`), `segments` (`SegmentStore` für Dateien mit Kopf nach 5.8, ohne Verschlüsselung selbst), `compaction` (Kompaktion mit Löschfilter für Records toter Seals, REQ-SCR-3), `fsync`, `budget`, `stats`. Entfernen: REM-02, REM-05, REM-08, REM-26, REM-27, CMP-4. Abhängigkeiten: `ports`, `ids`, `env`, `sys`, `durable-fs`. Tests: G-STORE-Benchmark, Wiederanlauf, Kompaktionsfilter.
-
-**`contextra-vector`** (E1). `hnsw/` (Graph, Delta, Persistenz nach REQ-VEC-4), `exact` (SIMD), `sq8` (Kalibrierung, REQ-VEC-1a), `acorn` (Filtertraversierung), `planner` (REQ-FLT-3), `scrub` (`ScrubTarget`, REQ-VEC-5), `index` (`VectorIndex`), `types`, `error`. Entfernen: REM-09, REM-23, CMP-8. Tests: T-RAG-04, T-RAG-05, T-IDX-01, T-ER-03.
-
-**`contextra-text`** (E1). `tokenize` (REQ-TXT-1a), `stopwords/` (Daten), `bm25`, `wand`, `inverted` (Segmente), `index` (`TextIndex`), `merge`, `scrub` (`ScrubTarget`), `discovery` (REQ-TXT-3), `types`, `error`. Entfernen: CMP-3, Komposita-Code (REQ-TXT-1a). Tests: T-RAG-03, T-ER-02, Metrik F-25.
-
-**`contextra-graph`** (E1, optional). Siehe 12.4 und 6.10. Tests: T-GR-01 bis T-GR-12.
-
-**`contextra-rank`** (E1). RRF, Top-k, Zeitgewichtung (`valid_at`), Erklärung. Entfernen: REM-06, REM-18, CMP-6. Features: `std`. Tests: Determinismus bei gleichen Eingaben, Tie-Break (REQ-SRC-1 Schritt 7).
-
-**`contextra-privacy`** (E1). `entity_recognizer` (Muster, Prüfziffern, Listen), `data_class`, `egress_guard` (fail-closed), `processing_registry`, `guarded_payload`. Entfernen: REM-20. Abhängigkeiten: `ids`, `env`. Tests: Erkennungsgrenzen, Guard fail-closed.
-
-**`contextra-checkpoint`** (E1). Hartlink-Snapshot und Restore, Ausschluss `keys/` und `erasure/` (ADR-42), Retention nach `checkpoint_retention`. Entfernen: CMP-2. Abhängigkeiten: `ports`, `ids`, `env`, `durable-fs`. Dev-Abhängigkeit `testkit`. Tests: Ausschluss, Restore-Test mit Gate-Erhalt.
-
-**`contextra-ingest`** (E2). `formats/` (ADR-35), `chunking/` (REQ-ING-3), `detect/` (MIME-Erkennung, unbekannte Formate abweisen), `pipeline/` (Parse-Stufe), `ir.rs` (einziger Zwischenformat-Typ), `limits`, `report`. Keine internen Abhängigkeiten. Features: `ingest-*` nach 6.1. Tests: T-RAG-01, T-RAG-02, Fuzz-Ziele unter `fuzz/`.
-
-**`contextra-embed`** (E2). `onnx/` (ort, Modellprüfung per SHA-256), `reranker/`, `provider` (`EmbeddingProvider`-Impl.). Abhängigkeiten: `ports`, `ids`. Features: keine. Tests: Modellhash, Batchgleichheit (`batch_equiv`), Modellwechsel.
-
-**`contextra-db`** (E2). Orchestrierung: Schreib-Task je Shard, Tenant-Koordinator, Commit-Lock, Erasure-Lock, Startsequenz (8.3), Scheduler, Latenzfenster (ADR-43), Verdrahtung der Ports (3.4, 7.13). Features: `graph`, `vector`, `embed`, `ingest` (Standard alle außer `graph`). `text` ist Pflicht (D8). Abhängigkeiten: alle E1-Crates, `ports`, `ids`, `env`, `ingest`, `embed`. Tests: T-OPS-01 bis T-OPS-10, T-SEC-03, T-RAG-11, T-ER-07.
-
-**`contextra`** (E2, Fassade). Öffentliche API nach 6.8, Konfigurationsladen, Fehlerabbildung. Entfernen: REM-02 (Profile), REM-24, REM-25. Abhängigkeiten: `db`, `ports`, `ids`, `privacy`. Tests: API-Oberflächentest, Konfigurationsfehler (T-OPS-03).
-
-**`contextra-mcp`** (E3). stdio-Server, Tool-Schemas aus den Fassadentypen, Principals aus Konfiguration (ADR-38). Entfernen: REM-21, REM-22. Abhängigkeiten: `contextra`, `ports`, `privacy`. Tests: T-SEC-04, Schema-Roundtrip.
-
-**`contextra-testkit`** (E3, nur dev). FaultVfs, Canary-Scanner (T-ENC-01), Mock-Store, Mock-Uhr, Schedule-Exploration (`loom`), Mock-Embedder, Mock-Gate. Enthält `mock.rs` aus CMP-3. Abhängigkeiten: alle außer `bench`, `server`, `kms`. Tests: G-03 (`layering.rs`).
-
-**`contextra-bench`** (E3, `benchmarks/contextra-bench/`). Benchmarks gegen `budgets.toml`, Basisvergleich (`bench_baseline`), Graph-Gold-Auswertung (G-GRAPH). Abhängigkeiten: `contextra`, `db`, `vector`, `text`, `store`, `rank`, `graph`.
-
-**`contextra-embed-http`** (E3). HTTP-Embedder mit TLS, Allowlist, Zeitgrenzen. Abhängigkeiten: `ports`. Features: `http` (Standard aus). Tests: Endpunkt-Allowlist, Egress-Guard-Anbindung.
-
-**`contextra-server`** (E3, M6). HTTP/gRPC, OIDC, Metriken (Prometheus), Backpressure. Abhängigkeiten: `contextra`, `ports`. Tests: Standard-Deny, Claim-Mapping.
-
-**`contextra-kms`** (E3, M6). Vault-Transit-Adapter (`RootKeyProvider`, ADR-47). Abhängigkeiten: `ports`. Tests: Verweigerung bei Verbindungsfehler, kein Klartext im Log.
-
----
-
-## Anhang A: Verbleib der Konzepte aus v4.0
-
-| Altes Konzept | Neu |
-|---|---|
-| ER-1/2 `DocDek` je Version | Schlüssel je **Seal** (ADR-01), Version ohne Schlüsselbezug |
-| ER-3 Wrap mit AES-GCM-SIV | beibehalten (REQ-KEY-2) |
-| ER-4 Keine HKDF für Datenschlüssel | beibehalten (REQ-KEY-1), präzisiert für Strukturschlüssel (ADR-40) |
-| ER-5 Gate vor Entschlüsselung | beibehalten (REQ-FLT-5) |
-| ER-6 Zeitreise gegen aktuellen Stand | folgt aus der Trennung (REQ-VER-6) |
-| ER-7/8 `fsync → Snapshot-Swap`, Quarantäne | beibehalten (REQ-GATE-1) |
-| ER-9 Gate-Log-Verdichtung | Gate-Snapshot `CXGS` (7.8) |
-| Gate-Log HMAC-Kette | entfällt, CRC und Sequenz (ADR-02); mit D9 wieder eingeführt als MAC-Kette mit Schlüssel `K_log` im Anker |
-| ER-10/11 Generationen, Epochen-Rewrap | Epochen, Rewrap in KeyTable (REQ-KEY-5) |
-| ER-12 KeyTable-Sharding | Slot-Datei mit Überschreiben an Ort (ADR-08), 128 Byte (ADR-29) |
-| ER-13 `DeleteAll` als Standard | `Restrict` als Standard (ADR-10) |
-| ER-14 Trockenlauf | beibehalten, erweitert um Entdeckung (7.3) |
-| ER-15/16 Konfliktdokumente, Review | beibehalten (REQ-ER-2, REQ-ER-3) |
-| ER-17 `RedactSplit` | `RedactReingest` (REQ-ER-4) |
-| ER-18 `Derived<T>` mit Quellmenge | ersetzt durch Seal-Bezug jedes Chunks, Provenienz im Graph (ADR-22) und `SealScoped` |
-| ER-20 Keine veralteten Ableitungen | beibehalten (Ableitungen verweisen auf Seals, werden gefiltert und im Scrub entfernt) |
-| ER-21/22 Inkrementelle BM25-Statistik | `N` und Länge exakt, `df` beim Merge (REQ-TXT-2) |
-| ER-23 Flache Suche, `zeroize` der Slots | HNSW mit routen-erhaltendem Scrub (REQ-VEC-5) |
-| ER-24 Kein Umverdrahten | aufgegeben: Konsolidierung (REQ-VEC-5) |
-| ER-25 Neuaufbau bei 20 % | Neuaufbau erst bei 30 % nach Konsolidierung |
-| ER-26/27 Cluster-Segmente | entfallen (ADR-11) |
-| ER-28 Handkodierte Formate | auf fünf begrenzt (REQ-FMT-4, 5.10) |
-| ER-29 `segment_max_bytes` | beibehalten (REQ-TXT-1) |
-| ER-30/31 Reihenfolge, frühe Vernichtung | frühe Vernichtung ist Standard (ADR-03), für Segmentschlüssel eingeschränkt (ADR-31) |
-| ER-32 Bereinigungsfrist | `scrub_deadline` (7.4) |
-| ER-33 Wiederanlauf | beibehalten, Slot-Tabelle (REQ-REC-2) |
-| ER-34 Einzelausführung | beibehalten (REQ-CON-4) |
-| ER-35 bis 37 Bericht, JCS, Ed25519, Bescheinigung | entfallen (ADR-02), ersetzt durch Ledger und Status (7.10) |
-| ER-38 Inventarpflicht | entfällt mit der Messung |
-| ER-39/40 Verifikation, Prüfwerkzeug | entfallen. Vier-Augen-Prinzip als Option für Entscheidungen |
-| ER-41 Sprach-Gate | als Dokumentationsregel (REQ-DOC-2) |
-| ER-42 Zwei Spuren | beibehalten, Schlüssel und Erasure getrennt (REQ-BAK-1, ADR-42) |
-| ER-43/44/45 Senke, Restore-Guard, Horizont | beibehalten (7.11) |
-| ER-46/47/48 Einschränkung, Automat | beibehalten, Automat in 7.5 mit Review-Fristen (REQ-ER-6) |
-| v3 Zustände `MeasuredA`, `Reported` u. a. | entfallen |
-| v3 Custody K1 bis K3 | K1, K1b, K3 (ADR-15, ADR-47) |
-| v3 REQ-IDX-1 Flach als Pflicht | exakt nur klein und als Referenz (ADR-04) |
-| Graph-Entwurf (PLAN v2.1) | Generationen mit ArtKey verworfen (ADR-27), Provenienz statt Klassenbindung (ADR-22) |
-| Graph-Anhang v4.0 (USP-Liste) | überarbeitet in 6.10 und ADR-21 bis ADR-27. `ConsistencyEnforcer` und `SessionBranchTree` entfallen (ADR-24, ADR-25) |
-
-## Anhang B: Feststellungen am Repository (HEAD `2fd0994`, 20.11.2026)
-
-Messung mit `find`, `grep`, `wc` und `git` am geklonten Stand. Alle Zahlen der Spalte „Messung“ wurden gezählt. Nur Angaben mit „Schätzung“ oder „nicht geprüft“ sind keine Messung.
-
-| Fakt | v4.0 | Messung | Quelle |
-|---|---|---|---|
-| Workspace-Mitglieder | 23 | **22** (21 Crates + `benchmarks/contextra-bench`) | `Cargo.toml` `members` |
-| Rust-Zeilen in `crates/` | 244.000 | **233.961** (inkl. Tests) | Summe über `crates/*/src` und `tests` |
-| Rust-Zeilen in `benchmarks/contextra-bench` | 5.200 | **5.199** | `wc -l` |
-| Rust-Zeilen gesamt inkl. `benchmarks/*.rs` | 249.000 | **239.968** | `find crates benchmarks -name '*.rs'` |
-| `contextra-graph` Umfang | nicht erfasst | **34.611** Zeilen, **153** Dateien | `wc` |
-| `contextra-ingest` (Historie `e5ec76c28^`) | 155 Dateien, ~21.000 | **129** `.rs`-Dateien, **30.737** Zeilen | `git archive` + `wc` |
-| `contextra-infer-onnx` (Historie) | ~1.000 | **14** Dateien, **1.176** Zeilen | `git archive` + `wc` |
-| `contextra-infer-candle` (Historie) | nicht erfasst | **47** Dateien, **8.910** Zeilen | `git archive` + `wc` |
-| `compat/`-Zeilen gesamt | rund 5.800 | **7.465** (7.443 in `compat/`-Verzeichnissen, 22 in `compat.rs`) | `find -type d -name compat` + `wc` |
-| `cfg(feature)`-Stellen mit `compat`/`workspace` | nicht erfasst | **120** | `grep -rn` |
-| `MAX_SEARCH_K`-Definitionen | sechs | **sechs**, Werte 1.000 (ids, types, graph) und 10.000 (text, rank, vector) | `grep -rn "const MAX_SEARCH_K"` |
-| `MAX_SEARCH_K`-Verwendungen | nicht erfasst | **86** | `grep -rn` |
-| Abhängigkeit `ports → types` | nicht erfasst | **5** Verwendungen im Code, Cargo-Abhängigkeit vorhanden | `grep`, `Cargo.toml` |
-| Abhängigkeit `store → crypto` | nicht erfasst | **16** Verwendungen, Cargo-Abhängigkeit | `grep`, `Cargo.toml` |
-| Abhängigkeit `store → mvcc`, `store → erasure` | nicht erfasst | Cargo-Abhängigkeit vorhanden | `Cargo.toml` |
-| Abhängigkeit `simd → types` | „entfernen“ | vorhanden | `Cargo.toml` |
-| Abhängigkeit `db → graph` | nicht erfasst | vorhanden, im Orchestrator ungenutzt | `Cargo.toml`, `grep` |
-| `unsafe` im Produktcode | nicht geprüft | nur in `contextra-sys` und `contextra-simd`. In Test-Targets zusätzlich `contextra-text/tests/alloc_profiler.rs` und `contextra-graph/tests/ppr_alloc_test.rs` (entfällt mit 12.4). Vektor-Distanzen enthalten kein `unsafe` | `grep -rn "unsafe "` ohne Kommentarzeilen |
-| `Instant::now`/`SystemTime::now` außerhalb `env` | nicht erfasst | **77** | `grep -rn` |
-| `unwrap`, `expect`, `panic!` | nicht erfasst | **2.942** Treffer in `crates/*/src` inkl. `#[cfg(test)]`-Module, **6.939** in `crates/` gesamt. Produktcode ohne Tests zählt M0 genau | `grep -rn` |
-| Netzwerk-Crates in Kern-Manifesten | „keine“ | keine. Die Grep-Treffer sind Teilwörter (`hyperedge`, `Isotonic`). G-05 prüft exakt | `grep` mit Wortgrenzen |
-| Feature `workspace` in `graph` (nicht Default) | nicht erfasst | vorhanden, lädt Typen und Ports | `Cargo.toml` |
-| Graph-Persistenz | nicht erfasst | `bincode` über Port `StorageEngine`, nur mit Feature `workspace` | `csr/graph_persist.rs` |
-| Graph-Klartext | nicht erfasst | `Entity.name: Arc<str>`, `Edge.label: Arc<str>` | `graph/src/types.rs` |
-| `ConsistencyEnforcer` | „zwingend für DSGVO-Löschung“ | Mustererkennung, keine Kantenbereinigung (Modul-Doku) | `graph/src/consistency_enforcement.rs` |
-| Graph-Default-Features | nicht erfasst | `session-dag`, `entity-extraction`, `hyperedge-suggest`, `experimental-graph` | `Cargo.toml` |
-| LLM-Pfad im Graph | nicht erfasst | `validate_candidates_with_llm` hinter `workspace` | `graph/src/hyperedge_suggest.rs` |
-| `contextra-engine` | „entfernt“ (REM-19) | Verzeichnis fehlt, Verweise in Kommentaren | `ls`, `grep` |
-| `contextra-vault` | „entfernt“ (REM-01) | Verzeichnis fehlt, Eintrag in `exclude` | `ls`, `Cargo.toml` |
-| `ports/src/ports/query_rewriter.rs` | REM-25 | fehlt. Richtig: `ports/src/query_rewriter.rs` | `ls` |
-| `store/src/compat` | REM-15 | fehlt | `ls` |
-| `docs/crates/`, Root-`AGENTS.md` | REM-29 | fehlen | `ls` |
-| `benchmarks/budgets.toml`, `docs/erasure.md`, `docs/Finale Löscharchitektur.md` | fehlend | fehlen | `ls` |
-| `tests/layering.rs` (G-03) | angelegt bis M0 | fehlt | `ls` |
-| `tests/unsafe_islands.rs` | G-02 | vorhanden | `ls` |
-| `ANCHOR[`-Kommentare | nicht erfasst | **460** Dateien | `grep -rl` |
-| `FILE-CONTEXT`-Kommentare | nicht erfasst | **415** Dateien in `crates/` (Messung 21.11.2026) | `grep -rl` |
-| `contract.rs` | nicht erfasst | **9** Dateien | `find` |
-| Skripte in `tools/` | nicht erfasst | **29** | `ls tools` |
-| `Cargo.lock` | Version 4 | Version 4 | `head` |
-| Toolchain | 1.89.0 | 1.89.0 in `rust-toolchain.toml`, Download im Sandbox blockiert, `stable` vorhanden | `rustup` |
-| Workspace-Lint `unsafe_code` | `deny` | `deny`. Ziel `forbid` (G-02) | `Cargo.toml` |
-| Historie | „5.952 Commits“ | Gesamtzahl nicht geprüft (flacher Fetch mit Tiefe 400). Commit-Hashes `e5ec76c28` (18.11.), `ae524bedf` (19.11.), `dd895a253` (17.11.) existieren | `git cat-file` |
-| `e5ec76c28` Inhalt | Ingest, Embedder, Candle eingefroren | zusätzlich `contextra-wire`, `contextra-py`, `contextra-prompt-guard`, `contextra-infer-ollama` | Commit-Message |
-| Vektor-Modul ACORN | „ACORN-artige Traversierung“ | `contextra-vector/src/acorn/` vorhanden | `ls` |
-| Vektor-Modul HNSW | vorhanden | `contextra-vector/src/hnsw/` vorhanden | `ls` |
-
-Die Zeilenzahlen der Zielspalte (Abschnitt 3.1) sind Schätzungen mit ±25 % Spanne.
-
-**Nachtrag 21.11.2026 (keine Neumessung der Tabelle oben):** Die Zeilen „`benchmarks/budgets.toml` … fehlend“ und „`tests/layering.rs` … fehlt“ beziehen sich auf den Stand vom 20.11.2026. Beide Dateien existieren inzwischen (Abschnitt 13.6). Die Schichtprüfung ergab am 21.11.2026 49 Befunde (`check_spec_sync.py layering`), darunter die in REM-27 genannten Verletzungen.
-
-## Anhang C: Glossar
-
-| Begriff | Bedeutung |
-|---|---|
-| **Seal** | Unveränderliche Inhaltseinheit einer Dokumentrevision mit eigenem Schlüssel und dichter Ordinalzahl |
-| **SegKey** | Schlüssel eines abgeleiteten Segments (Postings, Vektor- und Graphstruktur). Vernichtung erst nach Neuschreiben (ADR-31) |
-| **Gate** | Mandantenweite Lesesperre über Seal-Ordinale (`Open`, `Restricted`, `Erased`) und `tenant_erased` |
-| **LiveMask** | Abgeleitete Bitmap lebender Chunk-Slots im Suchpfad |
-| **Scrub** | Gebündelte Bereinigung abgeleiteter Strukturen nach Neuschreiben der Segmente |
-| **Konsolidierung** | Ersetzen toter Nachbarn in HNSW- oder Graph-Nachbarlisten durch deren lebende Nachbarn |
-| **Routen-erhaltender Scrub** | Ersetzen des SQ8-Codes eines toten Knotens durch den Mittelwert lebender Nachbarn |
-| **Provenienz** | Menge der Seals, aus denen eine Kante oder Entität stammt |
-| **PathRAG** | Traversierung eines Entitätsgraphen mit Pfadbewertung und Belegen |
-| **Ledger** | Nur-anhängen-Protokoll der Löschaufträge ohne Kennungen und Inhalte |
-| **Senke** | Unabhängiger Speicher für Gate- und Vernichtungsereignisse, nicht Teil der Datensicherung |
-| **Commit-Lock** | Mandantenweiter Lock: Ingest-Commits lesen, Löschung schreibt (REQ-CON-1b) |
-| **ContentRef** | Undurchsichtiger Verweis der Versionierung auf einen Seal |
-| **Compat-Auflösung** | Entfernen der Bridge-Schichten und Verschieben ihrer Inhalte in die Besitzer-Module (12.5) |
-
-## Anhang D: `benchmarks/budgets.toml` (Startwerte)
-
-Quelle für `benchmarks/budgets.toml` (SYNC-1). Prüfung: `python3 tools/check_spec_sync.py check`.
-
-```toml
-# Startwerte. Jeder Wert wird erst verbindlich, wenn der Benchmark ihn misst (INV-8).
-[search.s]
-hybrid_p50_ms = 15
-hybrid_p95_ms = 40
-filtered_factor_max = 1.5
-recall_at10_min = 0.95
-qps_min = 200
-ram_per_chunk_kb_max = 1.5
-cold_start_ready_s = 10
-
-[search.l]
-hybrid_p50_ms = 30
-hybrid_p95_ms = 80
-filtered_factor_max = 1.5
-recall_at10_min = 0.95
-qps_min = 100
-ram_per_chunk_kb_max = 1.5
-cold_start_ready_s = 60
-
-[graph]
-pathrag_extra_p95_ms_s = 25
-pathrag_extra_p95_ms_l = 50
-ingest_relations_per_s = 20000
-ram_per_entity_b = 96
-ram_per_edge_b = 48
-
-[ingest]
-chunks_per_s_per_shard = 2000
-chunker_mb_per_s_per_core = 5
-bulk_factor_min = 1.5
-
-[erasure]
-e1_p99_ms_1000_seals = 5
-e2_p99_s_1000_seals = 1
-tenant_offboarding_ms = 100
-search_overhead_max_pct = 3
-ingest_ratio_min_pct = 95
-search_overhead_during_scrub_max_pct = 5
-ram_overhead_max_pct = 1
-
-[keys]
-argon2_m_min_mib = 64
-argon2_t_min = 3
-argon2_p_min = 1
-slot_size_bytes = 128
+## 13. Recovery
+
+### 13.1 Ablauf beim Öffnen (deterministisch, 11 Schritte)
+
+```
+ 1. Fs::lock(LOCK): Exclusive (lesend-schreibend) oder Shared (open_readonly: heilt nichts, startet keine Wartung); scheitert ⇒ Err(Locked)
+ 2. FORMAT lesen; integrity_mode gegen Config prüfen (F-15) ⇒ Err(Unsupported); unbekanntes Pflicht-Feature ⇒ Err(Unsupported)
+    Authenticated/Encrypted: KEK holen, KEYS öffnen (root_key, Space-DEKs), FORMAT.chk prüfen
+ 3. CURRENT ⇒ Catalog-Datei; Records lesen (letzter Torn-Record verworfen, sonst Corrupt); Zustand aufbauen
+    (Spaces, FileMeta, Blob-Tabelle, Consumer, flushed_stamps, redo{floor,floor_stamp,hwm}, reserve, pending erases, erased_ranges, domain_retired)
+    keys_generation ≥ keys_generation_min prüfen ⇒ sonst Err(Rolledback); optional RollbackAnchor::latest vergleichen
+ 4. *.building.* löschen; Dateien, die der Catalog nicht nennt (Runs, Blobs inkl. nicht aktueller Generationen, Segmente,
+    Redo-Segmente mit segment_id < redo_floor), löschen — Reserve-Segmente (≥ redo_floor) bleiben (INV-LOG-7)
+ 5. Vom Catalog genannte Datei fehlt ⇒ Err(Corrupt{MissingFile{kind,id}}) (fail-closed, kein Raten)
+ 6. Redo-Segmente ab redo_floor in Id-Reihenfolge lesen:
+      gültige Frames anwenden, je Op nur wenn stamp > space.flushed_stamp
+         (domänenversiegelte Körper entsiegeln; Domänenschlüssel vernichtet oder in domain_retired ⇒ Körper verwerfen, Eintrag „vernichtet“)
+      EraseRange-Op ⇒ Marker in die Memtable und Auftrag in die pending-Menge, falls kein erase_done
+      Defekt in gesiegeltem Segment ⇒ Err(Corrupt)                                   (INV-LOG-6)
+      Ungesiegeltes Segment mit nachfolgendem Segment mit Frames ⇒ Err(Corrupt)
+      letztes ungesiegeltes Segment: auf letztes gültiges Frame abschneiden, sync_data, SIEGELN, sync_data
+      INV-LOG-8: letzter gültiger Stamp (bzw. redo_floor_stamp) < redo_hwm ⇒ Err(Corrupt{RedoTruncated})
+ 7. next_stamp = max(letzter Redo-Stamp, max flushed_stamp, max Run-Stamp) + 1; visible_stamp = next_stamp − 1; durable_stamp = visible_stamp
+ 8. ID-Vergabe beginnt bei den Hochwassermarken aus `reserve` (INV-KEY-2); vorallokiertes Reservesegment übernehmen oder neues Segment
+    anlegen (nie anhängen, INV-LOG-4); optional Catalog-Rollover
+ 9. Consumer prüfen: Rückstand > max_lag_bytes ⇒ als verworfen markieren; Untergrenze berechnen
+10. Pending Erases und ausstehende Blob-Sweeps (Catalog ∪ Erase-Frames im Redo ohne erase_done) in die urgent-Lane (Roll-forward, §14.4)
+11. Wartung starten (Vorallokation, ID-Reservierung, Cleanup)
 ```
 
-## Anhang E: Schichtregeln für G-03 (maschinenlesbar)
+Die Reihenfolge 3→4 ist wichtig: **erst** den Catalog als Wahrheit lesen, **dann** aufräumen. Runs und Blobs werden **nicht** geöffnet (Metadaten stehen im Catalog, H-S5). Im Shared-Modus entfallen die Schritte 4, 6 (Heilen/Siegeln), 8, 10 und 11; ein Torn-Tail wird als Ende des Logs gelesen.
 
-Quelle für `capabilities.toml` (SYNC-1). Prüfung der Abhängigkeiten: `python3 tools/check_spec_sync.py layering` (SYNC-2).
+### 13.2 Absturzmatrix (Soll-Zustand je Unterbrechungspunkt)
 
-```toml
-# Erlaubte interne Abhängigkeiten je Crate. Prüfung über cargo metadata.
-# Dev-Abhängigkeiten werden nur auf contextra-testkit geprüft.
-[allowed]
-contextra-ids          = []
-contextra-env          = ["contextra-ids"]
-contextra-sys          = []
-contextra-simd         = []
-contextra-durable-fs   = ["contextra-env", "contextra-ids", "contextra-sys"]
-contextra-ports        = ["contextra-ids"]
-contextra-crypto       = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-durable-fs"]
-contextra-erasure      = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-durable-fs"]
-contextra-version      = ["contextra-ports", "contextra-ids", "contextra-env"]
-contextra-store        = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-sys", "contextra-durable-fs"]
-contextra-vector       = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-simd", "contextra-durable-fs"]
-contextra-text         = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-durable-fs"]
-contextra-graph        = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-durable-fs"]
-contextra-rank         = ["contextra-ports", "contextra-ids"]
-contextra-privacy      = ["contextra-ids", "contextra-env"]
-contextra-checkpoint   = ["contextra-ports", "contextra-ids", "contextra-env", "contextra-durable-fs"]
-contextra-ingest       = []
-contextra-embed        = ["contextra-ports", "contextra-ids"]
-contextra-db           = ["contextra-crypto", "contextra-erasure", "contextra-version", "contextra-store", "contextra-vector", "contextra-text", "contextra-graph", "contextra-rank", "contextra-privacy", "contextra-checkpoint", "contextra-ports", "contextra-ids", "contextra-env", "contextra-ingest", "contextra-embed"]
-contextra              = ["contextra-db", "contextra-ports", "contextra-ids", "contextra-privacy"]
-contextra-mcp          = ["contextra", "contextra-ports", "contextra-privacy"]
-contextra-embed-http   = ["contextra-ports"]
-contextra-kms          = ["contextra-ports"]
-contextra-server       = ["contextra", "contextra-ports"]
+| Unterbrechung | Zustand auf Platte | Ergebnis nach Neustart |
+|---|---|---|
+| vor Redo-`write` | nichts | Change nicht vorhanden, nie quittiert |
+| mitten im `write` / vor `fsync` | halbes oder ungeflushtes Frame | Frame wird abgeschnitten oder fehlt, nie quittiert |
+| nach `fsync`, vor Quittung | Frame dauerhaft | Change vorhanden (zulässig) |
+| `ENOSPC` nach Teilschreiben, Abschneiden gelang | Segment endet beim letzten guten Frame | Neustart unauffällig |
+| `ENOSPC`, Abschneiden gescheitert → Poison, Absturz | Torn-Tail im letzten Segment | Heilen + Siegeln (§13.1 Schritt 6) |
+| Recovery-Heilen: nach Abschneiden, vor Siegel | Segment kurz, ungesiegelt | nächste Recovery wiederholt Heilen + Siegeln (idempotent) |
+| Siegel geschrieben, nächstes Segment fehlt | Segment gesiegelt, kein Nachfolger | neues Segment wird angelegt |
+| Reservesegment: Absturz beim Vorallokieren | `.building.*` | gelöscht, Reserve wird neu angelegt |
+| Reservesegment fertig, noch unbenutzt | Segment ohne Frames, `id ≥ redo_floor` | wird übernommen (INV-LOG-7), nicht gelöscht |
+| ID-Reservierung: Absturz vor Edit | keine Datei mit ungesicherter ID | IDs wurden nie benutzt |
+| ID benutzt (Datei angelegt), Absturz vor Flush-Edit | verwaiste Datei mit ID < Hochwassermarke | Datei gelöscht; ID wird **nie** wieder vergeben (INV-KEY-2) |
+| Flush (Interval/Never): vor Redo-Sync (Schritt 0) | Frame evtl. nicht dauerhaft, kein Run | nichts geflusht; Atomarität über Spaces bleibt erhalten (INV-FLUSH-1) |
+| Flush: nach Run/Blob-`sync`, vor Edit | verwaiste Run- und Blob-Dateien | Verwaisten-Suche löscht, Memtable aus Redo wiederhergestellt |
+| Flush: nach Edit, vor Version | Dateien im Catalog | lebendig, Redo-Frames mit Stamp ≤ `flushed_stamp` übersprungen |
+| Compaction/Blob-GC: nach Ausgabe, vor Edit | verwaiste Ausgaben | gelöscht, Eingaben unverändert |
+| Compaction: nach Edit, vor Unlink | Eingaben verwaist | gelöscht (Verwaisten-Suche) |
+| Blob-Sweep: neue Generation gebaut, vor Edit | zusätzliche Generationsdatei | gelöscht (nicht die aktuelle Generation) |
+| Blob-Sweep: nach Edit, vor Unlink | alte Generation | gelöscht |
+| Catalog-Rollover: nach neuer Datei, vor `CURRENT` | alte `CURRENT` gültig | neue Datei verwaist, gelöscht |
+| Catalog-Rollover: nach `CURRENT`, vor Löschen der alten Datei | beide vorhanden | alte Datei verwaist, gelöscht |
+| `Consumer::advance`: Absturz | Edit atomar | alter oder neuer Stand, nie dazwischen |
+| `KEYS`-Neuschreiben (KEK-Rotation, DEK-Entfernung): Absturz | `write_atomic` | alter oder neuer `KEYS`, nie halb |
+| Redo-Schwanz nach Edit verloren (Lost Write) | Redo endet unter `redo_hwm` | `Corrupt{RedoTruncated}` statt stillem Verlust (INV-LOG-8) |
+| `fsync`-Fehler zur Laufzeit | unbestimmt | Instanz vergiftet, kein Retry, Neustart führt Recovery aus |
 
-# Regeln, die die Tabelle nicht ausdrückt:
-[rules]
-e1_crates = ["crypto", "erasure", "version", "store", "vector", "text", "graph", "rank", "privacy", "checkpoint"]
-e1_no_e1_dependency = true                       # R2
-ports_only_ids = true                            # R1
-compat_forbidden = true                          # R7, CMP-10
-forbidden_crate_names = ["contextra-types", "contextra-mvcc", "contextra-engine", "contextra-vault"]
-```
+Diese Tabelle wird zu einem **Test** (§19.2): `FaultFs` bricht an jedem E/A-Index ab und prüft den Soll-Zustand.
 
 ---
 
-## 16. Offene Entscheidungen (Stand 21. November 2026)
+## 14. Löschung (`Erase`)
 
-Diese Entscheidungen hat der Verantwortliche noch nicht getroffen. Sie sind nicht durch die Spezifikation festgelegt, und eine Umsetzung darf sie nicht stillschweigend beantworten. Jede Entscheidung ist mit ihren Befunden aus dem Review `SPEC_Review_v4.1.1` verknüpft. Die Empfehlungen stammen aus dem Review und sind keine Festlegungen.
+Antwort auf „atomare, nachweisbare physische Löschung“ (Z-3). Sie beruht auf vier strukturellen Maßnahmen: **(1)** Spaces sind physisch getrennt (Löschgrenze = Verzeichnis, Blobs eingeschlossen); **(2)** der Catalog kennt Schlüsselbereich, Stamp-Bereich und `blob_no`-Bereich jeder Datei, die Planung öffnet keine Datei; **(3)** Dateien werden ausschließlich **nach** einem dauerhaften Edit gelöscht (P-3); **(4)** sensible Körper sind je `KeyDomain` versiegelt, sodass Schlüsselvernichtung den Körper auch in Redo und Blob unlesbar macht.
 
-| Nr. | Frage | Befunde | Empfehlung (Review) | Status |
-|---|---|---|---|---|
-| D1 | Wie lange darf ein Auftrag im Zustand `Restricted` bleiben, und was passiert bei Ablauf? | K-08 | Entschieden: Pflichtschalter `restricted_max_age` ohne Standardwert. Ohne Wert startet Contextra nicht. Bei Ablauf `Overdue` mit Ledger-Eintrag, keine automatische Löschung und keine automatische Freigabe (REQ-ER-6). Der Wert ist vom Verantwortlichen festzulegen. | entschieden, Wert offen |
-| D2 | Darf bei einem Fehler des Gate-Logs gelesen werden? | K-01, K-02 | Entschieden: Gate-Log-Fehler führt zu `ReadOnly`, der Löschauftrag wird abgelehnt. Nach durablem Log-Eintrag gilt eine lokale, nicht durable Lesesperre im Speicher (REQ-GATE-1). `Quarantine` nur bei Integritätsverletzung (INV-5). | entschieden |
-| D3 | Was geschieht mit Treffern der Entdeckung, die nicht deklariert sind? | K-07 | Entschieden: `Restrict` als Mandantenstandard. `Report` nur bewusst gesetzt; das Ergebnis ist dann `Partial` mit Anzahl und Grund (REQ-ER-2, 9). | entschieden |
-| D4 | Klasse K ohne Verschlüsselung und unbefristetes Ledger? | K-17, H-05 | Entschieden: keine Klartextoption, weder für Klasse K noch sonst (5.1). Ledger-Aufbewahrung ist Pflichtschalter `ledger_retention` ohne Standardwert. Der Wert ist vom Verantwortlichen festzulegen. | entschieden, Wert offen |
-| D5 | Wie viele Mandanten pro Prozess, und welche Referenz gilt? | H-27 | Entschieden: Budget je Prozess (`memory_budget_bytes`, Pflichtschalter) statt fester Mandantenzahl. Referenzstufen gelten je Mandant (1.2). | entschieden, Budget offen |
-| D6 | Standardgewicht des Graph-Signals | K-20 | Entschieden: Produktstandard `graph.weight = 0,0` (ADR-49). G-GRAPH misst mit dem Gewicht aus dem Benchmark-Profil `graph_weight_bench` (11.5). | entschieden |
-| D7 | Werkzeuge für Synchronität (SYNC-1 bis SYNC-5) | H-30, H-31, M-01, M-24 | Geprüft: `check_spec_sync.py`, `budgets.toml`, `capabilities.toml` und `layering.rs` sind im Repository vorhanden. H-31 ist damit behoben. Offen bleibt nur die Gate-Semantik (H-30). | teilweise entschieden |
-| D8 | Ist `contextra-text` optional? | M-09 | Entschieden: Pflicht. Das Feature `text` entfällt (3.3, 15). | entschieden |
-| D9 | Zielplattform und Integrität des Löschlogs | H-22, H-23 | Entschieden: Zielplattform Linux auf x86_64 (1.3). Löschlog mit MAC-Kette, Schlüssel `K_log` im Anker (7.8). ADR-02 präzisiert. | entschieden |
-| D10 | Eingabe der Passphrase und Änderungen der Konfiguration zur Laufzeit | H-24, H-26 | Entschieden: Passphrase über Datei mit Rechten 0600 oder Umgebungsvariable, keine interaktive Eingabe (REQ-KEY-7). Konfigurationsänderung nur mit Neustart (Kapitel 9). | entschieden |
+### 14.1 Was „atomar“, „physisch“ und „nachweisbar“ heißt
 
-**Umgesetzt in v4.2:** K-01 bis K-20 sowie H-02, H-05, H-06, H-08, H-12, H-22 bis H-24, H-26 bis H-28 und M-09 (Details in Anhang F). **Offen (ohne Entscheidung des Verantwortlichen, in v4.3 zu klären):** die übrigen Punkte aus Anhang F, z. B. Signaturenanhang (M-04), Byte-Tabellen (M-21), Bedrohungsmodell (H-21), Lebenszyklus (H-25), Gate-Semantik (H-30).
+- **Logisch atomar:** Ab Stamp `S` sieht keine View mit Stamp ≥ `S` etwas aus dem Löschbereich, für alle Schlüssel zugleich. Der Marker ist ein Op (`EraseRange`) in einem normalen Redo-Frame.
+- **Physisch atomar:** Es gibt **genau einen** Durability-Punkt (E5, ein Catalog-Edit), vor dem die alten Dateien lebendig und nach dem sie unreferenziert sind. Ein Absturz davor setzt den Vorgang fort, ein Absturz danach löscht die Dateien (Roll-forward, nie Rückabwicklung, `INV-ERA-4`).
+- **Nachweisbar:** Eine `ErasureReceipt` wird erst nach `remove_file` **und** `sync_dir` ausgestellt.
 
-## Anhang F: Änderungsprotokoll v4.2
+### 14.2 Stufen und ehrliche Garantien
 
-Befund-IDs nach dem Review `SPEC_Review_v4.1.1`. „umgesetzt“ bedeutet: Der Normtext ist in dieser Version geändert.
+|Stufe|Verfahren|Schützt gegen|Schützt **nicht** gegen|
+|---|---|---|---|
+|`Logical`|Marker|Lesen über die API|Dateiinhalt|
+|`Physical` (Standard)|Runs ohne den Bereich neu schreiben, Blob-Sweep, Edit, Unlink, `sync_dir`, Redo-Segmente entfernen|Lesen der Dateien im Verzeichnis; Wiederauftauchen nach Absturz|Reste im Dateisystem-Journal, Flash-Wear-Leveling, externe Snapshots/Backups, Hardlinks|
+|`Scrubbed`|wie `Physical`, vor dem Unlink Nullen überschreiben + `sync_data`|einfache Wiederherstellung auf klassischen Datenträgern|Copy-on-Write-Dateisysteme, SSDs (Best-Effort)|
+|`Cryptographic`|Schlüssel der `KeyDomain` bzw. des Spaces vernichten, **bevor** Dateien gelöscht werden|alle Reste, auch Backups ohne Schlüssel, Flash-Reste und Redo-Frames (Körper sind domänenversiegelt)|Kopien des Schlüssels; Metadaten unter dem Space-DEK|
 
-| ID | Status | Ort in v4.2 |
+**Konsequenz:** Echte Unwiederbringlichkeit auf modernen Datenträgern liefert nur `Cryptographic`. Sensible Körper gehören deshalb in `domain_sealed`-Spaces (§15.3). `Physical` minimiert Rückstände, mehr wird nicht versprochen.
+
+### 14.3 Protokoll `Erase::range(space, range)` mit Stamp `S`
+
+```
+E0  Vorprüfung: Space existiert, Recht Adm (append-only: Erase::admin()), Bereich gültig;
+    Views/Holds/Consumer mit Stamp < S gemäß ViewPolicy / HoldPolicy (§14.5)
+E1  Redo-Frame mit Op EraseRange(space, range) (normaler apply-Pfad, Durability::Always erzwungen)   ◄── LOGISCHER Punkt, Stamp S
+    Gleichzeitig (selber Edit bei Flush, selbe Memtable bei Replay): Auftrag in die pending-Menge
+E2  urgent-Lane belegen. Claims auf betroffene Dateien (laufende Compaction wird abgebrochen, §12.0).
+    Flush-Barriere: alle Memtables aller Spaces bis S flushen (INV-FLUSH-1), redo_floor anheben,
+    Redo-Segmente mit max_stamp ≤ S ins Graveyard. Erase::batch ⇒ EINE Barriere für alle Aufträge der Gruppe.
+E3  Dateien wählen (nur Catalog-Metadaten): Runs des Spaces mit überlappendem [min_key, max_key];
+    Blobs über BlobRef-Bereiche (blob_no_min/max, MetaBlock-Liste)
+E4  Je Run streamen, alle Einträge im Bereich mit Stamp ≤ S verwerfen (Holds je HoldPolicy), Ausgabe-Run bauen
+    (sync_all), sync_dir. Vollständig überdeckte Runs erzeugen keine Ausgabe. EraseRange-Marker wandern in den Ausgabe-Run.
+E4b Blob-Sweep: je betroffenem Blob neue Generation g+1 mit GLEICHEN Offsets: gelöschte Records → Hole (Nullen, unverschlüsselt,
+    INV-BLOB-3), übrige byte-identisch; sync_all, sync_dir
+E4c Segmente: überlappende Segmente via rewrite_without(range) neu bauen, sonst verwerfen (Besitzer baut neu)
+E5  EIN Edit { add_files, remove_files, blob_replace, blob_live_delta, erase_done(S), erased_ranges_add(space, range, S) }
+    → Catalog append + sync_data                                                                   ◄── PHYSISCHER Punkt
+E6  Neue Version veröffentlichen; BlockCache/TableCache invalidieren; alte Runs und Blob-Generationen ins Graveyard;
+    nach Rückgabe aller Referenzen (ViewPolicy): [Scrubbed: überschreiben + sync] → remove_file → sync_dir;
+    kalte Dateien: ColdTier::delete (§12.7)
+E7  Edit { erase_swept(S) } (nicht kritisch). ErasureReceipt{ id=S, level, runs_rewritten, runs_removed, blobs_swept,
+    hole_bytes, redo_segments_removed, segments_rebuilt, bytes_freed, completed_ms } zurückgeben
+```
+
+- **Kryptografisch je Space:** E3–E4c entfallen; E5 enthält `spaces_drop`; der Space-DEK wird **vor** E5 per `write_atomic(KEYS)` entfernt (`INV-ERA-3`).
+- **Kryptografisch je Domäne (`Erase::domain(d)`):** Der Aufrufer vernichtet `d` im `KeyProvider` (außerhalb des Crates). Der Kern **verweigert** den Auftrag, solange `domain_key(d)` noch einen Schlüssel liefert (`KeyStillPresent`), leert den Domänenschlüssel-Cache, schreibt `domain_retired(d, S)` per Edit und überlässt die Platzfreigabe der Blob-GC (§12.3 Punkt 4). Keine Flush-Barriere, kein Run-Umbau (H-S14).
+- **`drop_space`:** Schnellpfad: Schlüssel vernichten (falls verschlüsselt), ein Edit `{spaces_drop, remove_files[alle]}`, Graveyard, `remove_dir` (H-S6).
+- Schreibvorgänge nach `S` im selben Bereich bleiben erlaubt; E4 verwirft nur Stamp ≤ `S`.
+- **Kosten:** O(Bytes der berührten Runs) + O(Bytes der berührten Blobs, je ≤ 64 MiB). Der Sweep ist der teuerste Teil und der Grund, für große oder häufige Löschungen `Cryptographic` zu bevorzugen.
+
+### 14.4 Recovery der Löschung (Roll-forward)
+
+Offen = `Catalog.erase_pending ∪ {EraseRange-Frames im Redo ohne erase_done} − erase_done` (§13.1 Schritt 10). Sie werden in die `urgent`-Lane gelegt und ab E2 fortgesetzt. E3–E5 sind **idempotent** (Auswahl aus dem aktuellen Catalog; ein bereits ausgeführtes E5 ist an `erase_done` erkennbar). E6/E7 sind idempotent über die Verwaisten-Suche (alte Run-Dateien und nicht aktuelle Blob-Generationen sind verwaist). Ein Flush, der einen Erase-Marker in einen Run schreibt, trägt `erase_pending_add` im **selben** Edit.
+
+### 14.5 Nebenläufigkeit mit Views, Holds, Consumern
+
+|Policy|Verhalten|
+|---|---|
+|`ViewPolicy::Wait(timeout)` (Standard)|Das Löschen der Dateien wartet, bis alle Views mit Verweis auf die alten Dateien zurückgegeben sind. Nach Timeout `Err(Blocked{views})`; der Vorgang bleibt in E6 offen und wird wiederholt (der logische Teil gilt bereits).|
+|`ViewPolicy::Revoke`|Betroffene Views werden widerrufen (`Err(Revoked)` beim nächsten Zugriff), geben ihre Version frei, danach Löschen.|
+|`HoldPolicy::Fail` (Standard)|Hold oder Consumer mit Stamp < `S` über dem Bereich ⇒ `Err(HoldBlocked{holds})`, **vor** E1 (nichts geschrieben).|
+|`HoldPolicy::Override`|Hold wird für den Bereich ungültig, Consumer verworfen (Datenschutz hat Vorrang).|
+
+### 14.6 Kein stilles Fälschen der Historie
+
+Der Catalog führt je Space `erased_ranges: [(range, S)]`. Liest eine View mit Stamp < `S` in einen dort verzeichneten Bereich, antwortet sie `Err(Erased{range, erased_at: S})`; es gibt weder Fallback noch „leer“ (`INV-ERA-5`). Einträge werden entfernt (`erased_ranges_remove`), sobald `retention_floor ≥ S`.
+
+### 14.7 Invarianten und Prüfwerkzeuge
+
+`INV-ERA-1…7` stehen in §18. Prüfwerkzeuge:
+
+1. **`Storage::verify_erasure(id)`:** prüft `INV-ERA-2/6` anhand der Catalog-Metadaten und Stichprobenscan lebender, überlappender Dateien; Befund je Datei.
+2. **`ErasureOracle` (Feature `testing`):** schreibt Schlüssel/Werte mit eindeutigem Muster (Header **und** Körper; mit/ohne Domäne; `Plain`/`Encrypted`), führt `Erase` aus und durchsucht **alle Bytes aller Dateien** (Runs, Blobs aller Generationen, Redo, `.building`, Segmente, `MemFs`-Zustand inkl. nicht synchronisierter Seiten) nach dem Muster. `Physical` ⇒ 0 Treffer. `Cryptographic` ⇒ Muster auch ohne Schlüsselzugriff nie im Klartext, mit vernichtetem Schlüssel nicht rekonstruierbar. Für Vektor-Segmente zusätzlich Rückrechnung (Embedding des gelöschten Textes darf nicht mehr als Nachbar auftauchen).
+3. **Absturzmatrix über E1–E7 inkl. E4b/E4c:** `FaultFs` bricht an jedem E/A-Index ab; nach jedem Neustart gelten `INV-ERA-1…7`; fortgesetzte Vorgänge enden mit 0 Orakel-Treffern.
+4. **Backup-Hinweis:** `checkpoint` ist standardmäßig `Copy`; `Hardlink` ist Opt-in mit Warnung (§12.8).
+
+### 14.8 Grenzen (offen benannt)
+
+Append-only Spaces lassen `Erase` nur mit `Erase::admin()` zu; das steht im Receipt. Kalte Dateien unterliegen den Garantien des `ColdTier`-Ports. Speicherinhalt, Auslagerungsdatei, Core-Dumps werden nicht kontrolliert (A-5, §15.7). Externe Snapshots, Dateisystem-Journal und Flash-Wear-Leveling siehe §14.2. Die orchestrierende Ebene (Saga, signierte Berichte) liegt **über** diesem Primitiv (NZ-14); `ErasureReceipt` ist dafür serialisierbar und stabil.
+
+---
+
+## 15. Sicherheit und Verschlüsselung
+
+Kryptografische **Primitive** (AEAD, MAC, KDF, Zufall) kommen ausschließlich über Ports (§4); das **Protokoll** (Schlüsselhierarchie, Nonces, AAD, Reihenfolgen) lebt in `keys/` und ist hier normativ (SD-36). Der Kern hat keine Krypto-Abhängigkeit (Z-4). Empfohlene Port-Implementierungen (außerhalb des Kerns): BLAKE3 keyed für `Mac`/`Kdf`, ChaCha20-Poly1305 oder AES-256-GCM für `Cipher`. **Eigene Kryptografie wird nicht geschrieben.**
+
+### 15.1 Modi (SD-33)
+
+|Modus|Schutz|Verfahren|Gegen Angreifer|
+|---|---|---|---|
+|`Plain`|Zufallsfehler|CRC32C, Redo-Kette|A-1 nur über Dateirechte; **nicht** A-2/A-3|
+|`Authenticated`|Integrität ohne Vertraulichkeit|`Mac16` mit AAD (§9.1)|A-3 (Manipulation)|
+|`Encrypted`|Vertraulichkeit + Integrität|`Cipher` (AEAD), AAD-Bindung|A-2, A-3|
+
+`Authenticated` deckt „lesbar, aber nicht unbemerkt veränderbar“ ab (Audit-Protokolle, append-only Spaces). Der Modus steht in `FORMAT`, ist unveränderlich und wird beim Öffnen gegen `Config::integrity` geprüft (F-15, §9.2).
+
+### 15.2 Schlüsselhierarchie, Ableitung und Nonces
+
+```
+KEK (KeyProvider::kek, extern, 32 B)
+ └─ KEYS-Schlüssel = Kdf(KEK, "ctxs keys v1")                       umhüllt NUR die Datei KEYS (§9.3)
+KEYS enthält:
+ ├─ root_key (zufällig, einmalig)
+ │    ├─ Redo-Schlüssel    = Kdf(root_key, "ctxs redo v1"   ‖ segment_id u32)
+ │    ├─ Catalog-Schlüssel = Kdf(root_key, "ctxs cat v1"    ‖ catalog_no u64)
+ │    ├─ FORMAT-MAC-Schl.  = Kdf(root_key, "ctxs format v1")
+ │    └─ Token-Schlüssel   = Kdf(root_key, "ctxs token v1")        (ResumeToken-MAC)
+ └─ Space-DEK (zufällig, je Space, dek_gen)
+      ├─ Run-Schlüssel    = Kdf(DEK, "ctxs run v1"  ‖ key_epoch u32 ‖ run_id u64)
+      └─ Blob-Schlüssel   = Kdf(DEK, "ctxs blob v1" ‖ key_epoch u32 ‖ blob_no u64)
+      └─ Segment-Schlüssel = Kdf(DEK, "ctxs seg v1" ‖ key_epoch u32 ‖ segment_kind u16 ‖ segment_id u64)
+Domänenschlüssel: KeyProvider::domain_key(d) → Option<Secret32>   NICHT in KEYS; None = vernichtet
+```
+
+**KEK-Rotation ist O(1):** `KEYS` mit neuem KEK-Schlüssel und neuem `nonce` per `write_atomic` ersetzen, `keys_generation` hochzählen, `keys_generation_min` per Edit anheben. Keine Datendatei wird angefasst (SD-36).
+**Schlüsselepoche (SD-63).** Ein beschreibbarer Klon (`checkpoint`, Test-Klon) setzt Dateiname-IDs ab derselben Hochwassermarke fort; ohne Gegenmaßnahme würden Original und Klon unter gleichem DEK, gleicher `run_id` und gleichem Nonce **verschiedene** Inhalte versiegeln. Deshalb vergibt `checkpoint` dem Ziel eine neue `instance_id`, einen **neuen** zufälligen DEK je Space und `key_epoch + 1`; ältere DEKs bleiben in `KEYS`, damit übernommene Dateien lesbar bleiben. Neue Dateien nutzen stets den DEK der höchsten Epoche. Dasselbe gilt für Domänen-Körper: Nonce `0x03`/`0x05` tragen `segment_id`/`blob_no`, die im Klon aus dessen eigener Hochwassermarke stammen; der Klon erhält zusätzlich einen disjunkten ID-Bereich (`id_hwm += 2^40`).
+
+**Nonces (12 Byte, zentral in `keys/nonce.rs`; kein anderes Modul bildet Nonces):**
+
+|Verwendung|Schlüssel|Nonce|Eindeutig weil|
+|---|---|---|---|
+|Run-Block|Run-Schlüssel|`0x01 ‖ block_offset u64 ‖ 0u24`|Schlüssel je `run_id`, `run_id` aus Hochwassermarke (`INV-KEY-2`); Offset je Run eindeutig|
+|Redo-Frame|Redo-Schlüssel|`0x02 ‖ frame_index u32 ‖ 0u56`|Schlüssel je `segment_id`|
+|Redo-Op-Körper|Domänenschlüssel|`0x03 ‖ segment_id u32 ‖ frame_index u32 ‖ op_index u24`|Position im Log eindeutig; `segment_id` nie wiederverwendet|
+|Blob-Record|Blob-Schlüssel|`0x04 ‖ offset u64 ‖ 0u24`|Schlüssel je `blob_no`; `blob_no` nie wiederverwendet|
+|Blob-Körper unter Domänenschlüssel|Domänenschlüssel|`0x05 ‖ blob_no u56 ‖ offset u32`|`blob_no` nie wiederverwendet; GC vergibt neue `blob_no`|
+|Catalog-Record|Catalog-Schlüssel|`record_index u64 ‖ 0u32`|Schlüssel je `catalog_no`|
+|`KEYS`|KEYS-Schlüssel|`nonce` aus `Entropy`|zufällig je Schreibvorgang, Schreibvorgänge selten|
+
+> **Erratum E-6 (Nonce-Präfix):** §9.4 und §9.6 nennen für Blob-Körper unter dem Domänenschlüssel das Präfix `0x04`. Normativ ist `0x05` (oben), weil Blob-Record (Blob-Schlüssel) und Domänen-Körper in `domain_sealed` + `Encrypted` sonst dasselbe Nonce-Muster unter verschiedenen Schlüsseln nutzten. Das ist harmlos, aber unnötig verwechselbar; die Trennung macht die Eindeutigkeit **je Präfix** statt **je Schlüssel** beweisbar. Der Golden in Anhang A.6 folgt dieser Tabelle.
+
+`run_id`, `blob_no`, `tmp_id` < 2^56, `segment_id` < 2^32; Überlauf ⇒ `Exhausted` (`INV-KEY-2`). Eine Blob-Neufassung gleicher Offsets (Sweep) übernimmt Records **byte-identisch**; ein GC-Umzug vergibt eine neue `blob_no`. Ein Property-Test erzeugt über Absturzmatrix und Wartung alle `(Schlüssel, Nonce)`-Paare und verlangt Eindeutigkeit (`INV-KEY-1`).
+
+### 15.3 Domänenschlüssel: kryptografisches Löschen je Subjekt (SD-42)
+
+Eine sortierte LSM mischt viele Subjekte in einem Block; Block-Verschlüsselung je Subjekt würde die Schlüsselordnung zerstören. Lösung auf **Körper-Ebene:**
+
+- Schlüssel und Header bleiben unter dem Space-DEK. Ranking, Filter und Gewichte laufen ohne Domänenschlüssel; Metadaten (Provenienz) überleben eine Schlüsselvernichtung.
+- Der Körper eines `domain_sealed`-Space wird bereits im Committer (Schritt 5) mit dem Domänenschlüssel versiegelt, **bevor** er in den Redo-Frame geht. Die Memtable hält Klartext (A-5); der Flush versiegelt mit Blob-Nonce unter dem Domänenschlüssel neu.
+- Wird der Domänenschlüssel vernichtet, sind Körper in Redo **und** Blob ohne Flush-Barriere und ohne Run-Umbau unlesbar (`INV-ERA-7`); die Blob-GC gibt den Platz frei.
+- Der Domänenschlüssel-Cache (TTL, begrenzt) wird bei `Erase::domain(d)` sofort geleert. Der Kern speichert **keine** Domänenschlüssel; ein Schlüsselbund mit Millionen Subjekten ist Sache des `KeyProvider`.
+- **Offen (O-2):** Aus einem Körper abgeleitete Embeddings und Postings enthalten Rückstände. Sie liegen in Segmenten je Löschdomäne oder werden über `rewrite_without` neu gebaut.
+
+### 15.4 Typisierte Zugriffsrechte (SD-34)
+
+`Space<R>` mit Marken `Rd < Ap < Wr < Adm`, versiegelte Traits, nur Abschwächung (`read_only()`, `append_only()`), kein Rückweg. `AdminCap` ist je `Storage` genau einmal abrufbar. Dynamische, delegierbare Rechte (Macaroons, TTL) bleiben der oberen Schicht überlassen. `open_readonly` liefert nur `Rd`. **Grenze:** Das ist ein Übersetzungsfehler-Schutz gegen A-4 _innerhalb_ einer vertrauenswürdig kompilierten Anwendung, kein Prozess-Sandbox.
+
+### 15.5 Rollback-Anker (F-10)
+
+Authentisierte Blöcke schützen nicht vor dem Zurückspielen eines älteren, in sich stimmigen Gesamtstands. Im Modus `Authenticated/Encrypted` ist jeder Catalog-Record Glied einer Kette; `head_mac = Kdf(cat_key, [catalog_no, record_index, chk])` geht nach jedem dauerhaften Edit (ratenbegrenzt) an `RollbackAnchor::record`. Beim Öffnen vergleicht der Kern `(Generation, Kopf)` mit `latest()` ⇒ `Err(Rolledback{expected, found})`. Zusätzlich fällt ein alter `KEYS` über `keys_generation_min` auf. Das Fenster zwischen zwei `record`-Aufrufen bleibt Restrisiko. Ohne Anker ist F-10 nicht erkennbar (dokumentiert).
+
+### 15.6 Dateisystem-Rechte
+
+`Perm::Private` ⇒ `0700`/`0600`, **explizit gesetzt, unabhängig von der `umask`**, für `FORMAT`, `KEYS`, `CURRENT`, Catalog, Redo, Runs, Blobs, Segmente, `.building.*`, `LOCK`. Das Wurzelverzeichnis gilt als vertrauenswürdig (A-1). `RealFs` prüft vor dem Öffnen per `symlink_metadata`, dass das Wurzelverzeichnis kein Symlink ist; vollständige Härtung (`O_NOFOLLOW`, `openat`) gehört in eine alternative `Fs`-Implementierung. Windows: ACL-Härtung ist in Version 1 nicht zugesagt (NZ-6, A-02).
+
+### 15.7 Geheimnisse und Informationslecks
+
+- **`Secret32`:** kein `Debug`/`Display`/`Clone`/`Serialize`; `Drop` überschreibt per `fill(0)` + `black_box` (**best-effort**, ohne `unsafe` ist kein volatiler Schreibvorgang garantierbar; steht in der Doku).
+- Vergleiche von Tags laufen in `Mac::verify16` (konstante Zeit, Port-Vertrag).
+- **Keine Daten in Fehlern, Logs, Metriken:** `hint()` enthält nur Typen, Zahlen, Space-/Consumer-Namen und opake numerische Kennungen, **nie** Schlüssel-/Wertbytes oder Domänen-IDs im Klartext. Das **Lecks-Orakel** prüft alle in der Suite erzeugten Fehlertexte, Metriknamen und Logzeilen auf Muster der Testdaten (0 Treffer).
+- **Kein Dedup, kein Inhaltshash** im Kern (NZ-8): keine Seitenkanal-Klasse „existiert dieser Text bei jemand anderem?“.
+- Die in AAD gebundenen Schlüssel-Bindungen nutzen den Space-DEK als MAC-Schlüssel, nie unverschlüsselte Klartext-Hashes.
+
+### 15.8 Restrisiken (offen)
+
+|Risiko|Stand|
+|---|---|
+|Rollback ganzer Stände ohne Anker|nicht erkennbar (§15.5)|
+|Klartext im Prozessspeicher, Swap, Core-Dumps|nicht kontrolliert (A-5)|
+|Schlüsselmaterial im `KeyProvider`|Sache der einbettenden Anwendung|
+|Seitenkanäle (Größe, Zeit, `op_count` im Klartext bei `Encrypted`)|keine Gegenmaßnahme; Padding wäre Sache der oberen Schicht|
+|`Plain` gegen Manipulation|nicht geschützt; `FORMAT.integrity_mode` und Doku weisen darauf hin|
+|Löschen ganzer Dateien durch Angreifer ohne Schlüssel|erkannt über `MissingFile`/Catalog (fail-closed), aber Verfügbarkeit nicht geschützt|
+
+---
+
+## 16. Nebenläufigkeit: Protokolle und Beweise (Z-14)
+
+Alle Synchronisationsstücke sind so klein, dass `loom` sie vollständig erkundet (§19). Die Beweise sind schriftlich, damit Review und Modell dieselbe Aussage prüfen.
+
+### 16.1 Sperrränge
+
+Sperren werden **nur in aufsteigender Rangfolge** erworben (`INV-LOCK-1`), jede höchstens einmal je Thread. `src/sync.rs` kapselt `Mutex`/`RwLock` in `Ranked<T, const RANK: u8>`; unter `cfg(debug_assertions)` prüft ein thread-lokaler Rangstack jeden Erwerb.
+
+|Rang|Sperre|Hält über E/A?|Typische Haltezeit|
+|---|---|---|---|
+|1|`committer`|**ja (einzige Ausnahme, P-9)**|ms (ein Gruppen-`fsync`)|
+|2|`intake`|nein|ns|
+|3|`state` (`RwLock<Arc<Version>>`)|nein|ns (Arc klonen/austauschen)|
+|4|Memtable-`RwLock` (je Memtable)|nein|≤ 64 Ops je Schreibsperre|
+|5|`registry` (Views, Holds, Consumer, Floor, Claims)|nein|µs|
+|6|`maint` (je Lane, + Condvar)|nein|ns|
+|7|`notify` (Listener-Warteschlange)|nein|ns|
+
+**Blatt-Regel:** Ränge 5–7 sind Blätter: unter ihnen wird keine weitere Sperre erworben und kein Aufrufer-Code ausgeführt. Die geteilten Cache- und Governor-Sperren (sharded, kurz) sind ebenfalls Blätter und werden **nie über E/A gehalten**: Cache-Fehlgriffe laden ohne Sperre und fügen danach ein (zwei Lader desselben Blocks sind zulässig, einer gewinnt).
+
+**Deadlock-Freiheit (Beweis).** Jeder Thread erwirbt Sperren nur in streng aufsteigender Rangfolge, Blätter erwerben nichts. Ein Wartezyklus `T1 hält a, wartet auf b; T2 hält b, wartet auf a` verlangt `rang(a) < rang(b)` und `rang(b) < rang(a)`, ein Widerspruch. Wartebeziehungen außerhalb von Sperren (Condvars, Ticket-Wartende, Claims) sind **kein** Sperrerwerb: Ein Condvar-Wartender hält beim Warten **keine** Sperre außer der zur Condvar gehörenden; Claims sind Tabellenzeilen (§16.5), kein Warten, sondern „überspringen oder abbrechen“ (`cancel`). ∎
+
+### 16.2 Committer und Gegendruck ohne Wartezyklus
+
+> **Erratum E-4 (korrigiert §10.2 Schritt 3 und §10.4):** Der Entwurf ließ den Leiter bis zu `stall_slice`/`stall_timeout` **unter dem Committer-Lock** warten. Das kann das Auflösen des Staus blockieren: Der Flush braucht für `INV-FLUSH-1` (Schritt 0) kurz den Committer (`Storage::sync()`), den der wartende Leiter hält. Normativ ist stattdessen:
+> 
+> 1. **`apply` wartet vor dem Ticket** (§10.2 Schritt 1½, ohne Sperre): bei Stufe `Verlangsamt` bis zu `stall_slice`, bei `Gestoppt` bis zu `stall_timeout` auf eine Condvar (`maint`-Rang 6), die Flush/Compaction/Governor bei Entspannung signalisieren; danach `Err(Busy{retry_after})`.
+> 2. **Der Leiter wertet die Stufe nur aus** (Schritt 3) und wartet **nie**. Ist sie `Gestoppt`, erhält die Gruppe sofort `Err(Busy)`; sonst läuft sie.
+> 
+> Folge: Unter dem Committer wird nur noch auf bereits erteilte E/A gewartet, nie auf andere Wartungsjobs. Die Wartezeit je `apply` bleibt ≤ `stall_timeout`.
+
+**Leiterwahl.** `apply` hängt ein `Ticket` in `intake` (Rang 2, kurz), danach `committer.lock()`. Wer ihn erhält, prüft zuerst, ob sein Ticket schon erledigt ist (dann zurück), sonst wird er Leiter und leert `intake`. **Lebendigkeit:** Jedes Ticket steht in `intake`, bevor sein Besitzer um den Committer konkurriert; der Leiter, der den Committer verlässt, hat `intake` zuletzt geleert, also wird jedes Ticket entweder vom aktuellen Leiter bedient oder sein Besitzer erwirbt den Committer als Nächster (Mutex ist endlich-fair genug: kein Ticket wartet auf unbegrenzt viele Gruppen, weil jede Gruppe `intake` komplett leert, höchstens 1 000 Changes/8 MiB; der Rest geht an den nächsten Leiter). `loom` prüft: kein verlorenes Ticket, kein doppelt bedientes Ticket.
+
+### 16.3 Sichtbarkeit (`INV-VIS-1…3`)
+
+Zustand: `visible_stamp: AtomicU64`, `state: RwLock<Arc<Version>>`.  
+**Schreiber (Leiter):** (a) Memtable-Einträge der Gruppe einfügen (Rang 4, Unterbatches), (b) `visible_stamp.store(s, Release)`, (c) erst danach rotieren (Version tauschen, Rang 3).  
+**Leser:** (a) `v = visible_stamp.load(Acquire)`, (b) danach `V = state.read().clone()` (Rang 3).
+
+**Satz (`INV-VIS-3`).** Für jede View `(V, v)` enthält `V` (Memtables ∪ Runs) alle Einträge mit Stamp ≤ `v`. _Beweis._ Sei `e` ein Eintrag mit Stamp ≤ `v`. Weil `v` per Acquire geladen wurde, gilt für den Schreiber der Gruppe mit `v`: sein Einfügen von `e` (Schritt a) _happens-before_ das Laden (Release/Acquire). Zum Zeitpunkt des Einfügens stand `e` in der damaligen aktiven Memtable `M` der damaligen Version `V0`. Versionen wachsen nur monoton: Rotation macht `M` zu einer eingefrorenen Memtable derselben Daten, Flush ersetzt `M` durch einen Run mit denselben Einträgen (Schritt 4 des Flush erst **nach** dem Edit), Compaction erhält jede Version ≥ Untergrenze (`INV-RET-1`). `V` wurde **nach** dem Laden von `v` gelesen, ist also mindestens so neu wie jede Version, die zum Zeitpunkt des Releases galt; also enthält `V` `e` in `M`, einer eingefrorenen Memtable oder einem Run. ∎ _Warum die Reihenfolge nicht vertauschbar ist (Gegenbeispiel)._ Liest ein Leser **zuerst** `V0` (aktive Memtable `M`), rotiert der Leiter dann `M` und setzt `M2` als aktiv, fügt Einträge mit Stamp `s` in `M2` ein und veröffentlicht `s`, lädt der Leser danach `v = s`: `V0` kennt `M2` nicht, die View verliert Einträge ≤ `v`. Deshalb **zuerst `visible_stamp`, dann Version** (`INV-VIS-3`).
+
+**`INV-VIS-2` (halbe Gruppen unsichtbar).** Leser ignorieren Einträge mit Stamp > `v`. Da `v` erst nach vollständigem Einfügen aller Einträge der Gruppe veröffentlicht wird, ist jeder Stamp ≤ `v` vollständig eingefügt; jeder Stamp > `v` wird gefiltert. Ein `Change` hat einen Stamp ⇒ er ist atomar sichtbar. **`INV-VIS-1`:** Einfügen (Schritt 9) folgt auf erfolgreiches Schreiben/Sync (Schritt 7/8). Scheitert `sync_data` (Poison), erreicht keine Op der Gruppe eine Memtable.
+
+> **Erratum E-2 (Präzisierung §10.5 „Poison-Semantik“):** Der Satz „Memtables enthalten nur Daten aus erfolgreich synchronisierten Gruppen“ gilt nur für `Durability::Always`. Bei `Interval`/`Never` sind Daten mit Stamp > `durable_stamp` sichtbar, aber nicht dauerhaft; scheitert danach der Intervall-`fsync` (Poison), bleiben sie im degradierten Lesebetrieb sichtbar und können nach dem Neustart fehlen. Normativ: `health()` liefert `Poisoned{cause, durable_stamp}`; Views oberhalb `durable_stamp` tragen `maybe_lost = true`; Aufrufer, die `Interval`/`Never` wählen, haben diese Semantik gewählt. Das ist keine Verletzung von `INV-VIS-1` (das nur den Schreibpfad betrifft), sondern die dokumentierte Folge von `Interval`.
+
+### 16.4 Untergrenze und Aufbewahrung (`INV-RET-1`)
+
+**Registry (Rang 5)** hält: `views: Map<ViewId, Stamp>`, Holds, Consumer, `floor: u64`, Claims. **`register_view()`:** unter dem Registry-Lock `v = visible_stamp.load(Acquire)`; `floor = max(floor, compute_floor(v))`; View mit `v` eintragen. **`view_at(s)`:** unter **demselben** Lock `s ≥ floor` prüfen, eintragen, sonst `Err(HistoryPruned)`. `compute_floor(v) = min(v, min views, min holds, min consumed_stamp)`; `floor` ist durch `max` monoton. Die Wartung liest `floor_used` unter dem Registry-Lock, **bevor** sie plant, und bewahrt für den Job `retain(floor_used)`.
+
+**Satz (`INV-RET-1`).** Eine Compaction/Flush mit `floor_used` verändert keine Sicht `(V, s)` mit `s ≥ floor_used`. _Beweis._ `retain` bewahrt je Schlüssel alle Versionen mit Stamp > `floor_used` und die neueste mit Stamp ≤ `floor_used`. Eine Sicht mit `s ≥ floor_used` liest je Schlüssel die neueste Version ≤ `s`: ist sie > `floor_used`, bleibt sie erhalten; sonst ist es die neueste ≤ `floor_used`, die ebenfalls erhalten bleibt. Löschmarker werden nur verworfen, wenn unter ihnen nichts mehr liegt (§12.2). Bleibt zu zeigen: Keine Sicht mit `s < floor_used` **entsteht später**. Jede neue Sicht wird unter dem Registry-Lock mit `s ≥ floor ≥ floor_used` registriert (monotones `floor`, `view_at`-Prüfung und Eintrag unter demselben Lock; `view()` nutzt `v ≥ floor`, weil `visible_stamp` monoton ist und `compute_floor` ≤ `v` ist). Bereits bestehende Sichten gingen in `compute_floor` ein: ihr Stamp ≥ `floor_used`. Holds/Consumer analog. ∎ Ausnahmen mit bewusst anderer Semantik: `CompactionFilter` in `forgetting`-Spaces (§12.2) und `Erase` (§14).
+
+### 16.5 Claims, `obsolete`, Graveyard (`INV-CLAIM-1`)
+
+Eine Datei trägt `obsolete: AtomicBool` im Handle. **Claim** = Zeile in der Claim-Tabelle (Registry, Rang 5) mit `(file, job, cancel_flag)`. `claim(files)` prüft unter dem Registry-Lock für **alle** Dateien: nicht beansprucht (oder vom `urgent`-Job abbrechbar) **und** `!obsolete`; dann alle oder keine.
+
+**Satz (`INV-CLAIM-1`).** Kein Job beansprucht eine Datei, die ein anderer Job bereits ersetzt hat. _Beweis._ Installation eines Jobs (Edit → neue Version → `obsolete.store(true)` der Eingaben) geschieht, solange der Job seine Claims hält; Claims werden erst **nach** dem Setzen von `obsolete` freigegeben. Ein späterer `claim` sieht entweder die Zeile (Konflikt) oder, nach Freigabe, `obsolete = true` (Fehlschlag, Planer plant neu aus der aktuellen Version). Beides unter dem Registry-Lock, also nicht verschränkbar. ∎ **Graveyard:** Beim Drop der letzten `Arc<FileHandle>` mit `obsolete = true` wird der Pfad in eine Liste geschoben (kein E/A im `Drop`, P-9). Die `background`-Lane löscht per `remove_file` + `sync_dir`, wiederholt Fehlschläge und meldet sie als Metrik.
+
+### 16.6 Poison und Panik
+
+|Ereignis|Abbildung|
+|---|---|
+|`sync_data`/`sync_all`/`write_all_at` (nicht `ENOSPC`) im Committer scheitert|`Poisoned{cause: Io}`; alle Tickets der Gruppe `Err`; Flag `poisoned: AtomicBool` (Release); jeder Schreib-/Wartungseinstieg prüft es (Acquire)|
+|`std`-Sperre vergiftet (`PoisonError`)|`Poisoned{cause: LockPoison}`; **kein** `into_inner()` zum Weitermachen|
+|Panik in Aufrufer-Code in Wartung/Listener|`catch_unwind` an der Grenze; Job schlägt fehl, Listener abgemeldet; Instanz bleibt benutzbar (F-12)|
+|Panik im Committer-Abschnitt|Sperrvergiftung ⇒ Poison (F-13)|
+|Panik in `Weigher`/`Filter` in `scan_page`|`Err(CallerPanic)`; kein Poison|
+
+Eine vergiftete Instanz verweigert alle Schreibvorgänge und Wartungsjobs, **liest weiter** (§10.5, E-2).
+
+### 16.7 Was `loom` prüft
+
+Genau diese Modelle (jeweils ≤ 3 Threads, begrenzte Schritte): (1) Ticket-Warteschlange und Leiterwahl; (2) Sichtbarkeitsprotokoll mit Rotation (§16.3, inklusive des Gegenbeispiels als erwartetem Fehlschlag mit vertauschter Reihenfolge); (3) Registry: `register_view` ‖ `compute_floor` ‖ Compaction-`retain` (`INV-RET-1`); (4) Claim-Tabelle mit `obsolete` (`INV-CLAIM-1`); (5) Graveyard-Übergabe beim letzten `Arc`-Drop. Gesamtsystemläufe nutzen `Runtime::manual()` mit zufälliger Einplanung und `Hooks`.
+
+---
+
+## 17. Ressourcen und Effizienz (Z-12)
+
+Ziel: begrenzter, vorhersagbarer Verbrauch, kein Thread je Instanz, Leerlauf nahe null, faire Teilung zwischen vielen Instanzen im selben Prozess.
+
+### 17.1 Governor
+
+Ein geteiltes Objekt je Prozess (`Arc<Governor>` in `Env`), von vielen `Storage` genutzt:
+
+|Budget|Verfahren|Wirkung bei Knappheit|
 |---|---|---|
-| K-01 | umgesetzt | REQ-GATE-1, 8.1 |
-| K-02 | umgesetzt | REQ-GATE-1, 8.1, INV-5 |
-| K-03 | umgesetzt | REQ-REC-2, REQ-KEY-4 (`DestroyIntent`), 7.4 E2 |
-| K-04 | umgesetzt | INV-6 (Fehlerabbildung) |
-| K-05 | umgesetzt (Option b) | REQ-GR-3 |
-| K-06 | umgesetzt | REQ-SRC-1 Schritt 4, REQ-GR-5 |
-| K-07 | umgesetzt (D3) | REQ-ER-2, Kapitel 9 |
-| K-08 | umgesetzt (D1) | REQ-ER-6, Kapitel 9 |
-| K-09 | umgesetzt | 8.3 (`C4a`, `C4b`), REQ-OPS-2 |
-| K-10 | umgesetzt | 8.3 (Eager-Erasure-Pfad) |
-| K-11 | umgesetzt | 5.5 (zwei Dateien), REQ-KEY-3 |
-| K-12 | umgesetzt | 5.5 (`next_index`), 5.9 |
-| K-13 | umgesetzt | 5.6 (Offboarding) |
-| K-14 | umgesetzt | 7.9, Kapitel 9 |
-| K-15 | umgesetzt | REQ-BAK-1 (Manifest) |
-| K-16 | umgesetzt | REQ-BAK-2, REQ-BAK-4 |
-| K-17 | umgesetzt (D4) | 5.1, Kapitel 9 |
-| K-18 | umgesetzt | 4.6 (`seal_of`) |
-| K-19 | bereits in v4.1.2 | T-ER-10 |
-| K-20 | umgesetzt (D6) | ADR-49, G-GRAPH (11.5) |
-| H-02 | umgesetzt | Kapitel 15 (`contextra-ids`) |
-| H-05 | umgesetzt | 5.1, Kapitel 9 |
-| H-06 | umgesetzt | REQ-ING-8 |
-| H-08 | umgesetzt | ADR-18 |
-| H-12 | umgesetzt | 6.8 |
-| H-22 | umgesetzt (D9) | ADR-02, 5.6, 7.8, Anhang A |
-| H-23 | umgesetzt (D9) | 1.3 (Zielplattform) |
-| H-24 | umgesetzt (D10) | ADR-15, REQ-KEY-7 |
-| H-26 | umgesetzt (D10) | Kapitel 9 |
-| H-27 | umgesetzt (D5) | 1.2 |
-| H-28 | umgesetzt | ADR-43, 8.6 |
-| H-31 | bereits in v4.1.2, Werkzeuge geprüft | 13.6 |
-| M-09 | umgesetzt (D8) | 3.3, 15 |
-| H-04 | teilweise | ADR-50 (Begründung), Digest-Index offen |
-| M-14, M-12, M-13 | bereits in v4.1.2 | Anhang B, F-28 |
-| H-01, H-03, H-07, H-09, H-10, H-11, H-13 bis H-21, H-25, H-29, H-30 | offen | v4.3 |
-| M-01 bis M-08, M-10, M-11, M-15 bis M-27 | offen | v4.3 |
-| N-01 bis N-06 | offen | v4.3 |
+|Memtable-Gesamtsumme|gewichtete Quote je Instanz, harte Obergrenze|früherer Flush; Stufe `Verlangsamt`/`Gestoppt` (§10.4)|
+|`BlockCache`|ein CLOCK-Pool, Mindestanteil je Instanz|fremde Einträge verdrängen, Mindestanteil bleibt|
+|offene Dateien (`TableCache`)|globale LRU, Quote je Instanz|schließen und bei Bedarf neu öffnen; Footer/Index-Cache bleibt|
+|E/A-Raten|Token-Buckets (Lesen/Schreiben, `Clock`-basiert) für `background`; `urgent` ungedrosselt|Compaction wird gedrosselt|
+|Vorlesen|begrenzte Tiefe|weniger Vorlesen|
+|Wartungs-Threads|`Runtime` mit `n = min(4, Kerne)`; je Instanz höchstens zwei Jobs (Lanes)|faire Reihenfolge nach Rückstand|
+|`PressureSource` (optional)|cgroup/PSI-Stufe|verkleinert Caches, erzwingt Flush|
 
-Offene Befunde werden nicht stillschweigend umgesetzt. Jeder davon ist mit Verweis auf den Review zu schließen.
+### 17.2 Speicherbudget je Instanz (Richtwerte, in F5 kalibriert)
 
-*Ende der Spezifikation v4.2.*
+`Σ Memtables ≤ (1 + max_frozen) · memtable_bytes · Spaces_aktiv` (Hard-Cap über Governor-Quote); Index-/Filter-Blöcke zählen zum `BlockCache`; Redo-Puffer ≤ Gruppengröße (8 MiB); Körper werden nie im `BlockCache` gehalten. Offene Datei-Deskriptoren ≤ `max_open_files` + Redo + LOCK + Catalog.
+
+### 17.3 Leerlauf und Hibernation
+
+Ohne Last: kein Thread, kein Timer außer dem optionalen Intervall-`fsync` und `consumer_check_interval`; beide laufen als Jobs der geteilten `Runtime`, nicht als Thread je Instanz. `hibernate()` gibt Memtable und Caches frei (H-S16).
+
+### 17.4 Faire Teilung
+
+Quoten sind Gewichte, keine festen Teile: eine ruhende Instanz gibt Cache und Dateien frei, eine aktive darf bis zur harten Grenze wachsen. Mindestanteile verhindern Verhungern.
+
+### 17.5 Allokationsbudget im Heißpfad (P-11, per zählendem Allokator geprüft)
+
+|Operation|Budget (Hypothese, in F5 festgelegt)|
+|---|---|
+|`View::get` mit Cache-Treffer|≤ 2 Allokationen (Arc-Klon des Blocks, Rückgabewert; Header/Wert als `Bytes`-Ausschnitt ohne Kopie)|
+|`Cursor::next`|≤ 1 je Eintrag (nur wenn der Schlüssel rekonstruiert werden muss)|
+|`apply` einer Gruppe|≤ `2 + Anzahl Changes` (Frame-Puffer wiederverwendet, Ticket-Slab)|
+|Flush/Compaction|Puffer je Job einmal, nicht je Block|
+
+Weitere Ressourcentests: RSS-Obergrenze je Konfiguration unter Last; `ulimit -n 256` mit 1 000 Runs; 1 000 hibernierte Instanzen (Fußabdruck und CPU); Gegendruck unter simuliertem Speicherdruck.
+
+---
+
+## 18. Invariantenkatalog
+
+Jede Invariante wird in **mindestens einem** Test per ID zitiert (`// INV-LOG-6`); `tests/invariants.rs` liest diese Datei, extrahiert alle `INV-*`-IDs aus der Spalte 1 und schlägt fehl, wenn eine ID in keinem Test vorkommt.
+
+|ID|Aussage|Netz (§19)|
+|---|---|---|
+|`INV-STAMP-1`|Stamps sind über **angenommene** Changes streng monoton und lückenlos; erster Stamp ist 1.|Modell, Property|
+|`INV-STAMP-2`|Stamps < 2^56; Überlauf ⇒ `Exhausted`, nie Umbruch.|Property|
+|`INV-FMT-1`|Nur kanonische Varints sind gültig.|Fuzz, Golden|
+|`INV-FMT-2`|Jedes Längenfeld wird vor Allokation gegen §6.7 und die Restlänge der Datei geprüft; Dekodierung ist total (P-4).|Fuzz, Bitflip|
+|`INV-CAT-1`|Nur ein dauerhafter Catalog-Edit macht eine Datei lebendig oder obsolet; nicht genannte Dateien sind verwaist und löschbar.|Absturzmatrix|
+|`INV-CAT-2`|Ein Edit ist **ein** Record (P-2); er wird ganz oder gar nicht angewendet.|Absturzmatrix|
+|`INV-CAT-3`|Nur der **letzte** Catalog-Record darf als Torn Write verworfen werden; früherer Defekt ⇒ `Corrupt` (kein Wiederauferstehen gelöschter Dateien).|Bitflip, Fuzz|
+|`INV-CAT-4`|Nach einem Absturz räumt die Verwaisten-Suche alle `.building.*`, nicht genannten Dateien und nicht aktuellen Blob-Generationen auf; Reserve-Redo (`≥ redo_floor`) bleibt.|Absturzmatrix|
+|`INV-LOG-1`|Ein Frame = ein `Change`.|Modell|
+|`INV-LOG-2`|Beim Replay ist ein Frame vollständig gültig oder beendet den Log.|Fuzz, Absturzmatrix|
+|`INV-LOG-3`|Stamps im Log streng aufsteigend (nicht lückenlos).|Property|
+|`INV-LOG-4`|Jede Prozessinstanz beginnt ein neues Segment; nie anhängen.|Absturzmatrix|
+|`INV-LOG-5`|`fsync`-Fehler ⇒ Poison, nie Retry, nichts in die Memtable.|`FaultFs`|
+|`INV-LOG-6`|Jedes Segment außer dem neuesten mit Frames ist gesiegelt; Defekt in gesiegeltem Segment ⇒ `Corrupt`; `frame_count` passt.|Absturzmatrix, Bitflip|
+|`INV-LOG-7`|Ein Segment ohne Frames mit gültigem Header und `id ≥ redo_floor` ist lebendig (Reserve).|Absturzmatrix|
+|`INV-LOG-8`|Letzter gültiger Redo-Stamp < `redo_hwm` (ohne `redo_floor_stamp`-Erklärung) ⇒ `Corrupt{RedoTruncated}`.|`FaultFs` (Lost Write)|
+|`INV-VIS-1`|Memtables enthalten nur Daten aus erfolgreich geschriebenen Gruppen.|`FaultFs`, Hooks|
+|`INV-VIS-2`|Halb eingefügte Gruppen sind unsichtbar; ein `Change` ist atomar sichtbar.|Hooks, `loom`|
+|`INV-VIS-3`|Leser laden erst `visible_stamp`, dann die Version (Beweis §16.3).|`loom`|
+|`INV-RET-1`|Compaction/Flush verändert keine Sicht ≥ `floor_used`; neue Sichten entstehen nie unter `floor` (Beweis §16.4).|Property, `loom`|
+|`INV-FLUSH-1`|Ein Run mit Stamp `s` wird erst dauerhaft, wenn der Redo bis `s` per `sync_data` gesichert ist (gilt auch für Erase-Barriere und `checkpoint`).|Absturzmatrix|
+|`INV-CLAIM-1`|Kein Job beansprucht eine bereits ersetzte Datei (Beweis §16.5).|`loom`|
+|`INV-LOCK-1`|Sperren nur in aufsteigendem Rang (§16.1).|Rangstack-Test, `loom`|
+|`INV-KEY-1`|Kein `(Schlüssel, Nonce)`-Paar kommt je zweimal vor.|Property, Absturzmatrix|
+|`INV-KEY-2`|IDs (`run_id`, `blob_no`, `segment_id`, `tmp_id`) werden erst nach dauerhaftem Hochwassermarken-Edit benutzt und nie wiederverwendet.|Absturzmatrix|
+|`INV-BLOB-1`|Jeder `BlobRef` löst auf genau einen Record gleichen Schlüssels/Stamps (oder `blob_no = 0`).|`verify`, Property|
+|`INV-BLOB-2`|Kein Teilen: ein `BlobRef` ↔ ein Record; `live_bytes` ist exakt.|Property|
+|`INV-BLOB-3`|Hole-Records sind nie verschlüsselt; ein `BlobRef` auf ein Hole ⇒ `Corrupt{HoleRef}`.|Bitflip, Orakel|
+|`INV-ERA-1`|Logische Atomarität: View ≥ `S` sieht den Bereich leer, View < `S` ⇒ `Erased`; keine Mischsicht.|Modell|
+|`INV-ERA-2`|Nach `erase_done(S)` enthält kein lebender Run und kein lebendes Redo-Segment eine Version im Bereich mit Stamp ≤ `S`.|Orakel|
+|`INV-ERA-3`|Schlüssel vor Datei; der Kern führt den Auftrag nie aus, solange der Schlüssel noch liefert.|Absturzmatrix|
+|`INV-ERA-4`|Nur Roll-forward: ein begonnener Erase wird nach jedem Absturz fortgesetzt oder ist nie begonnen.|Absturzmatrix|
+|`INV-ERA-5`|Lesen unterhalb `S` ⇒ `Erased`, nie Daten, nie „leer“.|Modell|
+|`INV-ERA-6`|Nach `erase_done(S)` enthält keine lebende Blob-Generation einen Body-Record im Bereich mit Stamp ≤ `S`.|Orakel|
+|`INV-ERA-7`|Körper einer vernichteten Domäne ist weder in Redo noch Blob ohne Schlüssel lesbar; `Entry::body()` ⇒ `Shredded`, auch aus der Memtable.|Orakel|
+|`INV-POISON-1`|Ein vergiftetes Handle verweigert Schreiben und Wartung, liest weiter; `health()` nennt `durable_stamp` (E-2).|Fehlerklassen-Matrix|
+|`INV-API-1`|Fehlertexte, Metriken und Logs enthalten keine Schlüssel-/Wertbytes (P-12).|Lecks-Orakel|
+|`INV-FS-1`|Unter `FsPolicy::Strict` öffnet der Kern nur auf einer `Fs`, deren `caps()` Datei-/Verzeichnis-Sync, atomares `rename` und private Modi zusichert.|Manipulationstest, `fs_suite`|
+|`INV-KEYP-1`|Ein Frame mit domänenversiegeltem Körper wird erst dauerhaft, nachdem `KeyProvider::make_durable` nach der Schlüsselanlage zurückkehrte; `None` aus `domain_key` bedeutet dauerhaft vernichtet.|Absturzmatrix, `FaultFs`|
+|`INV-HOLD-1`|Dauerhafte Holds überleben Neustart und zählen bis Ablauf/`hold_drop` in die Untergrenze.|Absturzmatrix|
+|`INV-SEG-1`|Ein Segment wird nur mit gültigem Siegel-Footer und per Edit lebendig; Rahmenprüfung vor jeder Block-Ausgabe.|Bitflip, Absturzmatrix|
+|`INV-EPOCH-1`|Original und beschreibbarer Klon versiegeln nie unter gleichem (DEK, Nonce) verschiedene Inhalte.|Property (Klon-Divergenz)|
+|`INV-SCAN-1`|`scan_physical` ändert nichts und gibt keine Inhalte preis.|Lecks-Orakel|
+
+---
+
+## 19. Teststrategie und Qualitätstore
+
+### 19.1 Netze
+
+|Netz|Inhalt|
+|---|---|
+|**Modelltest**|Referenzmodell (`BTreeMap` mit Versionsliste je Schlüssel, Holds, Consumer, `erased_ranges`) gegen die Engine: zufällige Folgen aus `apply` (Guards, Durability, ephemeral), `view_at`, `scan`, `scan_page`, `history`, Flush, Compaction, Blob-GC, `CompactionFilter`, `Erase`, Neustart. Eigener Xorshift-PRNG, Seed bei Fehlschlag ausgegeben.|
+|**Gesetze (proptest)**|`decode ∘ encode = id` für alle Formate; Run-Lesen = Eingabe; `retain` idempotent; Planer liefert nie überlappende Ausgaben auf Level ≥ 1; Nonce-Eindeutigkeit; Blob-Lebendbilanz = Σ `PutRef` in lebenden Runs; Ordnung `(user_key ↑, tag ↓)`.|
+|**Absturzmatrix**|`FaultFs` bricht an **jedem** E/A-Index ab (§19.2); danach `open`, Vergleich mit Modell-Präfix der quittierten Changes, `verify` grün. Jede Zeile aus §13.2 und §14.3 (E1–E7) wird zu einem Testfall.|
+|**Fehlerklassen-Matrix**|Jede Klasse F-1…F-15 hat mindestens einen gezielten Test mit definiertem Zustand danach (§5.1, Spalte „Prüfnetz“).|
+|**Linearisierbarkeit**|`testing::linearize`: nebenläufige Läufe (n Schreiber, m Leser, Wartung) werden aufgezeichnet; die Prüfung weist eine zur Stamp-Folge passende Ordnung nach, die alle gelesenen Sichten erklärt (wegen der Stamp-Ordnung linear in der Historie).|
+|**Sichtbarkeit**|`Hooks` an `AfterRedoSync`/`BeforeVisible` pausiert: keine View sieht einen halben Change; nach Freigabe sieht jede neue View alle Ops oder keine.|
+|**Bitflip**|Jedes Byte jeder Datei (Run, Blob, Catalog, Redo, `FORMAT`, `KEYS`, `CURRENT`) wird gekippt: Ergebnis `Err(Corrupt)` oder identisch, nie falsche Daten; in `Authenticated/Encrypted` ausnahmslos `Err` (außer in Hole-Nutzbereichen, dort `HoleRef`).|
+|**Fuzz**|Decoder: Redo-Frame/Seal, Run-Block/Footer/Directory, Blob-Record/Hole, Catalog-Record, `FORMAT`, `KEYS`, `KeyRange`, `ResumeToken`; Stateful-Fuzz (`arbitrary`-Aktionsfolgen gegen das Modell).|
+|**Nebenläufigkeit**|`loom` für die fünf Modelle aus §16.7; Gesamtsystem über `Runtime::manual()`.|
+|**Panic-Injektion**|Panik in `Weigher`, `Filter`, `CompactionFilter`, `Extension`, `Listener`: Daten unverändert, Job scheitert, Instanz benutzbar (F-12); Panik im Committer ⇒ Poison (F-13).|
+|**Schichtregel**|`tests/layering.rs` (§3.3); `cargo tree -e normal` zeigt nur `contextra-ports`.|
+|**Lösch-Orakel**|§14.7.|
+|**Lecks-Orakel**|§15.7, `INV-API-1`.|
+|**Ressourcentests**|Allokationsbudget, Deskriptorgrenze, RSS, Leerlauf (§17.5).|
+|**Soak**|Agenten-Lastprofil (viele kleine Changes, kurzlebige Views, seltene Erases, 4-KiB-/64-KiB-Körper), Platte-voll, Speicherdruck, Dauer ≥ 12 h nachts.|
+|**Goldens**|Je Dateiart Referenzdateien (Anhang A, Freeze-Liste §9.8) in **allen drei** Integritätsmodi; Byte-Stabilität über Plattformen (x86-64, aarch64, big-endian-Host per `miri`/Cross-Test).|
+|**Differentialtest (begrenzt)**|Schlanke Harness gegen die Bibliotheks-API des rekonstruierten Altstands (Anhang B.2) für `put/get/delete/scan/commit` ohne Stromausfall; Abweichungen sind Befunde, kein automatischer Fehler.|
+
+**CI-Gates (jeder PR):** `cargo test` (alle Netze außer Soak/Fuzz-lang), `clippy -D warnings`, `cargo doc` ohne Warnungen, `cargo deny`, `cargo miri test` für `codec` und `keys`, Fuzz-Smoke (60 s je Ziel), Absturzmatrix, `loom`-Subset, `tests/invariants.rs`. **Nachts:** Fuzz lang (≥ 30 min je Ziel), Soak, Benchmarks gegen die Hypothesen (Regressionsgrenze ±10 %).
+
+### 19.2 `MemFs` und `FaultFs`
+
+`MemFs` hält je Datei zwei Zustände: _Seitencache_ (alles Geschriebene) und _dauerhaft_ (Stand der letzten `sync_data`/`sync_all`). Verzeichniseinträge (Anlegen, `rename`, `remove`) sind erst nach `sync_dir` dauerhaft. `FaultFs` kann:
+
+- an E/A-Operation Nr. _n_ einen **Absturz** auslösen: danach zählt nur der dauerhafte Zustand; nicht synchronisierte Schreibvorgänge gehen **verloren, teilweise (zerrissen, 512 B/4 KiB) oder in zufälliger Reihenfolge** in den Zustand ein;
+- `fsync`/`sync_dir` **fehlschlagen** lassen (Poison-Pfad);
+- „Platte voll“ (`StorageFull`) und Kurzschreibvorgänge simulieren, auch **mitten im Gruppen-Schreibvorgang** (§10.5);
+- `rename` ohne `sync_dir` rückgängig machen;
+- **Lesefehler** (`EIO`) und **Bitfäule** einzelner Offsets beim Lesen einschleusen;
+- **verlorene** (quittiert, nicht geschrieben) und **fehlgeleitete** Schreibvorgänge (falscher Offset derselben Datei) einschleusen;
+- das **Zurückspielen eines älteren Gesamtstands** (F-10) für den Anker-Test;
+- jede Operation mit einer **Hook-Marke** versehen (`AfterRedoWrite`, `AfterRedoSync`, `BeforeVisible`, `BeforeCatalogEdit`, …).
+
+Selbsttests von `FaultFs` sind Gate von F1: Nicht synchronisierte Daten gehen verloren, `rename` ohne `sync_dir` wird zurückgesetzt, Zerreißen in Sektorgrößen funktioniert, Lost-/Misdirected-Write sind deterministisch aus dem Seed reproduzierbar.
+
+### 19.3 Überführung des Bestandes
+
+Aus den 160 Testdateien des Altstands werden **Szenarien** übernommen, nicht Code (der Testkorpus ist nicht übersetzbar, B-14). Verworfen werden Tests für Legacy-Formate (`wal_legacy_*`, `hmac_legacy_*`, `format_version_compat`), `rollback_to_tx`, den adaptiven Planer und `docid-128`. `MergeOperator`-Tests sind nach SD-12 zurückgestellt (B-15). Anhang B.3 ordnet die Szenarioklassen den Netzen zu.
+
+---
+
+## 20. Leistungshypothesen
+
+**Es wurde nichts gemessen.** Jede Zeile ist eine Hypothese, die in der genannten Phase auf der Referenzhardware (A-09) belegt oder verworfen wird; Gate **G-P** verlangt den Bericht.
+
+|ID|Hypothese|Phase|
+|---|---|---|
+|H-S1|Punktlesen mit warmem Block-Cache `p99 < 50 µs`; kalt höchstens Anzahl Level × 1 Block-E/A|F3, F5|
+|H-S2|Ein `apply` mit `Always` kostet ein `sync_data`; bei 64 parallelen Schreibern ≥ 20× Durchsatz gegenüber seriellem Fsync (inkl. Guard-Vorwärmung)|F5|
+|H-S3|Leveled, Faktor 10: Schreibverstärkung ≤ 15, Platzverstärkung ≤ 1,3 (ohne Holds) für Header-Daten; zusätzlich mit 4-KiB- und 64-KiB-Werten|F6|
+|H-S4|Wiederanlauf ≤ 1 s je 256 MiB Redo-Replay|F4/F5|
+|H-S5|Öffnen ohne Redo und mit 1 000 Runs < 50 ms (Metadaten aus Catalog, Runs lazy)|F4|
+|H-S6|`drop_space` mit 1 000 Runs < 100 ms; `Erase::range` kostet O(Bytes der berührten Dateien)|F7|
+|H-S7|Memtable `RwLock<BTreeMap>` mit blockweisem Scan und 64-Ops-Unterbatches hält den Durchsatz (Schreiben + 8 Leser) bei ±20 % der Referenz|F5|
+|H-S8|`estimate` über 1 000 Index-Einträge < 1 ms; obere Schranke ≤ 2× ohne starke Überschattung|F5|
+|H-S9|Präfix-Filter reduziert Block-Lesevorgänge bei Präfix-Scans ohne Treffer in ≥ 90 % der Runs um ≥ 80 %|F3|
+|H-S10|`separate_body(4 KiB)` senkt die Schreibverstärkung bei 64-KiB-Werten um ≥ 3×|F6|
+|H-S11|Scan mit Header-Filter (Körper 8 KiB, Header 32 B) liest ≥ 10× weniger Bytes als mit Inline-Werten|F5|
+|H-S12|`read_batch` über 32 Blöcke ≥ 2× schneller als 32 serielle `read_at` auf NVMe|F3/F5|
+|H-S13|Vorallokierte Redo-Segmente senken die `sync_data`-Latenz (Median, p99)|F5|
+|H-S14|`Erase::domain` < 10 ms unabhängig vom Datenvolumen|F8|
+|H-S15|Ein `BodyCache` lohnt nur, wenn die Trefferquote des Seitencaches < 70 % ist|F5|
+|H-S16|1 000 hibernierte Instanzen: < 1 % CPU im Leerlauf, < 2 MiB RSS je Instanz|F9|
+|H-S17|Blob-Konsolidierung hält die Dateizahl je Space unter `max_open_files / Spaces` bei 10 Mio. Flushes-Äquivalent|F6|
+|H-S18|`Authenticated` kostet ≤ 15 %, `Encrypted` ≤ 40 % Durchsatz gegenüber `Plain` (mit AES-NI-/NEON-Port)|F8|
+
+**Abbruchkriterien:** Verfehlt F5 H-S7 um > 2×, wird die Memtable durch eine Skip-Liste in einer **isolierten, gesondert geprüften** Einheit ersetzt (SD-10; einzige Stelle, an der `unsafe` überhaupt diskutiert wird, nur per Beschluss). H-S13 verfehlt ⇒ Vorallokation bleibt Option, nicht Pflicht. H-S3 deutlich verfehlt ⇒ zweites Verfahren (Size-Tiered für L0) als **eigene** Entscheidung, nicht im Voraus.
+
+---
+
+## 21. Entscheidungsregister
+
+Die Nummern 01–26 stammen aus `REFACTORING_PLAN.md` (v1), 27–48 aus v2 und dieser Spezifikation. Nummern, die in den Altdokumenten nicht belegt waren (35, 37–40, 45–47), sind hier **erstmals** vergeben.
+
+|ID|Entscheidung|
+|---|---|
+|SD-01|Keine internen und keine externen Laufzeit-Abhängigkeiten im Kern (nur `std` + `contextra-ports`); Kryptografie über Ports. _(ersetzt „encryption zieht Krypto-Crates“)_|
+|SD-02|Synchroner Kern; Hintergrundarbeit auf teilbarer `Runtime`; `tokio` entfällt.|
+|SD-03|Ein Port `Fs` für alle E/A inkl. Verzeichnisse und Sperre; Stromausfall-Simulator ist Pflichttor.|
+|SD-04|Genau ein Format je Dateiart mit Feature-Bits; Altformate nur über ein separates Importer-Crate.|
+|SD-05|Der Catalog ist alleinige Wahrheit; Zustandsänderung = ein Edit; numerische IDs; Metadaten im Catalog.|
+|SD-06|Ein Redo-Frame je `Change`; neues Segment je Prozessstart; Rotation statt Truncate-in-place.|
+|SD-07|Spaces = getrennte LSM-Bäume mit gemeinsamem Redo und gemeinsamer Stamp-Folge; Space steckt nicht im Schlüssel.|
+|SD-08|`Change` mit `Guard`s ersetzt Transaktionspuffer, SSI und Intent-Locks.|
+|SD-09|`rollback_to_tx` entfällt; Zeitreise über `view_at` und Holds (belegt durch B-7).|
+|SD-10|Memtable = `RwLock<BTreeMap>` mit blockweisem Scan; Ersatz nur bei verfehlter H-S7.|
+|SD-11|Ein Compaction-Verfahren (Leveled), Planer als reine Funktion.|
+|SD-12|Kein Merge-Operator in Version 1 (`kind = 6` reserviert); Read-Modify-Write über `Guard`.|
+|SD-13|Keine Kompression in Version 1 (`codec`-Byte und `BlockCodec`-Trait reserviert).|
+|SD-14|`Erase` ist Kernprimitiv mit einem Durability-Punkt und Roll-forward; nie über Dateiendungen oder am Catalog vorbei.|
+|SD-15|Schlüsselvernichtung vor Dateilöschung; echte Unwiederbringlichkeit nur über `Cryptographic`.|
+|SD-16|**Geändert durch SD-32:** (v1: ein Wartungsjob je Instanz).|
+|SD-17|Fehler sind ein Enum mit `code`, `retryable`, strukturierten Feldern.|
+|SD-18|Eine Instanz, ein Prozess; Mehrprozess über einen Daemon der oberen Schicht.|
+|SD-19|Seitenweises Lesen mit `ResumeToken`; Bindung an Stamp und Bereich; Ablauf ist `Expired`.|
+|SD-20|`estimate` aus Index-Zählern (obere Schranke), ohne Datenblöcke.|
+|SD-21|`history` mit Untergrenzenprüfung (`HistoryPruned`).|
+|SD-22|Append-only Spaces vom Kern erzwungen; `Erase` nur mit `admin()`.|
+|SD-23|`DirectoryBlock`, Präfix-Filter (Standard in Haupt-Spaces), Extension-Blöcke von Anfang an.|
+|SD-24|`tier` für **alle** Dateiarten; `ColdTier` als Port in F10.|
+|SD-25|Fehler tragen `hint()` (datenfrei).|
+|SD-26|Lokalität nur über Schlüsselgestaltung und Run-Teilung; der Kern ordnet nie nach Zugriff um.|
+|SD-27|Zwei Ebenen: Header im LSM, große Körper in Blob-Dateien unter derselben Catalog-Verwaltung.|
+|SD-28|Gewichte als `u64`, mit `weigher_version`; `weights[0]` = logische Bytes.|
+|SD-29|Körper reisen im Redo-Frame und wandern beim Flush ins Blob: ein `fsync` je Gruppe.|
+|SD-30|Segmente (`FileKind::Segment`) für nicht zerlegbare Indizes; Lebenszyklus und Erase im Kern, Format beim Besitzer.|
+|SD-31|Kein `O_DIRECT`, kein `io_uring`, kein Thread-per-Core im Kern; über alternative `Fs`-Implementierung.|
+|SD-32|Zwei Lanes (`urgent`, `background`) mit Claim-Tabelle; Erase/Flush warten nie hinter Compaction.|
+|SD-33|Drei Integritätsmodi (`Plain`, `Authenticated`, `Encrypted`), unveränderlich, Downgrade-Schutz über `Config`.|
+|SD-34|Typisierte Capability-Handles `Rd < Ap < Wr < Adm`.|
+|SD-35|Poison lässt Lesen zu (degradierter Betrieb); `health()` nennt `durable_stamp` (E-2).|
+|SD-36|Kryptografische Primitive über Ports, Protokoll im Kern; `root_key` in `KEYS`, KEK umhüllt nur `KEYS` (Rotation O(1)).|
+|SD-37|`RollbackAnchor` als optionaler Port; ohne Anker ist F-10 offen dokumentiert.|
+|SD-38|Ein prozessweiter `Governor` mit Quoten je Instanz statt Budgets je Instanz.|
+|SD-39|Prüfpunkte über `Env::hooks()`; keine globalen veränderlichen Variablen (löst B-10).|
+|SD-40|`ResumeToken` mit `chk` (CRC32C bzw. `Mac16`), nicht fälschbar im Modus ≥ `Authenticated`.|
+|SD-41|`CompactionFilter` nur in `forgetting`-Spaces; entfernt oder kürzt, kein Merge.|
+|SD-42|Domänenschlüssel auf Körper-Ebene für kryptografisches Löschen je Subjekt.|
+|SD-43|Blob-GC compaction-getrieben, mit Konsolidierung kleiner Blobs.|
+|SD-44|Redo-Segmente sind kein `FileKind`; Lebendigkeit über `redo_floor`.|
+|SD-45|Leser laden `visible_stamp` **vor** der Version (Beweis §16.3).|
+|SD-46|ID-Hochwassermarken im Catalog **vor** Nutzung (`INV-KEY-2`).|
+|SD-47|`redo_hwm` in jedem Edit; Lost-Write im Redo-Schwanz wird erkannt (`INV-LOG-8`).|
+|SD-48|Ehrliche Semantik des Vergessens: sichtbare Zustandsänderung, kein Schutz durch `Hold` in `forgetting`-Spaces.|
+|SD-49|**Neu:** Gegendruck wartet **vor** dem Ticket, nie unter dem Committer (E-4).|
+|SD-50|**Neu:** Nonce-Präfixe sind je Verwendung disjunkt (`0x01…0x05`, E-6).|
+|SD-51|Verantwortungsgrenze (§2.3) ist bindend: Mechanismus im Kern, Politik außerhalb; nichts wird „vorsorglich“ gebaut.|
+|SD-52|Flächen aus §7.8 sind semver-stabil und konformitätsgetestet.|
+|SD-53|Guard-Vorwärmung ist Pflicht im `apply`-Pfad (E-9).|
+|SD-54|Segmente haben einen Kern-Rahmen (Block-Prüfwert/AEAD, Siegel-Footer) und ein opakes `reference`.|
+|SD-55|`KeyProvider` mit `domain_key_create` und `make_durable`; `None` = dauerhaft vernichtet.|
+|SD-56|`SecretAlloc` als optionaler Port für geschützten Speicher; Kern bleibt `forbid(unsafe_code)`.|
+|SD-57|`FsCaps` + `FsPolicy::Strict` als Standard (fail-closed auf schwächeren Plattformen).|
+|SD-58|Dauerhafte Holds im Catalog (`hold_set`/`hold_drop`).|
+|SD-59|`submit`/`Pending` mit Fertigmeldung statt `async`.|
+|SD-60|Merge-Space-Flag `32` und Pflicht-Bit `MERGE` reserviert, nicht erzeugbar.|
+|SD-61|`erase_status` und rein lesender `scan_physical` als Beobachtungsfläche.|
+|SD-62|Listener-Zustellung mit Frist; Überschreitung meldet ab, blockiert nie den Commit.|
+|SD-63|Schlüsselepoche und neuer DEK für beschreibbare Klone (Nonce-Eindeutigkeit über Instanzen).|
+|SD-64|Portables CRC32C im Kern; beschleunigte Varianten nur über Port und mit bestandenen Goldens.|
+
+---
+
+## 22. Annahmen, offene Punkte, Errata
+
+### 22.1 Annahmen (`A-nn`)
+
+|ID|Annahme|Wirkung, falls falsch|
+|---|---|---|
+|A-01|Es existieren **keine produktiven Altdaten** im Bestandsformat (das Repository enthält im HEAD nur das Crate; Historie siehe B-1).|Phase F-I (Importer) wird Pflicht.|
+|A-02|Windows ist in Version 1 nur ohne Durability-Garantie unterstützt.|Eigener Windows-`Fs` für `sync_dir`/`rename`.|
+|A-03|Werte ≤ 1 MiB genügen; größere Daten liegen in einer Objektschicht.|Wertgrenze und Frame-Grenze anheben.|
+|A-04|Obere Schichten nutzen `Guard` statt `TxBuffer`/SSI.|Aufwand in aufsetzenden Schichten.|
+|A-05|`File::try_lock` steht zur Verfügung; MSRV in F0 festgelegt. `sync_all` entspricht auf Apple-Plattformen `F_FULLFSYNC` — **in F1 per Test zu belegen**.|Ersatz über eigenes `Fs`-Mitglied.|
+|A-06|Aufrufer von `rollback_to_tx` sind durch Versionierung der oberen Schicht ersetzbar.|Übergangsfunktion.|
+|A-07|Passphrase→Schlüssel darf das Crate verlassen.|`KeyProvider` erweitern.|
+|A-08|Umbenennung `contextra-store` → `contextra-storage`; fremde Verweise sind im Repository nicht sichtbar.|Alias-Crate in der Übergangszeit.|
+|A-09|Referenzhardware (NVMe, Kerne, RAM) wird in F1 festgelegt.|Messwerte nicht vergleichbar.|
+|A-10|`Extension` bleibt bis F10 instabil.|Schnittstelle ändert sich, Format nicht.|
+|A-11|Kalter Speicher löscht zuverlässig oder wird nur verschlüsselt betrieben.|`Physical` gilt dort nicht.|
+|A-12|Aufsetzende Schichten kommen in Version 1 ohne Merge-Operator aus (Read-Modify-Write über `Guard`, Pufferung, Anhang D.2).|Entscheidung SD-12 überprüfen.|
+
+### 22.2 Offene Entscheidungen (`O-n`, mit Empfehlung)
+
+|ID|Frage|Empfehlung|Entscheidung bis|
+|---|---|---|---|
+|O-1|Toolchain/MSRV|stabile Rust-Version mit `File::lock/try_lock` (nach meinem Kenntnisstand ≥ 1.89, in F0 gegen die Toolchain prüfen); in F0 pinnen|G-0|
+|O-2|Rückstände abgeleiteter Daten (Embeddings, Postings) nach `Erase`|Segmente je Löschdomäne; `rewrite_without` Pflicht für löschfähige Formate|F10|
+|O-3|`BodyCache`|nur, wenn H-S15 es belegt|F5|
+|O-4|Windows-`Fs`|separates Crate nach V1|nach F9|
+|O-5|Schwellen der Blob-Konsolidierung (`blob_min_bytes`)|16 MiB starten, in F6 messen|F6|
+|O-6|Referenz-`Cipher`/`Mac` für die Goldens|BLAKE3 keyed + ChaCha20-Poly1305 im Dev-Crate `contextra-crypto-ref`|**G-F**|
+|O-7|Block-Kompression (SD-13)|frühestens V2 nach Messung|nach F9|
+
+### 22.3 Errata zu §1–§13
+
+Beim Vervollständigen wurden folgende Stellen des ersten Teils als zu knapp oder inkonsistent erkannt. **Die Korrekturen gelten ab sofort normativ;** der erste Teil ist beim nächsten Edit entsprechend nachzuziehen (§1.5).
+
+|ID|Stelle|Problem|Korrektur|
+|---|---|---|---|
+|E-1|§9.7 `spaces_add`, Flags|Das Flag `forgetting` (16, §12.2) fehlt in der Aufzählung `1, 2, 4, 8`.|Flags: `1 separate_body, 2 domain_sealed, 4 append_only, 8 ephemeral, 16 forgetting`. `forgetting` ist unvereinbar mit `append_only`.|
+|E-2|§10.5 „Poison-Semantik“|„Memtables enthalten nur Daten aus erfolgreich synchronisierten Gruppen“ gilt nur für `Always`.|§16.3 (E-2): `health()` mit `durable_stamp`, `maybe_lost`-Views.|
+|E-3|§9.7 Catalog-`chk` (Plain)|„`catalog_no` als `u32` gefaltet“ ist nicht definiert.|`fold(n) = (n as u32) ⊕ ((n >> 32) as u32)`, als `u32` little-endian Startwert des Seeds.|
+|E-4|§10.2 Schritt 3, §10.4|Leiter wartet unter dem Committer-Lock auf Entspannung ⇒ möglicher Stillstand mit Flush (Schritt 0).|§16.2: Warten vor dem Ticket, Leiter wertet nur aus.|
+|E-5|§9.4 `HWM-Verankerung`|`redo_hwm` unter `Interval`/`Never` ist `durable_stamp` des Edits, nicht `visible_stamp`; sonst falscher Alarm nach legitimem Verlust ungesicherter Frames.|`redo_hwm := durable_stamp` (so schon in §12.1 Schritt 3); hier ausdrücklich festgehalten.|
+|E-6|§9.4/§9.6 Nonce-Präfixe|`0x04` doppelt belegt (Blob-Record und Domänen-Körper im Blob).|§15.2: Domänen-Körper im Blob `0x05`.|
+|E-7|§7.2 `ResumeToken`|Layout nicht festgelegt.|Anhang A.7.|
+|E-8|§9.5 Run-Block-Nonce|Nicht genannt.|§15.2: `0x01 ‖ block_offset u64 ‖ 0u24` unter Run-Schlüssel.|
+
+---
+
+### 22.4 Revision R2 (Änderungsliste)
+
+|ID|Änderung|
+|---|---|
+|E-9|§10.2 Schritt 1: Guard-Vorwärmung von SOLL auf MUSS; neuer Schritt 1b (Schlüsselanlage + `make_durable`).|
+|E-10|Neue Abschnitte §2.3 (Verantwortungsgrenze) und §7.8 (stabile Flächen); NZ-13…NZ-20.|
+|E-11|§4: `FsCaps`, `KeyProvider` erweitert, `SecretAlloc`; `Config::fs_policy`.|
+|E-12|§9.7: Catalog-Felder `0x0012…0x0014`; `spaces_add`-Flags `16` (E-1) und `32` (reserviert).|
+|E-13|§15.2: Schlüsselepoche (`key_epoch`) in Run-/Blob-/Segment-Schlüsseln; Klon-Regel (SD-63).|
+|E-14|§18/§21: `INV-FS-1`, `INV-KEYP-1`, `INV-HOLD-1`, `INV-SEG-1`, `INV-EPOCH-1`, `INV-SCAN-1`; SD-51…SD-64.|
+|E-15|Namen aufsetzender Systeme aus der Spezifikation entfernt; sie bleiben außerhalb des Geltungsbereichs.|
+
+Neue Formatfelder (`0x0012…0x0014`, Segment-Rahmen, Epoche in Schlüsselableitung) stehen auf der Freeze-Liste §9.8 (Punkt 14) und brauchen Goldens vor **G-F** (A.8).
+
+## Anhang A: Referenzvektoren (Goldens)
+
+Berechnet mit einem **unabhängigen Python-Referenzcodierer** (CRC32C und XXH64 vor der Nutzung gegen die Prüfwerte validiert). **Nicht** aus Rust-Code erzeugt; die Rust-Implementierung muss sie byte-genau reproduzieren (Test `golden_anhang_a`). Alle Hexwerte sind Bytefolgen in Dateireihenfolge.
+
+### A.1 Primitive
+
+|Eingabe|Ergebnis|
+|---|---|
+|`CRC32C("123456789")`, `seed = 0`|`0xE3069283`|
+|`CRC32C("")`, `seed = 0`|`0x00000000`|
+|`CRC32C("a")`, `seed = 0`|`0xC1D04330`|
+|Fortsetzung: `crc32c(crc32c(0,"1234"), "56789")`|`0xE3069283` (= Einzelschritt)|
+|`XXH64("", 0)`|`0xEF46DB3751D8E999`|
+|`XXH64("a", 0)`|`0xD24EC4F1A98C6E5B`|
+|`XXH64("abc", 0)`|`0x44BC2CF5AD770999`|
+
+### A.2 Varint (LEB128, kanonisch)
+
+|Wert|Bytes|
+|---|---|
+|0|`00`|
+|1|`01`|
+|127|`7f`|
+|128|`80 01`|
+|300|`ac 02`|
+|16384|`80 80 01`|
+|2^32|`80 80 80 80 10`|
+|2^64 − 1|`ff ff ff ff ff ff ff ff ff 01`|
+
+Ungültig (`Corrupt`): `80 00` (überflüssige Fortsetzung), `ff×9 02` (zehntes Byte ≠ `0x01`), mehr als 10 Bytes, abgebrochene Folge.
+
+### A.3 Tag
+
+`tag = (stamp << 8) | kind` (u64 LE):
+
+|stamp|kind|Bytes|
+|---|---|---|
+|1|Put (1)|`01 01 00 00 00 00 00 00`|
+|7|Delete (2)|`02 07 00 00 00 00 00 00`|
+|2^56 − 1|PutRef (5)|`05 ff ff ff ff ff ff ff`|
+
+Sortierung `(user_key ↑, tag ↓)`: `("k", tag(7,Delete))` steht **vor** `("k", tag(1,Put))`.
+
+### A.4 `FORMAT` (`Plain`, 51 B)
+
+Eingabe: `version = 1`, `required = 0`, `optional = 0`, `integrity_mode = 0`, `instance_id = 00 01 … 0f`, `created_ms = 1_700_000_000_000`.
+
+```
+43 54 58 53 | 01 00 | 00×8 | 00×8 | 00 | 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f | 00 68 e5 cf 8b 01 00 00 | 56 63 b8 86
+"CTXS"        ver     req    opt    mode instance_id (16)                                       created_ms (LE)          crc32c
+```
+
+Kontrolle: Offset 22 trägt `integrity_mode`; `crc32c = 0x86B86356` über die 47 vorhergehenden Bytes. Vollständig: `4354585301000000000000000000000000000000000000000102030405060708090a0b0c0d0e0f0068e5cf8b0100005663b886`.
+
+### A.5 Redo-Frame (`Plain`)
+
+Segment mit `chain_seed = 0xA5A5A5A5`; erster Frame: `stamp = 1`, `op_count = 1`, `flags = 0` (Always), ein Op `Put(space=1, key="k", value="v")` ohne Domäne, `header_len = 0`.
+
+```
+Op (8 B):       01 | 01 00 | 00 | 01 6b | 01 76
+                kind space  opflags klen key vlen value
+Frame (29 B):   15 00 00 00 | 01 00 00 00 00 00 00 00 | 01 00 00 00 | 00 | <Op> | c4 8d 63 6f
+                len = 13+8 = 21   stamp                  op_count      flags payload  chk = 0x6F638DC4 (seed = chain_seed)
+```
+
+Vollständig: `150000000100000000000000010000000001010000016b0176c48d636f`.
+
+**Seal-Frame** (nach diesem einen Frame, `frame_count = 1`, `final_chain = 0x6F638DC4`, `stamp = 1`, Kette setzt bei `chk = 0x6F638DC4` fort):
+
+`190000000100000000000000ffffffff800100000000000000c48d636fdb7083de` (`chk = 0xDE8370DB`).
+
+Ein Frame mit `len = 0` beendet das Segment (vorallokierter Nullbereich).
+
+### A.6 Bloom, `BlobRef`, Nonces
+
+**Bloom** (`nbits = 64`, `k = 7`, Schlüssel `"k"`): `h1 = 0xC3D31922C50B1B63`, `h2 = 0x6CBC77349206F859 | 1`, Bitpositionen `pos_i = (h1 + i·h2) mod 2^64 mod 64`, `i = 0…6`: **35, 60, 21, 46, 7, 32, 57**.
+
+**BlobRef** (28 B): `blob_no = 0x71`, `offset = 4096`, `len = 1000`, `crc32c = 0xDEADBEEF`, `domain = 42`: `71 00 00 00 00 00 00 00 | 00 10 00 00 00 00 00 00 | e8 03 00 00 | ef be ad de | 2a 00 00 00`
+
+**Nonces** (12 B, §15.2):
+
+|Verwendung|Eingabe|Bytes|
+|---|---|---|
+|Run-Block|`block_offset = 4096`|`01 00 10 00 00 00 00 00 00 00 00 00`|
+|Redo-Frame|`frame_index = 3`|`02 03 00 00 00 00 00 00 00 00 00 00`|
+|Redo-Op-Körper|`segment_id = 0x12`, `frame = 3`, `op = 1`|`03 12 00 00 00 03 00 00 00 01 00 00`|
+|Blob-Record|`offset = 4096`|`04 00 10 00 00 00 00 00 00 00 00 00`|
+|Blob-Körper (Domäne)|`blob_no = 0x71`, `offset = 4096`|`05 71 00 00 00 00 00 00 00 10 00 00`|
+|Catalog-Record|`record_index = 2`|`02 00 00 00 00 00 00 00 00 00 00 00`|
+
+### A.7 `ResumeToken`
+
+```
+"CTXT" | version u8 (1) | space u16 | dir u8 (0 Fwd, 1 Bwd) | stamp u64 | range_hash u64 (XXH64 über kanonische Bereichskodierung, Seed 0)
+       | klen varint | last_key | chk
+chk = CRC32C (Plain, 4 B) | Mac16 mit Token-Schlüssel (Authenticated/Encrypted, 16 B), über alle vorhergehenden Bytes
+```
+
+Dekodierung ist total (P-4); `klen ≤ max_key_bytes`.
+
+### A.8 Offene Goldens (Pflicht vor **G-F**)
+
+Je ein Golden für `Authenticated` und `Encrypted` (Redo-Frame, Run-Block, Blob-Record, Catalog-Record, `KEYS`, `FORMAT` mit 16-Byte-Tag) mit der Referenz-Implementierung aus O-6; ein Run mit DataBlock + Index + Filter + Meta + Directory + Footer (`Plain`); eine Blob-Datei mit Body- und Hole-Record; ein Catalog mit Snapshot und Edit. Ohne diese Goldens ist **G-F** nicht erfüllt (§9.8).
+
+---
+
+## Anhang B: Herkunft und Auditspur
+
+### B.1 Befunde im Altstand (`crates/contextra-store`, 59 788 Zeilen insgesamt, `src/` 32 015, `tests/` 25 563)
+
+|ID|Befund|Antwort in dieser Spezifikation|
+|---|---|---|
+|B-1|HEAD enthält nur das Crate, kein Root-`Cargo.toml`; Abhängigkeiten nur in der Historie (`014319d`).|Anhang B.2 (Baseline), Plan F0|
+|B-2|Domänenlogik im Kern (TxBuffer, SSI, Intent-Locks, Mandanten-Codec, `docid-128`, Scanner/Purger).|NZ-3, NZ-8; `Guard`, `Erase`|
+|B-3|Drei Dateisystem-Verträge, 91 direkte FS-Aufrufe am Port vorbei.|P-1, SD-03|
+|B-4|`async` überall bei blockierender E/A; achtstufige Sperrhierarchie.|SD-02, §16 (sieben Ränge, Beweise)|
+|B-5|Drei Format-Generationen im Lesepfad (WAL V1–V3, SSTable v0–v4, Manifest v0–v2).|SD-04, `INV-FMT-*`|
+|B-6|Transaktion als Record-Folge mit `TxEnd`.|`INV-LOG-1`|
+|B-7|`rollback_to_tx` ohne produktiven Aufrufer.|SD-09|
+|B-8|Manifest als Pfad-String-Log.|SD-05, §9.7|
+|B-9|Unkontrollierte Löschung (Fehler verschluckt, kein `fsync`, am Manifest vorbei).|§14, `INV-ERA-*`, P-3|
+|B-10|Sechs statische Testschalter (`wal/core.rs`) im Release.|P-5, SD-39|
+|B-11|Drei Block-Caches, fester Bloom-Filter (100 000 Elemente).|§11 (ein Cache), §9.5 (dynamische Größe)|
+|B-12|Kommentarbanner, gemischte Sprachen.|P-6, P-7|
+|B-13|Dateirechte nur teilweise geregelt.|§15.6|
+|B-14|Feature-Matrix bricht; Testkorpus nicht übersetzbar.|§19.3|
+|B-15|Konsument nutzt `MergeOperator`.|SD-12, A-12|
+
+### B.2 Legacy-Baseline
+
+Rekonstruierbar aus Commit `014319d` mit einem auf 9 Crates reduzierten Workspace-Manifest (`ids, env, sys, mvcc, crypto, types, ports, testkit, store`): `cargo check -p contextra-store --lib` grün (234 Warnungen, überwiegend `missing_docs`); Tests, Benches und Konsumenten nicht baubar. Zweck: Differentialtest und Ausgangswerte. Die Rekonstruktion ist F0-Aufgabe mit Abbruchkriterium (Plan §6).
+
+### B.3 Szenarioklassen des Altbestandes → Netze
+
+|Altklasse|Neues Netz|
+|---|---|
+|`crash_*` (Kill, Durability)|Absturzmatrix|
+|`chaos_bitflip_*`|Bitflip|
+|`wal_*` (Replay, Torn Tail, Rotation)|Absturzmatrix (Redo), Fuzz|
+|`compaction_*` (Retention, Konflikte)|Gesetze (`INV-RET-1`), Modell|
+|`fsync_failure_*`, `disk_full_*`|Fehlerklassen-Matrix F-4/F-5|
+|`manifest_*`|Absturzmatrix (Catalog), `INV-CAT-*`|
+|`campaign_j21_hypotheses`|Benchmarks (H-S)|
+|`compaction_merge_operator`|zurückgestellt (SD-12)|
+
+### B.4 Übernommen aus den Konzeptdokumenten
+
+Aus `MNEMOS_CONCEPT.md`, `Optimal-LLM-Datenbank.md` und `REVIEW_contextra-storage_vs_mnemos.md` (soweit in diesem Dokument genannt, siehe Anhang C): Header-zuerst-Lesen, budgetierte Seitenlieferung, Gewichte, Konsumenten-Cursor, Domänenschlüssel, `CompactionFilter` („Zoom-Down“), Cluster-Präfix und Lokalitätsteilung, Redo-HWM, Siegel-Frames.
+
+---
+
+## Anhang C: Nicht übernommen und Branches
+
+|Konzept|Entscheidung|Begründung|
+|---|---|---|
+|Prolly-Tree / Merkle-DAG als Hauptstruktur|**zurückgestellt (NZ-12)**|Hash-Inhaltsadressierung widerspricht `Erase` (Z-3) und `forgetting`; obere Schicht|
+|Feste 4-KiB-„Context Slabs“|verworfen|Wertgrößen variieren; `block_bytes` genügt|
+|Commit ohne Log per CAS auf einen Superblock|verworfen|ein `fsync` je Gruppe ist einfacher und erprobt|
+|Thread-per-Core, `io_uring`, `O_DIRECT` im Kern|verworfen (SD-31)|alternative `Fs`-Implementierung|
+|2PC über Locality Groups|verworfen|Spaces teilen Redo und Stamp, ein `Change` ist ohnehin atomar|
+|Merge-Operatoren|zurückgestellt (SD-12)|Formatentscheidung nötig|
+
+**Branches, Stufe A (Overlay):** Ein Branch ist ein eigener **Overlay-Space** (Schreibvorgänge landen dort), gelesen wird über `View` auf Basis-Space + Overlay (obere Schicht mischt). Der Basisstand wird durch einen `Hold` mit Eigentümer (`HoldOwner::new("branch/a1")`) gehalten; Konflikte beim Zusammenführen prüft `Guard::range_unchanged_since(base_space, range, base_stamp)`; Änderungen am Basisstand seit dem Verzweigen liefert `history`. Verwerfen = `Hold` freigeben + `drop_space(overlay)`. Stufe B (Commit-DAG, Strukturteilung) ist NZ-12 und Sache der oberen Schicht.
+---
+
+## Anhang D: Leitplanken für aufsetzende Schichten (nicht Teil des Kerns)
+
+Diese Hinweise sind **Empfehlungen** an Konsumenten des Kerns und erzeugen keine Kern-Anforderung.
+
+1. **Schlüsselcodierung.** Mandant/Kollektion/Dokument werden vom Konsumenten als Bytepräfix codiert; feste, versionierte Präfixe verhindern Kollisionen. Der Kern vergleicht nur Bytes (`prefix_filter`, `locality_prefix`).
+2. **Zähler und Gewichte.** Bis `merge()` aktiviert wird: Read-Modify-Write über `Guard::equals`; häufige Akkumulation (Kantenverstärkung, Zugriffszähler) wird in der oberen Schicht gepuffert und gebündelt in **einem** `Change` geschrieben, um `Conflict`-Wiederholungen zu vermeiden.
+3. **Flüchtig vs. dauerhaft.** Ein `Change` mischt nie flüchtige und dauerhafte Spaces (`Forbidden{MixedDurability}`); Arbeitsgedächtnis und dauerhafter Zustand werden getrennt eingereicht.
+4. **Abgeleitete Indizes** (Volltext, Vektor, Graph) tragen Löschbitmaps oder bauen über `rewrite_without` neu (O-2) und folgen dem Kern über `Consumer` + `history`; `domain_retired` ist ihr Auslöser.
+5. **Löschnachweise.** Für Nachweise zählt `ErasureReceipt` + `scan_physical`; Signatur, Journal und Ledger liegen außerhalb.
+6. **Fehlerbehandlung.** `Busy` und `Conflict` sind strukturiert; `retryable()` und `hint()` genügen für automatische Wiederholung.
+

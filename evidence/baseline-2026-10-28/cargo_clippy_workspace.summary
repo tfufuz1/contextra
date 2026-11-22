@@ -1,0 +1,3 @@
+CMD: cargo clippy --workspace --all-targets --locked -- -D warnings
+EXIT_CODE: 101
+DURATION_MS: 2896

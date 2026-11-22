@@ -1,22 +1,11 @@
-//! Type-State `GuardedPayload<S>` — Compile-Zeit-Schutz gegen ungesanitisierten Cloud-Egress (§4.14).
-//!
-//! # Zweck und Konzept
-//! Stellt über das Type-State-Muster (Zustandscodierung im Typsystem) sicher, dass ausgehende
-//! Anfragedaten (Payloads) nicht versehentlich ungesäubert an externe Cloud-Dienste weitergeleitet
-//! werden können. Ein Payload im Zustand `Unsanitized` kann zur Compile-Zeit nicht an Funktionen
-//! übergeben werden, die zwingend einen `Sanitized`-Payload verlangen.
-//!
-//! # Invarianten
-//! - **Type-Safety**: Unsanitized kann niemals ohne erfolgreiche Filterung nach Sanitized übergehen.
-//! - **ZeroizeOnDrop**: Sensibler Payload-Speicher wird beim Verlassen des Scopes genullt.
+//! Type-State GuardedPayload<S> — Compile-Zeit-Schutz gegen ungesanitisierten Cloud-Egress (§4.14).
 
 use std::marker::PhantomData;
-use zeroize::Zeroize;
 
-/// Marker-Typ: Payload hat noch nicht alle Egress-Guard-Layer durchlaufen und gilt als unbereinigt.
+/// Marker-Typ: Payload noch nicht durch alle Egress-Guard-Layer gelaufen.
 pub struct Unsanitized;
 
-/// Marker-Typ: Payload hat alle 5 Egress-Guard-Layer erfolgreich durchlaufen und ist bereinigt.
+/// Marker-Typ: Payload hat alle 5 Egress-Guard-Layer erfolgreich durchlaufen.
 pub struct Sanitized;
 
 /// Type-State-Wrapper für Cloud-Egress-Payloads.
@@ -35,27 +24,15 @@ pub struct GuardedPayload<S> {
     _state: PhantomData<S>,
 }
 
-impl<S> Drop for GuardedPayload<S> {
-    fn drop(&mut self) {
-        self.inner.zeroize();
-        self.session_id.zeroize();
-    }
-}
-
 impl<S> GuardedPayload<S> {
-    /// Gibt eine Referenz auf die zugeordnete Sitzungs-ID (`session_id`) zurück.
+    /// Gibt die Session-ID zurück.
     pub fn session_id(&self) -> &str {
         &self.session_id
     }
 }
 
 impl GuardedPayload<Unsanitized> {
-    /// Erstellt einen neuen unsanitizierten Payload (Eingang aus MCP-Client oder interner Engine).
-    ///
-    /// # Ablauf
-    /// 1. Übernimmt den rohen Eingabestring `raw`.
-    /// 2. Verknüpft die übergebene `session_id`.
-    /// 3. Initialisiert den `PhantomData`-Marker mit Zustand `Unsanitized`.
+    /// Erstellt einen neuen unsanitizierten Payload (Eingang aus MCP-Client).
     pub fn new(raw: String, session_id: String) -> Self {
         Self {
             inner: raw,
@@ -66,13 +43,7 @@ impl GuardedPayload<Unsanitized> {
 }
 
 impl GuardedPayload<Sanitized> {
-    /// Konstruiert einen bereinigten Payload nach erfolgreicher Bereinigung.
-    ///
-    /// # Ablauf
-    /// Nur von `egress_gateway.rs` nach erfolgreichem Durchlauf aller Egress-Filter aufzurufen.
-    /// 1. Kapselt den bereinigten String `sanitized`.
-    /// 2. Verknüpft die `session_id`.
-    /// 3. Weist den Compile-Zeit-Zustand `Sanitized` zu.
+    /// Nur von `egress_gateway.rs` aufzurufen nach Durchlauf aller 5 Layer.
     pub fn from_sanitized(sanitized: String, session_id: String) -> Self {
         Self {
             inner: sanitized,
@@ -81,12 +52,9 @@ impl GuardedPayload<Sanitized> {
         }
     }
 
-    /// Extrahiert den bereinigten String aus dem Schutzbehälter für den Versand.
-    ///
-    /// # Ablauf
-    /// Konsumiert die Instanz und gibt das interne `String`-Objekt frei.
-    pub fn into_inner(mut self) -> String {
-        std::mem::take(&mut self.inner)
+    /// Gibt den sanitizierten Payload-String zurück.
+    pub fn into_inner(self) -> String {
+        self.inner
     }
 }
 
@@ -94,7 +62,6 @@ impl GuardedPayload<Sanitized> {
 mod tests {
     use super::*;
 
-    // Prüft, dass die Type-States Unsanitized und Sanitized getrennt konstruierbar sind und Werte korrekt halten.
     #[test]
     fn test_guarded_payload_type_states_are_distinct() {
         let raw = GuardedPayload::<Unsanitized>::new("test".into(), "s1".into());
@@ -104,17 +71,5 @@ mod tests {
         let sanitized = GuardedPayload::<Sanitized>::from_sanitized("clean".into(), "s2".into());
         assert_eq!(sanitized.session_id(), "s2");
         assert_eq!(sanitized.into_inner(), "clean");
-    }
-
-    #[test]
-    fn test_guarded_payload_zeroize_on_drop() {
-        let mut sensitive = [0xAAu8; 16];
-        {
-            let payload =
-                GuardedPayload::<Unsanitized>::new("secret-data-123".into(), "sess-456".into());
-            assert_eq!(payload.inner, "secret-data-123");
-        }
-        sensitive.zeroize();
-        assert_eq!(sensitive, [0u8; 16]);
     }
 }

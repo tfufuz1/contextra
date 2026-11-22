@@ -1,21 +1,9 @@
-//! Soft-Delete- und Tombstone-Verwaltung für Kanten und Hyperkanten.
-//!
-//! # Zweck
-//! Markiert gelöschte Elemente mit Transaktionszeitstempeln zur Wahrung von MVCC-Sichtbarkeiten.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::CsrGraph;
-#[cfg(feature = "ports-compat")]
 use contextra_ports::GraphIndex;
-use crate::error::Result;
-use crate::types::{EntityId, TxId};
+use contextra_types::{EntityId, Result, TxId};
 use std::collections::HashSet;
 
-
-// SECTION Tombstone Core Implementation
 impl CsrGraph {
-    #[cfg(feature = "ports-compat")]
     pub async fn tombstone_edge(
         &self,
         edge_id: crate::consistency_enforcement::EdgeId,
@@ -124,5 +112,3 @@ impl CsrGraph {
         true
     }
 }
-
-// !SECTION Tombstone Core Implementation

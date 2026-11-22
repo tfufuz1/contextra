@@ -1,8 +1,3 @@
-//! Äquivalenztest zwischen Stern-Expansion und Cliquen-Repräsentation von Hyperkanten.
-//!
-//! # Zweck
-//! Beweist die mathematische Gleichwertigkeit beider Repräsentationsformen für Traversierungen.
-
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::EntityId;

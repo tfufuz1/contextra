@@ -1,8 +1,3 @@
-//! Test für die Implementierung des `GraphCollectionMutation`-Traits.
-//!
-//! # Zweck
-//! Überprüft kollektionsbezogene Graphänderungen, Fehlerrückgaben und Rollback-Verhalten.
-
 use contextra_graph::CsrGraph;
 use contextra_ports::graph::{
     GraphCollectionMutation, GraphMutationError, HyperEdgeId, RoleBinding, RoleId,

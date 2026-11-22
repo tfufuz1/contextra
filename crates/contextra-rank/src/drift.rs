@@ -1,18 +1,9 @@
-//! # Drift-Erkennung (`drift`)
-//!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
-//!
-//! Dieses Modul überwacht die statistische Verteilung von Retrieval-Scores im Zeitverlauf.
-//! Wenn sich die Verteilung der Ähnlichkeitsscores einer Signalquelle (z. B. BM25-Text
-//! oder Dense Vectors) signifikant von einer zuvor etablierten Baseline unterscheidet,
-//! wird dies als Konzeptdrift (Concept Drift) oder Kovariatenverschiebung (Covariate Shift)
-//! signalisiert.
+//! Score distribution and ranking drift detection for Contextra search signals.
 
 use std::collections::VecDeque;
 
 /// Drift status summary representation.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-/// Zusammenfassung des aktuellen Drift-Status einer Signalverteilung.
 pub enum DriftStatus {
     /// Distribution is stable.
     Stable {
@@ -55,7 +46,6 @@ impl DriftStatus {
 
 /// Drift detector monitoring score shifts over sliding windows.
 #[derive(Debug, Clone)]
-/// Detektor zur Überwachung von Score-Verschiebungen über ein gleitendes Fenster.
 pub struct DriftDetector {
     window_size: usize,
     threshold: f32,

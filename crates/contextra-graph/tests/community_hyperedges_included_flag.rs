@@ -1,8 +1,3 @@
-//! Integrationstest zur Berücksichtigung von Hyperkanten bei der Community-Erkennung.
-//!
-//! # Zweck
-//! Verifiziert, dass der Flag zur Einbeziehung n-ärer Relationen in Cluster-Algorithmen korrekt angewendet wird.
-
 use contextra_graph::community::{detect_communities, CommunityDetectionConfig};
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};

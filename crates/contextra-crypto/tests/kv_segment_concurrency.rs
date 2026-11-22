@@ -1,14 +1,11 @@
-#![allow(deprecated)] // Testet bewusst den veralteten KV-Segment-Pfad.
-//! # Integrationstest: `kv_segment_concurrency.rs`
-//!
-//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `kv_segment_concurrency`.
-//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
-
+// FILE-CONTEXT
+// ZWECK: Concurrency Stress Test für TenantIsolatedKvStore und EvictionWorker unter hoher Parallellast.
+// STAND: TS:2026-09-09T16:15:00Z (SESSION: dafac391)
 
 use contextra_crypto::kv_segment::{
     emergency_wipe, EvictionWorker, KvSegment, TenantIsolatedKvStore,
 };
-use contextra_ids::TenantId;
+use contextra_types::TenantId;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;

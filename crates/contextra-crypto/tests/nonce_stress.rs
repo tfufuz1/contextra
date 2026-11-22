@@ -1,8 +1,8 @@
-//! # Integrationstest: `nonce_stress.rs`
-//!
-//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `nonce_stress`.
-//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
-
+// FILE-CONTEXT
+// ZWECK: Multi-threaded nonce uniqueness stress testing & empirical vs theoretical collision probability verification.
+// INVARIANTEN: 1,000,000 nonces generated via KeyManager::encrypt_auto_nonce across parallel threads must be distinct (0 collisions).
+// NICHT-OFFENSICHTLICH: Uses Birthday Paradox math calculation: p ~ 1 - exp(-n^2 / (2 * 2^64)) for 64-bit OsRng suffix.
+// STAND: TS:2026-08-30T19:35:00Z (SESSION: 20260830)
 
 use contextra_crypto::CryptoKey;
 use std::collections::HashSet;

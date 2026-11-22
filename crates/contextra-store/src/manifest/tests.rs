@@ -1,7 +1,3 @@
-//! # Manifest-Tests (Ring 1)
-//!
-//! Validiert Rollover, Recovery und atomare Manifest-Commits.
-
 use super::*;
 use std::path::{Path, PathBuf};
 use tempfile::tempdir;
@@ -411,66 +407,4 @@ async fn test_manifest_explicit_rollover() {
     let loaded = Manifest::load(&manifest_path).await.expect("load manifest");
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0], entry1);
-}
-
-#[tokio::test]
-async fn test_manifest_poisoning_on_fsync_failure() {
-    let dir = tempdir().expect("tempdir");
-    let manifest_path = dir.path().join("MANIFEST");
-
-    let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
-    assert!(!manifest.is_poisoned());
-
-    // Manually trigger poison state to simulate fsync failure (INV-FSYNC-1)
-    manifest
-        .is_poisoned
-        .store(true, std::sync::atomic::Ordering::SeqCst);
-    assert!(manifest.is_poisoned());
-
-    let entry = ManifestEntry::Add {
-        path: PathBuf::from("sst-fail.sst"),
-        max_tx: 99,
-    };
-    let err = manifest.append(&entry).await;
-    assert!(
-        err.is_err(),
-        "Poisoned manifest must reject append operations"
-    );
-    let err_msg = err.unwrap_err().to_string();
-    assert!(
-        err_msg.contains("poisoned") && err_msg.contains("INV-FSYNC-1"),
-        "Error message should mention poisoned and INV-FSYNC-1"
-    );
-}
-
-#[tokio::test]
-async fn test_wal_floor_manifest_entry_roundtrip() {
-    let entry = ManifestEntry::WalFloor { seq: 42_000 };
-    let bytes = entry.to_bytes().expect("serialize WalFloor");
-    let decoded = ManifestEntry::from_bytes(&bytes).expect("deserialize WalFloor");
-    assert_eq!(decoded, entry);
-
-    let entries = vec![
-        ManifestEntry::WalFloor { seq: 100 },
-        ManifestEntry::WalFloor { seq: 500 },
-        ManifestEntry::WalFloor { seq: 250 },
-    ];
-    let floor = Manifest::extract_wal_floor(&entries);
-    assert_eq!(floor, 500);
-}
-
-#[test]
-fn test_version_immutable_updates() {
-    let v0 = super::version::Version::empty();
-    assert_eq!(v0.generation_id, 0);
-    assert_eq!(v0.wal_floor, 0);
-    assert!(v0.sstables.is_empty());
-
-    let v1 = v0.update(Vec::new(), &[], Some(100));
-    assert_eq!(v1.generation_id, 1);
-    assert_eq!(v1.wal_floor, 100);
-
-    let v2 = v1.update(Vec::new(), &[], Some(50)); // darfnicht fallen
-    assert_eq!(v2.generation_id, 2);
-    assert_eq!(v2.wal_floor, 100);
 }

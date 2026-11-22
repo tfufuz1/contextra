@@ -1,12 +1,3 @@
-//! Kern-Datenstrukturen des inneren CSR-Graphzustands (`GraphInner`).
-//!
-//! # Zweck
-//! Hält Knoten-, Offset- und Kanten-Arrays flach im RAM für optimale CPU-Cache-Ausnutzung.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-
-// SECTION Mod Core Implementation
 pub mod compaction;
 pub mod estimate;
 pub mod reinforcement;
@@ -15,7 +6,7 @@ use arc_swap::ArcSwap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::types::{DocId, Entity, EntityId, TxId};
+use contextra_types::{DocId, Entity, EntityId, TxId};
 
 #[cfg(feature = "edge-reinforcement-learning")]
 use super::types::CsrEdge;
@@ -174,5 +165,3 @@ impl<'a> Drop for InnerWriteGuard<'a> {
         self.arc_swap.store(Arc::new((*self.guard).clone()));
     }
 }
-
-// !SECTION Mod Core Implementation

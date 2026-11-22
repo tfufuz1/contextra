@@ -9,24 +9,19 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
-//! # Integrationstest: Determinismus des Clock-Ports
-//!
-//! Verifiziert, dass alle Zeitstempel deterministisch über den injizierten Clock-Port erzeugt werden.
 
-use contextra_checkpoint::contract::InMemorySnapshotSource;
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore};
-use contextra_ids::TxId;
-use contextra_testkit::ManualClock;
+use contextra_testkit::{InMemoryStorageEngine, ManualClock};
+use contextra_types::TxId;
 use std::sync::Arc;
 
-// Testet: test a stores with same clock produce identical timestamps.
 #[tokio::test]
 async fn test_a_stores_with_same_clock_produce_identical_timestamps() {
     let initial_nanos = 1_700_000_000_000_000_000; // 1,700,000,000 ms
 
     // Store 1 setup
     let clock1 = Arc::new(ManualClock::new(initial_nanos));
-    let storage1 = Arc::new(InMemorySnapshotSource::new());
+    let storage1 = Arc::new(InMemoryStorageEngine::new());
     let store1 = PersistentCheckpointStore::open(storage1.clone(), "det_ns_a1")
         .await
         .expect("open store 1")
@@ -49,7 +44,7 @@ async fn test_a_stores_with_same_clock_produce_identical_timestamps() {
 
     // Store 2 setup (identical clock start)
     let clock2 = Arc::new(ManualClock::new(initial_nanos));
-    let storage2 = Arc::new(InMemorySnapshotSource::new());
+    let storage2 = Arc::new(InMemoryStorageEngine::new());
     let store2 = PersistentCheckpointStore::open(storage2.clone(), "det_ns_a2")
         .await
         .expect("open store 2")
@@ -91,11 +86,10 @@ async fn test_a_stores_with_same_clock_produce_identical_timestamps() {
     );
 }
 
-// Testet: test b clock backward jump preserves monotonicity.
 #[tokio::test]
 async fn test_b_clock_backward_jump_preserves_monotonicity() {
     let clock = Arc::new(ManualClock::new(2_000_000_000_000)); // 2,000,000 ms
-    let storage = Arc::new(InMemorySnapshotSource::new());
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let store = PersistentCheckpointStore::open(storage, "det_ns_b")
         .await
         .expect("open store")
@@ -115,12 +109,11 @@ async fn test_b_clock_backward_jump_preserves_monotonicity() {
     assert_eq!(ts2, 2_000_000);
 }
 
-// Testet: test c unfinalized guard drop records orphan with test clock.
 #[tokio::test]
 async fn test_c_unfinalized_guard_drop_records_orphan_with_test_clock() {
     let clock_nanos = 3_456_000_000_000_000; // 3,456,000 ms
     let clock = Arc::new(ManualClock::new(clock_nanos));
-    let storage = Arc::new(InMemorySnapshotSource::new());
+    let storage = Arc::new(InMemoryStorageEngine::new());
 
     let cp = contextra_checkpoint::StateCheckpoint {
         tx_id: TxId::new(999),
@@ -146,10 +139,9 @@ async fn test_c_unfinalized_guard_drop_records_orphan_with_test_clock() {
     );
 }
 
-// Testet: test d default constructors smoke test with system clock.
 #[tokio::test]
 async fn test_d_default_constructors_smoke_test_with_system_clock() {
-    let storage = Arc::new(InMemorySnapshotSource::new());
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let store = PersistentCheckpointStore::open(storage.clone(), "smoke_ns")
         .await
         .expect("open store with default SystemClock");
@@ -182,12 +174,11 @@ async fn test_d_default_constructors_smoke_test_with_system_clock() {
     let _ = guard.commit();
 }
 
-// Testet: test e pin guard with clock determinism.
 #[tokio::test]
 async fn test_e_pin_guard_with_clock_determinism() {
     let pin_clock_nanos = 5_000_000_000_000_000; // 5,000,000 ms
     let clock = Arc::new(ManualClock::new(pin_clock_nanos));
-    let storage = Arc::new(InMemorySnapshotSource::new());
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let orphan_reg = Arc::new(contextra_checkpoint::InstanceOrphanRegistry::new(""));
 
     let pin_guard =

@@ -1,11 +1,7 @@
-//! # Erweiterte SSTable-Leseoperationen (Ring 1)
-//!
-//! Stellt Scanner und Hilfsiteratoren fuer Snapshot-orientierte Abfragen bereit.
-
 use super::block_search::{binary_search_index_in_block, get_entry_at_index};
 use super::reader::{parse_block_trailer, SstableReader};
-use crate::error::{StoreError as ContextraError, StoreResult as Result};
 use bytes::Bytes;
+use contextra_types::{ContextraError, Result};
 
 impl SstableReader {
     /// Scans the SSTable for keys starting with the given prefix.
@@ -133,7 +129,7 @@ impl SstableReader {
                     let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
                         ContextraError::Storage("overflow calculating value position".into())
                     })?;
-                    if end_val > offsets_start {
+                    if end_val > block_data.len() {
                         return Err(ContextraError::Storage(
                             "malformed block: value length out of bounds".into(),
                         ));
@@ -284,7 +280,7 @@ impl SstableReader {
                 let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
                     ContextraError::Storage("overflow calculating value position".into())
                 })?;
-                if end_val > offsets_start {
+                if end_val > block_data.len() {
                     return Err(ContextraError::Storage(
                         "malformed block: value length out of bounds".into(),
                     ));

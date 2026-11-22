@@ -1,18 +1,13 @@
-//! Kaskadierende Invalidierung und Bereinigung von Hyperkanten bei Dokumenten-Invalidierung.
-//!
-//! # Zweck
-//! Wenn ein Quelldokument invalidiert oder aktualisiert wird, invalidiert dieses Modul
-//! alle daraus abgeleiteten Kanten und Hyperkanten atomar und kaskadierend (Fail-Closed).
-
+// FILE-CONTEXT
+// ZWECK: Cascading-Invalidation (Supersedes-Chunk -> Graph-Kanten-Tombstone)
+// INVARIANTEN: Jede tombstonierte Kante erhaelt einen Provenienz-Eintrag mit WAL-Seq (INV-GRAPH-PROV-1).
+// STAND: TS:2026-08-30T19:00:00Z
 
 use crate::csr::CsrGraph;
-use crate::error::{GraphError, Result};
-use crate::types::{DocId, EntityId, TxId};
+use contextra_types::{DocId, EntityId, Result, TxId};
 
 /// Maximum number of hyperedges processed synchronously per cascade invalidation run
 /// to bound latency spikes. Any remaining hyperedges are returned in `deferred`.
-
-// SECTION Cascade Core Implementation
 pub const MAX_HYPEREDGE_CASCADE_FANOUT: usize = 1_000;
 
 /// Default fan-out limit for hyperedge cascade invalidation per document (§6.8).
@@ -54,7 +49,6 @@ pub async fn cascade_invalidate_edges_for_superseded_doc(
         graph.tombstone_edges_direct(&edge_ids, wal_tx)?;
 
     // 3. Persistieren falls Storage vorhanden.
-    #[cfg(feature = "ports-compat")]
     if let Some(storage) = graph.storage() {
         for (from_id, to_id) in &newly_tombstoned_edges {
             graph
@@ -92,6 +86,10 @@ pub struct CascadeDeletionRecord {
     pub tombstoned_count: usize,
     pub wal_seq: u64,
 }
+
+/// Deprecated alias for [`CascadeDeletionRecord`] to maintain backward compatibility.
+#[deprecated(note = "Use CascadeDeletionRecord instead")]
+pub type DeletionProof = CascadeDeletionRecord;
 
 /// Ticket tracking persistent cascade invalidation status (§6.8).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -324,7 +322,6 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
     }
 
     if !deferred.is_empty() {
-        #[cfg(feature = "ports-compat")]
         if let Some(storage) = graph.storage() {
             for hid in &deferred {
                 let key = format!(
@@ -382,7 +379,7 @@ pub fn verify_doc_hyperedge_deletion_completeness(
     for edge in active_hyperedges {
         // Direct reference check
         if edge.source_doc_id == Some(target_doc_id) {
-            return Err(GraphError::InvalidInput(format!(
+            return Err(contextra_types::ContextraError::InvalidInput(format!(
                 "Active hyperedge {} directly references deleted DocId {}",
                 edge.id,
                 target_doc_id.inner()
@@ -402,7 +399,7 @@ pub fn verify_doc_hyperedge_deletion_completeness(
                 // graph.get_hyperedge(child_id) checks tx_valid_to.is_none() internally
                 if let Some(child_edge) = graph.get_hyperedge(child_id) {
                     if child_edge.source_doc_id == Some(target_doc_id) {
-                        return Err(GraphError::InvalidInput(format!(
+                        return Err(contextra_types::ContextraError::InvalidInput(format!(
                             "Active consolidated hyperedge {} transitively references deleted DocId {} via active child hyperedge {}",
                             edge.id,
                             target_doc_id.inner(),
@@ -422,17 +419,16 @@ pub fn verify_doc_hyperedge_deletion_completeness(
     Ok(())
 }
 
-#[cfg(all(test, feature = "workspace"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::csr::EdgeType;
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
     use crate::path_rag::PathRAGEngine;
     use contextra_ports::GraphIndex;
-    use crate::types::{Edge, Entity};
+    use contextra_types::{Edge, Entity};
 
     #[tokio::test]
-    #[cfg(feature = "workspace")]
     async fn test_cascade_invalidation_tombstones_edges_of_superseded_doc() {
         let graph = std::sync::Arc::new(CsrGraph::new());
         let tx1 = TxId::new(1);
@@ -446,21 +442,21 @@ mod tests {
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            Entity::new(node1, "n1", "Node"),
+            contextra_types::Entity::new(node1, "n1", "Node"),
         )
         .await
         .unwrap();
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            Entity::new(node2, "n2", "Node"),
+            contextra_types::Entity::new(node2, "n2", "Node"),
         )
         .await
         .unwrap();
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            Entity::new(node3, "n3", "Node"),
+            contextra_types::Entity::new(node3, "n3", "Node"),
         )
         .await
         .unwrap();
@@ -508,14 +504,14 @@ mod tests {
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            Entity::new(node1, "n1", "Node"),
+            contextra_types::Entity::new(node1, "n1", "Node"),
         )
         .await
         .unwrap();
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            Entity::new(node2, "n2", "Node"),
+            contextra_types::Entity::new(node2, "n2", "Node"),
         )
         .await
         .unwrap();
@@ -552,14 +548,14 @@ mod tests {
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            Entity::new(node1, "n1", "Node"),
+            contextra_types::Entity::new(node1, "n1", "Node"),
         )
         .await
         .unwrap();
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            Entity::new(node2, "n2", "Node"),
+            contextra_types::Entity::new(node2, "n2", "Node"),
         )
         .await
         .unwrap();
@@ -611,14 +607,14 @@ mod tests {
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            Entity::new(node1, "n1", "Node"),
+            contextra_types::Entity::new(node1, "n1", "Node"),
         )
         .await
         .unwrap();
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            Entity::new(node2, "n2", "Node"),
+            contextra_types::Entity::new(node2, "n2", "Node"),
         )
         .await
         .unwrap();
@@ -651,7 +647,7 @@ mod tests {
             GraphIndex::add_entity(
                 graph.as_ref(),
                 tx1,
-                Entity::new(n, format!("n{}", n.inner()), "Node"),
+                contextra_types::Entity::new(n, format!("n{}", n.inner()), "Node"),
             )
             .await
             .unwrap();
@@ -1065,5 +1061,3 @@ mod tests {
         );
     }
 }
-
-// !SECTION Cascade Core Implementation

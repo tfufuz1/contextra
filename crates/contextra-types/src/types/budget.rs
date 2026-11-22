@@ -1,17 +1,11 @@
-//! Ressourcen- und Token-Budgetverwaltung für Contextra.
-//!
-//! # Architektur-Rolle: Typen-Fundament (Budget- und Backpressure-Management)
-//!
-//! Dieses Modul überwacht und steuert den Ressourcenverbrauch:
-//! - `TokenBudget`: Atomares Tracking und RAII-Reservierung (`Reservation`) von LLM-Tokens
-//!   zur Vermeidung von Obergrenzenüberschreitungen und Double-Spending.
-//! - `ResourceTracker`: Speicherüberwachung (RAM) mit automatischem Backpressure-Signal
-//!   (`has_memory_capacity`), wenn die 95%-Grenze erreicht wird.
-//!
-//! # Invarianten
-//! - Atomare Zähler mit `Ordering::Acquire`, `Ordering::Release` und `compare_exchange_weak`.
-//! - Sättigende Subtraktion (`saturating_sub`) verhindert Underflow-Wrapping bei Speicherfreigaben.
+//! Resource budget management for Contextra.
 
+// FILE-CONTEXT
+// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
+// ZWECK: Token- und Resource-Budget-Management mit atomarem Tracking & Memory Backpressure.
+// INVARIANTEN: Atomares Memory Tracking; MemoryBudgetExceeded bei >95% Kapazität.
+// HOTSPOTS: 40-220
+// NICHT-OFFENSICHTLICH: TokenBudget reserviert Puffer für System-Prompts & Antworten in ContextManager.
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md
 
 //! # Architektur

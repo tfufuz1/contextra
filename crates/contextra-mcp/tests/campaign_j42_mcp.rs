@@ -1,9 +1,6 @@
 //! Campaign J-42: MCP Tool Dispatch & Sandbox Registry Classification Audit Test Suite
 //! Oracle Source (R4): MCP Tool Protocol Specification & Sandbox Isolation Model (Spec §5.3 / ENG-020)
 //! counter-test (R10): Verified against legacy fallback (legacy classify_method returns CodeExecution for unknown tools).
-// =========================================================================
-// SECTION: campaign_j42_mcp
-// =========================================================================
 
 use contextra_mcp::sandbox::{McpSandbox, ToolCategory, TOOL_REGISTRY};
 
@@ -53,5 +50,3 @@ fn test_campaign_j42_mcp_counter_factual_mutation_check() {
         "R10 Counter-Fact: Strict try_classify_method prevents silent fallback to CodeExecution"
     );
 }
-
-// !SECTION: campaign_j42_mcp

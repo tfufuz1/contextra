@@ -1,8 +1,3 @@
-//! Test für das Standard-Flip-Gate der Thresholded Local Hyper-Flow Diffusion.
-//!
-//! # Zweck
-//! Prüft Konvergenzschwellenwerte und Fehlerkriterien für Umschaltentscheidungen.
-
 use contextra_graph::{
     DefaultFlipGate, ShadowDiscrepancyReport, TlHfdFlipGate, MIN_AGREEMENT_THRESHOLD,
     MIN_SHADOW_SAMPLES,

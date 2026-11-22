@@ -1,21 +1,66 @@
-//! # Lesepfad-Implementierung (Ring 1)
-//!
-//! ZWECK: Hierarchische Schluesselsuche: Aktive MemTable -> Immutable MemTables -> L0..LN SSTables (newest first).
-//! INVARIANTEN:
-//! - INV-STORE-4: Bit-63-Maskierung vor max_seq-Vergleichen (Tombstone-Bit `TOMBSTONE_BIT = 1 << 63`).
-//! - INV-STORE-5: Single-Load-Regel fuer konsistente Snapshot-Sequenznummern.
-//! - INV-MVCC-SSI-1: Clamping bei `snapshot_seq = u64::MAX` auf `storage.last_applied_seq`.
-//! LOCK-HIERARCHIE: Keine `parking_lot`-Locks ueber `.await`; state-ReadLock vor SSTable-Iteration.
-
 use super::super::engine::LsmStorage;
 use super::super::scan::{check_in_range, SstableScanMode};
 use super::super::validate_key;
 use bytes::Bytes;
-use crate::error::StoreResult as Result;
-use contextra_ids::TOMBSTONE_BIT;
+use contextra_ports::StorageEngine;
+use contextra_types::{Result, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 
-pub(crate) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {
+pub(crate) async fn get_tracked(
+    storage: &LsmStorage,
+    tx_id: contextra_types::TxId,
+    key: &[u8],
+) -> Result<Option<Bytes>> {
+    validate_key(key)?;
+    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+    get_at_seq_tracked(storage, tx_id, key, snapshot_seq).await
+}
+
+/// Retrieves a value by key at `snapshot_seq`, registering the read in the transaction's ReadSet.
+///
+/// # Invarianten & SSI ReadSet Clamping
+/// `INV-MVCC-SSI-1`: A caller passing `snapshot_seq = u64::MAX` intends to read the latest state.
+/// To accurately detect concurrent write conflicts during transaction commit, the registered
+/// sequence number must reflect the actual sequence number observed at the time of the read,
+/// rather than `u64::MAX`. Therefore, the registered sequence number is clamped to
+/// `min(snapshot_seq, storage.last_applied_seq.load(Ordering::Acquire))`, captured *before* reading.
+/// Registrieren eines Werts, der nicht größer ist als der tatsächlich gelesene, ist konservativ (im Zweifel ein Konflikt, nie ein übersehener).
+/// Reading semantics remain unchanged and continue to query `storage.get_at_seq(key, snapshot_seq)`.
+///
+/// # Hinweis zu Phantomschutz
+/// Note: `scan_prefix_tracked` currently does not offer phantom protection; phantom protection is
+/// handled in a separate task.
+pub(crate) async fn get_at_seq_tracked(
+    storage: &LsmStorage,
+    tx_id: contextra_types::TxId,
+    key: &[u8],
+    snapshot_seq: u64,
+) -> Result<Option<Bytes>> {
+    validate_key(key)?;
+    let current_seq = storage.last_applied_seq.load(Ordering::Acquire);
+    let registered_seq = snapshot_seq.min(current_seq);
+    storage
+        .tx_buffer
+        .register_read(tx_id, key.to_vec(), registered_seq);
+    storage.get_at_seq(key, snapshot_seq).await
+}
+
+pub(crate) async fn scan_prefix_tracked(
+    storage: &LsmStorage,
+    tx_id: contextra_types::TxId,
+    prefix: &[u8],
+) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+    let results = storage.scan_prefix_at(prefix, snapshot_seq).await?;
+    for (k, _) in &results {
+        storage
+            .tx_buffer
+            .register_read(tx_id, k.clone(), snapshot_seq);
+    }
+    Ok(results)
+}
+
+pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {
     validate_key(key)?;
     let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
     let res = storage.get_at_seq(key, snapshot_seq).await?;
@@ -28,7 +73,7 @@ pub(crate) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes
     Ok(res)
 }
 
-pub(crate) async fn get_at_seq(
+pub(super) async fn get_at_seq(
     storage: &LsmStorage,
     key: &[u8],
     seq_no: u64,
@@ -72,7 +117,7 @@ pub(crate) async fn get_at_seq(
     // 3. SSTables (newest first, filtered by seq_no and snapshot_tx)
     let sstables = storage.sstables.read().await.clone();
     for sst in sstables.iter().rev() {
-        if (sst.metadata().min_tx_id < contextra_ids::TxId::INTERNAL_BASE
+        if (sst.metadata().min_tx_id < contextra_types::TxId::INTERNAL_BASE
             && snapshot_tx < sst.metadata().min_tx_id)
             || seq_no < sst.metadata().min_seq
         {
@@ -98,14 +143,14 @@ pub(crate) async fn get_at_seq(
     Ok(None)
 }
 
-pub(crate) async fn scan_prefix(
+pub(super) async fn scan_prefix(
     storage: &LsmStorage,
     prefix: &[u8],
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
     storage.scan_prefix_at(prefix, u64::MAX).await
 }
 
-pub(crate) async fn scan_prefix_bounded(
+pub(super) async fn scan_prefix_bounded(
     storage: &LsmStorage,
     prefix: &[u8],
     limit: usize,
@@ -168,7 +213,7 @@ pub(crate) async fn scan_prefix_bounded(
     Ok((results, next_cursor))
 }
 
-pub(crate) async fn scan_prefix_at(
+pub(super) async fn scan_prefix_at(
     storage: &LsmStorage,
     prefix: &[u8],
     seq_no: u64,
@@ -193,7 +238,7 @@ pub(crate) async fn scan_prefix_at(
     Ok(results)
 }
 
-pub(crate) async fn scan_bounded(
+pub(super) async fn scan_bounded(
     storage: &LsmStorage,
     start: std::ops::Bound<&[u8]>,
     end: std::ops::Bound<&[u8]>,
@@ -250,7 +295,7 @@ pub(crate) async fn scan_bounded(
     Ok((results, next_cursor))
 }
 
-pub(crate) async fn scan(
+pub(super) async fn scan(
     storage: &LsmStorage,
     start: std::ops::Bound<&[u8]>,
     end: std::ops::Bound<&[u8]>,

@@ -1,6 +1,3 @@
-// =========================================================================
-// SECTION: explain
-// =========================================================================
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
@@ -269,5 +266,3 @@ mod tests {
         assert!(!exp_res.explanation.is_empty());
     }
 }
-
-// !SECTION: explain

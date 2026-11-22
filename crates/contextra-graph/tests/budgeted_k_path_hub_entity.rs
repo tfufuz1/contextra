@@ -1,8 +1,3 @@
-//! Integrationstest für k-Pfad-Diffusion mit Budgetierung bei Hub-Knoten.
-//!
-//! # Zweck
-//! Stellt sicher, dass stark vernetzte Knoten (Hubs) das konfigurierte Kanten- und Tiefenbudget nicht überschreiten.
-
 #![cfg(feature = "k-path-diffusion")]
 
 use contextra_graph::path_rag::k_path::{KPathConfig, KPathDiffusion};

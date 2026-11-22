@@ -6,49 +6,25 @@ name = "contextra-rank"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version = "1.89"
+rust-version.workspace = true
 description = "4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for Contextra Cognitive OS"
-readme = "README.md"
-repository = "https://github.com/tfufuz1/contextra"
-keywords = ["ranking", "rrf", "fusion", "calibration", "retrieval"]
-categories = ["algorithms", "science"]
-include = ["src/**/*", "Cargo.toml", "README.md", "CHANGELOG.md", "LICENSE-*"]
-publish = false # Interner modularer Baustein des Contextra-Systems (AD-1)
 
 [package.metadata.contextra]
 ring = "0"
-klasse = "A"
-
-[features]
-default = ["std", "exp-dibud", "exp-resonance", "experimental-rank"]
-std = []
-workspace = ["dep:contextra-types", "dep:contextra-ports"]
-types-compat = ["workspace"]
-ports-compat = ["workspace"]
-
-# Experimente
-dibud = ["exp-dibud"]
-exp-dibud = []
-exp-resonance = []
-experimental-all = ["exp-dibud", "exp-resonance"]
-experimental-rank = ["experimental-all"]
 
 [dependencies]
-contextra-types = { path = "../contextra-types", version = "0.1.0", default-features = false, optional = true }
-contextra-ports = { path = "../contextra-ports", version = "0.1.0", default-features = false, optional = true }
-serde = { version = "1", features = ["derive"] }
-serde_json = { workspace = true }
-ahash = { version = "0.8", features = ["serde"] }
-tracing = { workspace = true }
-thiserror = { workspace = true }
+contextra-types.workspace = true
+contextra-ports.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ahash.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+
+[features]
+dibud = []
 
 [dev-dependencies]
-contextra-types = { path = "../contextra-types", version = "0.1.0" }
-contextra-ports = { path = "../contextra-ports", version = "0.1.0" }
+contextra-adapt.workspace = true
 proptest = "1"
-criterion = { workspace = true }
-tokio = { version = "1", features = ["rt", "macros"] }
-
-[[bench]]
-name = "rank_bench"
-harness = false
+tokio = { workspace = true, features = ["full"] }

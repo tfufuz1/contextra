@@ -1,5 +1,4 @@
-//! Tests für die deterministische Audit-Trace-Generierung nach INV-EGRESS-AUDIT-1.
-use contextra_privacy::Clock;
+use contextra_ports::Clock;
 use contextra_privacy::{
     compute_audit_trace, extract_rule_id, BlockReason, EgressClassification, EgressClassifier,
     EgressClassifierTrace, EgressVault, MAX_CLASSIFY_PAYLOAD_BYTES,
@@ -29,7 +28,6 @@ impl Clock for FixedClock {
 }
 
 #[tokio::test]
-// Prüft: Prüft die deterministische Wiederholbarkeit der 32-Byte-BLAKE3-Traces.
 async fn test_audit_trace_determinism() -> Result<(), Box<dyn std::error::Error>> {
     let patterns = vec![r"sk-[a-zA-Z0-9]{32}".to_string()];
     let vault = EgressVault::new(patterns)?;
@@ -52,7 +50,6 @@ async fn test_audit_trace_determinism() -> Result<(), Box<dyn std::error::Error>
 }
 
 #[tokio::test]
-// Prüft: Prüft die Trace-Erzeugung bei blockierten Anfragen mit spezifischen Block-Gründen.
 async fn test_audit_trace_negatives() -> Result<(), Box<dyn std::error::Error>> {
     let patterns = vec![
         r"sk-[a-zA-Z0-9]{32}".to_string(),
@@ -85,7 +82,6 @@ async fn test_audit_trace_negatives() -> Result<(), Box<dyn std::error::Error>> 
 }
 
 #[tokio::test]
-// Prüft: Prüft die Übereinstimmung der Klassifikation mit und ohne Trace-Erzeugung.
 async fn test_audit_trace_parity_with_classify() -> Result<(), Box<dyn std::error::Error>> {
     let patterns = vec![r"password".to_string()];
     let vault = EgressVault::new(patterns)?;
@@ -110,7 +106,6 @@ async fn test_audit_trace_parity_with_classify() -> Result<(), Box<dyn std::erro
 }
 
 #[tokio::test]
-// Prüft: Prüft das Verhalten an Grenzen (leere Payloads und maximale 64-KiB-Grenze).
 async fn test_audit_trace_empty_and_max_boundary_no_panic() -> Result<(), Box<dyn std::error::Error>>
 {
     let vault = EgressVault::try_default()?;
@@ -139,15 +134,12 @@ async fn test_audit_trace_empty_and_max_boundary_no_panic() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-// Prüft: Stellt sicher, dass sensible Klartext-PII niemals in Audit-Logs oder Traces lecken.
-async fn test_audit_trace_contains_zero_raw_pii_or_plaintext(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_audit_trace_contains_zero_raw_pii_or_plaintext() -> Result<(), Box<dyn std::error::Error>> {
     let raw_email = "super_secret_user@example.com";
     let raw_iban = "DE89370400440532013000";
     let raw_steuer_id = "86095742116";
 
-    let sensitive_payload =
-        format!("Nutzer {raw_email} Konto {raw_iban} Steuer-ID {raw_steuer_id}");
+    let sensitive_payload = format!("Nutzer {raw_email} Konto {raw_iban} Steuer-ID {raw_steuer_id}");
 
     let trace_bytes = compute_audit_trace(&sensitive_payload, "R-001", 1_700_000_000);
     assert_eq!(trace_bytes.len(), 32);

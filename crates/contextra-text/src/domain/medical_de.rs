@@ -1,8 +1,7 @@
-
-//! Deutsches Medizinisches Fachvokabular (`domain::medical_de`).
-//!
-//! # Ring-Zuordnung
-//! Ring 0 (Kern).
+// FILE-CONTEXT: Deutsches Medizinisches Fachvokabular (domain::medical_de).
+// ZWECK: Definiert Komposita-Staemme und geschuetzte Begriffe fuer domaenenspezifische Sprachanforderungen.
+// QUELLE: data/medical_de.txt (BfArM ICD-10-GM / MeSH German / BMG Open Data).
+// REGELN: Kleingeschrieben, alphabetisch sortiert, keine Duplikate, Staemme und geschuetzte Begriffe ueberschneiden sich nicht, keine Eigennamen/Marken.
 
 use super::{parse_domain_resource, DomainVocabulary, ParsedVocabulary};
 use std::sync::OnceLock;
@@ -15,7 +14,7 @@ fn get_parsed_medical() -> &'static ParsedVocabulary {
     PARSED_MEDICAL.get_or_init(|| parse_domain_resource(RAW_MEDICAL_DATA))
 }
 
-/// Deutsches Medizinisches Fachvokabular zur Anbindung an [`DomainVocabulary`].
+/// Deutsches Medizinisches Fachvokabular.
 pub struct MedicalDomainVocabulary;
 
 impl DomainVocabulary for MedicalDomainVocabulary {
@@ -32,12 +31,11 @@ impl DomainVocabulary for MedicalDomainVocabulary {
     }
 }
 
-/// Liefert den statischen Slice aller medizinischen Komposita-Wortstämme.
+/// Exportierte Hilfsfunktionen für direkten Slice-Zugriff.
 pub fn get_medical_compound_stems() -> &'static [&'static str] {
     get_parsed_medical().compound_stems
 }
 
-/// Liefert den statischen Slice aller medizinischen geschützten Fachbegriffe.
 pub fn get_medical_protected_terms() -> &'static [&'static str] {
     get_parsed_medical().protected_terms
 }
@@ -46,6 +44,5 @@ pub fn get_medical_protected_terms() -> &'static [&'static str] {
 pub static MEDICAL_COMPOUND_STEMS: std::sync::LazyLock<&'static [&'static str]> =
     std::sync::LazyLock::new(get_medical_compound_stems);
 
-/// Statische Referenz-Slices geschützter Fachbegriffe für Abwärtskompatibilität.
 pub static MEDICAL_PROTECTED_TERMS: std::sync::LazyLock<&'static [&'static str]> =
     std::sync::LazyLock::new(get_medical_protected_terms);

@@ -1,16 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-//! # Integrationstest: `vertical_path_ssi_under_write_load`
-//!
-//! Vertikaler Pfad-Test 3 (Teil 14.3 v17 / Bezug B-16):
-//! Überprüft die Stabilität und Korrektheit der seriellen Snapshot-Isolation (SSI = Serializable Snapshot Isolation)
-//! und MVCC (Multi-Version Concurrency Control) unter kontinuierlicher paralleler Schreiblast
-//! (1.000 Transaktionen über mehrere Tokio-Tasks).
-//!
-//! Stellt sicher, dass:
-//! - Lang offene Snapshots unverändert isoliert bleiben (keine Phantome, keine Versions-Leaks).
-//! - Schreibkonflikte als erwartete OCC-/SSI-Konflikte behandelt werden, ohne interne Fehler zu werfen.
-//! - Nach Lastspitzen eine vollständige System-Normalisierung eintritt.
+// FILE-CONTEXT
+// ZWECK: Vertikaler Pfad-Test 3 (Teil 14.3 v17), Bezug B-16: Schreiblast parallel zu einem langen offenen Snapshot darf SSI nicht beeinträchtigen oder ausfallen lassen.
+// INVARIANTEN: Greift ausschließlich über die öffentliche Facade (contextra::*) zu; Zero-Panic in Produktion; Timeout-geschützt.
 
 mod common;
 
@@ -23,7 +15,7 @@ use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use tokio::time::timeout;
 
-/// Hilfsfunktion zur Klassifizierung dokumentierter, erwarteter SSI- und OCC-Konflikte (Optimistic Concurrency Control).
+/// Helper function to determine if an error is a documented, expected SSI or OCC conflict.
 fn is_expected_ssi_conflict(err: &ContextraError) -> bool {
     if err.is_occ_conflict() {
         return true;

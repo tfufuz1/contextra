@@ -1,15 +1,9 @@
-//! # Graph Index Port (Ring 0 / Class B)
-//!
-//! LINK crates/contextra-ports/src/lib.rs
-//! LINK crates/contextra-ports/src/graph.rs
-//!
-//! Abstrakter Vertrag für CSR-basierte Entity-Relation-Graph-Operationen (z. B. in `contextra-graph`).
-//!
-//! // SECTION graph-index-contracts
-//! // NOTE: Verwendet BoxFuture für dyn-Safety und vielseitige Traversierungsalgorithmen (BFS, PPR, PathRAG).
-//! // Invarianten:
-//! // 1. INV-GRAPH-TXID (AGT-GRAPH-001): TxId-Origin-Invariante für kausale Konsistenz.
-//! // 2. INV-GRAPH-DETERMINISM: Tie-Break bei Traversierungs-Scores nach EntityId aufsteigend.
+//! Graph index trait definition and statistics.
+
+// FILE-CONTEXT
+// STAND: 2026-09-15T00:00:00Z
+// ZWECK: GraphIndex Trait & GraphIndexStats für CSR-basierte Entity-Relation-Graph-Operationen.
+// INVARIANTEN: AGT-GRAPH-001 TxId-Origin-Invariante. BoxFuture dyn-safety.
 
 use super::BoxFuture;
 use crate::types::{Edge, Entity, EntityId, PprConfig, TxId};
@@ -317,12 +311,12 @@ pub struct GraphIndexStats {
     pub memory_usage_bytes: usize,
 }
 
+// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von contextra-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
 /// Contract for resolving graph community assignments for entities.
 pub trait CommunityResolver: Send + Sync {
     /// Resolves the optional community ID for a given entity.
     fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>>;
 }
-// !SECTION graph-index-contracts
 
 #[cfg(test)]
 mod tests {

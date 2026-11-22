@@ -1,10 +1,9 @@
-//! Tests für die kryptografische Löschung von PII-Daten im Egress-Vault.
-#![allow(deprecated)]
+// FILE-CONTEXT
+// ZWECK: Test PII vault forces CryptoShred under DeploymentTier::EdgeMinimal (INV-COLLECTION-PROFILE-3)
 
 use contextra_privacy::egress_gateway::pii_vault_forces_crypto_shred;
 
 #[test]
-// Prüft: Prüft das Schredder-Kriterium bei PII-Übereinstimmungen und Nicht-Memory-Only-Speicherung.
 fn test_pii_vault_forces_crypto_shred_edge_minimal() {
     let is_pii_match = true;
 

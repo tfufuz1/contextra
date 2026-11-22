@@ -1,3 +1,6 @@
+// FILE-CONTEXT
+// STAND: 2026-09-15
+// ZWECK: BEIR (Benchmarking Information Retrieval) Evaluation für Contextra BM25 + Hybrid Search.
 
 use std::collections::{HashMap, HashSet};
 use std::fs::File;

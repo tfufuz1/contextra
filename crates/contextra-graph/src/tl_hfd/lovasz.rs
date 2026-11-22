@@ -1,8 +1,6 @@
 //! Lovász extension and subgradient calculations for TL-HFD (Spec §21.1).
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-use crate::types::EntityId;
+use contextra_types::EntityId;
 use std::cmp::Ordering;
 
 /// Truncates hyperedge participants to at most `max_sort_size` top x-value participants plus the min x-value participant.
@@ -12,8 +10,6 @@ use std::cmp::Ordering;
 ///
 /// # Complexity
 /// Time complexity $O(|P| \log |P|)$, where $|P|$ is the number of hyperedge participants.
-
-// SECTION Lovasz Core Implementation
 pub fn truncate_participants(
     participants: &[EntityId],
     get_x: impl Fn(EntityId) -> f32,
@@ -195,5 +191,3 @@ mod tests {
         );
     }
 }
-
-// !SECTION Lovasz Core Implementation

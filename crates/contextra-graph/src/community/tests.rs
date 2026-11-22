@@ -1,16 +1,9 @@
-#![cfg(feature = "workspace")]
-//! Test-Modul fuer Community-Detection
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
-use crate::types::{Edge, Entity, EntityId, TxId};
+use contextra_types::{Edge, Entity, EntityId, TxId};
 
 #[tokio::test]
-
-// SECTION Tests Core Implementation
 async fn test_community_detection_determinism() {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
@@ -244,9 +237,9 @@ async fn test_leiden_vs_lpa_well_connected_communities_comparison() {
 
     // Leiden guarantees that Cluster A and Cluster B are distinct well-connected communities
     assert_ne!(
-        comm_a, comm_b,
-        "Leiden must separate Cluster A and Cluster B into distinct well-connected communities despite weak bridge edge"
-    );
+            comm_a, comm_b,
+            "Leiden must separate Cluster A and Cluster B into distinct well-connected communities despite weak bridge edge"
+        );
 }
 
 #[derive(Clone)]
@@ -274,7 +267,7 @@ impl tracing::field::Visit for StringVisitor {
 
 proptest::proptest! {
     #[test]
-    fn test_prop_community_detection_never_panics(
+    fn prop_community_detection_never_panics(
         node_count in 1usize..50,
         edge_specs in proptest::collection::vec((0..50usize, 0..50usize), 0..150),
         max_iterations in 1u32..50,
@@ -307,7 +300,7 @@ proptest::proptest! {
     }
 
     #[test]
-    fn test_prop_community_detection_every_node_assigned(
+    fn prop_community_detection_every_node_assigned(
         node_count in 1usize..30,
         edge_specs in proptest::collection::vec((0..30usize, 0..30usize), 0..60),
         seed in proptest::num::u64::ANY,
@@ -409,7 +402,7 @@ async fn test_community_detection_non_convergence_logs_warning_and_returns_best_
 
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn test_detect_communities_CASE_empty_graph() {
+async fn detect_communities_CASE_empty_graph() {
     let graph = CsrGraph::new();
     let config = CommunityDetectionConfig::default();
 
@@ -422,7 +415,7 @@ async fn test_detect_communities_CASE_empty_graph() {
 
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn test_detect_communities_CASE_single_node() {
+async fn detect_communities_CASE_single_node() {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
     let id = EntityId::new(42);
@@ -443,7 +436,7 @@ async fn test_detect_communities_CASE_single_node() {
 
 #[test]
 #[allow(non_snake_case)]
-fn test_serialization_roundtrip_CASE_community_config_and_assignment() {
+fn serialization_roundtrip_CASE_community_config_and_assignment() {
     let config = CommunityDetectionConfig {
         max_iterations: 150,
         seed: 987654321,
@@ -815,5 +808,3 @@ async fn test_community_detection_with_star_expansion_hyperedges() {
     // Cluster 1 and Cluster 2 must be in distinct communities
     assert_ne!(c1_comm, c2_comm);
 }
-
-// !SECTION Tests Core Implementation

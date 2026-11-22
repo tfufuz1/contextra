@@ -1,21 +1,12 @@
-//! RAM-Bedarfsabschätzung und Budgetierung für den inneren Graphen.
-//!
-//! # Zweck
-//! Schätzt Heap- und Peak-Speicherverbrauch für Indexe, Arrays und Kompaktierungsläufe.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use crate::types::{DocId, Entity, EntityId, TxId};
+use contextra_types::{DocId, Entity, EntityId, TxId};
 
 use super::super::types::EdgePayload;
 use super::GraphInner;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-
-// SECTION Estimate Core Implementation
 pub struct MemoryEstimate {
     pub shared_payload_bytes: usize,
     pub private_bytes: usize,
@@ -258,5 +249,3 @@ impl GraphInner {
         current.total_bytes() + rebuild_private
     }
 }
-
-// !SECTION Estimate Core Implementation

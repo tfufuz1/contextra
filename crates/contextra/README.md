@@ -1,37 +1,37 @@
 # contextra
 
-**Zweck:** Öffentliche Fassade und API: Konfigurationsladen, Builder, Agent-Gedächtnis, Query-Rewriter-Anbindung, Performance-Profile. SPEC §6.8 (Fassade, Fehler, Schnittstellen). Die Crate-Verträge sind in SPEC §15.
+Haupt-Library Facade für Endanwender.
 
-**Ebene:** E2 (Fassade)
+Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; §6.0, `capabilities.toml`).
 
-## Öffentliche API (`src/lib.rs`, Stand dieser README)
 
-Ist-Stand. Module oder Namen, die laut PLAN.md entfallen, können hier noch stehen.
+`contextra` ist die primäre Fassade und Composition Root des Contextra Cognitive OS (Ring 4).
 
-```rust
-pub mod agent_memory
-pub mod boot
-pub mod builder
-pub mod collection_profile
-pub mod performance_profile
-pub mod query_rewriter
-pub use agent_memory::{AgentMemory, Memory, MemoryId}
-pub use builder::{ContextraBuilder, ContextraConfigExt, EncryptionMode}
-pub use collection_profile::{CollectionProfile, DeploymentTier, KvDeleteMode, LsmTuning}
-pub use contextra_db::
-pub use contextra_types::error::ContextraError
-pub use contextra_types::types::domain::{DocId, ScoredDocument}
-pub use contextra_types::DistanceMetric
-pub use performance_profile::{DurabilityConfigError, DurabilityMode, PerformanceProfile}
-pub use query_rewriter::LlmQueryRewriter
-pub fn builder(dimension: usize) -> ContextraBuilder
-```
+## Zweck
 
-## Features (`Cargo.toml`)
+Stellt den zentralen Einstiegspunkt und Builder-Muster (`ContextraBuilder`) für Rust-Anwendungen bereit. Dient als einzige Composition Root des Systems, um Backends, Memory Engines, Privatsphäre-Filter und Inferenz-Anbindungen sauber zu verbinden.
 
-`default`, `embedded`
+## Ring-Zugehörigkeit & Status
 
-## Dokumentation
+- **Ring:** Ring 4 (Ränder / Composition Root)
+- **Status:** 🟡 In Migration / Shell (Fassade)
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 
-Implementierungsspezifikation: [`PLAN.md`](PLAN.md). Maßgeblich ist `docs/SPEC.md` v4.1.
+## Öffentliche API-Übersicht
 
+In Phase 1b des Migrationsplans wird die Fassade kontinuierlich erweitert. Momentan stellt `contextra` grundlegende Module und Builder-Typen bereit:
+
+- **Composition Root / Builder:** `ContextraBuilder`
+- **Konfiguration:** `ContextraConfig`
+
+## Architektur & Verweise
+
+Für Details zur Zielarchitektur, Ring-Struktur und den einzelnen Migrationsphasen siehe [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §A2 / §4.2 im Repository-Root.
+
+## Feature-Ringe (Ring-Split)
+
+| Feature-Name | Enthaltene Features / Abhängigkeiten | Zielgruppe | Lizenzmodell |
+| --- | --- | --- | --- |
+| `embedded` | Default (embedded local search) | OSS-Adoption | Open Source (MIT/Apache-2.0) |
+| `candle` | `contextra-infer-candle` | Local Candle Inference | Open Source (MIT/Apache-2.0) |
+| `compliance` | `audit-export`, `avv-generator` | Kommerziell | Trade-Secret / Kommerziell (`compliance`) |

@@ -1,21 +1,7 @@
-//! `egress_vault` — DLP-Klassifikation (Layer 1) und `SurrogateVault`-Pseudonymisierung.
-//!
-//! # Zweck
-//! Stellt den Kern der Egress-Sicherheit (Schutz vor unberechtigtem Datenabfluss) dar:
-//! 1. **DLP-Klassifikation (Layer 1)**: Schnelle Prüfung ausgehender Texte mittels kompilierter Regex-Muster
-//!    auf Richtlinienverstöße und sensible Muster (z. B. geheime Tokens, API-Keys, PII).
-//! 2. **Surrogate-Vaulting**: Sichere Ersetzung sensibler Daten durch pseudonyme Ersatz-Tokens (Surrogate),
-//!    wobei die Zuordnung für die spätere Rehydrierung sitzungsgebunden im Speicher gehalten wird.
-//!
-//! # Ring-Zugehörigkeit
-//! Ring 3 (Domain-Sicherheit).
-//!
-//! # Invarianten
-//! - **Fail-Closed**: Jede Klassifikation terminiert innerhalb des konfigurierten Timeouts. Bei Timeouts,
-//!   RegEx-Überlastung (ReDoS-Schutz) oder internen Fehlern wird strikt blockiert (`Block`).
-//! - **Zeroize-on-Drop**: Sitzungssalts und sensitive Surrogat-Mappings werden beim Verlassen des Scopes
-//!   sicher aus dem Speicher genullt (Zeroization via `zeroize`).
-//! - **Mandantentrennung**: Egress-Operationen erzwingen explizite Mandantenprüfungen ([`crate::types::TenantScoped`]).
+// FILE-CONTEXT
+// ZWECK: Cloud-Egress-Vault mit Layer-1-Regex-Klassifikation und Fail-Closed-Semantik.
+// INVARIANTEN: Jede Klassifikationsentscheidung terminiert innerhalb des definierten Timeouts.
+// Bei Timeout, Regex-Fehlern oder Laufzeitfehlern gilt strikt Fail-Closed (EgressClassification::Block).
 
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -26,13 +12,14 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use zeroize::{Zeroize, Zeroizing};
 
-/// Trait zur Erkennung benannter Entitäten (NER) im Text ohne Abhängigkeit von Machine-Learning-Crates.
+/// Trait for recognizing entities (NER) in text without creating a direct dependency
+/// on heavy embedding or ML crates (DAG-neutral interface).
 pub trait EntityRecognizer: Send + Sync {
     /// Recognizes entities in the text and returns byte ranges and category labels.
     fn recognize(&self, text: &str) -> Vec<(std::ops::Range<usize>, String)>;
 }
 
-/// No-Op-Implementierung von [`EntityRecognizer`], die keine Entitäten erkennt (Null-Objekt-Muster).
+/// A default no-op entity recognizer that detects no entities.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoOpRecognizer;
 
@@ -42,9 +29,9 @@ impl EntityRecognizer for NoOpRecognizer {
     }
 }
 
-/// Sitzungsgebundener Tresor zur bidirektionalen Abbildung zwischen Klartext-PII und Surrogat-Tokens.
+/// Session-bound vault storing bidirectional mappings between original PII/entities and generated surrogates.
 ///
-/// Alle kryptografischen Schlüssel, Salts und Zuordnungen werden bei Drop flüchtig genullt (Zeroization).
+/// Material and mappings are zeroized upon drop.
 pub struct SurrogateVault {
     session_salt: [u8; 16],
     map: Mutex<BTreeMap<String, String>>,
@@ -60,7 +47,7 @@ impl std::fmt::Debug for SurrogateVault {
 }
 
 impl SurrogateVault {
-    /// Erstellt einen neuen `SurrogateVault` mit dem übergebenen 16-Byte Sitzungssalz.
+    /// Creates a new `SurrogateVault` with the specified session salt.
     pub fn new(session_salt: [u8; 16]) -> Self {
         Self {
             session_salt,
@@ -68,7 +55,7 @@ impl SurrogateVault {
         }
     }
 
-    /// Erstellt einen neuen `SurrogateVault` mit einem kryptografisch sicheren Zufallssalz.
+    /// Creates a new `SurrogateVault` with a cryptographically secure random session salt.
     pub fn random_salt() -> Self {
         let mut salt = [0u8; 16];
         rand::rngs::OsRng.fill_bytes(&mut salt);
@@ -129,25 +116,6 @@ impl SurrogateVault {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-
-    /// Clears and zeroizes all cached surrogate mappings (neutral maintenance / B8 / SPEC §6).
-    pub fn clear(&self) {
-        if let Ok(mut guard) = self.map.lock() {
-            let old_map = std::mem::take(&mut *guard);
-            for (mut k, mut v) in old_map {
-                k.zeroize();
-                v.zeroize();
-            }
-        }
-    }
-
-    /// Compacts the internal mapping storage (neutral maintenance / SPEC §6).
-    pub fn compact(&self) {
-        if let Ok(mut guard) = self.map.lock() {
-            let cloned = guard.clone();
-            *guard = cloned;
-        }
-    }
 }
 
 impl Drop for SurrogateVault {
@@ -163,7 +131,7 @@ impl Drop for SurrogateVault {
     }
 }
 
-/// Typalias für gepinnte, sende-fähige dynamische Zukunfts-Futures.
+/// Type alias for boxed dyn futures in `EgressClassifier` trait to ensure dyn compatibility.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Policy-Kategorie für Audit-Logging und Zugriffskontrolle.
@@ -240,38 +208,21 @@ impl CompiledPattern {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum EgressVaultError {
-    /// Ungültiges Regex-Muster.
     #[error("Invalid pattern '{pattern}': {reason}")]
-    InvalidPattern {
-        /// Das fehlerhafte Muster.
-        pattern: String,
-        /// Grund des Fehlers.
-        reason: String,
-    },
-    /// Nutzlast überschreitet die Größenbegrenzung.
+    InvalidPattern { pattern: String, reason: String },
     #[error("Payload size exceeds limit: {size} bytes > {limit} limit")]
-    PayloadTooLarge {
-        /// Tatsächliche Größe.
-        size: usize,
-        /// Maximal erlaubte Größe.
-        limit: usize,
-    },
-    /// Mandanten-Gültigkeitsbereich verletzt.
+    PayloadTooLarge { size: usize, limit: usize },
     #[error("Tenant scope violation: {0}")]
-    TenantScopeViolation(#[from] crate::types::TenantScopeViolation),
-    /// Kollision bei der Surrogat-Token-Generierung.
+    TenantScopeViolation(#[from] contextra_types::TenantScopeViolation),
     #[error("Surrogate token collision detected for token '{surrogate}': existing plaintext '{existing_plaintext}' != new plaintext '{new_plaintext}'")]
     SurrogateCollision {
-        /// Erzeugtes Surrogat-Token.
         surrogate: String,
-        /// Existierender Klartext.
         existing_plaintext: String,
-        /// Neuer abweichender Klartext.
         new_plaintext: String,
     },
 }
 
-/// Maximale zulässige Payload-Länge in Bytes für Layer-1-Klassifikation (64 KiB = 65.536 Bytes).
+/// Maximale zulässige Payload-Länge in Bytes für Layer-1-Klassifikation.
 pub const MAX_CLASSIFY_PAYLOAD_BYTES: usize = 65_536;
 
 /// Führt eine Layer-1-Regex-Klassifikation auf dem Payload mit neuem Task und hartem Timeout aus.
@@ -439,8 +390,8 @@ impl EgressVault {
     /// matches `expected_tenant_id`. If a tenant scope violation occurs, returns `Block(BlockReason::PolicyDenied(...))`.
     pub async fn classify_scoped(
         &self,
-        payload: crate::types::TenantScoped<&str>,
-        expected_tenant_id: &crate::types::TenantId,
+        payload: contextra_types::TenantScoped<&str>,
+        expected_tenant_id: &contextra_types::TenantId,
     ) -> EgressClassification {
         match payload.into_inner_checked(expected_tenant_id) {
             Ok(unpacked) => self.classify(unpacked).await,
@@ -452,14 +403,14 @@ impl EgressVault {
     /// `TenantId` matches `expected_tenant_id`. Re-wraps the sanitized output in a `TenantScoped<String>`.
     pub fn sanitize_and_vault_scoped(
         &self,
-        payload: crate::types::TenantScoped<&str>,
-        expected_tenant_id: &crate::types::TenantId,
+        payload: contextra_types::TenantScoped<&str>,
+        expected_tenant_id: &contextra_types::TenantId,
         recognizer: &dyn EntityRecognizer,
-    ) -> Result<(crate::types::TenantScoped<String>, usize), EgressVaultError> {
+    ) -> Result<(contextra_types::TenantScoped<String>, usize), EgressVaultError> {
         let text = payload.into_inner_checked(expected_tenant_id)?;
         let (sanitized_text, count) = self.sanitize_and_vault(text, recognizer)?;
         Ok((
-            crate::types::TenantScoped::new(*expected_tenant_id, sanitized_text),
+            contextra_types::TenantScoped::new(*expected_tenant_id, sanitized_text),
             count,
         ))
     }
@@ -533,7 +484,7 @@ impl EgressVault {
     }
 }
 
-/// Schnittstelle für Downstream-Crates (`contextra-mcp`).
+/// Schnittstelle für Downstream-Crates (`contextra-mcp`, `contextra-router`).
 pub trait EgressClassifier: Send + Sync {
     /// Klassifiziert einen Text-Payload für den Egress-Export.
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification>;
@@ -557,7 +508,6 @@ impl Default for EgressVault {
     }
 }
 
-// Implementierung des EgressClassifier-Traits für EgressVault.
 impl EgressClassifier for EgressVault {
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification> {
         Box::pin(classify_layer1_arc(
@@ -570,13 +520,7 @@ impl EgressClassifier for EgressVault {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::disallowed_methods,
-    clippy::indexing_slicing
-)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use std::time::Instant;
@@ -849,7 +793,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_classify_scoped_and_sanitize_scoped_tenant_isolation() {
-        use crate::types::{TenantId, TenantScoped};
+        use contextra_types::{TenantId, TenantScoped};
 
         let vault = EgressVault::try_default().expect("valid vault");
         let tenant_a = TenantId::try_new(10).expect("valid tenant_a");

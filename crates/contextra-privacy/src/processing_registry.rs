@@ -1,17 +1,9 @@
-//! `processing_registry` — Maschinell erzeugtes Verzeichnis von Verarbeitungstätigkeiten.
+//! `processing_registry` — Maschinell erzeugtes Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO).
 //!
-//! # Zweck
-//! Dieses Modul modelliert und generiert ein automatisiertes Verzeichnis von Verarbeitungstätigkeiten (VVT).
-//! Es ermöglicht die Erfassung, den strukturierten Export, Mandantenfilterung für Auskunftsabfragen
-//! sowie die Textsuche über Verarbeitungsdaten.
-//!
-//! # Ring-Zugehörigkeit
-//! Ring 3 (Domain / Compliance).
-//!
-//! Dieses Modul modelliert und generiert ein Verzeichnis von Verarbeitungstätigkeiten.
+//! Dieses Modul modelliert und generiert ein Verzeichnis von Verarbeitungstätigkeiten gemäß Art. 30 Abs. 1 DSGVO.
 //!
 //! ### Kanonischer Mandanten-Typ:
-//! Dieses Modul nutzt ausschließlich den kanonischen Domain-Typ [`crate::types::TenantId`] (`u64`) zur
+//! Dieses Modul nutzt ausschließlich den kanonischen Domain-Typ [`contextra_types::TenantId`] (`u64`) zur
 //! Gewährleistung von systemweiter Mandantentrennung und Isolation.
 //!
 //! ### Migrationspfad für bestehende Register (Legacy String-TenantId):
@@ -21,16 +13,16 @@
 
 use crate::egress_guard::{TextSearchEngine, TextSearchResult};
 use crate::egress_vault::BoxFuture;
-use crate::types::{Clock, TenantId};
+use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
 
-/// Rolle bezüglich der Verarbeitungstätigkeit.
+/// Rolle bezüglich der Verarbeitungstätigkeit gemäß DSGVO.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum ProcessorRole {
-    /// Verantwortliche Stelle für Datenverarbeitung.
+    /// Verantwortlicher (Art. 4 Nr. 7 DSGVO).
     Controller,
-    /// Auftragsverarbeitende Stelle.
+    /// Auftragsverarbeiter (Art. 4 Nr. 8 DSGVO).
     Processor,
 }
 
@@ -44,12 +36,11 @@ impl ProcessorRole {
     }
 }
 
-/// Standard-Schemaversion für die Deserialisierung von Verarbeitungsdatensätzen.
-pub fn default_version() -> u32 {
+fn default_version() -> u32 {
     1
 }
 
-/// Ein Datensatz einer Verarbeitungstätigkeit.
+/// Ein Datensatz einer Verarbeitungstätigkeit gemäß Art. 30 Abs. 1 DSGVO.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessingActivityRecord {
     /// Bezeichnung der Verarbeitungstätigkeit.
@@ -58,7 +49,7 @@ pub struct ProcessingActivityRecord {
     pub controller_or_processor_role: ProcessorRole,
     /// Zwecke der Verarbeitung.
     pub purpose: String,
-    /// Rechtsgrundlage der Verarbeitung (z. B. "Vertragserfüllung / Richtlinie B-12").
+    /// Rechtsgrundlage der Verarbeitung (z. B. "Art. 6 Abs. 1 lit. f DSGVO").
     #[serde(default)]
     pub legal_basis: String,
     /// Kategorien personenbezogener Daten.
@@ -69,7 +60,7 @@ pub struct ProcessingActivityRecord {
     pub recipients: Vec<String>,
     /// Übermittlungen von Daten an ein Drittland oder eine internationale Organisation.
     pub third_country_transfers: Vec<String>,
-    /// Vorgesehene Fristen für die Aufbewahrung der verschiedenen Datenkategorien.
+    /// Vorgesehene Fristen für die Löschung der verschiedenen Datenkategorien.
     pub retention_period: String,
     /// Allgemeine Beschreibung der technischen und organisatorischen Maßnahmen (TOMs).
     pub technical_and_organizational_measures: Vec<String>,
@@ -92,14 +83,12 @@ pub struct ProcessingRegistry {
 impl ProcessingRegistry {
     /// Erstellt ein neues leeres `ProcessingRegistry`.
     pub fn new() -> Self {
-        Self {
-            records: Vec::new(),
-        }
+        Self { records: Vec::new() }
     }
 
     /// Fügt einen Datensatz dem Verzeichnis hinzu (append-only) und belegt den Erstellungs-Zeitstempel
     /// über die injizierte Uhr.
-    pub fn append_record(&mut self, mut record: ProcessingActivityRecord, clock: &dyn Clock) {
+    pub fn append_record(&mut self, mut record: ProcessingActivityRecord, clock: &dyn contextra_ports::Clock) {
         let nanos = clock.now_unix_nanos();
         record.created_at_unix_secs = nanos / 1_000_000_000;
         if record.version == 0 {
@@ -134,9 +123,9 @@ impl ProcessingRegistryExport {
         Self { records }
     }
 
-    /// Filtert alle Verarbeitungstätigkeiten nach der angegebenen Mandanten-ID.
+    /// Filtert alle Verarbeitungstätigkeiten nach der angegebenen Mandanten-ID (Art. 15 DSGVO Auskunftsersuchen).
     ///
-    /// Stellt strikte Mandantentrennung bei Auskunftsabfragen sicher, sodass nur Datensätze des Zielmandanten
+    /// Garantiert strikte Mandantentrennung bei Auskunftsersuchen, sodass nur Datensätze des Zielmandanten
     /// zurückgegeben werden.
     pub fn filter_by_tenant(&self, tenant_id: TenantId) -> Self {
         let records = self
@@ -150,7 +139,7 @@ impl ProcessingRegistryExport {
 }
 
 impl TextSearchEngine for ProcessingRegistryExport {
-    /// Führt eine Volltext-Suche über das Verzeichnis von Verarbeitungstätigkeiten durch.
+    /// Führt eine Volltext-Suche über das Verzeichnis von Verarbeitungstätigkeiten durch (Art. 15 DSGVO).
     fn search_text<'a>(
         &'a self,
         text: &'a str,
@@ -231,11 +220,11 @@ fn sanitize_markdown_cell(input: &str) -> String {
 /// Erzeugt eine druckfertige, deutschsprachige Markdown-Tabelle aus dem Export.
 ///
 /// Die Tabelle enthält eine Zeile pro `ProcessingActivityRecord` und Spalten für alle
-/// geforderten Angaben.
+/// nach Art. 30 Abs. 1 DSGVO geforderten Angaben.
 pub fn render_markdown(export: &ProcessingRegistryExport) -> String {
     let mut out = String::new();
-    out.push_str("# Verzeichnis von Verarbeitungstätigkeiten\n\n");
-    out.push_str("| Mandant | Bezeichnung | Rolle | Zweck | Rechtsgrundlage | Datenkategorien | Betroffene | Empfänger | Drittlandtransfers | Aufbewahrungsfrist | TOMs | Erstellt |\n");
+    out.push_str("# Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO)\n\n");
+    out.push_str("| Mandant | Bezeichnung | Rolle | Zweck | Rechtsgrundlage | Datenkategorien | Betroffene | Empfänger | Drittlandtransfers | Löschfrist | TOMs | Erstellt |\n");
     out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
 
     for record in &export.records {
@@ -307,7 +296,7 @@ mod tests {
             activity_name: "Kundendaten-Analyse".to_string(),
             controller_or_processor_role: ProcessorRole::Controller,
             purpose: "Bereitstellung von Kontext-Suchen".to_string(),
-            legal_basis: "Vertragserfüllung / Richtlinie B-12".to_string(),
+            legal_basis: "Art. 6 Abs. 1 lit. f DSGVO".to_string(),
             data_categories: vec!["E-Mail".to_string(), "IP-Adresse".to_string()],
             data_subject_categories: vec!["Kunden".to_string(), "Endnutzer".to_string()],
             recipients: vec!["Hosting-Provider".to_string()],
@@ -323,20 +312,18 @@ mod tests {
         }
     }
 
-    // Prüft das Rendern einer leeren Datensatzliste mit korrekten Header- und Trennzeilen.
     #[test]
     fn test_empty_records_list() {
         let export = generate_registry(&[]);
         assert!(export.records.is_empty());
 
         let md = render_markdown(&export);
-        assert!(md.contains("# Verzeichnis von Verarbeitungstätigkeiten"));
-        assert!(md.contains("| Mandant | Bezeichnung | Rolle | Zweck | Rechtsgrundlage | Datenkategorien | Betroffene | Empfänger | Drittlandtransfers | Aufbewahrungsfrist | TOMs | Erstellt |"));
+        assert!(md.contains("# Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO)"));
+        assert!(md.contains("| Mandant | Bezeichnung | Rolle | Zweck | Rechtsgrundlage | Datenkategorien | Betroffene | Empfänger | Drittlandtransfers | Löschfrist | TOMs | Erstellt |"));
         let lines: Vec<&str> = md.trim().lines().collect();
         assert_eq!(lines.len(), 4);
     }
 
-    // Prüft das Rendern eines einzelnen Verarbeitungsdatensatzes in Tabellenform.
     #[test]
     fn test_single_record() {
         let rec = create_sample_record(123);
@@ -344,10 +331,9 @@ mod tests {
         assert_eq!(export.records.len(), 1);
 
         let md = render_markdown(&export);
-        assert!(md.contains("| TenantId(123) | Kundendaten-Analyse | Verantwortlicher | Bereitstellung von Kontext-Suchen | Vertragserfüllung / Richtlinie B-12 | E-Mail, IP-Adresse | Kunden, Endnutzer | Hosting-Provider | Keine | 30 Tage nach Kündigung | Verschlüsselung at rest, TLS 1.3 | 1700000000 |"));
+        assert!(md.contains("| TenantId(123) | Kundendaten-Analyse | Verantwortlicher | Bereitstellung von Kontext-Suchen | Art. 6 Abs. 1 lit. f DSGVO | E-Mail, IP-Adresse | Kunden, Endnutzer | Hosting-Provider | Keine | 30 Tage nach Kündigung | Verschlüsselung at rest, TLS 1.3 | 1700000000 |"));
     }
 
-    // Prüft Sonderzeichen, Zeilenumbrüche und Maskierung von Tabellen-Pipes.
     #[test]
     fn test_multiple_records_with_special_characters_and_escaping() {
         let mut rec1 = create_sample_record(123);
@@ -370,7 +356,6 @@ mod tests {
         assert_eq!(lines.len(), 6);
     }
 
-    // Prüft Volltextsuche und Mandantenisolation bei Auskunftsersuchen.
     #[tokio::test]
     async fn test_text_search_engine_and_tenant_filter_art15() {
         let rec1 = create_sample_record(100);

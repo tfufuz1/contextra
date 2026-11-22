@@ -1,4 +1,3 @@
-#![cfg(feature = "workspace")]
 //! Candidate stream for Personalized PageRank (PPR) graph retrieval (DiBud / Spec §21.2 / AK-17).
 //!
 //! # Candidate Ordering & Determinism
@@ -11,16 +10,11 @@
 //!
 //! The performance gain (P24) stems from seed-local forward-push calculation in the underlying PPR engine, rather than incremental batching.
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use contextra_ports::GraphIndex;
-use contextra_types::{ContextraError, Result};
-use crate::types::{DocId, EntityId, PprConfig, MAX_SEARCH_K};
+use contextra_types::{DocId, EntityId, PprConfig, Result, MAX_SEARCH_K};
 use std::collections::{HashSet, VecDeque};
 
 /// Default batch size for candidate retrieval (Spec §21.2).
-
-// SECTION Ppr Stream Core Implementation
 pub const DEFAULT_PPR_STREAM_BATCH_SIZE: usize = 16;
 
 /// On-demand loading async candidate stream for Personalized PageRank search.
@@ -149,11 +143,9 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
 
         match self.ranked.as_mut() {
             Some(ranked) => Ok(ranked),
-            None => Err(ContextraError::Internal(
+            None => Err(contextra_types::ContextraError::Internal(
                 "Failed to initialize PPR stream ranking buffer".to_string(),
             )),
         }
     }
 }
-
-// !SECTION Ppr Stream Core Implementation

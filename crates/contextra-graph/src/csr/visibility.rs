@@ -1,11 +1,4 @@
-//! MVCC-Sichtbarkeitsprüfungen und Transaktionsfilterung für Graphelemente.
-//!
-//! # Zweck
-//! Entscheidet, ob eine Kante oder ein Knoten zum Transaktionszeitpunkt `at_tx` sichtbar ist.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-use crate::types::TxId;
+use contextra_types::TxId;
 
 /// Untere Schranke für Wall-Clock-abgeleitete TxId-Heuristik.
 ///
@@ -15,8 +8,6 @@ use crate::types::TxId;
 /// TxId-Origin-Invariant (AGT-GRAPH-001).
 ///
 /// Wert gewählt als `1_400_000_000 * 1_000_000_000` (1. Jan 2014 UTC in ns).
-
-// SECTION Visibility Core Implementation
 pub const WALLCLOCK_TX_HEURISTIC_MIN: u64 = 1_400_000_000_000_000_000;
 
 /// Prüft, ob `tx` aus einem verdächtigen (wall-clock-ähnlichen) Bereich stammt.
@@ -86,5 +77,3 @@ pub fn is_edge_visible_bitemporal(
     }
     true
 }
-
-// !SECTION Visibility Core Implementation

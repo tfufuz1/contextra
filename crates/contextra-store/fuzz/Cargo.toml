@@ -1,3 +1,6 @@
+[lints]
+workspace = true
+
 [package]
 name = "contextra-store-fuzz" # <!-- crate-ref-ignore -->
 version = "0.0.0"
@@ -15,11 +18,18 @@ arbitrary = { version = "1.4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 tempfile = "3"
 bytes = "1"
+contextra-core = { path = "../../contextra-core" }
 contextra-store = { path = ".." }
 
 [[bin]]
 name = "wal_roundtrip"
 path = "fuzz_targets/wal_roundtrip.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "wal_mutation_chaos"
+path = "fuzz_targets/wal_mutation_chaos.rs"
 test = false
 doc = false
 
@@ -48,25 +58,13 @@ test = false
 doc = false
 
 [[bin]]
-name = "fuzz_sstable_block_footer"
-path = "fuzz_targets/fuzz_sstable_block_footer.rs"
+name = "fuzz_compaction_interleave"
+path = "fuzz_targets/fuzz_compaction_interleave.rs"
 test = false
 doc = false
 
 [[bin]]
-name = "fuzz_tenant_codec"
-path = "fuzz_targets/fuzz_tenant_codec.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "fuzz_wal_hmac_chain"
-path = "fuzz_targets/fuzz_wal_hmac_chain.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "fuzz_sstable_legacy_footer"
-path = "fuzz_targets/fuzz_sstable_legacy_footer.rs"
+name = "fuzz_recovery_arbitrary_state"
+path = "fuzz_targets/fuzz_recovery_arbitrary_state.rs"
 test = false
 doc = false

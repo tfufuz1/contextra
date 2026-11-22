@@ -1,8 +1,3 @@
-//! Audit-Test zur Erkennung und Vermeidung verwaister Knoten.
-//!
-//! # Zweck
-//! Garantiert, dass gelöschte Kanten keine inkonsistenten Referenzen auf Knoten im System hinterlassen.
-
 use contextra_graph::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, PprConfig, TxId};

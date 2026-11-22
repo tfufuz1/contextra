@@ -1,7 +1,4 @@
-
-#![cfg(feature = "experimental-diskann")]
 #![forbid(unsafe_code)]
-
 
 #[cfg(feature = "experimental-diskann")]
 use contextra_ports::vector_index::VectorIndex;

@@ -1,18 +1,9 @@
-//! Mutationslogik für n-äre Hyperkanten im CSR-Graphen.
-//!
-//! # Zweck
-//! Verwaltet n-stellige Beziehungen zwischen mehreren Entitäten samt Rollenbindungen.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::CsrGraph;
-use crate::error::{GraphMutationError, Result};
-use crate::types::{DocId, EntityId, TxId};
+use crate::error::GraphMutationError;
+use contextra_types::{DocId, EntityId, Result, TxId};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-
-// SECTION Hyperedge Core Implementation
 fn dfs_upward_cascade(
     graph: &CsrGraph,
     node: crate::hyperedge::HyperEdgeId,
@@ -90,9 +81,7 @@ impl CsrGraph {
                 }
             }
 
-            #[cfg(feature = "ports-compat")]
-            #[cfg(feature = "ports-compat")]
-        if let Some(storage) = self.storage() {
+            if let Some(storage) = self.storage() {
                 let key = format!(
                     "{}{:016x}:{:016x}",
                     crate::cascade::CASCADE_QUEUE_PREFIX,
@@ -133,7 +122,6 @@ impl CsrGraph {
         tx: TxId,
         hyperedge: &crate::hyperedge::HyperEdge,
     ) -> Result<()> {
-        #[cfg(feature = "ports-compat")]
         if let Some(storage) = self.storage() {
             let key = format!(
                 "{}{:016x}",
@@ -363,10 +351,7 @@ impl CsrGraph {
         let mut seen_ids = HashSet::with_capacity(new_edges.len());
         for edge in &new_edges {
             if !seen_ids.insert(edge.id) || inner_ptr.hyperedges.contains_key(&edge.id) {
-                return Err(GraphMutationError::Internal(format!(
-                    "Duplicate hyperedge ID {}",
-                    edge.id
-                )));
+                return Err(GraphMutationError::Internal(format!("Duplicate hyperedge ID {}", edge.id)));
             }
             edge.validate()?;
         }
@@ -381,5 +366,3 @@ impl CsrGraph {
         self.insert_hyperedge_direct(edge);
     }
 }
-
-// !SECTION Hyperedge Core Implementation

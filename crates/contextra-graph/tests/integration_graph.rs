@@ -1,8 +1,3 @@
-//! End-to-End-Integrationstest für den vollständigen CSR-Graphlebenszyklus.
-//!
-//! # Zweck
-//! Deckt den Ablauf aus Knotenregistrierung, Kantenmutation, PageRank und Persistenz ab.
-
 use contextra_graph::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};

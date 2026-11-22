@@ -3,15 +3,11 @@
 //! Provides lightweight, cheap-clone zero-copy sub-slicing without re-allocating
 //! underlying elements, similar to `bytes::Bytes` for arbitrary types `T`.
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use std::ops::{Deref, RangeBounds};
 use std::sync::Arc;
 
 /// A zero-copy slice view into an underlying `Arc<[T]>`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-
-// SECTION Arc Slice Core Implementation
 pub struct ArcSlice<T> {
     shared: Arc<[T]>,
     offset: usize,
@@ -159,5 +155,3 @@ mod tests {
         assert_eq!(&sub2[..], &[30]);
     }
 }
-
-// !SECTION Arc Slice Core Implementation

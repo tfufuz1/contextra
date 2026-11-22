@@ -1,18 +1,8 @@
-#![cfg(feature = "workspace")]
-//! Sequenzielle Mutationstests für komplexe Einfüge- und Löschfolgen.
-//!
-//! # Zweck
-//! Überprüft die Konsistenz nach wechselnden `add_edge`, `remove_edge` und Re-Insert-Aufrufen.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Entity, EntityId, TxId};
 use std::sync::Arc;
 
-
-// SECTION Mutation Sequence Tests Core Implementation
 fn create_entity(id: u64) -> Entity {
     Entity::new(EntityId::new(id), "label", "type")
 }
@@ -112,5 +102,3 @@ async fn test_csr_mutation_sequence_equivalence() {
     let n6: Vec<EntityId> = res6.into_iter().map(|(id, _)| id).collect();
     assert!(n6.contains(&EntityId::new(1)));
 }
-
-// !SECTION Mutation Sequence Tests Core Implementation

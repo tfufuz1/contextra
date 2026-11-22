@@ -3,12 +3,15 @@
 //! Native DAG implementation based on standard library maps and RwLock,
 //! keeping contextra-graph pure-Rust and zero-external-graph-dependency (ADR-004).
 
+// FILE-CONTEXT
+// STAND: 2026-08-30T18:53:58Z (SESSION: b1234567)
+// ZWECK: Session-DAG für persistente, azyklische Agent-State-Verzweigung (Contextra Session-DAG Pattern)
+// INVARIANTEN: Monoton steigende NodeIdx; active_head verweist immer auf existierenden Knoten.
+// HOTSPOTS: L100-L150 (branch_from & path_to_head)
 // SIEHE AUCH: DECISIONS.md ADR-004
 
-#[cfg(feature = "ports-compat")]
 use contextra_ports::StorageEngine;
-use crate::error::{GraphError, Result};
-use crate::types::TxId;
+use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -24,8 +27,6 @@ use std::sync::Arc;
 /// let tree = SessionBranchTree::new("a".into(), "b".into());
 /// let _ = tree.edges.read(); // Field `edges` is private
 /// ```
-
-// SECTION Session Dag Core Implementation
 pub struct NodesGuard<'a> {
     tree: &'a SessionBranchTree,
     _nodes_guard: RwLockReadGuard<'a, HashMap<NodeIdx, AgentStateNode>>,
@@ -202,13 +203,13 @@ impl SessionBranchTree {
         } = options;
 
         if prompt.len() > MAX_DAG_STRING_BYTES || response.len() > MAX_DAG_STRING_BYTES {
-            return Err(GraphError::InvalidInput(format!(
+            return Err(ContextraError::InvalidInput(format!(
                 "SessionDAG: prompt or response size exceeds limit of {MAX_DAG_STRING_BYTES} bytes"
             )));
         }
 
         if !nodes.nodes().contains_key(&parent_node) {
-            return Err(GraphError::InvalidInput(format!(
+            return Err(ContextraError::InvalidInput(format!(
                 "SessionDAG: node {} nicht gefunden",
                 parent_node
             )));
@@ -267,7 +268,7 @@ impl SessionBranchTree {
     /// Branches from an arbitrary prior node (Branch-Erstellung ab beliebigem Vorgänger-Knoten).
     ///
     /// # Errors
-    /// Returns `Err(GraphError::InvalidInput)` if `parent_node` does not exist in the DAG.
+    /// Returns `Err(ContextraError::InvalidInput)` if `parent_node` does not exist in the DAG.
     pub fn branch_from(
         &self,
         parent_node: NodeIdx,
@@ -299,7 +300,7 @@ impl SessionBranchTree {
             *head_guard = node_idx;
             Ok(())
         } else {
-            Err(GraphError::InvalidInput(format!(
+            Err(ContextraError::InvalidInput(format!(
                 "SessionDAG: node {} nicht gefunden",
                 node_idx
             )))
@@ -375,7 +376,6 @@ impl SessionBranchTree {
     }
 
     /// Persists all nodes, edges, active head, and next_id of the Session-DAG to the storage engine under the given namespace prefix.
-    #[cfg(feature = "ports-compat")]
     pub async fn save<S: StorageEngine + ?Sized>(
         &self,
         storage: &S,
@@ -391,14 +391,14 @@ impl SessionBranchTree {
             for (node_id, node) in nodes.iter() {
                 let key = format!("{prefix}node:{node_id}").into_bytes();
                 let val = bincode::serialize(node).map_err(|e| {
-                    GraphError::Serialization(format!("session dag node serialize: {e}"))
+                    ContextraError::Serialization(format!("session dag node serialize: {e}"))
                 })?;
                 items.push((key, val));
             }
 
             let edges = nodes_guard.edges();
             let edges_val = bincode::serialize(&*edges).map_err(|e| {
-                GraphError::Serialization(format!("session dag edges serialize: {e}"))
+                ContextraError::Serialization(format!("session dag edges serialize: {e}"))
             })?;
 
             let head = *nodes_guard.active_head();
@@ -416,7 +416,7 @@ impl SessionBranchTree {
         let meta = (head, next_id);
         let meta_key = format!("{prefix}meta").into_bytes();
         let meta_val = bincode::serialize(&meta).map_err(|e| {
-            GraphError::Serialization(format!("session dag meta serialize: {e}"))
+            ContextraError::Serialization(format!("session dag meta serialize: {e}"))
         })?;
         storage.put(tx, &meta_key, &meta_val).await?;
 
@@ -424,14 +424,13 @@ impl SessionBranchTree {
     }
 
     /// Loads and reconstructs a `SessionBranchTree` from storage for the specified namespace.
-    #[cfg(feature = "ports-compat")]
     pub async fn load<S: StorageEngine + ?Sized>(storage: &S, namespace: &str) -> Result<Self> {
         let prefix_str = format!("__session_dag:{namespace}:");
         let prefix_bytes = prefix_str.as_bytes();
 
         let entries = storage.scan_prefix(prefix_bytes).await?;
         if entries.is_empty() {
-            return Err(GraphError::NotFound(format!(
+            return Err(ContextraError::NotFound(format!(
                 "SessionDAG: namespace '{namespace}' nicht im Storage gefunden"
             )));
         }
@@ -443,28 +442,28 @@ impl SessionBranchTree {
 
         for (raw_key, raw_val) in entries {
             let key_str = std::str::from_utf8(&raw_key)
-                .map_err(|e| GraphError::Internal(format!("session dag key UTF-8: {e}")))?;
+                .map_err(|e| ContextraError::Internal(format!("session dag key UTF-8: {e}")))?;
 
             if key_str.ends_with("edges") {
                 edges = bincode::deserialize(&raw_val).map_err(|e| {
-                    GraphError::Serialization(format!("session dag edges deserialize: {e}"))
+                    ContextraError::Serialization(format!("session dag edges deserialize: {e}"))
                 })?;
             } else if key_str.ends_with("meta") {
                 let (h, n): (NodeIdx, u64) = bincode::deserialize(&raw_val).map_err(|e| {
-                    GraphError::Serialization(format!("session dag meta deserialize: {e}"))
+                    ContextraError::Serialization(format!("session dag meta deserialize: {e}"))
                 })?;
                 active_head = h;
                 next_id = n;
             } else if key_str.contains(":node:") {
                 let node: AgentStateNode = bincode::deserialize(&raw_val).map_err(|e| {
-                    GraphError::Serialization(format!("session dag node deserialize: {e}"))
+                    ContextraError::Serialization(format!("session dag node deserialize: {e}"))
                 })?;
                 nodes.insert(node.step_id, node);
             }
         }
 
         if !nodes.contains_key(&active_head) {
-            return Err(GraphError::InvalidInput(format!(
+            return Err(ContextraError::InvalidInput(format!(
                 "SessionDAG: active_head node {active_head} nicht in geladenen nodes gefunden"
             )));
         }
@@ -588,7 +587,7 @@ mod tests {
         let dag = SessionBranchTree::new("Root".into(), "Root Resp".into());
         let res = dag.branch_from(999, "Prompt".into(), "Resp".into(), None, vec![], "test");
         assert!(res.is_err());
-        assert!(matches!(res.unwrap_err(), GraphError::InvalidInput(_)));
+        assert!(matches!(res.unwrap_err(), ContextraError::InvalidInput(_)));
     }
 
     #[test]
@@ -616,11 +615,18 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "ports-compat")]
-    async fn test_session_dag_survives_restart() {
-        use crate::test_doubles::InMemoryStorageEngine;
+    async fn session_dag_survives_restart() {
+        use contextra_store::{LsmConfig, LsmStorage};
 
-        let storage = Arc::new(InMemoryStorageEngine::new());
+        let dir = tempfile::tempdir().unwrap(); // unwrap allowed
+        let storage = Arc::new(
+            LsmStorage::new(LsmConfig {
+                path: dir.path().to_path_buf(),
+                ..Default::default()
+            })
+            .await
+            .unwrap(), // unwrap allowed
+        );
 
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
         let step1 = dag
@@ -678,18 +684,18 @@ mod tests {
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_append_step_CASE_oversized_prompt_returns_invalid_input() {
+    fn append_step_CASE_oversized_prompt_returns_invalid_input() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
         let huge_prompt = "a".repeat(MAX_DAG_STRING_BYTES + 1);
 
         let res = dag.append_step(huge_prompt, "Resp".into(), None, vec![], "main");
         assert!(res.is_err());
-        assert!(matches!(res.unwrap_err(), GraphError::InvalidInput(_)));
+        assert!(matches!(res.unwrap_err(), ContextraError::InvalidInput(_)));
     }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_get_node_CASE_existent_and_nonexistent() {
+    fn get_node_CASE_existent_and_nonexistent() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
 
         // Step 0 exists
@@ -706,7 +712,7 @@ mod tests {
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_children_of_CASE_leaf_node_returns_empty() {
+    fn children_of_CASE_leaf_node_returns_empty() {
         let dag = SessionBranchTree::new("Root".into(), "Resp".into());
         let leaf_id = dag
             .append_step(
@@ -724,7 +730,7 @@ mod tests {
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_new_CASE_empty_and_unicode_strings() {
+    fn new_CASE_empty_and_unicode_strings() {
         // Empty strings
         let empty_dag = SessionBranchTree::new("".into(), "".into());
         assert_eq!(empty_dag.node_count(), 1);
@@ -742,30 +748,40 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "ports-compat")]
     #[allow(non_snake_case)]
-    async fn test_load_CASE_non_existent_namespace_returns_not_found() {
-        use crate::test_doubles::InMemoryStorageEngine;
+    async fn load_CASE_non_existent_namespace_returns_not_found() {
+        use contextra_store::{LsmConfig, LsmStorage};
 
-        let storage = InMemoryStorageEngine::new(); // unwrap allowed
+        let dir = tempfile::tempdir().unwrap(); // unwrap allowed
+        let storage = LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(); // unwrap allowed
 
         let result = SessionBranchTree::load(&storage, "non_existent_ns").await;
         assert!(result.is_err());
         let err = result.err().unwrap(); // unwrap allowed
         assert!(
-            matches!(err, GraphError::NotFound(_)),
-            "Expected GraphError::NotFound, got {:?}",
+            matches!(err, ContextraError::NotFound(_)),
+            "Expected ContextraError::NotFound, got {:?}",
             err
         );
     }
 
     #[tokio::test]
-    #[cfg(feature = "ports-compat")]
     #[allow(non_snake_case)]
-    async fn test_load_CASE_corrupt_data_returns_serialization_error() {
-        use crate::test_doubles::InMemoryStorageEngine;
+    async fn load_CASE_corrupt_data_returns_serialization_error() {
+        use contextra_store::{LsmConfig, LsmStorage};
 
-        let storage = InMemoryStorageEngine::new(); // unwrap allowed
+        let dir = tempfile::tempdir().unwrap(); // unwrap allowed
+        let storage = LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(); // unwrap allowed
 
         let tx = TxId::new(1);
         // Put invalid corrupt bytes under edges key
@@ -778,15 +794,15 @@ mod tests {
         assert!(result.is_err());
         let err = result.err().unwrap(); // unwrap allowed
         assert!(
-            matches!(err, GraphError::Serialization(_)),
-            "Expected GraphError::Serialization on corrupt payload, got {:?}",
+            matches!(err, ContextraError::Serialization(_)),
+            "Expected ContextraError::Serialization on corrupt payload, got {:?}",
             err
         );
     }
 
     #[test]
     #[allow(non_snake_case)]
-    fn test_serialization_roundtrip_CASE_agent_state_node_and_dag_edge() {
+    fn serialization_roundtrip_CASE_agent_state_node_and_dag_edge() {
         let node = AgentStateNode {
             step_id: 42,
             prompt: "Test prompt 🔥".into(),
@@ -887,7 +903,7 @@ mod tests {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
         let res = dag.set_active_head(99999);
         assert!(res.is_err());
-        assert!(matches!(res.unwrap_err(), GraphError::InvalidInput(_)));
+        assert!(matches!(res.unwrap_err(), ContextraError::InvalidInput(_)));
     }
 
     #[test]
@@ -961,5 +977,3 @@ mod tests {
         assert_eq!(path.last().map(|node| node.step_id), Some(active_head));
     }
 }
-
-// !SECTION Session Dag Core Implementation

@@ -1,10 +1,5 @@
-//! # Erklärbarkeitsmodul (`explain`)
-//!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
-//!
-//! Dieses Modul transformiert maschinenlesbare Herkunftsnachweise (`ProvenanceRecord`)
-//! in strukturierte Erklärungen (`RetrievalExplanation`) sowie in verständliche,
-//! standardisierte deutsche Beschreibungstexte.
+//! Provenance explanation module converting machine-readable search provenance
+//! into structured explanation objects and German human-readable text.
 
 use std::fmt;
 
@@ -16,7 +11,6 @@ pub use crate::fusion::SignalKind;
 
 /// Breakdown entry representing the contribution of a single search signal.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-/// Einzelner Beitrags-Eintrag für eine spezifische Signalquelle innerhalb der Erklärung.
 pub struct ExplanationEntry {
     /// Identified search signal type.
     pub signal: SignalKind,
@@ -32,7 +26,6 @@ pub struct ExplanationEntry {
 
 /// Structured explanation detailing why a document was retrieved with its given rank.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-/// Strukturierte Gesamterklärung zur Nachvollziehbarkeit eines Retrieval-Ergebnisses.
 pub struct RetrievalExplanation {
     /// Individual signal contribution entries, sorted descending by `contribution_share`.
     pub entries: Vec<ExplanationEntry>,
@@ -62,7 +55,6 @@ impl RetrievalExplanation {
     ///
     /// Formats all signal contributions using exact ranks and normalized percentage shares,
     /// along with any resonance coherence bonus or collection source.
-    /// Erzeugt eine verständliche deutsche Textzusammenfassung für Audit-Logs oder UIs.
     pub fn to_human_readable_de(&self) -> String {
         if self.entries.is_empty() {
             return "Keine Treffersignale für dieses Dokument vorhanden.".to_string();
@@ -203,7 +195,6 @@ fn compute_contribution_shares(raw_entries: &[RawSignalEntry]) -> Vec<f32> {
 ///
 /// Computes per-signal `contribution_share` normalized such that all present signals sum to `1.0`
 /// (or `0.0` if no signals are present).
-/// Erzeugt aus einem maschinenlesbaren `ProvenanceRecord` eine strukturierte `RetrievalExplanation`.
 pub fn explain(record: &ProvenanceRecord) -> RetrievalExplanation {
     let raw_entries = extract_raw_signal_entries(record);
 

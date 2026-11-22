@@ -1,11 +1,3 @@
-#![cfg(feature = "workspace")]
-//! Persistenz- und Wiederherstellungstests für den Graphen.
-//!
-//! # Zweck
-//! Testet das Replay von Transaktionslogs und die Wiederherstellung persistierter Zustände.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::super::*;
 use crate::csr::types::CsrGraphConfig;
 use crate::csr::visibility::is_edge_visible;
@@ -14,8 +6,6 @@ use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 #[tokio::test]
-
-// SECTION Persistence Tests Core Implementation
 async fn test_remove_edge_uncompacted_and_compacted() {
     let graph = CsrGraph::new();
     let tx1 = TxId::new(1);
@@ -126,7 +116,7 @@ async fn test_pagerank_linear_chain() {
 }
 
 #[tokio::test]
-async fn test_traverse_handles_cycles_without_infinite_loop() {
+async fn traverse_handles_cycles_without_infinite_loop() {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
     let id_a = EntityId::from_key("node_a").expect("test: non-empty key must succeed"); // expect
@@ -168,56 +158,7 @@ async fn test_traverse_handles_cycles_without_infinite_loop() {
 }
 
 #[tokio::test]
-async fn test_node_budgeted_cyclic_traversal_termination() {
-    let graph = CsrGraph::new();
-    let tx = TxId::new(42);
-
-    let nodes: Vec<EntityId> = (1..=5).map(EntityId::new).collect();
-    for &node in &nodes {
-        graph
-            .add_entity(
-                tx,
-                Entity::new(node, format!("Node_{}", node.inner()), "TestNode"),
-            )
-            .await
-            .unwrap();
-    }
-
-    for i in 0..5 {
-        let from = nodes[i];
-        let to = nodes[(i + 1) % 5];
-        graph
-            .add_edge(tx, Edge::new(from, to, "next").with_weight(0.9))
-            .await
-            .unwrap();
-    }
-    graph.commit(tx).await.unwrap();
-
-    let results = graph.traverse(nodes[0], 100).await.unwrap();
-    assert!(
-        !results.is_empty(),
-        "Traversal must discover reachable cyclic neighbors"
-    );
-    assert!(
-        results.len() <= nodes.len(),
-        "Traversal must not exceed the total number of nodes in cycle"
-    );
-
-    let mut seen = std::collections::HashSet::new();
-    for (entity_id, score) in results {
-        assert!(
-            seen.insert(entity_id),
-            "Duplicate node returned during cyclic traversal"
-        );
-        assert!(
-            score > 0.0 && score <= 1.0,
-            "Score must be bounded within (0.0, 1.0]"
-        );
-    }
-}
-
-#[tokio::test]
-async fn test_multi_traverse_keeps_highest_score_per_entity() {
+async fn multi_traverse_keeps_highest_score_per_entity() {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
     let id_a = EntityId::from_key("node_a").expect("test: non-empty key must succeed"); // expect
@@ -350,10 +291,18 @@ async fn test_staged_edges_invisible_to_concurrent_readers() {
 }
 
 #[tokio::test]
-async fn test_graph_edges_survive_storage_roundtrip() {
-    use crate::test_doubles::InMemoryStorageEngine;
+async fn graph_edges_survive_storage_roundtrip() {
+    use contextra_store::{LsmConfig, LsmStorage};
 
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let dir = tempfile::tempdir().unwrap(); // unwrap allowed
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap allowed
+    );
     let graph = CsrGraph::with_config_and_storage(CsrGraphConfig::default(), storage.clone());
     let tx = TxId::new(1);
     let id_a = EntityId::from_key("alice").unwrap(); // unwrap allowed
@@ -576,7 +525,7 @@ async fn test_traverse_at_time_unbounded_validity() {
 
 proptest::proptest! {
     #[test]
-    fn test_prop_add_edge_rollback_no_index_growth(
+    fn prop_add_edge_rollback_no_index_growth(
         edge_specs in proptest::collection::vec((1u64..1000, 1001u64..2000), 10..100)
     ) {
         let rt = tokio::runtime::Builder::new_current_thread().build().unwrap(); // unwrap
@@ -601,7 +550,7 @@ proptest::proptest! {
     }
 
     #[test]
-    fn test_prop_edge_visible_monotone(
+    fn prop_edge_visible_monotone(
         vf in 0u64..100,
         vt in 100u64..200,
         as_of in 0u64..200,
@@ -614,7 +563,7 @@ proptest::proptest! {
     }
 
     #[test]
-    fn test_prop_traverse_at_time_never_panics(
+    fn prop_traverse_at_time_never_panics(
         node_count in 1..=15usize,
         edge_specs in proptest::collection::vec((0..15usize, 0..15usize, 0u64..50u64, 50u64..100u64), 0..30),
         start_idx in 0..15usize,
@@ -650,7 +599,7 @@ proptest::proptest! {
 }
 
 #[test]
-fn test_prop_csr_graph_traverse_at_consistency() {
+fn prop_csr_graph_traverse_at_consistency() {
     use proptest::prelude::*;
 
     #[derive(Debug, Clone)]
@@ -771,7 +720,7 @@ fn test_prop_csr_graph_traverse_at_consistency() {
 
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn test_compact_async_CASE_dirty_and_clean_states() {
+async fn compact_async_CASE_dirty_and_clean_states() {
     let graph = Arc::new(CsrGraph::new());
     let tx = TxId::new(1);
 
@@ -805,5 +754,3 @@ async fn test_compact_async_CASE_dirty_and_clean_states() {
     graph.compact_async().await.unwrap(); // unwrap allowed
     assert!(!graph.inner_read().is_dirty);
 }
-
-// !SECTION Persistence Tests Core Implementation

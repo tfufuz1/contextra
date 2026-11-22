@@ -10,15 +10,10 @@
     clippy::await_holding_lock
 )]
 #![allow(deprecated)]
-//! # Integrationstest: Eigenschaftsbasierte Tests für Guards
-//!
-//! Generiert zufällige Transaktionsfolgen zur Verifikation der Guard-Invarianten.
 
-use contextra_checkpoint::{
-    CheckpointManifest, CheckpointMeta, CheckpointResult as Result, LocalBoxFuture as BoxFuture,
-    PersistentCheckpointStore, SnapshotSource,
-};
-use contextra_ids::TxId;
+use contextra_checkpoint::{CheckpointManifest, CheckpointMeta, PersistentCheckpointStore};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use proptest::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -40,7 +35,7 @@ impl TrackingMockStorage {
     }
 }
 
-impl SnapshotSource for TrackingMockStorage {
+impl StorageEngine for TrackingMockStorage {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
     }
@@ -76,6 +71,15 @@ impl SnapshotSource for TrackingMockStorage {
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+        Box::pin(async move {
+            Ok(StorageStats {
+                num_segments: 0,
+                total_size_bytes: 0,
+                memtable_size_bytes: 0,
+            })
+        })
+    }
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             self.pinned.lock().insert(seq_no);
@@ -88,11 +92,26 @@ impl SnapshotSource for TrackingMockStorage {
             Ok(())
         })
     }
+    fn get_at_seq<'a>(
+        &'a self,
+        key: &'a [u8],
+        _seq: u64,
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { self.get(key).await })
+    }
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move { Ok(0) })
     }
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(async move { Ok(TxId::new(0)) })
+    }
+    fn scan<'a>(
+        &'a self,
+        _start: std::ops::Bound<&'a [u8]>,
+        _end: std::ops::Bound<&'a [u8]>,
+        _: Option<usize>,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move { Ok(Vec::new()) })
     }
     fn scan_prefix<'a>(
         &'a self,
@@ -106,6 +125,13 @@ impl SnapshotSource for TrackingMockStorage {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect())
         })
+    }
+    fn scan_prefix_at<'a>(
+        &'a self,
+        prefix: &'a [u8],
+        _seq_no: u64,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move { self.scan_prefix(prefix).await })
     }
 }
 
@@ -132,7 +158,6 @@ prop_compose! {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(20))]
 
-// Testet: prop guard random lifecycle sequences.
     #[test]
     fn prop_guard_random_lifecycle_sequences(steps in proptest::collection::vec(arb_guard_step(), 1..15)) {
         let rt = tokio::runtime::Runtime::new().unwrap();
@@ -172,7 +197,6 @@ proptest! {
         }).unwrap();
     }
 
-// Testet: prop manifest checksum integrity.
     #[test]
     fn prop_manifest_checksum_integrity(
         name in "[a-zA-Z0-9_]{1,50}",
@@ -188,7 +212,6 @@ proptest! {
             tx_id: TxId::new(tx),
             metadata: serde_json::json!({"prop": true}),
             created_at: 1000,
-        id_width_bits: contextra_checkpoint::CURRENT_ID_WIDTH_BITS,
         };
 
         let manifest_res = CheckpointManifest::new(meta, components);

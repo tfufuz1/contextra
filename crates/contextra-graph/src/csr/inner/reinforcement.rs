@@ -1,12 +1,5 @@
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-//! Hebbsches Verstärkungslernen für Kantengewichte im GraphInner.
-//!
-//! # Zweck
-//! Passt Kantengewichte dynamisch an, wenn Pfade erfolgreich traversiert werden.
-
 #[cfg(feature = "edge-reinforcement-learning")]
-use crate::types::EntityId;
+use contextra_types::EntityId;
 
 #[cfg(feature = "edge-reinforcement-learning")]
 use super::super::types::CsrEdge;
@@ -14,8 +7,6 @@ use super::super::types::CsrEdge;
 use super::GraphInner;
 
 #[cfg(feature = "edge-reinforcement-learning")]
-
-// SECTION Reinforcement Core Implementation
 impl GraphInner {
     pub(crate) fn find_edge_mut_by_entities(
         &mut self,
@@ -159,5 +150,3 @@ impl GraphInner {
         }
     }
 }
-
-// !SECTION Reinforcement Core Implementation

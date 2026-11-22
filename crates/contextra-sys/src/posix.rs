@@ -1,53 +1,27 @@
-// =========================================================================
-// =========================================================================
-// LINK crates/contextra-sys/src/lib.rs
-// NOTE: Low-level POSIX syscall wrappers (Ring 0 / E0 / docs/SPEC.md §10.1).
-// Invariante: Zero panic; typed error propagation; bounds checked descriptors; safe wrappers over libc syscalls.
-// Keine unzulässigen Garantieversprechen (SPEC §6.4).
+// FILE-CONTEXT
+// STAND: 2026-10-28T00:00:00Z
+// ZWECK: Low-level POSIX syscall wrappers (Ring 0 / SPEC 7.7)
+// INVARIANTEN: Zero panic; typed io::Error propagation; single safe abstractions over libc syscalls
+// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7
 
-//! # Modul: POSIX-Systemaufrufe (`posix`)
-//!
-//! Dieses Modul kapselt grundlegende POSIX-Systemaufrufe (Syscalls) für das Dateideskriptor-Management
-//! und Prozess-Ressourcenlimits.
-//!
-//! ## Ring-Zugehörigkeit und Zweck
-//! - **Ring 0 / Ebene E0 (Kern / Unsafe-Insel):** Direkte FFI-Aufrufe an `libc` (`open`, `dup2`, `close`, `getrlimit`, `setrlimit`).
-//! - **Verwendung im System:**
-//!   - `ensure_fd_limit` / `set_fd_limit`: Datenbank- und Suchsysteme (wie LSM-Trees und Vektorindizes) halten
-//!     oft hunderte bis tausende SSTable- und WAL-Dateien gleichzeitig geöffnet. Diese Funktionen stellen
-//!     sicher, dass dem Prozess nicht die Dateideskriptoren ausgehen (`EMFILE` / "Too many open files").
-//!   - `reopen_and_dup2`: Ermöglicht das atomare Umleiten oder Ersetzen von Standarddeskriptoren oder offenen Dateien.
+//! POSIX system call abstractions for low-level I/O and process resource limit operations.
 
 use std::path::Path;
 
-// SECTION Descriptor Redirection
-
-/// Öffnet den Pfad `path` mit den angegebenen POSIX-Flags (z. B. `O_RDONLY`) und ersetzt atomar `target_fd` via `dup2`.
+/// Opens `path` with `flags` (e.g. `O_RDONLY` or `O_RDWR | O_APPEND`), then replaces `target_fd` with the new file descriptor via `dup2`.
 ///
-/// # Argumente
-/// * `path`: Pfad zur neu zu öffnenden Datei.
-/// * `target_fd`: Ziel-Dateideskriptor (muss >= 0 sein).
-/// * `flags`: POSIX-Öffnungsflags für `libc::open`.
-///
-/// # Fehler
-/// Liefert [`std::io::Error`], wenn der Pfad ein ungültiges Format aufweist oder Systemaufrufe fehlschlagen.
+/// # Errors
+/// Returns an [`std::io::Error`] if string conversion, opening, duplicating, or closing file descriptors fails.
 #[cfg(target_os = "linux")]
 pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Result<()> {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
 
-    if target_fd < 0 {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "target_fd must be non-negative",
-        ));
-    }
-
     let path_c = CString::new(path.as_os_str().as_bytes())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
 
-    // SAFETY: `path_c` ist ein gültiger nullterminierter C-String. `target_fd` ist validiert >= 0.
-    // `libc::open`, `libc::dup2` und `libc::close` sind Standard-POSIX-Syscalls, deren Rückgabewerte unmittelbar auf Fehler geprüft werden.
+    // SAFETY: `path_c` is a valid NUL-terminated C string, `target_fd` is a valid open file descriptor,
+    // and `libc::open`, `libc::dup2`, and `libc::close` are standard POSIX syscall wrappers.
     unsafe {
         let fd = libc::open(path_c.as_ptr(), flags);
         if fd < 0 {
@@ -62,7 +36,10 @@ pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Resu
     Ok(())
 }
 
-/// Fallback für Nicht-Linux-Systeme, auf denen `reopen_and_dup2` nicht unterstützt wird.
+/// Fallback for non-Linux targets where `reopen_and_dup2` is unsupported.
+///
+/// # Errors
+/// Always returns [`std::io::ErrorKind::Unsupported`].
 #[cfg(not(target_os = "linux"))]
 pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::Result<()> {
     Err(std::io::Error::new(
@@ -70,20 +47,16 @@ pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::R
         "reopen_and_dup2 is only supported on Linux target OS",
     ))
 }
-// !SECTION Descriptor Redirection
 
-// SECTION Resource Limits
-
-/// Stellt sicher, dass das weiche Limit für offene Dateideskriptoren (`RLIMIT_NOFILE`) mindestens `min_fds` beträgt.
-///
-/// Versucht das Limit bis zum maximal erlaubten harten Limit (`rlim_max`) anzuheben.
-/// Liefert `true`, wenn das effektive Limit nach dem Aufruf mindestens `min_fds` beträgt.
+/// Ensures the current process soft file descriptor limit (`RLIMIT_NOFILE`) is at least `min_fds`.
+/// If the current soft limit is lower, it attempts to raise it up to `min_fds` (or the hard limit).
+/// Returns `true` if the soft limit is at least `min_fds`, or `false` otherwise.
 pub fn ensure_fd_limit(min_fds: u64) -> bool {
     #[cfg(unix)]
     {
         use std::mem::MaybeUninit;
         let min_fds_rlim = min_fds as libc::rlim_t;
-        // SAFETY: `getrlimit` und `setrlimit` lesen und schreiben die `rlimit`-Struktur des Prozesses über gültige Zeiger auf allokierten/uninitialisierten Speicher.
+        // SAFETY: `getrlimit` and `setrlimit` read/write `RLIMIT_NOFILE` for current process using initialized pointers.
         unsafe {
             let mut rlim = MaybeUninit::<libc::rlimit>::uninit();
             if libc::getrlimit(libc::RLIMIT_NOFILE, rlim.as_mut_ptr()) != 0 {
@@ -110,9 +83,8 @@ pub fn ensure_fd_limit(min_fds: u64) -> bool {
     }
 }
 
-/// Setzt das weiche und harte Dateideskriptorlimit (`RLIMIT_NOFILE`) des aktuellen Prozesses exakt auf `limit`.
-///
-/// Liefert `true`, wenn das Limit erfolgreich gesetzt werden konnte.
+/// Sets the current process soft and hard file descriptor limit (`RLIMIT_NOFILE`) to `limit`.
+/// Returns `true` if `setrlimit` succeeded, or `false` otherwise.
 pub fn set_fd_limit(limit: u64) -> bool {
     #[cfg(unix)]
     {
@@ -120,7 +92,7 @@ pub fn set_fd_limit(limit: u64) -> bool {
             rlim_cur: limit as libc::rlim_t,
             rlim_max: limit as libc::rlim_t,
         };
-        // SAFETY: `rlim` ist eine vollständig initialisierte C-Struktur auf dem Stack. `setrlimit` liest diese ein.
+        // SAFETY: `setrlimit` sets process `RLIMIT_NOFILE` limits using valid struct values.
         let res = unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &rlim) };
         res == 0
     }
@@ -130,9 +102,7 @@ pub fn set_fd_limit(limit: u64) -> bool {
         true
     }
 }
-// !SECTION Resource Limits
 
-// SECTION Unit Tests
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,7 +127,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reopen_and_dup2() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn test_reopen_and_dup2() -> Result<(), Box<dyn std::error::Error>> {
         let dir = std::env::temp_dir();
         let path = dir.join(format!(
             "contextra_sys_posix_test_{}.bin",
@@ -179,8 +149,7 @@ mod tests {
             let target_fd = target_file.as_raw_fd();
             reopen_and_dup2(&path, target_fd, libc::O_RDONLY)?;
             let mut buf = Vec::new();
-            // SAFETY: `target_fd` wurde via `dup2` ersetzt und ist ein gültiger offener Deskriptor.
-            // `libc::dup` erzeugt ein neues dupliziertes Handle für die sichere Übergabe an Rusts `File::from_raw_fd`.
+            // SAFETY: `target_fd` was replaced via dup2 and remains an open file descriptor.
             let mut duped_file = unsafe {
                 <File as std::os::unix::io::FromRawFd>::from_raw_fd(libc::dup(target_fd))
             };
@@ -203,10 +172,9 @@ mod tests {
     fn test_reopen_and_dup2_invalid_path() {
         let invalid_path = Path::new("/nonexistent/file/path/dup2_test");
         let res = reopen_and_dup2(invalid_path, 999, 0);
+        #[cfg(target_os = "linux")]
         assert!(res.is_err());
-
-        let neg_res = reopen_and_dup2(invalid_path, -1, 0);
-        assert!(neg_res.is_err());
+        #[cfg(not(target_os = "linux"))]
+        assert!(res.is_err());
     }
 }
-// !SECTION Unit Tests

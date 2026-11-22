@@ -1,7 +1,5 @@
 //! Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::error::TlHfdError;
 
 /// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD).
@@ -9,8 +7,6 @@ use super::error::TlHfdError;
 /// # Complexity
 /// Time complexity of parameter validation is $O(1)$.
 #[derive(Debug, Clone, PartialEq)]
-
-// SECTION Params Core Implementation
 pub struct TlHfdParams {
     /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
     pub sigma: f32,
@@ -137,5 +133,3 @@ mod tests {
         assert!(p.validate().is_err());
     }
 }
-
-// !SECTION Params Core Implementation

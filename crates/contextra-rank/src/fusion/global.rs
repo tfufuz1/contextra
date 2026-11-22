@@ -1,12 +1,10 @@
-//! # Globale korpusweite Fusionsstrategie (`global`)
+//! Global Fusion Strategy for Corpus-Wide Topic Retrieval (§B.3.4).
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
-//!
-//! Implementiert eine themenbasierte, korpusweite Fusion über zusammengefasste
-//! Wissensgraph-Knoten (LeanRAG / Leiden-Community-Cluster).
+//! Executes community-aware Reciprocal Rank Fusion (RRF) over LeanRAG-aggregated nodes
+//! grouped by Leiden community assignments.
 
-use crate::error::RankError;
 use ahash::{AHashMap, AHashSet};
+use contextra_types::ContextraError;
 use serde::{Deserialize, Serialize};
 
 use super::rrf::weighted_reciprocal_rank_fusion_with_options;
@@ -15,7 +13,6 @@ use super::types::SearchResult;
 
 /// Configuration for `GlobalFusionStrategy`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-/// Konfigurationsparameter für die globale Community-Fusionsstrategie.
 pub struct GlobalFusionConfig {
     /// Maximum number of community nodes to include in the final result set.
     pub max_community_nodes: Option<usize>,
@@ -43,7 +40,6 @@ struct CommunityResult {
 
 /// Community-aware fusion strategy for corpus-wide topic retrieval (LeanRAG-backed).
 #[derive(Debug, Clone, Default)]
-/// Globale Fusionsstrategie für hierarchische und korpusweite Retrieval-Szenarien.
 pub struct GlobalFusionStrategy {
     config: GlobalFusionConfig,
 }
@@ -140,12 +136,12 @@ impl GlobalFusionStrategy {
     /// relevance before selecting the top nodes up to `max_community_nodes`.
     ///
     /// If no community assignments are present in candidate metadata (empty community index),
-    /// this method degrades controlledly with `RankError::InvalidInput`.
+    /// this method degrades controlledly with `ContextraError::InvalidInput`.
     pub fn fuse(
         &self,
         result_sets: Vec<(String, Vec<SearchResult>, f32)>,
         max_results: usize,
-    ) -> Result<Vec<SearchResult>, RankError> {
+    ) -> Result<Vec<SearchResult>, ContextraError> {
         if max_results == 0 {
             return Ok(Vec::new());
         }
@@ -153,7 +149,7 @@ impl GlobalFusionStrategy {
         let (doc_community, total_candidates) = Self::extract_community_mapping(&result_sets);
 
         if total_candidates > 0 && doc_community.is_empty() {
-            return Err(RankError::InvalidInput(
+            return Err(ContextraError::InvalidInput(
                 "Community index is empty or no community assignments present in search candidates; RetrievalStrategy::Global requires prior consolidation (contextra_consolidate)".to_string(),
             ));
         }
@@ -174,7 +170,7 @@ impl GlobalFusionStrategy {
         community_members.retain(|_, members| members.len() >= min_size);
 
         if community_members.is_empty() {
-            return Err(RankError::InvalidInput(format!(
+            return Err(ContextraError::InvalidInput(format!(
                 "No communities satisfy min_community_size requirement ({min_size})"
             )));
         }

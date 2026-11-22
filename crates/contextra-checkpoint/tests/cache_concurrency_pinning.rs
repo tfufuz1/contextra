@@ -9,20 +9,15 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
-//! # Integrationstest: Cache-Nebenläufigkeit und Snapshot-Pinning
-//!
-//! Prüft das Pinning und Entpinnen unter starker nebenläufiger Last sowie Cache-Treffer.
-
+// ANCHOR[TEST:CKPT-001] STATUS:DONE (TS:2026-09-02T23:18:12Z) (SESSION: 358e3b0a)
 // AUFGABE : Verify Concurrent Checkpoint Pinning & GC Exclusions
 // GATE    : cargo test -p contextra-checkpoint --test cache_concurrency_pinning
 // REVIEW-PASS[1/2] STATUS:PASS (ID: TEST:CKPT-001) (TS:2026-09-01T23:09:00Z) (SESSION: fdf7a62e) PRÜFER-KONTEXT: FRESH - Test covers concurrent pinning, GC safety, and cache behavior.
 // REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:CKPT-001) (TS:2026-09-02T23:18:12Z) (SESSION: 2155aaa2) PRÜFER-KONTEXT: FRESH - Confirmed concurrent stress test, cache hit/miss reloading, and unpinning lifecycle.
 
-use contextra_checkpoint::{
-    CheckpointResult as Result, LocalBoxFuture as BoxFuture, PersistentCheckpointStore,
-    SnapshotSource,
-};
-use contextra_ids::TxId;
+use contextra_checkpoint::PersistentCheckpointStore;
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -44,7 +39,7 @@ impl TrackingMockStorage {
     }
 }
 
-impl SnapshotSource for TrackingMockStorage {
+impl StorageEngine for TrackingMockStorage {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move {
             *self.get_count.lock() += 1;
@@ -80,6 +75,15 @@ impl SnapshotSource for TrackingMockStorage {
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+        Box::pin(async move {
+            Ok(StorageStats {
+                num_segments: 0,
+                total_size_bytes: 0,
+                memtable_size_bytes: 0,
+            })
+        })
+    }
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             self.pinned.lock().insert(seq_no);
@@ -92,11 +96,26 @@ impl SnapshotSource for TrackingMockStorage {
             Ok(())
         })
     }
+    fn get_at_seq<'a>(
+        &'a self,
+        key: &'a [u8],
+        _seq: u64,
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { self.get(key).await })
+    }
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move { Ok(0) })
     }
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(async move { Ok(TxId::new(0)) })
+    }
+    fn scan<'a>(
+        &'a self,
+        _start: std::ops::Bound<&'a [u8]>,
+        _end: std::ops::Bound<&'a [u8]>,
+        _: Option<usize>,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move { Ok(Vec::new()) })
     }
     fn scan_prefix<'a>(
         &'a self,
@@ -111,7 +130,13 @@ impl SnapshotSource for TrackingMockStorage {
                 .collect())
         })
     }
-}
+    fn scan_prefix_at<'a>(
+        &'a self,
+        prefix: &'a [u8],
+        _seq_no: u64,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move { self.scan_prefix(prefix).await })
+    }
 }
 
 /// Test Cache Hit vs Cache Miss reloading from storage.

@@ -1,13 +1,9 @@
 //! Error types for Thresholded Local Hyper-Flow Diffusion (TL-HFD).
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use thiserror::Error;
 
 /// Error type for TL-HFD operations and parameter validations.
 #[derive(Error, Debug, Clone, PartialEq)]
-
-// SECTION Error Core Implementation
 pub enum TlHfdError {
     /// Invalid parameter value provided to TL-HFD.
     #[error("Invalid parameter: {0}")]
@@ -18,4 +14,8 @@ pub enum TlHfdError {
     NonFinite,
 }
 
-// !SECTION Error Core Implementation
+impl From<TlHfdError> for contextra_types::ContextraError {
+    fn from(err: TlHfdError) -> Self {
+        contextra_types::ContextraError::InvalidInput(err.to_string())
+    }
+}

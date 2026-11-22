@@ -1,21 +1,8 @@
-//! # License & Feature Gate Port (Ring 0 / Class B)
-//!
-//! LINK crates/contextra-ports/src/lib.rs
-//! LINK crates/contextra-ports/src/policy.rs
-//!
-//! // SECTION license-gate-contracts
-//! // NOTE: Autorisierungsverträge für Feature-Ringe (`Fast`, `Sovereign`, `Compliance`).
-//! // Invarianten:
-//! // 1. INV-LIC-TOKEN: `AuthorizedRing` besitzt private Felder und kann nur durch `LicenseGate` gemintet werden.
-//! // 2. Fail-Closed bei abgelaufener oder fehlender Signatur.
+//! License and activation gate port trait definitions (§14.6, §15).
 
 /// Vector deletion mode for vector index maintenance (§15).
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[deprecated(
-    since = "0.2.0",
-    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
-)]
 pub enum VectorDeleteMode {
     /// Synchronous graph repair during vector deletion.
     SynchronousRepair,
@@ -32,10 +19,6 @@ impl Default for VectorDeleteMode {
 /// Feature-Ring gemäß Spec §15.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[deprecated(
-    since = "0.2.0",
-    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
-)]
 pub enum FeatureRing {
     /// Fast ring (open source core).
     Fast,
@@ -50,10 +33,6 @@ pub enum FeatureRing {
 /// `AuthorizedRing` cannot be directly instantiated outside of the `contextra-ports` crate or
 /// without passing through a [`LicenseGate`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[deprecated(
-    since = "0.2.0",
-    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
-)]
 pub struct AuthorizedRing {
     ring: FeatureRing,
 }
@@ -73,10 +52,6 @@ impl AuthorizedRing {
 /// Fehlerklasse für Lizenz-/Aktivierungsprüfung — crate-lokal, an der Grenze in
 /// `ContextraError` konvertierbar (P6-konform, siehe Spec §17).
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
-#[deprecated(
-    since = "0.2.0",
-    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
-)]
 pub enum LicenseError {
     /// No valid activation found for the requested feature ring.
     #[error("no valid activation found for feature ring {0:?}")]
@@ -90,40 +65,21 @@ pub enum LicenseError {
 }
 
 /// Dyn-kompatibler Port (P27) für Lizenzprüfung — Implementierung (Lizenzserver-Anbindung,
-/// Ed25519-Signaturprüfung analog zum Signaturprüfpfad §14.1) ist NICHT Teil dieses Tickets
+/// Ed25519-Signaturprüfung analog zum Löschbeweis-Pfad §14.1) ist NICHT Teil dieses Tickets
 /// und folgt in einem eigenen, separat zu beauftragenden Schritt.
-#[deprecated(
-    since = "0.2.0",
-    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
-)]
 pub trait LicenseGate: Send + Sync {
     /// Checks if the requested feature ring is activated and accessible.
-    ///
-    /// # Fehler
-    /// Liefert `LicenseError::NotActivated`, `LicenseError::InvalidSignature` oder `LicenseError::Expired`.
-    /// # Crash
-    /// Reiner Lesevorgang von Lizenz-Zertifikaten oder RAM-Zustand; keine Seiteneffekte.
     fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError>;
 
     /// Authorizes the requested feature ring and yields an [`AuthorizedRing`] token on success.
-    ///
-    /// # Fehler
-    /// Liefert `LicenseError` falls die Autorisierungsprüfung fehlschlägt.
-    /// # Crash
-    /// Reiner Statusabruf und Token-Ausstellung ohne persistente Mutation.
     fn authorize(&self, requested: FeatureRing) -> Result<AuthorizedRing, LicenseError> {
         self.check_ring(requested)?;
         Ok(AuthorizedRing::new(requested))
     }
 }
-// !SECTION license-gate-contracts
 
 /// Default open activation gate allowing `Fast` ring features without restriction.
 #[derive(Debug, Default, Clone, Copy)]
-#[deprecated(
-    since = "0.2.0",
-    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
-)]
 pub struct OpenFastGate;
 
 impl LicenseGate for OpenFastGate {

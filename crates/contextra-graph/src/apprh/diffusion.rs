@@ -1,12 +1,10 @@
 //! Core diffusion operator for Averaging-based Personalized PageRank for Hypergraphs (APPRH).
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::error::ApprhError;
 use super::params::ApprhParams;
 use crate::path_rag::PathGraph;
 use ahash::{AHashMap, AHashSet};
-use crate::types::EntityId;
+use contextra_types::EntityId;
 use std::collections::VecDeque;
 
 /// Computes Averaging-based Personalized PageRank for Hypergraphs (APPRH).
@@ -21,8 +19,6 @@ use std::collections::VecDeque;
 ///
 /// # Errors
 /// Returns [`ApprhError`] if parameters are invalid, seed list is empty, or non-finite float is produced.
-
-// SECTION Diffusion Core Implementation
 pub fn run_apprh_push<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -177,5 +173,3 @@ pub fn run_apprh_push<G: PathGraph>(
 
     Ok(p)
 }
-
-// !SECTION Diffusion Core Implementation

@@ -10,32 +10,17 @@
     clippy::await_holding_lock,
     clippy::type_complexity
 )]
-//! # Integrationstest: Crash-Recovery und Mandanten-Isolation
-//!
-//! Verifiziert die strikte Trennung von Checkpoints über verschiedene Mandanten-Namespaces hinweg.
 
 use contextra_checkpoint::{
-    CheckpointError, CheckpointHardlinkCloner, CheckpointResult as Result, DefaultHardlinkCloner,
-    LocalBoxFuture as BoxFuture, PersistentCheckpointStore, PinnedSeqNoOrphan, SnapshotPinner,
-    SnapshotSource, StateCheckpoint,
+    CheckpointHardlinkCloner, DefaultHardlinkCloner, PersistentCheckpointStore, PinnedSeqNoOrphan,
+    StateCheckpoint,
 };
-use contextra_ids::TxId;
+use contextra_mvcc::SnapshotRegistry;
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
-
-/// Minimaler Mock für SnapshotPinner im Testkit-Stil ohne contextra-version Abhängigkeit.
-#[derive(Default)]
-struct MockSnapshotPinner {
-    pinned: Mutex<Vec<u64>>,
-}
-
-impl SnapshotPinner for MockSnapshotPinner {
-    fn pin_seq_no(&self, seq_no: u64) -> Box<dyn std::any::Any + Send + Sync> {
-        self.pinned.lock().push(seq_no);
-        Box::new(())
-    }
-}
 
 /// In-memory mock storage supporting failpoints and versioned key namespaces.
 struct FaultMockStorage {
@@ -62,7 +47,7 @@ impl FaultMockStorage {
     }
 }
 
-impl SnapshotSource for FaultMockStorage {
+impl StorageEngine for FaultMockStorage {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
     }
@@ -70,7 +55,7 @@ impl SnapshotSource for FaultMockStorage {
     fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if *self.fail_put.lock() {
-                return Err(CheckpointError::Internal("Simulated Put Failure".into()));
+                return Err(ContextraError::Internal("Simulated Put Failure".into()));
             }
             self.data.lock().insert(key.to_vec(), value.to_vec());
             let mut last = self.last_tx.lock();
@@ -95,7 +80,7 @@ impl SnapshotSource for FaultMockStorage {
     fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if *self.fail_commit.lock() {
-                return Err(CheckpointError::Internal("Simulated Commit Failure".into()));
+                return Err(ContextraError::Internal("Simulated Commit Failure".into()));
             }
             let mut last = self.last_tx.lock();
             if tx_id > *last {
@@ -120,10 +105,20 @@ impl SnapshotSource for FaultMockStorage {
         Box::pin(async move { Ok(()) })
     }
 
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+        Box::pin(async move {
+            Ok(StorageStats {
+                num_segments: 0,
+                total_size_bytes: 0,
+                memtable_size_bytes: 0,
+            })
+        })
+    }
+
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if *self.fail_pin.lock() {
-                return Err(CheckpointError::Internal("Simulated Pin Failure".into()));
+                return Err(ContextraError::Internal("Simulated Pin Failure".into()));
             }
             self.pinned.lock().insert(seq_no);
             Ok(())
@@ -137,12 +132,29 @@ impl SnapshotSource for FaultMockStorage {
         })
     }
 
+    fn get_at_seq<'a>(
+        &'a self,
+        key: &'a [u8],
+        _seq: u64,
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { self.get(key).await })
+    }
+
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move { Ok(0) })
     }
 
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(async move { Ok(*self.last_tx.lock()) })
+    }
+
+    fn scan<'a>(
+        &'a self,
+        _s: std::ops::Bound<&'a [u8]>,
+        _e: std::ops::Bound<&'a [u8]>,
+        _: Option<usize>,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move { Ok(Vec::new()) })
     }
 
     fn scan_prefix<'a>(
@@ -158,7 +170,6 @@ impl SnapshotSource for FaultMockStorage {
                 .collect())
         })
     }
-}
 }
 
 // ============================================================================
@@ -382,7 +393,6 @@ async fn test_crash_recovery_dropped_guard_with_newer_tx_skipped_by_open_and_rec
 
 /// 9. Tenant isolation: Checkpoints created under tenant A are never listed by tenant B.
 #[tokio::test]
-// Prüft, dass Checkpoints eines Mandanten für andere Mandanten unsichtbar bleiben.
 async fn test_tenant_isolation_checkpoints_never_visible_across_namespaces() {
     let storage = Arc::new(FaultMockStorage::new());
 
@@ -414,7 +424,6 @@ async fn test_tenant_isolation_checkpoints_never_visible_across_namespaces() {
 
 /// 10. Tenant isolation: get_checkpoint for checkpoint name on another tenant returns None.
 #[tokio::test]
-// Prüft, dass Checkpoints eines Mandanten für andere Mandanten unsichtbar bleiben.
 async fn test_tenant_isolation_get_checkpoint_cross_tenant_returns_none() {
     let storage = Arc::new(FaultMockStorage::new());
 
@@ -450,7 +459,6 @@ async fn test_tenant_isolation_get_checkpoint_cross_tenant_returns_none() {
 
 /// 11. Tenant isolation: restore_checkpoint on tenant A never rolls back or mutates tenant B keys.
 #[tokio::test]
-// Prüft, dass Checkpoints eines Mandanten für andere Mandanten unsichtbar bleiben.
 async fn test_tenant_isolation_restore_checkpoint_never_affects_other_tenant() {
     let storage_a = Arc::new(FaultMockStorage::new());
     let storage_b = Arc::new(FaultMockStorage::new());
@@ -494,7 +502,6 @@ async fn test_tenant_isolation_restore_checkpoint_never_affects_other_tenant() {
 
 /// 12. Tenant isolation: drop_checkpoint on tenant A does not delete checkpoint with same name on tenant B.
 #[tokio::test]
-// Prüft, dass Checkpoints eines Mandanten für andere Mandanten unsichtbar bleiben.
 async fn test_tenant_isolation_drop_checkpoint_same_name_does_not_affect_other_tenant() {
     let storage = Arc::new(FaultMockStorage::new());
 
@@ -536,7 +543,6 @@ async fn test_tenant_isolation_drop_checkpoint_same_name_does_not_affect_other_t
 
 /// 13. Tenant isolation: Orphan recovery for tenant A only recovers orphans belonging to tenant A.
 #[tokio::test]
-// Prüft, dass Checkpoints eines Mandanten für andere Mandanten unsichtbar bleiben.
 async fn test_tenant_isolation_orphan_recovery_isolated_by_namespace() {
     let storage = Arc::new(FaultMockStorage::new());
 
@@ -574,11 +580,11 @@ async fn test_crash_recovery_hardlink_clone_fallback_to_copy_on_fault() {
     let sst_path = source_dir.path().join("000001.sst");
     std::fs::write(&sst_path, b"mock sstable content bytes").unwrap();
 
-    let pinner = MockSnapshotPinner::default();
+    let registry = Arc::new(SnapshotRegistry::new());
     let cloner = DefaultHardlinkCloner::new();
 
     let res = cloner
-        .clone_sstable_hardlinks(1, source_dir.path(), target_dir.path(), &pinner)
+        .clone_sstable_hardlinks(1, source_dir.path(), target_dir.path(), &registry)
         .await;
 
     assert!(res.is_ok());

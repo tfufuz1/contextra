@@ -1,22 +1,9 @@
-//! Typdefinitionen, Konfigurationsstrukturen und Basistypen des CSR-Graphen.
-//!
-//! # Zweck
-//! Definiert `CsrEdge`, `CsrGraphConfig`, `InternalIndex` und zugehörige Konstanten.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-use crate::types::{DocId, EntityId, ResourceTracker, TxId};
+use contextra_types::{DocId, EntityId, ResourceTracker, TxId};
 use serde::{Deserialize, Serialize};
 
-
-// SECTION Types Core Implementation
-#[allow(dead_code)]
 pub(crate) const GRAPH_ENTITY_PREFIX: &[u8] = b"__graph:entity:";
-#[allow(dead_code)]
 pub(crate) const GRAPH_EDGE_PREFIX: &[u8] = b"__graph:edge:";
-#[allow(dead_code)]
 pub(crate) const GRAPH_ENTITY_DELETED_PREFIX: &[u8] = b"graph:entity:deleted:";
-#[allow(dead_code)]
 pub(crate) const GRAPH_COMMUNITY_PREFIX: &[u8] = b"__graph:community:";
 
 /// Edge type representation for CSR edges.
@@ -119,5 +106,3 @@ pub(crate) struct StagedEdgePayload {
     pub(crate) business_valid_to: Option<i64>,
     pub(crate) source_doc_id: Option<DocId>,
 }
-
-// !SECTION Types Core Implementation

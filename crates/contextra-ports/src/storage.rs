@@ -1,17 +1,4 @@
-//! # Storage Engine Port (Ring 0 / Class B)
-//!
-//! LINK crates/contextra-ports/src/lib.rs
-//! LINK crates/contextra-ports/src/kv.rs
-//!
-//! Definiert die kanonischen asynchronen Speicherverträge für relationale und
-//! Key-Value-Speicher-Engines (z. B. `contextra-store::LsmStorage`).
-//!
-//! // SECTION storage-engine-contracts
-//! // NOTE: Alle Methoden nutzen `BoxFuture` für dynamische Polymorphie (dyn-Safety).
-//! // Invarianten:
-//! // 1. Transaktionsisolation wird über `TxId` und Sequenznummern garantiert.
-//! // 2. Fail-Closed: Unverarbeitete oder fehlerhafte Operationen führen zum Rollback.
-//! // 3. Bounds-Protection via `MAX_SCAN_MERGE_ACCUMULATOR`.
+//! Storage engine subsystem trait definitions and statistics.
 
 use super::BoxFuture;
 use crate::types::*;
@@ -97,11 +84,6 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// Returns `true` if this storage engine implementation actively tracks read-sets for SSI validation.
     ///
     /// Default implementation returns `false`.
-    ///
-    /// # Fehler
-    /// Keine; statische Fähigkeitsabfrage.
-    /// # Crash
-    /// Reiner Statusabruf ohne persistente Mutation.
     fn supports_ssi_tracking(&self) -> bool {
         false
     }
@@ -275,13 +257,6 @@ pub trait StorageEngine: Send + Sync + 'static {
             ))
         })
     }
-}
-// !SECTION storage-engine-contracts
-
-/// Prelude for storage engine ports.
-pub mod prelude {
-    pub use super::{StorageEngine, StorageStats, MAX_SCAN_MERGE_ACCUMULATOR};
-    pub use crate::kv::KvPrefixStore;
 }
 
 #[cfg(test)]

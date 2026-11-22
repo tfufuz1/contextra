@@ -1,6 +1,8 @@
-// =========================================================================
-// SECTION: config
-// =========================================================================
+// FILE-CONTEXT
+// STAND:       2026-10-31T00:00:00Z
+// ZWECK:       Dynamic Provider Construction for Embedding & LLM backends (Ollama, ONNX, Candle, Mock)
+// INVARIANTEN: No default mock provider in production; fail-closed explicit provider configuration; startup embedding probe
+// HOTSPOTS:    create_embedding_provider(), create_llm_text_generator(), verify_embedding_provider()
 // SIEHE AUCH:  ADR-010, contextra-ports/src/traits/mod.rs
 
 use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
@@ -14,6 +16,15 @@ static LLM_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
 /// Returns the list of currently compiled provider identifiers.
 pub fn available_compiled_providers() -> Vec<&'static str> {
     let mut list = Vec::new();
+    if cfg!(feature = "candle") {
+        list.push("candle");
+    }
+    if cfg!(feature = "ollama") {
+        list.push("ollama");
+    }
+    if cfg!(feature = "onnx") {
+        list.push("onnx");
+    }
     if cfg!(any(test, feature = "test-utils")) {
         list.push("mock");
     }
@@ -23,7 +34,7 @@ pub fn available_compiled_providers() -> Vec<&'static str> {
 fn no_provider_error() -> ContextraError {
     let avail = available_compiled_providers();
     let avail_str = if avail.is_empty() {
-        "keine einkompiliert / none compiled in".to_string()
+        "keine einkompiliert (features: candle, ollama, onnx) / none compiled in".to_string()
     } else {
         avail.join(", ")
     };
@@ -273,8 +284,47 @@ pub fn create_embedding_provider(
     let _ = (ollama_url, embed_model, onnx_model_path, candle_model_dir);
 
     match provider.as_str() {
+        #[cfg(feature = "candle")]
+        "candle" => {
+            let model_dir = candle_model_dir.ok_or_else(|| {
+                ContextraError::InvalidInput(
+                    "candle_model_dir is required when embedding provider is 'candle'".to_string(),
+                )
+            })?;
+            let quantization = contextra_infer_candle::model_registry::CandleQuantization::Q4KM;
+            let embedder =
+                contextra_infer_candle::CandleEmbedClient::from_dir(model_dir, quantization)
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to load Candle embed model: {e}"))
+                    })?;
+            Ok(Arc::new(embedder))
+        }
+        #[cfg(not(feature = "candle"))]
         "candle" => Err(uncompiled_provider_error("candle")),
+
+        #[cfg(feature = "ollama")]
+        "ollama" => {
+            let embedder = contextra_infer_ollama::OllamaEmbedder::new(ollama_url, embed_model);
+            Ok(Arc::new(embedder))
+        }
+        #[cfg(not(feature = "ollama"))]
         "ollama" => Err(uncompiled_provider_error("ollama")),
+
+        #[cfg(feature = "onnx")]
+        "onnx" => {
+            let embedder = if let Some(path) = onnx_model_path {
+                contextra_infer_onnx::OnnxEmbedder::from_path(path).map_err(|e| {
+                    ContextraError::Internal(format!("Failed to load ONNX model: {e}"))
+                })?
+            } else {
+                let cache_dir = contextra_infer_onnx::default_model_cache_dir("nomic-embed-text");
+                contextra_infer_onnx::OnnxEmbedder::load(&cache_dir).map_err(|e| {
+                    ContextraError::Internal(format!("Failed to load ONNX model from cache: {e}"))
+                })?
+            };
+            Ok(Arc::new(embedder))
+        }
+        #[cfg(not(feature = "onnx"))]
         "onnx" => Err(uncompiled_provider_error("onnx")),
 
         #[cfg(any(test, feature = "test-utils"))]
@@ -387,7 +437,35 @@ pub fn create_llm_text_generator(
     let _ = (ollama_url, llm_model, candle_model_dir);
 
     match provider.as_str() {
+        #[cfg(feature = "candle")]
+        "candle" => {
+            let model_dir = candle_model_dir.ok_or_else(|| {
+                ContextraError::InvalidInput(
+                    "candle_model_dir is required when LLM provider is 'candle'".to_string(),
+                )
+            })?;
+            let quantization = contextra_infer_candle::model_registry::CandleQuantization::Q4KM;
+            let generator =
+                contextra_infer_candle::CandleLlmClient::from_dir(model_dir, quantization)
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to load Candle LLM model: {e}"))
+                    })?;
+            Ok(Arc::new(generator))
+        }
+        #[cfg(not(feature = "candle"))]
         "candle" => Err(uncompiled_provider_error("candle")),
+
+        #[cfg(feature = "ollama")]
+        "ollama" => {
+            let config = contextra_infer_ollama::OllamaConfig {
+                base_url: ollama_url.to_string(),
+                model: llm_model.to_string(),
+                ..Default::default()
+            };
+            let client = contextra_infer_ollama::OllamaClient::with_config(config);
+            Ok(Arc::new(client))
+        }
+        #[cfg(not(feature = "ollama"))]
         "ollama" => Err(uncompiled_provider_error("ollama")),
 
         #[cfg(any(test, feature = "test-utils"))]
@@ -405,7 +483,11 @@ pub fn create_llm_text_generator(
 /// Router configuration settings.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct RouterConfig {
+    /// List of SLM profiles. If non-empty, routing is enabled.
+    pub profiles: Vec<contextra_router::SlmProfile>,
+    /// Optional path to routing profiles JSON file.
     pub profiles_path: Option<PathBuf>,
+    /// Optional path to persistent calibration state.
     pub calibration_store_path: Option<PathBuf>,
 }
 
@@ -420,7 +502,24 @@ impl RouterConfig {
             .ok()
             .map(PathBuf::from);
 
+        let mut profiles = Vec::new();
+        if let Some(ref path) = profiles_path {
+            if let Ok(bytes) = std::fs::read(path) {
+                if let Ok(loaded) =
+                    serde_json::from_slice::<Vec<contextra_router::SlmProfile>>(&bytes)
+                {
+                    profiles = loaded;
+                }
+            }
+        } else if let Ok(json_str) = std::env::var("CONTEXTRA_ROUTER_PROFILES_JSON") {
+            if let Ok(loaded) = serde_json::from_str::<Vec<contextra_router::SlmProfile>>(&json_str)
+            {
+                profiles = loaded;
+            }
+        }
+
         Self {
+            profiles,
             profiles_path,
             calibration_store_path,
         }
@@ -726,6 +825,22 @@ mod tests {
         assert!(resp.contains("[Mock LLM response for: hello]"));
     }
 
+    #[cfg(feature = "candle")]
+    #[test]
+    fn test_create_embedding_provider_candle_success() {
+        let tmp = tempfile::tempdir().unwrap();
+        let provider = create_embedding_provider(
+            Some("candle"),
+            "http://localhost:11434",
+            "embed_model",
+            None,
+            Some(tmp.path()),
+        )
+        .unwrap();
+        assert_eq!(provider.provider_name(), "candle");
+    }
+
+    #[cfg(not(feature = "candle"))]
     #[test]
     fn test_create_embedding_provider_candle_uncompiled_error() {
         let res = create_embedding_provider(
@@ -742,6 +857,21 @@ mod tests {
         assert!(msg.contains("Provider 'candle' ist nicht einkompiliert"));
     }
 
+    #[cfg(feature = "ollama")]
+    #[test]
+    fn test_create_embedding_provider_ollama_success() {
+        let provider = create_embedding_provider(
+            Some("ollama"),
+            "http://localhost:11434",
+            "nomic-embed-text",
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(provider.provider_name(), "ollama");
+    }
+
+    #[cfg(not(feature = "ollama"))]
     #[test]
     fn test_create_embedding_provider_ollama_uncompiled_error() {
         let res = create_embedding_provider(
@@ -758,6 +888,7 @@ mod tests {
         assert!(msg.contains("Provider 'ollama' ist nicht einkompiliert"));
     }
 
+    #[cfg(not(feature = "onnx"))]
     #[test]
     fn test_create_embedding_provider_onnx_uncompiled_error() {
         let res = create_embedding_provider(
@@ -774,5 +905,3 @@ mod tests {
         assert!(msg.contains("Provider 'onnx' ist nicht einkompiliert"));
     }
 }
-
-// !SECTION: config

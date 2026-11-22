@@ -1,14 +1,9 @@
-//! # WAL-Kryptographie und Integritätsprüfung (`wal_crypto.rs`)
-//!
-//! Stellt Verschlüsselung und HMAC-Kettenvalidierung für das Write-Ahead-Log (WAL) bereit.
-//!
-//! ## Invarianten
-//! - **Längenpräfixe (V3):** Zur Vermeidung von Partitionskollisionen werden Schlüssel- und
-//!   Wertlängen strikt als 4-Byte Little-Endian kodiert.
-//! - **HMAC-Kette:** Jeder WAL-Eintrag verkettet den Hash des vorherigen Eintrags,
-//!   sodass Entfernungen oder Vertauschungen sofort erkannt werden.
-//! - **KMS-Wrapping:** Dateischlüssel werden per Key Management Service (KMS) geschützt gewrappt.
-
+// FILE-CONTEXT
+// ZWECK: Transparent encrypted WAL chunk provider and constant-time HMAC-SHA256 integrity verifier.
+// INVARIANTEN: EncryptedWal prepends 12-byte nonce to ciphertext. IntegrityVerifier checks sequence HMAC chain in constant time.
+// NICHT-OFFENSICHTLICH: Subtle constant-time byte comparisons prevent timing attacks. All operations lock-free & I/O-free.
+// HOTSPOTS: [35-180]
+// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 //! Encryption at Rest layer for LSM/WAL components (WP-3.2)
 //!
@@ -134,18 +129,21 @@ impl KmsProvider for LocalKeyManagerKms {
     }
 }
 
+#[cfg(feature = "cloud-egress-guard")]
 /// Egress guard for inspecting and sanitizing encrypted payload blocks prior to cloud egress.
 #[derive(Debug, Clone)]
 pub struct CloudEgressGuard {
     max_egress_bytes: usize,
 }
 
+#[cfg(feature = "cloud-egress-guard")]
 impl Default for CloudEgressGuard {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(feature = "cloud-egress-guard")]
 impl CloudEgressGuard {
     /// Creates a new `CloudEgressGuard` with a default maximum payload limit of 10 MB.
     pub fn new() -> Self {
@@ -300,12 +298,10 @@ impl WalHmac {
         Ok(Self { mac })
     }
 
-    /// Führt neue Daten in die laufende HMAC-Berechnung ein.
     pub fn update(&mut self, data: &[u8]) {
         self.mac.update(data);
     }
 
-    /// Schließt die HMAC-Berechnung ab und liefert den 32-Byte-Digest.
     pub fn finalize(self) -> [u8; 32] {
         self.mac.finalize().into_bytes().into()
     }
@@ -478,7 +474,6 @@ impl IntegrityVerifier {
     #[deprecated(
         note = "Nur für Legacy-Replay von WalVersion::V2-Bestandsdateien. Nicht für neue WAL-Segmente verwenden — siehe Doc-Kommentar. Audit-Referenz: F2."
     )]
-    /// Verifiziert und aktualisiert die HMAC-Kette im V2-Format (Rückwärtskompatibilität).
     pub fn verify_and_update_v2(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> {
         if entry.op_type > 2 {
             return Err(CryptoError::wal_corruption(
@@ -719,7 +714,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hmac_chain_detects_tampered_entry() {
+    fn hmac_chain_detects_tampered_entry() {
         let key = b"integrity-key-32-bytes-long-----";
         let e1 = create_entry(key, [0u8; 32], 1, 0, b"key1", b"val1");
         let e2 = create_entry(key, e1.checksum, 2, 0, b"key2", b"val2");
@@ -741,7 +736,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hmac_chain_detects_deleted_entry() {
+    fn hmac_chain_detects_deleted_entry() {
         let key = b"integrity-key-32-bytes-long-----";
         let e1 = create_entry(key, [0u8; 32], 1, 0, b"key1", b"val1");
         let e2 = create_entry(key, e1.checksum, 2, 0, b"key2", b"val2");
@@ -1136,6 +1131,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cloud-egress-guard")]
     fn test_cloud_egress_guard_validation() -> Result<()> {
         let guard = CloudEgressGuard::with_max_bytes(1024);
 

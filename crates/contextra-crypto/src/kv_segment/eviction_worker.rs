@@ -1,11 +1,6 @@
-//! # Eviction Worker (`kv_segment/eviction_worker.rs`)
-//!
-//! Asynchroner Hintergrund-Task, der bei Speicherdruck Segmente nach LRU-Strategie freigibt.
-//!
-//! ## Invarianten
-//! - Blockiert niemals den Tokio-Executor bei CPU-intensiven Operationen.
-//! - Reagiert unmittelbar auf Notfall-Löschsignale.
-
+// FILE-CONTEXT
+// ZWECK: Eviction-Worker (nicht-blockierender Hot-Path LRU) und emergency_wipe (synchroner Notfall).
+// STAND: TS:2026-09-09T16:10:00Z (SESSION: dafac391)
 
 //! # Eviction-Architektur
 //!
@@ -13,10 +8,10 @@
 //!
 //! 1. **`EvictionWorker`**: Für den regelmäßigen Hot-Path (z.B. VRAM > 80%-Trigger).
 //!    Arbeitet auf einem **dedizierten OS-Thread** via `std::sync::mpsc`. Reicht
-//!    Bereinigungsbefehle asynchron ein, damit synchrone `Zeroize`-Operationen NIEMALS
+//!    Löschbefehle asynchron ein, damit synchrone `Zeroize`-Operationen NIEMALS
 //!    den Tokio-Async-Executor blockieren.
 //!
-//! 2. **`emergency_wipe()`**: Für seltene Notfall-Bereinigungen (z.B. Prozess-Shutdown,
+//! 2. **`emergency_wipe()`**: Für seltene Notfall-Löschungen (z.B. Prozess-Shutdown,
 //!    Sicherheits-Alarm). Synchron, blockierend, vor Rückkehr
 //!    vollständig abgeschlossen — bewusst anders als der reguläre Worker-Pfad.
 
@@ -32,7 +27,6 @@ enum EvictionCommand {
 /// Regelmäßiger Eviction-Pfad (VRAM > 80%-Trigger). NICHT im Async-Executor,
 /// da regelmäßige Zeroize-Operationen den Tokio-Scheduler blockieren würden.
 // AI-TAG[CONCURRENCY][MAJOR][RESOLVED] EvictionWorker is Sync via Mutex protection of sender and handle (ID: AGT-CRYPTO-edaee52e) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598)
-/// Hintergrund-Worker für die Speicherfreigabe nach dem Least-Recently-Used-Prinzip (LRU).
 pub struct EvictionWorker {
     sender: parking_lot::Mutex<mpsc::Sender<EvictionCommand>>,
     handle: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>,
@@ -49,23 +43,20 @@ impl EvictionWorker {
                     match cmd {
                         EvictionCommand::EvictLru { target_free_bytes } => {
                             let freed = store.evict_lru_fair(target_free_bytes);
-                            #[cfg(feature = "tracing")]
                             tracing::debug!(
                                 freed_bytes = freed,
                                 "KV eviction worker: LRU evict done"
                             );
-                            #[cfg(not(feature = "tracing"))]
-                            let _ = freed;
                         }
                         EvictionCommand::Shutdown => break,
                     }
                 }
-            });
-        #[cfg(feature = "tracing")]
-        if let Err(e) = &handle_opt {
-            tracing::error!(error = %e, "failed to spawn kv-eviction-worker thread");
-        }
-        let handle_opt = handle_opt.ok();
+            })
+            .map_err(|e| {
+                tracing::error!(error = %e, "failed to spawn kv-eviction-worker thread");
+                e
+            })
+            .ok();
 
         Self {
             sender: parking_lot::Mutex::new(sender),
@@ -96,7 +87,7 @@ impl Drop for EvictionWorker {
     }
 }
 
-/// SEPARATER Pfad für Notfall-Bereinigung (z.B. Prozess-Shutdown, expliziter
+/// SEPARATER Pfad für Notfall-Löschung (z.B. Prozess-Shutdown, expliziter
 /// Sicherheits-Trigger). Synchron, blockierend, vor Rückkehr abgeschlossen --
 /// bewusst ANDERS als der reguläre Worker-Pfad.
 pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
@@ -107,7 +98,7 @@ pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
 mod tests {
     use super::*;
     use crate::kv_segment::segment::KvSegment;
-    use contextra_ids::TenantId;
+    use contextra_types::TenantId;
     use std::time::Duration;
 
     #[test]

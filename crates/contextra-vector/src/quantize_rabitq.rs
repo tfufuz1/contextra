@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: RaBitQ-Quantisierer (Binär-Quantisierung mit orthogonaler Rotation und Fehlerkorrektur).
+// INVARIANTEN: Zero-Panic (keine .unwrap()/.expect() in Produktionscode), NaN-Scan beim Input.
+// NICHT-OFFENSICHTLICH: Orthogonale Rotation R R^T = I per Gram-Schmidt erlaubt isometry-erhaltende Binarisierung.
+// HOTSPOTS: quantize_rabitq.rs (RaBitQQuantizer::try_train, quantize, asymmetric_distance)
 
 //! RaBitQ Quantizer behind feature flag `experimental-rabitq`.
 //!
@@ -16,7 +21,7 @@
 //! 5. Asymmetric Euclidean distance estimation:
 //!    $$d(q, x) = \sqrt{\max\left(0, \|q\|^2 + \|x\|^2 - 2 \langle q', \hat{x}' \rangle\right)}$$
 
-use crate::error::{Result, VectorError};
+use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
 /// RaBitQ Quantizer with random orthogonal rotation and scalar metadata.
@@ -28,43 +33,37 @@ pub struct RaBitQQuantizer {
 }
 
 impl RaBitQQuantizer {
-    /// Safely trains a `RaBitQQuantizer` for vectors of the specified `dimension` with a default seed.
-    pub fn try_train(vectors: &[Vec<f32>], dimension: usize) -> Result<Self> {
-        let default_seed = 0x0A_B1_0C_u64.wrapping_add(dimension as u64);
-        Self::try_train_with_seed(vectors, dimension, default_seed)
-    }
-
-    /// Safely trains a `RaBitQQuantizer` for vectors of the specified `dimension` with an explicit injected `seed`.
+    /// Safely trains a `RaBitQQuantizer` for vectors of the specified `dimension`.
     ///
     /// Generates a deterministic orthogonal matrix $R \in \mathbb{R}^{D \times D}$ using
     /// Gram-Schmidt orthogonalization on a seeded Gaussian matrix.
     ///
-    /// Returns `VectorError::InvalidInput` if `dimension` is 0 or if any vector in `vectors`
+    /// Returns `ContextraError::InvalidInput` if `dimension` is 0 or if any vector in `vectors`
     /// contains NaN / infinite values or has a dimension mismatch.
-    pub fn try_train_with_seed(vectors: &[Vec<f32>], dimension: usize, seed: u64) -> Result<Self> {
+    pub fn try_train(vectors: &[Vec<f32>], dimension: usize) -> Result<Self> {
         if dimension == 0 {
-            return Err(VectorError::invalid_input(
+            return Err(ContextraError::invalid_input(
                 "RaBitQQuantizer dimension must be greater than 0",
             ));
         }
 
         for (idx, vec) in vectors.iter().enumerate() {
             if vec.len() != dimension {
-                return Err(VectorError::invalid_input(format!(
+                return Err(ContextraError::invalid_input(format!(
                     "Vector at index {idx} has dimension {}, expected {dimension}",
                     vec.len()
                 )));
             }
             for &val in vec {
                 if !val.is_finite() {
-                    return Err(VectorError::invalid_input(format!(
+                    return Err(ContextraError::invalid_input(format!(
                         "Vector at index {idx} contains non-finite value: {val}"
                     )));
                 }
             }
         }
 
-        let rotation_matrix = generate_orthogonal_matrix(dimension, seed)?;
+        let rotation_matrix = generate_orthogonal_matrix(dimension)?;
 
         Ok(Self {
             dimension,
@@ -90,7 +89,7 @@ impl RaBitQQuantizer {
     /// - 4 bytes: $\bar{s}$ ($f32$ little-endian).
     pub fn quantize(&self, vector: &[f32]) -> Result<Vec<u8>> {
         if vector.len() != self.dimension {
-            return Err(VectorError::invalid_input(format!(
+            return Err(ContextraError::invalid_input(format!(
                 "Vector dimension mismatch: expected {}, got {}",
                 self.dimension,
                 vector.len()
@@ -99,7 +98,7 @@ impl RaBitQQuantizer {
 
         for &val in vector {
             if !val.is_finite() {
-                return Err(VectorError::invalid_input(format!(
+                return Err(ContextraError::invalid_input(format!(
                     "Cannot quantize vector containing non-finite value: {val}"
                 )));
             }
@@ -157,7 +156,7 @@ impl RaBitQQuantizer {
     /// causing a systematic positive bias in Euclidean distance estimations.
     pub fn asymmetric_distance(&self, query: &[f32], code: &[u8]) -> Result<f32> {
         if query.len() != self.dimension {
-            return Err(VectorError::invalid_input(format!(
+            return Err(ContextraError::invalid_input(format!(
                 "Query dimension mismatch: expected {}, got {}",
                 self.dimension,
                 query.len()
@@ -166,7 +165,7 @@ impl RaBitQQuantizer {
 
         for &val in query {
             if !val.is_finite() {
-                return Err(VectorError::invalid_input(format!(
+                return Err(ContextraError::invalid_input(format!(
                     "Query vector contains non-finite value: {val}"
                 )));
             }
@@ -174,7 +173,7 @@ impl RaBitQQuantizer {
 
         let expected_code_len = self.code_length();
         if code.len() != expected_code_len {
-            return Err(VectorError::invalid_input(format!(
+            return Err(ContextraError::invalid_input(format!(
                 "Quantized code length mismatch: expected {expected_code_len} bytes, got {}",
                 code.len()
             )));
@@ -227,11 +226,11 @@ impl RaBitQQuantizer {
 }
 
 /// Generates a $D \times D$ orthogonal rotation matrix using a Gram-Schmidt process.
-fn generate_orthogonal_matrix(dim: usize, initial_seed: u64) -> Result<Vec<f32>> {
+fn generate_orthogonal_matrix(dim: usize) -> Result<Vec<f32>> {
     let mut mat = vec![0.0f32; dim * dim];
 
-    // Deterministic pseudo-random Gaussian initialization (Box-Muller transform) using injected seed
-    let mut seed = initial_seed;
+    // Simple deterministic pseudo-random Gaussian initialization (Box-Muller transform)
+    let mut seed = 0x0A_B1_0C_u64.wrapping_add(dim as u64);
     let mut next_u32 = || {
         seed = seed
             .wrapping_mul(6364136223846793005)
@@ -289,7 +288,7 @@ fn generate_orthogonal_matrix(dim: usize, initial_seed: u64) -> Result<Vec<f32>>
             }
             norm = v.iter().map(|&x| x * x).sum::<f32>().sqrt();
             if norm < 1e-12 {
-                return Err(VectorError::Internal(
+                return Err(ContextraError::Internal(
                     "Gram-Schmidt matrix orthogonalization failed to normalize row".to_string(),
                 ));
             }
@@ -306,19 +305,6 @@ fn generate_orthogonal_matrix(dim: usize, initial_seed: u64) -> Result<Vec<f32>>
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_rabitq_seed_determinism() -> Result<()> {
-        let dim = 16;
-        let v = vec![1.0; dim];
-        let q1 = RaBitQQuantizer::try_train_with_seed(&[v.clone()], dim, 42)?;
-        let q2 = RaBitQQuantizer::try_train_with_seed(&[v.clone()], dim, 42)?;
-        let q3 = RaBitQQuantizer::try_train_with_seed(&[v.clone()], dim, 99)?;
-
-        assert_eq!(q1.rotation_matrix, q2.rotation_matrix);
-        assert_ne!(q1.rotation_matrix, q3.rotation_matrix);
-        Ok(())
-    }
 
     #[test]
     fn test_rabitq_recall_synthetic() -> Result<()> {
@@ -381,7 +367,7 @@ mod tests {
             gt_distances.select_nth_unstable_by(top_k - 1, |a, b| {
                 a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
             });
-            let gt_top_k: std::collections::BTreeSet<usize> =
+            let gt_top_k: std::collections::HashSet<usize> =
                 gt_distances[..top_k].iter().map(|&(idx, _)| idx).collect();
 
             // RaBitQ asymmetric distance estimation
@@ -397,7 +383,7 @@ mod tests {
             rabitq_distances.select_nth_unstable_by(top_k - 1, |a, b| {
                 a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
             });
-            let rabitq_top_k: std::collections::BTreeSet<usize> = rabitq_distances[..top_k]
+            let rabitq_top_k: std::collections::HashSet<usize> = rabitq_distances[..top_k]
                 .iter()
                 .map(|&(idx, _)| idx)
                 .collect();
@@ -423,19 +409,19 @@ mod tests {
 
         // NaN during training
         let res_train = RaBitQQuantizer::try_train(&[nan_vec.clone()], dim);
-        assert!(matches!(res_train, Err(VectorError::InvalidInput(_))));
+        assert!(matches!(res_train, Err(ContextraError::InvalidInput(_))));
 
         let quantizer = RaBitQQuantizer::try_train(&[valid_vec.clone()], dim).expect("valid train");
 
         // NaN during quantization
         let res_quant = quantizer.quantize(&nan_vec);
-        assert!(matches!(res_quant, Err(VectorError::InvalidInput(_))));
+        assert!(matches!(res_quant, Err(ContextraError::InvalidInput(_))));
 
         let valid_code = quantizer.quantize(&valid_vec).expect("valid code");
 
         // NaN during asymmetric distance computation
         let res_asym = quantizer.asymmetric_distance(&nan_vec, &valid_code);
-        assert!(matches!(res_asym, Err(VectorError::InvalidInput(_))));
+        assert!(matches!(res_asym, Err(ContextraError::InvalidInput(_))));
     }
 
     #[test]

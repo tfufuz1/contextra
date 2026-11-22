@@ -1,11 +1,4 @@
-//! H-Reihe Kampagnentests für Egress-Shield, DLP-Evasion, Type-State-Safety und Audit-Determinismus.
 #![forbid(unsafe_code)]
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::disallowed_types,
-    deprecated
-)]
 //! Campaign J-27 Privacy Test Suite — Egress-Firewall, DLP Vault & Compliance Invariants
 
 use contextra_privacy::audit_trace::compute_audit_trace;
@@ -24,7 +17,7 @@ use contextra_privacy::egress_vault::{
     BlockReason, BoxFuture, EgressClassification, EgressClassifier, EgressVault,
 };
 use contextra_privacy::guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
-use contextra_privacy::{TenantId, TenantScoped};
+use contextra_types::{TenantId, TenantScoped};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,7 +25,6 @@ use std::time::Duration;
 // ── H1: Cross-Session & Foreign Token Injection in CloudResponseRehydrator ──────
 
 #[tokio::test]
-// Prüft: Prüft Rehydrierungsschutz gegen sitzungsübergreifende Token-Injektionen.
 async fn test_h1_cloud_response_rehydrator_cross_session_and_foreign_token_injection() {
     let mut vault_map = HashMap::new();
     let token_e1 = "[USER_ENTITY_00a1]".to_string();
@@ -114,7 +106,6 @@ async fn test_h1_cloud_response_rehydrator_cross_session_and_foreign_token_injec
 // ── H2: Layer-1 Pattern Vault Corpus & Evasion Matrix ───────────────────────────
 
 #[tokio::test]
-// Prüft: Prüft Layer-1 DLP-Regeln gegen Umgehungsversuche (Homoglyphen, Steuerzeichen).
 async fn test_h2_layer1_dlp_corpus_and_evasion_matrix() {
     let vault = EgressVault::try_default().expect("valid vault");
 
@@ -210,7 +201,6 @@ impl TextSearchEngine for MockSearchEngineH4 {
 }
 
 #[tokio::test]
-// Prüft: Prüft das Fail-Closed-Verhalten des semantischen Layer-4-Egress-Guards.
 async fn test_h4_layer4_egress_guard_fail_closed_behavior() {
     let test_payload =
         "Sensitive outbound data stream exceeding 128 bytes threshold for similarity scanning. "
@@ -291,7 +281,6 @@ async fn test_h4_layer4_egress_guard_fail_closed_behavior() {
 // ── H5: BulkExfiltrationDetector Sliding Window & Time Regression ─────────────
 
 #[tokio::test]
-// Prüft: Prüft Rate-Limiting, Zeitrückschritte und Nebenläufigkeit im Bulk-Exfiltrations-Detektor.
 async fn test_h5_bulk_exfiltration_detector_limits_time_regression_and_concurrency() {
     let detector = Arc::new(BulkExfiltrationDetector::new(1000, Duration::from_secs(60)));
     let session = SessionId::from("h5_test_session");
@@ -380,7 +369,6 @@ fn dispatch_to_cloud_mock(payload: GuardedPayload<Sanitized>) -> String {
 }
 
 #[test]
-// Prüft: Prüft die Type-State-Sicherheit des GuardedPayload-Containers zur Compile-Zeit.
 fn test_h6_guarded_payload_type_state_safety() {
     let raw = GuardedPayload::<Unsanitized>::new("raw_data".into(), "sess_1".into());
     assert_eq!(raw.session_id(), "sess_1");
@@ -397,7 +385,6 @@ fn test_h6_guarded_payload_type_state_safety() {
 // ── H7: PII Vault CryptoShred & Delete Mode Truth Table ─────────────────────────
 
 #[test]
-// Prüft: Prüft die Wahrheitstabelle für kryptografisches Schreddern bei PII-Treffern.
 fn test_h7_pii_vault_forces_crypto_shred_truth_table() {
     // 1. {PII match} x {is_memory_only} -> forces CryptoShred
     assert!(pii_vault_forces_crypto_shred(true, false)); // PII match + non-memory -> forced
@@ -440,7 +427,7 @@ struct FixedClock {
     nanos: u64,
 }
 
-impl contextra_privacy::Clock for FixedClock {
+impl contextra_ports::Clock for FixedClock {
     fn now_unix_nanos(&self) -> u64 {
         self.nanos
     }
@@ -450,7 +437,6 @@ impl contextra_privacy::Clock for FixedClock {
 }
 
 #[test]
-// Prüft: Prüft Audit-Trace-Determinismus, Manipulationserkennung und Zero-Leak-Garantie.
 fn test_h8_audit_trace_determinism_tamper_detection_and_no_pii_leak() {
     let payload = "Contact alice@example.com for access credentials";
     let rule_id = "R-001";

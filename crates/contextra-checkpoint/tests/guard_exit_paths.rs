@@ -9,15 +9,10 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
-//! # Integrationstest: Guard-Austrittspfade und RAII-Semantik
-//!
-//! Prüft alle Pfade, über die ein CheckpointGuard finalisiert oder vorzeitig verlassen wird.
 
-use contextra_checkpoint::{
-    CheckpointGuard, CheckpointResult as Result, LocalBoxFuture as BoxFuture,
-    PersistentCheckpointStore, SnapshotSource,
-};
-use contextra_ids::TxId;
+use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -42,7 +37,7 @@ impl TrackingMockStorage {
     }
 }
 
-impl SnapshotSource for TrackingMockStorage {
+impl StorageEngine for TrackingMockStorage {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
     }
@@ -83,6 +78,15 @@ impl SnapshotSource for TrackingMockStorage {
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+        Box::pin(async move {
+            Ok(StorageStats {
+                num_segments: 0,
+                total_size_bytes: 0,
+                memtable_size_bytes: 0,
+            })
+        })
+    }
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             self.pinned.lock().insert(seq_no);
@@ -95,11 +99,26 @@ impl SnapshotSource for TrackingMockStorage {
             Ok(())
         })
     }
+    fn get_at_seq<'a>(
+        &'a self,
+        key: &'a [u8],
+        _seq: u64,
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { self.get(key).await })
+    }
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move { Ok(0) })
     }
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(async move { Ok(*self.last_tx.lock()) })
+    }
+    fn scan<'a>(
+        &'a self,
+        _start: std::ops::Bound<&'a [u8]>,
+        _end: std::ops::Bound<&'a [u8]>,
+        _: Option<usize>,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move { Ok(Vec::new()) })
     }
     fn scan_prefix<'a>(
         &'a self,
@@ -113,6 +132,13 @@ impl SnapshotSource for TrackingMockStorage {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect())
         })
+    }
+    fn scan_prefix_at<'a>(
+        &'a self,
+        prefix: &'a [u8],
+        _seq_no: u64,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move { self.scan_prefix(prefix).await })
     }
 }
 
@@ -328,10 +354,10 @@ async fn test_guard_uncommitted_drop_with_newer_committed_tx_preserves_newer_tx(
         res.is_err(),
         "Explicit rollback must fail serialization barrier check when newer tx exists"
     );
-    if let Err(contextra_checkpoint::CheckpointError::Transaction(msg)) = res {
+    if let Err(ContextraError::Transaction(msg)) = res {
         assert!(msg.contains("Serialization barrier violation"));
     } else {
-        panic!("Expected contextra_checkpoint::CheckpointError::Transaction serialization barrier error");
+        panic!("Expected ContextraError::Transaction serialization barrier error");
     }
 }
 

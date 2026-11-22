@@ -1,17 +1,8 @@
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-//! Dichte Matrix-/Vektorberechnung für personalisierten PageRank (PPR).
-//!
-//! # Zweck
-//! Bietet klassische Matrixmultiplikation für kleine oder dicht vernetzte Teilgraphen.
-
 use super::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
-use crate::types::{EntityId, PprConfig};
+use contextra_types::{EntityId, PprConfig};
 use std::collections::HashSet;
 
-
-// SECTION Dense Core Implementation
 pub(crate) fn collect_valid_seeds(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
@@ -401,5 +392,3 @@ pub(crate) fn compute_ppr_dense(
     run_dense_power_iteration(inner, n, config, deleted_nodes, ctx);
     extract_dense_results(inner, n, deleted_nodes, ctx)
 }
-
-// !SECTION Dense Core Implementation

@@ -1,12 +1,11 @@
+// FILE-CONTEXT: v3 format, HOTSPOTS: [benches/hnsw_bench.rs]
+// Hot Path HNSW Insertion, Search, and Quantized Search Benchmarks for ADR-031 Regressions.
 
-
-mod common;
-
-use common::{generate_raw_vectors, DEFAULT_BENCH_SEED, DIM_MEDIUM};
 use contextra_ports::VectorIndex;
 use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use rand::Rng;
 
 fn bench_hnsw_hot_paths(c: &mut Criterion) {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -14,11 +13,14 @@ fn bench_hnsw_hot_paths(c: &mut Criterion) {
         .build()
         .expect("Tokio runtime required for HNSW benchmarks");
 
-    let dim = DIM_MEDIUM; // 128
+    let dim = 128;
     let num_docs = 100;
+    let mut rng = rand::thread_rng();
 
-    // Deterministische Vektorerzeugung mit festem Seed
-    let vectors = generate_raw_vectors(num_docs, dim, DEFAULT_BENCH_SEED);
+    // Generate test vectors
+    let vectors: Vec<Vec<f32>> = (0..num_docs)
+        .map(|_| (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect())
+        .collect();
 
     // 1. Insertion Throughput Benchmark
     let mut group = c.benchmark_group("HNSW_Insertion");
@@ -69,8 +71,7 @@ fn bench_hnsw_hot_paths(c: &mut Criterion) {
         index
     });
 
-    let queries = generate_raw_vectors(1, dim, DEFAULT_BENCH_SEED ^ 0xABCD);
-    let query = &queries[0];
+    let query: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
 
     // 2. Query Latency Benchmark
     let mut search_group = c.benchmark_group("HNSW_Search");
@@ -78,7 +79,7 @@ fn bench_hnsw_hot_paths(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let res = populated_index
-                    .search(black_box(query), black_box(10))
+                    .search(black_box(&query), black_box(10))
                     .await;
                 black_box(res).expect("Search failed");
             });
@@ -89,7 +90,7 @@ fn bench_hnsw_hot_paths(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let res = populated_index
-                    .search(black_box(query), black_box(50))
+                    .search(black_box(&query), black_box(50))
                     .await;
                 black_box(res).expect("Search failed");
             });

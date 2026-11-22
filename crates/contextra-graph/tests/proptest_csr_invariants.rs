@@ -1,8 +1,3 @@
-//! Property-basierte Tests für fundamentale CSR-Graph-Invarianten.
-//!
-//! # Zweck
-//! Erzeugt zufällige Mutationssequenzen und prüft die topologische Integrität kontinuierlich.
-
 use contextra_graph::{CsrGraph, PathGraph};
 use contextra_ports::GraphIndex;
 use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
@@ -203,7 +198,7 @@ proptest! {
             for i in 0..num_edges {
                 let src = EntityId::new((i * 2 + 1) as u64);
                 let dst = EntityId::new((i * 2 + 2) as u64);
-                let doc_id = DocId::new((1000 + i) as _);
+                let doc_id = DocId::new((1000 + i) as u64);
 
                 graph
                     .add_entity(tx, Entity::new(src, format!("N_{src:?}"), "T"))

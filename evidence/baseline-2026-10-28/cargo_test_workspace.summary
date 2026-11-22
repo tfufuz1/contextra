@@ -1,0 +1,3 @@
+CMD: cargo test --workspace --locked --no-fail-fast
+EXIT_CODE: 101
+DURATION_MS: 374955

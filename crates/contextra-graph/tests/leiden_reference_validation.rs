@@ -1,8 +1,3 @@
-//! Validierung des Leiden-Algorithmus gegen standardisierte Benchmark-Graphen.
-//!
-//! # Zweck
-//! Weist die mathematische Korrektheit und Reproduzierbarkeit der ermittelten Partitionen nach.
-
 use contextra_graph::community::{
     detect_communities, CommunityAssignment, CommunityDetectionConfig,
 };

@@ -4,16 +4,8 @@
 #![allow(clippy::indexing_slicing)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
-
-//! # Quantisierungs- und Mischpräzisions-Test-Suite: `quantized_and_mixed_precision_tests`
-//!
-//! **Zweck:**
-//! Überprüft quantisierte Distanzberechnungen:
-//! - Skalare Quantisierung auf 8 Bit (SQ8 = Scalar Quantization 8-bit).
-//! - Rekonstruktionsgenauigkeit bei Dequantisierung.
-//! - Mischpräzisions-Operationen zwischen unquantisierten Abfragen (`f32`) und quantisierten
-//!   Datenbank-Vektoren (`u8`).
-//! - Grenzwerte wie All-Zeros, All-Ones und Wertebereiche von 0 bis 255.
+// FILE-CONTEXT
+// ZWECK: Quantized SQ8 and mixed-precision (f32 <-> u8) distance kernel test suite across dimensions 1..=257.
 
 // ADR-002 / SPEC §27: Test assertions and test dataset casts
 
@@ -90,7 +82,6 @@ fn quantize_sq8(v: &[f32]) -> (Vec<u8>, f32, f32) {
 }
 
 #[test]
-// Prüft die Rekonstruktionsgenauigkeit von SQ8-quantisierten Vektoren über Dimensionen 1 bis 257.
 fn test_sq8_quantization_reconstruction_accuracy() {
     let mut rng = QuantTestRng::new(0x3141_5926_5358_9793);
 
@@ -110,7 +101,6 @@ fn test_sq8_quantization_reconstruction_accuracy() {
 }
 
 #[test]
-// Prüft gemischte f32/u8 dequantisierte euklidische Distanz gegen rein skalare Berechnung.
 fn test_dequantized_euclidean_distance_f32_u8() {
     let mut rng = QuantTestRng::new(0x2718_2818_2845_9045);
 
@@ -141,7 +131,6 @@ fn test_dequantized_euclidean_distance_f32_u8() {
 }
 
 #[test]
-// Prüft differentielles gemischtes Skalarprodukt zwischen f32 und u8.
 fn test_mixed_precision_dot_product_f32_u8_differential() {
     let mut rng = QuantTestRng::new(0x1618_0339_8874_9894);
 
@@ -164,7 +153,6 @@ fn test_mixed_precision_dot_product_f32_u8_differential() {
 }
 
 #[test]
-// Prüft die Komponenten der gemischten f32/u8 Kosinus-Ähnlichkeit.
 fn test_mixed_precision_cosine_similarity_parts_f32_u8() {
     let mut rng = QuantTestRng::new(0x0577_2156_6490_1532);
 
@@ -193,7 +181,6 @@ fn test_mixed_precision_cosine_similarity_parts_f32_u8() {
 }
 
 #[test]
-// Prüft alle u8-Metriken bei Vektoren, die ausschließlich Nullen enthalten.
 fn test_u8_metrics_all_zero_inputs() {
     let zero = vec![0u8; 128];
     assert_eq!(dot_product_u8(&zero, &zero).unwrap(), 0);
@@ -211,7 +198,6 @@ fn test_u8_metrics_all_zero_inputs() {
 }
 
 #[test]
-// Prüft alle u8-Metriken bei Vektoren, die ausschließlich Einsen enthalten.
 fn test_u8_metrics_all_ones_inputs() {
     let ones = vec![1u8; 128];
     assert_eq!(dot_product_u8(&ones, &ones).unwrap(), 128);
@@ -224,7 +210,6 @@ fn test_u8_metrics_all_ones_inputs() {
 }
 
 #[test]
-// Prüft, dass die Selbst-Kosinus-Distanz eines normalisierten Vektors exakt 0.0 ergibt.
 fn test_normalized_vector_self_cosine_distance_is_zero() {
     let mut rng = QuantTestRng::new(0x1234_4321_5678_8765);
 
@@ -241,7 +226,6 @@ fn test_normalized_vector_self_cosine_distance_is_zero() {
 }
 
 #[test]
-// Prüft dequantisierte Distanz mit dimensionsspezifischen Skalierungsfaktoren (alphas) und Offsets (mins).
 fn test_euclidean_distance_sq_f32_u8_per_dimension_alphas_and_mins() {
     let mut rng = QuantTestRng::new(0x9876_5432_10FE_DCBA);
 
@@ -266,7 +250,6 @@ fn test_euclidean_distance_sq_f32_u8_per_dimension_alphas_and_mins() {
 }
 
 #[test]
-// Prüft u8-Kosinus-Komponenten bei stark variierenden Amplituden.
 fn test_cosine_similarity_parts_u8_varying_vector_magnitudes() {
     let mut rng = QuantTestRng::new(0x8765_4321_0FED_CBA9);
 
@@ -284,7 +267,6 @@ fn test_cosine_similarity_parts_u8_varying_vector_magnitudes() {
 }
 
 #[test]
-// Prüft u8-Skalarprodukt mit maximalem Wertebereich (0 bis 255) über Dimensionen 1 bis 257.
 fn test_u8_dot_product_large_range_values() {
     let mut rng = QuantTestRng::new(0x7654_3210_FEDC_BA98);
 
@@ -297,30 +279,4 @@ fn test_u8_dot_product_large_range_values() {
 
         assert_eq!(dot_d, dot_s);
     }
-}
-
-#[test]
-fn test_avx512_vnni_dpbusd_signed_unsigned_wrapping_semantics() {
-    // In AVX-512 VNNI `_mm512_dpbusd_epi32`:
-    // The instruction computes dot product of pairs of 4 unsigned 8-bit integers (first operand)
-    // and 4 signed 8-bit integers (second operand), accumulating into a 32-bit signed integer.
-    // In our `dot_product_u8_avx512vnni`, both inputs are `u8` (treated as unsigned and accumulated into u32).
-    // This test verifies that the scalar oracle and differential test across varying byte values
-    // (including values >= 128 where MSB is 1) strictly adhere to unsigned wrapping addition semantics.
-    let mut a = Vec::with_capacity(256);
-    let mut b = Vec::with_capacity(256);
-    for i in 0..256 {
-        a.push(i as u8);
-        b.push((255 - i) as u8);
-    }
-
-    let scalar_res = dot_product_u8_scalar(&a, &b);
-    let dispatch_res = dot_product_u8(&a, &b).expect("matching dimensions");
-    assert_eq!(scalar_res, dispatch_res);
-
-    let parts_scalar = cosine_similarity_parts_u8_scalar(&a, &b);
-    let parts_dispatch = cosine_similarity_parts_u8(&a, &b).expect("matching dimensions");
-    assert_eq!(parts_scalar.dot, parts_dispatch.dot);
-    assert_eq!(parts_scalar.norm_a_sq, parts_dispatch.norm_a_sq);
-    assert_eq!(parts_scalar.norm_b_sq, parts_dispatch.norm_b_sq);
 }

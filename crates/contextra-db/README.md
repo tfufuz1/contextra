@@ -1,24 +1,29 @@
 # contextra-db
 
-**Zweck:** Orchestrierung der Hybridsuche: Schreibpfad, Lesepfad, Scheduler, Wiederanlauf, Verdrahtung der Ports. SPEC §13.1 Meilenstein M2. **Hier fehlt am meisten gegenüber der Spec**: Ist 412 Zeilen, Ziel 6.000.
+Contextra Main Database Abstraction, Hybrid Search & Collections.
 
-**Ebene:** E2
+Normativitätsklasse: **Kern `[K]`** (Ring 3, `stable`; §6.0, `capabilities.toml`).
 
-## Öffentliche API (`src/lib.rs`, Stand dieser README)
 
-Ist-Stand. Module oder Namen, die laut PLAN.md entfallen, können hier noch stehen.
+`contextra-db` stellt die zentrale Orchestruierungs- und Collection-API für Contextra bereit (Ring 3).
 
-```rust
-pub use erasure::ErasureWiring
-pub use lineage::{DerivedRef, LineageIndex, LineageRef, NonEmpty, SourceId, SourceRef}
-pub use storage::{Document, GateAudit, HybridCandidate, TenantScopedStorage}
-```
+## Zweck
 
-## Features (`Cargo.toml`)
+Haupt-Monolith für Collection-Verwaltung, 4-Signal-Hybridsuche, Multi-Step-Retrieval, Kontext-Kompaktierung und Speicher-Konsolidierung.
 
-`default`
+## Ring-Zugehörigkeit & Status
 
-## Dokumentation
+- **Ring:** Ring 3 (Anwendungskern / Orchestrator)
+- **Status:** 🟡 In Migration (wird schrittweise in `engine`, `cognition`, `privacy`, `rank`, `adapt` zerlegt)
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 
-Implementierungsspezifikation: [`PLAN.md`](PLAN.md). Maßgeblich ist `docs/SPEC.md` v4.1.
+## Öffentliche API-Übersicht
 
+- **Hauptinstanz & Collections:** `Contextra`, `Collection`
+- **Retrieval & Fusion Results:** `SearchResult`, `ProvenanceRecord`, `SignalContribution`
+- **Konsolidierung & Workers:** `ConsolidationEngine`, `execute_sleep_cycle`, `run_consolidation_pass`
+- **Kontext-Kompaktierung:** `ContextCompactor`, `CompactedContext`, `CompactionStrategy`
+
+## Architektur & Verweise
+
+Details zum Zerlegungsplan von `contextra-db` gemäß Strangler-Muster finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) und `README.md` §20 (Phase 3b).

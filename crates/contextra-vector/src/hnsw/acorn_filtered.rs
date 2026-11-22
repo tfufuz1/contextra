@@ -1,3 +1,6 @@
+// FILE-CONTEXT
+// ZWECK: ACORN Prädikats-gefilterte Graph-Suche (Patel et al. 2024) für HnswIndex.
+// INVARIANTEN: Zero Panic; Traversal über Brücken-Knoten gestattet; Zero Cross-Contamination im Ergebnis;
 //              Hot-Path Kandidatenspeicher & Visited-Tracking über Vec.
 
 use std::borrow::Cow;
@@ -5,7 +8,7 @@ use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::sync::atomic::Ordering;
 
-use crate::types::DocId;
+use contextra_types::DocId;
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex};

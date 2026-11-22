@@ -1,8 +1,7 @@
-//! # Integrationstest: `namespace_isolation.rs`
-//!
-//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `namespace_isolation`.
-//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
-
+// FILE-CONTEXT
+// ZWECK: Namespace isolation test suite for contextra-crypto (SD-09-CRYPTO-002).
+// INVARIANTEN: derive_file_key produces distinct keys when namespace paths differ.
+// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 //! SD-09-CRYPTO-002 — Namespace Isolation Tests.
 //!

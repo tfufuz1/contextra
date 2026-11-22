@@ -1,13 +1,6 @@
-//! # Group-Commit Pipeline (Ring 1)
-//!
-//! // STAND: 2026-11-11
-//! // ZWECK: Buendelt parallele Schreibanfragen deterministisch zur Reduktion von fsync-Aufrufen
-//! // INVARIANTEN: ADR-0XX-P0A (Lock-Handoff), INV-FSYNC-1, fail-closed
-
-use crate::error::StoreResult as Result;
 use crate::lsm::config::DurabilityMode;
 use crate::wal::{PreparedBatch, Wal, WalOp};
-use contextra_ids::TxId;
+use contextra_types::{Result, TxId};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -25,7 +18,6 @@ pub(super) async fn execute_group_commit_append(
             let append_res = wal
                 .append_batch_locked(all_wal_entries, &truncate_guard)
                 .await;
-            drop(truncate_guard);
             if append_res.is_err() {
                 if let Err(trunc_err) = wal.truncate(start_offset, start_hmac).await {
                     tracing::error!(
@@ -40,8 +32,10 @@ pub(super) async fn execute_group_commit_append(
                         }
                     }
                 }
+                drop(truncate_guard);
             } else {
                 committed_flag.store(true, Ordering::Release);
+                drop(truncate_guard);
             }
             append_res
         }

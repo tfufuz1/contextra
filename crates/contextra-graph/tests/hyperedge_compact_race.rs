@@ -1,8 +1,3 @@
-//! Nebenläufigkeitstest für Hyperkantenkompaktierung unter parallelen Schreibzugriffen.
-//!
-//! # Zweck
-//! Beweist Race-Condition-Freiheit zwischen Hintergrundkompaktierern und aktiven Graphmutanten.
-
 #![expect(clippy::unwrap_used)]
 
 use contextra_graph::csr::{CsrGraph, EdgeType};

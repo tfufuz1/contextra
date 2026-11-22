@@ -1,26 +1,18 @@
-//! Metriken zur Quantifizierung morphologischer Zerlegungseffekte.
-
-/// Metriken zur Erfassung der Token-Expansions- und Zerlegungswirkung.
+/// Metrics for measuring token reduction effectiveness.
 #[derive(Debug, Clone, Copy)]
 pub struct TokenReductionMetrics {
-    /// Anzahl ursprünglicher Token vor der morphologischen Zerlegung.
+    /// Number of original tokens before morphological decomposition.
     pub original_tokens: usize,
-    /// Anzahl resultierender Token nach Zerlegung von Komposita.
+    /// Number of tokens after decomposition.
     pub decomposed_tokens: usize,
 }
 
 impl TokenReductionMetrics {
-    /// Berechnet das Expansionsverhältnis der Token-Menge.
+    /// Computes the token reduction ratio.
     ///
-    /// Ein Wert > 1,0 bedeutet eine Erhöhung der Tokenanzahl durch Komposita-Splitting.
-    ///
-    /// # Zielwert
-    /// Für deutsche Fachtexte wird ein Zuwachs von > 20% (> 1,2) angestrebt,
-    /// um die Trefferquote (Recall) im BM25-Index signifikant zu steigern.
-    ///
-    /// # Ablauf
-    /// 1. Liefert 0.0, falls keine Ausgangstoken vorhanden sind (`original_tokens == 0`).
-    /// 2. Teilt `decomposed_tokens` als Gleitkommazahl durch `original_tokens`.
+    /// A ratio > 1.0 means decomposition increased tokens (expected for compounds).
+    /// Target: > 20% token-count increase for German technical texts
+    /// (which leads to better BM25 recall).
     pub fn expansion_ratio(&self) -> f32 {
         if self.original_tokens == 0 {
             return 0.0;

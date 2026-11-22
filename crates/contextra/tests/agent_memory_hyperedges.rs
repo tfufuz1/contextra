@@ -1,17 +1,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-//! # Integrationstest: `agent_memory_hyperedges`
-//!
-//! Prüft die Erstellung und Validierung n-ärer Beziehungen (Hyperedges) im Wissensgraphen
-//! über `AgentMemory::relate_n_ary`.
-
 use contextra::agent_memory::{MemoryId, RelationId};
 use contextra::{builder, AgentMemory, ContextraError, TextEmbeddingEngine};
-use contextra_ports::BoxFuture;
-use contextra_types::error::Result;
+use contextra_core::{BoxFuture, Result};
 use std::sync::Arc;
 
-/// Test-Double für die Vektoreinbettung mit konstanter Dimension.
 struct MockEmbedder;
 
 impl TextEmbeddingEngine for MockEmbedder {
@@ -24,7 +17,6 @@ impl TextEmbeddingEngine for MockEmbedder {
     }
 }
 
-/// Initialisiert eine isolierte temporäre Datenbank mit `AgentMemory` für Hyperedge-Tests.
 async fn setup_agent_memory() -> (AgentMemory, tempfile::TempDir) {
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let db_path = tmp_dir.path().join("agent_memory_hyperedges_db");
@@ -39,7 +31,6 @@ async fn setup_agent_memory() -> (AgentMemory, tempfile::TempDir) {
     (AgentMemory::new(engine), tmp_dir)
 }
 
-// Prüft die erfolgreiche Erstellung von n-ären Relationen und stellt sicher, dass unterschiedliche Kanten eindeutige IDs erhalten.
 #[tokio::test]
 async fn test_relate_n_ary_success_and_unique_ids() {
     let (memory, _tmp) = setup_agent_memory().await;
@@ -72,7 +63,6 @@ async fn test_relate_n_ary_success_and_unique_ids() {
     assert_ne!(rel_id1, rel_id2, "Two relations must have distinct IDs");
 }
 
-// Verifiziert, dass ein Aufruf von relate_n_ary mit weniger als 2 Teilnehmern als InvalidInput abgewiesen wird.
 #[tokio::test]
 async fn test_relate_n_ary_insufficient_participants() {
     let (memory, _tmp) = setup_agent_memory().await;
@@ -94,7 +84,6 @@ async fn test_relate_n_ary_insufficient_participants() {
     );
 }
 
-// Stellt sicher, dass leere Prädikate oder leere Rollennamen abgewiesen werden.
 #[tokio::test]
 async fn test_relate_n_ary_empty_predicate_or_role() {
     let (memory, _tmp) = setup_agent_memory().await;
@@ -125,7 +114,6 @@ async fn test_relate_n_ary_empty_predicate_or_role() {
     );
 }
 
-// Prüft, dass Hyperedge-Erstellung mit validen Schlüsselstrings auch ohne vorherige Dokumenteinträge nicht abstürzt.
 #[tokio::test]
 async fn test_relate_n_ary_nonexistent_memory_id() {
     let (memory, _tmp) = setup_agent_memory().await;
@@ -149,7 +137,6 @@ async fn test_relate_n_ary_nonexistent_memory_id() {
     );
 }
 
-// Verifiziert, dass das Löschen einer beteiligten Erinnerung (forget) nach Erstellung einer Hyperedge panikfrei gelingt.
 #[tokio::test]
 async fn test_relate_n_ary_forget_participant_does_not_panic() {
     let (memory, _tmp) = setup_agent_memory().await;

@@ -1,14 +1,8 @@
-//! # Commit-Pfade & Transaktionsabschluss (Ring 1)
-//!
-//! // STAND: 2026-11-11
-//! // ZWECK: Hilfsroutinen fuer Commit-Zustand, Intent-Locks, Backpressure und Sichtbarkeit
-//! // INVARIANTEN: ADR-0XX-P0A, INV-STORE-1, INV-LOCK-ORDER-1
-
 use super::observer::WriteOrigin;
 use super::*;
 use crate::wal::WalEntry;
-use contextra_ids::{TxId, TOMBSTONE_BIT};
-use crate::staging::STAGING_ENTRY_OVERHEAD_BYTES;
+use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
+use contextra_types::{TxId, TOMBSTONE_BIT};
 
 impl LsmStorage {
     /// Notifies registered observers of committed WAL entries for a transaction.
@@ -38,7 +32,6 @@ impl LsmStorage {
         locks.retain(|_, locked_tx| !predicate(*locked_tx));
     }
 
-    /// Clears intent locks for a specific transaction ID.
     pub fn clear_intent_locks_for_tx(&self, tx_id: TxId) {
         self.cleanup_intent_locks_where(|t| t == tx_id);
     }
@@ -77,7 +70,18 @@ impl LsmStorage {
             return;
         }
         if tx_id.inner() < TxId::INTERNAL_BASE {
-            super::fence::publish_visibility(&self.last_committed_tx, tx_id.inner());
+            let mut current = self.last_committed_tx.load(Ordering::Acquire);
+            while tx_id.inner() > current {
+                match self.last_committed_tx.compare_exchange_weak(
+                    current,
+                    tx_id.inner(),
+                    Ordering::SeqCst,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break,
+                    Err(actual) => current = actual,
+                }
+            }
         }
     }
 

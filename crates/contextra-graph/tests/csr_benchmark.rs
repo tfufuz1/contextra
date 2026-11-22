@@ -1,8 +1,3 @@
-//! Integrationstest zur Performancemessung von CSR-Graphmutationen unter Last.
-//!
-//! # Zweck
-//! Evaluiert Batch-Inserts und Nachbarschaftsabfragen bei ansteigender Knotenzahl.
-
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};

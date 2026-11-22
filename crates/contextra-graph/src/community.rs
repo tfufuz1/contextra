@@ -11,19 +11,20 @@
 //! any weakly connected or disconnected components within candidate communities before
 //! coarse-graining the graph structure.
 
+// FILE-CONTEXT
+// STAND: 2026-08-30T19:30:00Z (SESSION: b1234567)
+// ZWECK: Community-Erkennung via Leiden-Algorithmus für GraphRAG
+// INVARIANTEN: Bitidentischer Determinismus bei gleichem Seed & Graph.
+// HOTSPOTS: L100-L280 (Leiden Local Move, Refinement & Aggregation)
 // SIEHE AUCH: crates/contextra-graph/src/csr.rs
 
 use crate::CsrGraph;
-// TODO(baukasten): Community Detection & Graph-Perkolation entkoppeln (AD-2/AD-4). Algorithmen müssen vollkommen autark ohne contextra-types funktionieren.
-use crate::types::EntityId;
-use crate::error::Result;
+use contextra_types::{EntityId, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Configuration for Leiden Community Detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-
-// SECTION Community Core Implementation
 pub struct CommunityDetectionConfig {
     /// Maximum number of propagation / modularity optimization iterations.
     pub max_iterations: u32,
@@ -626,5 +627,3 @@ pub async fn detect_communities(
 
 #[cfg(test)]
 mod tests;
-
-// !SECTION Community Core Implementation

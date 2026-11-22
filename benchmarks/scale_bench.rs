@@ -1,3 +1,4 @@
+// ANCHOR[PERF:BENCH-002] STATUS:DONE (TS:2026-08-29T00:00:00Z) — Realistic-Scale Throughput & Latency Benchmark
 // ZIEL: Parameterisierte Messung (10K, 100K, 1M Chunks) von Batch-Insert-Durchsatz, Hybrid-Search-Latenz und Peak-RSS
 // AGENT:09 DATE:2026-08-29 STATUS:DONE
 

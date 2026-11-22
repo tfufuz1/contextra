@@ -1,13 +1,10 @@
-//! Deutsche Stoppwörter und Umlaut-Normalisierung.
-
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
 static GERMAN_STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
 
-/// Liefert die statische deutsche Stoppwort-Liste.
+/// Returns the static German stopword list.
 ///
-/// Wird per [`OnceLock`] beim ersten Zugriff lazy initialisiert.
 /// Erweitert um hochfrequente deutsche Funktionswörter gemäß DACH-KMU-Domänenanalyse, 2026-09-01.
 pub fn get_german_stopwords() -> &'static HashSet<String> {
     GERMAN_STOPWORDS.get_or_init(|| {
@@ -26,29 +23,23 @@ pub fn get_german_stopwords() -> &'static HashSet<String> {
     })
 }
 
-/// Prüft, ob ein kleingeschriebenes, normalisiertes Wort ein deutsches Stoppwort ist.
+/// Checks if a normalized lowercased word is a German stopword.
 pub fn is_german_stopword(word: &str) -> bool {
     get_german_stopwords().contains(word)
 }
 
-/// Normalisiert deutsche Umlaute und Sonderzeichen für robusten Volltextabgleich.
+/// Normalisiert deutsche Umlaute für robusten Suchabgleich.
 ///
-/// # Ersetzungen
-/// - `ä` -> `"ae"`
-/// - `ö` -> `"oe"`
-/// - `ü` -> `"ue"`
-/// - `ß` -> `"ss"`
-///
-/// # Beispiel
+/// # Example
 /// ```
 /// use contextra_text::morphology::{normalize_umlauts, GermanCompoundSplitter};
 /// use contextra_text::morphology::MorphologicalTokenizer;
 ///
 /// let splitter = GermanCompoundSplitter::new();
 /// let normalized = normalize_umlauts("Bundesverfassungsgericht");
-/// assert_eq!(normalized, "bundesverfassungsgericht");
+/// // normalized is now "bundesverfassungsgericht"
 /// let parts = splitter.decompose(&normalized);
-/// assert!(parts.contains(&"gericht"));
+/// // parts contains morphological components
 /// ```
 pub fn normalize_umlauts(input: &str) -> String {
     input

@@ -1,7 +1,5 @@
 //! Configuration parameters for Averaging-based Personalized PageRank for Hypergraphs (APPRH).
 
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::error::ApprhError;
 use crate::path_rag::PprParams;
 
@@ -10,8 +8,6 @@ use crate::path_rag::PprParams;
 /// # Complexity
 /// Time complexity of parameter validation is $O(1)$.
 #[derive(Debug, Clone, PartialEq)]
-
-// SECTION Params Core Implementation
 pub struct ApprhParams {
     /// Base PPR parameters ($\alpha$ teleport, $\epsilon$ convergence threshold).
     pub ppr: PprParams,
@@ -114,5 +110,3 @@ mod tests {
         assert!(p.validate().is_err());
     }
 }
-
-// !SECTION Params Core Implementation

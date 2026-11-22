@@ -1,0 +1,769 @@
+[[commands]]
+name = "--"
+owner_tier = "legacy"
+summary = "Legacy subcommand --"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "all"
+owner_tier = "legacy"
+summary = "Legacy subcommand all"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "ann-sift1m"
+owner_tier = "legacy"
+summary = "Legacy subcommand ann-sift1m"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "audit"
+owner_tier = "legacy"
+summary = "Legacy subcommand audit"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "audit-integrity-check"
+owner_tier = "legacy"
+summary = "Legacy subcommand audit-integrity-check"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "beir"
+owner_tier = "legacy"
+summary = "Legacy subcommand beir"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "bench-compile"
+owner_tier = "legacy"
+summary = "Legacy subcommand bench-compile"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "bench-download"
+owner_tier = "legacy"
+summary = "Legacy subcommand bench-download"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "bench-gate"
+owner_tier = "legacy"
+summary = "Legacy subcommand bench-gate"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "bench-trend"
+owner_tier = "legacy"
+summary = "Legacy subcommand bench-trend"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-action-pinning"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-action-pinning"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-adr-deadlines"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-adr-deadlines"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-agents-freshness"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-agents-freshness"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-agents-integrity"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-agents-integrity"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-audit-duplication"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-audit-duplication"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-audit-tool-evidence"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-audit-tool-evidence"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-audit-verdict-independence"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-audit-verdict-independence"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-bandit-latency-budget"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-bandit-latency-budget"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-branch-overlap"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-branch-overlap"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-commit-diff-integrity"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-commit-diff-integrity"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-commit-messages"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-commit-messages"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-compile"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-compile"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-consistency"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-consistency"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-coverage-gate"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-coverage-gate"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-crate-references"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-crate-references"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-dag"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-dag"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-doc-references"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-doc-references"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-duplicate-core-primitives"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-duplicate-core-primitives"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-duplicate-intent"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-duplicate-intent"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-duplicate-symbols"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-duplicate-symbols"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-duplicate-symbols-cross-file"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-duplicate-symbols-cross-file"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-fbs-drift"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-fbs-drift"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-ffi-panic-boundary"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-ffi-panic-boundary"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-flatbuffers-drift"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-flatbuffers-drift"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-jules-context-freshness"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-jules-context-freshness"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-manifest-completeness"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-manifest-completeness"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-marker-drift"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-marker-drift"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-max-results-unbound"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-max-results-unbound"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-module-reachability"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-module-reachability"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-mutation-score-gate"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-mutation-score-gate"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-nan-hot-loop"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-nan-hot-loop"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-orphan-modules"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-orphan-modules"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-phantom-files"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-phantom-files"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-placeholder-refs"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-placeholder-refs"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-recall-stability"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-recall-stability"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-result-dropped-io"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-result-dropped-io"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-review-coverage"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-review-coverage"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-ring-capabilities-consistency"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-ring-capabilities-consistency"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-ring-layering"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-ring-layering"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-ring-layering-full"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-ring-layering-full"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-ring0-async-purity"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-ring0-async-purity"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-stale-tags"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-stale-tags"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-toc-integrity"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-toc-integrity"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-toctou-defaults"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-toctou-defaults"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-type-registry"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-type-registry"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-unsafe-islands"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-unsafe-islands"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-veto-deadlines"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-veto-deadlines"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-vetoes"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-vetoes"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "check-workflow-commands"
+owner_tier = "legacy"
+summary = "Legacy subcommand check-workflow-commands"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "claim"
+owner_tier = "legacy"
+summary = "Legacy subcommand claim"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "commit-health"
+owner_tier = "legacy"
+summary = "Legacy subcommand commit-health"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "consolidate-adrs"
+owner_tier = "legacy"
+summary = "Legacy subcommand consolidate-adrs"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "context-pack"
+owner_tier = "legacy"
+summary = "Legacy subcommand context-pack"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "context-tags"
+owner_tier = "legacy"
+summary = "Legacy subcommand context-tags"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "crate-context"
+owner_tier = "legacy"
+summary = "Legacy subcommand crate-context"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "debt-audit"
+owner_tier = "legacy"
+summary = "Legacy subcommand debt-audit"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "deprecated"
+owner_tier = "legacy"
+summary = "Legacy subcommand deprecated"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "env-validate"
+owner_tier = "legacy"
+summary = "Legacy subcommand env-validate"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "experimental"
+owner_tier = "legacy"
+summary = "Legacy subcommand experimental"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "fast"
+owner_tier = "legacy"
+summary = "Legacy subcommand fast"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "feature-matrix"
+owner_tier = "legacy"
+summary = "Legacy subcommand feature-matrix"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "forensic-test"
+owner_tier = "legacy"
+summary = "Legacy subcommand forensic-test"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "gate-check"
+owner_tier = "legacy"
+summary = "Legacy subcommand gate-check"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "gen-feature-catalog"
+owner_tier = "legacy"
+summary = "Legacy subcommand gen-feature-catalog"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "gen-prompter-data"
+owner_tier = "legacy"
+summary = "Legacy subcommand gen-prompter-data"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "gen-sbom"
+owner_tier = "legacy"
+summary = "Legacy subcommand gen-sbom"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "generate-adr"
+owner_tier = "legacy"
+summary = "Legacy subcommand generate-adr"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "generate-diagnostics"
+owner_tier = "legacy"
+summary = "Legacy subcommand generate-diagnostics"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "generate-markers"
+owner_tier = "legacy"
+summary = "Legacy subcommand generate-markers"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "hardcoded-secret"
+owner_tier = "legacy"
+summary = "Legacy subcommand hardcoded-secret"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "hotspot-report"
+owner_tier = "legacy"
+summary = "Legacy subcommand hotspot-report"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "init-audit-fix"
+owner_tier = "legacy"
+summary = "Legacy subcommand init-audit-fix"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "json"
+owner_tier = "legacy"
+summary = "Legacy subcommand json"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "jules-preflight"
+owner_tier = "legacy"
+summary = "Legacy subcommand jules-preflight"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "jules-submit-gate"
+owner_tier = "legacy"
+summary = "Legacy subcommand jules-submit-gate"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "lint-unsafe-slices"
+owner_tier = "legacy"
+summary = "Legacy subcommand lint-unsafe-slices"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "loom-run"
+owner_tier = "legacy"
+summary = "Legacy subcommand loom-run"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "migrate-docid-128"
+owner_tier = "legacy"
+summary = "Legacy subcommand migrate-docid-128"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "mutation-score-record"
+owner_tier = "legacy"
+summary = "Legacy subcommand mutation-score-record"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "onnx-test-model"
+owner_tier = "legacy"
+summary = "Legacy subcommand onnx-test-model"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "panic-inventory"
+owner_tier = "legacy"
+summary = "Legacy subcommand panic-inventory"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "post-merge-report"
+owner_tier = "legacy"
+summary = "Legacy subcommand post-merge-report"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "pre-push"
+owner_tier = "legacy"
+summary = "Legacy subcommand pre-push"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "prune-branches"
+owner_tier = "legacy"
+summary = "Legacy subcommand prune-branches"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "py-test"
+owner_tier = "legacy"
+summary = "Legacy subcommand py-test"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "regenerate-flatbuffers"
+owner_tier = "legacy"
+summary = "Legacy subcommand regenerate-flatbuffers"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "reproducible-build"
+owner_tier = "legacy"
+summary = "Legacy subcommand reproducible-build"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "reproducible-build-check"
+owner_tier = "legacy"
+summary = "Legacy subcommand reproducible-build-check"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "run-community-detection"
+owner_tier = "legacy"
+summary = "Legacy subcommand run-community-detection"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "security-scan"
+owner_tier = "legacy"
+summary = "Legacy subcommand security-scan"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "session-init"
+owner_tier = "legacy"
+summary = "Legacy subcommand session-init"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "shell-commit-audit"
+owner_tier = "legacy"
+summary = "Legacy subcommand shell-commit-audit"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "shell-interpolation"
+owner_tier = "legacy"
+summary = "Legacy subcommand shell-interpolation"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "stable"
+owner_tier = "legacy"
+summary = "Legacy subcommand stable"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "std-fs-in-async"
+owner_tier = "legacy"
+summary = "Legacy subcommand std-fs-in-async"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "sync-docs"
+owner_tier = "legacy"
+summary = "Legacy subcommand sync-docs"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "tag-health"
+owner_tier = "legacy"
+summary = "Legacy subcommand tag-health"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "validate-pr-checklist"
+owner_tier = "legacy"
+summary = "Legacy subcommand validate-pr-checklist"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "validate-tags"
+owner_tier = "legacy"
+summary = "Legacy subcommand validate-tags"
+blocking = true
+phase = "Phase 0"
+
+[[commands]]
+name = "workspace-verify"
+owner_tier = "legacy"
+summary = "Legacy subcommand workspace-verify"
+blocking = true
+phase = "Phase 0"

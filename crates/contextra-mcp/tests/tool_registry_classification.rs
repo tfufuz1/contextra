@@ -1,7 +1,4 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// =========================================================================
-// SECTION: tool_registry_classification
-// =========================================================================
 
 use contextra_mcp::sandbox::{McpSandbox, ToolCategory, TOOL_REGISTRY};
 use contextra_mcp::McpServer;
@@ -183,5 +180,3 @@ async fn test_tool_registry_alignment_with_tools_list_and_dispatch() {
         );
     }
 }
-
-// !SECTION: tool_registry_classification

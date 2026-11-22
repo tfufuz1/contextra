@@ -1,17 +1,7 @@
-//! Entitätsverwaltung und Primärschlüssel-Mapping im CSR-Graphen.
-//!
-//! # Zweck
-//! Ordnet externen `EntityId`-Werten interne, dichte Array-Indizes für schnellen Zugriff zu.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::super::inner::sentinel_entity;
 use super::CsrGraph;
-use crate::error::Result;
-use crate::types::Entity;
+use contextra_types::{Entity, Result};
 
-
-// SECTION Entity Core Implementation
 impl CsrGraph {
     pub fn insert_entity_direct(&self, entity: Entity) -> Result<()> {
         let mut inner = self.inner_write();
@@ -33,5 +23,3 @@ impl CsrGraph {
         Ok(())
     }
 }
-
-// !SECTION Entity Core Implementation

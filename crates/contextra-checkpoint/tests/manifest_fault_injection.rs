@@ -9,10 +9,6 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
-//! # Integrationstest: Fehlereinschleusung in Manifeste
-//!
-//! Simuliert Dateibeschädigung und unvollständige Schreibvorgänge in Checkpoint-Manifesten.
-
 use contextra_checkpoint::{CheckpointManifest, CheckpointMeta};
 use contextra_types::TxId;
 
@@ -24,7 +20,6 @@ fn sample_meta() -> CheckpointMeta {
         tx_id: TxId::new(100),
         metadata: serde_json::json!({"step": 1}),
         created_at: 1000,
-        id_width_bits: contextra_checkpoint::CURRENT_ID_WIDTH_BITS,
     }
 }
 

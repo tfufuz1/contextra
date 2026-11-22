@@ -1,15 +1,6 @@
-//! Basistypen, Kontextstrukturen und Vektorpuffer für PPR-Berechnungen.
-//!
-//! # Zweck
-//! Definiert `PprContext` und `DeletedView` zur effizienten Wiederverwendung von Arbeitsvektoren.
-
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
-
-// SECTION Types Core Implementation
 pub struct DeletedView {
     deleted_nodes: HashSet<usize>,
 }
@@ -20,7 +11,6 @@ impl DeletedView {
     }
 
     #[cfg(test)]
-    #[allow(dead_code)]
     pub(crate) fn empty() -> Self {
         Self {
             deleted_nodes: HashSet::new(),
@@ -75,5 +65,3 @@ impl PprContext {
         }
     }
 }
-
-// !SECTION Types Core Implementation

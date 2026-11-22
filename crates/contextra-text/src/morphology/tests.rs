@@ -1,5 +1,3 @@
-//! Tests für morphologische Zerlegung und deutsche Sprachverarbeitung.
-
 use super::compound_splitter::{GermanCompoundSplitter, MorphologicalTokenizer};
 use super::metrics::TokenReductionMetrics;
 use super::passthrough::PassthroughTokenizer;
@@ -7,20 +5,18 @@ use super::stopwords::{is_german_stopword, normalize_umlauts};
 use super::trie::Trie;
 use std::collections::HashSet;
 
-// Prüft die Zerlegung deutscher Komposita durch den GermanMorphTokenizer.
 #[test]
-fn test_german_tokenizer_splits_compounds() {
+fn german_tokenizer_splits_compounds() {
     use crate::tokenizer::Tokenizer;
-    let tok = crate::tokenizer::GermanMorphTokenizer::try_new().expect("try_new succeeds");
+    let tok = crate::tokenizer::GermanMorphTokenizer::new();
     let tokens = tok.tokenize("Datenbankentwicklung");
     assert!(tokens.iter().any(|t| t == "Datenbank" || t == "datenbank"));
 }
 
-// Prüft die Normalisierung deutscher Umlaute während der Tokenisierung.
 #[test]
-fn test_german_tokenizer_normalizes_umlauts() {
+fn german_tokenizer_normalizes_umlauts() {
     use crate::tokenizer::Tokenizer;
-    let tok = crate::tokenizer::GermanMorphTokenizer::try_new().expect("try_new succeeds");
+    let tok = crate::tokenizer::GermanMorphTokenizer::new();
     let tokens = tok.tokenize("Bücher");
     // "Bücher" → "buecher" oder ähnlich
     assert!(tokens
@@ -28,7 +24,6 @@ fn test_german_tokenizer_normalizes_umlauts() {
         .any(|t: &String| t.contains("ue") || t.contains("buch")));
 }
 
-// Stellt sicher, dass Wörter mit Großbuchstaben sicher unzerlegt bleiben.
 #[test]
 fn test_decompose_handles_uppercase_safely() {
     let splitter = GermanCompoundSplitter::new();
@@ -36,7 +31,6 @@ fn test_decompose_handles_uppercase_safely() {
     assert_eq!(parts, vec!["Bundesverfassungsgericht"]);
 }
 
-// Prüft die Zerlegung kleingeschriebener Wörter.
 #[test]
 fn test_decompose_accepts_lowercase() {
     let splitter = GermanCompoundSplitter::new();
@@ -44,7 +38,6 @@ fn test_decompose_accepts_lowercase() {
     assert!(!parts.is_empty());
 }
 
-// Stellt sicher, dass umlaut-normalisierte Wörter gültige Eingaben für den Splitter darstellen.
 #[test]
 fn test_normalize_umlauts_produces_valid_input_for_splitter() {
     let splitter = GermanCompoundSplitter::new();
@@ -60,7 +53,6 @@ fn test_normalize_umlauts_produces_valid_input_for_splitter() {
     }
 }
 
-// Prüft Basisfunktionen und Fallbacks des deutschen Zerlegers.
 #[test]
 fn test_german_splitter_scaffold() {
     let splitter = GermanCompoundSplitter::new();
@@ -72,9 +64,8 @@ fn test_german_splitter_scaffold() {
     assert_eq!(splitter.language(), "de");
 }
 
-// Prüft die Zerlegung bekannter Wörter in ihre Einzelstämme.
 #[test]
-fn test_compound_splitting_known_words() {
+fn compound_splitting_known_words() {
     let splitter = GermanCompoundSplitter::new();
     let result = splitter.decompose("datenbankserver");
     assert!(
@@ -84,9 +75,8 @@ fn test_compound_splitting_known_words() {
     assert!(result.iter().any(|t| t.eq_ignore_ascii_case("server")));
 }
 
-// Prüft die Konsistenz und Idempotenz der Umlaut-Normalisierung.
 #[test]
-fn test_umlaut_normalization_is_consistent() {
+fn umlaut_normalization_is_consistent() {
     let n1 = normalize_umlauts("Müller");
     let n2 = normalize_umlauts("Müller");
     assert_eq!(
@@ -99,9 +89,8 @@ fn test_umlaut_normalization_is_consistent() {
     );
 }
 
-// Prüft das Ranking-Verhalten von BM25 bei Mehrfachtreffern deutscher Begriffe.
 #[test]
-fn test_bm25_german_ranks_more_matches_higher() {
+fn bm25_german_ranks_more_matches_higher() {
     let score_datenbank = crate::bm25::score_term(1, 10, 10.0, 2, 50);
     let score_server = crate::bm25::score_term(1, 10, 10.0, 2, 50);
 
@@ -236,6 +225,7 @@ struct KmuTestCase {
     interfix_type: &'static str,
 }
 
+// ANCHOR[TEST:TXT-001] STATUS:DONE — Recall-Evaluation für deutsche Zusammensetzungen (TS:2026-08-30T22:01:55Z) (SESSION:cf1f75c6)
 // REVIEW-PASS[1/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-01T23:15:00Z) (SESSION: de8fd9f5)
 // REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-02T08:30:00Z) (SESSION: 98e60e97)
 // PRÜFER-KONTEXT: FRESH
@@ -598,7 +588,7 @@ fn test_decompose_oversized_token_early_exit() {
 }
 
 #[test]
-fn test_trie_case_empty_single_and_multibyte() {
+fn trie_case_empty_single_and_multibyte() {
     let mut trie = Trie::new();
     assert!(!trie.contains("a"));
     assert!(!trie.starts_with("a"));
@@ -615,7 +605,7 @@ fn test_trie_case_empty_single_and_multibyte() {
 }
 
 #[test]
-fn test_german_compound_splitter_case_constructors() {
+fn german_compound_splitter_case_constructors() {
     let default_splitter = GermanCompoundSplitter::new();
     assert_eq!(default_splitter.min_component_len(), 3);
 
@@ -633,7 +623,7 @@ fn test_german_compound_splitter_case_constructors() {
 }
 
 #[test]
-fn test_passthrough_tokenizer_case_methods() {
+fn passthrough_tokenizer_case_methods() {
     let tok = PassthroughTokenizer::new("en");
     assert_eq!(tok.language(), "en");
     let decl = tok.decompose("hello");
@@ -641,15 +631,14 @@ fn test_passthrough_tokenizer_case_methods() {
 }
 
 #[test]
-fn test_normalize_umlauts_case_edge_inputs() {
+fn normalize_umlauts_case_edge_inputs() {
     assert_eq!(normalize_umlauts(""), "");
     assert_eq!(normalize_umlauts("ÄÖÜß"), "aeoeuess");
     assert_eq!(normalize_umlauts("Grüße aus Köln!"), "gruesse aus koeln!");
 }
 
-// Fuzz-Test mit 10.000 Iterationen zur Verifikation von Panik-Freiheit bei beliebigem UTF-8.
 #[test]
-fn test_fuzz_german_compound_splitter_utf8_panic_free_10k() {
+fn fuzz_german_compound_splitter_utf8_panic_free_10k() {
     let splitter = GermanCompoundSplitter::new();
 
     // Building blocks: German umlauts, 4-byte Emojis, interfixes, common stems, random multi-byte UTF-8 chars

@@ -1,12 +1,10 @@
-//! # Tests fuer WAL HMAC-Verkettung (Ring 1)
-//!
-//! Testet Schutz gegen Vertauschung und Modifikation von Frame-Hashes.
-
 use super::*;
 use crate::wal::KeyManager;
 use crate::wal::Wal;
+#[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::wal_crypto::WalHmac;
-use contextra_ids::TxId;
+use contextra_types::TxId;
+#[cfg(feature = "encryption-at-rest")]
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
@@ -83,7 +81,7 @@ async fn test_wal_hash_chain_verification() {
     // Should fail due to CRC mismatch or HMAC chain failure
     assert!(matches!(
         result,
-        Err(StoreError::Serialization(_)) | Err(StoreError::WalCorruption { .. })
+        Err(ContextraError::Serialization(_)) | Err(ContextraError::WalCorruption { .. })
     ));
 }
 

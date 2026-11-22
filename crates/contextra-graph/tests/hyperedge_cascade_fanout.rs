@@ -1,8 +1,3 @@
-//! Grenzprüfung für maximale Verzweigungstiefe (Fan-out) bei Hyperkanten-Kaskaden.
-//!
-//! # Zweck
-//! Verhindert unbegrenzte Rekursion und Stack-Überläufe in dicht vernetzten Hypergraphen.
-
 use contextra_graph::cascade::{
     cascade_invalidate_hyperedges_for_superseded_doc, MAX_HYPEREDGE_CASCADE_FANOUT,
 };
