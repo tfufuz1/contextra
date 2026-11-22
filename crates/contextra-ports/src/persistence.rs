@@ -106,8 +106,14 @@ pub trait Fs: Send + Sync + 'static {
     fn lock(&self, p: &Path, mode: LockMode) -> io::Result<Box<dyn LockGuard>>;
     /// Zugesicherte Eigenschaften.
     fn caps(&self) -> FsCaps;
-    /// Harter Link. Nur für Checkpoints (Opt-in).
-    fn hard_link(&self, from: &Path, to: &Path) -> io::Result<()>;
+    /// Harter Link. Nur für Checkpoints (Opt-in). Standard: `Unsupported` (SA-2).
+    fn hard_link(&self, _from: &Path, _to: &Path) -> io::Result<()> {
+        Err(io::Error::from(io::ErrorKind::Unsupported))
+    }
+    /// Referenzkopie (Copy-on-Write). Standard: `Unsupported` (SA-2).
+    fn reflink(&self, _from: &Path, _to: &Path) -> io::Result<()> {
+        Err(io::Error::from(io::ErrorKind::Unsupported))
+    }
 }
 
 /// Geöffnete Datei (SPEC §4).
@@ -152,6 +158,10 @@ pub trait File: Send + Sync {
     fn sync_data(&self) -> io::Result<()>;
     /// Synchronisiert Daten und Metadaten.
     fn sync_all(&self) -> io::Result<()>;
+    /// Gibt den Bereich frei (Lochen). Standard: `Unsupported` (SPEC §4, optional).
+    fn punch_hole(&self, _off: u64, _len: u64) -> io::Result<()> {
+        Err(io::Error::from(io::ErrorKind::Unsupported))
+    }
 }
 
 /// Marker für eine gehaltene Sperre. Die Sperre endet mit dem `Drop`.

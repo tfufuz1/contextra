@@ -242,3 +242,10 @@ impl Drop for Inner {
         self.condvar.notify_all();
     }
 }
+
+impl contextra_ports::persistence::Runtime for Runtime {
+    /// Brücke zum Port (SA-9). Die inherente Methode hat Vorrang.
+    fn spawn(&self, job: Box<dyn FnOnce() + Send>) {
+        Runtime::spawn(self, job);
+    }
+}
