@@ -2,7 +2,7 @@
 //!
 //! SPEC §9.6: Header (48 B), Records, Hole-Records, Footer (20 B) und BlobRef (28 B).
 
-pub use crate::blob::blob_ref::{BlobFooter, BlobRef, BLOB_FOOTER_LEN, BLOB_REF_LEN};
+pub use crate::store::blob::blob_ref::{BlobFooter, BlobRef, BLOB_FOOTER_LEN, BLOB_REF_LEN};
 use crate::codec::crc32c::crc32c;
 use crate::codec::varint::{decode_u64, encode_u64};
 use std::fmt;

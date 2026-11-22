@@ -5,7 +5,7 @@
 //! `| prealloc_len u64 | reserved u64 | crc32c u32`
 
 use crate::codec::crc32c::crc32c;
-use crate::redo::error::RedoError;
+use crate::store::redo::error::RedoError;
 
 /// Feste Länge des Segmentkopfes in Bytes.
 pub const HEADER_SIZE: usize = 48;

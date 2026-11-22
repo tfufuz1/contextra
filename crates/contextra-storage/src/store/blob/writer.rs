@@ -2,7 +2,7 @@
 //!
 //! Schreibt Blob-Dateien nach SPEC §9.6 append-only bis zum Abschluss per Footer.
 
-use crate::blob::record::{
+use crate::store::blob::record::{
     BlobFooter, BlobHeader, BlobRecord, BlobRef, BLOB_FOOTER_LEN, BLOB_HEADER_LEN,
 };
 use crate::codec::crc32c::crc32c;

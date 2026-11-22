@@ -9,8 +9,8 @@ use contextra_ports::persistence::{Cipher, Mac};
 use crate::codec::crc32c::crc32c;
 use crate::codec::limits::MAX_CHANGE_BYTES;
 use crate::keys::nonce::redo_frame_nonce;
-use crate::redo::error::RedoError;
-use crate::redo::op::RedoOp;
+use crate::store::redo::error::RedoError;
+use crate::store::redo::op::RedoOp;
 
 /// Durability-Stufe eines Frames nach SPEC §9.4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

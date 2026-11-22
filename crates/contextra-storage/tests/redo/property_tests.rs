@@ -3,10 +3,10 @@
 //! SPEC §9.4 und §18 (INV-LOG-1, INV-LOG-2, INV-LOG-3):
 //! Jedes gültige Präfix eines Frame-Stroms ergibt einen gültigen Modellzustand.
 
-use contextra_storage::redo::frame::{Durability, RedoFrame};
-use contextra_storage::redo::header::RedoHeader;
-use contextra_storage::redo::op::{RedoOp, RedoOpKind};
-use contextra_storage::redo::replay_sm::{ReplayEffect, ReplayEvent, ReplayStateMachine};
+use contextra_storage::store::redo::frame::{Durability, RedoFrame};
+use contextra_storage::store::redo::header::RedoHeader;
+use contextra_storage::store::redo::op::{RedoOp, RedoOpKind};
+use contextra_storage::store::redo::replay_sm::{ReplayEffect, ReplayEvent, ReplayStateMachine};
 use proptest::prelude::*;
 use std::collections::BTreeMap;
 

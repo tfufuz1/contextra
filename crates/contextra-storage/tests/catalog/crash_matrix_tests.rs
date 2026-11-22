@@ -7,10 +7,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
-use contextra_storage::blob::reader::BlobReader;
-use contextra_storage::blob::record::BlobRecord;
-use contextra_storage::blob::sweep::sweep_blob;
-use contextra_storage::blob::writer::BlobWriter;
+use contextra_storage::store::blob::reader::BlobReader;
+use contextra_storage::store::blob::record::BlobRecord;
+use contextra_storage::store::blob::sweep::sweep_blob;
+use contextra_storage::store::blob::writer::BlobWriter;
 use contextra_storage::catalog::current::{read_current, write_current};
 use contextra_storage::catalog::durable::sync_existing;
 use contextra_storage::catalog::edit::CatalogEdit;

@@ -4,11 +4,11 @@
 //! Führt die Effekte der Sans-I/O-Writer-Zustandsmaschine über `Fs` und `File` aus.
 
 use contextra_ports::persistence::{Entropy, File, Fs, OpenMode, Perm};
-use crate::redo::error::RedoError;
-use crate::redo::frame::{Durability, RedoFrame};
-use crate::redo::header::{RedoHeader, HEADER_SIZE};
-use crate::redo::op::RedoOp;
-use crate::redo::writer_sm::{WriterEffect, WriterEvent, WriterStateMachine};
+use crate::store::redo::error::RedoError;
+use crate::store::redo::frame::{Durability, RedoFrame};
+use crate::store::redo::header::{RedoHeader, HEADER_SIZE};
+use crate::store::redo::op::RedoOp;
+use crate::store::redo::writer_sm::{WriterEffect, WriterEvent, WriterStateMachine};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};

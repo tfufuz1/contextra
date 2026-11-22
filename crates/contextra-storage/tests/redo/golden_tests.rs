@@ -2,10 +2,10 @@
 //!
 //! SPEC Anhang A.5: Redo-Frame und Seal-Frame im Plain-Modus.
 
-use contextra_storage::redo::frame::{Durability, RedoFrame};
-use contextra_storage::redo::op::RedoOp;
-use contextra_storage::redo::replay_sm::{ReplayEffect, ReplayEvent, ReplayStateMachine};
-use contextra_storage::redo::header::RedoHeader;
+use contextra_storage::store::redo::frame::{Durability, RedoFrame};
+use contextra_storage::store::redo::op::RedoOp;
+use contextra_storage::store::redo::replay_sm::{ReplayEffect, ReplayEvent, ReplayStateMachine};
+use contextra_storage::store::redo::header::RedoHeader;
 
 #[test]
 fn test_golden_a5_frame_plain_byte_exact() {

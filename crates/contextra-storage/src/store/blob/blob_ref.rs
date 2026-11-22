@@ -2,7 +2,7 @@
 //!
 //! Definitionen für BlobRef (28 B) und BlobFooter (20 B) nach SPEC §9.6.
 
-use crate::blob::record::{BLOB_MAGIC, RecordError};
+use crate::store::blob::record::{BLOB_MAGIC, RecordError};
 use crate::codec::crc32c::crc32c;
 
 /// Feste Länge des Blob-Datei-Footers (20 Bytes).

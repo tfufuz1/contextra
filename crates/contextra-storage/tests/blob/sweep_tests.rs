@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
-use contextra_storage::blob::reader::{BlobReadError, BlobReader};
-use contextra_storage::blob::record::BlobRecord;
-use contextra_storage::blob::sweep::sweep_blob;
-use contextra_storage::blob::writer::BlobWriter;
+use contextra_storage::store::blob::reader::{BlobReadError, BlobReader};
+use contextra_storage::store::blob::record::BlobRecord;
+use contextra_storage::store::blob::sweep::sweep_blob;
+use contextra_storage::store::blob::writer::BlobWriter;
 use contextra_storage::testing::MemFs;
 use contextra_ports::persistence::{Fs, OpenMode, Perm};
 use std::collections::HashSet;

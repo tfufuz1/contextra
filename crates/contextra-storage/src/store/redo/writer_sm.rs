@@ -3,7 +3,7 @@
 //! SPEC §9.4, §10.2, §10.5 und §18:
 //! Zustandsmaschine für den Redo-Schreibpfad: `step(event) -> Vec<Effect>`.
 
-use crate::redo::frame::Durability;
+use crate::store::redo::frame::Durability;
 
 /// Ereignisse, die der Writer-Zustandsmaschine übergeben werden.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -307,7 +307,7 @@ impl WriterStateMachine {
     }
 
     fn create_seal_frame_bytes(&self) -> Vec<u8> {
-        let (seal_frame, _) = crate::redo::frame::RedoFrame::new_seal_plain(
+        let (seal_frame, _) = crate::store::redo::frame::RedoFrame::new_seal_plain(
             self.last_stamp,
             self.frame_count,
             self.last_chain,

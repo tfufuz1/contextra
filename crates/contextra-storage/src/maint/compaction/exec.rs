@@ -8,12 +8,12 @@
 use crate::catalog::reserve::IdReserve;
 use crate::catalog::types::{CatalogFileKind, CatalogSpaceOptions, FileMeta};
 use crate::codec::tag::TagKind;
-use crate::engine::compaction::plan::CompactionPlan;
-use crate::engine::compaction::retain::{retain_key_versions, CompactionEntry};
-use crate::run::blob_ref::BlobRef;
-use crate::run::block::BlockSecurity;
-use crate::run::builder::{RunBuilder, RunBuilderOptions};
-use crate::run::reader::RunReader;
+use crate::maint::compaction::plan::CompactionPlan;
+use crate::maint::compaction::retain::{retain_key_versions, CompactionEntry};
+use crate::store::run::blob_ref::BlobRef;
+use crate::store::run::block::BlockSecurity;
+use crate::store::run::builder::{RunBuilder, RunBuilderOptions};
+use crate::store::run::reader::RunReader;
 use contextra_ports::persistence::{CompactionFilter, Fs, KeyDomain, KeyProvider, OpenMode, Perm};
 use std::collections::{BTreeMap, HashMap};
 use std::io;
@@ -76,7 +76,7 @@ pub fn execute_compaction(
         for block_idx in 0..num_blocks {
             let block_data = reader.load_data_block(block_idx)
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
-            let db_reader = crate::run::data::DataBlockReader::new(&block_data)
+            let db_reader = crate::store::run::data::DataBlockReader::new(&block_data)
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
 
             for entry_res in db_reader.iter() {

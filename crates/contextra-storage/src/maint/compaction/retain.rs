@@ -6,7 +6,7 @@
 //! Keine Integer-Casts (M-02 = 0), keine Panics (M-08 = 0).
 
 use crate::codec::tag::{Tag, TagKind};
-use crate::run::blob_ref::BlobRef;
+use crate::store::run::blob_ref::BlobRef;
 use contextra_ports::persistence::{CompactionFilter, Decision, Stamp};
 
 /// Repräsentiert eine Version eines Schlüssels während der Kompaktion.

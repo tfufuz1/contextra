@@ -4,13 +4,13 @@
 //! Jede Invariante wird per ID zitiert und systematisch verifiziert.
 
 use contextra_storage::env::entropy::RealEntropy;
-use contextra_storage::redo::driver::{segment_file_name, RedoWriter};
-use contextra_storage::redo::error::{check_redo_hwm, RedoError};
-use contextra_storage::redo::frame::{Durability, RedoFrame};
-use contextra_storage::redo::header::RedoHeader;
-use contextra_storage::redo::op::RedoOp;
-use contextra_storage::redo::replay::recover_redo;
-use contextra_storage::redo::replay_sm::{ReplayEffect, ReplayEvent, ReplayStateMachine};
+use contextra_storage::store::redo::driver::{segment_file_name, RedoWriter};
+use contextra_storage::store::redo::error::{check_redo_hwm, RedoError};
+use contextra_storage::store::redo::frame::{Durability, RedoFrame};
+use contextra_storage::store::redo::header::RedoHeader;
+use contextra_storage::store::redo::op::RedoOp;
+use contextra_storage::store::redo::replay::recover_redo;
+use contextra_storage::store::redo::replay_sm::{ReplayEffect, ReplayEvent, ReplayStateMachine};
 use contextra_storage::testing::fault_fs::{FaultConfig, FaultFs};
 use contextra_storage::testing::mem_fs::MemFs;
 use contextra_ports::persistence::{Fs, OpenMode, Perm};

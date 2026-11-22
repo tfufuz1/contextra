@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 use crate::engine::memtable::Memtable;
-use crate::run::rangedel::RangeMarker;
+use crate::store::run::rangedel::RangeMarker;
 use crate::sync::{Arc, AtomicBool, Ordering, RankedRwLock};
 
 /// Handle für einen unveränderlichen Run (SSTable) nach P09 und SPEC §16.5.

@@ -3,8 +3,8 @@
 //! SPEC §9.4 und §15.2: Mac16, AES-256-GCM-SIV und Domänenversiegelung (Nonce 0x03).
 
 use contextra_storage::testing::refimpl::{Blake3Mac, AesGcmSivCipher};
-use contextra_storage::redo::frame::{Durability, RedoFrame};
-use contextra_storage::redo::op::{RedoOp, OPFLAG_DOMAIN, OPFLAG_SEALED};
+use contextra_storage::store::redo::frame::{Durability, RedoFrame};
+use contextra_storage::store::redo::op::{RedoOp, OPFLAG_DOMAIN, OPFLAG_SEALED};
 
 #[test]
 fn test_authenticated_frame() {

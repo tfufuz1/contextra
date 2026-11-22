@@ -6,7 +6,7 @@
 use contextra_ports::persistence::Cipher;
 use crate::codec::varint::{decode_u64, encode_u64};
 use crate::keys::nonce::redo_op_body_nonce;
-use crate::redo::error::RedoError;
+use crate::store::redo::error::RedoError;
 
 /// Bit 0 in `opflags`: Domäne ist angegeben (`domain u32` folgt).
 pub const OPFLAG_DOMAIN: u8 = 0x01;

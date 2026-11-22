@@ -6,11 +6,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use contextra_storage::codec::tag::{Tag, TagKind};
-use contextra_storage::run::blob_ref::BlobRef;
-use contextra_storage::run::block::BlockSecurity;
-use contextra_storage::run::block_cache::BlockCache;
-use contextra_storage::run::builder::{RunBuilder, RunBuilderOptions};
-use contextra_storage::run::reader::RunReader;
+use contextra_storage::store::run::blob_ref::BlobRef;
+use contextra_storage::store::run::block::BlockSecurity;
+use contextra_storage::store::run::block_cache::BlockCache;
+use contextra_storage::store::run::builder::{RunBuilder, RunBuilderOptions};
+use contextra_storage::store::run::reader::RunReader;
 use contextra_ports::persistence::{File, ReadReq};
 use std::io;
 use std::sync::Arc;

@@ -4,9 +4,12 @@
 //!
 //! ```text
 //! api     ──► engine, erase, catalog, keys, codec      (Typquellen)
-//! erase   ──► engine (nach oben); keys, codec, env     (nach unten)
-//! engine  ──► redo, run, blob, catalog
-//! redo, run, blob, catalog ──► keys, codec, env
+//! erase   ──► store, catalog, keys, codec, env          (nie engine, SPEC §3.3)
+//! engine  ──► store, maint, catalog, keys, codec, env
+//! maint   ──► engine, erase, store, catalog, keys       (D-22)
+//! recovery──► engine, store, maint, catalog, erase, keys
+//! store   ──► keys, codec, env   (redo, run, blob)
+//! catalog ──► keys, codec, env
 //! keys    ──► codec, env
 //! codec, env ──► keine internen Module
 //! testing ──► alles; außerhalb von testing nutzt niemand testing
@@ -29,16 +32,22 @@ const REGELN: &[(&str, &[&str])] = &[
         "api",
         &["engine", "erase", "catalog", "keys", "codec", "sync"],
     ),
-    ("erase", &["engine", "keys", "codec", "env", "sync"]),
+    ("erase", &["store", "catalog", "keys", "codec", "env", "sync"]),
     (
         "engine",
         &[
-            "redo", "run", "blob", "catalog", "keys", "codec", "env", "sync",
+            "store", "maint", "catalog", "keys", "codec", "env", "sync",
         ],
     ),
-    ("redo", &["keys", "codec", "env", "sync"]),
-    ("run", &["keys", "codec", "env", "sync"]),
-    ("blob", &["keys", "codec", "env", "sync"]),
+    (
+        "maint",
+        &["engine", "erase", "store", "catalog", "keys", "codec", "env", "sync"],
+    ),
+    (
+        "recovery",
+        &["engine", "store", "maint", "catalog", "erase", "keys", "codec", "env", "sync"],
+    ),
+    ("store", &["keys", "codec", "env", "sync"]),
     ("catalog", &["keys", "codec", "env", "sync"]),
     ("keys", &["codec", "env", "sync"]),
     ("codec", &[]),
@@ -365,7 +374,7 @@ fn env_ist_senke_ohne_interne_module() {
 #[test]
 fn inline_pfad_wird_erfasst() {
     let inhalt = "fn f() {\n    let x = crate::engine::Flush::new();\n}\n";
-    let v = pruefe_datei("redo/frame.rs", inhalt);
+    let v = pruefe_datei("store/redo/frame.rs", inhalt);
     assert_eq!(v.len(), 1);
     assert_eq!(v[0].zeile, 2);
     assert_eq!(v[0].nach, "engine");
@@ -373,15 +382,15 @@ fn inline_pfad_wird_erfasst() {
 
 #[test]
 fn gruppierter_mehrzeiliger_import_wird_erfasst() {
-    let inhalt = "use crate::{\n    keys::A,\n    blob::{B, C},\n    codec::D,\n};\n";
-    let v = pruefe_datei("redo/frame.rs", inhalt);
+    let inhalt = "use crate::{\n    keys::A,\n    engine::{B, C},\n    codec::D,\n};\n";
+    let v = pruefe_datei("store/redo/frame.rs", inhalt);
     assert_eq!(v.len(), 1);
-    assert_eq!(v[0].nach, "blob");
+    assert_eq!(v[0].nach, "engine");
 }
 
 #[test]
 fn kommentare_werden_ignoriert() {
-    let v = pruefe_datei("redo/frame.rs", "// use crate::engine::X;\n");
+    let v = pruefe_datei("store/redo/frame.rs", "// use crate::engine::X;\n");
     assert!(v.is_empty());
 }
 
@@ -392,18 +401,19 @@ fn wurzelitem_ist_kein_modul() {
 }
 
 #[test]
-fn erase_darf_nur_engine_nach_oben() {
+fn erase_nutzt_engine_nicht() {
+    // SPEC §3.3: erase ──► { store, catalog, keys, codec, env }, nie engine.
+    assert!(pruefe_datei("erase/plan.rs", "use crate::store::blob::B;\n").is_empty());
     assert_eq!(
-        pruefe_datei("erase/plan.rs", "use crate::blob::B;\n").len(),
+        pruefe_datei("erase/plan.rs", "use crate::engine::E;\n").len(),
         1
     );
-    assert!(pruefe_datei("erase/plan.rs", "use crate::engine::E;\n").is_empty());
 }
 
 #[test]
 fn api_nutzt_nur_erlaubte_quellen() {
     assert_eq!(
-        pruefe_datei("api/listener.rs", "use crate::redo::R;\n").len(),
+        pruefe_datei("api/listener.rs", "use crate::store::redo::R;\n").len(),
         1
     );
     assert!(pruefe_datei("api/listener.rs", "use crate::catalog::C;\n").is_empty());
@@ -432,13 +442,13 @@ fn testing_nur_von_testing_genutzt() {
 
 #[test]
 fn super_aus_modulwurzel_wird_aufgeloest() {
-    // In run/mod.rs zeigt `super` auf die Krate-Wurzel, also auf das Modul `redo`.
-    assert_eq!(pruefe_datei("run/mod.rs", "use super::redo::R;\n").len(), 1);
-    // In run/block.rs bleibt `super` innerhalb von `run`.
-    assert!(pruefe_datei("run/block.rs", "use super::error::E;\n").is_empty());
-    // Zwei Ebenen nach oben erreichen die Wurzel: `blob` ist für `run` verboten.
+    // In store/run/mod.rs zeigt `super` auf `store`; `super::redo` bleibt in `store`.
+    assert!(pruefe_datei("store/run/mod.rs", "use super::redo::R;\n").is_empty());
+    // In store/run/block.rs bleibt `super` innerhalb von `store::run`.
+    assert!(pruefe_datei("store/run/block.rs", "use super::error::E;\n").is_empty());
+    // Drei Ebenen nach oben erreichen die Wurzel: `engine` ist für `store` verboten.
     assert_eq!(
-        pruefe_datei("run/data.rs", "use super::super::blob::B;\n").len(),
+        pruefe_datei("store/run/data.rs", "use super::super::super::engine::E;\n").len(),
         1
     );
 }

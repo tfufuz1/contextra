@@ -5,9 +5,9 @@
 
 use crate::codec::crc32c::crc32c;
 use crate::codec::limits::MAX_CHANGE_BYTES;
-use crate::redo::frame::{RedoFrame, FLAG_DURABILITY_MASK, FLAG_SEAL};
-use crate::redo::header::{RedoHeader, HEADER_SIZE};
-use crate::redo::op::RedoOp;
+use crate::store::redo::frame::{RedoFrame, FLAG_DURABILITY_MASK, FLAG_SEAL};
+use crate::store::redo::header::{RedoHeader, HEADER_SIZE};
+use crate::store::redo::op::RedoOp;
 
 /// Ereignisse, die der Replay-Zustandsmaschine aus dem gelesenen Bytestrom übergeben werden.
 #[derive(Debug, Clone, PartialEq, Eq)]

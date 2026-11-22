@@ -2,7 +2,7 @@
 //!
 //! Liest und verifiziert Records aus Blob-Dateien nach SPEC §9.6.
 
-use crate::blob::record::{
+use crate::store::blob::record::{
     BlobFooter, BlobHeader, BlobRecord, BlobRef, BLOB_FOOTER_LEN, BLOB_HEADER_LEN,
     RECORD_KIND_HOLE,
 };

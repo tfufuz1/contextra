@@ -15,20 +15,20 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use contextra_storage::blob::reader::BlobReader;
-use contextra_storage::blob::record::BlobRecord;
+use contextra_storage::store::blob::reader::BlobReader;
+use contextra_storage::store::blob::record::BlobRecord;
 use contextra_storage::catalog::current::write_current;
 use contextra_storage::catalog::log::{catalog_file_name, CatalogLog};
 use contextra_storage::catalog::reserve::IdReserve;
 use contextra_storage::catalog::types::{CatalogFileKind, CatalogSpaceOptions};
 use contextra_storage::catalog::log::CatalogHeader;
 use contextra_storage::codec::tag::{Tag, TagKind};
-use contextra_storage::engine::compaction::exec::run_file_name;
-use contextra_storage::engine::flush::{flush_memtable, CommitterSync, FlushError, FrozenMemtable, MemtableEntry};
+use contextra_storage::maint::compaction::exec::run_file_name;
+use contextra_storage::maint::flush::{flush_memtable, CommitterSync, FlushError, FrozenMemtable, MemtableEntry};
 use crate::recover_engine;
-use contextra_storage::run::blob_ref::BlobRef;
-use contextra_storage::run::block::BlockSecurity;
-use contextra_storage::run::reader::RunReader;
+use contextra_storage::store::run::blob_ref::BlobRef;
+use contextra_storage::store::run::block::BlockSecurity;
+use contextra_storage::store::run::reader::RunReader;
 use contextra_storage::testing::fault_fs::{FaultConfig, FaultFs};
 use contextra_storage::testing::mem_fs::MemFs;
 use contextra_ports::persistence::{Secret32, File, Fs, KeyDomain, KeyProvider, OpenMode, Perm, Stamp};
@@ -297,7 +297,7 @@ fn test_flush_domain_sealed_shredded_body_produces_blobref_zero() {
     let reader = RunReader::open(Arc::from(run_file), file_len, BlockSecurity::Plain, None).unwrap();
 
     let block_data = reader.load_data_block(0).unwrap();
-    let db_reader = contextra_storage::run::data::DataBlockReader::new(&block_data).unwrap();
+    let db_reader = contextra_storage::store::run::data::DataBlockReader::new(&block_data).unwrap();
     let mut entries_iter = db_reader.iter();
     let entry = entries_iter.next().unwrap().unwrap();
 
@@ -381,11 +381,11 @@ fn test_crash_matrix_flush_after_edit_files_live_inv_flush_1() {
 
     // INV-LOG-8: Die Änderung steht vor dem Flush im Redo-Log (dauerhaft).
     let entropy = contextra_storage::env::entropy::RealEntropy;
-    let mut redo = contextra_storage::redo::driver::RedoWriter::open_new(
+    let mut redo = contextra_storage::store::redo::driver::RedoWriter::open_new(
         Arc::clone(&mem), base_dir, 1, 1024 * 1024, &entropy,
     ).unwrap();
-    let redo_op = contextra_storage::redo::op::RedoOp::new_put(1, None, b"k".to_vec(), b"v".to_vec());
-    redo.write_change(10, contextra_storage::redo::frame::Durability::Always, &[redo_op], 2, &entropy).unwrap();
+    let redo_op = contextra_storage::store::redo::op::RedoOp::new_put(1, None, b"k".to_vec(), b"v".to_vec());
+    redo.write_change(10, contextra_storage::store::redo::frame::Durability::Always, &[redo_op], 2, &entropy).unwrap();
 
     let committer = TestCommitter::new(10);
     let memtable = FrozenMemtable {

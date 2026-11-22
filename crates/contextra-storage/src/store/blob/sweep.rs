@@ -3,7 +3,7 @@
 //! SPEC §9.6 und §14.3: Erzeugt Generation g+1 mit identischen Offsets.
 //! Gelöschte Records werden durch Hole-Records mit Nullen ersetzt.
 
-use crate::blob::record::{
+use crate::store::blob::record::{
     BlobFooter, BlobHeader, BLOB_FOOTER_LEN, BLOB_HEADER_LEN, RECORD_KIND_HOLE,
 };
 use crate::codec::crc32c::crc32c;

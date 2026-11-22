@@ -10,10 +10,7 @@
 //! - `committer`: Flat-Combining Group-Commit mit Leiterwahl und Gegendruck (E-4, SD-49, SD-53)
 
 pub mod committer;
-pub mod compaction;
-pub mod flush;
 pub mod memtable;
-pub mod recovery;
 pub mod registry;
 pub mod retention;
 pub mod version;

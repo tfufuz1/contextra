@@ -5,10 +5,10 @@
 //! schneidet Torn Tails im letzten ungesiegelten Segment ab und siegelt sie.
 
 use contextra_ports::persistence::{Fs, OpenMode};
-use crate::redo::error::{check_redo_hwm, RedoError};
-use crate::redo::frame::RedoFrame;
-use crate::redo::op::RedoOp;
-use crate::redo::replay_sm::{ReplayEffect, ReplayEvent, ReplayStateMachine};
+use crate::store::redo::error::{check_redo_hwm, RedoError};
+use crate::store::redo::frame::RedoFrame;
+use crate::store::redo::op::RedoOp;
+use crate::store::redo::replay_sm::{ReplayEffect, ReplayEvent, ReplayStateMachine};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -71,7 +71,7 @@ pub fn recover_redo<F: Fs>(
     let num_segments = segment_ids.len();
 
     for (seg_idx, &seg_id) in segment_ids.iter().enumerate() {
-        let seg_path = base_dir.join(crate::redo::driver::segment_file_name(seg_id));
+        let seg_path = base_dir.join(crate::store::redo::driver::segment_file_name(seg_id));
         let file = fs.open(&seg_path, OpenMode::ReadWrite)?;
 
         let mut rsm = ReplayStateMachine::new();

@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
-use contextra_storage::blob::record::*;
+use contextra_storage::store::blob::record::*;
 
 #[test]
 fn test_blob_header_encode_decode_roundtrip() {

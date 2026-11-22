@@ -8,7 +8,7 @@ mod recovery_tests;
 
 use contextra_ports::persistence::{Cipher, Fs, Kdf, Mac};
 use contextra_storage::catalog::types::CatalogSpaceOptions;
-use contextra_storage::engine::recovery::{recover_instance, RecoveryError, RecoveryResult};
+use contextra_storage::recovery::{recover_instance, RecoveryError, RecoveryResult};
 use std::path::Path;
 use std::sync::Arc;
 
