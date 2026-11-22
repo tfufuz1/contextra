@@ -244,7 +244,7 @@ impl<F: Fs> RedoWriter<F> {
     }
 
     fn execute_truncate(&mut self, len: u64) -> Result<(), RedoError> {
-        let trunc_res = self.current_file.set_len(len);
+        let trunc_res = self.current_file.truncate(len);
         match trunc_res {
             Ok(()) => {
                 let effects = self.sm.step(WriterEvent::IoTruncateSuccess);

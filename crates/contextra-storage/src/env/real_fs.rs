@@ -114,7 +114,7 @@ impl File for RealFile {
         Ok(self.inner.metadata()?.len())
     }
 
-    fn set_len(&self, len: u64) -> io::Result<()> {
+    fn truncate(&self, len: u64) -> io::Result<()> {
         self.inner.set_len(len)
     }
 

@@ -56,7 +56,7 @@ impl File for MemFileHandle {
         Ok(self.content.read().unwrap().data.len() as u64)
     }
 
-    fn set_len(&self, len: u64) -> io::Result<()> {
+    fn truncate(&self, len: u64) -> io::Result<()> {
         let mut inner = self.content.write().unwrap();
         let len = usize::try_from(len).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
         inner.data.resize(len, 0);

@@ -74,7 +74,7 @@ fn test_file_read_write<F: Fs>(fs: &F, root: &Path) {
     assert_eq!(read_bytes, payload.len());
     assert_eq!(&buf, payload);
 
-    file.set_len(50).expect("set_len succeeds");
+    file.truncate(50).expect("truncate succeeds");
     assert_eq!(file.len().expect("len succeeds"), 50);
 }
 

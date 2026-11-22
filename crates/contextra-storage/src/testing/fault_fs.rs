@@ -202,7 +202,7 @@ impl File for FaultFile {
     }
 
     fn len(&self) -> io::Result<u64> { self.inner.len() }
-    fn set_len(&self, len: u64) -> io::Result<()> { self.inner.set_len(len) }
+    fn truncate(&self, len: u64) -> io::Result<()> { self.inner.truncate(len) }
 
     fn sync_data(&self) -> io::Result<()> {
         if self.config.fail_sync.load(Ordering::Relaxed) {

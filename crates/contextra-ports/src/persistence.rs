@@ -146,8 +146,8 @@ pub trait File: Send + Sync {
 
     /// Aktuelle Länge in Bytes.
     fn len(&self) -> io::Result<u64>;
-    /// Setzt die Länge.
-    fn set_len(&self, len: u64) -> io::Result<()>;
+    /// Setzt die Länge (kürzt oder verlängert; SA-3).
+    fn truncate(&self, len: u64) -> io::Result<()>;
     /// Synchronisiert Daten.
     fn sync_data(&self) -> io::Result<()>;
     /// Synchronisiert Daten und Metadaten.
@@ -314,8 +314,8 @@ pub enum FileKind {
     Run,
     /// Blob-Datei (große Körper).
     Blob,
-    /// Segment.
-    Segment,
+    /// Segment mit Nummer innerhalb des Layouts (IF-1).
+    Segment(u16),
 }
 
 /// Eindeutige Referenz auf eine Datei.

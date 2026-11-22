@@ -234,7 +234,7 @@ fn test_inv_cat_3_torn_tail_discarded_vs_early_defect_corrupt_over_fault_fs() {
     // Wir hängen einen weiteren vollständigen Edit 2 an
     let mut e2 = CatalogEdit::default();
     e2.space_flushed.push((2, 200));
-    cat_file.set_len(len_before).unwrap();
+    cat_file.truncate(len_before).unwrap();
     let s2 = sync_existing(&fs, &*cat_file, root, e2).unwrap();
     log.commit(&*cat_file, s2, None, None, None, None).unwrap();
 

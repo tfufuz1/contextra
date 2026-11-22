@@ -174,7 +174,7 @@ pub fn recover_redo<F: Fs>(
                     rsm.current_offset
                 };
 
-                file.set_len(trunc_offset)?;
+                file.truncate(trunc_offset)?;
                 file.sync_data()?;
 
                 // Siegel anhängen

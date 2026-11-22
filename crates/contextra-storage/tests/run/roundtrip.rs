@@ -54,7 +54,7 @@ impl File for MemoryFile {
         Ok(self.0.len() as u64)
     }
 
-    fn set_len(&self, _len: u64) -> io::Result<()> {
+    fn truncate(&self, _len: u64) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Unsupported, "readonly"))
     }
 
