@@ -32,6 +32,8 @@ Kennungen dieses Dokuments: `WP-g.n` Arbeitspaket des Gates g · `IF-n` Schnitts
 | `keys`  | 683            | 6       | `KeyEpoch`, `KeysFile`, Hierarchie, Nonce-Protokoll. Arbeitet mit **Domänenschlüsseln** (`KeyDomain`: 16 Treffer in `src`, 7 in `tests`) und 12-Byte-Nonces (11 Treffer `src`, 3 `tests`). **Umbau** auf Clusterschlüssel (D-19) und 24-Byte-Nonces (SD-14). |
 | `redo`  | 2 230          | 9       | Schreib- und Replay-Zustandsautomaten, Frame, Header. Der Segmentkopf ist 48 Byte fest mit `chain_seed: u32` und `prealloc_len` (`redo/header.rs`), die Spec verlangt `root_gen` und `chain_seed` von 4 oder 16 Byte (§10.4). **Layout neu ableiten** (G-3). |
 
+**Build- und Teststand (gemessen 22.11.2026, `rustc 1.97.0`):** `cargo check -p contextra-storage --all-targets --features testing` endet mit Exit 0 (25 Zeilen `warning`, u. a. `unused_mut` in `tests/redo`). `cargo test -p contextra-storage --features testing --no-fail-fast`: 200 bestanden, 1 fehlgeschlagen, 2 ignoriert. Der eine Fehlschlag ist `invariants::test_all_invariants_cited`: der Parser in `tests/invariants.rs` sucht Zeilen mit dem Präfix `|INV-` (altes Tabellenformat), Spec R8 §18 schreibt `| INV-… |` und enthält 59 Invarianten; Ergebnis „gefunden: 0“. Das ist ein Formatfehler im Test, kein Verstoß gegen eine Invariante; Behebung in WP-1.9.
+
 Gesamtumfang `crates/contextra-storage/src`: 17 525 Zeilen (`wc -l` über alle `*.rs`). Die Tabelle nennt nur die Module, die der Umbau am stärksten trifft; `run`, `blob`, `catalog`, `engine` und `testing` sind in §4.1 (Verschiebung) und §8 (Pakete) erfasst. `tests/` enthält u. a. `layering.rs`, `invariants.rs`, `golden_anhang_a.rs`, `fs_mem_test.rs`, `fs_real_test.rs` und die Verzeichnisse `loom/`, `redo/`, `run/`, `keys/`, `catalog/`, `engine/`, `format/`.
 
 ### 2.2 Port-Katalog `contextra-ports::persistence`
@@ -503,6 +505,7 @@ Notation: `WP-g.n` — Eingang (Spec/Bestand) → Ausgang (Dateien) → Nachweis
 | WP-1.5 | Mechanische Verschiebung nach Zielbaum (§4.1) per `git mv`; `tests/layering.rs` auf §4.2 anpassen ⇐ WP-1.3 | `cargo test -p contextra-storage --test layering` |
 | WP-1.6 | `Runtime` in den Port (SA-9), `Governor` bleibt im Kern | Test `Runtime::manual()` deterministisch |
 | WP-1.7 | Konsumentenmatrix gegen Spec §26 abgleichen und SA-6/SA-7/SA-10 einreichen | §2.4 dieses Dokuments |
+| WP-1.9 | `tests/invariants.rs`: Parser auf das Format `\| INV-… \|` aus Spec §18 umstellen (59 Invarianten); Test muss danach grün sein, ohne die Schwelle (≥ 35) zu senken | `cargo test -p contextra-storage --test invariants` |
 | WP-1.8 | O-12 (benannte Reviewer) klären — **Voraussetzung für G-1** | Eintrag in Spec §24 |
 
 ### G-2 Formate, Checksummen, Seal-Rahmen, Schlüsselhierarchie
