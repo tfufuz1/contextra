@@ -4,7 +4,7 @@
 
 use contextra_storage::testing::fault_fs::{FaultConfig, FaultFs, XorShift64};
 use contextra_storage::testing::{HookPoint, MemFs, TestHooks};
-use contextra_storage_ports::{Fs, OpenMode, Perm};
+use contextra_ports::persistence::{Fs, OpenMode, Perm};
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -13,7 +13,7 @@ fn run_deterministic_scenario(seed: u64) -> (u64, Vec<String>) {
     let mem = MemFs::new();
     let cfg = Arc::new(FaultConfig::new(seed));
     let hooks = Arc::new(TestHooks::new());
-    cfg.set_hooks(Arc::clone(&hooks) as Arc<dyn contextra_storage_ports::Hooks>);
+    cfg.set_hooks(Arc::clone(&hooks) as Arc<dyn contextra_ports::persistence::Hooks>);
     let fs = FaultFs::new_mem(mem.clone(), Arc::clone(&cfg));
 
     let root = Path::new("/det_root");

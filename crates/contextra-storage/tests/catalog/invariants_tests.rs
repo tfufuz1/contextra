@@ -6,7 +6,7 @@ use contextra_storage::catalog::edit::CatalogEdit;
 use contextra_storage::catalog::log::{catalog_file_name, CatalogHeader, CatalogLog};
 use contextra_storage::catalog::types::*;
 use contextra_storage::testing::{FaultConfig, FaultFs, MemFs};
-use contextra_storage_ports::{Fs, OpenMode, Perm};
+use contextra_ports::persistence::{Fs, OpenMode, Perm};
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;

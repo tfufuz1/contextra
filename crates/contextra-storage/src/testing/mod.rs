@@ -7,6 +7,7 @@ pub mod conformance;
 pub mod fault_fs;
 pub mod hooks;
 pub mod mem_fs;
+pub mod refimpl;
 
 pub use fault_fs::{CrashMode, FaultConfig, FaultFs, XorShift64};
 pub use hooks::{HookPoint, TestHooks};

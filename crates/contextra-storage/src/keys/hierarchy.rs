@@ -6,7 +6,7 @@
 //! - Space-DEK -> Run-, Blob-, Segment-Schlüssel (unter Berücksichtigung von `key_epoch`)
 
 use super::secret::Secret32;
-use contextra_storage_ports::Kdf;
+use contextra_ports::persistence::Kdf;
 
 /// KDF-Kontext für den KEYS-Dateischlüssel.
 pub const CONTEXT_KEYS: &[u8] = b"ctxs keys v1";

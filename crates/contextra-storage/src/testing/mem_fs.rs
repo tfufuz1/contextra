@@ -5,7 +5,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
-use contextra_storage_ports::{DirEntry, File, Fs, FsCaps, LockGuard, LockMode, OpenMode, Perm, ReadReq};
+use contextra_ports::persistence::{DirEntry, File, Fs, FsCaps, LockGuard, LockMode, OpenMode, Perm, ReadReq};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};

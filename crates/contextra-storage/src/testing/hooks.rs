@@ -4,8 +4,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-pub use contextra_storage_ports::HookPoint;
-use contextra_storage_ports::Hooks;
+pub use contextra_ports::persistence::HookPoint;
+use contextra_ports::persistence::Hooks;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

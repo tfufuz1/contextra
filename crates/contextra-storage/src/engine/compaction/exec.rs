@@ -14,7 +14,7 @@ use crate::run::blob_ref::BlobRef;
 use crate::run::block::BlockSecurity;
 use crate::run::builder::{RunBuilder, RunBuilderOptions};
 use crate::run::reader::RunReader;
-use contextra_storage_ports::{CompactionFilter, Fs, KeyDomain, KeyProvider, OpenMode, Perm};
+use contextra_ports::persistence::{CompactionFilter, Fs, KeyDomain, KeyProvider, OpenMode, Perm};
 use std::collections::{BTreeMap, HashMap};
 use std::io;
 use std::path::{Path, PathBuf};

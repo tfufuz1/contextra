@@ -11,7 +11,7 @@
 
 use super::hierarchy::derive_keys_key;
 use super::secret::Secret32;
-use contextra_storage_ports::{Cipher, Entropy, Kdf};
+use contextra_ports::persistence::{Cipher, Entropy, Kdf};
 use std::fmt;
 
 /// Magische Konstante für KEYS-Dateien.

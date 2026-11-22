@@ -1,8 +1,8 @@
 //! # Authenticated und Encrypted Frame Tests
 //!
-//! SPEC §9.4 und §15.2: Mac16, ChaCha20Poly1305 und Domänenversiegelung (Nonce 0x03).
+//! SPEC §9.4 und §15.2: Mac16, AES-256-GCM-SIV und Domänenversiegelung (Nonce 0x03).
 
-use contextra_crypto_ref::{Blake3Mac, ChaChaCipher};
+use contextra_storage::testing::refimpl::{Blake3Mac, AesGcmSivCipher};
 use contextra_storage::redo::frame::{Durability, RedoFrame};
 use contextra_storage::redo::op::{RedoOp, OPFLAG_DOMAIN, OPFLAG_SEALED};
 
@@ -32,7 +32,7 @@ fn test_authenticated_frame() {
 
 #[test]
 fn test_encrypted_frame() {
-    let cipher = ChaChaCipher;
+    let cipher = AesGcmSivCipher;
     let redo_key = [0x7Eu8; 32];
     let segment_id = 0x100u64;
     let frame_index = 1u32;
@@ -56,7 +56,7 @@ fn test_encrypted_frame() {
 
 #[test]
 fn test_domain_sealed_op_body() {
-    let cipher = ChaChaCipher;
+    let cipher = AesGcmSivCipher;
     let domain_key = [0x33u8; 32];
     let space = 1u16;
     let domain = 42u32;

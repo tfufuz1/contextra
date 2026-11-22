@@ -13,7 +13,7 @@ use crate::engine::compaction::exec::run_file_name;
 use crate::redo::error::RedoError;
 use crate::redo::op::{RedoOp, RedoOpKind, OPFLAG_UNBOUNDED_END};
 use crate::redo::replay::{parse_segment_id, recover_redo};
-use contextra_storage_ports::{Cipher, Fs, Kdf, LockGuard, LockMode, Mac, OpenMode, Stamp};
+use contextra_ports::persistence::{Cipher, Fs, Kdf, LockGuard, LockMode, Mac, OpenMode, Stamp};
 use std::collections::HashSet;
 use std::fmt;
 use std::io;

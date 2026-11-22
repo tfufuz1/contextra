@@ -5,7 +5,7 @@
 //! Weicht FORMAT.integrity_mode ab, ist das Ergebnis Err(Unsupported{integrity_mode}),
 //! bevor irgendeine andere Datei gelesen wird.
 
-use contextra_crypto_ref::Blake3Mac;
+use contextra_storage::testing::refimpl::Blake3Mac;
 use contextra_storage::catalog::format::{FormatError, FormatHeader, IntegrityMode};
 use contextra_storage::keys::secret::Secret32;
 

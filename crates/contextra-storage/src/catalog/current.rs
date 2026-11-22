@@ -6,7 +6,7 @@
 use crate::catalog::durable::{write_atomic_synced, Synced};
 use crate::catalog::types::CatalogError;
 use crate::codec::crc32c::crc32c;
-use contextra_storage_ports::{Fs, OpenMode};
+use contextra_ports::persistence::{Fs, OpenMode};
 use std::io;
 use std::path::Path;
 

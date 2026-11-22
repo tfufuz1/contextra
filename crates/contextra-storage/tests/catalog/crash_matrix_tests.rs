@@ -19,7 +19,7 @@ use contextra_storage::catalog::reserve::IdReserve;
 use contextra_storage::catalog::state::apply_edit;
 use contextra_storage::catalog::types::*;
 use contextra_storage::testing::{FaultConfig, FaultFs, MemFs};
-use contextra_storage_ports::{Fs, OpenMode, Perm};
+use contextra_ports::persistence::{Fs, OpenMode, Perm};
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::atomic::Ordering;

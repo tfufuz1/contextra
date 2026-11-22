@@ -4,7 +4,7 @@
 
 use contextra_storage::testing::conformance::run_fs_conformance_suite;
 use contextra_storage::testing::MemFs;
-use contextra_storage_ports::{Fs, OpenMode, Perm};
+use contextra_ports::persistence::{Fs, OpenMode, Perm};
 use std::path::Path;
 
 #[test]

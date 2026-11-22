@@ -25,22 +25,25 @@ use contextra_storage::catalog::edit::CatalogEdit;
 use contextra_storage::catalog::log::{catalog_file_name, CatalogLog};
 use contextra_storage::catalog::reserve::IdReserve;
 use contextra_storage::catalog::state::CatalogState;
-use contextra_storage::catalog::types::{CatalogFileKind, CatalogHeader, CatalogSpaceOptions, FileMeta};
+use contextra_storage::catalog::types::{CatalogFileKind, CatalogSpaceOptions, FileMeta};
+use contextra_storage::catalog::log::CatalogHeader;
 use contextra_storage::codec::tag::{Tag, TagKind};
 use contextra_storage::engine::compaction::exec::{execute_compaction, run_file_name};
 use contextra_storage::engine::compaction::install::{install_compaction, CompactionInstallError};
 use contextra_storage::engine::compaction::plan::{plan, Claims, CompactionParams};
 use contextra_storage::engine::compaction::retain::{retain_key_versions, CompactionEntry};
-use contextra_storage::engine::recovery::recover_engine;
+use crate::recover_engine;
+use contextra_storage::engine::compaction::CompactionPlan;
 use contextra_storage::run::block::BlockSecurity;
 use contextra_storage::run::builder::{RunBuilder, RunBuilderOptions};
 use contextra_storage::run::reader::RunReader;
 use contextra_storage::testing::fault_fs::{FaultConfig, FaultFs};
 use contextra_storage::testing::mem_fs::MemFs;
-use contextra_storage_ports::{File, Fs, OpenMode, Perm};
+use contextra_ports::persistence::{File, Fs, OpenMode, Perm};
 
 fn init_catalog(fs: &dyn Fs, base_dir: &Path) -> (Arc<dyn File>, CatalogLog, CatalogState) {
     fs.create_dir_all(base_dir, Perm::Private).unwrap();
+    crate::create_format(fs, base_dir);
     write_current(fs, base_dir, 1).unwrap();
     let cat_path = base_dir.join(catalog_file_name(1));
     let cat_file = fs.open(&cat_path, OpenMode::CreateNew(Perm::Private)).unwrap();
@@ -124,7 +127,7 @@ fn test_compaction_plan_l0_trigger_and_non_overlapping_level1_property() {
     // Auslöser: L0-Anzahl >= 4 => alle L0-Runs plus überlappende L1-Runs.
     // Planer-Eigenschaft: Auf Level >= 1 keine überlappenden Ausgaben.
     let mut state = CatalogState::default();
-    state.spaces.insert(1, CatalogSpaceOptions::default());
+    state.spaces.insert(1, (Vec::new(), crate::space_opts()));
 
     let params = CompactionParams {
         l0_trigger: 4,
@@ -191,7 +194,7 @@ fn test_compaction_plan_l0_trigger_and_non_overlapping_level1_property() {
 fn test_compaction_property_level_ge_1_disjoint_ranges() {
     // Property: Auf Level >= 1 gibt es keine überlappenden Runs je Space.
     let mut state = CatalogState::default();
-    state.spaces.insert(1, CatalogSpaceOptions::default());
+    state.spaces.insert(1, (Vec::new(), crate::space_opts()));
 
     // Drei disjunkte Level-1-Runs anlegen:
     // Run 1: ["a", "d"]
@@ -247,11 +250,11 @@ fn test_compaction_property_level_ge_1_disjoint_ranges() {
 fn test_compaction_exec_and_install_end_to_end_with_inv_claim_1() {
     // SPEC §12.2, §16.5 (INV-CLAIM-1):
     // Vollständiger Ablauf aus Plan, Exec und Install mit Atomizität und Cancel-Flag.
-    let mem = MemFs::new();
+    let mem = Arc::new(MemFs::new());
     let base_dir = Path::new("/test_compaction_e2e");
-    let (cat_file, mut cat_log, mut cat_state) = init_catalog(&mem, base_dir);
+    let (cat_file, mut cat_log, mut cat_state) = init_catalog(&*mem, base_dir);
 
-    cat_state.spaces.insert(1, CatalogSpaceOptions::default());
+    cat_state.spaces.insert(1, (Vec::new(), crate::space_opts()));
 
     // Erzeuge 4 L0-Runs mit jeweils 2 Einträgen
     let mut l0_metas = Vec::new();
@@ -260,7 +263,7 @@ fn test_compaction_exec_and_install_end_to_end_with_inv_claim_1() {
         let k2 = format!("key_{i:02}_b").into_bytes();
         let tag1 = Tag::new(i * 10, TagKind::Put);
         let tag2 = Tag::new(i * 10 + 1, TagKind::Put);
-        let meta = create_test_run(&mem, base_dir, 1, i, &[
+        let meta = create_test_run(&*mem, base_dir, 1, i, &[
             (&k1, tag1, b"val1"),
             (&k2, tag2, b"val2"),
         ]);
@@ -276,11 +279,11 @@ fn test_compaction_exec_and_install_end_to_end_with_inv_claim_1() {
     let comp_plan = plan(&cat_state, &params, 100, &claims).expect("Plan ausgelöst");
 
     let mut id_reserve = IdReserve::new(&cat_state);
-    let space_opts = CatalogSpaceOptions::default();
+    let space_opts = crate::space_opts();
 
     // 1. Exec: Runs zusammenführen
     let exec_res = execute_compaction(
-        &mem,
+        &*mem,
         base_dir,
         &comp_plan,
         &space_opts,
@@ -298,7 +301,7 @@ fn test_compaction_exec_and_install_end_to_end_with_inv_claim_1() {
     let mut graveyard = Vec::new();
 
     let new_state = install_compaction(
-        &mem,
+        &*mem,
         base_dir,
         &*cat_file,
         &mut cat_log,
@@ -324,18 +327,18 @@ fn test_compaction_exec_and_install_end_to_end_with_inv_claim_1() {
 #[test]
 fn test_compaction_install_cancelled_on_urgent_conflict_inv_claim_1() {
     // // INV-CLAIM-1: Kompaktion wird abgebrochen, wenn cancel_flag gesetzt ist
-    let mem = MemFs::new();
+    let mem = Arc::new(MemFs::new());
     let base_dir = Path::new("/test_compaction_cancelled");
-    let (cat_file, mut cat_log, mut cat_state) = init_catalog(&mem, base_dir);
-    cat_state.spaces.insert(1, CatalogSpaceOptions::default());
+    let (cat_file, mut cat_log, mut cat_state) = init_catalog(&*mem, base_dir);
+    cat_state.spaces.insert(1, (Vec::new(), crate::space_opts()));
 
-    let meta = create_test_run(&mem, base_dir, 1, 1, &[
+    let meta = create_test_run(&*mem, base_dir, 1, 1, &[
         (b"k", Tag::new(10, TagKind::Put), b"v"),
     ]);
     cat_state.files.insert((CatalogFileKind::Run, 1), meta.clone());
 
     let mut id_reserve = IdReserve::new(&cat_state);
-    let space_opts = CatalogSpaceOptions::default();
+    let space_opts = crate::space_opts();
 
     let comp_plan = CompactionPlan {
         space: 1,
@@ -350,7 +353,7 @@ fn test_compaction_install_cancelled_on_urgent_conflict_inv_claim_1() {
     };
 
     let exec_res = execute_compaction(
-        &mem,
+        &*mem,
         base_dir,
         &comp_plan,
         &space_opts,
@@ -365,7 +368,7 @@ fn test_compaction_install_cancelled_on_urgent_conflict_inv_claim_1() {
     let mut graveyard = Vec::new();
 
     let res = install_compaction(
-        &mem,
+        &*mem,
         base_dir,
         &*cat_file,
         &mut cat_log,
@@ -389,15 +392,15 @@ fn test_compaction_install_cancelled_on_urgent_conflict_inv_claim_1() {
 #[test]
 fn test_crash_matrix_compaction_crash_before_edit_cleans_unreferenced_outputs() {
     // Zeile §13.2: Compaction: nach Ausgabe, vor Edit | verwaiste Ausgaben | gelöscht, Eingaben unverändert
-    let mem = MemFs::new();
+    let mem = Arc::new(MemFs::new());
     let fault_cfg = Arc::new(FaultConfig::default());
-    let fs = FaultFs::new(mem, Arc::clone(&fault_cfg));
+    let fs = Arc::new(FaultFs::new((*mem).clone(), Arc::clone(&fault_cfg)));
     let base_dir = Path::new("/crash_comp_before_edit");
 
-    let (cat_file, mut cat_log, mut cat_state) = init_catalog(&fs, base_dir);
-    cat_state.spaces.insert(1, CatalogSpaceOptions::default());
+    let (cat_file, mut cat_log, mut cat_state) = init_catalog(&*fs, base_dir);
+    cat_state.spaces.insert(1, (Vec::new(), crate::space_opts()));
 
-    let meta = create_test_run(&fs, base_dir, 1, 1, &[
+    let meta = create_test_run(&*fs, base_dir, 1, 1, &[
         (b"k", Tag::new(10, TagKind::Put), b"v"),
     ]);
     cat_state.files.insert((CatalogFileKind::Run, 1), meta.clone());
@@ -407,7 +410,7 @@ fn test_crash_matrix_compaction_crash_before_edit_cleans_unreferenced_outputs() 
     let cat_f = fs.open(&cat_path, OpenMode::ReadWrite).unwrap();
     let mut edit = CatalogEdit::default();
     edit.add_files.push(meta.clone());
-    let s = sync_existing(&fs, &*cat_f, base_dir, edit).unwrap();
+    let s = sync_existing(&*fs, &*cat_f, base_dir, edit).unwrap();
     cat_log.commit(&*cat_f, s, None, None, None, None).unwrap();
 
     let mut id_reserve = IdReserve::new(&cat_state);
@@ -424,10 +427,10 @@ fn test_crash_matrix_compaction_crash_before_edit_cleans_unreferenced_outputs() 
     };
 
     let exec_res = execute_compaction(
-        &fs,
+        &*fs,
         base_dir,
         &comp_plan,
-        &CatalogSpaceOptions::default(),
+        &crate::space_opts(),
         &mut id_reserve,
         None,
         None,

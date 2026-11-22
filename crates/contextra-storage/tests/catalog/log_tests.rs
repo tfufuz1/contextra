@@ -8,7 +8,7 @@ use contextra_storage::catalog::rollover::rollover;
 use contextra_storage::catalog::state::CatalogState;
 use contextra_storage::catalog::types::*;
 use contextra_storage::testing::MemFs;
-use contextra_storage_ports::{Fs, OpenMode, Perm};
+use contextra_ports::persistence::{Fs, OpenMode, Perm};
 use std::path::Path;
 
 #[test]

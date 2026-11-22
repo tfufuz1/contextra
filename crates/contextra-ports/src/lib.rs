@@ -61,6 +61,8 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
+/// Persistenz-Ports für contextra-storage (SPEC §4). Kein Glob-Re-Export.
+pub mod persistence;
 /// Storage layer scanners and purgers (Vertrag V1, SPEC §12.7.4).
 pub mod scanner;
 /// Key-value storage engine traits.

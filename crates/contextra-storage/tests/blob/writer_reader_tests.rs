@@ -1,11 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
-use contextra_crypto_ref::{Blake3Kdf, Blake3Mac, ChaChaCipher};
+use contextra_storage::testing::refimpl::{Blake3Kdf, Blake3Mac, AesGcmSivCipher};
 use contextra_storage::blob::reader::{BlobReadError, BlobReader};
 use contextra_storage::blob::record::BlobRecord;
 use contextra_storage::blob::writer::BlobWriter;
 use contextra_storage::testing::MemFs;
-use contextra_storage_ports::{Fs, OpenMode, Perm};
+use contextra_ports::persistence::{Fs, OpenMode, Perm};
 use std::path::Path;
 
 #[test]
@@ -82,7 +82,7 @@ fn test_blob_writer_reader_encrypted() {
     let path = Path::new("blob_enc.ctxb");
     let file = fs.open(path, OpenMode::CreateNew(Perm::Private)).unwrap();
 
-    let cipher = ChaChaCipher;
+    let cipher = AesGcmSivCipher;
     let mac = Blake3Mac;
     let kdf = Blake3Kdf;
     let space_dek = [0x77u8; 32];

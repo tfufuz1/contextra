@@ -13,7 +13,7 @@ use crate::catalog::reserve::IdReserve;
 use crate::catalog::state::{apply_edit, CatalogState};
 use crate::catalog::types::CatalogFileKind;
 use crate::engine::compaction::exec::{run_file_name, CompactionExecutionResult};
-use contextra_storage_ports::{Cipher, File, Fs, Kdf, Mac};
+use contextra_ports::persistence::{Cipher, File, Fs, Kdf, Mac};
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};

@@ -8,7 +8,7 @@ pub mod config;
 pub use config::{CrashMode, FaultConfig, XorShift64};
 
 use crate::testing::MemFs;
-use contextra_storage_ports::{DirEntry, File, Fs, FsCaps, LockGuard, LockMode, OpenMode, Perm, ReadReq};
+use contextra_ports::persistence::{DirEntry, File, Fs, FsCaps, LockGuard, LockMode, OpenMode, Perm, ReadReq};
 use std::io;
 use std::path::Path;
 use std::sync::atomic::Ordering;

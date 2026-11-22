@@ -26,7 +26,7 @@ use crate::redo::parse_segment_id;
 use crate::run::blob_ref::BlobRef;
 use crate::run::block::BlockSecurity;
 use crate::run::builder::{RunBuilder, RunBuilderOptions};
-use contextra_storage_ports::{Cipher, File, Fs, Kdf, KeyDomain, KeyProvider, Mac, OpenMode, Perm, Stamp};
+use contextra_ports::persistence::{Cipher, File, Fs, Kdf, KeyDomain, KeyProvider, Mac, OpenMode, Perm, Stamp};
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};

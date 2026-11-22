@@ -23,19 +23,22 @@ use contextra_storage::catalog::durable::sync_existing;
 use contextra_storage::catalog::edit::CatalogEdit;
 use contextra_storage::catalog::log::{catalog_file_name, CatalogLog};
 use contextra_storage::catalog::reserve::IdReserve;
-use contextra_storage::catalog::types::{CatalogFileKind, CatalogHeader, FileMeta};
+use contextra_storage::catalog::types::{CatalogFileKind, FileMeta};
+use contextra_storage::catalog::log::CatalogHeader;
 use contextra_storage::engine::compaction::exec::run_file_name;
-use contextra_storage::engine::recovery::{recover_engine, RecoveryError};
+use contextra_storage::engine::recovery::RecoveryError;
+use crate::recover_engine;
 use contextra_storage::env::entropy::RealEntropy;
 use contextra_storage::redo::driver::{segment_file_name, RedoWriter};
 use contextra_storage::redo::frame::Durability;
 use contextra_storage::redo::op::RedoOp;
 use contextra_storage::testing::fault_fs::{FaultConfig, FaultFs};
 use contextra_storage::testing::mem_fs::MemFs;
-use contextra_storage_ports::{File, Fs, OpenMode, Perm};
+use contextra_ports::persistence::{File, Fs, OpenMode, Perm};
 
 fn init_catalog(fs: &dyn Fs, base_dir: &Path) {
     fs.create_dir_all(base_dir, Perm::Private).unwrap();
+    crate::create_format(fs, base_dir);
     write_current(fs, base_dir, 1).unwrap();
     let cat_path = base_dir.join(catalog_file_name(1));
     let cat_file = fs.open(&cat_path, OpenMode::CreateNew(Perm::Private)).unwrap();
@@ -68,7 +71,7 @@ fn test_recovery_step4_clean_building_and_unreferenced_files_inv_cat_4() {
     let _writer = RedoWriter::open_new(Arc::clone(&mem), base, 1, 1024 * 1024, &entropy).unwrap();
 
     // Recovery ausführen
-    let rec = recover_engine(&*mem, base, None, None, None, None).expect("Recovery gelingt");
+    let rec = recover_engine(&mem, base, None, None, None, None).expect("Recovery gelingt");
 
     // .building und unreferenzierter Run müssen weg sein
     assert!(mem.open(&b1, OpenMode::Read).is_err(), "INV-CAT-4: .building muss gelöscht sein");
@@ -113,13 +116,13 @@ fn test_recovery_step5_missing_file_fails_closed_corrupt_missing_file() {
     let s = sync_existing(&*mem, &*cat_file, base, edit).unwrap();
     log.commit(&*cat_file, s, None, None, None, None).unwrap();
 
-    let err = recover_engine(&*mem, base, None, None, None, None);
+    let err = recover_engine(&mem, base, None, None, None, None);
     match err {
         Err(RecoveryError::CorruptMissingFile { kind, id }) => {
             assert_eq!(kind, CatalogFileKind::Run);
             assert_eq!(id, 42);
         }
-        other => panic!("Erwartet CorruptMissingFile, erhalten: {:?}", other),
+        other => panic!("Erwartet CorruptMissingFile, erhalten Ok={}", other.is_ok()),
     }
 }
 
@@ -157,7 +160,7 @@ fn test_recovery_step6_flushed_stamp_filter_and_erase_pending() {
     let op15 = RedoOp::new_erase_range(1, b"a".to_vec(), Some(b"z".to_vec()));
     writer.write_change(15, Durability::Always, &[op15], 2, &entropy).unwrap();
 
-    let rec = recover_engine(&*mem, base, None, None, None, None).expect("Recovery gelingt");
+    let rec = recover_engine(&mem, base, None, None, None, None).expect("Recovery gelingt");
 
     // Prüfe angewendete Ops:
     // Op mit Stamp 8 darf NICHT angewendet worden sein
@@ -196,7 +199,7 @@ fn test_recovery_step6_inv_log_8_redo_truncated_fails_closed() {
     writer.write_change(50, Durability::Always, &[op], 2, &entropy).unwrap();
     writer.seal_and_close().unwrap();
 
-    let err = recover_engine(&*mem, base, None, None, None, None);
+    let err = recover_engine(&mem, base, None, None, None, None);
     assert!(
         matches!(
             err,
@@ -229,7 +232,7 @@ fn test_recovery_step7_and_step8_stamps_and_id_reserve_inv_key_2() {
     let op = RedoOp::new_put(1, None, b"k".to_vec(), b"v".to_vec());
     writer.write_change(75, Durability::Always, &[op], 2, &entropy).unwrap();
 
-    let mut rec = recover_engine(&*mem, base, None, None, None, None).expect("Recovery gelingt");
+    let mut rec = recover_engine(&mem, base, None, None, None, None).expect("Recovery gelingt");
 
     assert_eq!(rec.visible_stamp, 75);
     assert_eq!(rec.durable_stamp, 75);
@@ -237,10 +240,10 @@ fn test_recovery_step7_and_step8_stamps_and_id_reserve_inv_key_2() {
 
     // INV-KEY-2: ID-Vergabe beginnt ab den Hochwassermarken
     let r_id = rec.id_reserve.ensure_run_id().unwrap();
-    assert_eq!(r_id, 201, "INV-KEY-2: Run-ID Vergabe muss strikt > HWM (200) sein");
+    assert_eq!(r_id, 200, "INV-KEY-2: Run-ID-Vergabe beginnt bei der exklusiven HWM (200), SPEC §9.7 Schritt 8");
 
     let b_id = rec.id_reserve.ensure_blob_no().unwrap();
-    assert_eq!(b_id, 301, "INV-KEY-2: Blob-ID Vergabe muss strikt > HWM (300) sein");
+    assert_eq!(b_id, 300, "INV-KEY-2: Blob-ID-Vergabe beginnt bei der exklusiven HWM (300), SPEC §9.7 Schritt 8");
 
     // H-S4: Dauer gemessen
     assert!(rec.duration.as_nanos() > 0, "H-S4 Messhaken aktiv");

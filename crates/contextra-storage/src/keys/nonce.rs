@@ -5,7 +5,7 @@
 //! Jedes Präfix ist disjunkt (`0x01` bis `0x05`).
 //! Dieses Modul ist die einzige Stelle im gesamten Kern, die Nonces bildet.
 
-use contextra_storage_ports::Entropy;
+use contextra_ports::persistence::Entropy;
 use std::io;
 
 /// Erstellt die 12-Byte-Nonce für einen Run-Block.

@@ -3,7 +3,7 @@
 //! SPEC §9.3:
 //! Verifiziert Serialisierung, Deserialisierung, Verschlüsselung und Integrität der KEYS-Datei.
 
-use contextra_crypto_ref::{Blake3Kdf, ChaChaCipher};
+use contextra_storage::testing::refimpl::{Blake3Kdf, AesGcmSivCipher};
 use contextra_storage::env::RealEntropy;
 use contextra_storage::keys::protocol::*;
 use contextra_storage::keys::secret::Secret32;
@@ -47,7 +47,7 @@ fn test_keys_plain_encode_decode_roundtrip() {
 #[test]
 fn test_keys_file_seal_open_roundtrip() {
     let kdf = Blake3Kdf;
-    let cipher = ChaChaCipher;
+    let cipher = AesGcmSivCipher;
     let entropy = RealEntropy;
 
     let kek = Secret32::new([0xAAu8; 32]);
@@ -98,7 +98,7 @@ fn test_keys_file_seal_open_roundtrip() {
 #[test]
 fn test_keys_file_tampering_fails() {
     let kdf = Blake3Kdf;
-    let cipher = ChaChaCipher;
+    let cipher = AesGcmSivCipher;
     let entropy = RealEntropy;
 
     let kek = Secret32::new([0xAAu8; 32]);

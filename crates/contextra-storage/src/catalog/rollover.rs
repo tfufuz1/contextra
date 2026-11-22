@@ -15,7 +15,7 @@ use crate::catalog::state::CatalogState;
 use crate::catalog::types::CatalogError;
 use crate::codec::crc32c::crc32c;
 use crate::keys::nonce::catalog_record_nonce;
-use contextra_storage_ports::{Cipher, Fs, Kdf, Mac, OpenMode, Perm};
+use contextra_ports::persistence::{Cipher, Fs, Kdf, Mac, OpenMode, Perm};
 use std::path::Path;
 
 /// Führt einen Rollover zu einer neuen Katalog-Datei durch.

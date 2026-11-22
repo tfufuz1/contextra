@@ -2,7 +2,7 @@
 //!
 //! Produktive Implementierung des `Clock`-Ports über `std::time`.
 
-use contextra_storage_ports::Clock;
+use contextra_ports::persistence::Clock;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 /// Standard-Uhr basierend auf `std::time`.

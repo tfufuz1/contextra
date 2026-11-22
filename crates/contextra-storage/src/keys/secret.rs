@@ -5,4 +5,4 @@
 //! Implementiert bewusst weder `Debug`, `Clone` noch `Serialize`.
 //! Beim `Drop` wird der Speicher best-effort mit Nullen überschrieben.
 
-pub use contextra_storage_ports::{Secret32, SecretCell};
+pub use contextra_ports::persistence::{Secret32, SecretCell};

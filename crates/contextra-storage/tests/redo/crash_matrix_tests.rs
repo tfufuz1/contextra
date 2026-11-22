@@ -10,7 +10,7 @@ use contextra_storage::redo::op::RedoOp;
 use contextra_storage::redo::replay::recover_redo;
 use contextra_storage::testing::fault_fs::{FaultConfig, FaultFs};
 use contextra_storage::testing::mem_fs::MemFs;
-use contextra_storage_ports::{File, Fs, OpenMode};
+use contextra_ports::persistence::{File, Fs, OpenMode};
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -180,7 +180,7 @@ fn test_crash_row_prealloc_building_file_ignored() {
 
     // Temporäre building-Datei simulieren
     let b_path = base.join(".building.redo-0000000000000002.log");
-    let b_file = mem.open(&b_path, OpenMode::CreateNew(contextra_storage_ports::Perm::Private)).unwrap();
+    let b_file = mem.open(&b_path, OpenMode::CreateNew(contextra_ports::persistence::Perm::Private)).unwrap();
     b_file.write_all_at(b"incomplete-preallocation", 0).unwrap();
 
     let rep = recover_redo(Arc::clone(&mem), base, 1, 0, 0).expect("Recovery ignoriert building");

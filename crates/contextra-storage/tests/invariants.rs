@@ -2,7 +2,7 @@
 
 //! # Invarianten-Vollständigkeitstest
 //!
-//! Liest SPEC.md, extrahiert alle Invarianten-IDs (INV-*) aus Abschnitt 18
+//! Liest docs/SPEC.md (normativ), extrahiert alle Invarianten-IDs (INV-*) aus Abschnitt 18
 //! und prüft, dass jede Invariante in mindestens einer Quell- oder Testdatei zitiert wird.
 
 use std::collections::HashSet;
@@ -25,7 +25,8 @@ fn collect_rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
 #[test]
 fn test_all_invariants_cited() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let spec_path = root.join("SPEC.md");
+    // Normativ ist docs/SPEC.md (CLAUDE.md, Spec §1.3); die Root-SPEC.md ist ein anderes Dokument.
+    let spec_path = root.join("docs").join("SPEC.md");
     let spec_content = fs::read_to_string(&spec_path).expect("SPEC.md must exist");
 
     // Extrahiere alle INV-*-Kennungen aus der Invariantentabelle (§18)

@@ -7,7 +7,7 @@ use crate::blob::record::{
     BlobFooter, BlobHeader, BLOB_FOOTER_LEN, BLOB_HEADER_LEN, RECORD_KIND_HOLE,
 };
 use crate::codec::crc32c::crc32c;
-use contextra_storage_ports::{File, Mac};
+use contextra_ports::persistence::{File, Mac};
 use std::collections::HashSet;
 use std::fmt;
 use std::io;

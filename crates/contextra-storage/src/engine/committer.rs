@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 use std::io;
-use contextra_storage_ports::{HookPoint, Hooks, KeyDomain, KeyProvider};
+use contextra_ports::persistence::{HookPoint, Hooks, KeyDomain, KeyProvider};
 
 use crate::codec::limits::{
     MAX_CHANGE_BYTES, MAX_HEADER_LEN, MAX_KEY_BYTES, MAX_OPS_PER_CHANGE, MAX_VALUE_BYTES,

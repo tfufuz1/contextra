@@ -9,7 +9,7 @@ use crate::catalog::state::{apply_edit, CatalogState};
 use crate::catalog::types::CatalogError;
 use crate::codec::crc32c::crc32c;
 use crate::keys::nonce::catalog_record_nonce;
-use contextra_storage_ports::{Cipher, File, Kdf, Mac};
+use contextra_ports::persistence::{Cipher, File, Kdf, Mac};
 
 /// Magic-Bytes für Katalog-Dateien ("CTXC").
 pub const CATALOG_MAGIC: &[u8; 4] = b"CTXC";

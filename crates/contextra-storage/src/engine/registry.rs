@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
-use contextra_storage_ports::{FileKind, FileRef};
+use contextra_ports::persistence::{FileKind, FileRef};
 use crate::engine::version::FileHandle;
 use crate::sync::{Arc, AtomicBool, AtomicU64, Ordering, RankedMutex};
 

@@ -4,7 +4,7 @@
 //! durch sync_all und sync_dir (oder write_atomic) dauerhaft persistiert wurden,
 //! bevor der Katalog-Commit erfolgt.
 
-use contextra_storage_ports::{File, Fs};
+use contextra_ports::persistence::{File, Fs};
 use std::io;
 use std::ops::Deref;
 use std::path::Path;

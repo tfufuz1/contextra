@@ -12,7 +12,7 @@
 
 use crate::codec::crc32c::crc32c;
 use crate::keys::secret::Secret32;
-use contextra_storage_ports::Mac;
+use contextra_ports::persistence::Mac;
 use std::fmt;
 
 /// Magische Bytes der FORMAT-Datei ("CTXS").
@@ -359,4 +359,27 @@ impl FormatHeader {
 /// Pflicht-Bits werden gemäß SPEC §9.2 ausschließlich hinzugefügt (`|=`), nie entfernt.
 pub fn add_required_feature(header: &mut FormatHeader, feature_bit: u64) {
     header.required_features |= feature_bit;
+}
+
+/// Legt die `FORMAT`-Datei einer neuen Instanz im Modus `Plain` atomar an (SPEC §9.2).
+///
+/// Existiert `FORMAT` bereits, schlägt der Aufruf mit `AlreadyExists` fehl und
+/// verändert nichts. Eine Instanz wird damit nie stillschweigend überschrieben.
+pub fn create_format_plain(
+    fs: &dyn contextra_ports::persistence::Fs,
+    base_dir: &std::path::Path,
+    instance_id: [u8; 16],
+    created_ms: u64,
+) -> std::io::Result<()> {
+    use contextra_ports::persistence::{OpenMode, Perm};
+    let path = base_dir.join("FORMAT");
+    if fs.open(&path, OpenMode::Read).is_ok() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "FORMAT existiert bereits",
+        ));
+    }
+    fs.create_dir_all(base_dir, Perm::Private)?;
+    let header = FormatHeader::new(IntegrityMode::Plain, instance_id, created_ms, 0, 0);
+    crate::env::write_atomic(fs, &path, &header.encode_plain())
 }

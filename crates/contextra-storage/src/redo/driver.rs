@@ -3,7 +3,7 @@
 //! SPEC §9.4, §10.2, §10.5 und §18:
 //! Führt die Effekte der Sans-I/O-Writer-Zustandsmaschine über `Fs` und `File` aus.
 
-use contextra_storage_ports::{Entropy, File, Fs, OpenMode, Perm};
+use contextra_ports::persistence::{Entropy, File, Fs, OpenMode, Perm};
 use crate::redo::error::RedoError;
 use crate::redo::frame::{Durability, RedoFrame};
 use crate::redo::header::{RedoHeader, HEADER_SIZE};

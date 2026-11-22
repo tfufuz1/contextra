@@ -6,7 +6,7 @@
 //! - Token-Bucket für Lese- und Schreibbytes je Sekunde (Clock-basiert).
 //! - `PressureSource`-Anbindung als optionaler Eingang.
 
-use contextra_storage_ports::{Clock, Pressure, PressureSource};
+use contextra_ports::persistence::{Clock, Pressure, PressureSource};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

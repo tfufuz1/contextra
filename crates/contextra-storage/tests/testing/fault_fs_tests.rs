@@ -4,7 +4,7 @@
 
 use contextra_storage::testing::fault_fs::{CrashMode, FaultConfig, FaultFs};
 use contextra_storage::testing::{HookPoint, MemFs, TestHooks};
-use contextra_storage_ports::{Fs, OpenMode, Perm};
+use contextra_ports::persistence::{Fs, OpenMode, Perm};
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -291,7 +291,7 @@ fn test_fault_fs_hooks_sequence() {
     let mem = MemFs::new();
     let cfg = Arc::new(FaultConfig::default());
     let hooks = Arc::new(TestHooks::new());
-    cfg.set_hooks(Arc::clone(&hooks) as Arc<dyn contextra_storage_ports::Hooks>);
+    cfg.set_hooks(Arc::clone(&hooks) as Arc<dyn contextra_ports::persistence::Hooks>);
     let fs = FaultFs::new(mem, cfg);
 
     fs.config().trigger_hook(HookPoint::AfterRedoWrite);

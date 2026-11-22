@@ -7,7 +7,7 @@
 
 use crate::codec::tag::{Tag, TagKind};
 use crate::run::blob_ref::BlobRef;
-use contextra_storage_ports::{CompactionFilter, Decision, Stamp};
+use contextra_ports::persistence::{CompactionFilter, Decision, Stamp};
 
 /// Repräsentiert eine Version eines Schlüssels während der Kompaktion.
 #[derive(Debug, Clone, PartialEq, Eq)]

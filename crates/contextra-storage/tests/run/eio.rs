@@ -11,7 +11,7 @@ use contextra_storage::run::error::RunError;
 use contextra_storage::run::reader::RunReader;
 use contextra_storage::testing::fault_fs::{FaultConfig, FaultFs};
 use contextra_storage::testing::mem_fs::MemFs;
-use contextra_storage_ports::{File, Fs, OpenMode, Perm};
+use contextra_ports::persistence::{File, Fs, OpenMode, Perm};
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;

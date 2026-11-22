@@ -4,7 +4,7 @@
 //! Liest Redo-Segmente ab `redo_floor` in ID-Reihenfolge, validiert Siegel und Invarianten,
 //! schneidet Torn Tails im letzten ungesiegelten Segment ab und siegelt sie.
 
-use contextra_storage_ports::{Fs, OpenMode};
+use contextra_ports::persistence::{Fs, OpenMode};
 use crate::redo::error::{check_redo_hwm, RedoError};
 use crate::redo::frame::RedoFrame;
 use crate::redo::op::RedoOp;

@@ -4,7 +4,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_storage_ports::{HookPoint, Hooks};
+use contextra_ports::persistence::{HookPoint, Hooks};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 

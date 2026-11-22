@@ -7,7 +7,7 @@
 //! Keine Integer-Casts (M-02 = 0).
 
 use super::error::RunError;
-use contextra_storage_ports::{File, Fs, OpenMode};
+use contextra_ports::persistence::{File, Fs, OpenMode};
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};

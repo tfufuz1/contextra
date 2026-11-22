@@ -4,7 +4,7 @@
 //! Unterstützt Rechteverwaltung (`0600`/`0700`), atomare Umbenennungen,
 //! synchrone Directory-Syncs und exklusive/geteilte Locks nach SPEC §4, §15.6.
 
-use contextra_storage_ports::{DirEntry, File, Fs, FsCaps, LockGuard, LockMode, OpenMode, Perm};
+use contextra_ports::persistence::{DirEntry, File, Fs, FsCaps, LockGuard, LockMode, OpenMode, Perm};
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::path::Path;

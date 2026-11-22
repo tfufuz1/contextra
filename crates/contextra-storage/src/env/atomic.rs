@@ -3,7 +3,7 @@
 //! Implementiert `write_atomic` nach SPEC §8 und §9.2:
 //! Temp `.building` -> `sync_all` -> `rename` -> `sync_dir`.
 
-use contextra_storage_ports::{Fs, OpenMode, Perm};
+use contextra_ports::persistence::{Fs, OpenMode, Perm};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};

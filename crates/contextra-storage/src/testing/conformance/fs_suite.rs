@@ -5,7 +5,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
 use crate::env::{write_atomic, RealFs};
-use contextra_storage_ports::{Fs, LockMode, OpenMode, Perm, ReadReq};
+use contextra_ports::persistence::{Fs, LockMode, OpenMode, Perm, ReadReq};
 use std::path::Path;
 
 /// Führt die vollständige Konformitätssuite für eine `Fs`-Instanz aus.

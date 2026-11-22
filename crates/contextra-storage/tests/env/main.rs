@@ -7,7 +7,7 @@
 
 use contextra_storage::env::{Env, FsPolicy, RealClock, RealEntropy, RealFs, check_fs_policy};
 use contextra_storage::testing::conformance::run_fs_conformance_suite;
-use contextra_storage_ports::{
+use contextra_ports::persistence::{
     Clock, DirEntry, Entropy, File, Fs, FsCaps, LockGuard, LockMode, OpenMode, Perm,
 };
 use std::fs;

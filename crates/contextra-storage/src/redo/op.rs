@@ -3,7 +3,7 @@
 //! SPEC §9.4: Operation (Inhalt von `payload`, `op_count` Stück hintereinander):
 //! `kind u8 | space u16 | opflags u8 | [domain u32 wenn opflags.DOMAIN] | klen varint | key | vlen varint | value`
 
-use contextra_storage_ports::Cipher;
+use contextra_ports::persistence::Cipher;
 use crate::codec::varint::{decode_u64, encode_u64};
 use crate::keys::nonce::redo_op_body_nonce;
 use crate::redo::error::RedoError;
@@ -81,6 +81,23 @@ impl RedoOp {
             opflags,
             domain,
             key,
+            value,
+        }
+    }
+
+    /// Erstellt eine Löschung eines Bereichs `[start, end)` mit Erase-Semantik.
+    /// `end == None` bedeutet „bis zum Ende des Space“ (`OPFLAG_UNBOUNDED_END`).
+    pub fn new_erase_range(space: u16, start: Vec<u8>, end: Option<Vec<u8>>) -> Self {
+        let (opflags, value) = match end {
+            Some(e) => (0u8, e),
+            None => (OPFLAG_UNBOUNDED_END, Vec::new()),
+        };
+        Self {
+            kind: RedoOpKind::EraseRange,
+            space,
+            opflags,
+            domain: None,
+            key: start,
             value,
         }
     }

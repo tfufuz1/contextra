@@ -18,16 +18,32 @@ pub use metrics::{MetricsAdapter, NoopMetrics};
 pub use real_fs::RealFs;
 pub use runtime::{Lane, LaneBusyError, Runtime};
 
-pub use contextra_storage_ports::FsPolicy;
-use contextra_storage_ports::{Clock, Entropy, Fs, PressureSource};
+pub use contextra_ports::persistence::FsPolicy;
+use contextra_ports::persistence::{Clock, Entropy, Fs, PressureSource};
 use std::sync::Arc;
 
 /// Prüft, ob ein Dateisystem die Anforderungen einer Richtlinie erfüllt (INV-FS-1).
 pub fn check_fs_policy(
     policy: FsPolicy,
-    caps: &contextra_storage_ports::FsCaps,
+    caps: &contextra_ports::persistence::FsCaps,
 ) -> std::io::Result<()> {
-    caps.verify_policy(policy)
+    // Fail-closed: Strict verlangt alle vier Zusicherungen (SD-57). Relaxed
+    // ist nur für Tests und Wegwerf-Instanzen gedacht.
+    if policy == FsPolicy::Relaxed {
+        return Ok(());
+    }
+    let ok = caps.durable_file_sync
+        && caps.durable_dir_sync
+        && caps.atomic_rename
+        && caps.private_perm;
+    if ok {
+        Ok(())
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "INV-FS-1: Dateisystem erfüllt FsCaps nicht (Strict)",
+        ))
+    }
 }
 
 /// Bündelung aller Umgebungskomponenten gemäß SPEC §4.

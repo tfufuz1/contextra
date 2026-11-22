@@ -5,7 +5,7 @@ use contextra_storage::blob::record::BlobRecord;
 use contextra_storage::blob::sweep::sweep_blob;
 use contextra_storage::blob::writer::BlobWriter;
 use contextra_storage::testing::MemFs;
-use contextra_storage_ports::{Fs, OpenMode, Perm};
+use contextra_ports::persistence::{Fs, OpenMode, Perm};
 use std::collections::HashSet;
 use std::path::Path;
 

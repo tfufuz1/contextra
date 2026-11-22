@@ -15,7 +15,7 @@ use contextra_storage::env::clock::RealClock;
 use contextra_storage::env::governor::{FileQuota, Governor};
 use contextra_storage::env::metrics::MetricsAdapter;
 use contextra_storage::env::runtime::{Lane, Runtime};
-use contextra_storage_ports::{Metrics, Pressure, PressureSource};
+use contextra_ports::persistence::{Metrics, Pressure, PressureSource};
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 

@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/contextra-storage",
     "crates/contextra-wire",
     "crates/contextra-sys",
     "crates/contextra-simd",
@@ -118,6 +119,7 @@ contextra-sys = { path = "crates/contextra-sys" }
 contextra-simd = { path = "crates/contextra-simd" }
 contextra-core = { path = "crates/contextra-core" }
 contextra-store = { path = "crates/contextra-store" }
+contextra-storage = { path = "crates/contextra-storage" }
 contextra-vector = { path = "crates/contextra-vector" }
 contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" } # <!-- crate-ref-ignore -->
 contextra-db = { path = "crates/contextra-db" }

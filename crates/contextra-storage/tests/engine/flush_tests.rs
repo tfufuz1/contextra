@@ -20,17 +20,18 @@ use contextra_storage::blob::record::BlobRecord;
 use contextra_storage::catalog::current::write_current;
 use contextra_storage::catalog::log::{catalog_file_name, CatalogLog};
 use contextra_storage::catalog::reserve::IdReserve;
-use contextra_storage::catalog::types::{CatalogFileKind, CatalogHeader, CatalogSpaceOptions};
+use contextra_storage::catalog::types::{CatalogFileKind, CatalogSpaceOptions};
+use contextra_storage::catalog::log::CatalogHeader;
 use contextra_storage::codec::tag::{Tag, TagKind};
 use contextra_storage::engine::compaction::exec::run_file_name;
 use contextra_storage::engine::flush::{flush_memtable, CommitterSync, FlushError, FrozenMemtable, MemtableEntry};
-use contextra_storage::engine::recovery::recover_engine;
+use crate::recover_engine;
 use contextra_storage::run::blob_ref::BlobRef;
 use contextra_storage::run::block::BlockSecurity;
 use contextra_storage::run::reader::RunReader;
 use contextra_storage::testing::fault_fs::{FaultConfig, FaultFs};
 use contextra_storage::testing::mem_fs::MemFs;
-use contextra_storage_ports::{File, Fs, KeyDomain, KeyProvider, OpenMode, Perm, Stamp};
+use contextra_ports::persistence::{Secret32, File, Fs, KeyDomain, KeyProvider, OpenMode, Perm, Stamp};
 
 /// Test-Committer zur Überprüfung von INV-FLUSH-1.
 struct TestCommitter {
@@ -82,25 +83,30 @@ impl TestKeyProvider {
 }
 
 impl KeyProvider for TestKeyProvider {
-    fn root_key(&self) -> Result<[u8; 32], contextra_storage_ports::KeyError> {
-        Ok([0x42; 32])
+    fn kek(&self) -> std::io::Result<Secret32> {
+        Ok(Secret32::new([0x42; 32]))
     }
 
-    fn space_dek(&self, _space_id: u16) -> Result<[u8; 32], contextra_storage_ports::KeyError> {
-        Ok([0x24; 32])
-    }
-
-    fn domain_key(&self, domain: KeyDomain) -> Result<Option<[u8; 32]>, contextra_storage_ports::KeyError> {
+    fn domain_key(&self, domain: KeyDomain) -> std::io::Result<Option<Secret32>> {
         if self.destroyed_domains.contains(&domain.0) {
             Ok(None)
         } else {
-            Ok(Some([0x55; 32]))
+            Ok(Some(Secret32::new([0x55; 32])))
         }
+    }
+
+    fn domain_key_create(&self, domain: KeyDomain) -> std::io::Result<Option<Secret32>> {
+        self.domain_key(domain)
+    }
+
+    fn make_durable(&self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
 fn setup_catalog(fs: &dyn Fs, base_dir: &Path) -> (Arc<dyn File>, CatalogLog, contextra_storage::catalog::state::CatalogState) {
     fs.create_dir_all(base_dir, Perm::Private).unwrap();
+    crate::create_format(fs, base_dir);
     write_current(fs, base_dir, 1).unwrap();
     let cat_path = base_dir.join(catalog_file_name(1));
     let cat_file = fs.open(&cat_path, OpenMode::CreateNew(Perm::Private)).unwrap();
@@ -115,9 +121,9 @@ fn setup_catalog(fs: &dyn Fs, base_dir: &Path) -> (Arc<dyn File>, CatalogLog, co
 #[test]
 fn test_flush_inv_flush_1_sync_before_run_builder() {
     // // INV-FLUSH-1: Schritt 0: vor jedem Run-Bau Redo bis max_stamp per sync_data sichern
-    let mem = MemFs::new();
+    let mem = Arc::new(MemFs::new());
     let base_dir = Path::new("/test_inv_flush_1");
-    let (cat_file, mut cat_log, mut cat_state) = setup_catalog(&mem, base_dir);
+    let (cat_file, mut cat_log, mut cat_state) = setup_catalog(&*mem, base_dir);
 
     // Initialer Durable Stamp = 5, Memtable max_stamp = 10
     let committer = TestCommitter::new(5);
@@ -142,11 +148,13 @@ fn test_flush_inv_flush_1_sync_before_run_builder() {
         weights_k: 1,
         prefix_filter: 0,
         flags: 0,
+        separate_threshold: 4096,
+        locality_prefix: 0,
     };
     let mut graveyard = Vec::new();
 
     let new_state = flush_memtable(
-        &mem,
+        &*mem,
         base_dir,
         &*cat_file,
         &mut cat_log,
@@ -172,9 +180,9 @@ fn test_flush_inv_flush_1_sync_before_run_builder() {
 #[test]
 fn test_flush_inv_flush_1_sync_failure_aborts() {
     // // INV-FLUSH-1: Scheitert sync_data in Schritt 0, bricht der Flush vor dem Run-Bau ab
-    let mem = MemFs::new();
+    let mem = Arc::new(MemFs::new());
     let base_dir = Path::new("/test_inv_flush_1_fail");
-    let (cat_file, mut cat_log, cat_state) = setup_catalog(&mem, base_dir);
+    let (cat_file, mut cat_log, cat_state) = setup_catalog(&*mem, base_dir);
 
     let committer = TestCommitter::new(5);
     committer.fail_sync.store(true, Ordering::Relaxed);
@@ -194,11 +202,11 @@ fn test_flush_inv_flush_1_sync_failure_aborts() {
     };
 
     let mut id_reserve = IdReserve::new(&cat_state);
-    let space_opts = CatalogSpaceOptions::default();
+    let space_opts = crate::space_opts();
     let mut graveyard = Vec::new();
 
     let res = flush_memtable(
-        &mem,
+        &*mem,
         base_dir,
         &*cat_file,
         &mut cat_log,
@@ -228,9 +236,9 @@ fn test_flush_inv_flush_1_sync_failure_aborts() {
 fn test_flush_domain_sealed_shredded_body_produces_blobref_zero() {
     // SPEC §12.1: Domänenversiegelte Körper: ist der Domänenschlüssel vernichtet,
     // BlobRef mit blob_no = 0 (shredded), Körper nicht schreiben.
-    let mem = MemFs::new();
+    let mem = Arc::new(MemFs::new());
     let base_dir = Path::new("/test_domain_sealed");
-    let (cat_file, mut cat_log, cat_state) = setup_catalog(&mem, base_dir);
+    let (cat_file, mut cat_log, cat_state) = setup_catalog(&*mem, base_dir);
 
     let committer = TestCommitter::new(10);
     let mut key_provider = TestKeyProvider::new();
@@ -256,12 +264,14 @@ fn test_flush_domain_sealed_shredded_body_produces_blobref_zero() {
         header_len: 1,
         weights_k: 1,
         prefix_filter: 0,
-        flags: 4, // separate_body
+        flags: 2, // domain_sealed (SPEC E-1)
+        separate_threshold: 4096,
+        locality_prefix: 0,
     };
     let mut graveyard = Vec::new();
 
     let new_state = flush_memtable(
-        &mem,
+        &*mem,
         base_dir,
         &*cat_file,
         &mut cat_log,
@@ -301,12 +311,12 @@ fn test_flush_domain_sealed_shredded_body_produces_blobref_zero() {
 #[test]
 fn test_crash_matrix_flush_after_run_blob_sync_before_edit_orphans_cleaned() {
     // Zeile §13.2: Flush: nach Run/Blob-sync, vor Edit | verwaiste Run- und Blob-Dateien | Verwaisten-Suche löscht
-    let mem = MemFs::new();
+    let mem = Arc::new(MemFs::new());
     let fault_cfg = Arc::new(FaultConfig::default());
-    let fs = FaultFs::new(mem, Arc::clone(&fault_cfg));
+    let fs = Arc::new(FaultFs::new((*mem).clone(), Arc::clone(&fault_cfg)));
     let base_dir = Path::new("/crash_flush_before_edit");
 
-    let (cat_file, mut cat_log, cat_state) = setup_catalog(&fs, base_dir);
+    let (cat_file, mut cat_log, cat_state) = setup_catalog(&*fs, base_dir);
     let committer = TestCommitter::new(10);
 
     let memtable = FrozenMemtable {
@@ -324,14 +334,14 @@ fn test_crash_matrix_flush_after_run_blob_sync_before_edit_orphans_cleaned() {
     };
 
     let mut id_reserve = IdReserve::new(&cat_state);
-    let space_opts = CatalogSpaceOptions::default();
+    let space_opts = crate::space_opts();
     let mut graveyard = Vec::new();
 
     // Fehler bei sync_existing vor dem Katalog-Commit injizieren
     fault_cfg.fail_sync.store(true, Ordering::Relaxed);
 
     let res = flush_memtable(
-        &fs,
+        &*fs,
         base_dir,
         &*cat_file,
         &mut cat_log,
@@ -365,9 +375,17 @@ fn test_crash_matrix_flush_after_run_blob_sync_before_edit_orphans_cleaned() {
 #[test]
 fn test_crash_matrix_flush_after_edit_files_live_inv_flush_1() {
     // Zeile §13.2: Flush: nach Edit, vor Version | Dateien im Catalog | lebendig, Redo-Frames mit Stamp <= flushed_stamp übersprungen
-    let mem = MemFs::new();
+    let mem = Arc::new(MemFs::new());
     let base_dir = Path::new("/crash_flush_after_edit");
-    let (cat_file, mut cat_log, cat_state) = setup_catalog(&mem, base_dir);
+    let (cat_file, mut cat_log, cat_state) = setup_catalog(&*mem, base_dir);
+
+    // INV-LOG-8: Die Änderung steht vor dem Flush im Redo-Log (dauerhaft).
+    let entropy = contextra_storage::env::entropy::RealEntropy;
+    let mut redo = contextra_storage::redo::driver::RedoWriter::open_new(
+        Arc::clone(&mem), base_dir, 1, 1024 * 1024, &entropy,
+    ).unwrap();
+    let redo_op = contextra_storage::redo::op::RedoOp::new_put(1, None, b"k".to_vec(), b"v".to_vec());
+    redo.write_change(10, contextra_storage::redo::frame::Durability::Always, &[redo_op], 2, &entropy).unwrap();
 
     let committer = TestCommitter::new(10);
     let memtable = FrozenMemtable {
@@ -385,12 +403,12 @@ fn test_crash_matrix_flush_after_edit_files_live_inv_flush_1() {
     };
 
     let mut id_reserve = IdReserve::new(&cat_state);
-    let space_opts = CatalogSpaceOptions::default();
+    let space_opts = crate::space_opts();
     let mut graveyard = Vec::new();
 
     // Flush vollständig durchführen (Edit commited)
     let _ = flush_memtable(
-        &mem,
+        &*mem,
         base_dir,
         &*cat_file,
         &mut cat_log,

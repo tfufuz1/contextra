@@ -5,7 +5,7 @@
 //! Metrikmethoden nehmen ausschließlich `&'static str` und Zahlen (`u64`, `i64`, `f64`).
 //! Schlüssel- oder Wertbytes können strukturell nicht übergeben werden (INV-API-1).
 
-use contextra_storage_ports::Metrics;
+use contextra_ports::persistence::Metrics;
 use std::sync::Arc;
 
 /// No-Op-Implementierung für den Fall, dass kein Metrikensammler übergeben wurde.

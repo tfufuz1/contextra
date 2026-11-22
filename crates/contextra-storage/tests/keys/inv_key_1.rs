@@ -6,11 +6,11 @@
 //! Über alle Konstruktoren und beliebige Eingaben darf kein Paar (Schlüssel, Nonce)
 //! zweimal vorkommen, sofern die Eingaben verschieden sind.
 
-use contextra_crypto_ref::Blake3Kdf;
+use contextra_storage::testing::refimpl::Blake3Kdf;
 use contextra_storage::keys::hierarchy::*;
 use contextra_storage::keys::nonce::*;
 use contextra_storage::keys::secret::Secret32;
-use contextra_storage_ports::Kdf;
+use contextra_ports::persistence::Kdf;
 use proptest::prelude::*;
 use std::collections::HashSet;
 

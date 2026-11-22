@@ -7,7 +7,7 @@ use crate::blob::record::{
 };
 use crate::codec::crc32c::crc32c;
 use crate::keys::nonce::{blob_body_nonce, blob_record_nonce};
-use contextra_storage_ports::{Cipher, File, Kdf, Mac};
+use contextra_ports::persistence::{Cipher, File, Kdf, Mac};
 use std::fmt;
 use std::io;
 

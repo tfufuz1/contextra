@@ -3,7 +3,7 @@
 //! Produktive Implementierung des `Entropy`-Ports über `/dev/urandom` auf Unix.
 //! Fail-closed auf nicht-unterstützten Plattformen (O-13).
 
-use contextra_storage_ports::Entropy;
+use contextra_ports::persistence::Entropy;
 use std::io;
 
 /// Standard-Entropiequelle über `/dev/urandom`.
