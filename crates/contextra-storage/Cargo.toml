@@ -1,0 +1,27 @@
+[package]
+name = "contextra-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Embedded, crash-safe key-value core for contextra"
+
+[lints]
+workspace = true
+
+[features]
+# Kein Standard-Feature: Testhaken gehören nicht in die Release-API (S-9, SPEC §3.4).
+# Tests aktivieren `testing` über die Dev-Abhängigkeit auf sich selbst.
+testing = []
+
+[dependencies]
+contextra-storage-ports = { path = "../contextra-storage-ports" }
+
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"
+
+[dev-dependencies]
+contextra-storage = { path = ".", features = ["testing"] }
+proptest = "1.4"
+loom = "0.7"
+contextra-crypto-ref = { path = "../contextra-crypto-ref" }
