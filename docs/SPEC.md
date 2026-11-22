@@ -1738,6 +1738,30 @@ Die Abbildung leitet sich aus Crate-Namen, den gezählten Importen und dieser SP
 
 ---
 
+## 27. Umsetzungsentscheidungen R8.1
+
+Diese Tabelle übernimmt die Änderungsanträge SA-1 bis SA-14 aus `docs/IMPLEMENTATION_SPEC.md` §11 und die Entscheidungen UE-1 bis UE-10. Sie ist Eingang nach §1.5. Jede Zeile ist vom Autor entschieden; die Freigabe durch zwei benannte Reviewer (O-12) steht aus, solange die Zeile als „offen“ markiert ist.
+
+| ID | Änderung | Status |
+|---|---|---|
+| SA-1 | §3.5: `contextra-ports` mit Feature `persistence` ohne Fremdabhängigkeiten; Kern bindet nur dieses Feature ein. | umgesetzt in PR #6061, Freigabe offen |
+| SA-2 | §4: `Fs::hard_link` und `Fs::reflink` als optionale Methoden mit Standard `Err(Unsupported)`. | offen (WP-1.3b) |
+| SA-3 | §4: `File::write_all_at` und `File::truncate` statt `write_at`/`truncate`-Namensbestand. | offen (WP-1.3b) |
+| SA-4 | §4, P-11: `Cipher::seal_into` und `open_into` mit Standardimplementierung. | offen (WP-1.3b) |
+| SA-5 | §3.2: `MemFs` und `FaultFs` bleiben unter Feature `testing`. | offen (WP-1.4) |
+| SA-6 | §26.2: `contextra-checkpoint` nutzt im Produktivcode kein `contextra_store`. | offen (WP-1.7) |
+| SA-7 | §26.3: Zuordnungen für Löschpfad, Snapshot-Register, `last_tx_id`, `inner_storage`, `PressureLevel`, `DurabilityConfigError`. | offen (WP-1.7) |
+| SA-8 | §3.1, §26.2: `RealFs` bleibt im Kern (`env/real_fs.rs`); `contextra-durable-fs` liefert `FileAnchor` und die optionale gehärtete `Fs`. | offen |
+| SA-9 | §4: Trait `Runtime` gehört in den Port; `Governor` bleibt im Kern. | offen (WP-1.6) |
+| SA-10 | D-30: Prüfauftrag „Eignung vor G-5“ ist mit dem Befund erfüllt, dass `MergeOperator` produktiv nirgends verdrahtet ist. | offen (WP-1.7) |
+| SA-11 | §26.1: Umstellungsaufwand mit Prod-/Test-Spalte angeben. | offen (WP-1.7) |
+| SA-12 | §4: `KeyError` um `DestroyFailed` und `Unsupported` ergänzen; keine Inhaltsfelder. | offen (WP-2.3) |
+| SA-13 | §14.3, §16.7: `AnchorValue` je Instanz trennen (Dateiname aus `instance_id`). | offen (WP-4.4) |
+| SA-14 | §22 G-2: `tools/reference/generator.py` ist Lieferung von WP-2.1. | offen (WP-2.1) |
+| UE-10 | §10.1: `Cipher` mit 24-Byte-Nonce ist XChaCha20-Poly1305; AES-GCM-SIV bleibt intern in `contextra-crypto` unverändert. | offen (WP-2.4) |
+
+Abweichung zu WP-1.2 (nicht SA-geführt): Die zweite `Clock`-Definition (`contextra-ports/src/clock.rs`) bleibt bestehen. Sie wird über das Feature `full` vom Port-Modul `persistence` getrennt. Die Entfernung folgt, wenn die Konsumenten umgestellt sind.
+
 ## Anhang A: Goldens
 
 ### A.1 Verifiziert (unabhängiger Python-Referenzcodierer, Lauf in dieser Revision)

@@ -30,7 +30,7 @@ Der Kern ist ein eingebetteter, synchroner, crash-sicherer Schlüssel-Wert-Kern 
 
 ## 3. Ist-Stand
 
-- **Spec:** R7 ist die einzige normative Fassung (`docs/SPEC.md`). Die Vorfassungen liegen unter `docs/archive/` und sind keine Quelle. Gate G-0 gilt mit dieser Revision als erfüllt. **G-1 setzt O-12 (benannte Reviewer) voraus; O-1 ist mit D-17 entschieden** (§22, §24).
+- **Spec:** R8 ist die einzige normative Fassung (`docs/SPEC.md`); R8.1 (§27) hält die Umsetzungsentscheidungen zu IMPLEMENTATION_SPEC §11 fest. Die Vorfassungen liegen unter `docs/archive/` und sind keine Quelle. Gate G-0 gilt mit dieser Revision als erfüllt. **G-1 setzt O-12 (benannte Reviewer) voraus; O-1 ist mit D-17 entschieden** (§22, §24).
 - **Code:** Der Kern ist **noch nicht neu gebaut**. Es gibt kein Crate `contextra-storage-ports` und es entsteht keines: der Port-Katalog ist das Modul `contextra-ports::persistence` (D-02), das in G-1 eigenständig gemacht wird. `crates/contextra-storage` ist Bestand aus dem früheren Entwurf R2 (kein Cluster, kein Gate-Frame, kein Anker, kein Ledger) und zieht im Feature `testing` noch `blake3` und `aes-gcm-siv` (zu entfernen, D-05). Er ist **Vorlage**, nicht Zielzustand. Er hat keine Abhängigen; `contextra-store` wird von neun Crates genutzt (Spec §26).
 - **Tests des Bestands:** `tests/format/golden_test.rs` prüft ein FORMAT-Golden mit 51 Byte, das nicht mit R7 übereinstimmt (R7: 53 Byte bei `Plain`, §10.2). Die Tests werden in G-2 und G-4 neu erzeugt (§19.3). Bis dahin gelten sie nicht als Nachweis.
 - **Goldens:** Die Primitive CRC-32C, XXH64 und die Bloom-Positionen sind geprüft (Anhang A.1). FORMAT-, Frame- und Seal-Goldens sind **nicht verifiziert** (Anhang A.2).
@@ -71,7 +71,7 @@ Verteilung, eigene Kryptografie-Protokolle außerhalb von Ports, Schemas und Sek
 
 | Pfad | Rolle |
 |---|---|
-| `docs/SPEC.md` | **normativ** (R7) |
+| `docs/SPEC.md` | **normativ** (R8, §27 mit R8.1) |
 | `docs/IMPLEMENTATION_SPEC.md` | Umsetzungsplan (nicht normativ): Modulplan, Abläufe, Schnittstellenverträge IF-1…IF-8, Arbeitspakete je Gate, Änderungsanträge SA-n |
 | `AGENTS.md` | dieser Arbeitskontext |
 | `CLAUDE.md` | Sitzungsumgebung, Push-Ablauf, Arbeitsregeln |
