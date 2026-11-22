@@ -37,6 +37,7 @@ members = [
     "crates/contextra-avv-generator",
     "crates/contextra-license",
     "crates/contextra-ingest",
+    "crates/contextra-durable-fs",
     "xtask",
 ]
 # Restored archived crates to default-members:
@@ -47,6 +48,7 @@ default-members = [
     "crates/contextra-simd",
     "crates/contextra-types",
     "crates/contextra-ports",
+    "crates/contextra-durable-fs",
     "crates/contextra-mvcc",
     "crates/contextra-crypto",
     "crates/contextra-vector",

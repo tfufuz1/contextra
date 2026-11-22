@@ -975,6 +975,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-durable-fs"
+version = "0.1.0"
+dependencies = [
+ "crc32fast",
+ "criterion",
+ "proptest",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tracing",
+]
+
+[[package]]
 name = "contextra-engine"
 version = "0.1.0"
 dependencies = [
