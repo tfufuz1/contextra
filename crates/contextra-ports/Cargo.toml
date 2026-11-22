@@ -13,19 +13,34 @@ description = "Canonical dyn-compatible port traits for Contextra subsystems"
 ring = "0"
 
 [features]
-default = []
-contract-tests = []
-testkit = []
+# `full` (Standard): alle Ports und ihre Abhängigkeiten. Bestehende Konsumenten
+# beziehen es über den Standard und bleiben unverändert.
+default = ["full"]
+# `persistence`: nur das Port-Modul des Speicherkerns (SPEC §4, SA-1), ohne
+# Abhängigkeiten außer std. Der Kern bindet nur dieses Feature ein.
+persistence = []
+full = [
+    "dep:contextra-types",
+    "dep:blake3",
+    "dep:futures-util",
+    "dep:bytes",
+    "dep:serde",
+    "dep:serde_json",
+    "dep:ahash",
+    "dep:thiserror",
+]
+contract-tests = ["full"]
+testkit = ["full"]
 
 [dependencies]
-contextra-types = { workspace = true }
-blake3 = { workspace = true }
-futures-util = "0.3"
-bytes = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-ahash = { workspace = true }
-thiserror = { workspace = true }
+contextra-types = { workspace = true, optional = true }
+blake3 = { workspace = true, optional = true }
+futures-util = { version = "0.3", optional = true }
+bytes = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+ahash = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
 
 [dev-dependencies]
 proptest = "1.4"

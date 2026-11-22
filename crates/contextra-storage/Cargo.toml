@@ -15,7 +15,9 @@ workspace = true
 testing = ["dep:blake3", "dep:aes-gcm-siv"]
 
 [dependencies]
-contextra-ports = { workspace = true }
+# Nur das Port-Modul `persistence` (SPEC §3.5, SA-1): ohne full keine
+# Krypto-, Serde- oder Typ-Abhängigkeiten im Kern.
+contextra-ports = { path = "../contextra-ports", default-features = false, features = ["persistence"] }
 # Nur für das Feature testing (Testdoubles in src/testing/refimpl.rs).
 blake3 = { workspace = true, optional = true }
 aes-gcm-siv = { version = "0.11", optional = true }
