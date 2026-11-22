@@ -350,3 +350,270 @@ pub trait CompactionFilter: Send + Sync {
     /// Entscheidet über einen Eintrag.
     fn decide(&self, key: &[u8], header: &[u8], stamp: Stamp, now_ms: u64) -> Decision;
 }
+
+/// Opake Cluster-Kennung (SPEC §6.1, IF-1). 16 Byte, kein Inhalt in `Debug`.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ClusterId([u8; 16]);
+
+impl ClusterId {
+    /// Kennung für nicht geclusterte Spaces (SPEC §6.1).
+    pub const NONE: Self = Self([0u8; 16]);
+
+    /// Übernimmt 16 Bytes.
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
+    /// Gibt die Bytes zurück.
+    pub const fn as_bytes(&self) -> &[u8; 16] {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for ClusterId {
+    /// Zeigt nur die ersten vier Bytes als Hex (P-12, Umsetzung UE-3).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ClusterId({:02x}{:02x}{:02x}{:02x}..)",
+            self.0[0], self.0[1], self.0[2], self.0[3]
+        )
+    }
+}
+
+/// 32-Byte-Schlüsselbytes (IF-1: Typalias; die Geheimnis-Eigenschaft liegt in
+/// `Secret32` und `SecretCell`).
+pub type Key32 = [u8; 32];
+
+/// Zustand eines Clusterschlüssels beim `KeyProvider` (SPEC §4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyState {
+    /// Schlüssel vorhanden.
+    Present,
+    /// Schlüssel dauerhaft vernichtet oder nie angelegt.
+    Absent,
+}
+
+/// Fehler einer Versiegelung oder Entschlüsselung (SPEC §4). Ohne Inhalte (INV-KEY-3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CryptoError {
+    /// Authentisierung fehlgeschlagen: Tag, AAD oder Schlüssel passen nicht.
+    AuthFailed,
+    /// Eingabe hat eine unzulässige Länge.
+    InvalidLength,
+}
+
+impl std::fmt::Display for CryptoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AuthFailed => write!(f, "Authentisierung fehlgeschlagen"),
+            Self::InvalidLength => write!(f, "unzulässige Länge"),
+        }
+    }
+}
+
+impl std::error::Error for CryptoError {}
+
+/// Prüfwert-Port über CRC-32C (SPEC §4, SD-64).
+pub trait Checksum: Send + Sync {
+    /// Setzt einen CRC-32C-Strom fort. `seed = 0` liefert den üblichen CRC-32C.
+    fn crc32c(&self, seed: u32, data: &[u8]) -> u32;
+}
+
+/// Unkeyed Hash für die Ledger-Kette (SPEC §4, D-12).
+pub trait Hasher: Send + Sync {
+    /// 256-Bit-Hash über die Teile in Reihenfolge.
+    fn hash256(&self, parts: &[&[u8]]) -> [u8; 32];
+}
+
+/// Rollback-Anker (SPEC §4, §16.7). Der Wert ist monoton.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AnchorValue {
+    /// Epoche der letzten abgeschlossenen Löschung (ER7).
+    pub erase_epoch: u64,
+    /// Kopf der Ledger-Kette.
+    pub ledger_head: [u8; 32],
+    /// Epoche des Catalogs.
+    pub catalog_epoch: u64,
+}
+
+/// Fehler des Ankers. Ohne Inhalte (INV-KEY-3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnchorError {
+    /// Neuer Wert wäre kleiner als der gespeicherte (SPEC §16.7).
+    NotMonotonic,
+    /// Anker nicht erreichbar oder nicht lesbar.
+    Unavailable,
+}
+
+impl std::fmt::Display for AnchorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotMonotonic => write!(f, "Anker würde zurückgesetzt"),
+            Self::Unavailable => write!(f, "Anker nicht erreichbar"),
+        }
+    }
+}
+
+impl std::error::Error for AnchorError {}
+
+/// Rollback-Anker-Port (SPEC §4, §16.7).
+pub trait Anchor: Send + Sync {
+    /// Liest den gespeicherten Wert; `None`, wenn noch keiner gesetzt ist.
+    fn read(&self) -> Result<Option<AnchorValue>, AnchorError>;
+    /// Setzt einen neuen Wert. Monoton; durabel bei Rückkehr.
+    fn advance(&self, to: AnchorValue) -> Result<(), AnchorError>;
+}
+
+/// Ereignisse für Beobachter. Keine Schlüssel- oder Körperinhalte (INV-KEY-3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ObserverEvent {
+    /// Zustand der Instanz hat sich geändert.
+    HealthChanged,
+    /// Ein Flush ist abgeschlossen.
+    FlushDone,
+    /// Eine Compaction ist abgeschlossen.
+    CompactionDone,
+    /// Ein Löschschritt ist abgeschlossen.
+    EraseStepDone,
+}
+
+/// Beobachter-Port (SPEC §4). Nie unter einer Sperre aufrufen (§17.3).
+pub trait Observer: Send + Sync {
+    /// Nimmt ein Ereignis entgegen.
+    fn event(&self, e: ObserverEvent);
+}
+
+/// Hintergrund-Laufzeit (SPEC §4, SA-9). Teilbarer Pool.
+pub trait Runtime: Send + Sync {
+    /// Reiht einen Auftrag ein.
+    fn spawn(&self, job: Box<dyn FnOnce() + Send>);
+}
+
+/// Gewichtung eines Eintrags für Caches und Budgets (SPEC §4, §8.5, D-08).
+pub trait Weigher: Send + Sync {
+    /// Version des Zählverfahrens; ändert sich mit dem Verfahren.
+    fn version(&self) -> u32;
+    /// Schreibt bis zu vier Gewichtssummen (`u64`) nach `out`.
+    fn weigh(&self, key: &[u8], header: &[u8], out: &mut [u64; 4]);
+}
+
+/// Aufrufer-Filter bei Lesevorgängen (SPEC §4).
+pub trait Filter: Send + Sync {
+    /// `true`, wenn der Eintrag im Ergebnis bleibt.
+    fn keep(&self, key: &[u8], header: &[u8]) -> bool;
+}
+
+/// Eintrag, den Erweiterungen erhalten (SPEC §4, §15.9).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Entry {
+    /// Schlüssel des Eintrags.
+    pub key: Vec<u8>,
+    /// Kopf des Eintrags.
+    pub header: Vec<u8>,
+    /// Stamp des Eintrags.
+    pub stamp: Stamp,
+}
+
+/// Menge von Clustern für Löschoperationen (SPEC §4, §15.9).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ClusterSet {
+    ids: Vec<ClusterId>,
+}
+
+impl ClusterSet {
+    /// Leere Menge.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Fügt einen Cluster hinzu. Doppelte Einträge werden ignoriert.
+    pub fn insert(&mut self, c: ClusterId) {
+        if !self.contains(c) {
+            self.ids.push(c);
+        }
+    }
+
+    /// Prüft die Zugehörigkeit.
+    pub fn contains(&self, c: ClusterId) -> bool {
+        self.ids.contains(&c)
+    }
+}
+
+/// Fehler einer Erweiterung (SPEC §4). Ohne Inhalte (INV-KEY-3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ExtError {
+    /// Operation von der Erweiterung nicht unterstützt.
+    Unsupported,
+    /// Eingabe ist beschädigt.
+    Corrupt,
+    /// Erstellen oder Zusammenführen ist fehlgeschlagen.
+    Failed,
+}
+
+/// Erweiterungs-Port für Indexstrukturen je Run (SPEC §4, §15.9).
+/// `rewrite_without` ist Pflicht: ohne sie ist Löschung nicht zulässig.
+pub trait ExtensionBuilder: Send + Sync {
+    /// Eindeutige Kennung.
+    fn id(&self) -> u16;
+    /// Version des Formats.
+    fn version(&self) -> u16;
+    /// Baut eine Erweiterung aus Einträgen.
+    fn build(&self, entries: &mut dyn Iterator<Item = Entry>) -> Result<Vec<u8>, ExtError>;
+    /// Führt Erweiterungen zusammen.
+    fn merge(
+        &self,
+        inputs: &[&[u8]],
+        survivors: &mut dyn Iterator<Item = Entry>,
+    ) -> Result<Vec<u8>, ExtError>;
+    /// Schreibt einen Block ohne die Einträge der Cluster in `drop`.
+    fn rewrite_without(&self, block: &[u8], drop: &ClusterSet) -> Result<Vec<u8>, ExtError>;
+}
+
+/// Kalter Speicher (SPEC §4, O-8, Phase P6, optional).
+pub trait ColdTier: Send + Sync {
+    /// Lädt eine Datei hoch.
+    fn upload(&self, f: FileRef) -> io::Result<()>;
+    /// Liest einen Bereich.
+    fn read_range(&self, f: FileRef, off: u64, len: u32) -> io::Result<Vec<u8>>;
+    /// Löscht eine Datei.
+    fn delete(&self, f: FileRef) -> io::Result<()>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cluster_id_debug_zeigt_nur_vier_byte() {
+        let c = ClusterId::from_bytes([0xAB; 16]);
+        let s = format!("{c:?}");
+        assert_eq!(s, "ClusterId(abababab..)");
+        assert!(!s.contains("abababababab"));
+    }
+
+    #[test]
+    fn cluster_set_ignoriert_doppelte() {
+        let mut s = ClusterSet::new();
+        let c = ClusterId::from_bytes([1; 16]);
+        s.insert(c);
+        s.insert(c);
+        assert!(s.contains(c));
+        assert_eq!(s.ids.len(), 1);
+    }
+
+    #[test]
+    fn neue_traits_sind_dyn_kompatibel() {
+        fn _a(_: Option<&dyn Checksum>) {}
+        fn _b(_: Option<&dyn Hasher>) {}
+        fn _c(_: Option<&dyn Anchor>) {}
+        fn _d(_: Option<&dyn Observer>) {}
+        fn _e(_: Option<&dyn Runtime>) {}
+        fn _f(_: Option<&dyn Weigher>) {}
+        fn _g(_: Option<&dyn Filter>) {}
+        fn _h(_: Option<&dyn ExtensionBuilder>) {}
+        fn _i(_: Option<&dyn ColdTier>) {}
+    }
+}
