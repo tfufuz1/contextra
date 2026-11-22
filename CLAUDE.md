@@ -1,6 +1,6 @@
 # CLAUDE.md — Einstieg für Claude-Sitzungen im Contextra-Repo
 
-**FOKUS (verbindlich):** `contextra-store` wird durch `contextra-storage` ersetzt, das Fundament von Contextra. Bis Gate G-P gilt ausschließlich der Storage-Kern. Alles andere im Repository wird ignoriert und nicht verändert. Normativ ist `docs/SPEC.md` (R6, Gate G-0 offen). Arbeitskontext und Regeln für den Kern: `AGENTS.md` im Repo-Root. Vorfassungen und Konzepte liegen in `docs/archive/` und sind keine Anforderungsquelle.
+**FOKUS (verbindlich):** `contextra-store` wird durch `contextra-storage` ersetzt, das Fundament von Contextra. Bis Gate G-6 (Löschung, §22) gilt ausschließlich der Storage-Kern. Alles andere im Repository wird ignoriert und nicht verändert. Normativ ist `docs/SPEC.md` (R7, Gate G-0 erfüllt, G-1 setzt O-1 und O-12 voraus). Arbeitskontext und Regeln für den Kern: `AGENTS.md` im Repo-Root. Vorfassungen und Konzepte liegen in `docs/archive/` und sind keine Anforderungsquelle.
 
 
 ---
@@ -8,7 +8,7 @@
 ## 0. Arbeitsregeln (verbindlich)
 
 - **Subagenten nur als Haiku.** Beim `Agent`-Tool immer `model: "haiku"` setzen. Sonnet nie verwenden. Opus/Fable nur, wenn der Nutzer es ausdrücklich verlangt.
-- **Spec ist Quelle.** `docs/SPEC.md` (R6) ist normativ für den Storage-Kern. Erst die Spec ändern, dann den Code (Spec §1.5). Die frühere Regel zu TOML-Blöcken in Anhang D/E, `benchmarks/budgets.toml`, `capabilities.toml` und `tools/check_spec_sync.py` betrifft die ältere Gesamtspezifikation; das Tool existiert im Repository nicht. Diese Dateien werden bis G-P nicht angefasst.
+- **Spec ist Quelle.** `docs/SPEC.md` (R7) ist normativ für den Storage-Kern. Erst die Spec ändern, dann den Code (Spec §1.5). Die frühere Regel zu TOML-Blöcken in Anhang D/E, `benchmarks/budgets.toml`, `capabilities.toml` und `tools/check_spec_sync.py` betrifft die ältere Gesamtspezifikation; das Tool existiert im Repository nicht. Diese Dateien werden bis G-6 nicht angefasst.
 - **Sprache:** Antworten an den Nutzer und Kommentare/Doku im Repo auf Deutsch (Bestand ist deutsch; Rust-Bezeichner englisch).
 - **Push:** Nur über den GitHub-Zugang der Sitzung. Der Ablauf steht in Abschnitt 7 und hat am 21.11.2026 funktioniert.
 - **Commit-Trailer (Pflicht ab jetzt):** Jede Commit-Message endet mit
