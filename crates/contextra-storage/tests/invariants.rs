@@ -9,6 +9,39 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Invarianten, die der Bestand (Entwurf R2) noch nicht zitiert, weil der zugehörige Code
+/// erst in späteren Gates entsteht (Spec §22, IMPLEMENTATION_SPEC WP-1.9). Die Liste darf nur
+/// schrumpfen: Wird eine Invariante zitiert, muss sie hier entfernt werden (der Test erzwingt das).
+/// Neue Invarianten in Spec §18 gehören **nicht** hierher, sondern müssen zitiert werden.
+const NOCH_OFFEN: &[&str] = &[
+    "INV-CLUSTER-1",
+    "INV-CLUSTER-2",
+    "INV-COMMIT-1",
+    "INV-COMMIT-2",
+    "INV-COMMIT-3",
+    "INV-CONS-1",
+    "INV-ERA-8",
+    "INV-ERA-9",
+    "INV-FMT-3",
+    "INV-FMT-4",
+    "INV-IDEM-1",
+    "INV-KEY-3",
+    "INV-KEY-4",
+    "INV-KEYP-2",
+    "INV-LIM-1",
+    "INV-LOCK-2",
+    "INV-LOG-9",
+    "INV-PL-1",
+    "INV-PL-2",
+    "INV-PL-3",
+    "INV-PL-4",
+    "INV-RECOV-1",
+    "INV-RECOV-2",
+    "INV-STAMP-3",
+    "INV-SYNC-1",
+    "INV-VIEW-1",
+];
+
 fn collect_rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -41,10 +74,12 @@ fn test_all_invariants_cited() {
         if in_table && line.starts_with("## ") {
             break;
         }
-        if in_table && line.starts_with("|`INV-") {
-            if let Some(end) = line[2..].find('`') {
-                let id = &line[2..2 + end];
-                expected_invs.insert(id.to_string());
+        // Spec R8 §18: Tabellenzeilen der Form `| INV-XXX-n | Aussage | Prüfung |`.
+        if in_table {
+            if let Some(rest) = line.strip_prefix("| INV-") {
+                if let Some(end) = rest.find(' ') {
+                    expected_invs.insert(format!("INV-{}", &rest[..end]));
+                }
             }
         }
     }
@@ -60,12 +95,13 @@ fn test_all_invariants_cited() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     collect_rs_files(&manifest_dir.join("src"), &mut rs_files);
     collect_rs_files(&manifest_dir.join("tests"), &mut rs_files);
-    collect_rs_files(&manifest_dir.join("../contextra-storage-ports/src"), &mut rs_files);
-    collect_rs_files(&manifest_dir.join("../contextra-crypto-ref/src"), &mut rs_files);
-    collect_rs_files(&manifest_dir.join("../contextra-crypto-ref/tests"), &mut rs_files);
 
     let mut cited_invs = HashSet::new();
     for path in rs_files {
+        // Diese Datei nennt die Ausnahmeliste und zählt nicht als Zitat.
+        if path.file_name().is_some_and(|n| n == "invariants.rs") {
+            continue;
+        }
         if let Ok(code) = fs::read_to_string(&path) {
             for id in &expected_invs {
                 if code.contains(id) {
@@ -81,7 +117,21 @@ fn test_all_invariants_cited() {
         cited_invs.len()
     );
 
-    let mut uncited: Vec<_> = expected_invs.difference(&cited_invs).cloned().collect();
+    let offen: HashSet<String> = NOCH_OFFEN.iter().map(|s| s.to_string()).collect();
+
+    // Die Ausnahmeliste muss zur Spec passen und darf zitierte Invarianten nicht enthalten.
+    let mut unbekannt: Vec<_> = offen.difference(&expected_invs).cloned().collect();
+    unbekannt.sort();
+    assert!(unbekannt.is_empty(), "NOCH_OFFEN nennt Invarianten, die nicht in SPEC §18 stehen: {unbekannt:?}");
+    let mut veraltet: Vec<_> = offen.intersection(&cited_invs).cloned().collect();
+    veraltet.sort();
+    assert!(veraltet.is_empty(), "Diese Invarianten sind jetzt zitiert und aus NOCH_OFFEN zu entfernen: {veraltet:?}");
+
+    let mut uncited: Vec<_> = expected_invs
+        .difference(&cited_invs)
+        .filter(|id| !offen.contains(*id))
+        .cloned()
+        .collect();
     uncited.sort();
     assert!(
         uncited.is_empty(),

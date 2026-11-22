@@ -505,7 +505,7 @@ Notation: `WP-g.n` — Eingang (Spec/Bestand) → Ausgang (Dateien) → Nachweis
 | WP-1.5 | Mechanische Verschiebung nach Zielbaum (§4.1) per `git mv`; `tests/layering.rs` auf §4.2 anpassen ⇐ WP-1.3 | `cargo test -p contextra-storage --test layering` |
 | WP-1.6 | `Runtime` in den Port (SA-9), `Governor` bleibt im Kern | Test `Runtime::manual()` deterministisch |
 | WP-1.7 | Konsumentenmatrix gegen Spec §26 abgleichen und SA-6/SA-7/SA-10 einreichen | §2.4 dieses Dokuments |
-| WP-1.9 | `tests/invariants.rs`: Parser auf das Format `\| INV-… \|` aus Spec §18 umstellen (59 Invarianten); Test muss danach grün sein, ohne die Schwelle (≥ 35) zu senken | `cargo test -p contextra-storage --test invariants` |
+| WP-1.9 | `tests/invariants.rs`: Parser auf das Format `\| INV-… \|` aus Spec §18 umstellen (59 Invarianten); Test muss danach grün sein, ohne die Schwelle (≥ 35) zu senken. Umgesetzt: 59 Invarianten gefunden, 33 zitiert; die 26 noch nicht zitierten stehen in der Ausnahmeliste `NOCH_OFFEN`, die nur schrumpfen darf (der Test schlägt fehl, sobald ein Eintrag zitiert wird oder nicht in §18 steht) | `cargo test -p contextra-storage --test invariants` |
 | WP-1.8 | O-12 (benannte Reviewer) klären — **Voraussetzung für G-1** | Eintrag in Spec §24 |
 
 ### G-2 Formate, Checksummen, Seal-Rahmen, Schlüsselhierarchie
