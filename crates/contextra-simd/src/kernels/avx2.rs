@@ -1,12 +1,26 @@
-// FILE-CONTEXT
-// ZWECK: AVX2 SIMD-Intrinsics für f32, f32_bytes und u8 Distanzberechnungen.
-// INVARIANTEN: Target-Feature "avx2", "fma" vor Aufruf via Feature-Check verifiziert.
+
+//! # Modul `kernels::avx2`
+//!
+//! **Ring-Zugehörigkeit:** Ring 0 (Unsafe-Insel).
+//!
+//! **Zweck:**
+//! Hochoptimierte Vektordistanzberechnung auf x86_64-Prozessoren mit AVX2 (Advanced Vector Extensions 2)
+//! und FMA (Fused Multiply-Add).
+//! AVX2 operiert auf 256-Bit YMM-Vektorregistern:
+//! - Verarbeitet 8 x `f32` (8 x 32-Bit = 256 Bit) parallel pro Taktzyklus (`_mm256_loadu_ps`, `_mm256_fmadd_ps`).
+//! - Verarbeitet bis zu 32 x `u8` parallel mit vorzeichenloser Multiplikation und Akkumulation (`_mm256_maddubs_epi16`).
+//!
+//! **Sicherheitsgarantien (Safety-Invariante):**
+//! Alle Funktionen in diesem Modul sind als `pub(crate) unsichere Funktionen` deklariert und mit
+//! `#[target_feature(enable = "avx2", enable = "fma")]` versehen. Der Aufruf darf ausschließlich
+//! über das sichere Runtime-Dispatch-System in `dispatch.rs` nach Prüfung der CPU-Befehlssatzerweiterung erfolgen.
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 use crate::kernels::scalar::CosineSimilarityPartsU8;
 
+// SECTION AVX2-F32-KERNELS
 /// Calculates cosine distance between two float vectors using AVX2 and FMA instructions.
 ///
 /// # Safety
@@ -15,6 +29,7 @@ use crate::kernels::scalar::CosineSimilarityPartsU8;
 /// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2", enable = "fma")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -84,6 +99,7 @@ pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
 /// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2", enable = "fma")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -133,6 +149,7 @@ pub(crate) unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
 /// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2", enable = "fma")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -170,7 +187,9 @@ pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 
     -dot
 }
+// !SECTION AVX2-F32-KERNELS
 
+// SECTION AVX2-BYTES-KERNELS
 /// Calculates cosine distance between an f32 vector and raw LE f32 bytes using AVX2 and FMA instructions.
 ///
 /// # Safety
@@ -179,6 +198,7 @@ pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 /// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2", enable = "fma")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -259,6 +279,7 @@ pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -
 /// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2", enable = "fma")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -320,6 +341,7 @@ pub(crate) unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]
 /// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2", enable = "fma")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -376,6 +398,7 @@ pub(crate) unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f3
 /// Caller must ensure that target CPU supports `avx2` instruction set extension.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
     // SAFETY: Target feature `avx2` is enabled and `v` is a valid `__m256` register.
     let vlow = unsafe { _mm256_castps256_ps128(v) };
@@ -390,13 +413,16 @@ pub(crate) unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
     // SAFETY: Target feature `avx2` is enabled and `v32` contains a valid scalar float at lane 0.
     unsafe { _mm_cvtss_f32(v32) }
 }
+// !SECTION AVX2-BYTES-KERNELS
 
+// SECTION AVX2-U8-KERNELS
 /// Calculates dot product between two byte vectors using AVX2 instructions.
 ///
 /// # Safety
 /// Caller must ensure that target CPU supports `avx2` instruction set extension.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
@@ -459,6 +485,7 @@ pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
 /// Caller must ensure that target CPU supports `avx2` instruction set extension.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
@@ -526,6 +553,7 @@ pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
 /// Caller must ensure that target CPU supports `avx2` instruction set extension.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(
     a: &[u8],
     b: &[u8],
@@ -610,6 +638,7 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(
 /// Caller must ensure that target CPU supports `avx2` instruction set extension.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
     // SAFETY: Target feature `avx2` is enabled and `v` is a valid `__m256i` register.
     let vlow = unsafe { _mm256_castsi256_si128(v) };
@@ -624,3 +653,4 @@ pub(crate) unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
     // SAFETY: Target feature `avx2` is enabled and `v32` contains a valid 32-bit int at lane 0.
     unsafe { _mm_cvtsi128_si32(v32) }
 }
+// !SECTION AVX2-U8-KERNELS

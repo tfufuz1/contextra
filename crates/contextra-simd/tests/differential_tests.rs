@@ -4,8 +4,15 @@
 #![allow(clippy::indexing_slicing)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
-// FILE-CONTEXT
-// ZWECK: Deterministic differential test suite across vector dimensions 1..=257 and unaligned slice windows.
+
+//! # Differential-Test-Suite: `differential_tests`
+//!
+//! **Zweck:**
+//! Vergleicht die Ergebnisse der SIMD-beschleunigten Kernel (über `dispatch`) sequenziell
+//! und differentiell mit den exakten skalaren Referenzimplementierungen über alle Vektordimensionen
+//! von 1 bis 257.
+//! Dadurch wird nachgewiesen, dass SIMD-Loop-Unrolling, Restschleifen (Tail-Loops) und
+//! nicht 32-Byte-ausgerichtete Slice-Fenster identische Resultate liefern.
 
 // ADR-002 / SPEC §27: Test assertions and test dataset casts
 
@@ -64,6 +71,7 @@ impl DeterministicRng {
 // The resulting precision difference is typically within 1e-4 relative tolerance for normal float values.
 
 #[test]
+// Prüft Kosinus-Distanz für Dimensionen 1 bis 257 differentiell gegen Skalar-Referenz.
 fn test_sequential_dimensions_cosine_f32() {
     let mut rng = DeterministicRng::with_seed(0x1234_5678_9ABC_DEF0);
 
@@ -84,6 +92,7 @@ fn test_sequential_dimensions_cosine_f32() {
 }
 
 #[test]
+// Prüft euklidische Distanz für Dimensionen 1 bis 257 differentiell gegen Skalar-Referenz.
 fn test_sequential_dimensions_euclidean_f32() {
     let mut rng = DeterministicRng::with_seed(0x2345_6789_ABCD_EF01);
 
@@ -104,6 +113,7 @@ fn test_sequential_dimensions_euclidean_f32() {
 }
 
 #[test]
+// Prüft Skalarprodukt-Distanz für Dimensionen 1 bis 257 differentiell gegen Skalar-Referenz.
 fn test_sequential_dimensions_dot_product_f32() {
     let mut rng = DeterministicRng::with_seed(0x3456_789A_BCDE_F012);
 
@@ -124,6 +134,7 @@ fn test_sequential_dimensions_dot_product_f32() {
 }
 
 #[test]
+// Prüft Kosinus-Distanz auf Byte-Slices für Dimensionen 1 bis 257 gegen Skalar-Referenz.
 fn test_sequential_dimensions_cosine_f32_bytes() {
     let mut rng = DeterministicRng::with_seed(0x4567_89AB_CDEF_0123);
 
@@ -145,6 +156,7 @@ fn test_sequential_dimensions_cosine_f32_bytes() {
 }
 
 #[test]
+// Prüft euklidische Distanz auf Byte-Slices für Dimensionen 1 bis 257 gegen Skalar-Referenz.
 fn test_sequential_dimensions_euclidean_f32_bytes() {
     let mut rng = DeterministicRng::with_seed(0x5678_9ABC_DEF0_1234);
 
@@ -166,6 +178,7 @@ fn test_sequential_dimensions_euclidean_f32_bytes() {
 }
 
 #[test]
+// Prüft Skalarprodukt auf Byte-Slices für Dimensionen 1 bis 257 gegen Skalar-Referenz.
 fn test_sequential_dimensions_dot_product_f32_bytes() {
     let mut rng = DeterministicRng::with_seed(0x6789_ABCD_EF01_2345);
 
@@ -187,6 +200,7 @@ fn test_sequential_dimensions_dot_product_f32_bytes() {
 }
 
 #[test]
+// Prüft u8-Skalarprodukt für Dimensionen 1 bis 257 auf bitgenaue Übereinstimmung.
 fn test_sequential_dimensions_dot_product_u8() {
     let mut rng = DeterministicRng::with_seed(0x789A_BCDE_F012_3456);
 
@@ -205,6 +219,7 @@ fn test_sequential_dimensions_dot_product_u8() {
 }
 
 #[test]
+// Prüft quadrierte u8-euklidische Distanz für Dimensionen 1 bis 257 auf bitgenaue Gleichheit.
 fn test_sequential_dimensions_euclidean_sq_u8() {
     let mut rng = DeterministicRng::with_seed(0x89AB_CDEF_0123_4567);
 
@@ -223,6 +238,7 @@ fn test_sequential_dimensions_euclidean_sq_u8() {
 }
 
 #[test]
+// Prüft u8-Kosinus-Komponentensummen für Dimensionen 1 bis 257 gegen Skalar-Werte.
 fn test_sequential_dimensions_cosine_similarity_parts_u8() {
     let mut rng = DeterministicRng::with_seed(0x9ABC_DEF0_1234_5678);
 
@@ -241,6 +257,7 @@ fn test_sequential_dimensions_cosine_similarity_parts_u8() {
 }
 
 #[test]
+// Prüft gemischtes f32/u8-Skalarprodukt für Dimensionen 1 bis 257 gegen Referenz.
 fn test_sequential_dimensions_dot_product_f32_u8() {
     let mut rng = DeterministicRng::with_seed(0xABCD_EF01_2345_6789);
 
@@ -254,6 +271,7 @@ fn test_sequential_dimensions_dot_product_f32_u8() {
 }
 
 #[test]
+// Prüft gemischte dequantisierte quadrierte Distanz für Dimensionen 1 bis 257 gegen Referenz.
 fn test_sequential_dimensions_euclidean_sq_f32_u8() {
     let mut rng = DeterministicRng::with_seed(0xBCDE_F012_3456_789A);
 
@@ -269,6 +287,7 @@ fn test_sequential_dimensions_euclidean_sq_f32_u8() {
 }
 
 #[test]
+// Prüft gemischte f32/u8-Kosinus-Komponenten für Dimensionen 1 bis 257 gegen Referenz.
 fn test_sequential_dimensions_cosine_similarity_parts_f32_u8() {
     let mut rng = DeterministicRng::with_seed(0xCDEF_0123_4567_89AB);
 
@@ -283,6 +302,7 @@ fn test_sequential_dimensions_cosine_similarity_parts_f32_u8() {
 }
 
 #[test]
+// Prüft In-Place-Normalisierung auf Einheitslänge für Dimensionen 1 bis 257.
 fn test_sequential_dimensions_normalize_inplace() {
     let mut rng = DeterministicRng::with_seed(0x1122_3344_5566_7788);
 
@@ -299,6 +319,7 @@ fn test_sequential_dimensions_normalize_inplace() {
 }
 
 #[test]
+// Prüft f32-Metriken über 20 verschiedene Pseudozufalls-Seeds auf Konsistenz.
 fn test_multiple_prng_seeds_f32_metrics() {
     let seeds = [
         0x1111_2222_3333_4444,
@@ -329,6 +350,7 @@ fn test_multiple_prng_seeds_f32_metrics() {
 }
 
 #[test]
+// Prüft u8-Metriken über 20 verschiedene Pseudozufalls-Seeds auf Konsistenz.
 fn test_multiple_prng_seeds_u8_metrics() {
     let seeds = [
         0xA1B2_C3D4_E5F6_0102,
@@ -359,6 +381,7 @@ fn test_multiple_prng_seeds_u8_metrics() {
 }
 
 #[test]
+// Prüft f32-Berechnungen auf unaligned Speicher-Fenstern (Offsets 0 bis 7).
 fn test_unaligned_slice_windows_f32() {
     let mut rng = DeterministicRng::with_seed(0xDEF0_1234_5678_9ABC);
 
@@ -399,6 +422,7 @@ fn test_unaligned_slice_windows_f32() {
 }
 
 #[test]
+// Prüft u8-Berechnungen auf unaligned Speicher-Fenstern (Offsets 0 bis 31).
 fn test_unaligned_slice_windows_u8() {
     let mut rng = DeterministicRng::with_seed(0xEF01_2345_6789_ABCD);
 
@@ -435,6 +459,7 @@ fn test_unaligned_slice_windows_u8() {
 }
 
 #[test]
+// Prüft Byte-Slices mit beliebigen Byte-Offsets auf korrekte Dekodierung und Distanz.
 fn test_unaligned_f32_bytes_slice_windows() {
     let mut rng = DeterministicRng::with_seed(0x0123_4567_89AB_CDEF);
 
@@ -459,5 +484,69 @@ fn test_unaligned_f32_bytes_slice_windows() {
             let dot_d = dot_product_distance_f32_bytes(a, b_bytes).unwrap();
             assert!((dot_s - dot_d).abs() <= 1e-3 * dot_s.abs().max(dot_d.abs()).max(1.0));
         }
+    }
+}
+
+#[test]
+// Differenztests für Sonderwerte und R3-Dimensionen (1, 4, 17, 128, 768, 1536)
+fn test_differential_special_values_and_r3_dimensions() {
+    let dims = [1, 4, 17, 128, 768, 1536];
+
+    for &dim in &dims {
+        // 1. Zeros (+0.0)
+        let zeros_a = vec![0.0f32; dim];
+        let zeros_b = vec![0.0f32; dim];
+
+        // Euclidean: dist(0, 0) == 0.0
+        let euc_scalar = euclidean_distance_scalar(&zeros_a, &zeros_b);
+        let euc_simd = euclidean_distance(&zeros_a, &zeros_b).unwrap();
+        assert_eq!(euc_scalar, 0.0);
+        assert_eq!(euc_simd, 0.0);
+
+        // DotProduct: - (0 * 0) = -0.0 or 0.0
+        let dot_scalar = dot_product_scalar(&zeros_a, &zeros_b);
+        let dot_simd = dot_product_distance(&zeros_a, &zeros_b).unwrap();
+        assert_eq!(dot_scalar, 0.0);
+        assert_eq!(dot_simd, 0.0);
+
+        // Cosine: dist(0, 0) gives fallback 1.0
+        let cos_scalar = cosine_distance_scalar(&zeros_a, &zeros_b);
+        let cos_simd = cosine_distance(&zeros_a, &zeros_b).unwrap();
+        assert_eq!(cos_scalar, 1.0);
+        assert_eq!(cos_simd, 1.0);
+
+        // 2. Negative zeros (-0.0)
+        let neg_zeros_a = vec![-0.0f32; dim];
+        let neg_zeros_b = vec![0.0f32; dim];
+        let euc_neg = euclidean_distance(&neg_zeros_a, &neg_zeros_b).unwrap();
+        assert_eq!(euc_neg, 0.0);
+
+        // 3. Subnormal / Denormal values
+        let denorm_val = f32::from_bits(0x0000_0001); // smallest positive subnormal
+        assert!(denorm_val.is_subnormal());
+        let denorm_a = vec![denorm_val; dim];
+        let denorm_b = vec![denorm_val * 2.0; dim];
+
+        let denorm_euc_s = euclidean_distance_scalar(&denorm_a, &denorm_b);
+        let denorm_euc_simd = euclidean_distance(&denorm_a, &denorm_b).unwrap();
+        assert!((denorm_euc_s - denorm_euc_simd).abs() <= 1e-5 * denorm_euc_s.abs().max(1e-12));
+
+        let denorm_dot_s = dot_product_scalar(&denorm_a, &denorm_b);
+        let denorm_dot_simd = dot_product_distance(&denorm_a, &denorm_b).unwrap();
+        assert!((denorm_dot_s - denorm_dot_simd).abs() <= 1e-5 * denorm_dot_s.abs().max(1e-12));
+
+        // 4. Large magnitudes safely within f32 range across 1536 dims (e.g. 1e16, 1536 * 1e32 = 1.5e35 < 3.4e38)
+        let large_a = vec![1e16f32; dim];
+        let large_b = vec![1.00001e16f32; dim];
+        let large_cos_s = cosine_distance_scalar(&large_a, &large_b);
+        let large_cos_simd = cosine_distance(&large_a, &large_b).unwrap();
+        assert!((large_cos_s - large_cos_simd).abs() <= 1e-5);
+
+        // 5. Very small magnitudes (e.g. 1e-18)
+        let small_a = vec![1e-18f32; dim];
+        let small_b = vec![2e-18f32; dim];
+        let small_cos_s = cosine_distance_scalar(&small_a, &small_b);
+        let small_cos_simd = cosine_distance(&small_a, &small_b).unwrap();
+        assert!((small_cos_s - small_cos_simd).abs() <= 1e-5);
     }
 }

@@ -1,7 +1,24 @@
-// FILE-CONTEXT
-// ZWECK: Skalare Fallback-Implementierung der Distanzmetriken (f32, f32_bytes, u8, f32_u8).
-// INVARIANTEN: Mathematisch exakt und deterministisch; Null-Division-Schutz für Cosine.
 
+//! # Modul `kernels::scalar`
+//!
+//! **Ring-Zugehörigkeit:** Ring 0.
+//!
+//! **Zweck:**
+//! Plattformunabhängige Referenzimplementierung aller Distanzmetriken in reinem, sicherem Rust.
+//! Dieses Modul dient zwei Zwecken:
+//! 1. **Fallback:** Ausführung auf Plattformen ohne AVX2/AVX-512/NEON-Hardware-Support oder
+//!    bei Vektorlängen unterhalb der SIMD-Registerbreite.
+//! 2. **Orakel für Tests:** Differential- und Quertests vergleichen die Ergebnisse der
+//!    SIMD-Kernel bitgenau oder innerhalb definierter Fehlertoleranzen gegen diese Funktionen.
+//!
+//! **Unterstützte Metriken und Formate:**
+//! - Kosinus-Distanz ($1.0 - \text{Kosinus-Ähnlichkeit}$), Euklidische Distanz ($\sqrt{\sum(a_i-b_i)^2}$)
+//!   und Skalarprodukt (negierter Vektor-Dot-Product) für `f32`.
+//! - Zero-Copy Byte-Slices (`&[u8]`) mit Little-Endian encodierten `f32`-Werten.
+//! - Ganzzahl-Vektoren (`&[u8]`) für kompakte Quantisierung (z. B. SQ8).
+//! - Gemischte Präzision (`f32` und `u8`) mit Dequantisierungs-Parametern ($\alpha_i$, $\min_i$).
+
+// SECTION SCALAR-PARTS-STRUCTS
 /// Struct holding raw integer sum components for u8 cosine similarity calculation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CosineSimilarityPartsU8 {
@@ -23,7 +40,9 @@ pub struct CosineSimilarityPartsF32U8 {
     /// Accumulated squared L2 norm $\sum (b_i \text{ as } f32)^2$.
     pub norm_b_sq: f32,
 }
+// !SECTION SCALAR-PARTS-STRUCTS
 
+// SECTION SCALAR-F32-DISTANCES
 /// Scalar reference implementation for cosine distance on `f32` slices.
 ///
 /// # Semantics
@@ -40,12 +59,14 @@ pub fn cosine_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
     let mut norm_a = 0.0f32;
     let mut norm_b = 0.0f32;
 
+    // NOTE: Deterministische Schleifenakkumulation über Vektorpaare
     for (&x, &y) in a.iter().zip(b.iter()) {
         dot += x * y;
         norm_a += x * x;
         norm_b += y * y;
     }
 
+    // NOTE: Null-Vektoren ergeben deterministisch Distanz 1.0 (Orthogonal)
     if norm_a == 0.0 || norm_b == 0.0 {
         return 1.0;
     }
@@ -91,7 +112,9 @@ pub fn dot_product_scalar(a: &[f32], b: &[f32]) -> f32 {
     }
     -dot
 }
+// !SECTION SCALAR-F32-DISTANCES
 
+// SECTION SCALAR-BYTES-DISTANCES
 /// Scalar reference implementation for cosine distance between `f32` slice and raw LE `f32` byte slice.
 ///
 /// # Semantics
@@ -176,7 +199,9 @@ pub fn dot_product_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
     }
     -dot
 }
+// !SECTION SCALAR-BYTES-DISTANCES
 
+// SECTION SCALAR-U8-DISTANCES
 /// Scalar reference implementation for unsigned integer dot product between two `u8` byte slices.
 ///
 /// # Semantics
@@ -244,7 +269,9 @@ pub fn cosine_similarity_parts_u8_scalar(a: &[u8], b: &[u8]) -> CosineSimilarity
         norm_b_sq,
     }
 }
+// !SECTION SCALAR-U8-DISTANCES
 
+// SECTION SCALAR-MIXED-PRECISION
 /// Scalar reference implementation for mixed `f32`/`u8` dot product.
 ///
 /// # Semantics
@@ -332,3 +359,4 @@ pub fn normalize_inplace(v: &mut [f32]) {
         }
     }
 }
+// !SECTION SCALAR-MIXED-PRECISION

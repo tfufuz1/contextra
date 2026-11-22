@@ -6,6 +6,16 @@
 #![allow(clippy::cast_sign_loss)]
 // ADR-002 / SPEC §27: Test assertions and test dataset casts
 
+//! # Quervalidierungs- und Property-Test-Suite: `simd_cross_validation`
+//!
+//! **Zweck:**
+//! Führt umfassende hypothesen- und eigenschaftsbasierte Tests (Property-Based Testing via `proptest`)
+//! sowie deterministische Quervalidierungen durch:
+//! - Validiert SIMD-Dispatch gegen Skalar-Referenzen über zufällige Dimensionen (1 bis 1024).
+//! - Prüft 1.000 Vektorpaare auf strenge Äquivalenz-Schwellenwerte (`1e-4`).
+//! - Überprüft Grenzlängen um SIMD-Registergrenzen herum (z. B. 7, 8, 9 bei AVX2; 15, 16, 17 bei AVX-512).
+//! - Prüft mathematische Axiome: Nullvektor-Eigenschaften, Dreiecksungleichung, Symmetrie.
+
 use contextra_simd::dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
     dot_product_distance_f32_bytes, dot_product_u8, euclidean_distance,
@@ -20,6 +30,7 @@ use contextra_simd::kernels::scalar::{
 use proptest::prelude::*;
 
 proptest! {
+    // Property-Test: Vergleicht SIMD- und Skalar-Kosinus-Distanz über beliebige Dimensionen (1..1024).
     #[test]
     fn simd_vs_scalar_cosine_f32(
         dim in 1..1024usize,
@@ -41,6 +52,7 @@ proptest! {
         );
     }
 
+    // Property-Test: Vergleicht SIMD- und Skalar-euklidische Distanz über beliebige Dimensionen (1..1024).
     #[test]
     fn simd_vs_scalar_euclidean_f32(
         dim in 1..1024usize,
@@ -62,6 +74,7 @@ proptest! {
         );
     }
 
+    // Property-Test: Vergleicht SIMD- und Skalarprodukt-Distanz über beliebige Dimensionen (1..1024).
     #[test]
     fn simd_vs_scalar_dot_product_f32(
         dim in 1..1024usize,
@@ -83,6 +96,7 @@ proptest! {
         );
     }
 
+    // Property-Test: Vergleicht SIMD- und Skalar-Kosinus-Distanz auf Byte-Slices über Dimensionen 1..1024.
     #[test]
     fn simd_vs_scalar_cosine_f32_bytes(
         dim in 1..1024usize,
@@ -104,6 +118,7 @@ proptest! {
         );
     }
 
+    // Property-Test: Vergleicht SIMD- und Skalar-euklidische Distanz auf Byte-Slices über Dimensionen 1..1024.
     #[test]
     fn simd_vs_scalar_euclidean_f32_bytes(
         dim in 1..1024usize,
@@ -125,6 +140,7 @@ proptest! {
         );
     }
 
+    // Property-Test: Vergleicht SIMD- und Skalarprodukt auf Byte-Slices über Dimensionen 1..1024.
     #[test]
     fn simd_vs_scalar_dot_product_f32_bytes(
         dim in 1..1024usize,
@@ -146,6 +162,7 @@ proptest! {
         );
     }
 
+    // Property-Test: Vergleicht u8-Skalarprodukt zwischen SIMD und Skalar auf Gleichheit.
     #[test]
     fn simd_vs_scalar_dot_product_u8(
         dim in 1..1024usize,
@@ -165,6 +182,7 @@ proptest! {
         );
     }
 
+    // Property-Test: Vergleicht quadrierte u8-euklidische Distanz zwischen SIMD und Skalar auf Gleichheit.
     #[test]
     fn simd_vs_scalar_euclidean_sq_u8(
         dim in 1..1024usize,
@@ -184,6 +202,7 @@ proptest! {
         );
     }
 
+    // Property-Test: Vergleicht u8-Kosinus-Komponentensummen zwischen SIMD und Skalar.
     #[test]
     fn simd_vs_scalar_cosine_similarity_parts_u8(
         dim in 1..1024usize,
@@ -204,9 +223,10 @@ proptest! {
     }
 }
 
+// Prüft 1000 normalisierte Zufallsvektorpaare auf strikte Äquivalenz (Delta < 1e-4) bis Dimension 4097.
 #[test]
 fn test_s4_1000_pairs_equivalence_threshold() {
-    let dimensions = [128, 512, 1536, 4096];
+    let dimensions = [1, 3, 15, 17, 31, 33, 128, 512, 1536, 4096, 4097];
     let num_pairs = 1000;
 
     for &dim in &dimensions {
@@ -255,6 +275,7 @@ fn test_s4_1000_pairs_equivalence_threshold() {
     }
 }
 
+// Prüft Grenzdimensionen um SIMD-Registerbreiten (0 bis 65) auf exakte Restschleifen-Verarbeitung.
 #[test]
 fn test_simd_remainder_boundary_lengths_f32() {
     // Tests boundary vector lengths across SIMD chunk sizes (4, 8, 16, 32, 64)
@@ -340,6 +361,7 @@ fn test_simd_remainder_boundary_lengths_f32() {
     }
 }
 
+// Prüft Grenzdimensionen für u8-Vektoren (0 bis 130) auf fehlerfreie Vektorrest-Akkumulation.
 #[test]
 fn test_simd_remainder_boundary_lengths_u8() {
     let boundary_lengths = [
@@ -373,6 +395,7 @@ fn test_simd_remainder_boundary_lengths_u8() {
     }
 }
 
+// Prüft mathematisches Axiom S1: Nullvektor-Kosinusdistanz ist 1.0 und L2-Norm ist 0.0.
 #[test]
 fn test_s1_zero_vector_and_l2_norm() {
     let zero = vec![0.0f32; 128];
@@ -393,6 +416,7 @@ fn test_s1_zero_vector_and_l2_norm() {
     );
 }
 
+// Prüft mathematisches Axiom S2: Euklidische Distanz erfüllt Dreiecksungleichung und Symmetrie.
 #[test]
 fn test_s2_l2_distance_correctness() {
     let a = vec![3.0f32, 0.0];
@@ -404,6 +428,7 @@ fn test_s2_l2_distance_correctness() {
     );
 }
 
+// Prüft mathematisches Axiom S3: Kein vorzeitiger Überlauf bei großen Werten innerhalb f32::MAX.
 #[test]
 fn test_s3_overflow_behavior() {
     let norm_a = vec![1.0f32 / (4096.0f32.sqrt()); 4096];

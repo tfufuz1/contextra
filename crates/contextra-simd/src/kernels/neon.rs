@@ -1,10 +1,24 @@
-// FILE-CONTEXT
-// ZWECK: ARM NEON SIMD-Intrinsics für f32 Distanzberechnungen.
-// INVARIANTEN: Target-Architektur aarch64 / neon.
+
+//! # Modul `kernels::neon`
+//!
+//! **Ring-Zugehörigkeit:** Ring 0 (Unsafe-Insel).
+//!
+//! **Zweck:**
+//! Hardwarespezifische Distanzberechnung für ARM 64-Bit-Prozessoren (AArch64) mittels ARM NEON-Intrinsics.
+//! NEON stellt 128-Bit breite Vektorregister (`float32x4_t`) bereit, womit vier 32-Bit Gleitkommazahlen
+//! parallel in einem einzigen Befehlstakt verarbeitet werden (`vld1q_f32`, `vfmaq_f32`, etc.).
+//!
+//! **Architektur und Invarianten:**
+//! - Nur aktiv unter `#[cfg(target_arch = "aarch64")]`.
+//! - Alle Kernel sind `unsichere Funktionen`, da der Aufrufer sicherstellen muss, dass die NEON-Erweiterung
+//!   vorhanden ist und die Vektorlängen übereinstimmen.
+//! - Schleifen werden in 4-Element-Schritten durchlaufen (`i + 4 <= len`), der verbleibende Rest
+//!   wird in einer skalaren Nachschleife (`while i < len`) abgearbeitet.
 
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
 
+// SECTION NEON-F32-KERNELS
 /// Computes the cosine distance between two `f32` slices using ARM NEON intrinsics.
 ///
 /// # Safety
@@ -13,6 +27,7 @@ use std::arch::aarch64::*;
 /// - Slices `a` and `b` must have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "aarch64")]
 #[target_feature(enable = "neon")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -74,6 +89,7 @@ pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
 /// - Slices `a` and `b` must have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "aarch64")]
 #[target_feature(enable = "neon")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -118,6 +134,7 @@ pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
 /// - Slices `a` and `b` must have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "aarch64")]
 #[target_feature(enable = "neon")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -150,3 +167,4 @@ pub(crate) unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
 
     -dot
 }
+// !SECTION NEON-F32-KERNELS
