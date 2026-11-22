@@ -110,3 +110,12 @@ blockieren würden.
 |---|---|
 | ADR-030 | Agent State Machine & Orchestrator Design |
 | `rules/llm_protocol.md` | Identifier-Validierung |
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: Konsument (3 Zeilen, alle Produktivcode): `LsmStorage` als Feldtyp; `db.inner_storage()`, `last_tx_id()`, `CheckpointGuard::for_agent_step` in `engine.rs`.
+- Vertrag IF-8: Zugriff läuft nach der Umstellung über den Adapter-Handle des Konsumenten (`inner_storage()` ist in Spec §26.3 nicht abgebildet, SA-7).
+- Verboten: neue direkte Abhängigkeit auf Interna des Kerns.
+- Arbeitspakete: WP-5.5.

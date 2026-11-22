@@ -28,3 +28,12 @@
 
 ## 7. Offene Punkte
 - keine.
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: Indexstruktur; kein direkter Bezug zu `contextra-store`.
+- Vertrag IF-6: später `ExtensionBuilder`/Segment (Spec §15.9); Pflicht `rewrite_without`.
+- Verboten: der Kern kennt keine Volltextindizes.
+- Arbeitspakete: nach G-6.

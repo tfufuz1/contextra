@@ -29,3 +29,12 @@
 
 ## 7. Offene Punkte
 - keine.
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: bleibt obere Schicht (SSI, Transaktionspuffer, Snapshot-Register); der Stamp des Kerns ist die einzige Ordnung.
+- Vertrag IF-5: nutzt `View::stamp`, `view_at(stamp)` und `Guard::{Version, Unchanged, RangeUnchangedSince}`. Die Abbildung `TxId ↔ Stamp` liegt im Adapter, nicht im Kern.
+- Verboten: eigene Zeitordnung neben dem Stamp; Eingriffe in den Kern. Stand: `contextra_store` kommt nur in Kommentaren vor (2 Dateien).
+- Arbeitspakete: WP-5.5 (Adapter).

@@ -113,3 +113,12 @@ ausgeführt werden (Fehlerklasse 11).
 | ADR-023 | LLM-gestützte Context Compaction (ConsolidationSession) |
 | `COMMON_LLM_ERRORS.md` | Fehler-Klasse 11: Lock-Guard über `.await` |
 | `COMMON_LLM_ERRORS.md` | Fehler-Klasse 5: RRF Panic Out-of-Bounds |
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: Konsument; `contextra-store` steht unter `[dependencies]`, wird aber nur in Tests genutzt (25 Zeilen, 0 in Produktivcode).
+- Vertrag IF-8: Umstellung nach `contextra-engine`; vorher Abhängigkeit auf `[dev-dependencies]` verschieben (erst ab G-5).
+- Verboten: neue Produktivnutzung von `contextra-store`.
+- Arbeitspakete: WP-5.5.

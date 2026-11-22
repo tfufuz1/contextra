@@ -28,3 +28,12 @@
 
 ## 7. Offene Punkte
 - keine.
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: Indexstruktur; hängt an `contextra-store` nur als `[dev-dependencies]` (16 Zeilen, alle in `#[cfg(test)]`).
+- Vertrag IF-6: Graph-Strukturen kommen später als `ExtensionBuilder` bzw. Segment an den Kern; jeder Builder implementiert `rewrite_without` (Pflicht für ER3).
+- Verboten: der Kern kennt keine Graphstrukturen.
+- Arbeitspakete: nach G-6.

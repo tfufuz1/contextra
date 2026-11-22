@@ -72,6 +72,7 @@ Verteilung, eigene Kryptografie-Protokolle außerhalb von Ports, Schemas und Sek
 | Pfad | Rolle |
 |---|---|
 | `docs/SPEC.md` | **normativ** (R7) |
+| `docs/IMPLEMENTATION_SPEC.md` | Umsetzungsplan (nicht normativ): Modulplan, Abläufe, Schnittstellenverträge IF-1…IF-8, Arbeitspakete je Gate, Änderungsanträge SA-n |
 | `AGENTS.md` | dieser Arbeitskontext |
 | `CLAUDE.md` | Sitzungsumgebung, Push-Ablauf, Arbeitsregeln |
 | `docs/archive/` | Vorfassungen R2 und R6-Cluster-Entwurf. **Keine Anforderungsquelle.** |

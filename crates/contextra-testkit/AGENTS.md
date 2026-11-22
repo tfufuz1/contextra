@@ -26,3 +26,13 @@
 
 ## 7. Offene Punkte
 - keine.
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: Test-Primitive und Test-`KeyProvider` für den Kern, nur als `dev-dependency`.
+- Ist: `ManualClock`, In-Memory-Stores, `FaultVfs` (eigene API, kein Port-`Fs`); **kein** Test-`KeyProvider`, keine Konformitätssuite für `Fs`/`Cipher`/`Mac`/`Kdf`/`KeyProvider`.
+- Vertrag IF-4: Test-`KeyProvider`, Test-`Cipher`/`Mac`/`Kdf` (übernimmt `testing/refimpl.rs` aus dem Kern, D-05), `ManualClock` und seedbare `Entropy` als Port-Implementierungen.
+- Verboten: Abhängigkeit auf `contextra-store`; Nutzung außerhalb von `dev-dependencies` (INV-EMBED-1).
+- Arbeitspakete: WP-2.5.

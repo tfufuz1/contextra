@@ -103,3 +103,12 @@ andere Lese-Transaktionen behindern (weil das MVCC-Watermark nicht voranschreite
 | ADR-011 | RAII-basierte Checkpoint Guards (Orphan-Reaping bei Panic) |
 | `rules/async_drop.md` | Hintergrund-Reaping von synchronen Drops (Orphaned Checkpoints) |
 | `COMMON_LLM_ERRORS.md` | Fehler-Klasse 11: Lock-Guard über `.await` halten |
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: benannte Checkpoints bleiben hier (NZ-18); der Kern liefert `Storage::checkpoint` mit `Copy`/`Reflink`/`Hardlink`.
+- Ist: `contextra_store` wird nur in einem Test importiert (`tests/checkpoint_systematic_crash.rs`, `[dev-dependencies]`); Rollbacks laufen über einen eigenen Trait (`rollback_to_tx`), der Snapshot-Typ kommt aus `contextra-mvcc`. Die Aussage in Spec §26.2 „nutzt `Storage::checkpoint`“ trifft heute nicht zu (SA-6).
+- Vertrag IF-5: fehlende Fähigkeit (`reflink`/`hard_link`) ⇒ Rückfall auf `Copy` oder `Unsupported` (WP-6.4).
+- Arbeitspakete: WP-5.5, WP-6.4.

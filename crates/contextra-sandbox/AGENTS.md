@@ -59,3 +59,9 @@ impl WasmExecutor {
 |---|---|
 | §4.18 Spec | WASM Execution Boundary & Fuel Budgeting |
 | P9 Security Invariant | Zeroize-On-Drop für Exec Output |
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: kein Codebezug zu `contextra-store`; Treffer nur in Kommentaren bzw. in `Cargo.toml` (Stand 22.11.2026). Keine Änderung bis G-6.

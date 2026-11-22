@@ -101,3 +101,9 @@ contextra-core/-db Tasks. Dieser Threadpool lebt unabhängig von Python-Threads.
 |---|---|
 | ADR-042 | PyO3 Architektur & Async/Sync Bridging |
 | `rules/ffi_boundary.md` | FFI-Panics verhindern, Python Exceptions |
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: `contextra-store` steht in `Cargo.toml`, aber nicht im Code (0 Zeilen mit `contextra_store` in `*.rs`). Umstellung mit der Fassade (ab G-5), vorher keine Änderung.

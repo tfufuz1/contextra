@@ -27,3 +27,12 @@
 
 ## 7. Offene Punkte
 - keine.
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: Port-Katalog des Kerns ist das Modul `persistence` (`src/persistence.rs`, 352 Zeilen, Stand 22.11.2026). Es importiert nur `std`; das Crate zieht aber `contextra-types`, `blake3`, `serde`, `futures-util` und hat 26 Abhängige.
+- Vertrag IF-1: Feature `persistence` (übrige Abhängigkeiten optional, SA-1); doppelte `Clock` (`clock.rs:8`) entfällt; `Cipher` von 12 auf 24 Byte Nonce; `KeyProvider` auf `ClusterId` statt `KeyDomain`; `File::write_all_at`/`truncate` (SA-3); optionale `hard_link`/`reflink` (SA-2). Fehlend: `Checksum`, `Hasher`, `Observer`, `Anchor`, `ColdTier`, `SecretAlloc`, `Weigher`, `Filter`, `ExtensionBuilder`, `Runtime`, `ClusterId`.
+- Verboten: Logik im Port-Modul; Abhängigkeit des Ports vom Kern. Die Nähte `StorageEngine`, `KvBridgeStorage`, `KvPrefixStore` bleiben unverändert und sind Adapterziele ab G-5.
+- Arbeitspakete: WP-1.2, WP-1.3, WP-1.6.

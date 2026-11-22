@@ -26,3 +26,12 @@
 
 ## 7. Offene Punkte
 - keine.
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: Konsument von `Eraser`/`ErasureReceipt`; Politik bleibt hier.
+- Vertrag IF-7: wie `contextra-privacy`.
+- Verboten: Politik im Kern.
+- Arbeitspakete: nach G-6.

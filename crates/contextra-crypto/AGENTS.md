@@ -35,3 +35,13 @@
 ## 7. Offene Punkte
 - **P-01 bis P-14 (§20.13):** Offene juristische Prüfpunkte bezüglich Schutzbedarf und Schlüsselvernichtungs-Attestierung.
 - **F-01 bis F-08 (§34):** Architekturentscheidungen zu Crypto-Erase und DeletionProof v4.
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: liefert die produktiven Port-Implementierungen `Cipher`, `Mac`, `Kdf`, `Hasher`, `FileKeyProvider` für den Kern.
+- Ist (22.11.2026): AES-256-GCM-SIV mit 12-Byte-Nonce, HKDF, BLAKE3 und weitere Primitive; **keine** Implementierung eines `persistence`-Ports; `KeyManager` implementiert `KeyProvider` nicht.
+- Vertrag IF-3: `Cipher` mit 24-Byte-Nonce (Vorschlag XChaCha20-Poly1305, UE-10, Review nach Spec §1.5), `Mac`/`Kdf`/`Hasher` nach Spec §4, `FileKeyProvider` mit zufälligen Clusterschlüsseln (D-19). Schlüssel stehen nie im Datenverzeichnis des Kerns.
+- Verboten: der Kern hängt nie an diesem Crate (Allow-Liste Spec §3.5); keine Panik, kein Schlüsselmaterial in `Debug`/Logs.
+- Arbeitspakete: WP-2.4. Nachweis: `cipher_suite`, `mac_suite`, `kdf_suite`, `key_provider_suite`.

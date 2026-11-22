@@ -105,3 +105,9 @@ Regel `detect_nested_locks.yml` verbietet geschachtelte Locks innerhalb von Laye
 | ADR-010 | Entfernung der HTTP-Schicht (Nur Stdio) |
 | ADR-044 | MCP Write-Authorization (Opt-In Security) |
 | `rules/detect_nested_locks.yml` | Verbietet Deadlock-anfällige Lock-Schachtelungen |
+
+## Storage-Umbau (`contextra-storage`)
+
+Normativ: `docs/SPEC.md` (R8). Umsetzungsplan und Verträge: `docs/IMPLEMENTATION_SPEC.md` (nicht normativ). Bis Gate G-5 ändert sich dieses Crate nicht (Spec §22); die Angaben hier sind Dokumentation, kein Auftrag zur Codeänderung.
+
+- Rolle: kein Codebezug zu `contextra-store`; Treffer nur in Kommentaren bzw. in `Cargo.toml` (Stand 22.11.2026). Keine Änderung bis G-6.
