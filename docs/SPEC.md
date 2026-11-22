@@ -1,10 +1,10 @@
-# SPEC.md — `contextra-storage` (Speicherkern), Revision R7
+# SPEC.md — `contextra-storage` (Speicherkern), Revision R8
 
 | | |
 |---|---|
-| Status | **Normativ (R7).** Einzige normative Spezifikation des Speicherkerns. Ersetzt vollständig `docs/archive/SPEC-R2.md` und `docs/archive/SPEC-R6-Cluster-Entwurf.md` (Herkunft siehe Anhang B). Gate **G-0** (§22) gilt mit dieser Revision als erfüllt. Gate **G-1** setzt O-1 und O-12 voraus. |
+| Status | **Normativ (R8).** Einzige normative Spezifikation des Speicherkerns. Ersetzt vollständig R7, `docs/archive/SPEC-R2.md` und `docs/archive/SPEC-R6-Cluster-Entwurf.md` (Herkunft siehe Anhang B). R8 behebt die inneren Widersprüche von R7 (Register §25, C-21 bis C-34; Entscheidungen D-17 bis D-30). Gate **G-0** (§22) gilt erst mit R8 als erfüllt. Gate **G-1** setzt O-12 voraus; O-1 ist mit D-17 entschieden. |
 | Gegenstand | Eingebetteter, synchroner, crash-sicherer Schlüssel-Wert-Kern für Sprachmodell-Speicher: atomare Mehr-Space-Änderungen, MVCC-Sichten, löschlokale Datenanordnung (Cluster), kryptografische und physische Löschung mit Nachweis. |
-| Crates | `contextra-storage` (Kern), `contextra-storage-ports` (Traits, Werttypen, keine Logik). `contextra-crypto-ref` nur als Dev-Abhängigkeit für Referenz-Primitive (O-6). Der bestehende Crate `contextra-ports` gehört nicht zum Kern und wird nicht verwendet (D-02). |
+| Crates | `contextra-storage` (Kern). Port-Katalog: das Modul `contextra-ports::persistence` (eigenständig, keine Logik; D-02). Produktive Primitive: `contextra-crypto`; Test-Primitive: `contextra-testkit` (D-05). Es entstehen keine neuen Crates (D-18). Anbindung der bestehenden Crates: §26. |
 | Sprache | Prosa und Rustdoc deutsch, Bezeichner englisch. |
 | Verifikation | **Nichts im Kern ist kompiliert oder gemessen.** Alle Leistungsangaben sind Hypothesen (§21). Die Primitiv-Goldens in Anhang A sind mit einem unabhängigen Python-Skript nachgerechnet (CRC32C, XXH64, Varint, Tag, Bloom). Byte-Goldens der Container-Formate sind vor **G-F** zu erzeugen. |
 | Rechtlicher Vorbehalt | Der Kern liefert technische Eigenschaften. Er trifft keine Rechtsaussage zu Löschfristen oder Ausnahmen (O-2). Aussagen über Löschung sind immer an eine Stufe aus §15.2 und an die Prüfung nach §15.11 gebunden. |
@@ -32,7 +32,7 @@ Eine Vorfassung gilt nie als Quelle. Widersprüche zwischen Dokumenten werden im
 
 ### 1.4 Kennungen
 
-`Z-n` Ziel · `NZ-n` Nicht-Ziel · `P-n` Codierregel · `F-n` Fehlerklasse · `AT-n` Angreifer · `AN-nn` Annahme · `SD-nn` Entscheidung (§23) · `D-nn` Entscheidung aus der Konsolidierung R7 (§23.2) · `C-nn` Widerspruch aus den Vorfassungen (§25) · `INV-*` Invariante (§18) · `H-n` Hypothese (§21) · `O-n` offene Entscheidung (§24) · `G-*` Gate (§22) · `ER0…ER7` Schritte der Löschung (§15.5) · `PD1…PD5` Schritte des Packgruppen-Abwurfs (§15.6).
+`Z-n` Ziel · `NZ-n` Nicht-Ziel · `P-n` Codierregel · `F-n` Fehlerklasse · `AT-n` Angreifer · `AN-nn` Annahme · `SD-nn` Entscheidung (§23) · `D-nn` Entscheidung aus der Konsolidierung R7 (§23.2) · `C-nn` Widerspruch aus den Vorfassungen (§25) · `INV-*` Invariante (§18) · `H-n` Hypothese (§21) · `O-n` offene Entscheidung (§24) · `G-*` Gate (§22) · `ER0…ER7` Schritte der Löschung (§15.5) · `PD1…PD5` Schritte des Packgruppen-Abwurfs (§15.12).
 
 ### 1.5 Änderungsprozess
 
@@ -97,14 +97,16 @@ Der Kern löst Speicherung, Dauerhaftigkeit, Nebenläufigkeit und Löschung voll
 ### 3.1 Workspace
 
 ```
-Cargo.toml                          Workspace, resolver 3, MSRV und Toolchain-Pin gemäß O-1
-crates/contextra-storage-ports/     Traits und Werttypen, keine Logik, keine Laufzeitabhängigkeiten
+Cargo.toml                          Workspace, resolver "2", rust-version 1.89 (D-17)
+crates/contextra-ports/             Modul `persistence` = Port-Katalog des Kerns (§4); keine Logik
 crates/contextra-storage/           Kern; #![forbid(unsafe_code)]
-crates/contextra-crypto-ref/        Referenz-Primitive, nur Dev-Abhängigkeit (O-6)
+crates/contextra-crypto/            produktive Cipher, Mac, Kdf, Hasher, KeyProvider (Port-Implementierungen)
+crates/contextra-testkit/           Test-Primitive und Test-Provider (Dev-Abhängigkeit des Kerns)
+crates/contextra-durable-fs/        Plattform-`Fs` (RealFs-Implementierung, §26)
 docs/archive/                       Vorfassungen und Konzepte
 ```
 
-Der Kern hängt an `contextra-storage-ports`, nie umgekehrt. Implementierer von Prüfsummen, Kryptografie, Plattform-`Fs`, Indexbau und Telemetrie hängen nur am Port-Crate.
+Der Kern hängt an `contextra-ports::persistence`, nie umgekehrt. Implementierer von Prüfsummen, Kryptografie, Plattform-`Fs`, Indexbau und Telemetrie hängen nur an diesem Port-Modul, nicht am Kern. Das Modul importiert weder `contextra-types` noch `blake3`, `serde` oder `futures-util` (D-02).
 
 ### 3.2 Modulschnitt von `contextra-storage`
 
@@ -112,7 +114,7 @@ Der Kern hängt an `contextra-storage-ports`, nie umgekehrt. Implementierer von 
 api        Storage, Space, View, Change, Cursor, Hold, Restriction, Consumer, Eraser, Inspector, Pending
 engine     committer · memtable · version · views · registry · claims · retention · volatile
 maint      flush · compaction · blob_gc · purge · pack_drop · scheduler (Lanes, Governor)
-erase      gate · cluster_table · links · protocol · ledger · oracle (Feature testing)
+erase      gate · cluster_table · links · protocol · ledger · oracle
 recovery   open-Sequenz, Anker-Prüfung, Redo-Replay
 catalog    snapshot · edits · log · rollover · current · reservations
 store      run · blob · segment · redo
@@ -128,8 +130,8 @@ sync       Sperren mit Rang (Ranked<T, RANK>), Generationszähler
 
 ```
 api ──► engine ──► { store, catalog, erase } ──► { keys, codec, env }
-api ──► erase  ──► engine
-maint ──► { engine, store, catalog, keys }
+erase ──► { store, catalog, keys, codec, env }      (nie engine; der Löschdurchlauf liegt in maint, D-22)
+maint ──► { engine, erase, store, catalog, keys }
 keys ──► { codec, env }       store/catalog/redo/blob nutzen nur keys::*-Schnittstellen
 testing (Feature) ──► alles; nichts hängt von testing ab
 ```
@@ -142,19 +144,19 @@ testing (Feature) ──► alles; nichts hängt von testing ab
 - `cfg(loom)` nur in `src/sync.rs`. `cfg(miri)` ist zulässig.
 - Es gibt **kein** Verschlüsselungs-Feature. Primitive kommen über Ports; der Modus steht in `FORMAT` (§10.2).
 - Entwicklungsabhängigkeiten (`proptest`, `loom`, `shuttle`, `arbitrary`, `cargo-mutants`) zählen nicht zur Laufzeit.
-- Die Testfunktion `testing` darf nicht Krypto-Crates in den Kern ziehen. Das Referenz-Primitiv liegt in `contextra-crypto-ref` (D-05).
+- Das Feature `testing` darf keine Krypto-Crates in den Kern ziehen. Test-Primitive kommen aus `contextra-testkit` als Dev-Abhängigkeit (D-05).
 
 ### 3.5 Erlaubte Laufzeitabhängigkeiten des Kerns (D-05)
 
 | Crate | Zweck | Bedingung |
 |---|---|---|
 | `std` | alles | – |
-| `contextra-storage-ports` | Traits | Pflicht |
+| `contextra-ports` (nur Modul `persistence`) | Traits | Pflicht |
 | `zeroize` | Löschen von Schlüsselmaterial | Pflicht für `Secret32` |
 | `bytes` | Zero-Copy-Puffer | optional, Registereintrag nötig |
 | `crossbeam-skiplist` | lock-freie Memtable (§17.3) | Registereintrag nötig |
 
-Keine Krypto-Crates (`blake3`, `chacha20poly1305`, `aes-gcm-siv`) im Kern. Sie liegen in `contextra-crypto-ref` (Dev) oder in einem Produktiv-Port außerhalb des Kerns. Jede weitere Abhängigkeit braucht einen Eintrag in §23.3 und `cargo-deny` (`advisories`, `bans`, `sources`). Dev-Abhängigkeiten sind frei, aber nie in der Release-Konfiguration.
+Keine Krypto-Crates (`blake3`, `chacha20poly1305`, `aes-gcm-siv`) im Kern. Sie liegen in `contextra-crypto` (produktiv) oder `contextra-testkit` (Test), nie im Kern. Jede weitere Abhängigkeit braucht einen Eintrag in §23.3 und `cargo-deny` (`advisories`, `bans`, `sources`). Dev-Abhängigkeiten sind frei, aber nie in der Release-Konfiguration.
 
 ### 3.6 Codierregeln
 
@@ -177,7 +179,7 @@ Keine Krypto-Crates (`blake3`, `chacha20poly1305`, `aes-gcm-siv`) im Kern. Sie l
 
 ---
 
-## 4. Ports (`contextra-storage-ports`, semver-stabil)
+## 4. Ports (`contextra-ports::persistence`, semver-stabil)
 
 ```rust
 pub enum Perm { Private /* 0600 Dateien, 0700 Verzeichnisse oder restriktive ACL */, Inherit }
@@ -187,7 +189,7 @@ pub enum LockMode { Exclusive, Shared }                           // nicht block
 pub trait Fs: Send + Sync + 'static {
     fn create_dir_all(&self, p: &Path, perm: Perm) -> io::Result<()>;
     fn open(&self, p: &Path, mode: OpenMode) -> io::Result<Box<dyn File>>;
-    fn rename(&self, from: &Path, to: &Path) -> io::Result<()>;   // atomar (AN-04), wirksam erst nach sync_dir
+    fn rename(&self, from: &Path, to: &Path) -> io::Result<()>;   // atomar (AN-01), wirksam erst nach sync_dir
     fn remove_file(&self, p: &Path) -> io::Result<()>;
     fn remove_dir(&self, p: &Path) -> io::Result<()>;
     fn list_dir(&self, p: &Path) -> io::Result<Vec<DirEntry>>;     // Name + Länge
@@ -266,7 +268,7 @@ pub trait ExtensionBuilder: Send + Sync { fn id(&self) -> u16; fn version(&self)
 - `RealFs` nutzt ausschließlich `std`.
 - `Checksum::crc32c(seed, data)` setzt einen CRC-32C-Strom fort: Ergebnis = `!update(!seed, data)`; `seed = 0` liefert den üblichen CRC-32C (`"123456789"` → `0xE3069283`). Beschleunigte Varianten über denselben Port müssen die Goldens aus Anhang A bestehen (SD-64).
 - **`FsCaps` und Fail-closed (INV-FS-1).** Unter `FsPolicy::Strict` (Standard) öffnet der Kern nur, wenn `durable_file_sync`, `durable_dir_sync`, `atomic_rename` und `private_perm` wahr sind; sonst `Err(Unsupported{fs_caps})`. `Relaxed` ist nur für Tests und Wegwerf-Instanzen und setzt `Receipt.durable = false`. Neue `Fs`-Implementierungen bestehen `testing::conformance::fs_suite`.
-- **`KeyProvider`-Vertrag (INV-KEYP-1).** (1) `create_cluster_key` legt an, wenn ein Cluster erstmals beschrieben wird. (2) `make_durable` kehrt erst zurück, wenn alle bis dahin angelegten Schlüssel dauerhaft sind; der Kern ruft es vor dem Dauerhaftwerden eines Frames mit so versiegelten Körpern (§8.2, Schritt 1b). (3) `None` darf nur zurückkommen, wenn die Vernichtung dauerhaft und geprüft ist. (4) Aufrufe können blockieren und laufen ohne gehaltene Sperre (P-10). (5) Der Kern hält Clusterschlüssel nur im begrenzten Cache (§16.4).
+- **`KeyProvider`-Vertrag (INV-KEYP-1, INV-KEY-1).** (1) `create_cluster_key` legt an, wenn ein Cluster erstmals beschrieben wird. (2) `make_durable` kehrt erst zurück, wenn alle bis dahin angelegten Schlüssel dauerhaft sind; der Kern ruft es vor dem Dauerhaftwerden eines Frames mit so versiegelten Körpern (§11.1, Schritt 1). (3) `None` darf nur zurückkommen, wenn die Vernichtung dauerhaft und geprüft ist. (4) Aufrufe können blockieren und laufen ohne gehaltene Sperre (P-10). (5) Der Kern hält Clusterschlüssel nur im begrenzten Cache (§16.4). (6) Der Provider ist alleiniger Verwahrer der Clusterschlüssel; sie stehen weder im Catalog noch in `KEYS` noch in einer Datendatei (D-19, INV-KEY-1).
 - **`Secret32`:** undurchsichtiges Handle ohne `Debug`, `Clone`, `Serialize`. `Drop` überschreibt per `zeroize`. `SecretAlloc` ersetzt den Speicher durch geschützten Speicher der Anwendung, ohne dass der Kern `unsafe` braucht (SD-56).
 - `Mac::mac16` und `Cipher` hängen **keine** Länge an; der Kern kodiert Längen selbst.
 - `Weigher::version()` ändert sich, wenn sich das Zählverfahren ändert; der Kern speichert sie je Run.
@@ -287,10 +289,10 @@ Die Klassen F-1 bis F-16 vereinen die Vorfassungen (C-20). Jede Klasse hat ein d
 | F-2 | Zerrissener Schreibvorgang | Gruppen-, Frame-, Block-, Recordprüfwert | Torn Tail im **letzten** Segment wird geheilt; sonst `Corrupt` | Absturzmatrix, Fuzz |
 | F-3 | Umordnung unsynchronisierter Schreibvorgänge | Reihenfolge-Vertrag (P-3) | nie ein Edit vor seiner Datei | `FaultFs` |
 | F-4 | `fsync`-Fehler zur Laufzeit | **Instanz-Poison**, kein Retry (§11.6) | Schreiben und Wartung tot; Lesen bleibt (§11.6) | `FaultFs` |
-| F-5 | `ENOSPC` beim Anhängen | Abschneiden auf den letzten guten Offset, Gruppe `Busy{StorageFull}`; schlägt das Abschneiden fehl, Instanz-Poison | heil und wiederholbar oder Poison | `FaultFs` |
+| F-5 | `ENOSPC` beim Anhängen | Abschneiden auf den letzten guten Offset, Gruppe `Busy{StorageFull}`, Zustand `Degraded` bis `resume_writes` (§11.6); schlägt das Abschneiden fehl, Instanz-Poison | heil und wiederholbar oder Poison | `FaultFs` |
 | F-6 | `EIO` beim **Lesen** | immer als Fehler melden, **nie als „leer“**; Datei wird als verdächtig markiert | Operation scheitert; Instanz benutzbar | `FaultFs` |
 | F-7 | Bitfäule im Ruhezustand | Prüfwert je Block, Frame, Record; in `Authenticated`/`Encrypted` kryptografisch | `Corrupt{file, offset}` und **Datei-Quarantäne** (§5.3); nie falsche Daten | Bitflip |
-| F-8 | Verlorener oder fehlgeleiteter Schreibvorgang | Kettenprüfwert im Redo, AAD mit Block-ID, Redo-HWM (INV-LOG-8), `verify` | erkannt, solange Dateien intern inkonsistent sind; ein ganzer älterer, in sich stimmiger Stand bleibt unerkannt (→ F-10) | `FaultFs` |
+| F-8 | Verlorener oder fehlgeleiteter Schreibvorgang | Kettenprüfwert im Redo, AAD mit Block-ID, Redo-HWM (INV-LOG-9), `verify` | erkannt, solange Dateien intern inkonsistent sind; ein ganzer älterer, in sich stimmiger Stand bleibt unerkannt (→ F-10) | `FaultFs` |
 | F-9 | Speicherdruck, Deskriptorerschöpfung | `Governor`: verlangsamen, Flush erzwingen, Caches verkleinern; `Busy{retry_after}` | keine Allokationsabbrüche; kein OOM | Ressourcentests |
 | F-10 | Zurückspielen eines älteren Gesamtstands | nur mit Rollback-Anker (§16.7) erkennbar | ohne Anker nicht erkennbar; offen dokumentiert | Anker-Test |
 | F-11 | Uhrsprung | `Clock` nur für Ablauf (Holds, TTL, Intervall-`fsync`); Ordnung nur über Stamps | nie Ordnungsfehler | Clock-Tests |
@@ -357,12 +359,12 @@ Eine Prüfwertverletzung in einer Datei **vergiftet nicht die Instanz**. Der Ker
 
 ### 6.3 Wert, Kopf, Körper, Gewichte
 
-Ein Wert besteht aus `header ‖ body`, getrennt durch `header_len` (je Space fest, 0…255 Byte; Obergrenze `max_header_bytes`). Der Kern interpretiert den Kopf nie und liefert ihn ohne Körper-E/A.
+Ein Wert besteht aus `header ‖ body`, getrennt durch `header_len` (je Space fest, 0…`max_header_bytes`). Der Kern interpretiert den Kopf nie und liefert ihn ohne Körper-E/A.
 
 - Jeder Eintrag trägt `weights: [u32; W]`, `W = weight_slots` des Space (0…4). Gewichtsbedeutung bestimmt die obere Schicht.
 - **Summen sind `u64`** (D-08, C-13): Block- und Clusterverzeichnis führen `weight_sum: [u64; W]`. Eine Summe aus `u32`-Einträgen kann in einem Block überlaufen.
 - Körper mit Länge ≥ `value_separation_min` (Standard 1 KiB) liegen in Blob-Dateien (`PutRef`). Kleinere Körper liegen inline im Run. Der Kopf liegt **immer** inline.
-- `value_separation_min` ist der einzige Schwellwert für die Körpertrennung (C-06).
+- `value_separation_min` ist der einzige Schwellwert für die Körpertrennung (C-01).
 
 ### 6.4 `SpaceOptions` (unveränderlich nach dem Anlegen)
 
@@ -387,7 +389,7 @@ pub struct SpaceOptions {
 
 - `Seal::Cluster` setzt `clustered = true` voraus. `EraseLevel::Cryptographic` ist nur in Spaces mit `Seal::Cluster` zulässig, sonst `Err(Unsupported)`.
 - `forgetting` und `AppendOnly` schließen sich aus (`Config`-Fehler).
-- **Volatile** (§11.2) ist ein eigener Space-Typ. Er vermischt sich nie mit dauerhaften Zielen in einem Change: `Forbidden{MixedDurability}` (D-10, C-07). Ein Opt-in für Mischung gibt es nicht.
+- **Volatile** (§11.2) ist ein eigener Space-Typ. Er vermischt sich nie mit dauerhaften Zielen in einem Change: `MixedDurability` (D-10, C-07). Ein Opt-in für Mischung gibt es nicht.
 
 ### 6.5 Change, Guard, Receipt
 
@@ -404,7 +406,7 @@ Die Standardwerte stehen in §20.2. Ein Parameter ohne Standard (`purge_deadline
 
 Je Cluster führt der Catalog: `{ cluster_id, tenant_tag, pack_key, state, key_epoch, created_stamp, due_bucket, links, restrictions }`.
 
-`state`: `Live → Retired(S) → [Shredded] → Purged` (nur vorwärts). `Shredded` entfällt, wenn kein Schlüssel vernichtet wird (`Seal::None` oder Stufe ohne Schlüsselvernichtung). `Restricted` ist keine Zustandsstufe, sondern eine Menge `restrictions` (§15.4). Ein `Purged`-Cluster wird nie wiederverwendet (INV-CLUSTER-1).
+`state`: `Live → Gated(g) → Erased → Purged` (nur vorwärts; D-26). `Gated(g)`: ab dem Gate-Stamp `g` nimmt der Cluster keine Änderungen mehr an (§11.3). `Erased`: alle für die gewählte Stufe nötigen ER-Schritte außer ER7 sind erreicht (§15.2). `Purged`: ER7 quittiert, Cluster-Eintrag entfernt. Das Flag `key_destroyed` ist kein Zustand, sondern ein Merkmal von `Gated` und `Erased`. `Restricted` ist ebenfalls kein Zustand, sondern die Menge `restrictions` (§15.4). Ein `Purged`-Cluster wird nie wiederverwendet (INV-CLUSTER-1).
 
 ### 6.8 Limits
 
@@ -430,7 +432,7 @@ Ein Change über den Limits wird **vor** jeder Sperre abgewiesen (§11.1).
 - **R-PL-3** Überschreiten die lebenden Bytes eines Clusters `pure_threshold`, wird er bei der nächsten Compaction Pure. Der umgekehrte Weg findet nicht statt.
 - **R-PL-4** Compaction mischt nur innerhalb **einer Wartungsgruppe**: einer Packgruppe oder eines Pure-Clusters (INV-PL-3).
 - **R-PL-5** `PackKey = (tenant_tag, due_bucket, shard)`. Packgruppen je Space ≤ `max_pack_groups` (4 096).
-- **R-PL-6** Der Wechsel in eine andere Packgruppe (`rebucket`) ist ein atomarer Umzug (§15.7, INV-PL-4).
+- **R-PL-6** Der Wechsel in eine andere Packgruppe (`rebucket`) ist ein atomarer Umzug (§7.3, INV-PL-4).
 - **R-PL-7** Blob-Dateien folgen denselben Regeln wie Runs (Pure oder Packed).
 
 ### 7.2 Wirkung auf die Löschung
@@ -441,7 +443,13 @@ Ein Change über den Limits wird **vor** jeder Sperre abgewiesen (§11.1).
 | Packgruppe läuft ab | alle Dateien der Gruppe entfernen, ein Edit | dieselbe Operation |
 | Mandant verlässt | alle Pure-Cluster und Packgruppen des Tags nacheinander abwerfen | Packgruppen einzeln |
 
-Rohkopieren ist gültig, weil die Block-AAD nicht an die Dateiposition gebunden ist (§10.10). Die Datei-Integrität deckt stattdessen der Datei-MAC über Verzeichnis und Abschnittsindex ab (§10.6).
+Rohkopieren ist gültig, weil die Block-AAD nicht an die Dateiposition gebunden ist (§10.10). Die Datei-Integrität deckt stattdessen der Datei-MAC über Verzeichnis und Abschnittsindex ab (§10.6). Für **Blobs** gilt das Überspringen nicht: Offsets von `BlobRef` müssen stabil bleiben, deshalb entstehen dort Löcher in einer neuen Inkarnation (§9.2, §10.7).
+
+### 7.3 Umzug zwischen Packgruppen (`rebucket`)
+
+1. Die Abschnitte des Clusters werden roh in neue Dateien der Zielgruppe kopiert (Datei-MAC je Datei neu, §10.6). Die Quelldateien bleiben unverändert.
+2. Ein **einziger** Catalog-Edit enthält `pack_assign` und alle `files_add`/`files_remove` beider Gruppen (P-2, INV-PL-4).
+3. Erst nach dem dauerhaften Edit werden Quelldateien entfernt (P-3). Ein Absturz davor hinterlässt verwaiste Zieldateien, nie einen halben Umzug.
 
 ---
 
@@ -487,10 +495,11 @@ impl Storage {
     pub fn apply(&self, c: Change) -> Result<Receipt, ApplyError>;
     pub fn submit(&self, c: Change) -> Pending;                    // §8.8
     pub fn sync(&self) -> Result<(), Error>;                       // erzwingt Durabilität aller quittierten Changes
+    pub fn resume_writes(&self) -> Result<(), Error>;              // verlässt `Degraded` nach ENOSPC (§11.6); aus `Poisoned` nie
 }
 pub enum ApplyError {
-    GuardFailed { guard_index: u32 }, AlreadyApplied { stamp: Stamp },
-    ClusterRetired, ClusterShredded, Restricted { ids: Vec<u64>, reasons: Vec<u16> },
+    GuardFailed { guard_index: u32 }, IdemConflict, IdemExpired,
+    ClusterGated, Restricted { ids: Vec<u64>, reasons: Vec<u16> },
     ChangeTooLarge, Limit { what: LimitKind, max: u64 }, MixedDurability, Forbidden { space: SpaceId, op: OpKind },
     Busy { retry_after: Duration, reason: BusyReason },           // StorageFull, Governor, Stall
     Poisoned { cause: PoisonCause }, Indeterminate,               // §11.6
@@ -514,7 +523,7 @@ impl View {
     pub fn cursor(&self, sp: &Space, c: ClusterId, r: KeyRange, o: ScanOpts) -> Cursor;
     pub fn page(&self, sp: &Space, c: ClusterId, r: KeyRange, b: Budget, resume: Option<ResumeToken>)
         -> Result<Page, ReadError>;                                  // summiert weight_sum, überspringt Blöcke
-    pub fn estimate(&self, sp: &Space, c: ClusterId, r: KeyRange) -> Result<Estimate, ReadError>;  // §12.5
+    pub fn estimate(&self, sp: &Space, c: ClusterId, r: KeyRange) -> Result<Estimate, ReadError>;  // §12.7
     pub fn history(&self, sp: &Space, c: ClusterId, key: &[u8], from: Stamp) -> Result<History, ReadError>;
 }
 impl Entry {
@@ -533,6 +542,9 @@ impl Entry {
 impl Storage {
     pub fn clusters(&self) -> Clusters;
     pub fn hold(&self, at: Stamp, owner: OwnerId, ttl: Duration) -> Result<Hold, Error>;   // ttl ≤ max_hold_ttl
+    pub fn hold_durable(&self, at: Stamp, owner: OwnerId, ttl: Duration) -> Result<Hold, Error>;  // INV-HOLD-1
+    pub fn hold_drop(&self, id: HoldId, by: OwnerId) -> Result<(), Error>;
+    pub fn holds(&self, owner_prefix: &[u8]) -> Vec<HoldInfo>;
     pub fn restrict(&self, c: ClusterId, r: RestrictionSpec) -> Result<RestrictionId, Error>;
     pub fn lift(&self, id: RestrictionId, by: OwnerId) -> Result<(), Error>;
     pub fn consumer(&self, id: ConsumerId, from: Stamp, max_lag: u64) -> Result<Consumer, Error>;
@@ -579,10 +591,12 @@ pub struct EraseReq {
 pub trait Listener: Send { fn on_change(&mut self, e: ChangeEvent); fn on_lagged(&mut self, missed_from: Stamp); }
 impl Storage {
     pub fn checkpoint(&self, dst: &Path, m: CheckpointMode) -> Result<Manifest, Error>;   // Copy | Reflink | Hardlink (Opt-in)
-    pub fn restore_check(&self, m: &Manifest, ledger: &LedgerRef) -> RestorePlan;         // §15.7
+    pub fn restore_check(&self, m: &Manifest, ledger: &LedgerRef) -> RestorePlan;         // §14.3
+    pub fn restore(cfg: Config, env: Env, src: &Path, m: &Manifest) -> Result<Storage, OpenError>;  // §14.3
+    pub fn rekey_clone(&self, dst: &Path, plan: KeyPlan) -> Result<Manifest, Error>;       // §15.10
     pub fn verify(&self, scope: VerifyScope) -> VerifyReport;                             // Online | Offline
     pub fn stats(&self) -> Stats;                                                         // §19.3
-    pub fn health(&self) -> Health;                                                       // Healthy | Poisoned{cause, durable_stamp}
+    pub fn health(&self) -> Health;                                                       // Healthy | Degraded{cause} | Poisoned{cause, durable_stamp}
     pub fn hibernate(&self) -> Result<(), Error>;
     pub fn inspect(&self) -> Inspector;
 }
@@ -604,11 +618,11 @@ Beispiel: „Space ‚trace‘ ist append-only; Schlüssel existiert bereits. Ne
 | `Indeterminate` | Fsync-Ergebnis unbekannt | ja, mit demselben `IdemToken` |
 | `Corrupt{file, offset, what}` | Prüfwert oder Struktur falsch; Datei quarantänisiert | nein |
 | `Erased{range, erased_at}` | Zugriff unterhalb eines Löschstamps | nein |
-| `Shredded{domain}` | Schlüssel des Clusters vernichtet | nein |
+| `Shredded{cluster}` | Schlüssel des Clusters vernichtet | nein |
 | `Quarantined{file}` | Einheit wegen früherer Prüfwertverletzung gesperrt | nein |
 | `Restricted{ids, reasons}` | Restriction blockiert Lesen, Schreiben oder Löschen | nein (nach `lift`) |
 | `HoldBlocked{holds}` | Löschung durch Halteregel blockiert | ja (nach Freigabe) |
-| `KeyStillPresent` | `Erase` mit noch vorhandenem Schlüssel | nein (Schlüssel zuerst vernichten) |
+| `KeyStillPresent` | Abschluss von ER6 bei noch vorhandenem Schlüssel | nein (Schlüssel zuerst vernichten) |
 | `Limit{what, max}`, `ChangeTooLarge` | Größe überschritten | nein |
 | `Forbidden{space, op}` | Operation im Space nicht erlaubt | nein |
 | `MixedDurability` | Change über dauerhafte und flüchtige Ziele | nein |
@@ -619,6 +633,10 @@ Beispiel: „Space ‚trace‘ ist append-only; Schlüssel existiert bereits. Ne
 | `CallerPanic{what}` | Panik in Aufrufer-Code | nein |
 | `Rollback{expected, found}` | Rollback-Anker verletzt (§16.7) | nein |
 | `Unsupported{feature}` | Pflicht-Feature, Modus oder Dateiversion unbekannt | nein |
+| `ClusterGated` | Cluster ist ab Gate-Stamp `g` für Änderungen gesperrt (§11.3) | nein |
+| `IdemConflict` / `IdemExpired` | Token bekannt mit abweichendem Inhalt / außerhalb des Fensters (§11.4) | nein |
+| `ViewExpired` | Lease einer `View` abgelaufen (§12.1) | nein (neue View) |
+| `KeyUnavailable` | KEK oder Clusterschlüssel nicht lieferbar (§16.6) | je nach Provider |
 | `Locked`, `Closed`, `NotFound`, `Exhausted`, `Io(kind)` | Sonstiges | je nach Fall |
 
 ### 8.8 Fertigmeldung statt `async`
@@ -652,6 +670,7 @@ Die folgenden Flächen sind Vertrag und haben je einen Konformitätstest in `tes
   CURRENT             Zeiger auf die aktive Catalog-Datei (atomar ersetzt)
   CATALOG-0000007     Snapshot-Record und Edit-Records (§10.8)
   KEYS                (Authenticated/Encrypted) Schlüsselwurzel und Space-DEKs, mit KEK umhüllt (§16.2)
+  CKEYS               nur Standard-`FileKeyProvider`: Clusterschlüssel, mit KEK umhüllt; gehört dem Provider (§16.4)
   ERASE-LEDGER/       append-only Löschprotokoll, kettenverknüpft (§15.8)
   redo/redo-<segment_id:016x>.log     vorallokiert, am Ende gesiegelt (§10.4)
   spaces/<space:04x>/<file_id:016x>.run
@@ -669,7 +688,7 @@ Der Anker liegt **nicht** im Verzeichnis, sondern hinter dem Port `Anchor` (§16
 - **Redo-Segmente sind kein `FileKind`:** lebendig ⇔ `segment_id ≥ redo_floor`. Das vorallokierte Reservesegment ist lebendig (INV-LOG-7). `FileKind` kennt `Run`, `Blob`, `Segment(kind)`.
 - Alle Dateien und Verzeichnisse entstehen mit `Perm::Private`.
 - **Temporäre Dateien** tragen das Suffix `.building.<tmp_id>`. `tmp_id` stammt aus dem im Catalog reservierten Bereich (§10.8), nie aus der Prozess-ID. Beim Öffnen werden alle `.building.*` entfernt.
-- **Verwaiste Dateien** (nicht vom Catalog genannt) werden beim Öffnen und periodisch gelöscht. Das ist sicher, weil nur ein Catalog-Edit eine Datei lebendig macht (INV-CAT-1).
+- **Verwaiste Dateien** unter `spaces/` und `segments/`, die der Catalog nicht nennt, werden beim Öffnen und periodisch gelöscht. Das ist sicher, weil nur ein Catalog-Edit eine Datei lebendig macht (INV-CAT-1). Alles andere folgt eigenen Regeln und wird **nie** als verwaist behandelt (D-24): `FORMAT`, `LOCK`, `CURRENT`, `KEYS`, `CKEYS`, `CATALOG-*` (über `CURRENT`), `redo/` (über `redo_floor`) und `ERASE-LEDGER/` (append-only, nie gelöscht).
 - **Ein Space = ein Verzeichnis.** Ein Space wird entfernt durch Edit, Löschen aller Dateien und `remove_dir`.
 - Lebendige Dateien sind unveränderlich. Ausnahme: das Redo-Segment bis zu seinem Siegel.
 
@@ -703,7 +722,7 @@ Jeder Wechsel zwischen „unreferenziert“ und „lebendig“ ist **ein** Catal
 
 - **Header und Footer** tragen in allen Modi zusätzlich einen CRC-32C. In `Authenticated`/`Encrypted` tragen sie außerdem `Mac16` über dieselben Bytes (Datei-MAC, §10.6).
 - **AAD (INV-FMT-3):** Jeder authentifizierte Frame, Block und Record bindet die Kennungen seiner Art, Ort und Zugehörigkeit (Dateiart, Space, Cluster, Block-UID, Frame-Index oder Record-Offset). Ein vertauschter Block öffnet deshalb nicht.
-- **Nonces:** `Cipher` verwendet **24 Byte Zufallsnonce** (XChaCha-Familie). Jede Versiegelung zieht eine frische Nonce aus `Entropy`. Es gibt keinen Zählerzustand, der bei Absturz oder Kopie verloren gehen könnte (SD-14). Die Kollisionswahrscheinlichkeit je Schlüssel ist bei 192 Bit vernachlässigbar, solange je Schlüssel weniger als 2^64 Versiegelungen stattfinden. Die Anzahl je Schlüssel wird im Catalog gezählt und bei Erreichen einer Schranke rotiert (§16.3).
+- **Nonces:** `Cipher` verwendet **24 Byte Zufallsnonce** (XChaCha-Familie). Jede Versiegelung zieht eine frische Nonce aus `Entropy`. Es gibt keinen Zählerzustand, der bei Absturz oder Kopie verloren gehen könnte (SD-14). Die Kollisionswahrscheinlichkeit je Schlüssel ist bei 192 Bit vernachlässigbar, solange je Schlüssel höchstens 2^32 Versiegelungen stattfinden (D-28, §16.3). Die Versiegelungen werden nicht einzeln gezählt, sondern blockweise im Catalog reserviert (`seal_hw`, §10.8); bei Erreichen der Schranke beginnt eine neue Schlüsselepoche.
 - **Längen** werden gegen §20.1 und die Restlänge der Datei geprüft, bevor allokiert wird (INV-FMT-2).
 - **Reservierte Felder** werden mit 0 geschrieben und beim Lesen auf 0 geprüft.
 
@@ -732,7 +751,7 @@ sealed = Cipher.seal( key = Kdf(KEK, "ctxs keys v1" ‖ instance_id), nonce, aad
 
 - Die Datei wird per `write_atomic` ersetzt. `keys_generation` zählt hoch. `FORMAT` und `CURRENT` nennen die erwartete Generation (`keys_generation_min`, §10.8), sodass ein zurückgespielter alter `KEYS` auffällt.
 - **Schlüsselwurzel (D-06, C-04):** `root_key` je Generation ist die Wurzel aller Nicht-Cluster-Schlüssel (§16.2). Die KEK umhüllt nur `KEYS`. **KEK-Rotation ist deshalb O(1)** und berührt keine Datendatei.
-- **Space-DEK** je Space und `dek_gen`: Schlüssel für Blöcke, Blobs und Datei-MACs nicht versiegelter Spaces (§16.2).
+- **Space-DEK** je Space und `dek_gen`: Schlüssel für Blöcke, Blobs und Datei-MACs. **Jeder** Space in `Authenticated`/`Encrypted` hat einen DEK, auch mit `Seal::Cluster` (der Datei-MAC braucht ihn, §10.6, D-21).
 - Alte `root_key`-Generationen und alte DEKs bleiben in `KEYS`, solange Dateien mit ihnen existieren. Jede Redo-Datei und jeder Run trägt seine Generation im Header.
 
 ### 10.4 Redo-Log
@@ -746,7 +765,7 @@ Datei `redo/redo-<segment_id:016x>.log`, vorallokiert (§12.5), am Ende gesiegel
 ```
 
 - Jede Prozessinstanz beginnt ein **neues** Segment (INV-LOG-4). Es wird nie an ein bestehendes angehängt (D-14).
-- Ein Gate-Frame (§15.5) beginnt immer ein neues Segment; das vorige Segment wird vorher gesiegelt (INV-LOG-4).
+- Ein Gate-Frame (§11.3) beginnt immer ein neues Segment; das vorige Segment wird vorher gesiegelt (INV-LOG-5).
 
 **Gruppe.** Eine Gruppe beginnt an einer `redo_align`-Grenze (4 096 Byte). Sie besteht aus einem Gruppenkopf, einem oder mehreren Frames und einem Gruppenabschluss. Den Rest bis zur nächsten Grenze füllt Nullpadding.
 
@@ -823,12 +842,12 @@ Datei-MAC = Mac16( Kdf(DEK, "ctxs file v1" ‖ file_id), Header ‖ ClusterDirec
 Blob := Header ‖ Record* ‖ ClusterDirectory ‖ Footer
 Header: "CTXB" | ver u16 | flags u16 | blob_id u64 | inc u32 | space u16 | reserved [22] | chk
 Record: rlen u32 | nonce [24] (nur Encrypted) | content (Klartext oder Ciphertext mit Tag) | chk (Plain: CRC-32C; Authenticated: Mac16)
-        content = kind u8 (1 Body) | domain u32 | stamp u64 | klen varint | key | body
+        content = kind u8 (1 Body) | record_uid [16] | cluster [16] | stamp u64 | klen varint | key | body
 Footer: "CTXB" | record_count u32 | bytes u64 | datei-mac | chk
 ```
 
-- **Selbstbeschreibend:** Jeder Record trägt `(domain, stamp, key)`. Dadurch kann `verify` Blobs ohne den Run prüfen, die GC Lebendigkeit bestimmen und die Löschprüfung (§15.11) Reste finden.
-- **Versiegelung:** `Encrypted` verschlüsselt `content` mit dem Blob-Schlüssel `Kdf(DEK, "ctxs blob v1" ‖ key_epoch u32 ‖ blob_id u64)`, Nonce zufällig, AAD `(space, cluster, blob_id, offset)`. `Seal::Cluster`-Körper werden mit dem Clusterschlüssel versiegelt, Nonce zufällig, AAD `(space, cluster, blob_id, offset)`.
+- **Selbstbeschreibend:** Jeder Record trägt `(cluster, stamp, key)`. Dadurch kann `verify` Blobs ohne den Run prüfen, die GC Lebendigkeit bestimmen und die Löschprüfung (§15.11) Reste finden.
+- **Versiegelung:** `Encrypted` verschlüsselt `content` mit dem Blob-Schlüssel `Kdf(DEK, "ctxs blob v1" ‖ key_epoch u32 ‖ blob_id u64)`, Nonce zufällig, AAD `(space, cluster, blob_id, record_uid)`. `Seal::Cluster`-Körper werden mit dem Clusterschlüssel versiegelt, Nonce zufällig, AAD `(space, cluster, blob_id, record_uid)`.
 - **Löcher (INV-BLOB-3):** Entfallende Records werden mit **Nullen gleicher Länge** überschrieben. Löcher werden nie verschlüsselt. Ein Verweis, der auf ein Loch zeigt, liefert `Corrupt{HoleRef}`.
 - **Inkarnation (C-11):** Eine neue Inkarnation mit gleichen Offsets übernimmt alle überlebenden Records **byte-identisch**. Dadurch bleiben Verweise gültig, ohne Runs umzuschreiben.
 - **Größe:** `blob_target_bytes` = 64 MiB. Ein einzelner Record über dem Ziel erhält eine eigene Datei.
@@ -837,7 +856,7 @@ Footer: "CTXB" | record_count u32 | bytes u64 | datei-mac | chk
 ### 10.8 Catalog
 
 ```
-Datei  : Header (20 B) "CTXC" | ver u16 | flags u16 | catalog_no u64 | chk
+Datei  : Header (16 B + chk: 20 B in Plain, 32 B sonst) "CTXC" | ver u16 | flags u16 | catalog_no u64 | chk
 Record : len u32 | tag u8 (1 Snapshot, 2 Edit) | payload | chk
 chk    : Plain: CRC-32C über Tag ‖ payload, Seed = Vorgänger
          Auth.: Mac16(Schlüssel aus Wurzel, chk_vorher ‖ len ‖ tag ‖ payload ‖ catalog_no ‖ record_index)
@@ -849,7 +868,7 @@ Der **Snapshot** ist ein Edit, der vom leeren Zustand ausgeht. Ein **Edit** ist 
 | Op | Inhalt |
 |---|---|
 | `space_add` / `space_drop` | Space mit Optionen und Namen; Entfernen nur nach Abwurf aller Dateien |
-| `cluster_register` / `cluster_state(c, state, stamp)` | Clusterzustand und Gate-Stamp |
+| `cluster_register` / `cluster_state(c, state, stamp)` | Clusterzustand und Gate-Stamp. **Kein Schlüsselmaterial** (D-19, INV-KEY-1) |
 | `cluster_link` | Verknüpfung abgeleiteter Cluster |
 | `restriction_set` / `restriction_lift` | Restrictions mit Grund und Eigentümer |
 | `pack_assign` | Zuordnung Cluster → Packgruppe (nur zusammen mit Dateimengen, INV-PL-4) |
@@ -857,8 +876,8 @@ Der **Snapshot** ist ein Edit, der vom leeren Zustand ausgeht. Ein **Edit** ist 
 | `blob_replace(blob_id, inc_alt, inc_neu)` | Inkarnationstausch |
 | `blob_live_delta(blob_id, delta)` | Auswahlhilfe für GC; ist nicht Wahrheit (INV-BLOB-1) |
 | `space_flushed(space, stamp)` | Memtable bis `stamp` ist in Runs |
-| `redo_floor(floor, floor_stamp, hwm, mark)` | Untergrenze des Redo und Hochwassermarke (INV-LOG-8) |
-| `reserve(run_id_hw, blob_id_hw, segment_id_hw, tmp_id_hw, stamp_hw, keys_gen_min, erase_epoch)` | Hochwassermarken, nur steigend (INV-KEY-2, INV-STAMP-3) |
+| `redo_floor(floor, floor_stamp, hwm, mark)` | Untergrenze des Redo und Hochwassermarke (INV-LOG-9) |
+| `reserve(run_id_hw, blob_id_hw, segment_id_hw, tmp_id_hw, stamp_hw, seal_hw, keys_gen_min, erase_epoch)` | Hochwassermarken, nur steigend (INV-KEY-2, INV-STAMP-3). `seal_hw`: je Schlüsselepoche reservierte Versiegelungsblöcke (D-28) |
 | `consumer_set` / `consumer_ack` / `consumer_drop` | Consumer-Zustand und Rückstandsgrenze |
 | `hold_set` / `hold_drop` | dauerhafte Holds (INV-HOLD-1) |
 | `erase_pending_add(ticket)` / `erase_done(ticket)` / `erase_swept(ticket)` | Löschaufträge |
@@ -911,7 +930,7 @@ Jeder Punkt braucht vor **G-F** einen Golden aus dem unabhängigen Referenzcodie
 submit(Change) ─► Intake (Rang 2) ─► Committer (Rang 1, einziger Schreiber des Redo) ─► Redo-Gruppe ─► sync_data ─► Memtable (lock-frei) ─► Receipt
 ```
 
-1. **Intake** prüft Schema, Limits (§20.1), Idempotenz (`IdemToken`), Restriction und Clusterzustand gegen den Stand des Catalogs. Der Body wird versiegelt (§10.10). Danach ist die Änderung ein fertiger Frame ohne Stamp.
+1. **Intake** prüft Schema, Limits (§20.1), Idempotenz (`IdemToken`), Restriction und Clusterzustand gegen den Stand des Catalogs. Der Body wird versiegelt (§10.10). Wird ein Cluster erstmals beschrieben, ruft der Intake `create_cluster_key`; `make_durable` läuft vor dem Dauerhaftwerden des Frames (INV-KEYP-1). Danach ist die Änderung ein fertiger Frame ohne Stamp.
 2. **Stamp-Vergabe** erfolgt erst im Committer. Der Committer nimmt Stamps aus dem reservierten Block (§10.8, INV-KEY-2). Reicht der Block nicht, reserviert er einen neuen per dauerhaftem `reserve`-Edit, bevor er den Frame schreibt.
 3. **Committer** bündelt Frames zu einer Gruppe (§10.4), schreibt sie in das Redo und ruft **einmal** `sync_data` auf. Erst danach ist die Gruppe dauerhaft.
 4. **Memtable** wird erst nach der Dauerhaftigkeit gefüllt. Ein Leser sieht also nie einen Wert, den ein Absturz zurücknehmen könnte (INV-COMMIT-1).
@@ -924,14 +943,14 @@ submit(Change) ─► Intake (Rang 2) ─► Committer (Rang 1, einziger Schreib
 - **INV-COMMIT-3 (Flüchtig):** Ein `Volatile`-Change (SD-19) wird nur in die Memtable geschrieben und nicht ins Redo. Er ist nach Absturz verloren. Volatile und dauerhafte Changes dürfen **nicht in derselben Gruppe** liegen, damit INV-COMMIT-2 gilt. Der Committer trennt sie. Ein Volatile-Change wird nie als dauerhaft bestätigt.
 - **Gruppenbildung:** Der Committer sammelt Frames, bis `group_max_bytes` (1 MiB) oder `group_max_delay` (2 ms, §20.2) erreicht ist, oder bis die Warteschlange leer ist. Die Gruppe wird nie absichtlich künstlich verzögert, wenn kein weiterer Frame wartet.
 
-### 11.3 Clustergate (ClusterGate-Frame, C-16)
+### 11.3 Clustergate (ClusterGate-Frame, C-17)
 
-Ein Cluster wechselt seinen Zustand (`Open → Restricted → Erasing → Erased`, §15.2) nur über ein **Gate**. Das Gate ist ein Frame `kind = 2` im Redo, mit Stamp `g`.
+Ein Cluster verlässt den Zustand `Live` (`Live → Gated → Erased → Purged`, §6.7) nur über ein **Gate**. Das Gate ist ein Frame `kind = 2` im Redo, mit Stamp `g`.
 
 - Der Committer schreibt das Gate **vor** allen weiteren Frames des Clusters mit Stamp `> g`. Frames mit Stamp `< g` dürfen vor dem Gate stehen.
 - Nach dem durable Gate lehnt der Committer alle Changes für diesen Cluster mit `ApplyError::ClusterGated` ab, die nach dem Gate ankommen. Die Prüfung erfolgt im Committer, nicht im Intake, damit keine Lücke zwischen Prüfung und Schreiben entsteht.
 - Ein Gate-Frame beginnt ein neues Redo-Segment (§10.4). Das vorige Segment wird vorher gesiegelt. Dadurch ist „Stand vor dem Gate“ im Log eindeutig abgrenzbar.
-- Die Gate-Stamp steht im Catalog als `cluster_state(c, state, stamp)`. Ein Cluster im Zustand `Erasing` ist durch Replay und Neustart wieder gegated, bevor er Änderungen annimmt (INV-ERA-2).
+- Die Gate-Stamp steht im Catalog als `cluster_state(c, state, stamp)`. Ein Cluster im Zustand `Gated` ist durch Replay und Neustart wieder gegated, bevor er Änderungen annimmt (INV-ERA-2).
 
 ### 11.4 Idempotenz
 
@@ -946,12 +965,21 @@ Ein Cluster wechselt seinen Zustand (`Open → Restricted → Erasing → Erased
 - Zwischen Warn- und Stopp-Grenze verzögert der Intake (`Governor`, §13.1). Die Verzögerung ist durch `Config` begrenzt; sie ist nie unbegrenzt.
 - `Busy` ist ein Zustand, kein Fehler im Sinne von F-Klassen. Er ist wiederholbar, ohne dass etwas Halbfertiges entsteht.
 
-### 11.6 Schreibfehler (fail-closed, F-Klassen §5)
+### 11.6 Schreibfehler und Instanzzustände (fail-closed, D-25)
 
-- **Fehler vor `sync_data` einer Gruppe:** Die Gruppe ist nicht bestätigt. Der Committer schneidet das Redo auf das vorige Gruppenende zurück (`set_len` + `sync_data`), gibt allen Wartenden `Err(Io)` zurück und wechselt in den Zustand **`Degraded`**. In `Degraded` werden nur Lesezugriffe und Wartung erlaubt. Ein Neustart prüft das Log erneut.
-- **ENOSPC (SD-08):** Wie oben. Zusätzlich verbietet der Kern danach jeden Schreibversuch, bis mindestens `enospc_cooldown` vergangen ist. Die Wiederaufnahme ist ein expliziter `Storage::resume_writes()`-Aufruf und kein stiller Retry.
-- **Fehler beim Abschneiden:** Ist auch das Abschneiden nicht möglich, wechselt der Kern in **`Poisoned`**. `Poisoned` ist nur über Neustart verlassen. Der Kern bestätigt nichts mehr.
-- **Fehler nach `sync_data`:** Die Gruppe ist dauerhaft. Der Fehler wird als `Io` an den Aufrufer gegeben, der Zustand ist aber `Degraded`. Das Receipt ist nicht vorhanden. Beim Neustart erscheint der Change als vorhanden, wenn er das Log erreicht hat. Der Aufrufer muss dann mit `IdemToken` nachfragen, nicht blind wiederholen.
+Der Schreibpfad kennt drei Zustände: `Ready`, `Degraded` und `Poisoned`. Lesen ist in allen drei Zuständen erlaubt.
+
+| Ereignis | Verhalten | Zustand danach |
+|---|---|---|
+| Schreib- oder Allokationsfehler **vor** `sync_data`, Abschneiden gelingt | Gruppe unbestätigt; Redo auf das vorige Gruppenende abgeschnitten (`truncate` + `sync_data`); Wartende erhalten `Err(Io)` bzw. `Busy{StorageFull}` | `Degraded` |
+| ENOSPC (SD-08) | wie oben; zusätzlich keine Schreibversuche, bis `enospc_cooldown` verstrichen ist und `Storage::resume_writes()` aufgerufen wird | `Degraded` |
+| Abschneiden scheitert | Kern bestätigt nichts mehr | `Poisoned` |
+| `sync_data`/`sync_all` selbst scheitert | **Kein Retry, kein Abschneiden** (der Seitenzustand ist unbestimmt, INV-SYNC-1). Wartende erhalten `Indeterminate` | `Poisoned` |
+| Fehler nach erfolgreichem `sync_data` | Gruppe ist dauerhaft, das Receipt fehlt: `Indeterminate`. Der Aufrufer fragt nach Neustart mit dem `IdemToken` nach | `Poisoned` |
+
+- `Degraded` erlaubt Lesen und Wartung, die Platz freigibt; Schreiben liefert `Busy{StorageFull}`. `resume_writes` ist ein expliziter Aufruf, kein stiller Retry.
+- `Poisoned` verlässt nur ein Neustart. Schreiben und Wartung sind tot, Lesen bleibt (F-4).
+- Ein Neustart prüft das Log erneut (§14).
 
 ### 11.7 Segmentschnitt
 
@@ -973,7 +1001,7 @@ Für einen Schlüssel `k` und Stamp-Schnitt `s`:
 
 1. **Memtables** des Space, neueste zuerst, nur Einträge mit Stamp `≤ s`.
 2. **Runs** in der Reihenfolge der Ebenen: zuerst L0 (neueste zuerst), dann tiefere Ebenen.
-3. Je Run: **Cluster des Schlüssels bestimmen** (Schlüsselbereich der Cluster-Tabelle, §6.4), dann **Schlüsselfilter** (§10.5.1). Negativ ⇒ weiter, ohne Blockzugriff.
+3. Je Run: **Abschnitt des Clusters bestimmen** (der Cluster ist Aufrufparameter; `ClusterDirectory`, §10.5), dann **Schlüsselfilter** (§10.5.1). Negativ ⇒ weiter, ohne Blockzugriff.
 4. **SubIndex** binär suchen ⇒ genau ein Datenblock. Block laden, prüfen, Schlüssel suchen.
 5. **RangeDel** des Clusters prüfen: Ein Löschbereich mit Stamp `> stamp(Eintrag)` und `≤ s` verdeckt den Eintrag.
 6. Der **erste gefundene** Eintrag mit höchstem Stamp `≤ s` gewinnt. Ein Tombstone gewinnt ebenso und liefert „nicht vorhanden“.
@@ -981,7 +1009,7 @@ Für einen Schlüssel `k` und Stamp-Schnitt `s`:
 ### 12.3 Löschsperren im Lesepfad (INV-ERA-4)
 
 - Ein Schlüssel in einem Bereich der Liste `erased_ranges` liefert nie einen Wert, auch wenn er in einem Run steht. Diese Prüfung erfolgt **vor** dem Blockzugriff, damit der Kern keinen gelöschten Körper entschlüsselt.
-- Eine `Restriction` (§8.5) liefert `Restricted` für den Cluster, ohne Körper zu lesen. Ein Lesen ist nur mit `Holds`-Status erlaubt, den der Aufrufer ausdrücklich anfordert.
+- Eine `Restriction` mit `BLOCK_READ` (§8.4) liefert `Restricted{ids, reasons}` für den Cluster, ohne Körper-E/A. Ohne `BLOCK_READ` bleibt Lesen erlaubt. Einen Override über Holds gibt es nicht.
 
 ### 12.4 Iteratoren und Präfixe
 
@@ -1004,6 +1032,12 @@ Für einen Schlüssel `k` und Stamp-Schnitt `s`:
 
 ---
 
+### 12.7 Schätzung (`estimate`)
+
+`estimate` liest nur `ClusterDirectory` und `SubIndex` (`entries`, `weight_sum`, Bytes), nie Datenblöcke oder Blobs. Randblöcke gehen anteilig ein; das Ergebnis trägt Unter- und Obergrenze (`Estimate{lo, hi}`). Memtable-Anteile werden exakt gezählt.
+
+---
+
 ## 13. Wartung
 
 ### 13.1 Lanes und Governor
@@ -1018,7 +1052,7 @@ Für einen Schlüssel `k` und Stamp-Schnitt `s`:
 
 - Jede Lane hat eine eigene Warteschlange und ein Budget an Bytes je Sekunde. Der **Governor** teilt I/O-Budget zwischen Lanes zu und senkt das Budget der Lanes unter `flush` und `compact`, wenn Nutzer-Schreibe-Latenz über `write_latency_target` liegt (H-11).
 - `urgent` wird nie gedrosselt, weil sonst ein Löschauftrag unbegrenzt liegen bliebe (INV-ERA-6).
-- Wartung läuft im Hintergrund auf dem Wartungsrang 8 (§17). Sie hält keine Sperre des Intake oder Committers über I/O hinweg.
+- Wartung läuft im Hintergrund. Der Wartungsrang 8 schützt nur Auswahl und Planung und wird **vor** jedem Catalog-Edit (Rang 3) und vor jeder E/A freigegeben (D-22). Wartung hält keine Sperre des Intake oder Committers über I/O hinweg.
 
 ### 13.2 Flush
 
@@ -1041,12 +1075,12 @@ Ein Absturz vor Schritt 4 lässt den Run unreferenziert zurück. Er wird beim Ö
 
 - Das Redo darf bis `redo_floor` gekürzt werden, wenn alle Stamps darunter in Runs stehen **und** kein Gate und keine offene Löschung darin fehlt.
 - Die Kürzung ist ein Catalog-Edit `redo_floor(floor, floor_stamp, hwm, mark)`. Erst nach dem dauerhaften Edit wird die Redo-Datei entfernt (`remove`, `sync_dir`).
-- **INV-LOG-8:** Die Kürzung behält den letzten gültigen Stand, der für Recovery nötig ist. Gelöscht wird nur, was unterhalb des `mark` liegt und gesiegelt ist.
+- **INV-LOG-9:** Die Kürzung behält den letzten gültigen Stand, der für Recovery nötig ist. Gelöscht wird nur, was unterhalb des `mark` liegt und gesiegelt ist.
 
 ### 13.5 Compaction
 
 - Runs einer Ebene werden zu einem Run der nächsten Ebene zusammengeführt. Die Ausgabe wird wie ein Flush geschrieben (§13.2).
-- Ein Cluster in Zustand `Restricted` wird **nicht** entfernt. Er wird in der Ausgabe mit Restriction-Marker geführt. Ein Cluster in `Erasing` wird gar nicht zusammengeführt. Er wird über den Löschpfad behandelt (§15).
+- Ein Cluster mit Restrictions wird **nicht** entfernt und in der Ausgabe unverändert geführt. Ein Cluster im Zustand `Gated` wird nicht zusammengeführt, sondern nur über den Löschpfad behandelt (§15).
 - Verdrängte Eingaben bleiben lebendig, bis die letzte `View` auf sie geschlossen ist. Danach `files_remove` (Edit), dann Entfernen.
 
 ### 13.6 Scrub
@@ -1073,9 +1107,9 @@ Beim Öffnen laufen die Schritte R1–R10 in dieser Reihenfolge. Scheitert einer
 | **R4** | `CURRENT` lesen, Catalog-Dateien laden, Snapshot und Edits replayen. Nur der **letzte** Record darf halb sein und wird verworfen (INV-CAT-3) | `Corrupt` |
 | **R5** | **Anker prüfen** (§16.7): gespeicherter `AnchorValue` gegen den Stand aus R4. Der Anker darf nie über dem Stand liegen. | `Rollback` |
 | **R6** | `.building.*`-Dateien entfernen, Verwaiste nach Schonfrist markieren (§13.7) | — |
-| **R7** | Redo ab `redo_floor` replayen: Segmente in Reihenfolge, Torn-Tail nach INV-LOG-8 | `Corrupt{RedoMidLog}` |
-| **R8** | Gate-Frames anwenden: Cluster mit Zustand `Restricted`/`Erasing` aus Catalog und Redo gegated setzen (INV-ERA-2) | — |
-| **R9** | Löschprotokoll prüfen: `ERASE-LEDGER` Kette und Kopf gegen Anker (§15.8). Offene `erase_pending` wieder einplanen | `Rollback` / `Corrupt` |
+| **R7** | Redo ab `redo_floor` replayen: Segmente in Reihenfolge, Torn-Tail nach INV-LOG-8. Gate-Frames wirken beim Replay sofort: Frames eines Clusters mit Stamp > Gate-Stamp gehen nicht in die Memtable, sondern in die Löschpipeline (INV-ERA-2, §15.6) | `Corrupt{RedoMidLog}` |
+| **R8** | Clusterzustände aus Catalog und Redo abgleichen; jeder Cluster im Zustand `Gated` bleibt gegated (INV-ERA-2) | — |
+| **R9** | Löschprotokoll prüfen: `ERASE-LEDGER`-Kette vollständig; der `ledger_head` des Ankers muss der Kettenkopf oder ein Vorfahre in der Kette sein (§15.8). Offene `erase_pending` wieder einplanen | `Rollback` / `Corrupt` |
 | **R10** | Zustand `Ready` setzen, Schreibe freigeben. Schreibfähig nur, wenn `ReadWrite` und Schritte R1–R9 erfolgreich. | — |
 
 ### 14.1 Replay-Regeln
@@ -1083,7 +1117,7 @@ Beim Öffnen laufen die Schritte R1–R10 in dieser Reihenfolge. Scheitert einer
 - Ein Change aus dem Redo mit Stamp `≤ space_flushed` (§10.8) ist bereits in einem Run und wird nicht doppelt in die Memtable gesetzt (INV-RECOV-1).
 - Ein Change mit Stamp oberhalb der Hochwassermarke `stamp_hw` wird nicht erwartet. Wird er gefunden, ist das `Corrupt` (INV-STAMP-3).
 - Replay ist **idempotent**: zweimaliges Replay desselben Redo ergibt denselben Zustand (INV-RECOV-2).
-- Ein Change für einen Cluster im Zustand `Erased` wird verworfen und als `Corrupt` gezählt, weil ein Schreiber vor dem Gate nicht hätte schreiben dürfen. Die Zählung geht in `Metrics`.
+- Ein Frame mit Stamp > Gate-Stamp für einen Cluster im Zustand `Gated` oder `Erased` darf nicht existieren, weil der Committer ihn ablehnt (§11.3). Wird er gefunden, ist das `Corrupt{GateViolation}` und das Öffnen scheitert (SD-07).
 
 ### 14.2 Rollback-Erkennung (C-03)
 
@@ -1110,49 +1144,58 @@ Löschung ist die einzige Form, mit der ein Nutzer Daten aus dem Speicher entfer
 | Stufe | Bedeutung | Nachweis |
 |---|---|---|
 | **ER0 Logisch** | `Erase` gilt für Leser: Schlüssel im Bereich liefern nichts mehr (§12.3) | Lesetest über alle Schnitte |
-| **ER1 Gegated** | Cluster im Zustand `Erasing`; Änderungen werden abgelehnt (§11.3) | Gate-Stamp im Catalog |
-| **ER2 Physisch im Log** | Redo-Frames mit betroffenen Körpern sind durch Kürzung oder Neuschreiben entfernt | Kürzung nach `redo_floor` mit `mark` |
+| **ER1 Gegated** | Cluster im Zustand `Gated`; Änderungen werden abgelehnt (§11.3) | Gate-Stamp im Catalog |
+| **ER2 Physisch im Log** | Redo-Segmente mit betroffenen Körpern sind als **ganze Segmente** entfernt (kein Neuschreiben, D-23) | `redo_floor` mit `mark`, Segmente entfernt |
 | **ER3 Physisch in Runs** | Runs des Clusters sind durch neue Runs ohne ihn ersetzt (Compaction) | Compaction-Edit, alte Dateien entfernt |
 | **ER4 Physisch in Blobs** | Records sind durch Nullen ersetzt, Inkarnation getauscht (§10.7) | Scrub über Blob-Records |
 | **ER5 Gescrubbt** | Scrub über alle Dateien und Kopien im Verzeichnis bestätigt keine Reste (§15.11) | Löschorakel-Bericht |
-| **ER6 Kryptografisch** | Der Clusterschlüssel ist aus Catalog und Speicher entfernt; ohne ihn sind verbliebene Bytes unlesbar (§16.4) | Schlüssel-Entfernung im Edit, Zeroize |
+| **ER6 Kryptografisch** | Der Clusterschlüssel ist beim `KeyProvider` vernichtet (`destroy`, `probe` = Absent) und im Speicher überschrieben; ohne ihn sind verbliebene Bytes unlesbar (§16.4) | Provider-Bestätigung, Zeroize |
 | **ER7 Quittiert** | Ledger-Eintrag mit Kettenkopf ist geschrieben; `ErasureReceipt` ist ausgestellt (§15.8) | Ledger-Kopf im Anker |
 
-- Die Stufen sind **kumulativ**: ER7 setzt ER0–ER6 voraus.
-- **Pure/Packed (PD1–PD5, §7):** Bei `Pure` (ein Cluster je Datei) wirkt ER3 mit dem Entfernen der Datei. Bei `Packed` (mehrere Cluster je Datei) entsteht ER3 erst mit der Neuschreibung der Packgruppe. Ein Löschauftrag wartet auf die Packgruppe, nicht auf den einzelnen Cluster.
-- **Plain-Modus:** ER6 entfällt, weil es keine Schlüssel gibt. Der Kern meldet in `Plain` die höchste erreichbare Stufe als ER5 und sagt das im Receipt ausdrücklich (INV-ERA-7).
+- **Stufenprofile (D-20).** `EraseLevel` wählt ein Profil. Es laufen nur die Schritte des Profils, in aufsteigender Nummer. Profile sind **nicht** kumulativ.
+
+| `EraseLevel` | Schritte | Kosten |
+|---|---|---|
+| `Logical` | ER0, ER1, ER7 | O(1) je Cluster |
+| `Physical` | ER0–ER4, ER7 | O(Dateien des Clusters) |
+| `Scrubbed` | ER0–ER5, ER7 | wie `Physical` plus Scan |
+| `Cryptographic` | ER0, ER1, ER6, ER7 | O(1) je Cluster, kein Datenumschreiben (Z-14) |
+
+- **Höchste erreichbare Stufe je Konfiguration (INV-ERA-7).** `Seal::Cluster` (nur mit `Encrypted`): ER6. Alle anderen Fälle (`Plain`, `Authenticated`, `Encrypted` ohne `Seal::Cluster`): ER5; `Cryptographic` liefert dort `Err(Unsupported)`. Das Receipt nennt immer die tatsächlich erreichten Schritte und die Obergrenze der Konfiguration.
+- Wer Vernichtung des Schlüssels **und** physisches Entfernen will, stellt zwei Aufträge (`Cryptographic`, danach `Physical`); sie sind unabhängig und idempotent.
+- **Pure/Packed (PD1–PD5, §15.12):** Bei `Pure` wirkt ER3 mit dem Entfernen der Datei. Bei `Packed` entsteht ER3 erst mit der Neuschreibung der Packgruppe; der Auftrag wartet auf die Packgruppe, nicht auf den einzelnen Cluster. Für `Cryptographic` ist das irrelevant.
 
 ### 15.3 Löschaufträge
 
-- `Eraser::request(EraseReq)` erzeugt einen Auftrag mit Pflicht-`purge_deadline` (§8.7). Der Auftrag wird im Catalog als `erase_pending_add(ticket)` festgehalten, bevor etwas anderes geschieht (INV-ERA-1).
+- Jede `Eraser`-Methode (§8.5) erzeugt einen Auftrag mit Pflicht-`purge_deadline`. Der Auftrag wird im Catalog als `erase_pending_add(ticket)` festgehalten, bevor etwas anderes geschieht (INV-ERA-1).
 - Der Gate-Schritt (ER1) läuft in Lane `urgent`. Danach arbeiten ER2–ER6 in der Lane `urgent` bzw. `compact`, je nach Stufe.
 - Eine Frist, die verstreicht, bevor ER5 erreicht ist, setzt den Auftrag auf `Overdue` und erzeugt ein Ereignis über `Observer` und `Metrics`. Der Kern blockiert nicht und löscht nicht schneller als ER-Stufen zulassen.
-- `domain_retired` (§10.8) wird nicht mehr erzeugt. Der Tag ist nur für Import älterer Kataloge reserviert (§15.3, C-06).
+- `domain_retired` (§10.8) wird nicht mehr erzeugt. Der Tag ist nur für Import älterer Kataloge reserviert (C-06).
 
-### 15.4 Gate und Zustände
+### 15.4 Gate, Zustände, Restrictions
 
-Clusterzustand: `Open → Restricted → Erasing → Erased`.
+Der Clusterzustand ist `Live → Gated(g) → Erased → Purged` (§6.7, D-26).
 
-- `Restricted`: Lesen nur mit Holds (§12.3), Schreiben abgelehnt.
-- `Erasing`: wie `Restricted`, zusätzlich Löschauftrag aktiv. Zustand bleibt bei Neustart erhalten (INV-ERA-2).
-- `Erased`: ER0–ER6 erreicht. Der Cluster-Eintrag bleibt im Catalog als Tombstone, bis ER7 quittiert ist. Danach wird er entfernt, außer die Restriction-Liste verlangt ihn.
+- `Gated`: ab Stamp `g` lehnt der Committer Änderungen ab (`ClusterGated`). Lesen bleibt erlaubt, solange keine Restriction mit `BLOCK_READ` und kein `Erased`-Bereich (INV-ERA-4) entgegensteht. Der Zustand bleibt bei Neustart erhalten (INV-ERA-2).
+- `Erased`: die Schritte des gewählten Profils außer ER7 sind erreicht. Der Cluster-Eintrag bleibt als Tombstone, bis ER7 quittiert ist; danach wird er entfernt (`Purged`), außer die Restriction-Liste verlangt ihn.
+- **Restrictions** sind eine Menge am Cluster, kein Zustand. `BLOCK_ERASE` verhindert den Eintritt in `Gated` durch einen Löschauftrag (`Restricted{…}`); `BLOCK_WRITE` und `BLOCK_READ` wirken wie benannt. Ein bereits `Gated`er Cluster wird durch eine neue Restriction nicht zurückgenommen.
 - Die Übergänge laufen nur über Gate-Frames (§11.3) und Catalog-Edits. Kein anderer Pfad setzt den Zustand.
 
 ### 15.5 Löschdurchlauf (Ablauf)
 
-1. **ER1:** Gate-Frame schreiben, Edit `cluster_state(c, Erasing, g)`.
-2. **ER2:** Redo-Segmente, die Körper des Clusters enthalten, werden nach `redo_floor` gekürzt oder das Redo wird ohne den Cluster neu geschrieben (Edit `redo_floor`).
+1. **ER1:** Gate-Frame schreiben, Edit `cluster_state(c, Gated, g)`.
+2. **ER2:** Der Gate-Frame hat ein neues Segment begonnen (§11.3). Sobald alle Spaces über `g` hinaus geflusht sind und `redo_floor` angehoben ist, werden die ganzen Segmente vor dem Gate entfernt. **Kein Segment wird je neu geschrieben** (D-23). In `Seal::Cluster`-Spaces entfällt ER2: die Körper sind versiegelt, ER6 macht sie unlesbar.
 3. **ER3:** Packgruppen und Pure-Runs des Clusters werden neu geschrieben (Compaction ohne den Cluster), Edit `files_add`/`files_remove` atomar pro Gruppe.
 4. **ER4:** Blob-Records des Clusters werden durch Nullen ersetzt, Inkarnation getauscht (`blob_replace`).
 5. **ER5:** Scrub über alle Dateien, Kopien im Verzeichnis und Caches (INV-ERA-3). Ergebnis ist ein Löschorakel-Bericht (§15.11).
-6. **ER6:** Clusterschlüssel-Eintrag aus dem Catalog entfernen (Edit `cluster_state(c, Erased, ...)` mit Löschung des umhüllten Schlüssels), Speicherkopie mit `zeroize` überschreiben.
+6. **ER6:** `KeyProvider::destroy(c)` (durabel, idempotent), danach `probe(c)` = Absent; Cache-Einträge und Speicherkopien werden mit `zeroize` überschrieben; Edit `cluster_state(c, …)` setzt `key_destroyed`. Im Catalog liegt kein Schlüsselmaterial (INV-KEY-1).
 7. **ER7:** Ledger-Eintrag schreiben, Anker auf den neuen `ledger_head` setzen (§16.7), `ErasureReceipt` ausgeben, `erase_done` und danach `erase_swept` als Edits.
 
 Jeder Schritt ist idempotent. Ein Absturz zwischen zwei Schritten setzt bei Neustart mit dem nächsten Schritt fort, weil der Auftragszustand im Catalog steht (INV-ERA-6).
 
 ### 15.6 Zurückspielen eines Redo-Stands (Roll-forward)
 
-- Recovery (§14, R8–R9) wendet Gate-Frames und Löschaufträge an, bevor Schreibe freigegeben wird. Ein Redo mit Körpern eines `Erasing`-Clusters wird beim Replay nicht in die Memtable übernommen, sondern nur in die Löschpipeline gestellt (INV-ERA-2).
+- Recovery (§14, R8–R9) wendet Gate-Frames und Löschaufträge an, bevor Schreibe freigegeben wird. Ein Redo mit Körpern eines `Gated`-Clusters wird beim Replay nicht in die Memtable übernommen, sondern nur in die Löschpipeline gestellt (INV-ERA-2).
 - Damit ist Löschung **vorwärtsgerichtet**: Ein Absturz nimmt eine Löschung nie zurück.
 
 ### 15.7 Erase-Epoch
@@ -1170,7 +1213,7 @@ Eintrag := seq u64 | prev_hash [32] | erase_epoch u64 | cluster [16] | space u16
 hash    := Hasher(prev_hash ‖ alle Felder außer hash)
 ```
 
-- `Hasher` ist ein eigener Port (§4, C-07). Der Kern verwendet dafür BLAKE3, Hashgröße 32 B.
+- `Hasher` ist ein eigener Port (§4, C-12) und liefert 256 Bit; die Standardbelegung in `contextra-crypto` nutzt BLAKE3 unkeyed. Der Kern enthält keine Hash-Implementierung (D-05). Die Kette ist unkeyed (D-12): sie erkennt Teilmanipulation nur zusammen mit dem Anker (§16.7) und beweist ohne Anker nichts gegen AT-3 oder AT-5. Ledger-Datei: Kopf `"CTXE" | ver u16 | segment_no u64 | first_seq u64 | prev_hash [32] | chk`, danach Einträge. Ledger-Dateien stehen nicht im Catalog und werden nie entfernt (D-24).
 - `scope_hash` ist der Hash über die Bereichsbeschreibung, nie der Klartext des Schlüssels (INV-ERA-8). Der Ledger enthält damit keine Nutzerdaten.
 - `ErasureReceipt` = `(seq, hash, erase_epoch, level, ledger_head)`. Es beweist, dass ein Eintrag im Ledger steht. Es beweist **nicht**, dass die Daten fehlen. Dafür ist das Löschorakel (§15.11) zuständig.
 - **Recovery R9:** Die Kette wird vollständig geprüft. Ihr Kopf muss zu `ledger_head` im Anker passen. Ein fehlender letzter Eintrag nach einem gemeldeten Schritt ist `Rollback`, ein Bruch in der Mitte ist `Corrupt`.
@@ -1181,7 +1224,7 @@ Segmente oberer Schichten (§10.9) haben die gleichen Stufen. Der Kern löscht s
 
 ### 15.10 Checkpoint und Rekey-Klon
 
-- **Checkpoint:** `Storage::checkpoint(dir)` erzeugt eine konsistente Kopie. Der Kern schreibt dafür Redo-Frames bis zum aktuellen `stamp`, setzt einen Catalog-Snapshot und kopiert alle lebendigen Dateien. Die Kopie ist ein gültiges Verzeichnis mit eigenem Anker.
+- **Checkpoint:** `Storage::checkpoint(dst, mode)` erzeugt eine konsistente Kopie. Der Kern schreibt dafür Redo-Frames bis zum aktuellen `stamp`, setzt einen Catalog-Snapshot und kopiert alle lebendigen Dateien. Die Kopie ist ein gültiges Verzeichnis mit eigenem Anker.
 - **Rekey-Klon (`rekey_clone`):** Eine Kopie mit neuer KEK, neuen Wurzeln und neuen DEKs. Der Kern liest jeden Block, verschlüsselt ihn neu und schreibt ihn in ein neues Verzeichnis. Die Quelle bleibt unverändert. Der Vorgang ist die einzige Form der Schlüssel-Rotation, die Dateien neu schreibt.
 - Eine Kopie vor einer Löschung ist eine Kopie mit dem alten Schlüssel. Ein Restore dieser Kopie nach einer Löschung wird durch `erase_epoch` abgelehnt (§14.3).
 
@@ -1193,6 +1236,17 @@ Segmente oberer Schichten (§10.9) haben die gleichen Stufen. Der Kern löscht s
 - Das Orakel verändert nichts. Es ist ein Nachweis, kein Löschvorgang.
 
 ---
+
+### 15.12 Packgruppen-Abwurf (PD1–PD5)
+
+Gilt für `Eraser::pack_expired` und für Mandantenabwurf (§7.2).
+
+1. **PD1 Gate:** ein Gate-Frame je betroffenem Cluster, alle in **einer** Barriere (`clusters_batch`, §15.5 ER1).
+2. **PD2 Auswahl:** Dateien der Packgruppe (Runs, Blobs) und Pure-Dateien der betroffenen Cluster aus dem Catalog bestimmen.
+3. **PD3 Ablauf der ganzen Gruppe:** alle Dateien der Gruppe werden in **einem** Edit mit `files_remove` ausgetragen, O(Dateien) (Z-5).
+4. **PD3′ Teil-Abwurf:** betrifft er nur einen Teil der Cluster, werden die Dateien roh ohne die Abschnitte der betroffenen Cluster neu geschrieben (§7.2) und per einem Edit getauscht.
+5. **PD4 Entfernen:** Dateien wandern in den Graveyard und werden nach der letzten Claim-Freigabe entfernt (§17.2). Blobs: Löcher und Inkarnationswechsel (ER4).
+6. **PD5 Weiter:** ER5–ER7 laufen wie in §15.5 je Cluster.
 
 ## 16. Kryptografie
 
@@ -1214,12 +1268,12 @@ KEK (extern, KeyProvider)          ─umhüllt─►  KEYS
 KEYS ─► root_key (je Generation, 32 B, zufällig)
          │   └─ Kdf("ctxs redo v1" ‖ segment_id) ─► Redo-Schlüssel   (nur Encrypted)
          └─ Space-DEK (zufällig, je dek_gen, in KEYS geführt)        → Blöcke, Blobs, Datei-MAC
-Cluster-Schlüssel ck(c, epoch): ZUFÄLLIG erzeugt, mit Space-DEK umhüllt, im Catalog (cluster_register)
+Cluster-Schlüssel ck(c, epoch): ZUFÄLLIG, vom KeyProvider erzeugt und verwahrt (nie im Catalog, nie in KEYS; D-19)
   ├─ Kdf(ck, "ctxs seal v1" ‖ key_epoch)  → Versiegelung der Cluster-Inhalte (§10.10)
   └─ Kdf(ck, "ctxs blob v1" ...)          → Blob-Records mit Seal::Cluster
 ```
 
-- **Clusterschlüssel sind zufällig, nicht abgeleitet.** Eine Ableitung aus der Wurzel würde einen einzelnen Cluster nicht kryptografisch löschbar machen (C-04). Das ist die zentrale Entscheidung dieser Spezifikation. Zufällige Clusterschlüssel machen ER6 möglich, ohne den ganzen Space neu zu schreiben.
+- **Clusterschlüssel sind zufällig, nicht abgeleitet.** Eine Ableitung aus der Wurzel würde einen einzelnen Cluster nicht kryptografisch löschbar machen (C-04). Das ist die zentrale Entscheidung dieser Spezifikation. Zufällige Clusterschlüssel machen ER6 möglich, ohne den ganzen Space neu zu schreiben. Die Verwahrung liegt beim `KeyProvider` (D-19): nur dort ist die Vernichtung nachprüfbar (`probe`). Ein im Catalog umhüllter Schlüssel überlebt dagegen in jeder älteren Catalog-Kopie, solange der Space-DEK existiert; das war die Schwäche von R7.
 - **KEK-Rotation** ist O(1): `KEYS` wird mit neuer KEK neu umhüllt (§10.3).
 - **Wurzel-Rotation** erzeugt eine neue `root_gen`. Alte Generationen bleiben, bis alle Dateien mit ihnen neu geschrieben sind (§16.3).
 - **Space-DEK-Rotation** geschieht mit `rekey_clone` (§15.10) oder durch Compaction, die alte Blöcke neu verschlüsselt.
@@ -1227,15 +1281,16 @@ Cluster-Schlüssel ck(c, epoch): ZUFÄLLIG erzeugt, mit Space-DEK umhüllt, im C
 ### 16.3 Nonces und Rotationsgrenzen
 
 - Jede Versiegelung benutzt eine **24-Byte-Zufallsnonce** aus `Entropy` (SD-14, §10.1).
-- **Rechnung:** Bei `n` Versiegelungen je Schlüssel ist die Kollisionswahrscheinlichkeit ≈ `n² / 2^193`. Für `n = 2^32` ergibt das ≈ `2^-129`. Die Schranke `2^32` je Schlüssel ist deshalb konservativ. Der Zähler je Schlüssel steht im Catalog (`key_epoch`) und löst bei Erreichen die Rotation aus.
-- Die Rotation greift bei `2^32` Versiegelungen je Clusterschlüssel und je Space-DEK. Eine höhere Schranke ist nur über eine Spezifikationsänderung zulässig.
-- Nonces werden nie wiederverwendet, auch nicht nach einem Absturz. Ein Absturz verwirft die Nonce, ohne die Schlüsselzähler zu beeinflussen.
+- **Rechnung:** Bei `n` Versiegelungen je Schlüssel ist die Kollisionswahrscheinlichkeit ≈ `n² / 2^193`. Für `n = 2^32` ergibt das ≈ `2^-129`. Die Schranke `2^32` je Schlüssel ist deshalb konservativ. Versiegelungen werden blockweise im Catalog reserviert (`seal_hw`, §10.8); bei Erreichen der Schranke beginnt eine neue Epoche (`key_epoch`).
+- Die Rotation greift bei `2^32` Versiegelungen je Clusterschlüssel und je Space-DEK. Eine höhere Schranke ist nur über eine Spezifikationsänderung zulässig (D-28).
+- Nonces werden nie wiederverwendet, auch nicht nach einem Absturz. Ein Absturz verwirft Nonces und den Rest eines reservierten Blocks; die Reservierung steigt nur.
 
 ### 16.4 Kryptografische Löschung (ER6)
 
-- Der Clusterschlüssel `ck(c, epoch)` wird aus dem Catalog entfernt (Edit), im Speicher mit `zeroize` überschrieben (INV-KEY-4) und aus dem Blockcache entfernt (§12.6).
-- Danach sind alle Dateien mit diesem Schlüssel ohne den Schlüssel unlesbar. Das gilt für Runs, Blobs und Redo-Körper dieses Clusters.
-- **Grenze:** Kopien des Catalogs, die den umhüllten Schlüssel noch enthalten, können ihn nicht offenbaren, solange der Space-DEK fehlt. Der Space-DEK bleibt aber bestehen. Deshalb verlangt ER6 zusätzlich, dass der alte Catalog gelöscht und der neue Snapshot durch Rollover geschrieben wird (§10.8). Ob eine alte Kopie in einem Backup liegt, kann der Kern nicht wissen. Die Restore-Regel (§14.3) und das Löschorakel (§15.11) decken diesen Fall ab, nicht die Kryptografie allein.
+- Der Kern ruft `KeyProvider::destroy(c)` und prüft danach `probe(c) = Absent`. Erst dann gilt ER6. Cache-Einträge (§12.6) und Speicherkopien werden mit `zeroize` überschrieben (INV-KEY-4).
+- Danach sind alle Dateien mit diesem Schlüssel ohne ihn unlesbar: Runs, Blobs und Redo-Körper des Clusters.
+- **Standard-Provider.** `FileKeyProvider` (in `contextra-crypto`) hält Clusterschlüssel in einer eigenen Datei `CKEYS` außerhalb von `KEYS`, mit der KEK umhüllt, und ersetzt sie bei `destroy` per `write_atomic`.
+- **Grenze.** Der Kern kann nur die Aussage des Providers prüfen. Backups des Schlüsselspeichers (bei `FileKeyProvider`: alte `CKEYS` samt zugehöriger KEK) können den Schlüssel weiter enthalten. Das Receipt nennt deshalb `key_provider_attested` (Provider hat die Vernichtung bestätigt) und trägt keine Aussage über Backups (O-14). Die Restore-Regel (§14.3) und das Löschorakel (§15.11) decken nur das Datenverzeichnis ab.
 
 ### 16.5 Schlüsselmaterial im Speicher (SecretAlloc)
 
@@ -1245,20 +1300,20 @@ Cluster-Schlüssel ck(c, epoch): ZUFÄLLIG erzeugt, mit Space-DEK umhüllt, im C
 
 ### 16.6 KeyProvider
 
-- Der Port `KeyProvider` liefert die KEK. Der Kern ruft ihn nur beim Öffnen und bei Rotation auf.
-- **make_durable (R2-Stärke, übernommen):** `KeyProvider::make_durable()` muss zurückkehren, bevor eine neue KEK-Version in `KEYS` benutzt wird. Ohne diesen Aufruf wird `KEYS` nicht umgehängt (INV-KEYP-1).
+- Der Port `KeyProvider` liefert die KEK und verwahrt die Clusterschlüssel. Der Kern ruft `kek` beim Öffnen und bei Rotation; `cluster_key`, `create_cluster_key`, `destroy` und `probe` zur Laufzeit (§4).
+- **make_durable (R2-Stärke, übernommen):** `KeyProvider::make_durable()` muss zurückkehren, bevor eine neue KEK-Version in `KEYS` benutzt wird. Ohne diesen Aufruf wird `KEYS` nicht umgehängt (INV-KEYP-2). Für neue Clusterschlüssel gilt INV-KEYP-1 (§4, §11.1).
 - Der Kern prüft beim Öffnen, ob `KeyProvider` eine KEK liefert, die `KEYS` öffnet. Schlägt das fehl, ist das Ergebnis `KeyUnavailable`, nie ein neuer Start mit leeren Schlüsseln.
 
 ### 16.7 Anker
 
 ```
 AnchorValue := (erase_epoch u64, ledger_head [32], catalog_epoch u64)
-Anchor-Port := read() -> Option<AnchorValue> | write(value) (atomar, durable)
+Anchor-Port := read() -> Option<AnchorValue> | advance(to) (monoton, durabel bei Rückkehr; §4)
 ```
 
 - Der Anker wird **nach** jedem ER7-Schritt und nach jedem Catalog-Rollover geschrieben.
 - Die Recovery-Schritte R5 und R9 vergleichen den Anker mit dem Stand, den Catalog und Ledger ergeben (§14.2).
-- **Standard-Anker `FileAnchor`:** eine Datei außerhalb des Speicherverzeichnisses, atomar ersetzt. Er schützt gegen das Zurückspielen des Speicherverzeichnisses, nicht gegen das Zurückspielen des Ankers selbst (C-03, offen in §24, O-7).
+- **Standard-Anker `FileAnchor`** (in `contextra-durable-fs`): eine Datei außerhalb des Speicherverzeichnisses, atomar ersetzt. Er schützt gegen das Zurückspielen des Speicherverzeichnisses, nicht gegen das Zurückspielen des Ankers selbst (C-03, offen in §24, O-7).
 - Ein Anker mit leerem Wert bei einem Speicher, der bereits Löschungen oder Catalog-Epochen hat, ist `Rollback`.
 - Die Anker-Schreibfolge ist: erst Ledger und Catalog dauerhaft, dann Anker. Ein Absturz dazwischen ergibt nur einen zu alten Anker, nie einen zu neuen.
 
@@ -1279,7 +1334,7 @@ Sperren werden nur in **aufsteigender** Rangfolge genommen. Eine Sperre niedrige
 | — | — | Rang 5 entfällt | — |
 | 6 | `registry` | Dateiregister lebendiger Runs und Blobs | nein |
 | 7 | `cluster_table` | Clustertabelle und Gate-Zustände | nein |
-| 8 | `maint` | Wartungsschritte (Flush, Compaction, GC, Löschung) | nein |
+| 8 | `maint` | Auswahl und Planung der Wartungsschritte; vor Catalog-Edit (Rang 3) und E/A freigegeben (D-22) | nein |
 | 9 | `notify` | Ereignisse an `Observer` und `Listener` | nein |
 
 - **Memtable:** lock-frei (`crossbeam-skiplist`). Sie hat keine Sperre im Rang und wird nur nach der Redo-Dauerhaftigkeit geschrieben (§11.1).
@@ -1311,7 +1366,7 @@ Die Tabelle ist normativ. Die Spalte `ID` ist das Format, das `tests/invariants.
 | ID | Aussage | Prüfung |
 |---|---|---|
 | INV-FS-1 | Jeder Port-Aufruf, der Durabilität verspricht, ist ohne `FsCaps`-Bestätigung nicht zulässig (`FsPolicy::Strict`). | Fail-closed-Test mit `FaultFs` |
-| INV-KEYP-1 | Eine neue KEK-Version wird erst nach `KeyProvider::make_durable()` in `KEYS` verwendet. | Absturzmatrix |
+| INV-KEYP-1 | Ein neuer Clusterschlüssel ist per `KeyProvider::make_durable()` dauerhaft, bevor ein Frame mit damit versiegelten Körpern dauerhaft wird. | Absturzmatrix |
 | INV-FMT-1 | Varint wird nur kanonisch gelesen; jede Abweichung ist `Corrupt`. | proptest, Goldens |
 | INV-FMT-2 | Längen werden gegen §20.1 und die Restlänge geprüft, bevor allokiert wird. | Fuzz-Test, Längenmatrix |
 | INV-FMT-3 | Authentifizierte Frames, Blöcke und Records binden Art, Ort und Zugehörigkeit in der AAD. | Vertauschungstest |
@@ -1322,8 +1377,8 @@ Die Tabelle ist normativ. Die Spalte `ID` ist das Format, das `tests/invariants.
 | INV-LOG-1 | Ein Frame enthält genau einen Change. | Format-Test |
 | INV-LOG-2 | Ein Frame ist beim Replay ganz gültig oder beendet das Log. | Torn-Tail-Matrix |
 | INV-LOG-3 | Stamps im Log sind streng aufsteigend und dürfen Lücken haben. | proptest |
-| INV-LOG-4 | Jede Prozessinstanz und jedes Gate beginnt ein neues Segment. | Modelltest |
-| INV-LOG-5 | Reserviert (nicht belegt). | — |
+| INV-LOG-4 | Jede Prozessinstanz beginnt ein neues Redo-Segment. | Modelltest |
+| INV-LOG-5 | Jedes Gate beginnt ein neues Segment; das vorige ist vorher gesiegelt. | Modelltest |
 | INV-LOG-6 | Ein gesiegeltes Segment mit Defekt ist `Corrupt` (fail-closed). | Defekt-Injektion |
 | INV-LOG-7 | Alles bis zur letzten `redo_mark` ist gültig; das Reservesegment ist lebendig. | Absturzmatrix |
 | INV-LOG-8 | Torn-Tail endet das Log nur ohne prüfbar gültige Folgegruppe, sonst `Corrupt{RedoMidLog}`. | Torn-Tail-Matrix |
@@ -1340,12 +1395,12 @@ Die Tabelle ist normativ. Die Spalte `ID` ist das Format, das `tests/invariants.
 | INV-BLOB-3 | Löcher sind Nullen gleicher Länge und werden nie entschlüsselt; ein Verweis auf ein Loch ist `Corrupt{HoleRef}`. | Löschtest |
 | INV-SEG-1 | Jeder Block wird vor Ausgabe geprüft. | Defekt-Injektion |
 | INV-ERA-1 | Ein Löschauftrag ist im Catalog festgehalten, bevor etwas anderes geschieht. | Absturzmatrix |
-| INV-ERA-2 | Ein `Erasing`-Cluster ist nach Neustart wieder gegated und nimmt keine Änderungen an. | Recovery-Test |
+| INV-ERA-2 | Ein `Gated`-Cluster ist nach Neustart wieder gegated und nimmt keine Änderungen an. | Recovery-Test |
 | INV-ERA-3 | Gegatete oder gelöschte Cluster verlassen Caches und Views sofort. | Modelltest |
 | INV-ERA-4 | Ein Schlüssel im Löschbereich liefert nie einen Wert, auch nicht aus Runs. | Lesetest über alle Schnitte |
 | INV-ERA-5 | Erased-Bereiche tragen den Löschstamp und werden nur entfernt, wenn ER7 quittiert ist. | Modelltest |
 | INV-ERA-6 | Löschschritte sind idempotent und werden nie gedrosselt, bis sie abgeschlossen sind. | Absturzmatrix, Lane-Test |
-| INV-ERA-7 | In `Plain` meldet das Receipt höchstens ER5. | Receipt-Test |
+| INV-ERA-7 | Das Receipt meldet höchstens die Obergrenze der Konfiguration (ER5 ohne `Seal::Cluster`, ER6 mit) und nennt die erreichten Schritte. | Receipt-Test |
 | INV-ERA-8 | Der Ledger enthält keinen Klartext des Schlüssels, nur `scope_hash`. | Scan-Test |
 | INV-RECOV-1 | Redo-Changes unterhalb `space_flushed` werden nicht doppelt übernommen. | Recovery-Test |
 | INV-RECOV-2 | Replay ist idempotent. | Recovery-Test, proptest |
@@ -1362,8 +1417,15 @@ Die Tabelle ist normativ. Die Spalte `ID` ist das Format, das `tests/invariants.
 | INV-SCAN-1 | `scan_physical` ist rein lesend und liefert nur Anzahl und Dateikennung. | Test mit schreibgesperrtem `FaultFs` |
 | INV-STAMP-1 | Stamps sind streng monoton über angenommene Changes. | proptest |
 | INV-STAMP-2 | Ein Stamp-Überlauf ist `Exhausted` und nie ein Umlauf. | Grenztest |
+| INV-KEYP-2 | Eine neue KEK-Version wird erst nach `KeyProvider::make_durable()` in `KEYS` verwendet. | Absturzmatrix |
+| INV-KEY-1 | Clusterschlüssel stehen nie im Catalog, in `KEYS` oder in einer Datendatei; dort liegt nur `key_epoch`. | Scan-Test |
+| INV-LOG-9 | Redo-Kürzung entfernt nur gesiegelte Segmente unterhalb von `mark`, wenn alle Stamps darunter in Runs stehen und kein Gate fehlt; die Hochwassermarke steigt nur. | Absturzmatrix |
+| INV-SYNC-1 | Nach einem Fehler von `sync_data` oder `sync_all` wird weder wiederholt noch abgeschnitten; die Instanz ist `Poisoned`. | `FaultFs`-Test |
+| INV-ERA-9 | Kein Redo-Segment und keine lebende Datei wird zum Löschen neu geschrieben, außer Runs und Blob-Inkarnationen nach den Regeln des Catalogs. | Modelltest |
+| INV-IDEM-1 | Ein bekannter `IdemToken` mit gleichem Inhalt liefert das ursprüngliche Receipt und schreibt nichts. | proptest |
+| INV-CLUSTER-2 | Der Clusterzustand geht nur vorwärts: `Live → Gated → Erased → Purged`. | Modelltest |
 
-Ein Eintrag mit „Reserviert“ hat keine Verpflichtung und darf nicht als Test verwendet werden; er bleibt aus Gründen der Stabilität der Nummerierung stehen.
+Nummern werden nie wiederverwendet. Ein entfallener Eintrag bleibt als „Entfallen“ stehen.
 
 ---
 
@@ -1410,7 +1472,7 @@ Die Grenzen gelten für Eingaben, Dateilängen und Speicher. Sie sind in `Config
 
 | Limit | Wirkung | Herkunft |
 |---|---|---|
-| Schlüssellänge, Wertlänge, Ops je Change, Frame-Länge | Schema-Grenzen; Überschreitung ⇒ `TooLarge` (vor Allokation) | §6.8 |
+| Schlüssellänge, Wertlänge, Ops je Change, Frame-Länge | Schema-Grenzen; Überschreitung ⇒ `Limit` bzw. `ChangeTooLarge` (vor Allokation) | §6.8 |
 | `memtable_limit` | Stopp-Grenze je Space (Busy, §11.5) | §11.5 |
 | `block_cache_bytes` | Budget für entschlüsselte Blöcke (§12.6) | §12.6 |
 | `view_max_age` | Lease-Dauer einer View (§12.1) | §12.1 |
@@ -1489,19 +1551,19 @@ Jede Hypothese hat ein Messkriterium. Eine Hypothese wird in G-8 bestätigt, ver
 | Gate | Inhalt | Voraussetzung |
 |---|---|---|
 | **G-0** | Spezifikation R7 als einzige normative Quelle, Register (§23–§25) vollständig | erfüllt mit dieser Revision |
-| **G-1** | Ports-Crate `contextra-storage-ports` und `MemFs`, `FaultFs` | G-0, O-1, O-12 |
-| **G-2** | Format-Codecs, Varint, Checksummen, Goldens aus `tools/reference/generator.py` | G-1 |
+| **G-1** | Port-Katalog `contextra-ports::persistence` (bereinigt nach D-02), `MemFs`, `FaultFs`; Konsumentenmatrix (§26); `contextra-durable-fs` im Workspace | G-0, O-12 |
+| **G-2** | Format-Codecs, Varint, Checksummen, Seal-Rahmen und Schlüsselhierarchie (§16.1–§16.3, §16.5, §16.6, mit Test-Provider), Goldens aus `tools/reference/generator.py` | G-1 |
 | **G-3** | Redo, Gruppen, Gate-Frames, Torn-Tail, Absturzmatrix | G-2 |
 | **G-4** | Catalog, Hochwassermarken, Anker, Recovery R1–R10 | G-3 |
 | **G-5** | Lesen und Schreiben über Memtable und Runs, Iteratoren, Views | G-4 |
 | **G-6** | Löschung ER0–ER7, Ledger, Löschorakel, Checkpoint, Restore | G-5 |
-| **G-7** | Krypto: Schlüsselhierarchie, Rotation, `rekey_clone`, Zeroize | G-6 |
+| **G-7** | Krypto-Betrieb: Rotation, `rekey_clone`, Zeroize-Nachweis, Härtung des Standard-`KeyProvider` | G-6 |
 | **G-8** | Nebenläufigkeit (loom/shuttle), Messung der Hypothesen H-1…H-18, Festlegung der Standardwerte (§20.2) | G-7 |
 | **G-F** | Format-Freeze (§10.12) | G-2 bis G-8, alle Goldens verifiziert |
 
 - Phasen laufen in dieser Reihenfolge. Ein Gate gilt erst, wenn seine Tests in der CI grün sind.
 - Die Kern-API (§8) wird mit G-5 stabil. Die stabilen Flächen für aufsetzende Schichten (§8.9) gelten ab G-6.
-- Die aufsetzenden Crates werden nach G-6 angepasst. Keine Anpassung vor G-6.
+- Konsumenten werden erst ab G-5 hinter einem Adapter umgestellt; `contextra-store` wird nach G-6 abgelöst (§26). Vor G-5 ändert sich kein Konsument. Erlaubt sind nur die Arbeiten an Port-Katalog und Workspace (G-1).
 
 ---
 
@@ -1512,7 +1574,7 @@ Jede Hypothese hat ein Messkriterium. Eine Hypothese wird in G-8 bestätigt, ver
 | ID | Entscheidung |
 |---|---|
 | SD-04 | Jede Dateiart hat Version 1 und Feature-Bits; unbekannte Pflicht-Bits ⇒ `Unsupported` (§10.1). |
-| SD-06 | `purge_deadline` ist Pflichtparameter ohne Standardwert (§8.7). |
+| SD-06 | `purge_deadline` ist Pflichtparameter ohne Standardwert (§8.5). |
 | SD-07 | Recovery ist fail-closed; es gibt keinen Best-effort-Start (§14). |
 | SD-08 | Redo wird vorallokiert; ENOSPC führt zur Schreibsperre bis `resume_writes` (§11.6, §12.5). |
 | SD-14 | Nonces sind 24-Byte-Zufallswerte; es gibt keinen Zählerzustand (§10.1, §16.3). |
@@ -1527,20 +1589,34 @@ Jede Hypothese hat ein Messkriterium. Eine Hypothese wird in G-8 bestätigt, ver
 
 | ID | Entscheidung |
 |---|---|
-| D-02 | `contextra-ports` gehört nicht zum Kern und wird nicht verwendet. Der Kern nutzt `contextra-storage-ports`. |
-| D-05 | Krypto-Crates sind im Kern verboten. Das Referenz-Primitiv liegt in `contextra-crypto-ref` (dev) oder in einem Port außerhalb des Kerns (§3.5). |
+| D-02 | Port-Katalog des Kerns ist das Modul `contextra-ports::persistence`. Es wird eigenständig gemacht: keine Abhängigkeit von `contextra-types`, `blake3`, `serde`, `futures-util`; die doppelte `Clock`-Definition entfällt; `KeyDomain` wird zu `ClusterId`; fehlende Ports (`Checksum`, `Hasher`, `Anchor`, `Observer`, `Weigher`, `Filter`, `ColdTier`, `SecretAlloc`, `Runtime`) kommen hinzu. Ein Crate `contextra-storage-ports` entsteht nicht. |
+| D-05 | Krypto-Crates sind im Kern verboten. Produktive Primitive liegen in `contextra-crypto`, Test-Primitive in `contextra-testkit`. Ein Crate `contextra-crypto-ref` entsteht nicht (O-6 entschieden). Das Feature `testing` des Bestands darf `blake3` und `aes-gcm-siv` nicht mehr ziehen. |
 | D-06 | Die Schlüsselwurzel ist `root_key` je Generation; die KEK umhüllt nur `KEYS` (§10.3, §16.2). |
 | D-07 | `destroy` ist idempotent und ist bei Rückkehr durabel (§4, KeyProvider). |
 | D-08 | Gewichtssummen sind `u64` (C-13). |
-| D-10 | Volatile und dauerhafte Ziele dürfen nicht in einem Change gemischt werden: `Forbidden{MixedDurability}` (§6.4, C-07). |
+| D-10 | Volatile und dauerhafte Ziele dürfen nicht in einem Change gemischt werden: `MixedDurability` (§6.4, C-07). |
 | D-12 | Der Hasher für die Ledger-Kette ist unkeyed (§4, §15.8). |
 | D-14 | Jede Prozessinstanz beginnt ein neues Redo-Segment (§10.4). |
 | D-15 | Die Cluster-Versiegelung bindet keinen Stamp in die AAD (§10.4, C-16). |
 | D-16 | Stabile Flächen für aufsetzende Schichten sind über semver festgelegt (§8.9). |
+| D-17 | O-1 entschieden: `rust-version = 1.89` (MSRV, CI-Job), `rust-toolchain.toml` nutzt `channel = "stable"`; Workspace-`resolver = "2"` (Repo-Stand). |
+| D-18 | Es entstehen keine neuen Crates. Bestehende Crates übernehmen die Rollen aus §26. |
+| D-19 | Clusterschlüssel verwahrt der `KeyProvider`. Catalog, `KEYS` und Datendateien enthalten kein Clusterschlüsselmaterial (INV-KEY-1). |
+| D-20 | `EraseLevel` wählt ein Stufenprofil (nicht kumulativ). Höchststufe ER5 ohne `Seal::Cluster`, ER6 mit (§15.2). |
+| D-21 | Jeder Space in `Authenticated`/`Encrypted` hat einen DEK, auch mit `Seal::Cluster`. |
+| D-22 | Wartung hält Rang 8 nicht über Catalog-Edits und E/A. `erase` hängt nicht von `engine` ab; der Löschdurchlauf liegt in `maint`. |
+| D-23 | Redo-Segmente werden nie neu geschrieben; ER2 entfernt nur ganze Segmente. |
+| D-24 | Nur `spaces/` und `segments/` unterliegen der Verwaisten-Suche. Ledger-Dateien stehen nicht im Catalog und werden nie entfernt. |
+| D-25 | Fehler von `sync_data`/`sync_all` ⇒ `Poisoned`, nie Retry. `Degraded` nur bei Fehlern vor dem Sync mit erfolgreichem Abschneiden (inkl. ENOSPC). |
+| D-26 | Ein Zustandsautomat für Cluster: `Live → Gated(g) → Erased → Purged`; `Restricted` ist eine Menge, `key_destroyed` ein Merkmal. |
+| D-27 | Blob-Records tragen `record_uid`; die Blob-AAD enthält keinen Offset. |
+| D-28 | Nonce-Schranke 2^32 je Schlüssel, Zählung über blockweise Reservierung `seal_hw`. |
+| D-29 | Schlüsselhierarchie und Seal-Rahmen gehören zu G-2, nicht zu G-7. |
+| D-30 | Merge-Operanden gibt es im Kern in Version 1 nicht (NZ-4). Aufrufer (`contextra-engine`) wechseln auf Guard-gestütztes Lesen-Ändern-Schreiben (`Guard::Version`). Die Eignung ist vor G-5 gegen den Code zu prüfen. |
 
 ### 23.3 Abhängigkeiten des Kerns
 
-Erlaubt sind nur: `std`, `contextra-storage-ports`, `zeroize`, `crossbeam-skiplist`, `bytes` (optional). Jede weitere Abhängigkeit braucht einen Eintrag in dieser Liste und eine Prüfung mit `cargo-deny` (`advisories`, `bans`, `sources`). Krypto-Crates sind nicht erlaubt (D-05).
+Erlaubt sind nur: `std`, `contextra-ports` (nur Modul `persistence`), `zeroize`, `crossbeam-skiplist`, `bytes` (optional). Jede weitere Abhängigkeit braucht einen Eintrag in dieser Liste und eine Prüfung mit `cargo-deny` (`advisories`, `bans`, `sources`). Krypto-Crates sind nicht erlaubt (D-05).
 
 ### 23.4 Annahmen
 
@@ -1559,12 +1635,12 @@ Erlaubt sind nur: `std`, `contextra-storage-ports`, `zeroize`, `crossbeam-skipli
 
 | ID | Frage | Verantwortlich, Frist |
 |---|---|---|
-| O-1 | Toolchain-Pin und MSRV. `rust-toolchain.toml` pinnt 1.89.0, das in der Arbeitsumgebung nicht lädbar ist. Entscheidung über Pin und Ersatz (`stable`) vor G-1. | Maintainer, vor G-1 |
+| O-1 | ~~Toolchain-Pin und MSRV~~ **Entschieden mit D-17.** | erledigt |
 | O-2 | Rechtliche Löschfristen und Ausnahmen. Der Kern trifft keine Rechtsaussage (§1). | Rechtsberatung, außerhalb des Kerns |
 | O-3 | Ablauf von Restrictions: nur Vermerk entfallen, nie automatisch löschen (§8.4). | Produkt, vor G-6 |
 | O-4 | Windows mit voller Durabilität in Version 1 (NZ-8). | Port-Implementierung, nach G-8 |
 | O-5 | Inhaltsadressierung und Dedup (NZ-11). | obere Schicht, nach G-6 |
-| O-6 | Ob `contextra-crypto-ref` als eigener Dev-Crate bleibt oder im Workspace-Testcode aufgeht. | Maintainer, vor G-2 |
+| O-6 | ~~Verbleib von `contextra-crypto-ref`~~ **Entschieden mit D-05**: Crate entfällt. | erledigt |
 | O-7 | Externer Anker gegen Zurückspielen des Ankers selbst. `FileAnchor` schützt das nicht (§14.2, §16.7). | Betreiber, vor G-F |
 | O-8 | Schnittstelle des Cold-Tier-Ports (`ColdTier`), Speicherung über Feature `COLD_TIER`. | Spezifikation, vor G-6 |
 | O-9 | Kompressionscodec. Das Feld ist reserviert, der Codec ist nicht spezifiziert (NZ-10). | Spezifikation, nach G-F |
@@ -1572,6 +1648,7 @@ Erlaubt sind nur: `std`, `contextra-storage-ports`, `zeroize`, `crossbeam-skipli
 | O-11 | Verhalten bei überfälligen Löschaufträgen (`Overdue`): nur Ereignis, oder Betriebsstopp. | Produkt, vor G-6 |
 | O-12 | Benannte Reviewer für G-0 und Änderungen an §4, §5, §9–§11, §14–§16, §18 (Anforderung aus §1.5). | Maintainer, vor G-1 |
 | O-13 | Bloom- oder Ribbon-Filter. Die Entscheidung braucht eine Messung (H-3, H-14). | Maintainer, vor G-F |
+| O-14 | Löschnachweis gegen Backups des Schlüsselspeichers (`CKEYS`, externer Provider). Der Kern kann nur die Provider-Aussage prüfen (§16.4). | Betreiber, vor G-7 |
 
 ---
 
@@ -1584,7 +1661,7 @@ Jede Zeile beschreibt einen Widerspruch aus den Vorfassungen (Anhang B) und die 
 | C-01 | `max_inline_bytes` und `value_separation_min` waren zwei Schwellwerte. | Ein einziger Schwellwert: `value_separation_min` (§6.3). |
 | C-02 | `erase_epoch` war nicht definiert. | Definiert im Catalog und im Anker, ein Wert je ER7 (§15.7). |
 | C-03 | Restore und Rollback waren vermischt. | Getrennt: Rollback wird erkannt, Restore ist ein eigener Pfad mit Prüfung gegen den Anker (§14.2, §14.3). |
-| C-04 | Cluster-Schlüssel waren aus der Wurzel abgeleitet und damit nicht einzeln löschbar. | Clusterschlüssel sind zufällig und im Catalog umhüllt (§16.2). |
+| C-04 | Cluster-Schlüssel waren aus der Wurzel abgeleitet und damit nicht einzeln löschbar. | Clusterschlüssel sind zufällig und werden vom `KeyProvider` verwahrt (D-19). R7 hatte sie im Catalog umhüllt; das ist mit C-21 korrigiert. |
 | C-05 | Der Stamp sollte lückenlos sein, im Log gab es Lücken. | Lücken sind erlaubt; streng aufsteigend (§6.2, INV-LOG-3). |
 | C-06 | `domain_retired` war erzeugt, aber nie gelesen. | Nicht erzeugt; nur für Import reserviert (§15.3). |
 | C-07 | Volatile-Mischung und INV-COMMIT-2 widersprachen sich. | Mischung verboten (D-10), Volatile in eigener Gruppe (§11.2). |
@@ -1601,6 +1678,63 @@ Jede Zeile beschreibt einen Widerspruch aus den Vorfassungen (Anhang B) und die 
 | C-18 | Die Trait-Namen der Ports waren uneinheitlich. | Ein Kanon in §4. |
 | C-19 | Das Redo-Segment war als `FileKind` geführt, obwohl es eigene Lebendigkeitsregeln hat. | Eigene Regel: lebendig ⇔ `segment_id ≥ redo_floor` (§9.2). |
 | C-20 | Die Fehlerklassen unterschieden sich zwischen den Vorfassungen. | Vereinheitlicht zu F-1 bis F-16 (§5.1). |
+| C-21 | R7: Clusterschlüssel einmal beim `KeyProvider` (§4), einmal im Catalog (§16.2). Im Catalog bleibt der Schlüssel in alten Kopien lesbar, solange der DEK existiert. | D-19, INV-KEY-1 |
+| C-22 | R7: drei Zustandsautomaten für Cluster (§6.7, §11.3, §15.4), `Restricted` zugleich Zustand und Menge. | D-26 |
+| C-23 | R7: `fsync`-Fehler als Poison (F-4) und als `Degraded` mit Abschneiden (§11.6); `Degraded` fehlte in `Health`. | D-25, INV-SYNC-1 |
+| C-24 | R7: Löschstufen kumulativ, zugleich kryptografische Löschung O(1) (Z-14, H-6). | D-20 |
+| C-25 | R7: ER2 „Redo neu schreiben“ gegen unveränderliche Segmente und Frame-Kette. | D-23, INV-ERA-9 |
+| C-26 | R7: Blob-AAD mit Offset (§10.7) gegen „keine AAD enthält die Dateiposition“ (§10.10). | D-27 |
+| C-27 | R7: DEK „nicht versiegelter Spaces“ (§10.3) gegen Datei-MAC mit DEK in versiegelten Spaces (§10.6, §7.2). | D-21 |
+| C-28 | R7: Nonce-Schranke 2^64 (§10.1) gegen 2^32 (§16.3); Zähler je Versiegelung im Catalog unmöglich (P-2). | D-28 |
+| C-29 | R7: Wartung in Rang 8 mit Catalog-Edit in Rang 3; Zyklus `engine`/`erase` in §3.3. | D-22 |
+| C-30 | R7: Schlüsselhierarchie in G-7, aber Redo-Versiegelung in G-3 und ER6 in G-6. | D-29 |
+| C-31 | R7: Crates `contextra-storage-ports` und `contextra-crypto-ref` gegen Bestand und Vorgabe „keine neuen Crates“. | D-02, D-05, D-18 |
+| C-32 | R7: Verwaisten-Suche über alle Nicht-Catalog-Dateien, auch Ledger, `KEYS`, `FORMAT`. | D-24 |
+| C-33 | R7: Verweis- und Nummerierungsfehler (INV-LOG-4/5/8, INV-KEYP-1, Paragraphen, C-/AN-Nummern, `header_len`, fehlende Fehlervarianten, Orakel unter `testing`). | redaktionell behoben in R8 |
+| C-34 | R7: Merge nicht erzeugbar (NZ-4), `contextra-engine` nutzt `MergeOperator`. | D-30 |
+
+---
+
+## 26. Integration der bestehenden Crates
+
+### 26.1 Grundsatz
+
+- Der Neubau entsteht im vorhandenen Verzeichnis `crates/contextra-storage` (D-18). `crates/contextra-store` bleibt bis zur Ablösung unverändert. Es werden **keine** neuen Crates angelegt.
+- Alle Konsumenten sprechen heute `contextra-store` an. Nach dem Messstand dieser Revision (Zählung der Zeilen mit `contextra_store` in `*.rs`) sind es: `contextra-engine` 144, `contextra-db` 25, `contextra-graph` 16, `contextra-cognition` 15, `contextra` (Fassade) 5, `contextra-agent` 3, `contextra-checkpoint` 2, `benchmarks/contextra-bench` 1, `contextra-py` 0. Genutzt werden `LsmStorage`, `LsmConfig`, `tenant_codec::TenantScopedStorage`, `SystemPressure`, `MergeOperator`, `DurabilityMode` und `kv::delete_mode`.
+- `contextra-storage` hat keinen Abhängigen, `contextra-ports` etwa 26.
+
+### 26.2 Rollen
+
+Die Abbildung leitet sich aus Crate-Namen, den gezählten Importen und dieser SPEC ab. Sie ist vor G-5 gegen den Code der jeweiligen Crates zu prüfen.
+
+| Crate | Rolle gegenüber dem Kern |
+|---|---|
+| `contextra-ports` | Port-Katalog (§4); bestehende Nähte `StorageEngine`, `KvBridgeStorage`, `KvPrefixStore` sind auf Eignung als Adapterziel zu prüfen (G-1) |
+| `contextra-crypto` | produktive `Cipher`, `Mac`, `Kdf`, `Hasher`, `FileKeyProvider` |
+| `contextra-testkit` | Test-Primitive, Test-`KeyProvider`, Konformitätsläufe |
+| `contextra-durable-fs` | `RealFs`, `FileAnchor`; muss in `members` aufgenommen werden (G-1) |
+| `contextra-mvcc` | bleibt obere Schicht (SSI, Transaktionspuffer, Snapshot-Register nach NZ-3); stützt sich auf `View::stamp`, `view_at`, `Guard`; der Stamp ist die einzige Ordnung |
+| `contextra-checkpoint` | nutzt `Storage::checkpoint`; benannte Checkpoints bleiben dort (NZ-18) |
+| `contextra-vector`, `-text`, `-graph` | Indexstrukturen als `ExtensionBuilder` bzw. Segmente (§15.9); Kern kennt sie nicht |
+| `contextra-privacy`, `-audit-export`, `-license` | Konsumenten von `Eraser`, `ErasureReceipt`, Ledger-Bytes; Politik bleibt dort (NZ-14, NZ-16) |
+| `contextra-engine`, `-db`, `-cognition`, `-agent`, `contextra` | Konsumenten über einen Adapter (§26.3) |
+
+### 26.3 Abbildung der genutzten `store`-API
+
+| Bestand | Ziel im Kern |
+|---|---|
+| `LsmStorage`, `LsmConfig` | `Storage`, `Config`, `SpaceOptions` hinter dem Adapter |
+| `TenantScopedStorage` | Mandant wird Teil des Adapters: Mandant → `ClusterId` bzw. `tenant_tag` der Packgruppe; der Kern kennt keine Mandanten (NZ-16) |
+| `SystemPressure` | `PressureSource` |
+| `DurabilityMode` | `Durability` (`Durable` \| `Relaxed`) je Change und `durability_default` je Space |
+| `delete_mode` | `Change::delete`, `delete_range`, `Eraser` mit `EraseLevel` |
+| `MergeOperator` | entfällt im Kern (D-30); Ersatz: Guard-gestütztes Lesen-Ändern-Schreiben |
+
+### 26.4 Vorgehen
+
+1. **Ab G-1:** Port-Katalog bereinigen, `contextra-durable-fs` aufnehmen, Konsumentenmatrix gegen den Code verifizieren. Kein Konsument ändert sich.
+2. **Ab G-5:** Adapter hinter einem Cargo-Feature je Konsument; beide Backends parallel testbar.
+3. **Nach G-6:** Umschalten, `contextra-store` und die Feature-Weichen entfernen. Gate G-6 ist erst grün, wenn die Konsumentenmatrix auf den neuen Kern zeigt.
 
 ---
 
@@ -1639,6 +1773,7 @@ Jede Zeile beschreibt einen Widerspruch aus den Vorfassungen (Anhang B) und die 
 | `docs/archive/SPEC-R2.md` | Domänenschlüssel, Fail-closed-FsCaps, `KeyProvider.make_durable`, ENOSPC-Abschneiden, Guard-Vorwärmung, `SecretAlloc`, Consumer, Segmente, Goldens | 12-Byte-Nonces (ersetzt durch 24 B, SD-14) |
 | `docs/archive/SPEC-R6-Cluster-Entwurf.md` | Cluster als Löschdomäne, Pure/Packed, Gate im Committer, Anker, Ledger, ER-Stufen, Packgruppen | Widersprüche aus §25 |
 | Konsolidierung R7 | Entscheidungen D- und SD-Register, Widerspruchsregister, Hypothesen | — |
+| Revision R8 | Behebung der Widersprüche C-21 bis C-34; Entscheidungen D-17 bis D-30; Abschnitt 26 (Integration) | Ableitung des Clusterschlüssels aus dem Catalog (R7, §16.2) |
 
 Die beiden Vorfassungen gelten nicht mehr als Quelle. Sie bleiben im Ordner `docs/archive/` zur Nachvollziehbarkeit erhalten.
 

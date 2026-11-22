@@ -1,6 +1,6 @@
 # CLAUDE.md — Einstieg für Claude-Sitzungen im Contextra-Repo
 
-**FOKUS (verbindlich):** `contextra-store` wird durch `contextra-storage` ersetzt, das Fundament von Contextra. Bis Gate G-6 (Löschung, §22) gilt ausschließlich der Storage-Kern. Alles andere im Repository wird ignoriert und nicht verändert. Normativ ist `docs/SPEC.md` (R7, Gate G-0 erfüllt, G-1 setzt O-1 und O-12 voraus). Arbeitskontext und Regeln für den Kern: `AGENTS.md` im Repo-Root. Vorfassungen und Konzepte liegen in `docs/archive/` und sind keine Anforderungsquelle.
+**FOKUS (verbindlich):** `contextra-store` wird durch `contextra-storage` ersetzt, das Fundament von Contextra. Bis Gate G-6 (Löschung, §22) gilt ausschließlich der Storage-Kern. Alles andere im Repository wird ignoriert und nicht verändert. Normativ ist `docs/SPEC.md` (R8, Gate G-0 erfüllt, G-1 setzt O-12 voraus; O-1 entschieden mit D-17). Arbeitskontext und Regeln für den Kern: `AGENTS.md` im Repo-Root. Vorfassungen und Konzepte liegen in `docs/archive/` und sind keine Anforderungsquelle.
 
 
 ---
@@ -31,7 +31,7 @@
 | Benutzer | `root` (UID 0). `sudo -n` funktioniert ohne Passwort. | Pakete können direkt installiert werden (Abschnitt 9). |
 | Repo-Pfad | Klon unter `/home/claude/contextra` | Alle Befehle aus dem Repo-Root ausführen |
 | Python | 3.13 (`python3`). Standardbibliothek reicht für die Tools. | Tools laufen ohne Zusatzpakete |
-| Rust-Toolchain | `rust-toolchain.toml` pinnt **1.89.0**. Der Download von `static.rust-lang.org` ist blockiert (`unsuccessful tunnel`). | **Immer `RUSTUP_TOOLCHAIN=stable cargo …`** (stable = 1.97.0). `cargo metadata` ebenso, sonst versucht Cargo den Download. |
+| Rust-Toolchain | `rust-toolchain.toml` nutzt seit SPEC R8 (D-17) `channel = "stable"`; MSRV ist `rust-version = 1.89` im Workspace. | Kein Download einer gepinnten Version nötig. `RUSTUP_TOOLCHAIN=stable` ist nur noch bei einer lokal abweichenden Pin-Datei erforderlich. |
 | Rust-Komponenten | `clippy`, `rustfmt` für stable installiert. `cargo-deny`, `cargo-audit`, `cargo-nextest`, `cargo-mutants` **nicht** installiert. | Siehe Abschnitt 9 für Installation. |
 | Werkzeuge | `rg`, `jq` vorhanden. `shellcheck` und `ruff` nachinstalliert (Abschnitt 9). | Für Suche und Lint nutzen. |
 | crates.io | erreichbar (`cargo check`, `cargo install` getestet) | Abhängigkeiten und Cargo-Tools laufen normal |
@@ -45,7 +45,7 @@
 
 ## 5. Bekannte Stolpersteine
 
-1. **Toolchain 1.89.0 nicht ladbar** → `RUSTUP_TOOLCHAIN=stable` setzen, auch bei `cargo metadata` und `cargo install`. Nicht versuchen, `static.rust-lang.org` per curl zu erreichen.
+1. **Toolchain:** Der frühere Pin 1.89.0 ist durch `channel = "stable"` ersetzt (SPEC D-17). Die MSRV 1.89 wird in der CI separat geprüft.
 2. **Facade `contextra` baut nicht.** Vor Arbeit an `contextra-db`-Schnittstellen zuerst prüfen, ob `contextra` darauf zugreift.
 3. **Anhänge sind Quelle.** `budgets.toml` und `capabilities.toml` nie von Hand ändern. Abweichungen zeigt `check`.
 4. **Zahlen aus der Spec sind Soll-Werte.** Anhang B und diese Datei sind Messungen vom 20./21.11.2026.
