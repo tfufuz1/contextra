@@ -1,11 +1,11 @@
 //! SealFrame and canonical AAD. Logical identities are stable across file
 //! copies and relocation; physical file IDs and offsets are deliberately absent.
 
-use contextra_storage_ports::traits::{Checksum, Cipher, Kdf, Mac};
+use contextra_storage_ports::traits::{Checksum, Cipher, Mac};
 use contextra_storage_ports::{ClusterId, Error, Key32, SpaceId};
 use zeroize::Zeroizing;
 
-const LABEL: &[u8] = b"ctxs seal v1";
+const AUTH_DOMAIN: &[u8] = b"ctxs-auth-v1";
 const NONCE_LEN: usize = 24;
 const TAG_LEN: usize = 16;
 const HEADER_LEN: usize = 4 + NONCE_LEN;
@@ -54,7 +54,6 @@ pub fn seal_frame(
     aad: Aad<'_>,
     plaintext: &[u8],
     cipher: &dyn Cipher,
-    kdf: &dyn Kdf,
     mac: &dyn Mac,
     checksum: &dyn Checksum,
 ) -> Result<Vec<u8>, Error> {
@@ -73,19 +72,15 @@ pub fn seal_frame(
         }
         SealMode::Authenticated => {
             let source = source.ok_or(Error::KeyUnavailable { retry_after_secs: None })?;
-            let subkey = kdf.derive_subkey_fast(source, LABEL, nonce)?;
             out.extend_from_slice(plaintext);
-            let mut authenticated = Vec::with_capacity(aad.len() + out.len());
-            authenticated.extend_from_slice(&aad);
-            authenticated.extend_from_slice(&out);
-            let tag = mac.tag(&subkey, &authenticated);
+            let authenticated = auth_input(mode, nonce, &aad, plaintext)?;
+            let tag = mac.tag(source, &authenticated);
             out.extend_from_slice(tag.get(..TAG_LEN).ok_or(Error::Corrupt { place: "MAC tag length" })?);
         }
         SealMode::Encrypted => {
             let source = source.ok_or(Error::KeyUnavailable { retry_after_secs: None })?;
-            let subkey = kdf.derive_subkey_fast(source, LABEL, nonce)?;
             let mut ciphertext = Vec::new();
-            cipher.seal(&subkey, nonce, &aad, plaintext, &mut ciphertext)?;
+            cipher.seal(source, nonce, &aad, plaintext, &mut ciphertext)?;
             out.extend_from_slice(&ciphertext);
         }
     }
@@ -98,7 +93,6 @@ pub fn unseal_frame(
     aad: Aad<'_>,
     frame: &[u8],
     cipher: &dyn Cipher,
-    kdf: &dyn Kdf,
     mac: &dyn Mac,
     checksum: &dyn Checksum,
 ) -> Result<(u32, Zeroizing<Vec<u8>>), Error> {
@@ -132,12 +126,8 @@ pub fn unseal_frame(
             let split = body.len() - TAG_LEN;
             let data = body.get(..split).ok_or(Error::Corrupt { place: "authenticated seal body" })?;
             let tag = body.get(split..).ok_or(Error::Corrupt { place: "authenticated seal tag" })?;
-            let subkey = kdf.derive_subkey_fast(source, LABEL, nonce)?;
-            let mut authenticated = Vec::with_capacity(aad.len() + HEADER_LEN + data.len());
-            authenticated.extend_from_slice(&aad);
-            authenticated.extend_from_slice(frame.get(..HEADER_LEN).ok_or(Error::Corrupt { place: "seal frame header" })?);
-            authenticated.extend_from_slice(data);
-            let actual = mac.tag(&subkey, &authenticated);
+            let authenticated = auth_input(mode, nonce, &aad, data)?;
+            let actual = mac.tag(source, &authenticated);
             if !constant_time_eq(actual.get(..TAG_LEN).ok_or(Error::Corrupt { place: "MAC tag length" })?, tag) {
                 return Err(Error::Corrupt { place: "authenticated seal tag" });
             }
@@ -145,11 +135,32 @@ pub fn unseal_frame(
         }
         SealMode::Encrypted => {
             let source = source.ok_or(Error::KeyUnavailable { retry_after_secs: None })?;
-            let subkey = kdf.derive_subkey_fast(source, LABEL, nonce)?;
-            cipher.open(&subkey, nonce, &aad, body, &mut plaintext)?;
+            cipher.open(source, nonce, &aad, body, &mut plaintext)?;
         }
     }
     Ok((u32::from_le_bytes(epoch_bytes), plaintext))
+}
+
+fn mode_byte(mode: SealMode) -> u8 {
+    match mode { SealMode::Plain => 1, SealMode::Authenticated => 2, SealMode::Encrypted => 3 }
+}
+
+fn auth_input(mode: SealMode, nonce: &[u8; NONCE_LEN], aad: &[u8], payload: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {
+    let aad_len = u32::try_from(aad.len()).map_err(|_| Error::Limit { limit: "SealFrame AAD length" })?;
+    let payload_len = u64::try_from(payload.len()).map_err(|_| Error::Limit { limit: "SealFrame payload length" })?;
+    let capacity = AUTH_DOMAIN.len().checked_add(1 + NONCE_LEN + 4 + 8)
+        .and_then(|value| value.checked_add(aad.len()))
+        .and_then(|value| value.checked_add(payload.len()))
+        .ok_or(Error::Limit { limit: "SealFrame authentication input length" })?;
+    let mut input = Zeroizing::new(Vec::with_capacity(capacity));
+    input.extend_from_slice(AUTH_DOMAIN);
+    input.push(mode_byte(mode));
+    input.extend_from_slice(nonce);
+    input.extend_from_slice(&aad_len.to_le_bytes());
+    input.extend_from_slice(aad);
+    input.extend_from_slice(&payload_len.to_le_bytes());
+    input.extend_from_slice(payload);
+    Ok(input)
 }
 
 fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {

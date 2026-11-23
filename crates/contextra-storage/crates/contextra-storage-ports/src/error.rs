@@ -23,7 +23,7 @@ pub enum ErrorClass {
     Conflict,
     /// Externer Anker liegt vor den wiederhergestellten dauerhaften Daten
     Rollback,
-    /// Platzhalter oder interner Fehler
+    /// interne Fehler, die nach Recovery/Neustart zu behandeln sind
     Internal,
 }
 
@@ -42,8 +42,36 @@ pub enum Error {
     Unsupported { what: &'static str },
     #[error("Schlüssel nicht verfügbar")]
     KeyUnavailable { retry_after_secs: Option<u64> },
+    #[error("Schlüsselverlust ohne bestätigten Löschbeleg")]
+    KeyLost,
     #[error("Daten sind gelöscht (Crypto-Shredding)")]
     Shredded,
+    #[error("Cluster ist retired")]
+    ClusterRetired,
+    #[error("Cluster ist unbekannt")]
+    UnknownCluster,
+    #[error("Sicht liegt unterhalb des verfügbaren Historienbodens")]
+    BelowFloor,
+    #[error("Zugriff ist durch eine Restriction gesperrt")]
+    Restricted,
+    #[error("Guard-Konflikt")]
+    Conflict,
+    #[error("Change überschreitet das zulässige Formatlimit")]
+    ChangeTooLarge,
+    #[error("Idempotenz-Token wurde mit anderem Inhalt wiederverwendet")]
+    IdemConflict,
+    #[error("Idempotenzspeicher ist ausgelastet")]
+    IdemCapacity,
+    #[error("Branch ist geschlossen")]
+    BranchClosed,
+    #[error("Branch hat noch lebende Kinder")]
+    BranchHasChildren,
+    #[error("Consumer muss nach einem Lag neu aufbauen")]
+    Lagged,
+    #[error("Erase-Hülle überschreitet das konfigurierte Fanout-Limit")]
+    EraseFanoutExceeded,
+    #[error("Uhrabweichung verhindert sichere Fristberechnung")]
+    ClockUncertain,
     #[error("Eingabe verletzt Grenze: {limit}")]
     Limit { limit: &'static str },
     #[error("Anker-Wettlauf verloren (CAS)")]
@@ -55,8 +83,6 @@ pub enum Error {
         role: &'static str,
         kind: std::io::ErrorKind,
     },
-    #[error("Platzhalter: {sp} ist noch nicht implementiert")]
-    NotImplemented { sp: &'static str },
 }
 
 impl Error {
@@ -67,11 +93,12 @@ impl Error {
             Self::Poisoned { .. } => ErrorClass::Poisoned,
             Self::Corrupt { .. } => ErrorClass::Corrupt,
             Self::Unsupported { .. } => ErrorClass::Unsupported,
-            Self::KeyUnavailable { .. } | Self::Shredded => ErrorClass::Key,
-            Self::Limit { .. } => ErrorClass::Usage,
-            Self::CasLost => ErrorClass::Conflict,
+            Self::KeyUnavailable { .. } | Self::KeyLost | Self::Shredded => ErrorClass::Key,
+            Self::Limit { .. } | Self::ClusterRetired | Self::UnknownCluster | Self::BelowFloor
+            | Self::Restricted | Self::ChangeTooLarge | Self::IdemCapacity | Self::BranchClosed
+            | Self::BranchHasChildren | Self::Lagged | Self::EraseFanoutExceeded | Self::ClockUncertain => ErrorClass::Usage,
+            Self::CasLost | Self::Conflict | Self::IdemConflict => ErrorClass::Conflict,
             Self::Rollback => ErrorClass::Rollback,
-            Self::NotImplemented { .. } => ErrorClass::Internal,
         }
     }
 
@@ -85,11 +112,22 @@ impl Error {
             }
             Self::Unsupported { .. } => "Version des Kerns prüfen",
             Self::KeyUnavailable { .. } => "Schlüsselprovider prüfen",
+            Self::KeyLost => "Store quarantänisieren und Erase-Ledger prüfen",
             Self::Shredded => "Daten sind endgültig gelöscht",
+            Self::ClusterRetired => "Erasure-Ticket prüfen",
+            Self::UnknownCluster => "Cluster-Registrierung prüfen",
+            Self::BelowFloor => "Neuere View öffnen oder Historie wiederherstellen",
+            Self::Restricted => "Restriction und zuständige Freigabe prüfen",
+            Self::Conflict | Self::CasLost | Self::IdemConflict => "Zustand neu lesen und Request prüfen",
+            Self::ChangeTooLarge => "Change in kleinere atomare Änderungen aufteilen",
+            Self::IdemCapacity => "Ablauf/Trim abwarten; Request nicht ohne Token wiederholen",
+            Self::BranchClosed => "Einen neuen Branch vom aktuellen Head anlegen",
+            Self::BranchHasChildren => "Zuerst die Branch-Kinder schließen",
+            Self::Lagged => "Consumer ab einem vollständigen Snapshot neu aufbauen",
+            Self::EraseFanoutExceeded => "Löschdomäne verkleinern oder Grenze prüfen",
+            Self::ClockUncertain => "Uhrquelle prüfen; Fristen bleiben bis dahin angehalten",
             Self::Limit { .. } => "Eingabe verkleinern",
-            Self::CasLost => "Anker neu lesen und wiederholen",
             Self::Rollback => "ReadOnly-Diagnose öffnen und Restore-Reconcile ausführen",
-            Self::NotImplemented { .. } => "Komponente ist noch Platzhalter",
         }
     }
 }

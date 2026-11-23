@@ -25,7 +25,7 @@ use ports::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-/// Öffentliche Fassade. Rümpfe folgen den Besitzer-SPs; bis dahin NotImplemented.
+/// Public storage façade. Persistent lifecycle operations are owned by their SP modules.
 pub struct Storage {
     _fs: Arc<dyn ports::traits::Fs>,
     catalog: catalog::file::CatalogFile,

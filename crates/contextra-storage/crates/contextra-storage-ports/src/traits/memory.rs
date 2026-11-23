@@ -3,7 +3,6 @@
 use crate::error::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
 pub enum ResourceClass {
     Memtable,
     ClusterMeta,
