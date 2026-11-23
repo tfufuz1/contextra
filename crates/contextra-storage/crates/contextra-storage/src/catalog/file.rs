@@ -160,14 +160,32 @@ impl CatalogFile {
         };
         next_state.apply_record(&record)?;
         let encoded = encode_record(self.next_sequence, self.previous_crc, &ops, integrity, key, &self.previous_mac, mac)?;
+        // Validate the exact encoded bytes before the first write. Once the
+        // sync below succeeds, there must be no fallible format check left
+        // that could leave durable disk state ahead of this handle's state.
+        let (decoded, used) = decode_record(
+            &encoded, self.next_sequence, self.previous_crc, integrity, key, &self.previous_mac, mac,
+        )?;
+        if used != encoded.len() {
+            return Err(Error::Corrupt { place: "catalog encoded record trailing bytes" });
+        }
         let next_offset = self.append_offset.checked_add(encoded.len() as u64)
             .ok_or(Error::Limit { limit: "catalog append offset" })?;
         if next_offset > self.allocated_until {
             let additional = next_offset.checked_add(PREALLOC_BYTES - 1)
                 .map(|v| (v / PREALLOC_BYTES) * PREALLOC_BYTES)
                 .ok_or(Error::Limit { limit: "catalog preallocation" })?;
-            self.file.preallocate(additional, IO)?;
-            self.file.sync_all(IO)?;
+            if let Err(error) = self.file.preallocate(additional, IO) {
+                if !matches!(error, Error::DiskFull) {
+                    self.writable = false;
+                    return Err(Error::Poisoned { cause: "catalog preallocation failed" });
+                }
+                return Err(error);
+            }
+            if self.file.sync_all(IO).is_err() {
+                self.writable = false;
+                return Err(Error::Poisoned { cause: "catalog preallocation sync failed" });
+            }
             self.allocated_until = additional;
         }
         if let Err(error) = self.file.append_prealloc(&encoded, IO) {
@@ -178,9 +196,6 @@ impl CatalogFile {
             self.writable = false;
             return Err(Error::Poisoned { cause: "catalog edit sync failed" });
         }
-        let (decoded, _) = decode_record(
-            &encoded, self.next_sequence, self.previous_crc, integrity, key, &self.previous_mac, mac,
-        )?;
         self.state = next_state;
         self.previous_crc = decoded.crc;
         self.previous_mac = decoded.chain_mac.unwrap_or([0; 32]);

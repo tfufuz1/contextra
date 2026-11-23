@@ -91,7 +91,15 @@ impl CatalogState {
                 match self.files.get(file_id) {
                     Some(existing) if existing == &file => Ok(()),
                     Some(_) => Err(Error::Corrupt { place: "catalog duplicate file id" }),
-                    None => { self.files.insert(*file_id, file); Ok(()) }
+                    None => {
+                        if cluster.is_some_and(|cluster| {
+                            self.clusters.get(&cluster).is_some_and(|entry| entry.lifecycle != ClusterLifecycle::Live)
+                        }) {
+                            return Err(Error::Corrupt { place: "catalog adds file for retired cluster" });
+                        }
+                        self.files.insert(*file_id, file);
+                        Ok(())
+                    }
                 }
             }
             CatalogOp::FilesRemove { file_id } => {
