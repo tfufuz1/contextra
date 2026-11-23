@@ -1,0 +1,65 @@
+# SP-KEYS — `keys` + `contextra-crypto-ref` + Provider
+
+| | |
+|---|---|
+| Crates | `contextra-storage/src/keys/` (KeyCache, Wrapper), `contextra-crypto-ref`, `contextra-keys-file`, `contextra-keys-cohort` |
+| Besitzt | Referenzimplementierungen von `Cipher/Mac/Kdf/Checksum`; `MemKeyProvider`; `KeyProviderConformance`; Schlüsselcache mit Generationszähler; RootKey-/Space-DEK-Umhüllung; Epochenrotation |
+| Konsumiert | SP-PORTS, SP-CODEC (nur Formate von `KEYS`), SP-ENV (`Entropy`, `Clock`) |
+| Spec-Bezug | R8 §5.2, §9.4, §11.5, §13.1; INV-KEY-1…4, INV-ERA-7 (Schlüsselseite), AN-06/07 |
+| Phase | P0 (Primitive, Mem-Provider, Konformanz), P1 (Cache), P6 (`keys-file`, `keys-cohort`) |
+
+## 1 Auftrag und Abgrenzung
+Stellt Schlüsselmaterial bereit und vernichtet es nachweisbar. Der Kern kennt Kryptografie nur über Ports (SD-03, NZ-2); dieser Bereich liefert die **geprüften Referenzimplementierungen** und die Konformanzsuite. **Darf nicht:** eigene Kryptoprimitive erfinden (nur Bibliotheken: `chacha20poly1305`, `hkdf`, `blake3`, `crc32c`), Clusterschlüssel in Dateien des Kerns ablegen (INV-KEY-1), einen Provider unter einer Kernsperre aufrufen (§11.2).
+
+## 2 Schnittstelle
+Port-Trait `KeyProvider` siehe SP-PORTS (inkl. E-02). Ergänzungen:
+```rust
+// E-08: Batch-Lesen (Recovery, Flush, Cache-Miss-Bündelung)
+fn cluster_keys(&self, req: &[(ClusterId, u32)]) -> Result<Vec<KeyLookup>, KeyError>;
+pub enum KeyLookup { Present(Key32), Shredded, Missing }   // Missing ≠ Shredded (F-6 KeyLost)
+
+pub struct KeyCache { .. }
+impl KeyCache {
+    pub fn get(&self, c: ClusterId, epoch: u32) -> Result<Key32Handle, KeyError>; // prüft gen vor+nach Nutzung
+    pub fn prefetch(&self, req: &[(ClusterId, u32)]);                              // außerhalb jeder Sperre
+    pub fn invalidate(&self, c: ClusterId);                                        // Gate/ER2: gen++, Zeroizing-Drop
+}
+pub fn wrap_root(kek: &Key32, root: &Key32, ent: &dyn Entropy) -> Vec<u8>;         // für KEYS (Format: SP-CODEC)
+```
+`Key32Handle` ist nicht `Clone`, `Debug` redigiert, `Drop` überschreibt.
+
+## 3 Regeln
+1. **Hierarchie** exakt R8 §9.4: KEK (extern) → RootKey (32 B) → Space-DEK; Redo-/Catalog-/FORMAT-/Ledger-Schlüssel = `KDF(RootKey, Label)`; Clusterschlüssel ausschließlich über Provider.
+2. **Subkey-Ableitung (E-07):** Standardpfad `derive_subkey_fast` (HChaCha20, domain-separiert, Label `ctxs seal v1`) je Siegel; HKDF nur für Wurzel/Label. Falls H-11 (Seal ≤ 15 % CPU) scheitert, gilt der Fallback „Subkey je 8-Block-Gruppe“ **nur nach Krypto-Review**.
+3. **KeyCache:** Schlüssel liegen in `Zeroizing`; je Cluster ein Generationszähler (gemeinsam mit `cluster_table`, SP-CLUSTER); Treffer nur gültig, wenn `gen` vor **und** nach Nutzung (Entsiegeln) übereinstimmt (INV-KEY-2). TTL und `key_grace` (10 min): bei Providerausfall dürfen gecachte Schlüssel bis zum Ablauf weiter genutzt werden; Gate/ER2 invalidieren sofort. Cache ist größenbegrenzt (LRU nach Cluster); Evict überschreibt.
+4. **Batch (E-08):** Cache-Misses werden gebündelt (≤ 256 je Anfrage). Recovery (R6) und Flush rufen `prefetch` für alle Cluster der zu verarbeitenden Frames/Memtable **vor** dem Entsiegeln. Ohne Batch wäre die Recovery-Zeit ∝ (#Cluster im Redo) × Providerlatenz — bei Remote-KMS unbrauchbar.
+5. **Epochen:** `key_epoch` im Siegelrahmen; Rotation = neue Epoche für neue Writes (`create_cluster_key` idempotent je Epoche); alte Epoche vernichtet erst, wenn nichts mehr mit ihr versiegelt ist (Zähler aus `files_*`/Compaction, INV-KEY-3); `destroy_many` vernichtet **alle** Epochen (INV-KEY-4).
+6. **`Disabled` vs `Absent`:** `probe` unterscheidet; Cache behandelt `Disabled` wie `Shredded` (nie Daten), ER2 gilt erst bei `Absent` als beendet (SP-ERASE).
+7. **`MemKeyProvider`:** hält Schlüssel im Speicher, gibt sie für Orakel preis (`testing`), simuliert `Immediate`/`Scheduled{max_delay}`, Ausfälle (`retry_after`), Crash zwischen `create` und Rückgabe.
+8. **`keys-file` (Einzelhost):** Schlüsseldatei je Cluster-Batch, KEK-umhüllt, Löschen = Überschreiben+Unlink+`sync_dir`; `keys_in_backups=false` nur, wenn Verzeichnis außerhalb von Backups liegt (Betreiberzusicherung, im Receipt vermerkt). Batch-Anlage: **ein** Durabilitätspunkt je `create_cluster_keys`.
+9. **`keys-cohort`:** Cohorts ≤ 1024 unter Cohort-KEK-Generation; `destroy_many` = Rewrap ohne Gelöschte, dann KMS-Destroy der alten Generation; Keyring in ≥ 2 Failure Domains repliziert, **nie** in Backups. Atomarität des Rewrap (alte Generation erst nach durabler neuer löschen) ist Konformanzpflicht.
+
+## 4 Fehlerverhalten
+F-6: `KeyUnavailable{retry_after}` (Provider offline), `Shredded` (Absent/Disabled mit Löschnachweis), `KeyLost` (fehlt ohne Nachweis; Alarm, **keine** automatische Löschung). Fehlertexte ohne Schlüssel-/Clusterbytes.
+
+## 5 Invarianten / Tests
+INV-KEY-1 (Canary-Suche über alle Dateien/Checkpoints), INV-KEY-2 (loom: Gate zwischen Lookup und Entsiegeln), INV-KEY-3, INV-KEY-4 (Konformanz: mehrere Epochen, danach `probe == Absent` für alle). `KeyProviderConformance`: Idempotenz von `create/destroy`, Crash an jedem Punkt (`FaultFs` für `keys-file`), `probe`-Semantik, Batch ≡ Einzelaufrufe, Provider-Ausfall. Known-Answer-Tests der Primitive (RFC-Vektoren XChaCha20-Poly1305, HKDF, CRC32C). `miri`.
+
+## 6 Lücken / Errata
+- **E-08** Batch-Lesen `cluster_keys` (neu, ergänzt R8 §9.4; sonst Recovery/Flush ∝ Cluster × KMS-Latenz). Muss in SP-PORTS vor G-0.
+- **E-25 (Altstand-Krypto):** `contextra-crypto` nutzt AES-GCM-SIV und `kv_shredding` (Gruppen-Subkeys, `revoke_*`). Beschluss: **keine** Übernahme in den Kern (NZ-2, andere Siegelform); `deletion_proof`/`ed25519_proof` bleiben als **Signaturschicht oben** (NZ-14) und signieren die kanonischen Receipt-Bytes (→ SP-BRIDGE WP-18.6).
+- **E-26 (Nonce-Budget):** 24-Byte-Zufallsnonce je Siegel; Pflicht: Zähler der Siegel je (Quelle, Epoche) als Metrik, Rotation bei 2³² (SP-CODEC Regel 6).
+- **E-11 (`IntegrityMode`)** wird in SP-RECOVERY entschieden; Provider sind davon unabhängig.
+
+## 7 Arbeitspakete
+| ID | Titel | PW | Abhängig von | Phase | Abnahme |
+|---|---|---|---|---|---|
+| WP-04.1 | `crypto-ref`: XChaCha20-Poly1305, HChaCha-Subkey, HKDF, keyed MAC, CRC32C + KATs | 2.0 | WP-01.2 | P0 | KATs, miri |
+| WP-04.2 | `MemKeyProvider` + `KeyProviderConformance` | 2.5 | WP-04.1, WP-03.5 | P0 | Suite grün inkl. Crash-/Ausfallfälle |
+| WP-04.3 | `KeyCache` (gen vor/nach, TTL, grace, Batch, Zeroizing) | 2.0 | WP-04.2 | P1 | loom INV-KEY-2 |
+| WP-04.4 | `keys-file` | 2.5 | WP-04.2, WP-03.3 | P6 | Konformanz + Crash-Sweep |
+| WP-04.5 | `keys-cohort` | 3.0 | WP-04.2 | P6 | Konformanz, Rewrap-Atomarität |
+| WP-04.6 | KMS-/HSM-Adapterschnittstelle, SimKms, Spike eines realen KMS | 1.5 | WP-04.5 | P6 | Spike-Bericht |
+
+## 8 Abnahme
+Kein Schlüsselmaterial außerhalb `Zeroizing`/Provider (Test mit Canary-Schlüsseln, O-Files); Konformanzsuite für jeden Provider Gate-Pflicht; Batch-API vorhanden und in Recovery/Flush genutzt.
