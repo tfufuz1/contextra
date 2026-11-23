@@ -81,6 +81,24 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<(), Error> {
+        if self.max_body_bytes == 0 || self.max_body_bytes > MAX_BODY_BYTES {
+            return Err(Error::Limit { limit: "max_body_bytes must be 1..=4 MiB" });
+        }
+        if self.max_change_bytes == 0 || self.max_change_bytes > MAX_CHANGE_BYTES {
+            return Err(Error::Limit { limit: "max_change_bytes must be 1..=8 MiB" });
+        }
+        if self.max_group_bytes == 0 || self.max_group_bytes as u64 > self.redo_segment_bytes {
+            return Err(Error::Limit { limit: "max_group_bytes must fit one redo segment" });
+        }
+        if self.redo_segment_bytes == 0 || self.redo_segment_bytes % REDO_ALIGN != 0 {
+            return Err(Error::Limit { limit: "redo_segment_bytes must be nonzero and REDO_ALIGN aligned" });
+        }
+        if self.max_clusters == 0 || self.max_clusters > 64_000_000 {
+            return Err(Error::Limit { limit: "max_clusters must be in 1..=64 million" });
+        }
+        if self.max_lag_bytes == 0 {
+            return Err(Error::Limit { limit: "max_lag_bytes must be nonzero" });
+        }
         if self.max_body_bytes.saturating_mul(2) > self.max_change_bytes {
             return Err(Error::Limit {
                 limit: "max_body_bytes <= max_change_bytes / 2 (E-35)",

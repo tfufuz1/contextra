@@ -26,12 +26,14 @@ pub mod testing;
 
 use config::Config;
 use ports::Error;
+use ports::traits::{FileRole, FsLock, IoCtx};
 use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Public storage façade. Persistent lifecycle operations are owned by their SP modules.
 pub struct Storage {
     _fs: Arc<dyn ports::traits::Fs>,
+    _instance_lock: Box<dyn FsLock>,
     catalog: catalog::file::CatalogFile,
 }
 
@@ -41,6 +43,13 @@ impl Storage {
         config.validate()?;
         let fs = config.fs.ok_or(Error::Limit { limit: "storage filesystem is required" })?;
         let root: PathBuf = config.root.ok_or(Error::Limit { limit: "storage root is required" })?;
+        // Enforce the one-live-writer-per-instance rule before opening any
+        // mutable durable file. Fs implementations without a real lock fail
+        // closed through the port default.
+        let instance_lock = fs.lock(
+            &root.join("LOCK"),
+            IoCtx { role: FileRole::Other, purpose: "instance_lock" },
+        )?;
         let authenticated = config.catalog_integrity == catalog::CatalogIntegrity::Authenticated;
         if authenticated && (config.catalog_key.is_none() || config.catalog_mac.is_none()) {
             return Err(Error::Limit { limit: "catalog key and MAC must be supplied together" });
@@ -56,7 +65,7 @@ impl Storage {
             config.catalog_key.as_deref(),
             config.catalog_mac.as_deref(),
         )?;
-        Ok(Storage { _fs: fs, catalog })
+        Ok(Storage { _fs: fs, _instance_lock: instance_lock, catalog })
     }
 
     pub fn catalog(&self) -> &catalog::state::CatalogState { self.catalog.state() }

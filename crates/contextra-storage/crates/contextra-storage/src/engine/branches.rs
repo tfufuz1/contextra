@@ -19,7 +19,7 @@ pub enum ForkPoint {
     At(Stamp),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct BranchOptions {
     /// Opaque application label. The core never interprets or logs it.
     pub name: Vec<u8>,
