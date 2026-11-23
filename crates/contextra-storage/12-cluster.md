@@ -12,7 +12,7 @@
 Cluster sind Lösch-, Schlüssel-, Versions- und Platzierungsdomäne. Nur der Kern erzeugt ClusterId aus Entropy. `ClusterSpec{protection, pack, tag}` und `Clusters::list(filter)` schließen die Auffindungslücke E-33; Tag ≤32 B, Sealed-Tag ausschließlich im versiegelten SYS-Header. Cluster-Tabelle kompakt ≤48 B/Eintrag; Branch-Tabellen lazy (E-38).
 
 ## 2 Verträge
-`create_cluster`, `list`, `link/unlink`, `restrict/lift`, `space_create/drop`. Link-Hülle trägt BLOCK_ERASE-Restriction. Claim gehört einem Handle und begrenzt jede Dateioperation. Schutzklasse Sealed/Plain wird beim Erzeugen festgelegt; `personal ⇒ Sealed`.
+`create_cluster`, `list`, `link/unlink`, `restrict/lift`, `space_create/drop`. `link(derived,sources[<=8])` hält einen azyklischen `DerivedFrom`-Graph. Jede mögliche transitive Erase-Hülle ist auf `max_gate_clusters=4096` begrenzt: Admission berechnet sie auf einer Graph-Generation außerhalb Rang 1; Commit validiert Generation und Hülle erneut. Überschreitung ergibt `EraseFanoutExceeded` ohne Teilmutation. Fachliche Gleichheit der Personen-/Löschdomäne prüft die obere Identity-/Policy-Schicht; der Storage-Kern kennt keine Personenidentität. Link-Hülle trägt BLOCK_ERASE-Restriction. Claim gehört einem Handle und begrenzt jede Dateioperation. Schutzklasse Sealed/Plain wird beim Erzeugen festgelegt; `personal ⇒ Sealed`.
 
 ## 3 Regeln
 Keine ID-Wiederverwendung. Link-Kaskade und Restriction werden im Committer-Frame geprüft. Lift folgt `LiftPolicy`; keine Override-Möglichkeit für BLOCK_ERASE. Packgruppe enthält ausschließlich kompatible Cluster; Pure/Packed/Staging-Regeln und Levels werden vor Catalog-Edit validiert. Cluster dürfen nicht aus Caller-ID oder Kennung ableitbar sein.

@@ -2,7 +2,7 @@
 
 use super::version::Version;
 use contextra_storage_ports::{Error, Stamp};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, Bound};
 use std::sync::{Arc, RwLock};
 
 struct Roots {
@@ -34,18 +34,34 @@ impl VersionRegistry {
     /// coherent state. Durable contents are supplied independently so Relaxed
     /// writes can never leak into `view_durable`.
     pub fn publish(&self, version: Arc<Version>) -> Result<(), Error> {
+        self.publish_group(&[version])
+    }
+
+    pub fn publish_group(&self, versions: &[Arc<Version>]) -> Result<(), Error> {
+        if versions.is_empty() { return Err(Error::Limit { limit: "version publication group must not be empty" }); }
         let mut roots = self.roots.write().map_err(|_| Error::Poisoned { cause: "version registry poisoned" })?;
-        if version.visible_stamp() <= roots.visible.visible_stamp()
-            || version.durable_stamp() < roots.durable.durable_stamp()
-            || version.durable_stamp() > version.visible_stamp()
-        {
-            return Err(Error::Limit { limit: "version publication must be monotone" });
+        let mut previous_visible = roots.visible.visible_stamp();
+        let mut previous_durable = roots.durable.durable_stamp();
+        for version in versions {
+            if version.visible_stamp() <= previous_visible
+                || version.durable_stamp() < previous_durable
+                || version.durable_stamp() > version.visible_stamp()
+            {
+                return Err(Error::Limit { limit: "version publication must be monotone" });
+            }
+            previous_visible = version.visible_stamp();
+            previous_durable = version.durable_stamp();
         }
-        if version.durable_stamp() > roots.durable.durable_stamp() {
-            roots.durable = Arc::new(version.durable_snapshot()?);
+        for version in versions {
+            roots.history.insert(version.visible_stamp(), Arc::clone(version));
         }
-        roots.history.insert(version.visible_stamp(), Arc::clone(&version));
-        roots.visible = version;
+        let latest = versions.last().ok_or(Error::Limit { limit: "version publication group" })?;
+        if latest.durable_stamp() > roots.durable.durable_stamp() {
+            let (_, durable) = roots.history.range(..=latest.durable_stamp()).next_back()
+                .ok_or(Error::Limit { limit: "durable version root unavailable" })?;
+            roots.durable = Arc::clone(durable);
+        }
+        roots.visible = Arc::clone(latest);
         Ok(())
     }
 
@@ -63,6 +79,14 @@ impl VersionRegistry {
         Ok(Arc::clone(&roots.durable))
     }
 
+    pub fn advance_recovered(&self, stamp: Stamp) -> Result<(), Error> {
+        let parent = self.snapshot()?;
+        if stamp <= parent.visible_stamp() { return Ok(()); }
+        let durable_stamp = stamp.max(parent.durable_stamp());
+        let next = Arc::new(Version::commit(Arc::clone(&parent), stamp, durable_stamp, Vec::new())?);
+        self.publish(next)
+    }
+
     /// Drops versions strictly older than the durable history floor. Active
     /// readers retain their roots through Arc references.
     pub fn prune_before(&self, floor: Stamp) -> Result<(), Error> {
@@ -72,11 +96,17 @@ impl VersionRegistry {
         }
         let predecessor = roots.history.range(..=floor).next_back().map(|(_, root)| Arc::clone(root))
             .ok_or(Error::Limit { limit: "version gc predecessor unavailable" })?;
-        let floor_root = Arc::new(predecessor.at_stamp(floor)?);
-        roots.history.retain(|stamp, _| *stamp >= floor);
-        roots.history.insert(floor, floor_root);
-        roots.visible = Arc::new(roots.visible.with_gc_floor(floor)?);
-        roots.durable = Arc::new(roots.durable.with_gc_floor(floor)?);
+        let floor_root = Arc::new(predecessor.compact_history(floor)?.at_stamp(floor)?);
+        let mut compacted = BTreeMap::new();
+        compacted.insert(floor, Arc::clone(&floor_root));
+        for (stamp, root) in roots.history.range((Bound::Excluded(floor), Bound::Unbounded)) {
+            compacted.insert(*stamp, Arc::new(root.compact_history(floor)?));
+        }
+        roots.visible = Arc::new(roots.visible.compact_history(floor)?);
+        roots.durable = compacted.range(..=roots.durable.durable_stamp()).next_back()
+            .map(|(_, root)| Arc::clone(root))
+            .ok_or(Error::Limit { limit: "durable version below gc floor" })?;
+        roots.history = compacted;
         Ok(())
     }
 }

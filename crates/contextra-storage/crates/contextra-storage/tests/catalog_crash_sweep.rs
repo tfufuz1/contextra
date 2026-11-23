@@ -157,6 +157,71 @@ fn purge_batch_requires_durable_unlink_ack_before_completion() {
 }
 
 #[test]
+fn purge_recovery_never_completes_a_batch_without_unlink_ack() {
+    let fs = MemFs::new();
+    let mut catalog = CatalogFile::open(
+        &fs, Path::new(PATH), OpenMode::ReadWrite, CatalogIntegrity::Plain, None, None,
+    ).expect("create catalog");
+    let cluster = contextra_storage_ports::ClusterId::from_wire([31; 16]);
+    catalog.append_durable(
+        &[
+            CatalogOp::SpaceAdd { space: SpaceId(7), protection: Protection::Sealed },
+            CatalogOp::ClusterRegister { cluster, protection: Protection::Sealed },
+            CatalogOp::FilesAdd { file_id: 20, space: SpaceId(7), cluster: Some(cluster), kind: FileKind::Run,
+                level: 0, bytes: 128, min_stamp: 5, max_stamp: 9 },
+        ],
+        CatalogIntegrity::Plain, None, None,
+    ).expect("seed live file");
+    let ticket = [57; 16];
+    catalog.append_edits_durable(
+        &[CatalogEdit::PurgeBatch(PurgeBatchEdit::remove(ticket, 20))],
+        CatalogIntegrity::Plain, None, None,
+    ).expect("durable remove batch");
+
+    // Crash after the Catalog batch but before unlink: recovery sees a pinned
+    // source file and must refuse completion until unlink + sync_dir + ack.
+    let after_batch = fs.crash_image().expect("crash after batch");
+    let mut recovered = CatalogFile::open(
+        &after_batch, Path::new(PATH), OpenMode::ReadWrite, CatalogIntegrity::Plain, None, None,
+    ).expect("recover batch");
+    assert!(recovered.state().files().get(&20).is_none());
+    assert!(recovered.state().graveyard().contains_key(&(ticket, 20)));
+    assert!(recovered.append_edits_durable(
+        &[CatalogEdit::PurgeComplete(PurgeCompleteEdit::after_owner_attestations(ticket))],
+        CatalogIntegrity::Plain, None, None,
+    ).is_err());
+
+    // A crash after physical unlink but before its Catalog acknowledgement is
+    // idempotent: the graveyard pin remains and unlink can safely be retried.
+    after_batch.unlink(Path::new("/store/run-20"), contextra_storage_ports::traits::IoCtx {
+        role: contextra_storage_ports::traits::FileRole::Run,
+        purpose: "purge_unlink_test",
+    }).ok();
+    after_batch.sync_dir(Path::new("/store"), contextra_storage_ports::traits::IoCtx {
+        role: contextra_storage_ports::traits::FileRole::Run,
+        purpose: "purge_unlink_test",
+    }).expect("durable directory unlink");
+    drop(recovered);
+    let mut after_unlink = CatalogFile::open(
+        &after_batch, Path::new(PATH), OpenMode::ReadWrite, CatalogIntegrity::Plain, None, None,
+    ).expect("reopen before unlink ack");
+    assert!(after_unlink.state().graveyard().contains_key(&(ticket, 20)));
+    after_unlink.append_edits_durable(
+        &[CatalogEdit::UnlinkAck(UnlinkAckEdit::after_durable_unlink(ticket, 20))],
+        CatalogIntegrity::Plain, None, None,
+    ).expect("record unlink ack");
+    let after_ack = after_batch.crash_image().expect("crash after ack");
+    let mut final_open = CatalogFile::open(
+        &after_ack, Path::new(PATH), OpenMode::ReadWrite, CatalogIntegrity::Plain, None, None,
+    ).expect("reopen after ack");
+    assert!(final_open.state().graveyard().is_empty());
+    final_open.append_edits_durable(
+        &[CatalogEdit::PurgeComplete(PurgeCompleteEdit::after_owner_attestations(ticket))],
+        CatalogIntegrity::Plain, None, None,
+    ).expect("complete after durable unlink ack");
+}
+
+#[test]
 fn current_pointer_replace_is_old_or_new_at_each_io_boundary() {
     let root = Path::new("/store");
     let initial = MemFs::new();

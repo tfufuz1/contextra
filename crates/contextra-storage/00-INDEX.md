@@ -2,8 +2,9 @@
 
 | | |
 |---|---|
-| Normativ | `docs/SPEC-R8.md`; je Komponente `docs/implement/NN-*.md` |
-| Status 01–25 | Implementierungsverträge und Audit-Traceability vorhanden; SP-06–25 liegen als `NN-*.md` neben dieser Datei |
+| Normativ | `docs/SPEC-R8.md`; Besitzer-SP `01-ports.md` bis `25-r8-audit-remediation.md` in diesem Crate |
+| Lesekopien | `docs/implement/01-ports.md` bis `07-run.md` sind Spiegel ohne unabhängige Normwirkung; bei Abweichung gilt die SPEC und danach der Besitzer-SP hier |
+| Status 01–25 | Implementierungsverträge und Audit-Traceability liegen als `NN-*.md` neben dieser Datei |
 | Status Code | R8 dokumentiert den historischen Ausgangsstand als nicht kompiliert/gemessen. Aktueller Teilcheck: Storage + Crypto-Referenz kompilieren mit `--ignore-rust-version`; die vollständigen Gates sind offen. |
 | Phasenfortschritt | [PHASE-STATUS.md](PHASE-STATUS.md) — isolierter Fortschritt und offene Gates |
 | Prinzip | **Disjunktion:** jeder Typ, jede Datei, jede Invariante hat genau einen Besitzer-SP; Fremdzugriff nur über dessen Schnittstelle (§1 dieser Datei) |
@@ -100,6 +101,9 @@ Kritischer Pfad bis G-F: 01.1 → 01.2 → 02.1 → 03.1 → 03.2 → 05.1 → 0
 | E-65 | `DerivedFrom` über mehrere Löschdomänen kann beim Löschen eines Subjects fremde Daten kaskadierend entfernen | Cross-subject Kaskaden verbieten; getrennte Ableitungen oder nicht-kaskadierende Referenzen, validiert vor Link-Commit | CLUSTER/ERASE |
 | E-66 | Limits und Branch-Tiefen-Annahmen waren zwischen Spec, Config und Messzielen nicht deckungsgleich | `max_body_bytes=4 MiB`, `max_change_bytes=8 MiB`; H-21 misst die konfigurierte Max-Tiefe, Default bei Verfehlung senken oder Branches flatten | PORTS/FACADE/BRANCH/VERIFY |
 | E-67 | Per-Datei Purge-Install und endgültiger Abschluss waren als ein `PurgeEdit` missverständlich | `PurgeBatchEdit` pro betroffener Datei/Inkarnation, Unlink nach Reader-Drain, finales `PurgeCompleteEdit` erst nach allen Segment-Attesten | CATALOG/PURGE/ERASE |
+| E-68 | Referenzcode leitet vor XChaCha noch einen HKDF/HChaCha-Subkey ab; dies widerspricht der festgelegten direkten XChaCha-Siegelform | Quellschlüssel ist bereits nach Schutzdomäne/Epoche scoped; XChaCha erhält ihn direkt. `Authenticated` nutzt domain-separated HMAC über Modus/Nonce/AAD/Payload. Vor G-F Code und unabhängige Referenzvektoren angleichen; keine Formatfreigabe bei Abweichung | CODEC/KEYS/VERIFY |
+| E-69 | Transitive `DerivedFrom`-Kaskade kann durch viele gültige Links größer als ein atomarer Gate-Change werden | Link-Admission begrenzt jede mögliche Löschhülle auf `max_gate_clusters=4096`; Hüllenberechnung außerhalb Rang 1, Graph-Generation bei Commit erneut prüfen; Überlauf ⇒ `EraseFanoutExceeded`, keine Mutation | CLUSTER/COMMIT/ERASE |
+| E-70 | Geteilte HNSW-/BM25-/CSR-Topologie überlebt Cluster-Key-Zerstörung und kann O(Index)-Rewrite erfordern | Clusterreine Payload+Beziehungen dürfen `MixedPerClusterKey` nutzen; alle clusterübergreifenden Strukturen sind bounded `Rebuildable`, am Gate sofort query-gefiltert und erst nach Rewrite/Verify attestiert | EXT/ERASE/BRIDGE |
 
 ## 4 Querschnittsregeln für alle SPs
 1. Kein `unwrap/expect/panic/indexing`; `Result` mit typisierter Fehlerklasse (F-1…F-9); Fehlertexte ohne Inhalte (Canary-Test).

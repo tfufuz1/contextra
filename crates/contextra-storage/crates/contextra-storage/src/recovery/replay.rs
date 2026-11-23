@@ -1,9 +1,14 @@
 //! Geordnetes, fail-closed Replay nach Abschluss des Integritäts- und Gate-Scans.
 
 use super::scan::RecoveryScan;
-use crate::store::redo::frame::{DecodedFrame, FrameKind};
+use crate::engine::committer::{CommitMutationDecoder, CommitPublisher, MemtableCommitPublisher};
+use crate::engine::memtable::Memtable;
+use crate::engine::registry::VersionRegistry;
+use crate::store::redo::frame::{DecodedFrame, EncodedFrame, FrameKind};
+use crate::store::redo::writer::GroupAck;
 use contextra_storage_ports::{ClusterId, Error, Stamp};
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 /// Engine adapter for recovery. Implementations decrypt and apply Change
 /// payloads; this layer controls ordering and suppresses retired-cluster data.
@@ -14,6 +19,69 @@ pub trait ReplaySink {
     fn apply_change(&mut self, frame: &DecodedFrame<'_>, live_ops: &[usize]) -> Result<(), Error>;
     fn apply_control(&mut self, frame: &DecodedFrame<'_>) -> Result<(), Error>;
     fn finish(&mut self, last_stamp: Stamp) -> Result<(), Error>;
+}
+
+pub trait ControlReplayApplier: Send + Sync {
+    fn apply_control(&self, frame: &DecodedFrame<'_>) -> Result<(), Error>;
+}
+
+/// Concrete replay bridge into the same memtable/version publication path used
+/// by commits. Control and Gate state remain owned by the erase/cluster adapter.
+pub struct EngineReplaySink {
+    publisher: MemtableCommitPublisher,
+    versions: Arc<VersionRegistry>,
+    controls: Arc<dyn ControlReplayApplier>,
+    last_stamp: Stamp,
+}
+
+impl EngineReplaySink {
+    pub fn new(
+        memtable: Arc<Memtable>,
+        versions: Arc<VersionRegistry>,
+        decoder: Arc<dyn CommitMutationDecoder>,
+        controls: Arc<dyn ControlReplayApplier>,
+    ) -> Self {
+        Self {
+            publisher: MemtableCommitPublisher::new(memtable, Arc::clone(&versions), decoder),
+            versions,
+            controls,
+            last_stamp: 0,
+        }
+    }
+}
+
+impl ReplaySink for EngineReplaySink {
+    fn apply_change(&mut self, frame: &DecodedFrame<'_>, live_ops: &[usize]) -> Result<(), Error> {
+        let mut head = frame.head.clone();
+        let mut ops = Vec::with_capacity(live_ops.len());
+        let mut payloads = Vec::with_capacity(live_ops.len());
+        for index in live_ops {
+            let op = head.ops.get(*index).copied().ok_or(Error::Corrupt { place: "recovery live op index" })?;
+            let payload = frame.payloads.get(*index).ok_or(Error::Corrupt { place: "recovery live payload index" })?;
+            ops.push(op);
+            payloads.push(payload.bytes.to_vec());
+        }
+        head.ops = ops;
+        let encoded = EncodedFrame { head, payloads };
+        self.publisher.publish(&[encoded], GroupAck { last_stamp: frame.head.stamp, durable: true, end_offset: 0 })?;
+        self.last_stamp = frame.head.stamp;
+        Ok(())
+    }
+
+    fn apply_control(&mut self, frame: &DecodedFrame<'_>) -> Result<(), Error> {
+        self.controls.apply_control(frame)?;
+        self.last_stamp = frame.head.stamp;
+        Ok(())
+    }
+
+    fn finish(&mut self, last_stamp: Stamp) -> Result<(), Error> {
+        // Every scanned frame is durable by definition; advance over reserve,
+        // skipped-retired, and control-only stamps as well.
+        if last_stamp < self.last_stamp {
+            return Err(Error::Corrupt { place: "recovery finish stamp regression" });
+        }
+        self.versions.advance_recovered(last_stamp)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

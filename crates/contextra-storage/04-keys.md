@@ -43,7 +43,7 @@ pub fn wrap_root(kek: &Key32, root: &Key32, ent: &dyn Entropy) -> Vec<u8>;      
 F-6: `KeyUnavailable{retry_after}` (Provider offline), `Shredded` (Absent/Disabled mit Löschnachweis), `KeyLost` (fehlt ohne Nachweis; Alarm, **keine** automatische Löschung). Fehlertexte ohne Schlüssel-/Clusterbytes.
 
 ## 5 Invarianten / Tests
-INV-KEY-1 (Canary-Suche über alle Dateien/Checkpoints), INV-KEY-2 (loom: Gate zwischen Lookup und Entsiegeln), INV-KEY-3, INV-KEY-4 (Konformanz: mehrere Epochen, danach `probe == Absent` für alle). `KeyProviderConformance`: Idempotenz von `create/destroy`, Crash an jedem Punkt (`FaultFs` für `keys-file`), `probe`-Semantik, Batch ≡ Einzelaufrufe, Provider-Ausfall. Known-Answer-Tests der Primitive (RFC-Vektoren XChaCha20-Poly1305, HKDF, CRC32C). `miri`.
+INV-KEY-1 (Canary-Suche über alle Dateien/Checkpoints), INV-KEY-2 (loom: Gate zwischen Lookup und Entsiegeln), INV-KEY-3, INV-KEY-4 (Konformanz: mehrere Epochen, danach `probe == Absent` für alle). `KeyProviderConformance`: Idempotenz von `create/destroy`, Crash an jedem Punkt (`FaultFs` für `keys-file`), `probe`-Semantik, Batch ≡ Einzelaufrufe, Provider-Ausfall. Known-Answer-Tests der Primitive (RFC-Vektoren XChaCha20-Poly1305, HKDF, HMAC, CRC32C). `miri`. Die vorhandene `derive_subkey_fast`-Strecke vor XChaCha liegt außerhalb des finalen R8-Vertrags und muss vor G-F entfernt oder auf stabile Schlüsselrollen begrenzt werden; Format-/Receipt-Freeze kann nicht auf abweichendem Verhalten basieren.
 
 ## 6 Lücken / Errata
 - **E-02/E-08** Batch-Schreiben/-Lesen sind beide in SP-PORTS normiert. Write: bis 256 IDs mit idempotentem `BatchId`, explizite Teilresultate, jeder Erfolg durable; Read: bis 256 `(ClusterId, epoch)`-Paare. Es wird keine fiktive atomare KMS-Batch-Transaktion verlangt.
@@ -54,7 +54,7 @@ INV-KEY-1 (Canary-Suche über alle Dateien/Checkpoints), INV-KEY-2 (loom: Gate z
 ## 7 Arbeitspakete
 | ID | Titel | PW | Abhängig von | Phase | Abnahme |
 |---|---|---|---|---|---|
-| WP-04.1 | `crypto-ref`: XChaCha20-Poly1305, HChaCha-Subkey, HKDF, keyed MAC, CRC32C + KATs | 2.0 | WP-01.2 | P0 | KATs, miri |
+| WP-04.1 | `crypto-ref`: XChaCha20-Poly1305 direkt, HKDF nur für stabile Schlüsselrollen, keyed MAC mit Domain-Separation, CRC32C + KATs | 2.0 | WP-01.2 | P0 | KATs, miri; kein per-frame Subkey |
 | WP-04.2 | `MemKeyProvider` + `KeyProviderConformance` | 2.5 | WP-04.1, WP-03.5 | P0 | Suite grün inkl. Crash-/Ausfallfälle |
 | WP-04.3 | `KeyCache` (gen vor/nach, TTL, grace, Batch, Zeroizing) | 2.0 | WP-04.2 | P1 | loom INV-KEY-2 |
 | WP-04.4 | `keys-file` | 2.5 | WP-04.2, WP-03.3 | P6 | Konformanz + Crash-Sweep |

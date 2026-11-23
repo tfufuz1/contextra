@@ -2,13 +2,71 @@
 
 use crate::store::redo::frame::EncodedFrame;
 use crate::store::redo::writer::{GroupAck, RedoWriter};
-use contextra_storage_ports::{Durability, Error, Stamp};
+use super::memtable::{MemKey, Memtable};
+use super::registry::VersionRegistry;
+use super::version::{Version, VersionEntry};
+use contextra_storage_ports::{BranchId, ClusterId, Durability, Error, Stamp};
+use std::sync::Arc;
+
+pub struct CommitMutation {
+    pub cluster: ClusterId,
+    pub branch: BranchId,
+    pub key: Vec<u8>,
+    pub kind: u8,
+    pub payload: Vec<u8>,
+}
+
+/// Decodes already-authenticated frame operations. A sealed implementation
+/// must verify the cluster generation before and after unsealing.
+pub trait CommitMutationDecoder: Send + Sync {
+    fn decode(&self, frame: &EncodedFrame) -> Result<Vec<CommitMutation>, Error>;
+}
 
 /// Adapter applies committed frames to the memtable and publishes a new MVCC
 /// root. It is called only after the append/sync result is known and without
 /// storage-internal locks held by this module.
 pub trait CommitPublisher: Send + Sync {
     fn publish(&self, frames: &[EncodedFrame], ack: GroupAck) -> Result<(), Error>;
+}
+
+/// Concrete commit-to-memtable/MVCC adapter. The decoder owns operation
+/// format and key-scope policy; this publisher owns stamp ordering and
+/// post-durability visibility.
+pub struct MemtableCommitPublisher {
+    memtable: Arc<Memtable>,
+    versions: Arc<VersionRegistry>,
+    decoder: Arc<dyn CommitMutationDecoder>,
+}
+
+impl MemtableCommitPublisher {
+    pub fn new(memtable: Arc<Memtable>, versions: Arc<VersionRegistry>, decoder: Arc<dyn CommitMutationDecoder>) -> Self {
+        Self { memtable, versions, decoder }
+    }
+}
+
+impl CommitPublisher for MemtableCommitPublisher {
+    fn publish(&self, frames: &[EncodedFrame], ack: GroupAck) -> Result<(), Error> {
+        let mut parent = self.versions.snapshot()?;
+        let mut durable_stamp = parent.durable_stamp();
+        let mut roots = Vec::with_capacity(frames.len());
+        for frame in frames {
+            if frame.head.stamp <= parent.visible_stamp() || frame.head.stamp > ack.last_stamp {
+                return Err(Error::Corrupt { place: "commit publisher stamp order" });
+            }
+            let mutations = self.decoder.decode(frame)?;
+            let mut entries = Vec::with_capacity(mutations.len());
+            for mutation in mutations {
+                let key = MemKey::new(mutation.branch, mutation.key.clone(), frame.head.stamp << 8 | u64::from(mutation.kind));
+                self.memtable.insert(mutation.cluster, key, mutation.kind, &mutation.payload)?;
+                entries.push(VersionEntry::new(mutation.cluster, mutation.branch, mutation.key, frame.head.stamp, mutation.kind, mutation.payload));
+            }
+            if ack.durable { durable_stamp = frame.head.stamp; }
+            parent = Arc::new(Version::commit(parent, frame.head.stamp, durable_stamp, entries)?);
+            roots.push(Arc::clone(&parent));
+        }
+        if parent.visible_stamp() != ack.last_stamp { return Err(Error::Corrupt { place: "commit publisher group stamp mismatch" }); }
+        self.versions.publish_group(&roots)
+    }
 }
 
 pub struct Committer<'a> {

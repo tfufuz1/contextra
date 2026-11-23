@@ -15,15 +15,16 @@ Einzige Quelle für Typen und Traits. Jede andere Komponente importiert von hier
 ## 2 Öffentliche Schnittstelle
 ```rust
 // Identität (Debug redigiert, kein Display)
-pub struct ClusterId([u8; 16]);  pub struct SpaceId(pub u16);  pub struct BranchId(pub u32);
+pub struct InstanceId([u8; 16]); pub struct ClusterId([u8; 16]);  pub struct SpaceId(pub u16);  pub struct BranchId(pub u32);
 pub struct BatchId([u8; 16]);
 pub type Stamp = u64;            pub const STAMP_MAX: Stamp = (1 << 56) - 1;
+// Stamp wird ausschließlich zusammen mit InstanceId interpretiert und ist instanzlokal.
 pub struct TombId([u8; 32]);     pub struct IdemToken([u8; 16]);   pub struct Ticket([u8; 16]);
 
 pub enum Protection { Sealed, Plain }
 pub enum Durability { Durable, Relaxed }
 pub enum Origin { User, Maintenance, Replication, Migration }       // NEU (E-04), 1 Byte im Frame
-pub struct CallerMeta { pub origin: Origin, pub caller_seq: u64 }    // NEU (E-04), z. B. TxId des Aufrufers
+pub struct CallerMeta { pub origin: Origin, pub caller_seq: u64 }    // aufruferlokale Sequenz, nie als globale TxId interpretieren
 
 pub struct Change { pub ops: Vec<Op>, pub guards: Vec<Guard>, pub idem: Option<IdemToken>,
                     pub durability: Durability, pub allow_mixed: bool, pub caller: CallerMeta }
@@ -35,7 +36,7 @@ pub enum Guard {
     Range { space: SpaceId, cluster: ClusterId, branch: BranchId, start: Bytes, end: Bytes, since: Stamp }, // NEU (E-05)
 }
 pub enum Precondition { Absent, Version(Stamp), Unchanged { since: Stamp } }
-pub struct Receipt { pub stamp: Stamp, pub durable: bool }
+pub struct Receipt { pub instance: InstanceId, pub stamp: Stamp, pub durable: bool }
 pub enum KeyCreateResult { Created { cluster: ClusterId, epoch: u32 }, Failed { cluster: ClusterId, error: KeyError } }
 ```
 **Traits** (Signaturen in R8 §3.2/§9.4/§12.1; Abweichungen/Ergänzungen hier):

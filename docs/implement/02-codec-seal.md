@@ -19,13 +19,13 @@ pub fn cmp_entry(a: &EntryKey, b: &EntryKey) -> Ordering; // (cluster, branch, u
 pub struct SealCtx<'a> { pub source: SealSource<'a>, pub aad: Aad<'a> }
 pub fn seal(cipher:&dyn Cipher, kdf:&dyn Kdf, ctx:&SealCtx, nonce:[u8;24], pt:&[u8], out:&mut Vec<u8>) -> Result<(), SealError>;
 pub fn unseal(cipher:&dyn Cipher, kdf:&dyn Kdf, ctx:&SealCtx, frame:&[u8], out:&mut Zeroizing<Vec<u8>>) -> Result<(), SealError>;
-pub enum Aad<'a> { Block{space,cluster,block_uid}, RedoOp{space,cluster,op_uid,op_index}, BlobRecord{space,cluster,blob_id,offset}, … }
+pub enum Aad<'a> { Block{instance,space,cluster,key_epoch,block_uid}, RedoOp{instance,space,cluster,key_epoch,op_uid,op_index}, BlobRecord{instance,space,cluster,key_epoch,record_uid}, … }
 ```
 ## 3 Regeln
 1. **Kanonizität (INV-FMT-1):** nicht-kanonisches varint, Überlängen, reservierte Bits ≠ 0, unbekannte Tags ⇒ `FormatError`, nie „tolerant lesen“.
 2. **Längen vor Allokation prüfen (P-4):** jede `Vec::with_capacity` aus Wire-Länge nur nach Vergleich mit Restpuffer **und** konfiguriertem Limit.
-3. **Eine Siegelform (L14):** `SealFrame := key_epoch u32 | nonce[24] | ct | tag[16]`; Siegelschlüssel `KDF(quelle, "ctxs seal v1" ‖ nonce)`; AAD **ohne** Dateiname/-ID/-Position ⇒ Rohkopie gültig (Property-Test `rawcopy_roundtrip`).
-4. `Authenticated`-Modus: nur Tag; `Plain`: CRC32C. Moduswechsel pro Space unveränderlich.
+3. **Eine Siegelform (L14):** `SealFrame := key_epoch u32 | nonce[24] | ct | tag[16]`; Cipher-Aufruf ist direkt `XChaCha20-Poly1305(quelle, nonce, AAD)`. Es gibt keine zusätzliche HKDF/HChaCha-Ableitung pro Frame; XChaCha-internes HChaCha ist Bestandteil des Primitive. AAD bindet stabile logische Identitäten (`instance`, Space, Cluster, Epoche, Block-/Op-/Record-ID), nie Datei-, Blob-ID oder Offset ⇒ unveränderte Frames sind datei-/positionsunabhängig rohkopierbar. Identitätsbindung verhindert Cross-Cluster-Replay (Property-Test `rawcopy_roundtrip` plus AAD-Replay-Tests).
+4. `Authenticated`-Modus: Nutzdaten bleiben Klartext und werden mit HMAC-SHA256 authentisiert. MAC-Eingabe ist eindeutig codiert und enthält feste Domain `ctxs-auth-v1`, Modus, Nonce, AAD und Payload; Moduswechsel pro Space ist unveränderlich. `Plain`: CRC32C ohne Authentizität. `personal`-Daten dürfen ausschließlich `Encrypted` sein.
 5. Keine persistierten Inhalts-Hashes (INV-PRIV-1): `blake3` im Codec nur für Metadaten-Prüfsummen (Dateikopf, Manifest), nie über Nutzdaten; Lint-Test sucht `blake3::hash` auf Datenpfaden.
 6. **Nonce-Politik:** 24-Byte-Zufallsnonce aus `Entropy`; Nonce-Kollisionsbudget dokumentieren (2⁻⁸⁰ bei ≤ 2³² Siegeln je Quelle; Rotation der Epoche erzwingt neue Quelle).
 7. `FORMAT`: unveränderlich, MAC über RootKey-abgeleiteten Schlüssel; `KEYS`: RootKey (KEK-umhüllt), Space-DEKs (RootKey-umhüllt); **kein Clusterschlüssel** (INV-KEY-1).
@@ -37,14 +37,14 @@ pub enum Aad<'a> { Block{space,cluster,block_uid}, RedoOp{space,cluster,op_uid,o
 Proptest: `varint` Rundreise + Nicht-Kanonizität; `cmp` ≡ Referenz (Tupelordnung) inkl. Präfix-Fälle (`"a"` < `"a\0"`); `seal/unseal` Rundreise, Bit-Flip ⇒ `Auth`; AAD-Vertauschung ⇒ `Auth`; Rohkopie-Eigenschaft; `miri` auf gesamtes Modul; Fuzz-Ziel `decode_*`.
 
 ## 6 Lücken / Errata
-- **E-07** Siegelkosten: HKDF je 16-KiB-Block ist teurer als XChaCha-Subkey-Ableitung (HChaCha). Entscheidung: `Kdf`-Port erhält Methode `derive_subkey_fast` (HChaCha20-basiert, domain-separiert) als Standardpfad; HKDF nur für Wurzel-/Label-Ableitungen. Messung in H-11 verpflichtend; Fallback: Subkey je Block-Gruppe (8 Blöcke) nur nach Freigabe durch Krypto-Review.
+- **E-07** v1 verwendet XChaCha20-Poly1305 direkt; keine zusätzliche Subkey-KDF oder gruppengeteilte Subkeys. HKDF ist nur für Root-/Space-/Integritätsschlüssel mit festen Labels zulässig. H-11 misst die echte Primitive auf Zielhardware.
 - Referenzcodierer für diese Primitive: SP-VERIFY (WP-15.2).
 
 ## 7 Arbeitspakete
 | ID | Titel | PW | Abhängig von | Phase | Abnahme |
 |---|---|---|---|---|---|
 | WP-02.1 | varint, Tags, CRC32C-Wrapper, `cmp_entry` + Proptests | 2.0 | WP-01.1 | P0 | Properties grün, miri sauber |
-| WP-02.2 | SealFrame, AAD-Builder, KDF-Labels, Rohkopie-Eigenschaft | 2.5 | WP-01.2, WP-04.1 | P1 | Rundreise-/Bit-Flip-/Rohkopie-Tests |
+| WP-02.2 | SealFrame, AAD-Builder, Key-Scope, Rohkopie-Eigenschaft | 2.5 | WP-01.2, WP-04.1 | P1 | Rundreise-/Bit-Flip-/Rohkopie-Tests |
 | WP-02.3 | Dateikopf, `FORMAT`-/`KEYS`-Codec | 1.5 | WP-02.1, WP-02.2 | P1 | Goldene Vektoren (nach G-F) |
 
 ## 8 Abnahme

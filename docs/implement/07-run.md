@@ -26,7 +26,7 @@ impl RunReader {
     pub fn directory(&self) -> &ClusterDirectory;
     pub fn get(&self, c: ClusterId, b: BranchId, key: &[u8], cap: Stamp, k: &KeyScope) -> Result<Option<EntryOwned>, RunError>; // Filter → SubIndex → 1 Block
     pub fn iter(&self, c: ClusterId, range: KeyRange, caps: &BranchCaps, k: &KeyScope) -> RunIter<'_>;  // Kopf ohne Körper
-    pub fn block_skip_scan(&self, c: ClusterId, ..) -> impl Iterator<Item = BlockSummary>;              // entsiegelt kleine SubIndex-Metadaten, kein Body-I/O
+    pub fn block_skip_scan(&self, c: ClusterId, ..) -> impl Iterator<Item = BlockSummary>;              // entsiegelt kleine SubIndex-Metadaten; kein Body-I/O
 }
 pub fn copy_sections(src:&RunReader, keep:&[ClusterId], dst:&mut RunBuilder<'_>) -> Result<(), RunError>; // Rohkopie: prüft nur CRC, nie AEAD
 pub struct TableCache { .. }                     // FD-LRU, Pin/Refcount, max_open_files
@@ -35,8 +35,8 @@ pub struct TableCache { .. }                     // FD-LRU, Pin/Refcount, max_op
 
 ## 3 Regeln
 1. **Struktur:** exakt R8 §5.6; ein zusammenhängender Abschnitt je Cluster (INV-PL-2), sortiert nach ClusterId; Offsets **abschnittsrelativ**. Nur `ClusterDirectory`, `PackMeta`, `Footer` hängen von der Datei ab; alles andere ist positionsunabhängig ⇒ `copy_sections` kopiert Bytes unverändert.
-2. **DataBlock:** Ziel 16 KiB; Präfixkompression mit Restart-Punkten alle 16 Einträge; Eintrag trägt `branch`; Block versiegelt als **ein** SealFrame (AAD `Block{space,cluster,block_uid}`; `block_uid` 128 Bit Zufall, nie aus Position). Rohkopie ⇒ `block_uid` bleibt.
-3. **SubIndex:** je Block `last_key, off, len, entries, weight_sum[W], min/max_stamp, block_uid`; versiegelt unter Clusterschlüssel (INV-SEAL-1, SD-05). **Filter:** Ribbon (Standard) / Bloom über `user_key` ohne Branch; Salt im Block; versiegelt; false-positive-Ziel 1 %. **RangeDelBlock:** Marker `(cluster, branch, start, end, tag)`.
+2. **DataBlock:** Ziel 16 KiB; Präfixkompression mit Restart-Punkten alle 16 Einträge; Eintrag trägt `branch`; Block versiegelt als **ein** SealFrame (AAD `Block{instance,space,cluster,key_epoch,block_uid}`; `block_uid` 128 Bit Zufall, nie aus Position). Rohkopie ⇒ `block_uid` bleibt.
+3. **SubIndex:** je Block `last_key, off, len, entries, weight_sum[W], min/max_stamp, block_uid`; versiegelt unter Clusterschlüssel (INV-SEAL-1, SD-05). `block_skip_scan` entschlüsselt nur diese kleinen Metadatenblöcke, nie den Body-Block; Tokenprofile bleiben außerhalb Directory/PackMeta. **Filter v1:** ausschließlich Bloom (`filter_kind=1`) über `user_key` ohne Branch; Salt im Block; versiegelt; False-positive-Ziel ≤ 1 %. Ribbon ist kein v1-Format. **RangeDelBlock:** Marker `(cluster, branch, start, end, tag)`; `EraseRange` liegt als separater clusterweiter Control-Marker ohne Branch.
 4. **Reader:** Punktabfrage = Directory (Binärsuche ClusterId) → Filter → SubIndex → **genau ein** Datenblock (H-2). Unbekannter Cluster in Datei ⇒ `None` (kein Fehler). Block-CRC/AEAD-Fehler ⇒ `Corrupt{Block}` (F-4: kleinste Einheit; Datei bleibt lesbar für andere Cluster). Entsiegeln nur mit `KeyScope`, der `gen` vor/nach prüft (SP-KEYS INV-KEY-2); der Reader ruft den Provider **nie**.
 5. **Branch-Kappen:** `get/iter` nehmen `BranchCaps` (Liste `(branch, stamp_cap)` der Kette); Branch-Semantik selbst (SP-BRANCH) — der Reader filtert nur nach `(branch, tag ≤ cap)`. Bis P7 enthält die Liste genau `main`.
 6. **Staging-Run (L0):** wie Packed, Abschnitte beliebig, **nur L0**; `PackMeta.kind = Staging`. Builder erzwingt: Pure ≤ 1 Cluster, Packed ⊆ Packgruppe (Prüfung gegen übergebene `PackKey`).
@@ -54,9 +54,9 @@ INV-PL-1/2/3/5 (Builder verweigert Verstöße; Property), INV-SEAL-1, INV-FMT-1;
 
 ## 6 Lücken / Errata
 - **E-36** Table-Cache (INDEX).
-- **E-48 (Filterwahl):** Ribbon spart Platz, kostet Bau-CPU; Standard **Bloom** in P2, Ribbon als Feature nach Messung H-2/H-5 (Format trägt `filter_kind u8`, vor G-F festlegen).
+- **E-48 (Filterwahl):** v1 verwendet ausschließlich Bloom, `filter_kind=1`; kein impliziter Ribbon-Modus. Ein späterer Filtertyp braucht Feature-/Formatmigration und eigene Referenzvektoren.
 - **E-49 (Block-Größenvarianz):** Körper < `value_separation_min` bleiben inline; Block darf bis 2× Ziel wachsen, wenn ein Eintrag es erzwingt (Fortschrittsgarantie `oversize_single`).
-- **E-23** `read_ranges` (SP-ENV) wird vom `block_skip_scan`/Purge-Pfad genutzt, falls entschieden.
+- **E-23** `read_ranges` ist verpflichtender `Fs`-Trait mit geordnetem `read_at`-Default; Run-Skips und Purge-Repack dürfen ihn nutzen, ohne Adapterabhängigkeit.
 
 ## 7 Arbeitspakete
 | ID | Titel | PW | Abhängig von | Phase | Abnahme |
@@ -65,7 +65,7 @@ INV-PL-1/2/3/5 (Builder verweigert Verstöße; Property), INV-SEAL-1, INV-FMT-1;
 | WP-07.2 | SubIndex, Filter (Bloom), RangeDel, Directory/PackMeta/Footer | 2.5 | WP-07.1 | P2 | Fuzz, Filter-Property |
 | WP-07.3 | `RunBuilder` (Sektionen, Prealloc, Staging/Pure/Packed-Regeln) | 2.0 | WP-07.2, WP-03.2 | P2 | INV-PL, Crash-Sweep Bau |
 | WP-07.4 | `RunReader` (get/iter), `copy_sections`, Rohkopie-Test | 2.5 | WP-07.2 | P2 | `rawcopy_roundtrip`, Byte-Zähler |
-| WP-07.5 | `block_skip_scan`, `TableCache`, Ribbon-Option | 2.0 | WP-07.4 | P4 | Skipping ≡ Vollscan, FD-Test |
+| WP-07.5 | `block_skip_scan`, `TableCache`, Bloom-Filter | 2.0 | WP-07.4 | P4 | Skipping ≡ Vollscan, FD-Test |
 
 ## 8 Abnahme
 Keine `unwrap/expect/panic/indexing`; jeder Decoder Fuzz-Ziel; `rawcopy_roundtrip` und goldene Vektoren grün (G-F); H-2/H-3/H-4 messbar.

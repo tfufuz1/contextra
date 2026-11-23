@@ -16,6 +16,7 @@ Einzige Quelle für Typen und Traits. Jede andere Komponente importiert von hier
 ```rust
 // Identität (Debug redigiert, kein Display)
 pub struct ClusterId([u8; 16]);  pub struct SpaceId(pub u16);  pub struct BranchId(pub u32);
+pub struct BatchId([u8; 16]);
 pub type Stamp = u64;            pub const STAMP_MAX: Stamp = (1 << 56) - 1;
 pub struct TombId([u8; 32]);     pub struct IdemToken([u8; 16]);   pub struct Ticket([u8; 16]);
 
@@ -35,12 +36,14 @@ pub enum Guard {
 }
 pub enum Precondition { Absent, Version(Stamp), Unchanged { since: Stamp } }
 pub struct Receipt { pub stamp: Stamp, pub durable: bool }
+pub enum KeyCreateResult { Created { cluster: ClusterId, epoch: u32 }, Failed { cluster: ClusterId, error: KeyError } }
 ```
 **Traits** (Signaturen in R8 §3.2/§9.4/§12.1; Abweichungen/Ergänzungen hier):
-- `Fs`/`File`: `read_at`, `append_prealloc`, `preallocate` (**Nullen schreiben**, nie sparse), `sync_data/sync_all/sync_dir`, `rename`, `lock`, `list`, `free_space`, `caps() -> FsCaps`, optional `link/reflink/punch_hole`. Jede Operation trägt einen `IoCtx` (Datei-Rolle, Zweck) für `FaultFs`-Indizierung.
-- `KeyProvider`: R8 §9.4 **plus** `create_cluster_keys(&self, &[ClusterId], &dyn Entropy) -> Result<Vec<u32>, KeyError>` (**Batch, ein Durabilitätspunkt**, E-02).
+- `Fs`/`File`: `read_at`, `read_ranges`, `append_prealloc`, `preallocate` (**Nullen schreiben**, nie sparse), `sync_data/sync_all/sync_dir`, `rename`, `lock`, `list`, `free_space`, `caps() -> FsCaps`, optionale `link/reflink/punch_hole`. `read_ranges` hat eine geordnete Default-Schleife über `read_at`; Optimierungen ändern weder Semantik noch Ergebnisreihenfolge. Jede Operation trägt einen `IoCtx` (Datei-Rolle, Zweck) für `FaultFs`-Indizierung.
+- `KeyProvider`: R8 §9.4 **plus** `create_cluster_keys(&self, request_id: BatchId, clusters: &[ClusterId], entropy: &dyn Entropy) -> Result<Vec<KeyCreateResult>, KeyError>` (idempotenter Batch, max. 256 IDs; pro Cluster expliziter Erfolg/Epoch oder Fehler; jeder Erfolg ist vor Rückgabe durable). Der Batch ist kein All-or-None-Transaction-Vertrag; Teil-Erfolge werden retrybar und verwaiste Schlüssel durch `orphan_key_grace` bereinigt (E-02).
 - `Anchor`, `Clock`, `Entropy`, `Cipher`, `Mac`, `Kdf`, `Checksum`, `Authority`, `Metrics`, `Observer`, `ColdTier`, `Spawner`.
 - `Memtable` (Skiplist hinter Trait), `SegmentOwner`, `ExtensionBuilder`, `ConsumerFeed` (Verträge §12).
+- `MemoryBudget`: gemeinsamer, thread-sicherer Admission-Port; `try_reserve(class, bytes) -> ResourcePermit`, dessen `Drop` Budget exakt freigibt. Klassen sind `Memtable`, `ClusterMeta`, `Guard`, `BlockCache`, `KeyCache`, `ExtensionDelta`, `Inflight`, `PurgeScratch`; kein Besitzer darf vor erfolgreicher Reservation allozieren.
 - `Error` (Klassen F-1…F-9) mit `hint() -> &'static str` und `class() -> ErrorClass`; Texte ohne Schlüssel/Nutzdaten (Test mit Canaries).
 
 **Fassadenprofil** `Storage` (Rümpfe verteilt per `impl Storage` auf Komponenten; Besitzer in Klammern):
@@ -59,8 +62,8 @@ Fehlerklassen und Reaktion exakt nach R8 §3.5. `Error::Poisoned` ist klebrig un
 `INV-CLUSTER-2` (kein Konstruktor aus Kennung), `INV-LIM-1` (Limit-Konstanten), Redaktions-Test (Canary in Debug/Display/Error → 0 Treffer), Compile-fail-Doctests: `ClusterId` nicht aus `&[u8]` ableitbar außer `from_wire` (nur `pub(crate)`-Pfad via SP-CODEC-Feature `wire`).
 
 ## 6 Lücken / Errata (Beschlüsse)
-- **E-02** Batch-Schlüsselanlage im `KeyProvider` (sonst 1 Fsync je Cluster; Ingest von 10⁶ Dokumenten unbrauchbar).
-- **E-04** `CallerMeta` im Frame-Kopf: trägt die TxId des Aufrufers (Altstand-Abbildung `last_tx_id`, `rollback_to_tx`, Observer-`WriteOrigin`). **Muss vor G-F** entschieden sein, sonst Migration.
+- **E-02** Batch-Schlüsselanlage ist idempotent und max. 256 IDs pro Request. Pro Schlüssel ist Erfolg vor Rückgabe durable; Teil-Erfolge sind erlaubt, müssen im Ergebnis einzeln stehen und per `BatchId` wiederholbar sein. Cluster werden erst nach erfolgreichem Key-Ergebnis registriert; verwaiste Schlüssel sind recoverbar und nach Grace bereinigbar. Kein atomarer KMS-Multi-Key-Vertrag wird vorausgesetzt.
+- **E-04** `CallerMeta` ist v1 optionales Audit-Metadatum: `origin u8` plus aufruferlokale `caller_seq u64`, nie TxId/Personenkennung. Es beeinflusst weder Idempotenz noch Commitsemantik. Altstand-TxIds werden nur in der Bridge übersetzt und nicht roh persistiert.
 - **E-05** `Guard::Range` (Phantom-Schutz für `scan_prefix_tracked`).
 - Zwei `Clock`-Traits im Altstand (`clock.rs`, `persistence.rs`): hier genau einer.
 
