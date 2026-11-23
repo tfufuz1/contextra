@@ -1,5 +1,5 @@
 //! Fehlerklassen und Hinweise (SP-PORTS §4). Texte ohne Schlüssel- oder Nutzdaten.
-//! F-7 bis F-9 sind in SPEC-R8 §3.5 zu verifizieren (Lücke, siehe README).
+//! F-7 bis F-9 sind in SPEC.md §3.5 zu verifizieren (Lücke, siehe README).
 use thiserror::Error as ThisError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,6 +1,6 @@
 # Formale Modelle für R8
 
-Diese Modelle sind unabhängige Spezifikationen für Sicherheits- und Liveness-Eigenschaften. Sie implementieren keine Produktionslogik. Die normative Semantik steht in `docs/SPEC-R8.md`; bei Modellkonflikten wird zuerst die SPEC geklärt und erst danach das Modell angepasst. Ein grüner Modelllauf ersetzt weder FaultFs- noch Integrationstests.
+Diese Modelle sind unabhängige Spezifikationen für Sicherheits- und Liveness-Eigenschaften. Sie implementieren keine Produktionslogik. Die normative Semantik steht in `crates/contextra-storage/SPEC.md`; bei Modellkonflikten wird zuerst die SPEC geklärt und erst danach das Modell angepasst. Ein grüner Modelllauf ersetzt weder FaultFs- noch Integrationstests.
 
 ## Konventionen
 

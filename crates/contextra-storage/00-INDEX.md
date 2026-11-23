@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Normativ | `docs/SPEC-R8.md`; Besitzer-SP `01-ports.md` bis `25-r8-audit-remediation.md` in diesem Crate |
+| Normativ | `crates/contextra-storage/SPEC.md`; Besitzer-SP `01-ports.md` bis `25-r8-audit-remediation.md` in diesem Crate |
 | Lesekopien | `docs/implement/01-ports.md` bis `07-run.md` sind Spiegel ohne unabhängige Normwirkung; bei Abweichung gilt die SPEC und danach der Besitzer-SP hier |
 | Status 01–25 | Implementierungsverträge und Audit-Traceability liegen als `NN-*.md` neben dieser Datei |
 | Status Code | R8 dokumentiert den historischen Ausgangsstand als nicht kompiliert/gemessen. Aktueller Teilcheck: Storage + Crypto-Referenz kompilieren mit `--ignore-rust-version`; die vollständigen Gates sind offen. |
@@ -37,7 +37,7 @@
 | CKPT | 22 | `checkpoint/` | P6 |
 | FACADE | 23 | `lib.rs`, `config`, `spaces`, Metrik-/Observer-Katalog | P1–P8 |
 | CUTOVER | 24 | `tools/migrate`, Umstellungsplan | P8+ |
-| AUDIT | 25 | SPEC-R8 §12.8 Audit-Remediation, Querschnittsverfolgung | vor G-0/G-F, danach je Besitzer-SP |
+| AUDIT | 25 | SPEC.md §12.8 Audit-Remediation, Querschnittsverfolgung | vor G-0/G-F, danach je Besitzer-SP |
 
 Regeln: Ein Typ, der ≥ 2 SPs teilen, steht in PORTS. Ein Dateiformat gehört dem SP, dessen Datei es ist; Primitive (varint, Siegel, Tag) immer CODEC. Kein SP ruft einen höheren SP (Layering-Test `layering`, Richtung wie SPEC §3.1).
 

@@ -17,6 +17,6 @@ Die HMAC-Vektoren kodieren die exakten Spec-Domänen, Längenfelder und Byteordn
 
 ## Schnittstellen und Abnahme
 
-Der Generator schreibt in einen temporären Build-Ausgabepfad. Ein separater Vergleichstest liest die eingefrorenen Fixtures und vergleicht sie bytegenau mit dem Rust-Encoder/Decoder. Jede Änderung referenziert `SPEC-R8.md`-Abschnitt, Besitzer-SP und Gate. Versionierung/Feature-Bits sind explizit; unbekannte Versionen werden abgelehnt, nicht geraten.
+Der Generator schreibt in einen temporären Build-Ausgabepfad. Ein separater Vergleichstest liest die eingefrorenen Fixtures und vergleicht sie bytegenau mit dem Rust-Encoder/Decoder. Jede Änderung referenziert `SPEC.md`-Abschnitt, Besitzer-SP und Gate. Versionierung/Feature-Bits sind explizit; unbekannte Versionen werden abgelehnt, nicht geraten.
 
 G-F bleibt offen, bis alle Formate der SPEC abgedeckt sind, Vektoren unabhängig geprüft wurden und Rust-Implementierung und Referenzcodierer dieselben positiven und negativen Fälle bestehen.

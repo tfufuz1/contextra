@@ -1,6 +1,6 @@
 # R8 Code-Fundament und Implementierergrenzen
 
-Normative Quelle: `docs/SPEC-R8.md`; SP-Verträge: `crates/contextra-storage/*.md`. Dieses Dokument beschreibt, wie die Rust-Module zusammengebaut werden. Es autorisiert keine Abweichung von den SPs und behauptet nicht, dass ein als Scaffold aufgeführtes Modul implementiert sei.
+Normative Quelle: `crates/contextra-storage/SPEC.md`; SP-Verträge: `crates/contextra-storage/*.md`. Dieses Dokument beschreibt, wie die Rust-Module zusammengebaut werden. Es autorisiert keine Abweichung von den SPs und behauptet nicht, dass ein als Scaffold aufgeführtes Modul implementiert sei.
 
 ## 1. Kernpfad und Vertrauensgrenzen
 

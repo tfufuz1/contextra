@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Besitzer | Querschnitt; Implementierung verbleibt im jeweiligen Besitzer-SP |
-| Normative Quelle | `docs/SPEC-R8.md` §12.8 (hat Vorrang bei Widerspruch) |
+| Normative Quelle | `crates/contextra-storage/SPEC.md` §12.8 (hat Vorrang bei Widerspruch) |
 | Ziel | Keine Audit-Regel als unzugeordnete Prosa verlieren; jede Regel erhält Besitzer, Phase und prüfbare Abnahme. |
 | Phase | Vor G-0/G-F planen; Umsetzung in P0–P8 gemäß Tabelle |
 

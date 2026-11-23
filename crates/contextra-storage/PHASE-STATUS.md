@@ -1,6 +1,6 @@
 # Phasenstatus — contextra-storage R8.1
 
-Die Reihenfolge und Gates folgen [00-INDEX.md](00-INDEX.md), `SPEC.md` §14 und dem Audit-Addendum `docs/SPEC-R8.md` §12.8. Die Anforderungen sind in [25-r8-audit-remediation.md](25-r8-audit-remediation.md) den Besitzer-SPs zugeordnet. Ein Phasenabschnitt wird erst als abgeschlossen markiert, wenn Implementierung, spezifizierte Verifikation und Gate-Evidenz vorliegen. Eine grüne Kompilierung allein schließt keine Phase ab.
+Die Reihenfolge und Gates folgen [00-INDEX.md](00-INDEX.md), `SPEC.md` §14 und dem Audit-Addendum `crates/contextra-storage/SPEC.md` §12.8. Die Anforderungen sind in [25-r8-audit-remediation.md](25-r8-audit-remediation.md) den Besitzer-SPs zugeordnet. Ein Phasenabschnitt wird erst als abgeschlossen markiert, wenn Implementierung, spezifizierte Verifikation und Gate-Evidenz vorliegen. Eine grüne Kompilierung allein schließt keine Phase ab.
 
 | Phase | Stand | Umfang / offene Abnahme |
 |---|---|---|
@@ -24,7 +24,7 @@ Die Tabelle bildet Komponentenfortschritt ab, keine Freigabe der Phasen-Gates. E
 
 ## Normative Entscheidungen mit Implementierungsblockern
 
-`docs/SPEC-R8.md` ist die normative Quelle; diese Statusdatei und die SPs dürfen sie nicht überschreiben. A-23/E-72 ist teilweise umgesetzt: `SpaceId u64`, reservierte IDs 0…255, Benutzer-ID ab 256, High-Water-Reserve und Big-Endian-Kodierung in vorhandenen AAD-, Redo-, KEYS- und Catalog-Feldern sind vorhanden. Space-Gate-/Ledger-Scope-Tags, alle Referenzvektoren und End-to-End-Recovery müssen noch folgen; G-0/G-F ist deshalb nicht bestanden. Außerdem beweist lokales `LOCK` keine Exklusivität restaurierter Kopien auf verschiedenen Hosts; Restore-Schreibzugriff verlangt externes Fencing und bleibt sonst `RestoreQuarantine` (A-24/E-73), mit Zwei-Host-Nachweis bei G-CUTOVER.
+`crates/contextra-storage/SPEC.md` ist die normative Quelle; diese Statusdatei und die SPs dürfen sie nicht überschreiben. A-23/E-72 ist teilweise umgesetzt: `SpaceId u64`, reservierte IDs 0…255, Benutzer-ID ab 256, High-Water-Reserve und Big-Endian-Kodierung in vorhandenen AAD-, Redo-, KEYS- und Catalog-Feldern sind vorhanden. Space-Gate-/Ledger-Scope-Tags, alle Referenzvektoren und End-to-End-Recovery müssen noch folgen; G-0/G-F ist deshalb nicht bestanden. Außerdem beweist lokales `LOCK` keine Exklusivität restaurierter Kopien auf verschiedenen Hosts; Restore-Schreibzugriff verlangt externes Fencing und bleibt sonst `RestoreQuarantine` (A-24/E-73), mit Zwei-Host-Nachweis bei G-CUTOVER.
 
 ## Compile- und Testhinweis
 
