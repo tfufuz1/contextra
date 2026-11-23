@@ -10,6 +10,7 @@
 //! KEK-Rotation ist O(1): KEYS wird mit neuem KEK-Schlüssel und neuer Nonce ersetzt.
 
 use super::hierarchy::derive_keys_key;
+use super::nonce::port_nonce;
 use super::secret::Secret32;
 use contextra_ports::persistence::{Cipher, Entropy, Kdf};
 use std::fmt;
@@ -219,7 +220,7 @@ impl KeysFile {
         let keys_key = derive_keys_key(kdf, kek, instance_id);
         let aad = Self::build_aad(instance_id, KEYS_VERSION_1, keys_generation);
         let plain_bytes = plain.encode();
-        let sealed_payload = cipher.seal(keys_key.expose(), &nonce, &aad, &plain_bytes);
+        let sealed_payload = cipher.seal(keys_key.expose(), &port_nonce(&nonce), &aad, &plain_bytes);
 
         Ok(Self {
             version: KEYS_VERSION_1,
@@ -240,7 +241,7 @@ impl KeysFile {
         let keys_key = derive_keys_key(kdf, kek, instance_id);
         let aad = Self::build_aad(instance_id, self.version, self.keys_generation);
         let plain_bytes = cipher
-            .open(keys_key.expose(), &self.nonce, &aad, &self.sealed_payload)
+            .open(keys_key.expose(), &port_nonce(&self.nonce), &aad, &self.sealed_payload)
             .map_err(|e| KeysError::Cipher(e.to_string()))?;
 
         KeysPlain::decode(&plain_bytes)
