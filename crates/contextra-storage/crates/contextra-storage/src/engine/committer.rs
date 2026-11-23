@@ -49,22 +49,43 @@ impl CommitPublisher for MemtableCommitPublisher {
         let mut parent = self.versions.snapshot()?;
         let mut durable_stamp = parent.durable_stamp();
         let mut roots = Vec::with_capacity(frames.len());
+        let mut staged = Vec::with_capacity(frames.len());
+
+        // Decode and validate the complete group before touching the mutable
+        // table. A malformed later frame must not leave earlier mutations
+        // behind without a corresponding published version root.
         for frame in frames {
             if frame.head.stamp <= parent.visible_stamp() || frame.head.stamp > ack.last_stamp {
                 return Err(Error::Corrupt { place: "commit publisher stamp order" });
             }
             let mutations = self.decoder.decode(frame)?;
             let mut entries = Vec::with_capacity(mutations.len());
-            for mutation in mutations {
-                let key = MemKey::new(mutation.branch, mutation.key.clone(), frame.head.stamp << 8 | u64::from(mutation.kind));
-                self.memtable.insert(mutation.cluster, key, mutation.kind, &mutation.payload)?;
-                entries.push(VersionEntry::new(mutation.cluster, mutation.branch, mutation.key, frame.head.stamp, mutation.kind, mutation.payload));
+            for mutation in &mutations {
+                entries.push(VersionEntry::new(
+                    mutation.cluster,
+                    mutation.branch,
+                    mutation.key.clone(),
+                    frame.head.stamp,
+                    mutation.kind,
+                    mutation.payload.clone(),
+                ));
             }
             if ack.durable { durable_stamp = frame.head.stamp; }
             parent = Arc::new(Version::commit(parent, frame.head.stamp, durable_stamp, entries)?);
             roots.push(Arc::clone(&parent));
+            staged.push((frame.head.stamp, mutations));
         }
         if parent.visible_stamp() != ack.last_stamp { return Err(Error::Corrupt { place: "commit publisher group stamp mismatch" }); }
+
+        // All fallible frame decoding and MVCC validation has completed. Only
+        // now apply the prepared mutations, then make the matching roots
+        // visible as one publication.
+        for (stamp, mutations) in staged {
+            for mutation in mutations {
+                let key = MemKey::new(mutation.branch, mutation.key, stamp << 8 | u64::from(mutation.kind));
+                self.memtable.insert(mutation.cluster, key, mutation.kind, &mutation.payload)?;
+            }
+        }
         self.versions.publish_group(&roots)
     }
 }

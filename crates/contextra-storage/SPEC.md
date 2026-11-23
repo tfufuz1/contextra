@@ -1,13 +1,14 @@
-# SPEC.md — `contextra-storage` (Speicherkern), Revision R8.2
+# SPEC.md — `contextra-storage` (Speicherkern), Revision R9.0
 
 | | |
 |---|---|
-| Status | **Revision R8.2, Entwurf zur Freigabe als Gate G-0.** Ersetzt SPEC R7 und konsolidiert sechs Quellen: R7 (`SPEC(18).md`), Lethe-Architekturentwurf, Lethe-Engine-Spec, Mnemos-Konzept, „Optimal-LLM-Datenbank“ (Engram, AetherStore ×2, CairnDB) und die Octa-Spec (Abgleich R8.1 → R8.2, Anhang B). |
+| Status | **Revision R9.0 (Audit-Konsolidierung von R8.2), Entwurf zur Freigabe als Gate G-0.** Ersetzt SPEC R7 und konsolidiert sechs Quellen: R7 (`SPEC(18).md`), Lethe-Architekturentwurf, Lethe-Engine-Spec, Mnemos-Konzept, „Optimal-LLM-Datenbank“ (Engram, AetherStore ×2, CairnDB) und die Octa-Spec (Abgleich R8.1 → R8.2, Anhang B). |
 | Gegenstand | Eingebetteter, synchroner, crash-sicherer Speicherkern für LLM-/Agenten-Workloads mit atomaren Mehr-Space-Änderungen, MVCC-Sichten, **versionskontrollartigen Branches und Merges (clusterlokal)** und **vollständiger, nachweisbarer Löschung personenbezogener Daten** (logisch, kryptografisch, physisch). |
 | Verifikation | Der in `crates/contextra-storage/PHASE-STATUS.md` dokumentierte Teilcheck umfasst Storage-/Crypto-Compile sowie ausgewählte Config-, Catalog-/Redo-Crash-Sweeps und Strukturtests; vollständige Release-Gates sind offen. Keine Leistungszahl ist als gemessen anzusehen. R7-Messungen wurden nicht neu erhoben. Formate brauchen vor **G-F** Referenzvektoren aus einem unabhängigen Codierer. |
 | Rechtlicher Vorbehalt | Der Kern liefert technische Eigenschaften, keine Rechtsaussage zu Art. 17 DSGVO, Fristen oder Ausnahmen. „Gelöscht“ ist immer an eine Stufe aus §9.2 gebunden. |
 | Normative Quelle | **Diese Datei ist die einzige normative Fassung.** `docs/SPEC-R8.md` entfällt; Besitzer-SPs, `00-INDEX.md` und `PHASE-STATUS.md` verweisen hierher und dürfen sie nicht überschreiben. |
 | Sprache | Prosa deutsch, Bezeichner englisch. |
+| R9-Audit | R9.0 schließt die in Anhang B (R9-01…R9-24) gelisteten Engpässe, Lücken und Widersprüche von R8.2: Commit-Pipeline ohne E/A unter Rang 1, branch-bewusster Lesepfad, skalierende Cluster-Metadaten, amortisierte Löschung, Datei-/FD-Admission. Alle neuen Leistungsaussagen sind **Entwurfsziele** (H-24…H-28), keine Messungen. |
 
 ---
 
@@ -19,7 +20,8 @@
 
 | Eigenschaft | Wie sie entsteht |
 |---|---|
-| Atomare Änderung über Spaces | ein Redo-Frame je `Change`, ein Gruppen-Fsync, ein Schreiber (Committer) |
+| Atomare Änderung über Spaces | ein Redo-Frame je `Change`, ein Gruppen-Fsync, Sequencer + Syncer (§6.1) |
+| Tail-Latenz und Skalierung (R9) | Commit-Pipeline: Sequencer ohne E/A unter Rang 1 plus Syncer (§6.1); branch-bewusster Lesepfad (§7.1); Metadaten- und Datei-Admission (§4.3.1); amortisierte Löschung (§9.5) |
 | Git-artige Versionierung | Stamps = Commit-Reihenfolge; `view_at`; **Branches je Cluster** (O(1)-Fork, Diff, Merge mit Konfliktliste); kein Merkle-Baum, keine Inhaltsadressierung |
 | Löschung in drei geordneten Schritten | **Gate** (Millisekunden, Cluster ist ab Stamp `S` für alle Sichten `Erased`) < **Schlüssel** (Clusterschlüssel vernichten, alles des Clusters unlesbar) < **Purge** (Bytes aus lebenden Dateien entfernen, Rohkopie ohne Entschlüsseln) |
 | Gate/KeyDestroy ∝ Zielcluster; physischer Purge ∝ betroffene Dateien/Extents | clusterreine Abschnitte + `EraseLocality`; `ClusterLocal` vermeidet fremde Survivor-Rewrites, `PackedBounded` tauscht I/O gegen geringeren Platzverbrauch |
@@ -34,7 +36,7 @@
 
 ## 1. Konfliktregister: Entscheidungen der Konsolidierung
 
-Die Quellen widersprechen sich an 28 Stellen; K-29…K-32 halten die Entscheidungen zu den Vorschlägen des Octa-Abgleichs fest. Jede Entscheidung ist final; die Spalte „Wirkung“ nennt den Paragrafen, der sie umsetzt.
+Die Quellen widersprechen sich an 28 Stellen; K-29…K-32 halten die Entscheidungen zu den Vorschlägen des Octa-Abgleichs fest, K-33…K-38 die Entscheidungen des R9-Audits (Anhang B). Jede Entscheidung ist final; die Spalte „Wirkung“ nennt den Paragrafen, der sie umsetzt.
 
 | ID | Konflikt | Entscheidung | Begründung | Wirkung |
 |---|---|---|---|---|
@@ -58,7 +60,7 @@ Die Quellen widersprechen sich an 28 Stellen; K-29…K-32 halten die Entscheidun
 | K-18 | Single-Sequencer als Engpass (Cairn-Kritik, Lethe-Spec B.5) | **Ein Committer je Instanz**; Skalierung durch mehrere Instanzen (Tenant-Sharding) oben, keine instanzübergreifende Atomarität | ehrlich benannte Grenze | §11 |
 | K-19 | Durability `Sync/GroupSync/Async` (Cairn) vs. `Durable/Relaxed` (R7) | **`Durable` (Gruppen-Fsync) / `Relaxed`** | gleiche Semantik, weniger Modi; `Relaxed` nie für Löschung | §6 |
 | K-20 | Slab-Sub-Allokator mit Free-Lists (Grok) | **Verworfen** | veränderliche Free-Lists widersprechen unveränderlichen Dateien und Rohkopie | — |
-| K-21 | Guard-Prüfung im Committer (kalte E/A unter Sperre) | **Zweistufig** (R7) | keine Plattenlesezugriffe unter Rang 1 | §6.3 |
+| K-21 | Guard-Prüfung im Committer (kalte E/A unter Sperre) | **Zweistufig** (R7; R9: Stufe A auf dem Aufruferthread exakt, Stufe B im Sequencer nur Delta, §6.3) | keine Plattenlesezugriffe unter Rang 1 | §6.3 |
 | K-22 | Ledger im Datenvolume (R7) vs. eigene Failure Domain (Lethe) | **`ledger_dir` konfigurierbar**, Produktivempfehlung: getrenntes Volume; Anker bindet den Kopf | beide Quellen vereint | §9.7, §10.3 |
 | K-23 | Stufen G0/G1/G2 (Lethe-Entwurf), `Logical/Physical/Scrubbed/Cryptographic` (R7), Ticket-Stufen (Lethe-Spec) | **Zwei Achsen**: `EraseLevel` = gewünschter Endzustand; `Stage` = Fortschritt (`Gated`=G0, `KeysDestroyed`=G1, `Purged`/`Done`=G2) | keine Doppeldeutigkeit | §9.2 |
 | K-24 | Zuordnung Person → Cluster | **Normatives Muster in §12.7**: Sealed-Wurzel je Person plus registrierter `IdentityDirectoryOwner` mit tenant-scoped HMAC-Indexschlüssel und per-Subject-Entry-DEK; Löschung widerruft Cluster und Directory-Eintrag | Verhindert gemeinsame Shard-DEKs und Überlöschung. HMAC bleibt pseudonymisierend, nicht anonymisierend; Schlüsselkompromittierung wird als Restrisiko geführt. Entry-DEK-Zerstörung und Owner-Attest sind Teil der Löschkette | §12.7 |
@@ -70,6 +72,12 @@ Die Quellen widersprechen sich an 28 Stellen; K-29…K-32 halten die Entscheidun
 | K-30 | Kumulative `cum_weight[W]`/`cum_count` im SubIndex (A2) | **Nein im Format.** Präfixsummen werden beim Laden des SubIndex im RAM berechnet | Ein Abschnitt hat ≤ 64 MiB, also ≤ ca. 4096 Blöcke; die Traversierung des RAM-Indexes ist vernachlässigbar (in H-4 zu messen). Persistierte Summen kosten Formatbytes und sind bei Überlappung/Schatten ohnehin nur eine Obergrenze | §7 |
 | K-31 | `tomb_id` bleibt bis ans Ledger-Ende ein linkbares Pseudonym (offenes Restrisiko aus K-03; A3) | **Ja: `tomb_epoch` als Format-Slot jetzt.** Tomb-Schlüssel je Epoche liegen im `KeyProvider` (nicht in `KEYS`, nicht in Backups); Rotation und Retire sind optional (Default: aus) | Nach dem Backup-Horizont (§10.4) werden Ledger-Einträge anonym, ohne die Kettenprüfung zu verlieren. Der Slot ist jetzt billig, nach G-F nur per Migration nachrüstbar | §4.1, §9.4, §9.7, §10.4 |
 | K-32 | Derivation Cache (Embedding-/Token-Memoisierung) vs. `INV-PRIV-1` (B4) | **Ja als Konvention** der oberen Schicht; `INV-PRIV-1` präzisiert; zufälliges Cluster-Secret statt Kern-API | Keyed MAC unter einem im Cluster versiegelten Zufallssecret ist clusterlokal, stirbt mit dem Cluster und bleibt über Löschdomänen nicht vergleichbar. Spart Re-Embedding bei Re-Ingest, Merge und Modellwechsel | §3.3, §12.6 |
+| K-33 | Committer hielt Rang 1 über Redo-Sync, Guard-Langsampfad, Graph-Traversierung der Löschhülle (≤ 4096 Cluster) und Catalog-Fallback (R9-Audit 1) | **Pipeline aus Sequencer (Rang 1, nur RAM) und Syncer (ein Schreiber, kein Lock).** Hülle, Guards, Krypto und Idempotenz werden auf dem Aufruferthread vorbereitet; der Sequencer prüft nur `policy_epoch` und das Guard-Delta | p99 aller Agenten hängt nicht mehr an der langsamsten Gate-/Guard-Berechnung. Die Fsync-Rate bleibt die physische Obergrenze; Gruppengröße ist die Stellschraube | §6.1, §6.3, §9.5, §9.6, §11 |
+| K-34 | Bloom ohne `branch` ⇒ Block-Reads je Branch-Ebene, H-21 unter R8.2 unerreichbar (R9-Audit 2) | **Branch-bewusster Filter `(branch, user_key)`, `BranchTableBlock`, Chain-Resolve mit Early-Exit, Default-Tiefe 4**, Spike-Messung vor G-F | `cmp` sortiert `branch` vor `user_key`: Branch-Bereiche sind zusammenhängend. Das Format ist noch nicht eingefroren, die Korrektur ist jetzt billig | §5.6, §7.1, §8.3 |
+| K-35 | Metadaten-RAM ∝ Cluster × Dateien, Kleinstcluster mit sechs versiegelten Blöcken (R9-Audit 3) | **`ClusterIndex` ≤ 40 B, Sparse-Directory, `HotRecord` nur bei Bedarf, `MiniSection`, Admission vor Allokation; Konvention „Session ≠ Cluster“** | Der Cluster folgt der Löschdomäne, nicht der Sitzung; ein AEAD-Rahmen statt sechs für Kleinstabschnitte | §4.3.1, §5.6, §12.6 |
+| K-36 | Packgruppen-Write-Amplification (Entmischen schrieb 64-MiB-L1 für ≈ 16 KiB), Einzel-Purge-Kosten (R9-Audit 3) | **Staging-Spill-Policy, Fenster-Amortisierung, Compaction-Huckepack, Hygiene-Lane für Sealed-Purge** | Entmischen erst bei genug Bytes je Gruppe; Kryptolöschung wirkt sofort, die Byte-Hygiene darf bis zur Frist warten | R-PL-7, §9.5 |
+| K-37 | `ClusterLocal` ohne Admission ⇒ Inode-/FD-Explosion, „nie zurück“-Pure-Promotion (R9-Audit 4) | **Mindestgröße, Quoten, Pure-Demotion, FD-Cache statt FD-Limit, Verzeichnis-Sharding** | Ressourcenschutz ist Mechanismus, keine Politik; keine stille Herabstufung der Löschlokalität | §4.3.1, §5.4 |
+| K-38 | Idempotenz-Prüfung als Sonderpfad im kritischen Pfad (Race zweier gleicher Tokens) | **Implizite `Absent`-Guard auf den SYS_IDEM-Schlüssel** | derselbe Zwei-Stufen-Mechanismus wie jede Guard; kein Token-Index im Sequencer, kein RAM ∝ aktive Tokens | §6.5 |
 
 ### 1.1 Herkunft der übernommenen Elemente
 
@@ -97,7 +105,7 @@ Die Quellen widersprechen sich an 28 Stellen; K-29…K-32 halten die Entscheidun
 | L2 | Ordnung geclusterter Spaces: `(cluster, branch, user_key, tag↓)`. Blöcke clusterrein, je Datei ein zusammenhängender Abschnitt je Cluster mit **abschnittsrelativen** Offsets. |
 | L3 | Cluster sind `Sealed` (eigener Schlüssel) oder `Plain`. **Alles** eines Sealed-Clusters ist unter seinem Schlüssel versiegelt (`INV-SEAL-1`). |
 | L4 | Dateien sind Pure, Packed oder Staging (nur L0). |
-| L5 | **Ein Schreiber** (Committer) für alle stamp-relevanten Zustände einschließlich Gate, Control, Branch-Ops. Dateien unveränderlich, `Version` per `Arc`. |
+| L5 | **Eine Sequenzierungsstelle** (Sequencer, Rang 1, ohne E/A) vergibt alle Stamps und linearisiert Gate, Control, Link und Branch-Ops; **ein Syncer** schreibt und synchronisiert das Redo in Stamp-Reihenfolge (§6.1). Dateien unveränderlich, `Version` per `Arc`. |
 | L6 | **Catalog = einzige Wahrheit über Dateien.** Lebendig ⇔ durabler Edit nennt die Datei. |
 | L7 | **Reihenfolge ist Vertrag:** Gate < Schlüsselvernichtung < Dateiwechsel < Unlink. Nur Roll-forward. |
 | L8 | Cluster-Links (`DerivedFrom`) kaskadieren die Löschung atomar im selben Gate-Frame. |
@@ -116,7 +124,7 @@ Die Quellen widersprechen sich an 28 Stellen; K-29…K-32 halten die Entscheidun
 
 ### 2.2 Ziele
 
-Z-1 Atomarität über Spaces und Branches · Z-2 Durability (sichtbar nur nach Fsync) · Z-3 Snapshot-Isolation ohne Lesesperren · Z-4 Gate/KeyDestroy unabhängig von Storegröße, Purge bounded durch betroffene Datei-/Extension-Partitionen · Z-5 Ablauf einer Packgruppe als O(Dateien) · Z-6 Nachweisbarkeit (Receipt, `verify`, Orakel, Ledger, Anker) · Z-7 Kopf ohne Körper-I/O, Budgetseiten ohne Body-Block-Lesen · Z-8 Race-Freiheit durch Konstruktion, belegt durch Modell, Simulation, Loom · Z-9 begrenzte Ressourcen · Z-10 stabile Verträge nach oben · Z-11 flüchtige Arbeitsbereiche · Z-12 Idempotenz für Agenten-Retries · Z-13 **Gate/KeyDestroy bei vollem Datenträger; physischer Purge nutzt vorgehaltene Scratch-Reserve** · Z-14 überwachbare Löschfristen · **Z-15** O(1)-Fork, indexierter Diff und konfliktgeprüfter Merge je Cluster. **Z-16 (Datenklassifikation):** `DataClass` ist ein geschlossenes Enum; ungültige Kombinationen (Personal ohne Cluster/Encrypted, bei Durable ohne Cluster-Seal) werden vor dem ersten I/O abgewiesen und durch API-/Property-Tests abgedeckt. **Z-17 (Observability):** Gate, KeyDestroy und Purge haben getrennte Dauer-/Ergebnis-/Byte-Metriken; feste Label-Allowlist, keine IDs/Inhalte; Katalogprüfung weist unzulässige Labels zurück. **Z-18 (Entwicklerdiagnose):** jeder öffentliche Fehler hat stabilen Typ und sichere `hint()`-Handlung; Fassade kann eine typisierte `suggested_call` ergänzen. Simulationsfehler enthalten reproduzierbaren Seed und Inspector-Ausgaben bleiben inhaltsfrei; Gates prüfen Reproduzierbarkeit und Leakage.
+Z-1 Atomarität über Spaces und Branches · Z-2 Durability (sichtbar nur nach Fsync) · Z-3 Snapshot-Isolation ohne Lesesperren · Z-4 Gate/KeyDestroy unabhängig von Storegröße, Purge bounded durch betroffene Datei-/Extension-Partitionen · Z-5 Ablauf einer Packgruppe als O(Dateien) · Z-6 Nachweisbarkeit (Receipt, `verify`, Orakel, Ledger, Anker) · Z-7 Kopf ohne Körper-I/O, Budgetseiten ohne Body-Block-Lesen · Z-8 Race-Freiheit durch Konstruktion, belegt durch Modell, Simulation, Loom · Z-9 begrenzte Ressourcen · Z-10 stabile Verträge nach oben · Z-11 flüchtige Arbeitsbereiche · Z-12 Idempotenz für Agenten-Retries · Z-13 **Gate/KeyDestroy bei vollem Datenträger; physischer Purge nutzt vorgehaltene Scratch-Reserve** · Z-14 überwachbare Löschfristen · **Z-15** O(1)-Fork, indexierter Diff und konfliktgeprüfter Merge je Cluster. **Z-16 (Datenklassifikation):** `DataClass` ist ein geschlossenes Enum; ungültige Kombinationen (Personal ohne Cluster/Encrypted, bei Durable ohne Cluster-Seal) werden vor dem ersten I/O abgewiesen und durch API-/Property-Tests abgedeckt. **Z-17 (Observability):** Gate, KeyDestroy und Purge haben getrennte Dauer-/Ergebnis-/Byte-Metriken; feste Label-Allowlist, keine IDs/Inhalte; Katalogprüfung weist unzulässige Labels zurück. **Z-18 (Entwicklerdiagnose):** jeder öffentliche Fehler hat stabilen Typ und sichere `hint()`-Handlung; Fassade kann eine typisierte `suggested_call` ergänzen. Simulationsfehler enthalten reproduzierbaren Seed und Inspector-Ausgaben bleiben inhaltsfrei; Gates prüfen Reproduzierbarkeit und Leakage. **Z-19 (Tail-Latenz):** unter Rang 1 keine E/A, kein Provider-, Graph- oder Plattenzugriff; der kritische Abschnitt ist O(Ops der Gruppe) im RAM (H-24). **Z-20 (Metadaten-Skalierung):** RAM, Dateien und Dateideskriptoren wachsen kontrolliert mit der Clusterzahl; jede dieser Ressourcen hat Admission vor Allokation (§4.3.1, H-25, H-27).
 
 ### 2.3 Nicht-Ziele
 
@@ -207,7 +215,7 @@ Der Kern entscheidet nie, **ob** gelöscht werden darf oder muss, **wer** ein Re
 
 ### 3.4 Threading
 
-Ein Committer (Flat-Combining, Gruppen-Fsync). Lesen lock-frei bis auf `Arc`-Klone und Blatt-Sperren. Wartung in Lanes `urgent > flush > compact > blobgc > idle`. Ledger und Anker haben je **genau einen Schreiber** (`urgent`). Threads gehören dem Aufrufer oder einem `Spawner`. Keine Async-Runtime im Kern.
+Der **Committer** ist eine Pipeline aus **Sequencer** (Rang 1, nur RAM, Flat-Combining-Leader) und **Syncer** (ein Thread, einziger Schreiber des Redo, kein Lock), siehe §6.1. Wo diese Spec „im Committer“ sagt, liegt die Prüfung im Sequencer. Lesen lock-frei bis auf `Arc`-Klone und Blatt-Sperren. Wartung in Lanes `urgent > flush > compact > blobgc > idle`. Ledger und Anker haben je **genau einen Schreiber** (`urgent`); der Ledger-Writer bündelt wartende Events zu Gruppen. Threads gehören dem Aufrufer oder einem `Spawner`. Keine Async-Runtime im Kern. Provider-, Cipher-, KDF-, Graph- und Guard-Arbeit läuft ausschließlich auf Aufruferthreads und Wartungs-Lanes, nie im Sequencer.
 
 ### 3.5 Fehlermodell
 
@@ -263,10 +271,34 @@ Stamps: erster = 1, streng monoton über angenommene Changes und Frames, nie dop
 ### 4.3 Cluster
 
 - **Erzeugung:** `Clusters::register(ClusterSpec)` zieht 128 Bit aus `Entropy`, prüft Kollision, legt bei `Sealed` **zuerst** den Schlüssel an (`create_cluster_keys`, Batch, idempotent je `BatchId`, durabel), dann Catalog-Edit `cluster_register`. Ein Schlüssel ohne Cluster (Absturz dazwischen) wird von `idle` nach `orphan_key_grace` (24 h) über `KeyProvider::list` vernichtet.
-- **Zustände:** `Live → Retired(S) → [Shredded] → Purged → (Trim)`. `Shredded` nur bei `Sealed`. Nur vorwärts.
+- **Zustände:** `Live → Retired(S) → [Shredded] → Purged → (Trim)`. Zwischen `Live` und `Retired` existiert nur im Sequencer ein flüchtiges `Retiring(S)` (§6.1): es schließt die Schreibadmission, ist für Leser weder sichtbar noch persistiert. `Shredded` nur bei `Sealed`. Nur vorwärts.
 - **Trim:** Ein `Purged`-Eintrag wird per `cluster_trim` entfernt, sobald `history_floor > S` (keine View/Hold/Consumer-Fenster darunter). Danach `UnknownCluster`. Wiederverwendung ausgeschlossen (128-Bit-Zufall). Der Dauer-Nachweis liegt als `tomb_id` im Ledger (§9.7).
 - **Restrictions** sind eine Menge am Cluster, kein Zustand.
-- `ClusterSpec` trägt unveränderlich `erase_locality`. v1-Default ist `PackedBounded{max_file_bytes: 64 MiB}`; `ClusterLocal` ist explizit zu wählen, wenn unlink-basierte Run-/Blob-Isolation die zusätzliche Datei-/FD-Last rechtfertigt. `ClusterLocal` erzwingt eine Cluster-ID je Run-/Blob-Datei; gepackte Sections allein erfüllen die Option nicht. Beide Modi unterliegen den separaten Redo-/Pin-Kosten aus INV-ERA-11.
+- `ClusterSpec` trägt unveränderlich `erase_locality` und `expected_bytes` (Größenklasse, ausschließlich Admission-Hinweis). v1-Default ist `PackedBounded{max_file_bytes: 64 MiB}`. `ClusterLocal` bedeutet: Run-/Blob-Dateien dieses Clusters enthalten **ausschließlich** seine Abschnitte (Pure); gepackte Sections erfüllen die Option nicht. Sie ist nur nach Admission (§4.3.1) wählbar (`expected_bytes ≥ cluster_local_min_bytes`, Cluster-Quote, Datei-Quote) und wird nie still herabgestuft; `ClusterLocal`-Cluster sind von der Pure-Demotion (R-PL-3) ausgenommen, die Quote ist daher eine harte Obergrenze der durch sie erzeugten Dateien. Beide Modi unterliegen den separaten Redo-/Pin-Kosten aus INV-ERA-11.
+
+#### 4.3.1 Admission für Cluster, Dateien und Metadaten (K-35, K-37)
+
+Ein Cluster kostet RAM, Dateien und Dateideskriptoren. R8.2 verließ sich auf weiche Obergrenzen („`max_clusters` ist keine zugesagte Resident-Kapazität“) ohne Mechanismus. R9 macht jede dieser Ressourcen zu einer Admission mit eigener Fehlerklasse, geprüft **vor** der Allokation (`INV-ADM-1`). Es ist technischer Ressourcenschutz, keine Politik (§3.3).
+
+**Residenz der Metadaten**
+
+| Struktur | Residenz | Kosten | `MemoryBudget`-Klasse |
+|---|---|---|---|
+| `ClusterIndex` (offene Adressierung, Schlüssel = `ClusterId`) | immer resident | ≤ 40 B je Cluster: id 16 · `state:8 \| gen:56` 8 · `pack_group` 4 · `hot_ref` 4 · `flags` 4 · Slack bei Lastfaktor ≤ 0,8 | `ClusterMeta` |
+| `HotRecord` (Branch-Tabelle, Restrictions, Links, Pins, offene Views, Cursor-Zustand) | nur für Cluster mit solchen Merkmalen; kaltstellbar (Neuaufbau aus Redo/`SYS_BRANCH`), **nicht** kaltstellbar bei Restriction, Link oder Pin | ≤ 256 B + Inhalt | `ClusterHot` |
+| `ClusterDirectory` je Datei | nur Sparse-Index (eine Zeile je 4-KiB-Seite, ≈ 0,3 B je Cluster und Datei) und `ClusterFilter` (≈ 1 B je Cluster); Seiten über den Block-Cache | ≈ 1,3 B je Cluster und Datei | `DirIndex`, `BlockCache` |
+
+Rechenbeispiel: 16 Mio. Cluster ⇒ ≈ 640 MiB `ClusterIndex`; R8.2 rechnete mit ≈ 48 B je Cluster **und Datei** plus 128 B je Cluster, bei vier Dateien je Cluster ≈ 5 GiB. Kapazität: `resident_clusters_max = cluster_meta_budget / 40 B` mit `cluster_meta_budget` = 15 % von `memory_budget_bytes` (§16). Der Gate-Check bleibt O(1) und ohne E/A.
+
+**Admission-Regeln**
+
+1. **Cluster-Metadaten:** `register` reserviert `ClusterMeta` (40 B) beim `MemoryBudget`; Fehlschlag ⇒ `Err(Limit{ClusterMetaBudget})` ohne Teilzustand. `open` vergleicht die Clusterzahl des Catalogs mit dem Budget und öffnet andernfalls `ReadOnly` mit Diagnose statt in den OOM zu laufen.
+2. **`ClusterLocal`:** nur wenn (a) `expected_bytes ≥ cluster_local_min_bytes` (Standard = `pure_threshold`, 8 MiB), (b) die Zahl lebender `ClusterLocal`-Cluster `< max_cluster_local_clusters` (Standard 1024, ≤ 65 536) und (c) `max_live_files` Reserve für mindestens zwei Dateien je Level lässt. Sonst `Err(Limit{ClusterLocalAdmission})`. Zweck der Option: `Plain`-Cluster und große `Sealed`-Cluster mit physischem Löschzeitziel. Für Massen personenbezogener Cluster ist **PackedBounded + Crypto-Erase** der vorgesehene Weg: `KeysDestroyed` wirkt sofort, die Hygiene-Purge läuft amortisiert (§9.5).
+3. **Pure-Demotion:** R-PL-3. Pure ist keine Einbahnstraße mehr.
+4. **`max_live_files`** (Standard 262 144): ab 80 % hebt der Governor den effektiven `pure_threshold` je Stufe um den Faktor 2 und alarmiert; bei 100 % entstehen keine neuen Pure-Dateien (alles Packed) und keine neuen `ClusterLocal`-Cluster. Gate, KeyDestroy und Purge bleiben ausführbar.
+5. **FD-Cache:** `max_open_files` (Standard 1024) ist die Größe eines LRU-Caches offener Handles und **kein** Limit der Dateianzahl. Lesepfad, Wartung und Purge teilen ihn; `urgent`-Arbeit hat `fd_reserve` (256) exklusive Handles. `open` prüft `RLIMIT_NOFILE ≥ max_open_files + fd_reserve` über `HostProbe`/Fs-Adapter, sonst `Err(FdLimitTooLow{needed})`. Ein Cache-Miss kostet einen `open()`; H-27 begrenzt dessen Rate.
+6. **Verzeichnis-Sharding:** §5.4; keine Millionen Einträge in einem Verzeichnis.
+7. **Konvention „Session ≠ Cluster“:** §12.6. Der größte Hebel gegen Metadaten- und Dateiflut liegt oben: pro Sitzung einen Cluster anzulegen, wäre ein Modellfehler, kein Kernproblem.
 
 ### 4.4 Wert, Kopf, Körper, Gewichte
 
@@ -295,7 +327,7 @@ pub struct SpaceOptions {
 
 ### 4.6 Limits
 
-`max_key_bytes` 1 KiB (≤ 4 KiB) · `max_header_bytes` 4 KiB (≤ 64 KiB) · `max_body_bytes` **4 MiB (hart; E-35)** · `max_change_ops` 4096 · `max_change_bytes` 8 MiB · `max_page_bytes` 1 MiB · `max_clusters` 16 Mio. (weich, ≤ 64 Mio.) · `max_branches_per_cluster` 1024 · `max_branch_depth` 8 (H-21 muss die konfigurierte Maximaltiefe messen; falls Ziel verfehlt, ist der Default zu senken oder Flattening zu erzwingen). Überschreitung ⇒ `Limit`/`ChangeTooLarge` **vor jeder Sperre** (`INV-LIM-1`).
+`max_key_bytes` 1 KiB (≤ 4 KiB) · `max_header_bytes` 4 KiB (≤ 64 KiB) · `max_body_bytes` **4 MiB (hart; E-35)** · `max_change_ops` 4096 · `max_change_bytes` 8 MiB · `max_page_bytes` 1 MiB · `max_clusters` 16 Mio. (weich, ≤ 64 Mio.; effektiv durch `cluster_meta_budget` begrenzt, §4.3.1) · `max_branches_per_cluster` 1024 · `max_branch_depth` **4 (Default), 8 (hart)**; Tiefen > 4 nur mit `BranchOptions::deep_ack`; H-21 misst jede Tiefe 1…8, verfehlt Tiefe 8 das Ziel, wird die harte Obergrenze gesenkt (§7.1). Überschreitung ⇒ `Limit`/`ChangeTooLarge` **vor jeder Sperre** (`INV-LIM-1`).
 
 ### 4.7 Datenklassen
 
@@ -316,10 +348,12 @@ Ein `Personal`-Space im `Volatile`-Modus bleibt nur im Prozessspeicher, hat kein
 
 - **R-PL-1** Jede Datei ist genau eine von Pure (ein Cluster), Packed (mehrere Cluster einer Packgruppe), Staging (nur L0, beliebige Cluster, nur Runs).
 - **R-PL-2** Jeder Cluster bildet je Datei **einen zusammenhängenden Abschnitt**, sortiert nach ClusterId, Blöcke clusterrein, Offsets abschnittsrelativ.
-- **R-PL-3** Cluster ≥ `pure_threshold` wird bei der nächsten Compaction Pure (nie zurück).
-- **R-PL-4** Compaction mischt nur innerhalb einer Wartungsgruppe (Packgruppe oder Pure-Cluster); L0→L1 entmischt Staging.
+- **R-PL-3** Cluster ≥ `pure_threshold` wird bei der nächsten Compaction Pure. Fällt ein **nicht** `ClusterLocal`-Cluster unter `pure_demote_ratio × pure_threshold` (Standard 0,25 ⇒ 2 MiB; Hysterese gegen Flattern), führt eine Compaction ihn per `rebucket` (ein Edit) in seine Packgruppe zurück. Ohne Demotion hinterließen schrumpfende Cluster unbegrenzt viele Kleinstdateien (Inode-Flut, §4.3.1). `ClusterLocal`-Cluster bleiben Pure (§4.3).
+- **R-PL-4** Compaction mischt nur innerhalb einer Wartungsgruppe (Packgruppe oder Pure-Cluster); der Spill (R-PL-7) entmischt Staging.
 - **R-PL-5** Ein Flush schreibt je Space **eine** Staging-Datei plus je großem Cluster eine Pure-Datei: L0-Dateizahl unabhängig von der Zahl der Packgruppen.
 - **R-PL-6** `rebucket` ist ein atomarer Umzug in einem Edit.
+- **R-PL-7 (Spill-Policy, K-36)** Staging-Runs werden size-tiered zusammengeführt (gleichgroße Runs, Schreibverstärkung ≈ log); sie werden **nicht** bei jeder Gelegenheit in die Packgruppen entmischt. Eine Packgruppe `g` wird erst gespillt (in ihr L1 überführt), wenn `staged_bytes(g) ≥ max(spill_min_bytes, size(L1(g)) / spill_ratio)` (Standard 8 MiB und 4), oder ihr ältestes gestagtes Byte älter als `spill_max_age` (Standard 6 h) ist, oder ein Purge/`rebucket` die Gruppe berührt. Damit gilt je Spill Schreibverstärkung ≤ 1 + `spill_ratio`. R8.2 hätte bei 4096 Gruppen und einem 64-MiB-Flush je Gruppe ≈ 16 KiB in ein bis zu 64 MiB großes L1 gemischt (Faktor ≈ 4000). Die Zähler `staged_bytes(g)` liegen im RAM (≤ `max_pack_groups` Einträge). Die Zahl der Staging-Runs ist durch `max_staging_runs` (16) begrenzt; Überschreitung erzwingt einen Tier-Merge. Punktlesen prüft Staging-Runs nur bei `ClusterFilter`-Treffer.
+- **R-PL-8 (MiniSection, K-35)** Ist die Nutzdatensumme eines Cluster-Abschnitts ≤ `mini_section_max_bytes` (Standard 4 KiB), besteht er aus **einem** SealFrame (Einträge, Range-Deletes, ChangeIndex- und BranchTable-Einträge als Teilstrukturen, lineare Suche, kein Filter). Overhead = 40 B Siegel + Directory-Eintrag statt sechs versiegelter Blöcke. Verlässt der Abschnitt die Schwelle, stellt die nächste Compaction auf `FullSection` um (und umgekehrt, mit Hysterese 50 %).
 
 ### 5.2 Siegelrahmen (eine Form für alles)
 
@@ -343,7 +377,7 @@ Little-endian; `varint` = kanonisches LEB128; Dateikopf `magic[8] ‖ file_kind 
 
 ```
 <root>/FORMAT  LOCK  CURRENT  CATALOG-<n>  KEYS  RESERVE
-       redo/redo-<n>.log  spaces/<id>/<id>.run|.blob  segments/<kind>/<id>.seg
+       redo/redo-<n>.log  spaces/<id>/<s>/<file_id>.run|.blob   (s = file_id mod file_shard_count, 3 Hex-Stellen)  segments/<kind>/<id>.seg
 <ledger_dir>/ERASE-LEDGER/…      (Standard: <root>/ERASE-LEDGER, Produktivempfehlung: getrenntes Volume)
 ```
 
@@ -358,8 +392,8 @@ Frame := head ‖ body ‖ tail
 head (Klartext, kettengeschützt): len u32 | stamp u64 | kind u8 | n_ops u16 | idem_token[16] | epoch u64 | flags u8 |
       ops_head[]: { space_id u64, cluster[16], branch u32, op_kind u8, key_epoch u32, op_uid[16], payload_len u32 }
 kind: Change=1 | Gate=2 | Control=3 | Reserve=4
-Gate-Body (Klartext):    scope(Clusters|Space) | ticket[16] | level | n u16 | cluster[16]×n oder space_id u64
-Control-Body (Klartext): op(Restrict|Lift|BranchFork|BranchDrop|BranchMerge) | … Nutzdaten der Branch-Ops sind versiegelt
+Gate-Body (Klartext):    scope(Clusters|Space) | ticket[16] | level | policy_epoch u64 | n u16 | cluster[16]×n oder space_id u64
+Control-Body (Klartext): op(Restrict|Lift|Link|BranchFork|BranchDrop|BranchMerge) | … Nutzdaten der Branch-Ops sind versiegelt; Link-Body: derived[16] | n u8 | sources[16]×n | policy_epoch_after u64
 tail: crc32c | chain_mac
 ```
 
@@ -369,10 +403,12 @@ Redo-Integritätsschlüssel = `KDF(RootKey, "ctxs redo-auth v1")` (nicht je Segm
 
 ```
 Run := header · ClusterSection* · ClusterDirectory · PackMeta · ExtensionBlock* · Footer
-ClusterSection := DataBlock* · SubIndexBlock · FilterBlock · RangeDelBlock · ChangeIndexBlock
+ClusterSection := FullSection | MiniSection
+FullSection    := DataBlock* · SubIndexBlock · BranchTableBlock · FilterBlock · RangeDelBlock · ChangeIndexBlock
+MiniSection    := SealFrame{ entries · range_dels · change_idx · branch_tab }      (≤ mini_section_max_bytes, kein Filter, R-PL-8)
 ```
 
-`ClusterDirectory` (Klartext): `{cluster, section_off, section_len, n_blocks, n_entries, min/max_stamp}`; keine Gewichte/Tokenprofile im Klartext. `DataBlock` Ziel 16 KiB, Präfixkompression, versiegelt; Eintrag trägt `branch`. `SubIndexBlock` je Block: letzter Schlüssel, abschnittsrelativer Offset, Länge, `entries`, `weight_sum[W]`, `min/max_stamp`, `block_uid`; bei Sealed vollständig unter Clusterschlüssel versiegelt. Page darf diesen kleinen Indexblock entsiegeln, ohne Body-Block/Blob zu lesen. v1-`FilterBlock` ist ausschließlich Bloom (`filter_kind=1`) über `user_key` ohne Branch (ein Filter für die Branch-Kette), samt Salt cluster-sealed; Ribbon ist kein v1-Format. Nur Directory, PackMeta und Footer mit nicht sensiblen Strukturmetadaten bleiben beim Umkopieren unverändert/werden neu erzeugt. Verzeichnisse liegen im Speicher (~48 Byte je Cluster und Datei).
+`ClusterDirectory` (Klartext): `{cluster, section_kind u8 (0 Full, 1 Mini), section_off, section_len, n_blocks, n_entries, min/max_stamp}`; keine Gewichte/Tokenprofile im Klartext. `DataBlock` Ziel 16 KiB, Präfixkompression, versiegelt; Eintrag trägt `branch`. `SubIndexBlock` je Block: letzter Schlüssel, abschnittsrelativer Offset, Länge, `entries`, `weight_sum[W]`, `min/max_stamp`, `block_uid`; bei Sealed vollständig unter Clusterschlüssel versiegelt. Page darf diesen kleinen Indexblock entsiegeln, ohne Body-Block/Blob zu lesen. v1-`FilterBlock` ist ausschließlich Bloom (`filter_kind=1`) über `(branch, user_key)` (branch-bewusst, K-34; je Kettenebene eine RAM-Probe), samt Salt cluster-sealed; Ribbon ist kein v1-Format. Der `BranchTableBlock` (cluster-sealed, mit dem SubIndex geladen) listet je Branch `{branch u32, first_block u32, last_block u32, n_entries, min/max_stamp, has_range_del}` sortiert nach `branch`; da `cmp` den Branch vor den Schlüssel sortiert, bilden die Einträge eines Branches einen zusammenhängenden Blockbereich (§7.1). Nur Directory, PackMeta und Footer mit nicht sensiblen Strukturmetadaten bleiben beim Umkopieren unverändert/werden neu erzeugt. Das `ClusterDirectory` ist nach `ClusterId` sortiert und in 4-KiB-Seiten gegliedert (≈ 78 Einträge je Seite); im RAM liegt nur der **Sparse-Index** (erste `ClusterId` und Seitenoffset je Seite, ≈ 20 B je Seite) sowie der `ClusterFilter` (Bloom über `ClusterId`, ≈ 8 Bit je Cluster, in `PackMeta`). Seiten laden über den Block-Cache (Klasse `DirPage`). Punktlesen kostet je Level-Datei höchstens einen zusätzlichen Seitenzugriff, bei Warm-Cache keinen; der `ClusterFilter` erspart ihn für Dateien, die den Cluster nicht enthalten. Resident-Kosten: §4.3.1.
 
 ### 5.7 Blob
 
@@ -382,11 +418,11 @@ ClusterSection := DataBlock* · SubIndexBlock · FilterBlock · RangeDelBlock ·
 
 Snapshot-Record + Edit-Records (Kette, CRC), nur in vorallokierten 1-MiB-Blöcken. **Gruppen-Commit:** `catalog_edit` fasst wartende Edits mit einem `write` + einem `sync_data` zusammen, entlässt die Wartenden erst danach (`INV-CAT-2`); mehrere gekoppelte Zustandsänderungen sind **ein** Edit (P-2). Rollover bei `max(8 MiB, Größe des letzten Snapshots)`; `CURRENT` per atomarem `rename`.
 Ops: `space_add(space_id,options) | space_state | space_remove | cluster_register | cluster_state | cluster_trim | cluster_link | restriction_set | restriction_lift | pack_assign | files_add(meta.floor) | files_remove | unlink_ack(file_id) | blob_replace | blob_live_delta | replay_floor | retain_floor | redo_mark | segment_add | segment_remove | hold_set | consumer_ack | erase_pending_add | erase_stage | erase_done | erased_ranges_add | erased_ranges_trim | key_epoch | kek_id | idem_trim | reserve_stamps | reserve_ids | reserve_space_ids | anchor_mark`. `space_id` ist ein unveränderliches Identitätsfeld; jedes Space-Gate bindet diese ID. `files_remove` verschiebt die Datei im selben Edit in den persistenten Graveyard; `unlink_ack` entfernt sie erst nach erfolgreichem `unlink + sync_dir`. Reservierter Bereich `0xF000…0xFFFF`; unbekannte Tags ⇒ `Unsupported`. **Der Catalog enthält keine Branch-Namen und keine Nutzdaten** (§8.2).
-Reservierungen: `reserve_stamps` (2^20), `reserve_ids` (2^16) und `reserve_space_ids` (2^16) heben Hochwassermarken vorab an (Wartungsthread bei < 50 % Rest); Zuweisung ist crash-sicher und überspringt ungenutzte IDs. Fallback im Committer ist die **einzige** Doppelhaltung von Rang 1 und Rang 3.
+Reservierungen: `reserve_stamps` (2^20), `reserve_ids` (2^16) und `reserve_space_ids` (2^16) heben Hochwassermarken vorab an (Wartungsthread bei < 50 % Rest); Zuweisung ist crash-sicher und überspringt ungenutzte IDs. Erschöpft eine Reserve, weist der Sequencer normale Changes mit `Backpressure(Retry)` ab, **ohne** Rang 3 zu nehmen. Gate-, Control- und Link-Frames ziehen aus dem **Notpool** (`reserve_stamps_urgent` 2^10, `reserve_ids_urgent` 2^8), den nur die Lane `urgent` auffüllt. Es gibt **keine** Doppelhaltung von Rang 1 und Rang 3 (R8.2 hielt den Catalog-Sync unter Rang 1).
 
 ### 5.9 Freeze-Liste (Gate G-F)
 
-Dateikopf, `FORMAT`, `KEYS`, Redo-Gruppe/Frame (inkl. `space_id`, `branch`, `kind`, `epoch`, `op_uid`, Gate-/Control-Body), Kette, ClusterSection, ClusterDirectory, PackMeta, SubIndex, Siegelrahmen, Blob-Record und Inkarnationsregel, Catalog-Op-Tags einschließlich `reserve_space_ids`, `AnchorValue`, Ledger-Format einschließlich Domain-Separation und Byteordnung der Tomb-HMACs, `tomb_epoch u32` je Tomb-tragendem Event und der Tomb-Epochen-Events (K-31), `cmp` (inkl. Branch), Tag-Kodierung. Je Format ein unabhängiger Referenzcodierer (Python) und goldene Vektoren (Anhang A). Nach G-F ist jede Änderung eine Migration.
+Dateikopf, `FORMAT`, `KEYS`, Redo-Gruppe/Frame (inkl. `space_id`, `branch`, `kind`, `epoch`, `op_uid`, Gate-Body inkl. `policy_epoch`, Control-Body inkl. `Link`), Kette, ClusterSection (Full/Mini, `BranchTableBlock`, branch-bewusster Filter), ClusterDirectory (seitenweise, Sparse-Index, `section_kind`), PackMeta (inkl. `ClusterFilter`), SubIndex, Siegelrahmen, Dateipfad-Sharding, Blob-Record und Inkarnationsregel, Catalog-Op-Tags einschließlich `reserve_space_ids`, `AnchorValue`, Ledger-Format einschließlich Domain-Separation und Byteordnung der Tomb-HMACs, `tomb_epoch u32` je Tomb-tragendem Event und der Tomb-Epochen-Events (K-31), `cmp` (inkl. Branch), Tag-Kodierung. Je Format ein unabhängiger Referenzcodierer (Python) und goldene Vektoren (Anhang A). Nach G-F ist jede Änderung eine Migration.
 
 | System-Space | SpaceId | Zweck |
 |---|---:|---|
@@ -401,34 +437,71 @@ Die Belegung dieser Tabelle ist Teil des Format-Freeze. Neue Systemspaces erhalt
 
 ## 6. Schreibpfad
 
-### 6.1 `apply`
+### 6.1 `apply` (Commit-Pipeline)
+
+Der Committer besteht aus zwei Stufen mit je genau einem aktiven Schreiber (K-33):
+
+| Stufe | Sperre | Aufgabe | Verboten |
+|---|---|---|---|
+| **Sequencer** | Rang 1 (`sequencer`) | Zustandsprüfung, Guard-Delta, Epochenvergleich, Stamp-Vergabe, Übergabe an den Syncer. Rein RAM, O(Ops der Gruppe) | jede E/A, jeder Provider-/Cipher-/KDF-Aufruf, jedes Warten, Graph-Traversierung (einzige Ausnahme: Selbstberechnung nach Epochen-Retry, ≤ `max_gate_clusters` Knoten, nur RAM) |
+| **Syncer** | keine (der Thread besitzt die Redo-Datei) | CRC und Ketten-MAC, ein `write` + ein `sync_data`, danach Publikation in Stamp-Reihenfolge | Stamps vergeben, Zustand validieren |
 
 ```
-1  Vorprüfung ohne Sperre: Größen, Space/Cluster bekannt, INV-SEAL-1, Clusterzustand, IdemToken (AlreadyApplied), DiskFull
-2  Vorbereiten auf dem Aufruferthread: View V0 pinnen, Guards gegen V0 (Fingerabdruck), Ops kodieren, op_uid ziehen,
-   Nutzlast versiegeln (Provider-Wartezeit liegt hier, nie im Committer)
-3  Stamp-Reserve prüfen (ggf. reserve_stamps vor Rang 1)
-4  Intake (Rang 2), Warten auf Gruppenführer
-5  Committer (Rang 1) nimmt alle Wartenden:
-     a) Cluster-/Branch-Zustand: Retired/Shredded/Purged ⇒ ClusterRetired; BLOCK_WRITE ⇒ Restricted; Branch nicht Live ⇒ BranchClosed
-     b) Guards bestätigen (Schnellpfad Konfliktfenster, sonst exakt gegen Memtable ∪ Version ∪ Gruppen-Overlay)
-     c) Stamps vergeben, vorreservierte Branch-IDs validieren und Branch-Ops ausführen
-     d) Gruppe bauen (Frames, Kette)
-     e) ein write + ein sync_data                              ◄── DURABILITÄTSPUNKT
-6  Memtable einfügen, Konfliktfenster fortschreiben, Cluster-/Branch-Zustand setzen, Version veröffentlichen (Rang 4),
-   visible_stamp anheben (Release)
-7  Receipt { instance_id, stamp, durable }
+1  Vorprüfung ohne Sperre: Größen/Limits (INV-LIM-1), Space/Cluster bekannt, INV-SEAL-1, Clusterzustand, DiskFull,
+   Idempotenz-Lookup (Treffer ⇒ gespeichertes Ergebnis, AlreadyApplied)
+2  Vorbereiten auf dem Aufruferthread (keine Sperre; Plattenzugriffe und Provider-Wartezeit sind hier erlaubt):
+   a) View V1 pinnen, Guards exakt gegen V1 auswerten (Stufe A, §6.3), Punkt-Fingerabdrücke fp berechnen
+   b) bei Gate/Link/Restrict/Lift/Space-Drop: Hülle H, Restrictions und Space-Restriction-Treffer berechnen; `policy_epoch` P1 notieren
+   c) Ops kodieren, op_uid ziehen, Nutzlast versiegeln, Frame vollständig vorkodieren (Stamp-Felder 0, Kette/CRC leer)
+   d) implizite Absent-Guard für den SYS_IDEM-Schlüssel anfügen (§6.5)
+3  Stamp-Reserve prüfen: erschöpft ⇒ Backpressure(Retry) (normale Changes); Gate/Control/Link ziehen aus dem Notpool (§5.8)
+4  Pipeline-Credit holen (Semaphor, `commit_pipeline_depth`, Standard 2; `urgent` hat einen eigenen Credit).
+   Warten findet nur hier statt, nie unter einer Sperre
+5  Einreihen: an die Intake anhängen (Rang 2, kurz, ohne weitere gehaltene Sperre), Rang 2 wieder frei. Dann try_lock auf Rang 1:
+   Erfolg ⇒ Leader (nimmt Rang 2 nur zum Leeren der Intake, also aufsteigend); Misserfolg ⇒ auf das Ergebnissignal warten.
+   Der Leader prüft nach dem Freigeben von Rang 1 die Intake erneut und übernimmt bei Nichtleere erneut (kein verlorener Wakeup, loom)
+6  Sequencer (Rang 1), je Change in Intake-Reihenfolge:
+     a) Zustand: Retiring/Retired/Shredded/Purged ⇒ ClusterRetired; BLOCK_WRITE ⇒ Restricted; Branch nicht Live ⇒ BranchClosed
+     b) Guards Stufe B: Delta (V1, head] im Konfliktfenster; Treffer oder V1 < Fensterfuß ⇒ GuardRetry (Aufrufer wiederholt ab 2a)
+     c) Gate/Link/Restrict/Lift: policy_epoch == P1, sonst PolicyRetry; nach `policy_retry_max` (3) Fehlversuchen berechnet der
+        Sequencer die Hülle einmalig selbst (eine Löschung wird nie ausgehungert)
+     d) Stamps vergeben; vorreservierte Branch-IDs validieren, Branch-Ops ausführen; bei Gate: cluster_table Live → Retiring(S)
+     e) Konfliktfenster um (stamp, fp, ck) der Gruppe fortschreiben (schon vor der Durabilität)
+     f) Gruppe (vorkodierte Frames mit Stamps) in die Syncer-Warteschlange legen (nie blockierend, der Credit garantiert Platz); Rang 1 frei
+7  Syncer: Frames finalisieren (CRC, Ketten-MAC), ein write + ein sync_data                  ◄── DURABILITÄTSPUNKT
+8  Publikation (Syncer, strikt in Stamp-Reihenfolge, nur nach Schritt 7 derselben Gruppe): Memtable einfügen, Fenstereinträge als
+   durabel markieren, Retiring → Retired + gen++, Version veröffentlichen (Rang 4), visible_stamp/durable_stamp anheben (Release),
+   Aufrufer wecken, Credit freigeben
+9  Receipt { instance_id, stamp, durable }
 ```
 
-Sichtbarkeit nur nach Durabilität (Ausnahme `Relaxed`, nie für Löschung). Jeder Stamp und jede Receipt ist nur innerhalb ihrer `instance_id` eindeutig; Vergleiche, Feed-Offsets oder Audit-Referenzen über Instanzen müssen das Tupel `(instance_id, stamp)` führen. Sync-Fehler ⇒ Poison; alle Changes der Gruppe `Indeterminate`, spätere `Poisoned`; Lesen bleibt. Rückdruck stufenweise **außerhalb** jeder Sperre (`Backpressure(Retry)`); Warten unter Rang 1 ist verboten. `Urgent`-Löschfolgen umgehen den Rückdruck.
+**Eigenschaften.**
+
+1. *Durchsatz* = Gruppengröße / Sync-Latenz. Die Pipeline hebt die Fsync-Rate nicht an, aber der Sequencer baut die nächste Gruppe, während die vorige synchronisiert; alle in dieser Zeit eintreffenden Changes bilden eine Gruppe, die mit der Last wächst (bis `max_group_changes` 1024 / `max_group_bytes` 8 MiB). Kein Graph-, Guard-, Idempotenz- oder Kryptoaufwand verlängert den kritischen Pfad. Tiefen > 2 nur, wenn die Fs-Konformanzsuite überlappende `sync_data`-Aufrufe als beschleunigend belegt.
+2. *Fehler:* Sync-Fehler ⇒ Poison. Die fehlgeschlagene und alle bereits sequenzierten späteren Gruppen sind `Indeterminate{first_stamp,last_stamp}` bzw. `Poisoned`; nichts davon wurde veröffentlicht (`INV-PIPE-2`). Ein Konflikt oder `ClusterRetired`, der durch eine noch nicht durable Gruppe entstand, ist harmlos: scheitert diese, ist das Handle ohnehin vergiftet, nach dem Neustart entscheidet allein das Redo.
+3. *Sichtbarkeit:* Leser sehen `Retiring` als `Live`, bis das Gate durabel und publiziert ist. Es wird nie ein nicht durabler Zustand gelesen; die Schreibadmission ist dagegen sofort geschlossen, weil kein Change nach einem sequenzierten Gate in denselben Cluster geraten darf.
+4. *Memtable-Einfügung* durch den Syncer ist Standard. Parallele Einfügung durch die wartenden Aufrufer mit Barriere vor der Publikation ist eine zulässige Optimierung, sofern der Syncer bei Ausfall eines Aufrufers nach `publish_timeout` selbst einfügt.
+5. `Relaxed`-Changes reiten in der nächsten Gruppe mit und werden nach dem `write` (ohne Sync) veröffentlicht; nie für Löschung.
+
+Sichtbarkeit nur nach Durabilität (Ausnahme `Relaxed`). Jeder Stamp und jede Receipt ist nur innerhalb ihrer `instance_id` eindeutig; Vergleiche, Feed-Offsets oder Audit-Referenzen über Instanzen müssen das Tupel `(instance_id, stamp)` führen. Rückdruck stufenweise **außerhalb** jeder Sperre (`Backpressure(Retry)`); Warten unter Rang 1 ist verboten. `Urgent`-Löschfolgen umgehen den Rückdruck (eigener Credit, Notpool).
 
 ### 6.2 Memtable und Stamps
 
 Lock-freie Skiplist hinter dem Trait `Memtable`, Klartext (AN-05); 64 MiB je Space, ≤ 3 immutable, 256 MiB gesamt. Nach Absturz: `next_stamp = max(stamp_limit, letzter gültiger Redo-Stamp, max Run-Stamp) + 1`. Consumer und `view_durable` sehen nur Stamps ≤ `durable_stamp` derselben `instance_id` (`INV-CONS-1`).
 
-### 6.3 Guards in zwei Stufen
+### 6.3 Guards: optimistische Validierung in zwei Stufen
 
-Aufrufer wertet gegen `V0` aus und berechnet für Punkt-Guards `fp = SipHash-1-3(prozessschlüssel, space‖cluster‖branch‖key)`. Der Committer prüft das **Konfliktfenster** (Ring der letzten 1 Mio. `(fp, stamp)`, nur im Speicher): kein Stamp > `V0` ⇒ Punkt-Guard gilt (O(1), keine E/A). Sonst oder bei `V0` älter als Fensterfuß: exakter Langsampfad. Hashkollisionen dürfen nur den Langsampfad auslösen, nie Konflikte übersehen. `Guard::Range{start,end,since}` ist halboffen und wird über den stamp-sortierten ChangeIndex gegen Punkt- und Bereichsmutationen geprüft; der Punktfilter darf Range-Guards nicht vorzeitig bestätigen. `INV-GUARD-1`: Ein Change wird nur angenommen, wenn jede Guard zur Stamp-Vergabe gilt. `Precondition`: `Absent | Version(Stamp) | Unchanged{since}`.
+**Stufe A (Aufrufer, außerhalb jeder Sperre).** Der Aufrufer pinnt `V1` und wertet jede Guard **exakt** gegen `V1` aus (Plattenzugriffe, `ChangeIndex`-Scans, Merge-Konfliktprüfung; `Precondition`: `Absent | Version(Stamp) | Unchanged{since}`). Konflikt ⇒ `Err(Conflict)` an die Anwendung; der Sequencer wird nicht bemüht. Sonst entstehen Guard-Beweise: für Punkt-Guards `(V1, fp)` mit `fp = SipHash-1-3(prozessschlüssel, space‖cluster‖branch‖key)`, für `Guard::Range{start,end,since}` (halboffen) `(V1, ck, [start,end))` mit `ck = (space, cluster, branch)`.
+
+**Stufe B (Sequencer, Rang 1, nur RAM, O(Guards)).** Der Sequencer prüft lediglich, ob seit `V1` etwas Relevantes sequenziert wurde. Datenstruktur: **Konfliktfenster** = stamp-sortierter Ring der letzten `guard_window_entries` (≤ 1 Mio.) Mutationen `(stamp, fp, ck)`, einschließlich sequenzierter, noch nicht durabler Gruppen; nur im Speicher.
+
+- Punkt-Guard: ein Eintrag mit gleichem `fp` und `stamp > V1` ⇒ `GuardRetry`.
+- Range-Guard: jeder Eintrag mit gleichem `ck` und `stamp > V1` (Punkt, `RangeDelete`, `EraseRange`, Merge) ⇒ `GuardRetry`. Es findet bewusst kein Schlüsselvergleich unter Rang 1 statt (konservativ, nie ein übersehener Konflikt); der Punktfilter bestätigt Range-Guards nie.
+- `V1 < Fensterfuß` ⇒ `GuardRetry`.
+
+Der Sequencer urteilt nie über Anwendungskonflikte; `GuardRetry` heißt nur „V1 ist veraltet“. Der Aufrufer wiederholt Stufe A mit frischem `V1`, höchstens `guard_retry_max` (3) Mal, danach `Err(Conflict{contended: true})`. Hash-Kollisionen kosten höchstens einen Retry. **Es gibt keinen Langsampfad im Sequencer**; R8.2 verlangte dort „exakt gegen Memtable ∪ Version“, was Plattenzugriffe unter Rang 1 bedeutet hätte und `K-21` widersprach.
+
+`INV-GUARD-1`: Ein Change wird nur angenommen, wenn jede Guard zur Stamp-Vergabe gilt. Begründung: Stufe A ist exakt zu `V1`; Stufe B schließt jede Mutation in `(V1, Stamp-Vergabe]` aus oder liefert `GuardRetry`. M1 modelliert Fenster, Fensterfuß und Pipeline.
 
 **Guard-Katalog je Operationsart (aus CairnDB, als Konvention für die obere Schicht):** Event anhängen → keine Guard (append-only); Working State → `Version`; Fakt ändern → `Version`; Tool-Zustand → `IdemToken` + `Version`; Branch-Merge → `Unchanged{since: merge_base}` je Schlüssel (§8.5).
 
@@ -438,7 +511,7 @@ Je Space: Memtable einfrieren → je Cluster ein Abschnitt (**Retired-Cluster we
 
 ### 6.5 Idempotenz
 
-`IdemToken` im Frame-Kopf; Committer emittiert zusätzlich einen internen `SYS_IDEM`-Record im **selben Redo-Frame/Commit** wie den Change. `SYS_IDEM` ist ein reservierter, instanzweiter Systemspace unter dediziertem System-DEK; Record-Schlüssel und Request-Fingerprint sind keyed HMACs, kein Nutzwert und keine Klartext-ClusterId. Systemspace-Key/HMAC-Epoche bleibt bis Ablauf aller damit markierten Tokens verfügbar. Record-Payload wird vor Rang 1 versiegelt; Ergebnis-Stamp ist der äußere MVCC-Stamp des SYS_IDEM-Records, kein im Committer zu versiegelndes Feld. Aktive Records dürfen nicht durch `replay_floor` verworfen werden: sie werden geflusht/kompaktiert und bis TTL-Ende gepinnt. Gespeichert werden Token-Scope/Hash, kanonischer Request-Fingerprint, Status, Ablaufbucket und pseudonymes Cluster-Scope-Digest aus `tomb_id`s. Catalog-`idem_trim` ist nur eine durable Trim-Wasserstands-/Epoch-Marke, kein per-Commit zweiter Fsync. Aktive Tokenanzahl und SYS_IDEM-Bytes sind konfigurationsbegrenzt; bei ausgeschöpftem Limit wird ein tokenierter Commit vor Mutation mit `IdemCapacity` abgelehnt, aktive Tokens werden nie vorzeitig verdrängt. Bei nicht verfügbarem SYS_IDEM-Schlüssel werden tokenierte Reads/Writes fail-closed abgelehnt; kein Retry darf ohne Idem-Prüfung committen. Systemspace-Format, Schlüsselableitung, TTL-Index, Limits und Trim-Recovery sind G-F-Formatbestandteil. Wiederholung desselben Changes ⇒ gespeichertes Ergebnis; Token mit abweichendem Request ⇒ `IdemConflict`; nach Cluster-Retire ⇒ `Erased`/`ClusterRetired`, niemals neues Apply.
+`IdemToken` im Frame-Kopf; der Aufrufer legt zusätzlich einen internen `SYS_IDEM`-Record im **selben Redo-Frame/Commit** wie den Change an und setzt eine **implizite `Absent`-Guard** auf dessen HMAC-Schlüssel (K-38). Die Eindeutigkeit des Tokens wird damit durch denselben Zwei-Stufen-Mechanismus gesichert wie jede andere Guard (§6.3): kein zweiter, im Sequencer zu pflegender Token-Index und kein RAM-Wachstum ∝ aktive Tokens (bei 1000 Commits/s und 24 h TTL wären das ≈ 86 Mio. Einträge). Zwei gleichzeitige Requests mit demselben Token: der zweite erhält `GuardRetry`, wiederholt Stufe A, findet das gespeicherte Ergebnis und liefert `AlreadyApplied`. Der Vorprüfungs-Lookup (§6.1, Schritt 1) ist nur eine Abkürzung. `SYS_IDEM` ist ein reservierter, instanzweiter Systemspace unter dediziertem System-DEK; Record-Schlüssel und Request-Fingerprint sind keyed HMACs, kein Nutzwert und keine Klartext-ClusterId. Systemspace-Key/HMAC-Epoche bleibt bis Ablauf aller damit markierten Tokens verfügbar. Record-Payload wird vor Rang 1 versiegelt; Ergebnis-Stamp ist der äußere MVCC-Stamp des SYS_IDEM-Records, kein im Committer zu versiegelndes Feld. Aktive Records dürfen nicht durch `replay_floor` verworfen werden: sie werden geflusht/kompaktiert und bis TTL-Ende gepinnt. Gespeichert werden Token-Scope/Hash, kanonischer Request-Fingerprint, Status, Ablaufbucket und pseudonymes Cluster-Scope-Digest aus `tomb_id`s. Catalog-`idem_trim` ist nur eine durable Trim-Wasserstands-/Epoch-Marke, kein per-Commit zweiter Fsync. Aktive Tokenanzahl und SYS_IDEM-Bytes sind konfigurationsbegrenzt; bei ausgeschöpftem Limit wird ein tokenierter Commit vor Mutation mit `IdemCapacity` abgelehnt, aktive Tokens werden nie vorzeitig verdrängt. Bei nicht verfügbarem SYS_IDEM-Schlüssel werden tokenierte Reads/Writes fail-closed abgelehnt; kein Retry darf ohne Idem-Prüfung committen. Systemspace-Format, Schlüsselableitung, TTL-Index, Limits und Trim-Recovery sind G-F-Formatbestandteil. Wiederholung desselben Changes ⇒ gespeichertes Ergebnis; Token mit abweichendem Request ⇒ `IdemConflict`; nach Cluster-Retire ⇒ `Erased`/`ClusterRetired`, niemals neues Apply.
 
 ### 6.6 Notbetrieb bei vollem Datenträger
 
@@ -450,13 +523,26 @@ Redo, Catalog und Ledger schreiben nur in **vorallokierte** Bereiche (AN-10); `E
 
 1. `view()` lädt zuerst `visible_stamp` (Acquire), dann `Arc<Version>` (`INV-VIEW-2`). Keine Sperre über E/A.
 2. **Gate zuerst:** Clusterzustand und Restrictions vor jeder Entsiegelung (O(1)). Unbekannt ⇒ `UnknownCluster`; `Retired` oder weiter ⇒ `Erased{at:S}` **für jede Sicht, auch für Sichten ≥ S** (Erasure-Barriere überstimmt Snapshot-Isolation); `BLOCK_READ` ⇒ `Restricted`; widerrufene View ⇒ `Revoked`.
-3. **Punktabfrage:** Memtable → immutable → je Level die Dateien der Wartungsgruppe (Binärsuche nach `[min_cluster,max_cluster]`) → ClusterDirectory → SubIndex → Filter → **ein** Datenblock je Treffer-Level.
+3. **Punktabfrage:** Memtable → immutable → Staging-Runs (nur `ClusterFilter`-Treffer) → je Level die Dateien der Wartungsgruppe (Binärsuche nach `[min_cluster,max_cluster]`, `ClusterFilter`) → ClusterDirectory (Sparse-Index, höchstens eine Seite) → Abschnitt (`MiniSection`: ein Frame) → `BranchTable` → branch-bewusster Filter → SubIndex → **ein** Datenblock je Treffer-Level. Auf einem Branch läuft dies als Chain-Resolve (§7.1).
 4. **Cursor/Page:** k-Wege-Merge über Quellen **eines Clusters und seiner Branch-Kette**; Kopf ohne Body-Block-E/A; `page` entschlüsselt kleine SubIndex-Metadaten mit `weight_sum`, überspringt danach Body-Blöcke ohne deren Entsiegeln und liefert `ResumeToken`. Kumulative Gewichts-/Zählsummen über die Blöcke eines Abschnitts werden beim Laden des SubIndex im RAM berechnet und nicht persistiert (K-30); sie sind eine Obergrenze (Überlappung, Schatten) und nie Korrektheitsquelle. Ein Eintrag, der das Budget sprengen würde, beendet die Seite, **außer** die Seite wäre leer (Fortschrittsgarantie, `oversize_single`). Cursor prüfen Gate und Widerruf **zwischen Blöcken**. Der `ResumeToken` ist AEAD-versiegelt unter einem Prozessschlüssel und enthält Stamp, Cluster, Branch, letzten Schlüssel (kein Klartextschlüssel außen); nach Löschung ⇒ `Err(Erased)`.
 5. **Körper** erst bei `body()`; Schlüssel fehlt ⇒ `Shredded`, Gate ⇒ `Erased`. Nie Daten, nie „leer“.
 6. **Block-Cache** hält entsiegelte Blöcke mit `(cluster, gen)`; Treffer nur gültig, wenn `gen` dem Clusterzustand entspricht; Gate und ER2 erhöhen `gen`; `urgent` überschreibt die Puffer (`Zeroizing`). **Check-after-decrypt:** `gen` wird vor **und** nach dem Entsiegeln geprüft (`INV-KEY-2`).
 7. `view_at(S)` mit `S < history_floor` ⇒ `BelowFloor`; Sicht unter `S_erase` in einen Bereich mit `erased_ranges` ⇒ `Erased` (`INV-ERA-5`).
 8. **`View::filter_visible(&[RecordRef])`:** prüft Clusterzustand/Restriction und Stamp für Treffer, die obere Strukturen (Indizes) liefern. **Jedes Ergebnis einer Extension muss diesen Filter passieren, bevor es den Aufrufer erreicht** (`INV-VIS-1`); damit ist die Sichtbarkeit unabhängig davon, wie schnell die Extension aufräumt.
 9. Keine clusterübergreifenden Scans im Kern; `Inspector::clusters()` iteriert.
+
+### 7.1 Chain-Resolve und Branch-Kosten (K-34)
+
+Ursache der R8.2-Kostenexplosion war ein Filter ohne `branch`: Ein Schlüssel, der auf `main` existiert, wurde auf **jeder** Ebene der Kette als Treffer gemeldet und löste dort einen Block-Read aus. R9 macht Filter und Layout branch-bewusst:
+
+1. **Layout.** `cmp` (§4.2) sortiert `branch` vor `user_key`; die Einträge eines Branches bilden je Abschnitt einen zusammenhängenden Blockbereich. Der `BranchTableBlock` (§5.6) liefert diesen Bereich. Hat ein Branch keine Einträge im Abschnitt, kostet das eine RAM-Suche und nichts sonst.
+2. **Filter.** Der Bloom hasht `(branch, user_key)` mit cluster-gesalzenem Hash (gleiche Bits je Eintrag wie zuvor). Eine Probe je Kettenebene ist reiner RAM-Zugriff.
+3. **Punktlesen = Chain-Resolve.** Kette `[b0 = Blatt … bd = Wurzel]` mit Stamp-Kappen `cap_0 = V`, `cap_{i+1} = min(cap_i, fork_stamp(b_i))`. Je Ebene und Datei: (a) `BranchTable` negativ ⇒ weiter; (b) hat der Branch `has_range_del`, die beim Öffnen in eine fragmentierte Intervallliste geladene `RangeDelBlock`-Struktur prüfen (O(log r)); (c) Filter negativ ⇒ weiter; (d) sonst Blocklesung nur im Blockbereich des Branches. Der erste sichtbare Treffer mit Stamp ≤ `cap_i` beendet die Suche (Early-Exit). Ein `Delete` oder ein `RangeDelete` mit Stamp ≤ `cap_i`, der jede eigene Version des Schlüssels überdeckt, beendet sie mit „nicht vorhanden“, ohne die Eltern zu lesen: Elternversionen haben Stamps ≤ `fork_stamp`, also kleiner als der des `RangeDelete`. Der Range-Delete-Check läuft auch bei negativem Filter, weil ein Bereichs-Tombstone keinen Punkt-Eintrag hat.
+4. **Kostenmodell.** Datenblock-Lesungen ≈ `1 (main)` + `d × FPR` für Zwischenebenen + Treffer im Branch. Bei 1 % geänderten Schlüsseln und FPR ≈ 1 % ist der erwartete Mehraufwand ≈ `d × 0,01` Blöcke plus `d` RAM-Proben (≈ 50 ns je Ebene); Treffer im Blatt sind sogar billiger als auf `main`. Das ist das Tragwerk von H-21; die Messung entscheidet.
+5. **Cursor/Page.** k-Wege-Merge nur über Quellen, die im Schlüsselbereich laut `BranchTable`/SubIndex Einträge haben. `RangeDelete`-Fragmente und Stamp-Kappen werden im Iterator angewandt, nicht durch Nachfilterung. Merge-Fan-in = Σ je Kettenebene (Dateien mit Treffern im Bereich), nicht Σ aller Dateien.
+6. **Begrenzung.** Default `max_branch_depth` = 4 (hart 8). Tiefen > 4 verlangen `BranchOptions::deep_ack` und erscheinen in der Metrik `branch_depth`. Verfehlt H-21 bei Tiefe 8 das Ziel, sinkt die harte Obergrenze (Spec-Änderung); das Messverfahren wird nicht gelockert.
+7. **Korrektheit.** Filter und `BranchTable` dürfen nie ein falsches Negativ liefern (`INV-BR-5`). Property-Test: Chain-Resolve und Cursor ≡ Referenzmodell, einschließlich `RangeDelete` auf Zwischenebenen, `Fork At(S)` und Compaction mit Fork-Floor.
+8. **Vor G-F.** Weil Filter-Hashing, `BranchTableBlock` und `MiniSection` Format sind, ist eine Spike-Messung H-21 (Tiefe 1…8) und H-11 (MiniSection) Voraussetzung des Formatfreezes (§14, P2).
 
 ---
 
@@ -481,7 +567,7 @@ Branch-Metadaten liegen **im Cluster**, nicht im Catalog: reservierter Space `SY
 
 ### 8.3 Lesen auf einem Branch
 
-Sicht `(V, b)`: Für einen Schlüssel gilt die neueste Version in `b` mit Stamp ≤ `V`; sonst rekursiv in `parent(b)` mit Stamp-Obergrenze `min(V, fork_stamp(b))`. `Delete`/`RangeDelete` in `b` verdecken Elternversionen. Zusätzlich wird der clusterweite `EraseRange`-Maskensatz vor Versionsauflösung angewandt und kann durch keine Branch-Version oder Merge-Resolution aufgehoben werden. Umsetzung: k-Wege-Merge mit je Quelle einer **Stamp-Kappe**. Der Filter einer Datei bezieht sich nur auf `user_key` (ein Probe für die ganze Kette).
+Sicht `(V, b)`: Für einen Schlüssel gilt die neueste Version in `b` mit Stamp ≤ `V`; sonst rekursiv in `parent(b)` mit Stamp-Obergrenze `min(V, fork_stamp(b))`. `Delete`/`RangeDelete` in `b` verdecken Elternversionen. Zusätzlich wird der clusterweite `EraseRange`-Maskensatz vor Versionsauflösung angewandt und kann durch keine Branch-Version oder Merge-Resolution aufgehoben werden. Umsetzung: k-Wege-Merge mit je Quelle einer **Stamp-Kappe**. Filter und `BranchTable` sind branch-bewusst (§7.1): Punktlesen läuft als Chain-Resolve (Blatt → Wurzel, Early-Exit), Bereichslesen als k-Wege-Merge nur über Quellen mit Treffern im Bereich.
 
 ### 8.4 Fork, Drop, TTL
 
@@ -537,7 +623,7 @@ Jeder Löschauftrag (Cluster, Range, Branch oder Space) verlangt einen zufällig
 | `Purging` / `Purged` | Bytes aus lebenden Dateien entfernt | G2 |
 | `Done` | Ledger durabel, Anker fortgeschritten, Receipt | — |
 
-Die Stufe muss zur Schutzklasse passen, sonst `Err(Unsupported)`: **`Sealed` ⇒ `Cryptographic`, `Plain` ⇒ `Physical`/`Scrubbed`.** Das Receipt spricht nie von „unwiderruflich“ oder „konform“.
+Ein Cluster-Ticket **endet** nur auf der zur Schutzklasse passenden Stufe: **`Sealed` ⇒ `Cryptographic`, `Plain` ⇒ `Physical`/`Scrubbed`**; jede andere Endstufe ⇒ `Err(Unsupported)`. `Logical` ist (a) Zwischenziel eines Cluster-Tickets, das per `escalate` auf die Endstufe gehoben wird, und (b) zulässiges Endziel für `range`, `branch` und `space_drop` (§9.8). Ein Cluster-Ticket, das nur `Logical` erreicht hat, ist `CompleteWithResidual{LogicalOnly}` (nie `Complete`). R8.2 verlangte `Sealed ⇒ Cryptographic` und erlaubte zugleich `Logical`, `escalate` und logische Range-/Space-Löschung; das war widersprüchlich. Das Receipt spricht nie von „unwiderruflich“ oder „konform“.
 
 ### 9.3 Garantie-Kernsätze
 
@@ -563,7 +649,7 @@ pub trait KeyProvider: Send + Sync {
     // E-02/E-08: Batch ≤ 256, idempotent je BatchId, Teilresultate, jeder gemeldete Erfolg vor Rückgabe durabel
     fn create_cluster_keys(&self, request_id: BatchId, cs: &[ClusterId], e: &dyn Entropy) -> Result<Vec<KeyCreateResult>, KeyError>;
     fn cluster_keys(&self, req: &[(ClusterId, u32)]) -> Result<Vec<KeyLookup>, KeyError>;     // ≤ 256; Missing ≠ Shredded
-    fn destroy_many(&self, cs: &[ClusterId]) -> Result<DestroyReceipt, KeyError>;              // ALLE Epochen, idempotent
+    fn destroy_many(&self, cs: &[ClusterId]) -> Result<DestroyReceipt, KeyError>;              // ≤ 256 je Aufruf (der Eraser chunkt die Hülle bis 4096 und ruft parallel auf), ALLE Epochen, idempotent
     fn probe(&self, c: ClusterId, epoch: u32) -> Result<KeyProbe, KeyError>;                   // Present | Disabled | Absent
     fn list(&self) -> Result<Vec<ClusterId>, KeyError>;
     // R8.2 (K-31): Tomb-Epochenschlüssel für Ledger-Pseudonyme; nicht in KEYS, nicht in Kern-Backups
@@ -594,8 +680,8 @@ ER0 Vorprüfung:  Cluster existiert; Link-Hülle H = {c} ∪ transitiv DerivedFr
                  BLOCK_ERASE-Restriction in H ⇒ Err(Restricted{ids,reasons}); level passt zur Protection; Provider erreichbar
                  und info() erlaubt Cryptographic; bereits Retired ⇒ vorhandenes Ticket (ggf. escalate)
 ER1 Gate:        Committer-Op: Gate-Frame{scope=Clusters(H), ticket, level}, Gruppen-Fsync          ◄── LOGISCHER Punkt (G0)
-                 Committer berechnet Hülle und Restrictions NEU (INV-ERA-10); wuchs die Hülle ⇒ Retry ab ER0.
-                 Danach: cluster_table ← Retired{S}, gen++. erase() kehrt mit Ok(ticket) zurück; ab hier nie mehr ein Fehler.
+                 Der Aufrufer hat Hülle und Restrictions gegen `policy_epoch` P1 berechnet (INV-ERA-10); der Sequencer vergleicht nur `policy_epoch == P1`, Abweichung ⇒ Retry ab ER0. Nach `policy_retry_max` (3) berechnet der Sequencer die Hülle einmalig selbst (nur RAM, ≤ `max_gate_clusters` Knoten): eine Löschung wird nie von Link-/Restrict-Verkehr ausgehungert.
+                 Im Sequencer: cluster_table ← Retiring{S} (schließt nur die Schreibadmission); nach durablem Sync und Publikation Retired{S}, gen++. erase() kehrt mit Ok(ticket) zurück; ab hier nie mehr ein Fehler.
                  Asynchron (urgent): Memtable-Einträge freigeben/überschreiben, Cache-Puffer überschreiben,
                  Catalog-Edit{cluster_state(H→Retired,S), erase_pending_add}, Ledger `Retired`.
 ER2 Schlüssel:   (Cryptographic) destroy_many(H); **nur** bei `probe == Absent` KeysDestroyed; Cache leeren, gen++;
@@ -611,9 +697,9 @@ ER7 Danach:      Ledger `Done`, Anker fortschreiben, ErasureReceipt; allgemeine 
 
 **Reihenfolge ist Vertrag:** ER1 < ER2 < jedes `PurgeBatchEdit` < zugehöriger Unlink < finales ER6/`Done`; bei `Cryptographic` beginnt physischer Purge nie vor `probe == Absent` (`INV-ERA-3`). Jede Batcherweiterung ist crash-sicher und roll-forward; nach finalem Verify gibt es keine lebende Datei/Inkarnation mit H. Das Gate liegt im Committer, weil ein vor dem Gate geprüfter Change nach dem durablen Gate nicht sichtbar werden darf. Es schneidet kein Segment: der Commit-Pfad bleibt frei von Löschkosten.
 **Frist:** `purge_deadline` ist **Pflichtparameter** (kein Standard). Ticket speichert Deadline, monotone Dauer und `clock_floor`. Rücksprung wird geklemmt; ein UTC-Sprung außerhalb `max_clock_skew` friert Retention/Deadline-Berechnung ein und ergibt `ClockUncertain` mit Alarm, statt Holds vorzeitig zu beenden oder Compliance-Frist zu simulieren. Überfällige, zeitlich verifizierte Tickets erhalten `urgent`; echte Überschreitung meldet `erase_deadline_breaches_total` und `Blocked{reason=Deadline}`.
-**Bündelung:** Purge-Auslöser: Frist zu 70 % verbraucht, ≥ `purge_batch_min` (16) Cluster oder anstehende Compaction in der Datei.
+**Bündelung und Amortisierung (K-36):** Purge-Auslöser (das Erste, was eintritt): (a) **Compaction-Huckepack:** jede Compaction/Blob-GC, die eine Datei ohnehin umschreibt, lässt `Retired`-Cluster weg und erfüllt deren Purge ohne Zusatz-I/O (Standardfall); (b) Frist zu 70 % verbraucht; (c) ≥ `purge_batch_min` (16) Cluster **in derselben Datei**. Eine Datei wird je Fenster `W = purge_window_fraction × purge_deadline` (0,3) höchstens einmal umgeschrieben: alle in `W` anfallenden Löschungen der Datei teilen sich einen Rewrite. Obere Schranke der Purge-Bytes je `W` = Σ Größen der betroffenen Dateien ≤ 1 × Storegröße; die Kosten einer einzelnen Löschung sind damit amortisiert statt „eine 64-MiB-Datei je Kleinstcluster“. **Dringlichkeit:** `Plain` ⇒ Lane `urgent` (Klartext). `Sealed` ⇒ Lane `compact`, Eskalation auf `flush` bei 70 % und auf `urgent` bei 90 % der Frist (`sealed_purge_escalate`): nach `KeysDestroyed` liegt nur unlesbarer Ciphertext vor, die Hygiene darf die Wartungsbandbreite (`maint_io_fraction`) nicht verdrängen. Das Ticket bleibt bis zum Purge `Purging`; Receipt-Zeitpunkte `t_crypto` (G1) und `t_physical` (G2) werden getrennt ausgewiesen.
 **Views:** `ViewPolicy::Wait(timeout)` (Unlink wartet; logische Garantie gilt bereits) oder `Revoke` (§11.4).
-**Done-Bedingungen (`INV-ERA-8`):** (1) keine lebende Datei/Segment/Inkarnation trägt Daten von H (bei Cryptographic unlesbar), (2) Memtable-Einträge freigegeben, (3) Ledger durabel, (4) Anker fortgeschritten, (5) alle Segmentbesitzer bestätigt, (6) bei Cryptographic `probe == Absent`.
+**Done-Bedingungen (`INV-ERA-8`):** (1) keine lebende Datei/Segment/Inkarnation trägt Bytes von H, auch keinen Ciphertext (bei Cryptographic ist Unlesbarkeit notwendig, aber nicht hinreichend), (2) Memtable-Einträge freigegeben, (3) Ledger durabel, (4) Anker fortgeschritten, (5) alle Segmentbesitzer bestätigt, (6) bei Cryptographic `probe == Absent`.
 
 #### 9.5.1 `purge` (der einzige Dateilöschalgorithmus)
 
@@ -651,24 +737,24 @@ Tests: `FaultFs` mit `EIO` auf Redo/Catalog gefolgt von Erase-Request (Ledger ge
 - **Restriction:** `RestrictionSpec { reason u16 ≠ 0, owner, effects (BLOCK_ERASE immer | BLOCK_WRITE | BLOCK_READ), expires }`. Ablauf lässt nur den Vermerk fallen, löst nie Löschung aus. **Kein Override im Kern.** `lift` nach `LiftPolicy`: `OwnerOrAdmin` (Standard) oder `FourEyes` (Port `Authority`, Signatur einer Principal ≠ Requester). `restrict`/`lift` laufen als Control-Frame durch den Committer, in derselben Stamp-Reihenfolge wie das Gate (`INV-ERA-10`). Durchsetzung dreischichtig: Committer-Prüfung (ER0/ER1), Purge verweigert `files_remove`/Umbau für Cluster mit BLOCK_ERASE, `cluster_state`-Edit verweigert den Übergang nach `Retired` für Restricted-Cluster. Ein Erase blockiert **sofort** mit `Err(Restricted)` (kein Zwischenzustand); will die obere Schicht den Cluster währenddessen verbergen, setzt sie selbst `BLOCK_READ`.
 - **`BLOCK_READ`:** Lesen ⇒ `Err(Restricted)`; zweckgebundene Lesung nur mit nicht klonbarer `RestrictedReadCap` (Observer-Ereignis mit Zweck-Code, nie in Cache oder Consumer-Feed).
 - **Hold:** technisch, befristet (`ttl ≤ 24 h`); ein Erase überstimmt einen Hold ohne Fehler.
-- **Links:** `Clusters::link(derived, sources[≤ 8])` (azyklisch, Tiefenlimit). Die Storage-Schicht begrenzt die transitive `DerivedFrom`-Erase-Hülle auf `max_gate_clusters=4096`: Link-Admission prüft die resultierenden Nachfahren außerhalb Rang 1 und Commit revalidiert die Graph-Generation; zu große Hüllen ergeben `EraseFanoutExceeded` ohne Link-Mutation. Dadurch passt jede zulässige Kaskade in einen Gate-Change. Löschung irgendeines Quellclusters zieht den abgeleiteten **im selben Gate-Frame** mit (`INV-ERA-12`): es gibt keinen Zustand, in dem die Quelle gelöscht ist und ein Abgeleiteter lebt. Ein Kind mit mehreren Eltern wird konservativ gelöscht, sobald **eines** seiner Eltern gelöscht wird. Die fachliche Cross-Subject-Prüfung gehört wegen NZ-16 in die Identity-/Policy-Schicht; sie muss vor Link-Commit sicherstellen, dass die betroffenen Löschdomänen übereinstimmen. Ein gemeinsam genutzter Cluster darf nicht als `DerivedFrom`-Kind einer einzelnen Person angelegt werden; pro Löschdomäne getrennte Ableitungen oder nicht-kaskadierende `Reference` verwenden.
+- **Links:** `Clusters::link(derived, sources[≤ 8])` (azyklisch, Tiefenlimit). Die Storage-Schicht begrenzt die transitive `DerivedFrom`-Erase-Hülle auf `max_gate_clusters=4096`: Ein Link ist ein **Control-Frame `Link`** und damit im Sequencer total mit Gate, Restrict und Lift geordnet (R8.2: Catalog-Edit außerhalb der Stamp-Ordnung ⇒ Race „Quelle gelöscht, Link danach angelegt“ verletzte `INV-ERA-12`). Admission außerhalb Rang 1 gegen `policy_epoch` P1: (a) azyklisch, (b) `max_link_depth` (8), (c) für **jeden Vorfahren-oder-selbst** `a` jeder Quelle gilt `|Hülle(a) ∪ Hülle(derived)| ≤ max_gate_clusters` (die Hülle eines Vorfahren wächst mit jedem neuen Nachfahren; eine Prüfung nur am neuen Kind genügt nicht), (d) keine Quelle ist `Retiring`/`Retired` (sonst `ClusterRetired`). Die Traversierung bricht bei `max_gate_clusters + 1` besuchten Knoten ab ⇒ `EraseFanoutExceeded` ohne Link-Mutation. Der Sequencer prüft nur `policy_epoch == P1` (sonst Retry) und „Quelle `Live`“, setzt die Kante und erhöht `policy_epoch`; keine Graph-Arbeit unter Rang 1. Dadurch passt jede zulässige Kaskade in einen Gate-Change. Löschung irgendeines Quellclusters zieht den abgeleiteten **im selben Gate-Frame** mit (`INV-ERA-12`): es gibt keinen Zustand, in dem die Quelle gelöscht ist und ein Abgeleiteter lebt. Ein Kind mit mehreren Eltern wird konservativ gelöscht, sobald **eines** seiner Eltern gelöscht wird. Die fachliche Cross-Subject-Prüfung gehört wegen NZ-16 in die Identity-/Policy-Schicht; sie muss vor Link-Commit sicherstellen, dass die betroffenen Löschdomänen übereinstimmen. Ein gemeinsam genutzter Cluster darf nicht als `DerivedFrom`-Kind einer einzelnen Person angelegt werden; pro Löschdomäne getrennte Ableitungen oder nicht-kaskadierende `Reference` verwenden.
 
 ### 9.7 Ledger, Anker, Receipt
 
-- **Ledger:** append-only, vorallokiert, kettenverknüpft über `Mac`, **ein Schreiber**. Record ist ein kanonischer tagged union: `{seq, prev_hash, clock_sample, event, mac}`; keine Null-/Platzhalterfelder. Erase-Events enthalten nur `tomb_id = HMAC(tomb_key(tomb_epoch), "ctxs cluster tomb v1" || instance_id[16] || ClusterId[16])` samt `tomb_epoch u32`, Ticket, Level, Stamp/Stage und Evidence-Digest; niemals Klartext-ClusterId, SpaceId, Nutzdaten, Nutzerschlüssel oder Person-ID (`INV-LED-1`). Event-Kinds umfassen `EraseIntent`, `SpaceDropIntent`, `GateApplied`, `KeyDestroyIntent`, `KeysDestroyed`, `KeyLost`, `PurgeProgress`, `UnlinkProgress`, `ExtAck`, `PurgeVerified`, `Completed`, `RestrictionSet/Lifted`, `BranchEraseDone`, `SpaceDropped`, `RestoreReconciled`, `ReceiptIssued`, `TombEpochOpened`, `TombEpochClosed`, `TombEpochRetireIntent`, `TombEpochRetired`. Ein `EraseIntent` ist genau ein kanonischer, atomar appendbarer Datensatz mit höchstens 4096 sortierten `tomb_id`s (max. 256 KiB Record); selektive Range-/Branch-Selectoren sind als `scope_ciphertext` AEAD-versiegelt unter langlebigem `LedgerScopeKey`, AAD bindet Instance/Ticket/Digest. Ein `SpaceDropIntent` trägt nur `space_tomb_id`, Scope-Digest, Count und Level. `space_tomb_id = HMAC(ledger_key, "ctxs space tomb v1" || instance_id[16] || be_u64(SpaceId))`. Weder IDs noch Nutzdaten stehen im Ledger im Klartext; bei Restore berechnet der Matcher den Pseudonymwert über Catalog-Einträge und sperrt vor Zugriff jede passende SpaceId. Ledger-Scratch ist vorallokiert; ein Intent wird erst bei vollständigem validem Record plus Sync angenommen. Der Schlüssel bleibt außerhalb von Datenbackups und muss für Restore verfügbar bleiben. Klartext-ClusterId/SpaceId, Benutzerkeys und Nutzdaten stehen nie im Ledger. `request_id_hmac` und `request_digest` machen Retry exakt idempotent; gleicher Token mit anderem Digest ⇒ `IdemConflict`. Ein Gate ist erst zulässig, wenn sein versiegeltes Ledger-Intent durabel ist. Reihenfolge: Restriction-/Closure-Prüfung und Sequencer-Reservierung → einzelnes vollständiges Ledger-Intent durable → Gate-Catalog-Edit durable und In-Memory-Gate veröffentlichen → `GateApplied`-Ledger-Event → Anchor-CAS → erst dann KeyDestroy/Purge. Vor `destroy_many` steht ein durables `KeyDestroyIntent`; Recovery kann KMS-Ergebnis mit `probe` idempotent nachziehen. So kann weder ein altes Backup noch ein Crash ein angenommenes Gate ohne Tombstone wiederbeleben. Jeder Übergang ist crash-idempotent und vor irreversibler Folgestufe durabel. `ledger_dir` konfigurierbar (K-22).
+- **Ledger:** append-only, vorallokiert, kettenverknüpft über `Mac`, **ein Schreiber**, der wartende Events zu Gruppen bündelt (ein `write` + ein `sync_data`). Erwartete Gate-Latenz ≈ `t_sync(Ledger) + t_sync(Redo-Pipeline)`; das ist die untere Schranke von H-6. Record ist ein kanonischer tagged union: `{seq, prev_hash, clock_sample, event, mac}`; keine Null-/Platzhalterfelder. Erase-Events enthalten nur `tomb_id = HMAC(tomb_key(tomb_epoch), "ctxs cluster tomb v1" || instance_id[16] || ClusterId[16])` samt `tomb_epoch u32`, Ticket, Level, Stamp/Stage und Evidence-Digest; niemals Klartext-ClusterId, SpaceId, Nutzdaten, Nutzerschlüssel oder Person-ID (`INV-LED-1`). Event-Kinds umfassen `EraseIntent`, `SpaceDropIntent`, `SpaceScopeFrozen`, `GateApplied`, `KeyDestroyIntent`, `KeysDestroyed`, `KeyLost`, `PurgeProgress`, `UnlinkProgress`, `ExtAck`, `PurgeVerified`, `Completed`, `RestrictionSet/Lifted`, `BranchEraseDone`, `SpaceDropped`, `RestoreReconciled`, `ReceiptIssued`, `TombEpochOpened`, `TombEpochClosed`, `TombEpochRetireIntent`, `TombEpochRetired`. Ein `EraseIntent` ist genau ein kanonischer, atomar appendbarer Datensatz mit höchstens 4096 sortierten `tomb_id`s (max. 256 KiB Record); selektive Range-/Branch-Selectoren sind als `scope_ciphertext` AEAD-versiegelt unter langlebigem `LedgerScopeKey`, AAD bindet Instance/Ticket/Digest. Ein `SpaceDropIntent` trägt nur `space_tomb_id` und Level; Count und Scope-Digest folgen nach dem Gate als `SpaceScopeFrozen`. `space_tomb_id = HMAC(ledger_key, "ctxs space tomb v1" || instance_id[16] || be_u64(SpaceId))`. Weder IDs noch Nutzdaten stehen im Ledger im Klartext; bei Restore berechnet der Matcher den Pseudonymwert über Catalog-Einträge und sperrt vor Zugriff jede passende SpaceId. Ledger-Scratch ist vorallokiert; ein Intent wird erst bei vollständigem validem Record plus Sync angenommen. Der Schlüssel bleibt außerhalb von Datenbackups und muss für Restore verfügbar bleiben. Klartext-ClusterId/SpaceId, Benutzerkeys und Nutzdaten stehen nie im Ledger. `request_id_hmac` und `request_digest` machen Retry exakt idempotent; gleicher Token mit anderem Digest ⇒ `IdemConflict`. Ein Gate ist erst zulässig, wenn sein versiegeltes Ledger-Intent durabel ist. Reihenfolge: Restriction-/Closure-Prüfung und Sequencer-Reservierung → einzelnes vollständiges Ledger-Intent durable → Gate-Catalog-Edit durable und In-Memory-Gate veröffentlichen → `GateApplied`-Ledger-Event → Anchor-CAS → erst dann KeyDestroy/Purge. Vor `destroy_many` steht ein durables `KeyDestroyIntent`; Recovery kann KMS-Ergebnis mit `probe` idempotent nachziehen. So kann weder ein altes Backup noch ein Crash ein angenommenes Gate ohne Tombstone wiederbeleben. Jeder Übergang ist crash-idempotent und vor irreversibler Folgestufe durabel. `ledger_dir` konfigurierbar (K-22).
 - **Anker:** `AnchorValue = (erase_epoch, ledger_head, catalog_epoch)`. Der Anker wird nach durablem Gate-Catalog-Edit fortgeschrieben und **vor** `KeyDestroyIntent`/KeyDestroy oder Purge-Barriere muss die aktuelle Gate-/Ledger-Position verankert sein. Zusätzlich Fortschreibung bei Catalog-Rollover, `close` und spätestens `anchor_max_age` (1 s) bei ausstehendem Zustand; koalesziert. `Required` ist Standard bei Encrypted/Authenticated; wenn der erforderliche Anker vor einer irreversiblen Folgestufe nicht fortgeschrieben werden kann, bleibt das Ticket `Blocked` und diese Stufe beginnt nicht. `Weak`-Anker erfordert explizites `acknowledged_weak` und kann keinen starken Rollback-Schutz attestieren. Referenz: `MemAnchor` (Test), `FileAnchor` (`Weak`); `Strong`-Anker (TPM, Transparency-Log, Object-Lock) als getrennte Crates.
-- **Scope-Digest:** Einzelcluster- und Batch-Erase-Digests sind HMACs über domain-separierte, sortierte Tomb-IDs plus kanonische Selector-Bytes. Beim Space-Drop fixiert der Sequencer vor dem Intent die Space-Mitgliedschaft; `scope_digest = HMAC(ledger_key, "ctxs space scope v1" || instance_id[16] || be_u64(SpaceId) || level || count || sorted_tomb_ids)`. Die HMAC-Eingabe wird gestreamt; keine Klartext-ID-Liste kommt ins Ledger. `space_tomb_id` dient dem Restore-Gate, `scope_digest` dem Nachweis der eingefrorenen Mitgliedschaft.
+- **Scope-Digest:** Einzelcluster- und Batch-Erase-Digests sind HMACs über domain-separierte, sortierte Tomb-IDs plus kanonische Selector-Bytes. Beim Space-Drop wird die Mitgliedschaft **nicht** unter Rang 1 ermittelt (R8.2 verlangte dort ein Einfrieren aller Cluster des Spaces, O(Cluster) im kritischen Pfad): Das Gate maskiert die gesamte SpaceId und schließt Writes in den Space, danach ermittelt ein Wartungsjob die Mitgliedschaft aus der zum Gate-Stamp gepinnten Version (O(Dateien), ohne Lock, nach dem Gate unveränderlich) und schreibt `SpaceScopeFrozen{count, scope_digest}` ins Ledger; `scope_digest = HMAC(ledger_key, "ctxs space scope v1" || instance_id[16] || be_u64(SpaceId) || level || count || sorted_tomb_ids)`. Die HMAC-Eingabe wird gestreamt; keine Klartext-ID-Liste kommt ins Ledger. `space_tomb_id` dient dem Restore-Gate, `scope_digest` dem Nachweis der eingefrorenen Mitgliedschaft.
 - **Tomb-Epochen (K-31, E-74):** Jedes Event mit `tomb_id` trägt `tomb_epoch`; ein `tomb_id` wird nie ohne Epochenbezug interpretiert. Die Kette selbst (`prev_hash`, `mac`) nutzt `ledger_key` und bleibt von Tomb-Schlüsseln unabhängig; `verify_receipt` rechnet `tomb_id`s nur als Werte und braucht daher nie einen Tomb-Schlüssel. Nach `TombEpochRetired` ist kein `tomb_id` dieser Epoche mehr auf eine ClusterId abbildbar, auch nicht mit Kenntnis der ClusterId; der Ledger-Eintrag ist dann anonym (Ablauf und Bedingungen: §10.4). `space_tomb_id` bleibt unter `ledger_key`, weil SpaceIds nicht personenbezogen sind.
 - **Ledger-Failure-Domain (K-22, E-81):** `OpenProfile::Production` verlangt, dass `ledger_dir` auf einem anderen Gerät liegt als das Datenverzeichnis (Vergleich der `device_ids` aus `HostProbe`, sonst Adapterangabe); andernfalls `Err(LedgerSameDevice)`, außer `ledger_same_device_ack` ist gesetzt (dann Restexposition im Receipt). Ist das Ledger beim schreibenden Öffnen nicht lesbar, lautet das Ergebnis `Err(LedgerUnavailable)`; `ReadOnly` ist nur mit Diagnose erlaubt, Gates aus dem Catalog gelten weiter.
 - **Erase-Idempotenz:** `request_id_hmac = HMAC(ledger_key, "ctxs erase request id v1" || instance_id[16] || EraseRequestId[16])`. `request_digest = HMAC(ledger_key, "ctxs erase request digest v1" || canonical_erase_request)`, wobei `canonical_erase_request` ein versioniertes, tag- und längencodiertes Format mit sortierten eindeutigen Zielen, Erase-Level und semantischen Optionen ist. Deadlines und Retry-Metadaten sind nicht semantisch und bleiben außerhalb. Gleiche Request-ID und gleicher Digest liefern dasselbe Ticket/Resultat, gleiche ID mit anderem Digest ergibt `IdemConflict`. Die Ledger-Key-Epoche bleibt für die gesamte Ledger-Retention verfügbar.
-- **`ErasureReceipt`:** `{instance_id, req/ticket, scope_digest (HMAC über kanonisch sortierte Tomb-IDs und Selector-Digest), level, t_requested, t_logical, erase_epoch S, t_crypto?, t_physical?, t_verified?, stages[{stage, ledger_seq, evidence_digest}], key_attestations, provider{destroy, keys_in_backups, assurance}, ext_acks, verifier_report_digest[MeasureKind je Messung, §13.2.1], ledger_head, anchor{strength, value}, restrictions_encountered, status (Complete | CompleteWithResidual | Incomplete | Blocked | Failed), residual[§9.9], canonical_bytes}`. `Complete` verlangt jede für den angeforderten Level erforderliche Kern- und Owner-Attestation. `CompleteWithResidual` bedeutet abgeschlossen mit explizit benannten, nicht vom Vertrag abgedeckten Restrisiken. `Incomplete` bedeutet, dass ein erforderlicher Owner-/Scope-Nachweis fehlt oder der Scope nur teilweise belegt ist; es ist niemals eine erfolgreiche Löschquittung. `Blocked` bedeutet ein sicher pausierter, fortsetzbarer Auftrag; `Failed` ist ein terminaler Integritäts-/Protokollfehler. **Statuscaps:** `BoundedBackupKeys{until}`, `WeakKeyAssurance` und deklarierte Host-/Gerät-Restexposition (§9.9) begrenzen `Complete` auf `CompleteWithResidual`; eine Pflichtmessung (§13.2.1) mit `NotMeasured` oder `NotImplemented` begrenzt auf `Incomplete` (`INV-VER-1`). **Die Signatur liegt oben (NZ-14);** der Kern liefert kanonische Bytes und die reine, offline lauffähige Funktion `verify_receipt(receipt, ledger_slice, anchor_attestation) → Verdict` (Kette, Anker, Stufenreihenfolge, Zeitmonotonie).
+- **`ErasureReceipt`:** `{instance_id, req/ticket, scope_digest (HMAC über kanonisch sortierte Tomb-IDs und Selector-Digest), level, t_requested, t_logical, erase_epoch S, t_crypto?, t_physical?, t_verified?, stages[{stage, ledger_seq, evidence_digest}], key_attestations, provider{destroy, keys_in_backups, assurance}, ext_acks, verifier_report_digest[MeasureKind je Messung, §13.2.1], ledger_head, anchor{strength, value}, restrictions_encountered, status (Complete | CompleteWithResidual | Incomplete | Blocked | Failed), residual[§9.9], canonical_bytes}`. `Complete` verlangt jede für den angeforderten Level erforderliche Kern- und Owner-Attestation. `CompleteWithResidual` bedeutet abgeschlossen mit explizit benannten, nicht vom Vertrag abgedeckten Restrisiken. `Incomplete` bedeutet, dass ein erforderlicher Owner-/Scope-Nachweis fehlt oder der Scope nur teilweise belegt ist; es ist niemals eine erfolgreiche Löschquittung. `Blocked` bedeutet ein sicher pausierter, fortsetzbarer Auftrag; `Failed` ist ein terminaler Integritäts-/Protokollfehler. **Statuscaps:** `BoundedBackupKeys{until}`, `WeakKeyAssurance`, `LogicalOnly` und deklarierte Host-/Gerät-Restexposition (§9.9) begrenzen `Complete` auf `CompleteWithResidual`; eine Pflichtmessung (§13.2.1) mit `NotMeasured` oder `NotImplemented` begrenzt auf `Incomplete` (`INV-VER-1`). **Die Signatur liegt oben (NZ-14);** der Kern liefert kanonische Bytes und die reine, offline lauffähige Funktion `verify_receipt(receipt, ledger_slice, anchor_attestation) → Verdict` (Kette, Anker, Stufenreihenfolge, Zeitmonotonie).
 - **`Eraser::verify`:** strukturell, ohne Schlüssel: (a) keine lebende Datei/Segment/behaltenes Redo-Segment trägt ClusterDirectory-/Frame-Kopf-Eintrag für H, (b) Memtables ohne H, (c) bei Cryptographic `probe == Absent`, (d) Ledgerkette bis zum Anker gültig. Inhaltssuche ist Sache des Orakels.
 
 ### 9.8 Weitere Löschpfade
 
 - **`Eraser::range(space, cluster, range)`:** keine Branch-Argumente; `EraseRange` ist ein clusterweiter Gate-Marker, der nach durablem Frame sofort alle Branches und auch ältere Views maskiert. Für `Plain` sind `Logical|Physical|Scrubbed` verfügbar; `Physical` rewritet alle Branch-/Stamp-Versionen des Bereichs aus lebenden Run-/Blob-Dateien. `Scrubbed` ist best-effort und kein SSD-/CoW-Beweis. Für `Sealed` ist ausschließlich `Logical` zulässig: selektive Range-Key-Vernichtung existiert in v1 nicht, und ein Rewrite allein macht Backup-Kopien mit demselben Cluster-Key nicht unlesbar. Für physische/kryptografische Entfernung eines Sealed-Bereichs ist der ganze Cluster zu löschen oder der Bereich vorab in eine eigene Cluster-Löschdomäne zu legen. `EraseRange` kann nie per Merge aufgehoben werden. `erased_ranges` dürfen erst getrimmt werden, wenn `history_floor > erase_stamp` und keine Branch-/View-/Consumer-Pins darunter liegen.
 - **`Eraser::branch(cluster, branch)`:** nur terminale, leaf-Branches. Für `Plain` sind `Logical|Physical|Scrubbed` analog zu `range` möglich; physisch werden alle Versionen dieses Branches aus lebenden Run-/Blob-Dateien entfernt. Für `Sealed` nur `Logical`, da die Cluster-Keydomäne mit anderen Branches geteilt wird. Eine Crypto-Anforderung wird als Cluster-Erase ausgeführt; es gibt keine branchlokale Schlüsselvernichtung.
-- **`Storage::space_drop(space, request_id, level, deadline)`:** Sequencer friert SpaceId und Scope-Digest ein und prüft alle `BLOCK_ERASE`-Restrictions; jede Restriction blockiert vor Mutation. V1 unterstützt `Logical` für beide Seal-Modi und `Physical|Scrubbed` nur für Plain. `Cryptographic` auf Space-Ebene ist `Unsupported`: ein Space kann Cluster mit anderen Spaces teilen, und der Cluster-Key lässt keine sichere Teilvernichtung zu. Crypto-Erasure erfordert explizite Cluster-Tickets. Vor dem Gate wird `SpaceDropIntent{space_tomb_id,scope_digest,count,level}` durable ins Ledger geschrieben; `space_tomb_id=HMAC(ledger_key, "ctxs space tomb v1" || instance_id[16] || be_u64(SpaceId))`, ohne Klartext-ID oder Memberliste. Da SpaceId nie wiederverwendet wird, kann Restore jede alte Catalog-Kopie auf diese SpaceId matchen und ihre Sichtbarkeit vor Datenzugriff sperren; Scope-Digest/Count dienen dem Receipt-Abgleich, nicht als Ersatz für den Scope-Matcher. Nach Intent folgen `Gate{Space(id),intent_id}`, `GateApplied` und Anchor-CAS. Erst danach starten Physical-Folgestufen. `SpaceDropped` ist das Abschlussereignis nach allen erforderlichen Purge-/Extension-Attesten. Kein einzelner Catalog-Edit versucht beliebig viele Dateien umzuschreiben. Wiederanlage erfordert eine neue SpaceId.
+- **`Storage::space_drop(space, request_id, level, deadline)`:** Der Aufrufer prüft die RAM-Menge der `BLOCK_ERASE`-Restrictions (O(|R| × Dateien des jeweiligen Clusters), außerhalb Rang 1) darauf, ob ein eingeschränkter Cluster Daten im Space hat; jeder Treffer blockiert vor Mutation. Der Sequencer revalidiert `policy_epoch`, sodass keine zwischenzeitlich gesetzte Restriction übersehen wird. V1 unterstützt `Logical` für beide Seal-Modi und `Physical|Scrubbed` nur für Plain. `Cryptographic` auf Space-Ebene ist `Unsupported`: ein Space kann Cluster mit anderen Spaces teilen, und der Cluster-Key lässt keine sichere Teilvernichtung zu. Crypto-Erasure erfordert explizite Cluster-Tickets. Vor dem Gate wird `SpaceDropIntent{space_tomb_id,level}` durable ins Ledger geschrieben; `space_tomb_id=HMAC(ledger_key, "ctxs space tomb v1" || instance_id[16] || be_u64(SpaceId))`, ohne Klartext-ID oder Memberliste. Da SpaceId nie wiederverwendet wird, kann Restore jede alte Catalog-Kopie auf diese SpaceId matchen und ihre Sichtbarkeit vor Datenzugriff sperren; Scope-Digest/Count dienen dem Receipt-Abgleich, nicht als Ersatz für den Scope-Matcher. Nach Intent folgen `Gate{Space(id),intent_id}`, `GateApplied` und Anchor-CAS. Erst danach starten Physical-Folgestufen. `SpaceDropped` ist das Abschlussereignis nach `SpaceScopeFrozen` und allen erforderlichen Purge-/Extension-Attesten. Kein einzelner Catalog-Edit versucht beliebig viele Dateien umzuschreiben. Wiederanlage erfordert eine neue SpaceId.
 - **System-Space-Lifecycle:** Öffentliche Drop- und Mutations-APIs akzeptieren keine `SpaceId < 256`; sie liefern `ReservedSpace`. Änderungen oder Entfernung von `SYS_BRANCH`/`SYS_IDEM` sind nur über versionierte interne Migrationen mit eigenem Recovery-Vertrag zulässig.
 - **`pack_expired(PackKey)`:** `H` = nicht Restricted-Cluster der Packgruppe. Der Ablauf zerlegt H deterministisch in unabhängige Tickets mit höchstens `max_gate_clusters=4096`; jedes Ticket hat einen eigenen Gate-Frame und eigene Receipt-/Ledger-Kette. Es gibt keine behauptete atomare Gesamtlöschung der Packgruppe. Restricted-Cluster werden mit Grund im Aggregate ausgewiesen und separat erneut versucht, wenn die Restriction aufgehoben wird.
 - **`escalate(ticket, level)`** (z. B. Logical → Cryptographic), **`open_tickets()`** (nach Absturz des Aufrufers), **`clusters_batch`**.
@@ -716,7 +802,7 @@ R8  Vor Freigabe von Views/Schreibzugriff: alle versiegelten Ledger-Erase-/Space
     ⇒ bei fehlendem LedgerScopeKey RestoreQuarantine/LockedKeys; sonst urgent fortsetzen; kein Body wird vor Gate-Auflösung entsiegelt, keine irreversible Stufe ohne Anchor
     (E-75: Intents mit `origin = Poisoned` laufen hier identisch; zuvor lösen R6/R7 `Indeterminate`-Changes auf)
 R9  Verwaiste Dateien und .building.* entfernen (nach R8, nie davor)
-R10 Reserven (Stamp, ID, Redo-Segment, RESERVE) herstellen, Wartung starten, OpenReport
+R10 Reserven (Stamp, Notpool, ID, Redo-Segment, RESERVE) herstellen; Admission-Prüfungen (FD-Limit `RLIMIT_NOFILE ≥ max_open_files + fd_reserve`, `max_live_files`, `cluster_meta_budget` gegen die Clusterzahl des Catalogs; Verstoß ⇒ `Err(AdmissionLimit{..})` bzw. `ReadOnly` mit Diagnose); Wartung starten, OpenReport
 ```
 
 Ehrliche Grenze: Ein beschädigter letzter quittierter Gruppenabschnitt hinter der letzten `redo_mark`, dem nichts Gültiges folgt, ist von einem Torn Write nicht unterscheidbar; die Heilung kürzt dann. Das ist die einzige Stelle, an der Bitfäule `durable = true` verletzen kann; `redo_mark` hält das Fenster klein.
@@ -766,13 +852,13 @@ Ehrliche Grenze: Ein beschädigter letzter quittierter Gruppenabschnitt hinter d
 
 ### 11.1 Prinzipien
 
-Ein Schreiber (Committer) für stamp-relevante Zustände; unveränderliche Dateien und `Arc<Version>`; Besitz durch Claims; Wahrheit durch durable Edits/Frames; Generationszähler statt Sperren für Schlüsselcache, Blockcache, Clusterzustand; keine Sperre über E/A außer Committer (Redo-Sync) und `catalog_edit` (Catalog-Sync); Ledger/Anker haben je einen Schreiber über Kanäle.
+Ein Sequencer (Rang 1, ohne E/A) für stamp-relevante Zustände und ein Syncer für das Redo; unveränderliche Dateien und `Arc<Version>`; Besitz durch Claims; Wahrheit durch durable Edits/Frames; Generationszähler statt Sperren für Schlüsselcache, Blockcache, Clusterzustand; keine Sperre über E/A außer `catalog_edit` (Catalog-Sync); der Redo-Sync läuft im Syncer-Thread ohne Sperre; Ledger/Anker haben je einen Schreiber über Kanäle.
 
 ### 11.2 Sperrränge (nur aufsteigend, je Thread höchstens einmal, `debug_assertions` prüft per Rangstack)
 
 | Rang | Sperre | Über E/A | Bemerkung |
 |---|---|---|---|
-| 1 | `committer` | ja (Redo-Sync) | Stamp-Vergabe, `Live → Retired`, Branch-Ops |
+| 1 | `sequencer` | **nein** | Stamp-Vergabe, `Live → Retiring`, Link/Restrict/Lift, Branch-Ops; nur RAM, O(Ops) |
 | 2 | `intake` | nein | |
 | 3 | `catalog_edit` | ja (Catalog-Sync) | Gruppen-Commit |
 | 4 | `state` (`RwLock<Arc<Version>>`) | nein | Veröffentlichung |
@@ -781,11 +867,11 @@ Ein Schreiber (Committer) für stamp-relevante Zustände; unveränderliche Datei
 | 7 | `maint` (je Lane) | nein | Blatt |
 | 8 | `notify` | nein | Blatt |
 
-Rang 1 + 3 gleichzeitig nur im Reservierungs-Fallback. Kein Rückruf (`Observer`, `SegmentOwner`, `KeyProvider`) unter Sperren, **insbesondere kein Provideraufruf unter Rang 1**. Memtable lock-frei. Kein `std::sync::Mutex` außerhalb `sync::Ranked`.
+Rang 1 und Rang 3 werden nie gleichzeitig gehalten (Notpool, §5.8). Rang 2 wird vom Leader nur unter Rang 1 genommen (aufsteigend); wartende Aufrufer halten beim Anhängen ausschließlich Rang 2 (§6.1, Schritt 5). Kein Rückruf (`Observer`, `SegmentOwner`, `KeyProvider`) unter Sperren, **insbesondere kein Provideraufruf unter Rang 1**. Memtable lock-frei. Kein `std::sync::Mutex` außerhalb `sync::Ranked`.
 
 ### 11.3 Lock-freie Pfade
 
-`ArcSwap`/`RwLock<Arc<_>>` für `Version`; Reihenfolge Publish: Version, dann `visible_stamp` (Release); Leser laden Stamp (Acquire), dann Version. Cluster-Zustand = `AtomicU64 (state:8 | gen:56)`; nur der Committer setzt `Live → Retired` (`INV-LOCK-2`); spätere Übergänge sind monoton und laufen per `catalog_edit`.
+`ArcSwap`/`RwLock<Arc<_>>` für `Version`; Reihenfolge Publish: Version, dann `visible_stamp` (Release); Leser laden Stamp (Acquire), dann Version. Cluster-Zustand = `AtomicU64 (state:8 | gen:56)`; nur der Sequencer setzt `Live → Retiring`, die Publikation nach durablem Sync setzt `Retiring → Retired` (`INV-LOCK-2`); spätere Übergänge sind monoton und laufen per `catalog_edit`.
 
 ### 11.4 Views und Graveyard
 
@@ -810,14 +896,19 @@ Rang 1 + 3 gleichzeitig nur im Reservierungs-Fallback. Kein Rückruf (`Observer`
 | R7 | Rebucket × Lesen | Gruppe im selben Edit | M5 |
 | R8 | Zwei Erase, überlappende Hülle | Serialisierung nach Ticket-ID in `urgent` | Sim |
 | R9 | Restriction × Erase | beides im Committer, eine Stamp-Reihenfolge | M2 |
-| R10 | Link × Erase | Hülle im Committer neu berechnet, Retry | M2 |
-| R11 | Guard × Gate | Zustandsprüfung (5a) vor Guard (5b) | M2 |
+| R10 | Link × Erase | beide als Frames im Sequencer total geordnet; `policy_epoch`-Vergleich, Retry, nach 3 Retries Selbstberechnung | M2 |
+| R11 | Guard × Gate | Zustandsprüfung (6a) vor Guard (6b) | M2 |
 | R12 | Anker × Edit | Anker nie vor Edit, Nachzug in R2a | M6 |
 | R13 | Staging × Erase | `purge` behandelt Staging wie Packed | M3, Sim |
 | R14 | Space-Drop × Flush/Compaction | Claims, `Dropping` bricht Jobs ab | M2, Sim |
-| **R15** | **Merge × Gate/Restriction** | Merge ist ein Change; Zustandsprüfung 5a gilt für Quell- und Zielcluster (derselbe Cluster) | M2 |
+| **R15** | **Merge × Gate/Restriction** | Merge ist ein Change; Zustandsprüfung 6a gilt für Quell- und Zielcluster (derselbe Cluster) | M2 |
 | **R16** | **Fork × Compaction** | `floor` berücksichtigt lebende `fork_stamp`s | M3 |
 | **R17** | **Branch-Drop × Merge** | beides im Committer, serialisiert; Merge auf gedroppten Branch ⇒ `BranchClosed` | M2 |
+| **R18** | **Sync-Fehler × Publikation** | Publikation nur nach Sync derselben Gruppe, in Stamp-Reihenfolge; Fehler ⇒ spätere Gruppen nie veröffentlicht (`INV-PIPE-2`) | M1, Sim |
+| **R19** | **Leader-Wechsel × Intake** | Leader prüft Intake nach Freigabe erneut, kein verlorener Wakeup | loom |
+| **R20** | **Guard Stufe A × Pipeline-Delta** | Konfliktfenster enthält sequenzierte, noch nicht durable Stamps; `V1 < Fensterfuß` ⇒ Retry | M1, Sim |
+| **R21** | **Space-Drop × neue Cluster-Zuordnung** | Space-Gate schließt Writes im selben Frame; Mitgliedschaft nach dem Gate unveränderlich | M2 |
+| **R22** | **Link × Gate (derselbe Quellcluster)** | Link ist Control-Frame; Quelle `Retiring`/`Retired` ⇒ `ClusterRetired`; sonst Hülle über `policy_epoch` | M2 |
 
 ---
 
@@ -895,6 +986,7 @@ Alle Komponenten beziehen RAM-, Scratch-, I/O- und Lag-Grenzen aus dem gemeinsam
 | **Work Queue / Sleep Cycles** | Consumer + Tasks als Daten im Cluster; Ergebnis = normaler `Change` mit Producer im Kopf |
 | **Vergessen als Zoom-Down** | Löschauftrag der oberen Schicht; keine stille Entfernung ohne `Eraser`-Aufruf |
 | **KV-/Prompt-Cache** | außerhalb; wer Prefix-Daten persistiert, legt sie als Segment mit `rewrite_without` ab |
+| **Session ≠ Cluster (K-35)** | Der Cluster folgt der **Löschdomäne** (Person, Fall, Arbeitskontext), nicht der Sitzung. Agenten-Sessions sind Schlüsselpräfix (`sess/<id>/…`) oder ein TTL-Branch im Cluster der Person; rein flüchtiger Scratch liegt in `Volatile`-Spaces. Ein Cluster je Sitzung ist nur zulässig, wenn die Sitzung eine eigene Löschdomäne ist (z. B. anonyme Gastsitzung mit eigenem Aufbewahrungsende). Wer 10⁷ Mikro-Cluster anlegt, zahlt 40 B RAM je Cluster, ein Siegel je Abschnitt und eine Directory-Zeile; die Fassade meldet `ClusterMetaBudget`-Druck früh mit `hint()` |
 
 ### 12.7 Person → Cluster (normatives Muster)
 
@@ -913,7 +1005,7 @@ Diese Regeln ergänzen die bisherigen Abschnitte und gehen bei Widerspruch vor. 
 2. **Branch-Korrektheit:** `ForkPoint` ist `Head | At(Stamp)`. `Head` linearisiert im Committer. `At(S)` ist nur gültig, wenn `history_floor ≤ S ≤ parent_head` und Cluster/Branch nicht retired/closed sind; andernfalls `BelowFloor`/`InvalidForkPoint`, niemals stilles Rebasen. Merge ist v1 nur vom direkten Child zum Parent erlaubt; Source mit lebenden Kindern ist nicht mergbar. Merge-Konfliktmenge schließt Punkt- und Intervalländerungen ein: `Delete`, `RangeDelete` und jeder überlappende `EraseRange` kollidieren; ein bereits aktiver clusterweiter Erase-Marker kann durch Merge nicht überschrieben werden. Merge-Plan bindet `source_head`, `target_head` und `merge_base`; Commit prüft diese erneut atomar. Erfolgreich gemergte Source-Branches sind terminal (`Merged`); für weitere Änderungen wird ein neuer Branch geforkt.
 3. **Idempotenz-Retention:** Idempotenz-Ergebnis (Token-Scope/Hash, Request-Fingerprint, Ergebnis-Stamp/Status und pseudonymes Cluster-Scope-Digest aus sortierten `tomb_id`s) überlebt Redo-`replay_floor` unabhängig, solange TTL aktiv ist. Es wird erst nach Ablauf plus durablem `idem_trim` entfernt. Scope enthält keine Nutzdaten/Klartext-ClusterIds. Retry auf inzwischen `Retired`-Cluster liefert `Erased`/`ClusterRetired`, niemals ein scheinbar neues Apply. Token-Wiederverwendung mit anderem Request-Inhalt wird als `IdemConflict` abgelehnt.
 4. **Löschgranularität:** `Eraser::range` bietet für Plain `Logical|Physical|Scrubbed`, für Sealed ausschließlich `Logical`; es gibt **keine** kryptografische Einzelbereichslöschung. `key_epoch`-Rotation macht alte Cluster-Daten erst nach vollständigem Rewrap aller zu erhaltenden Daten und Vernichtung aller alten Epochen unlesbar; sie ist ein eigener, nicht atomarer Workflow und kein v1-Range-Versprechen. Für sofortige Crypto-Erasure müssen Daten in getrennte Cluster/Löschdomänen gelegt werden. Der Marker wirkt über alle Branches und historischen Views und kann nicht gemergt/überschrieben werden.
-5. **Space-Drop:** `SpaceDropIntent{space_tomb_id,scope_digest,count,level}` wird vor dem Space-Gate dauerhaft geschrieben; HMAC-Pseudonym plus SpaceId im Backup reicht, um das Space-Gate beim Restore wieder zu gaten. `BLOCK_ERASE` blockiert vor Intent. V1 erlaubt auf Space-Ebene kein Crypto-Erase, weil Cluster mehrere Spaces teilen können; dafür sind Cluster-Tickets nötig. Nach Intent folgen Gate, `GateApplied`, Anchor und für Plain erst danach Purge. `SpaceDropped` ist nur finaler Abschluss nach erforderlichen Attesten. Keine Klartext-IDs oder Einzel-Edit-/Ein-Fsync-Behauptung für beliebig große Spaces.
+5. **Space-Drop:** `SpaceDropIntent{space_tomb_id,level}` wird vor dem Space-Gate dauerhaft geschrieben; HMAC-Pseudonym plus SpaceId im Backup reicht, um das Space-Gate beim Restore wieder zu gaten. `BLOCK_ERASE` blockiert vor Intent. V1 erlaubt auf Space-Ebene kein Crypto-Erase, weil Cluster mehrere Spaces teilen können; dafür sind Cluster-Tickets nötig. Nach Intent folgen Gate, `GateApplied`, Anchor und für Plain erst danach Purge. `SpaceDropped` ist nur finaler Abschluss nach erforderlichen Attesten. Keine Klartext-IDs oder Einzel-Edit-/Ein-Fsync-Behauptung für beliebig große Spaces.
 6. **Klartext-Reclamation:** `Zeroizing` ist eine Maßnahme, kein Beweis für sämtliche Kopien. Memtable-/Cache-Interfaces verbieten unkontrollierte Clone-Pfade für Klartext; Ausgaben liegen in Zeroizing-Puffern. Gate erhöht Generation, entzieht neue Zugriffe und wartet auf Leser-Epochen bzw. weist noch aktive Leser als Exposition aus, bevor `Purged`/Receipt Abschluss behauptet. Allocator-/OS-Kopien sicher zu nullen ist keine Garantie und bleibt Restrisiko.
 7. **Blob-Purge:** Purge darf nicht auf `punch_hole` angewiesen sein. Überschreitet der zu entfernende Anteil den konfigurierten Hole-Ratio- oder Max-Fragment-Grenzwert, wird eine neue `blob_id` mit gepackten Überlebenden geschrieben und per Catalog-Edit ersetzt. Reserveplatz und maximale Rewrite-Gruppe sind harte Admission-Grenzen. `Plain`-Barriere invalidiert Consumer explizit mit Epoch-Wechsel/`Lagged`; kein Consumer darf eine Lücke als verarbeitet bestätigen.
 8. **Durable Extensions:** `watermark` darf nur bis zum höchsten angewandten `durable_stamp` reichen. Extension-Builder liest nur durable Views oder durable Feed-Frames. Query-Fassade erzwingt `filter_visible` nach Kandidatenfund und erneut vor Rückgabe (Generation-Check); ungefilterte Indexresultate sind kein unterstützter API-Pfad.
@@ -952,8 +1044,8 @@ Diese Regeln ergänzen die bisherigen Abschnitte und gehen bei Widerspruch vor. 
 
 | Ebene | Werkzeug | Inhalt |
 |---|---|---|
-| Formal | TLA+/TLC (oder Quint) | M1 Commit/Sichtbarkeit/Recovery/Stamps/Guards · M2 Erase (ER0–ER7, Gate, Restriction, Link, Consumer-Floors, Space-Drop, **Branch-Ops und Merge**) · M3 Compaction × Erase × Claims × Staging × Fork-Floor · M4 Checkpoint × Erase × Restore · M5 Rebucket · M6 Anker × Edit × Rollback |
-| Code-Modell | `loom` | Sperren, `Arc`-Swap, Generationszähler, Claims, Graveyard, Committer-Führung, View-Widerruf |
+| Formal | TLA+/TLC (oder Quint) | M1 Commit-Pipeline (Intake, Sequencer, Syncer, Publikation, `Retiring → Retired`)/Sichtbarkeit/Recovery/Stamps/Guards (Konfliktfenster, Fensterfuß) · M2 Erase (ER0–ER7, Gate, Restriction, Link, Consumer-Floors, Space-Drop, **Branch-Ops und Merge**) · M3 Compaction × Erase × Claims × Staging × Fork-Floor · M4 Checkpoint × Erase × Restore · M5 Rebucket · M6 Anker × Edit × Rollback |
+| Code-Modell | `loom` | Sperren, `Arc`-Swap, Generationszähler, Claims, Graveyard, Leader-Wechsel (kein verlorener Wakeup), Pipeline-Credits, View-Widerruf |
 | Simulation | eigener Scheduler + `shuttle` | **Hauptwerkzeug gegen Races:** seeded Interleavings, `FaultFs`, `SimClock`, `SimEntropy`, `SimKms`, reproduzierbarer Seed; Race-Nahtstellen R1–R17 als benannte Szenarien |
 | Absturz | `FaultFs` | Crash an **jedem** E/A-Index, Torn Writes, verlorene Fsyncs, Rename-Reihenfolgen, Rollback-Versuche, `ENOSPC` beim Vorallokieren, **Geister-Journal** aller je geschriebenen Seiten |
 | Eigenschaft | `proptest` | Codecs, `cmp`, Siegel-Roundtrip und Rohkopie, Compaction ≡ Referenzmodell (`BTreeMap` mit Versionen und Branches), Purge ≡ Modell ohne Cluster, Paging (Budget nie überschritten, lückenlos, vorwärts/rückwärts gleiche Menge, Block-Skipping ≡ Vollscan), Branch-Lesen ≡ Modell, Merge ≡ Modell |
@@ -1011,11 +1103,11 @@ Planungsannahme für 3–4 erfahrene Rust-Entwickler plus 1 Test-/Simulationsing
 |---|---|---|---|
 | **P0 Fundament** | `ports`, `codec`, `env` (MemFs, RealFs, FaultFs, Sim), `sync`, Anker (Mem, Datei), `crypto-ref` mit In-Memory-Provider und Konformanzsuite, Orakel-Skelett, CI, Lint-Gerüst, Referenzcodierer, Workspace-Einbindung, R8.2-Typen (`KeyProvider`-Angleichung, `HostProbe`, `BlockPruner`, `MeasureKind`, neue Fehlerklassen; WP-01.5) | **G-0:** diese Spec normativ (zwei Reviewer), CI grün | 3 Wo. |
 | **P1 Walking Skeleton (vertikaler Durchstich)** | ein Space, `apply`, Redo + Memtable, `view`, Cluster-Register, Gate, `destroy_many`, Ledger (ohne Anker), Recovery aus Redo; **Formate provisorisch** | Crash-Sweep über alle Fs-Operationen grün; O-Files findet nach `Done` nichts, obwohl Daten nur in Redo/Memtable lagen | 4 Wo. |
-| **P2 Runs und Catalog** | Flush, ClusterSection, Staging, Catalog + `CURRENT`, Purge, Plain-Barriere, vollständige Recovery, Absturzmatrix | O-Files für Daten in Runs grün; Modelltest grün; M1, M2 (ohne Branches) geprüft | 5 Wo. |
+| **P2 Runs und Catalog** | Flush, ClusterSection, Staging, Catalog + `CURRENT`, Purge, Plain-Barriere, vollständige Recovery, Absturzmatrix | O-Files für Daten in Runs grün; Modelltest grün; M1, M2 (ohne Branches) geprüft; **Spike-Messungen als Freeze-Voraussetzung:** H-21 (Tiefe 1…8 mit branch-bewusstem Filter), H-11 (MiniSection), H-25 (Directory-Sparse-Index) und H-26 (Spill-Policy) | 5 Wo. |
 | **G-F Formatfreeze** | alle Formate (§5.9) inkl. reserviertem `branch`-Feld, goldene Vektoren, Rohkopie-Test, ≥ 8 Fuzz-Ziele | Freeze-Review, Referenzcodierer vollständig | — |
-| **P3 Schreibpfad produktiv** | Gruppen-Commit, Reservierungen, Guards zweistufig, Volatile, Notbetrieb `DiskFull`, Idempotenz, Backpressure | **G-W:** Absturzmatrix, Linearisierbarkeit in Sim, H-1, H-18 | 4 Wo. |
-| **P4 Lesepfad** | Blobs, Cache, Views (Revoke, Lease/`SnapshotTooOld`), `page` mit Gewichten, Block-Skipping, `ResumeToken`, `filter_visible` | **G-R:** Modellgleichheit, Paging-Properties, H-2…H-4 | 4 Wo. |
-| **P5 Wartung** | Compaction je Wartungsgruppe, Claims, Blob-GC, Governor, Rotation, Consumer-Feed aus Redo | **G-M:** M3 geprüft, Sim ohne Invariantenbruch, H-5, H-19 | 5 Wo. |
+| **P3 Schreibpfad produktiv** | Gruppen-Commit, Reservierungen, Guards zweistufig, Volatile, Notbetrieb `DiskFull`, Idempotenz, Backpressure | **G-W:** Absturzmatrix, Linearisierbarkeit in Sim, H-1, H-18, H-24 | 4 Wo. |
+| **P4 Lesepfad** | Blobs, Cache, Views (Revoke, Lease/`SnapshotTooOld`), `page` mit Gewichten, Block-Skipping, `ResumeToken`, `filter_visible` | **G-R:** Modellgleichheit, Paging-Properties, H-2…H-4, H-25 | 4 Wo. |
+| **P5 Wartung** | Compaction je Wartungsgruppe, Claims, Blob-GC, Governor, Rotation, Consumer-Feed aus Redo | **G-M:** M3 geprüft, Sim ohne Invariantenbruch, H-5, H-19, H-26, H-27, H-28 | 5 Wo. |
 | **P6 Löschung komplett** | Links, Restrictions (`LiftPolicy`), Abwurf, Space-Drop, `range`, Ledger/Anker, Checkpoint/Restore, `keys-file`, `keys-cohort`, `SegmentOwner`/`ExtensionBlock`, Receipt + `verify_receipt` (mit `MeasureKind` und Statuscaps), Tomb-Epochen/Backup-Horizont (§10.4), Löschauftrag auf `Poisoned` (§9.5.2), volle Orakel | **G-E:** M2/M4/M5/M6 geprüft, Orakel 0 Treffer, INV-ERA-11 (Lokalität), H-6…H-11, H-17, Konformanzsuite grün | 6 Wo. |
 | **P7 Versionierung** | `BRANCHES`-Feature-Bit, `SYS_BRANCH`, Fork/Drop/TTL, Branch-Lesen, Diff, Merge, `Eraser::branch`, Fork-Floor | **G-V:** Branch-Properties vs. Modell, M2/M3 mit Branches, H-20…H-22, Orakel mit Branch-Canaries | 5 Wo. |
 | **P8 Härtung** | Soak 72 h, Dauer-Fuzz, Platte voll, Fehlerinjektion, Fassade, Abdeckung, Krypto-Review, Messbericht, Bedrohungsmodell-Review | **G-P:** alle INV getestet (100 %), H-15/H-16, Messbericht §17, keine offenen Korruptionsbefunde | 5 Wo. |
@@ -1043,7 +1135,7 @@ Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur 
 | INV-PRUNE-1 | Ein Lesevorgang mit `BlockPruner` liefert dasselbe Ergebnis wie derselbe Lesevorgang ohne Pruner; der Kern ruft `may_skip` nur für deklariert schattensichere Besitzer auf `main` |
 | INV-VER-1 | Kein Receipt mit Status `Complete`, wenn eine Pflichtmessung nicht `Complete` ist oder ein Statuscap (`BoundedBackupKeys`, `WeakKeyAssurance`, deklarierte Host-/Gerätereste) gilt |
 | INV-CONS-1 | Consumer und `view_durable` sehen nur Stamps ≤ `durable_stamp` derselben `instance_id` |
-| INV-LOCK-1/2 | Sperren nur aufsteigend · Stamp-Vergabe und `Live → Retired` nur im Committer |
+| INV-LOCK-1/2 | Sperren nur aufsteigend · Stamp-Vergabe und `Live → Retiring` nur im Sequencer; `Retiring → Retired` nur durch die Publikation nach durablem Sync |
 | INV-CAT-1/2 | Datei lebendig ⇔ durabler `files_add` ohne `files_remove`; entfernte Datei bleibt bis `unlink_ack` im Graveyard · Edit gilt erst nach `sync_data` der Gruppe |
 | INV-FMT-1 | Nur kanonische Kodierungen; unbekannte Version/Tags ⇒ Fehler |
 | INV-LOG-5/7/8/9 | `replay_floor`-Regel · Reservesegment vorallokiert, alles bis `redo_mark` gültig · Torn-Tail-Regel · nach ER4 kein lebendes Redo-Segment mit Plain-Nutzlast aus H |
@@ -1054,7 +1146,7 @@ Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur 
 | INV-CLUSTER-1/2 | `ClusterId` nie zweimal vergeben · nicht aus Kennung ableitbar |
 | INV-SEAL-1 | Schutzklasse ↔ Space-Siegel (§5.2) |
 | INV-ERA-1 | Logische Atomarität, `Erased{at:S}` für jede View, keine Mischsicht |
-| INV-ERA-2 | Nach `Purged` keine Version des Clusters in lebenden Runs/Redo/Memtable (Physical); bei Cryptographic zusätzlich INV-ERA-7 |
+| INV-ERA-2 | Nach `Purged` enthält keine lebende Datei Bytes des Clusters, auch keinen Ciphertext (Physical wie Cryptographic); bei Cryptographic gilt zusätzlich INV-ERA-7 bereits ab `KeysDestroyed` |
 | INV-ERA-3 | `EraseIntent` durable < Gate-Catalog-Edit < `GateApplied` < Anchor < irreversible KeyDestroy/Purge; vor KMS zusätzlich `KeyDestroyIntent`; danach jedes `PurgeBatchEdit` < Unlink+`sync_dir` < `UnlinkAck` < finales ER6/`PurgeCompleteEdit`; `Done` nur nach allen erforderlichen Attesten |
 | INV-ERA-4 | Nur Roll-forward |
 | INV-ERA-5 | Reads unter `S` in `erased_ranges` liefern `Erased`, nie Daten, nie „leer“ |
@@ -1079,15 +1171,21 @@ Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur 
 | **INV-BR-2** | Ein Merge ist atomar: bei Konflikten ändert sich nichts; bei Erfolg sind alle Auflösungen und der `Merged`-Zustand in einem Frame |
 | **INV-BR-3** | `history_floor` eines Clusters ≤ `fork_stamp` jedes lebenden Branches; Branch-Daten und -Metadaten liegen im Cluster und sterben mit ihm |
 | **INV-BR-4** | Fork kopiert keine Nutzdaten (O(1)), Branch-IDs werden je Cluster nie wiederverwendet |
+| **INV-BR-5** | Branch-bewusster Filter und `BranchTable` liefern nie ein falsches Negativ; Chain-Resolve und Cursor ≡ Referenzmodell, einschließlich `RangeDelete` auf Zwischenebenen |
+| **INV-PIPE-1** | Unter Rang 1 findet weder E/A noch ein Provider-/Cipher-/KDF-Aufruf noch ein Warten statt; Publikation (Memtable, `visible_stamp`, `durable_stamp`) erfolgt strikt in Stamp-Reihenfolge und nur nach dem durablen Sync derselben Gruppe |
+| **INV-PIPE-2** | Schlägt der Sync einer Gruppe fehl, wird keine Gruppe mit gleichem oder höherem Stamp veröffentlicht; alle sind `Indeterminate`/`Poisoned`; ein `Retiring` ohne durables Gate existiert nach dem Neustart nicht |
+| **INV-POL-1** | Gate, Link, Restrict und Lift sind im Sequencer total geordnet; ein Gate übernimmt nur eine Hülle, die zu seiner `policy_epoch` berechnet wurde oder die der Sequencer selbst berechnet hat |
+| **INV-ADM-1** | Cluster-Metadaten, `ClusterLocal`-Cluster, Live-Dateien und Dateideskriptor-Reserve werden nur nach erfolgreicher Admission (Budget/Quote) angelegt; keine stille Herabstufung der Löschlokalität |
 
 ---
 
 ## 16. Konfiguration (Auszug)
 
-`block_target` 16 KiB · `memtable_total_bytes` ≤ 256 MiB · `redo_segment_bytes` 64 MiB, `redo_mark_bytes` 8 MiB, `redo_max_age` 1 h · `run_target_bytes` 64 MiB · `blob_max_bytes` 64 MiB · `max_pack_groups` 4096 · `pure_threshold` 8 MiB · `max_gate_clusters` 4096 · `max_open_files` 1024 · `maint_io_fraction` 0,5 · `purge_batch_min` 16 · `purge_rewrite_concurrency` 1 · `purge_scratch_reserve_bytes` ≥128 MiB (zwei Slots, keine normale Allokation) · **`purge_deadline` kein Standard (Pflichtparameter)** · Reservierungen 2^20 / 2^16 · `max_links` 8 · `max_hold_ttl` / `idem_ttl` 24 h · `anchor` Required bei Encrypted/Authenticated, `anchor_max_age` 1 s · `guard_window_entries` ≤ 1 Mio. und durch MemoryBudget begrenzt · `max_lag_bytes` 1 GiB · `erase_reserve_bytes` ≥2 GiB (inklusive Scratch 128 MiB, Consumer-Retention 1 GiB, Emergency-Reserve und FS-Metadaten-Headroom) · `max_clock_skew` 5 min default, strenger nur explizit · `key_grace` 10 min · `orphan_key_grace` 24 h · `revoke_grace` 5 s · `max_branches_per_cluster` 1024, `max_branch_depth` 8 · `LiftPolicy` OwnerOrAdmin.
+`block_target` 16 KiB · `memtable_total_bytes` ≤ 256 MiB · `redo_segment_bytes` 64 MiB, `redo_mark_bytes` 8 MiB, `redo_max_age` 1 h · `run_target_bytes` 64 MiB · `blob_max_bytes` 64 MiB · `max_pack_groups` 4096 · `pure_threshold` 8 MiB · `max_gate_clusters` 4096 · `max_open_files` 1024 (Größe des FD-Caches, kein Dateilimit, §4.3.1) · `maint_io_fraction` 0,5 · `purge_batch_min` 16 · `purge_rewrite_concurrency` 1 · `purge_scratch_reserve_bytes` ≥128 MiB (zwei Slots, keine normale Allokation) · **`purge_deadline` kein Standard (Pflichtparameter)** · Reservierungen 2^20 / 2^16 · `max_links` 8 · `max_hold_ttl` / `idem_ttl` 24 h · `anchor` Required bei Encrypted/Authenticated, `anchor_max_age` 1 s · `guard_window_entries` ≤ 1 Mio. und durch MemoryBudget begrenzt · `max_lag_bytes` 1 GiB · `erase_reserve_bytes` ≥2 GiB (inklusive Scratch 128 MiB, Consumer-Retention 1 GiB, Emergency-Reserve und FS-Metadaten-Headroom) · `max_clock_skew` 5 min default, strenger nur explizit · `key_grace` 10 min · `orphan_key_grace` 24 h · `revoke_grace` 5 s · `max_branches_per_cluster` 1024, `max_branch_depth` 4 (Default, hart 8) · `LiftPolicy` OwnerOrAdmin.
 
-**Gemeinsames RAM-Budget:** `memory_budget_bytes` defaultet auf `min(1 GiB, max(256 MiB, 20 % des effektiven cgroup-/Job-Limits))`; kann der Adapter kein verlässliches Limit liefern, ist der Wert beim Öffnen Pflicht. Unterbudgets sind Obergrenzen am selben Budget: 25 % Memtables, 15 % Cluster-/Branch-Metadaten, 2 % Guard-Fenster, 20 % Block-Cache, 1 % Key-Cache, 20 % Extension-/Indexdelta und 10 % In-flight-Changes/Rewrite-Buffer; 7 % bleiben als Allocator-/Runtime-Headroom unangetastet. Jede Allokation reserviert atomar beim `MemoryBudget` und gibt per RAII frei. `max_clusters`, Branch-Limits und Extension-Admission werden zusätzlich durch tatsächliche Metadatenbytes begrenzt; `max_clusters=16 Mio.` ist eine Obergrenze, keine zugesagte Resident-Kapazität. Ein Extension-Owner ohne Budget-Token darf keine Indexarbeit oder Cache-Allokation starten.
+**Gemeinsames RAM-Budget:** `memory_budget_bytes` defaultet auf `min(1 GiB, max(256 MiB, 20 % des effektiven cgroup-/Job-Limits))`; kann der Adapter kein verlässliches Limit liefern, ist der Wert beim Öffnen Pflicht. Unterbudgets sind Obergrenzen am selben Budget: 25 % Memtables, 15 % Cluster-/Branch-Metadaten, 2 % Guard-Fenster, 20 % Block-Cache, 1 % Key-Cache, 20 % Extension-/Indexdelta und 10 % In-flight-Changes/Rewrite-Buffer; 7 % bleiben als Allocator-/Runtime-Headroom unangetastet. Jede Allokation reserviert atomar beim `MemoryBudget` und gibt per RAII frei. `max_clusters`, Branch-Limits und Extension-Admission werden zusätzlich durch tatsächliche Metadatenbytes begrenzt; `max_clusters=16 Mio.` ist eine Obergrenze, keine zugesagte Resident-Kapazität: `resident_clusters_max = cluster_meta_budget / 40 B` (§4.3.1). Für 16 Mio. Cluster sind ≈ 640 MiB Metadatenbudget nötig (≈ 4,3 GiB `memory_budget_bytes` bei 15 % Anteil); `register` weist darüber hinaus vor jeder Allokation mit `Limit{ClusterMetaBudget}` ab. Ein Extension-Owner ohne Budget-Token darf keine Indexarbeit oder Cache-Allokation starten.
 **R8.2-Schlüssel:** `view_lease` 60 s, `view_lease_max` 10 min (§11.4) · `tomb_epoch_rotation` (Default aus), `backup_horizon` (Pflicht, sobald Retire aktiv ist; sonst kein Retire), `max_active_tomb_epochs` 4 (§10.4) · `OpenProfile::{Development, Production}` (Default `Production` bei persistentem Open; `Development` schaltet die Prüfungen `ProviderAssuranceInsufficient` und `LedgerSameDevice` auf Warnung), `acknowledged_weak_keys`, `ledger_same_device_ack` (beide erscheinen im Receipt als Restexposition).
+**R9-Schlüssel:** `commit_pipeline_depth` 2 · `max_group_changes` 1024 · `max_group_bytes` 8 MiB · `guard_retry_max` 3 · `policy_retry_max` 3 · `publish_timeout` 1 s · `reserve_stamps_urgent` 2^10 · `reserve_ids_urgent` 2^8 · `max_link_depth` 8 · `dir_page_bytes` 4096 · `mini_section_max_bytes` 4096 · `spill_min_bytes` 8 MiB · `spill_ratio` 4 · `spill_max_age` 6 h · `max_staging_runs` 16 · `cluster_local_min_bytes` = `pure_threshold` · `max_cluster_local_clusters` 1024 (≤ 65 536) · `max_live_files` 262 144 · `pure_demote_ratio` 0,25 · `fd_reserve` 256 · `file_shard_count` 1024 · `purge_window_fraction` 0,3 · `sealed_purge_escalate` 0,7/0,9 · `cluster_meta_budget` 15 % von `memory_budget_bytes`.
 **Metrikvertrag (Pflicht, Z-14/Z-17):** Der feste Katalog in `metrics.rs` definiert Name, Typ, Einheit, begrenzte Labels und Bedeutung. Pflichtfamilien: Commits (Anzahl, Gruppengröße, Latenz nach `durability`/`result`), Erase-Stufen (Gate- und KeyDestroy-Latenz, getrennte Zähler nach Status), Durability (sichtbar-durable Stamp-Lag, Fsync-Latenz nach festem `file_role`), Ressourcen (Bytes/Limit nach festem `resource_class`, Memtable/Cache-Belegung und Trefferquote, Reserve frei/benutzt, Scratch belegt), Wartung (Flush/Compaction/Purge-Bytes und Laufzeit nach `phase`), Erase (offene Tickets, ältestes Alter, Fristverletzungen, Dauer und Ergebnis je `stage`, Gate-Latenz, KeyDestroy-Latenz, Purge-Bytes, Anchor-Lag), Extensions (Feed-/Index-Watermark-Lag und blockierte Owner nach festem `owner_kind`), Guards (Fast-/Slowpath-Anteil), Branches (Anzahl, Tiefe, ältester Pin/History-Floor) sowie Fehler/Poison-Zustand nach geschlossenem `ErrorClass`; R8.2: abgelaufene View-Leases, offene Poisoned-Löschabsichten, Anzahl/Alter aktiver Tomb-Epochen (nur Zähler/Gauges, keine IDs). Jede Zeitreihe hat definierte Einheit und monotone Counter-Semantik; Histogramm-Buckets sind pro Release versioniert.
 
 Labelwerte stammen ausschließlich aus kleinen geschlossenen Enums (`durability`, `result`, `file_role`, `resource_class`, `phase`, `stage`, `owner_kind`, `ErrorClass`). Keine IDs, Namen, Tenant-/Cluster-/Space-Kennung, Schlüssel, Request-Token, Querytexte, Dokumentinhalte oder Embeddings als Label oder Standard-Event. `Metrics`/`Observer` sind best-effort, nicht blockierend und werden außerhalb aller Kernlocks aufgerufen; Telemetrie-Ausfall ändert keine Storage-Semantik. Der Inspector ist administrative Diagnose, standardmäßig nur aggregierte/opaque Werte, benötigt Capability und darf keine Inhalte entsiegeln. Metrik-Katalog-Review und Kardinalitäts-/Leakage-Test sind Release-Gates.
@@ -1100,7 +1198,7 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 
 | ID | Hypothese | Messung |
 |---|---|---|
-| H-1 | `apply`: Durchsatz ≥ 80 % von Fsync-Rate × mittlere Gruppengröße; p99 ≤ 2 × Fsync-Latenz | Mikrobench, variierende Schreiberzahl |
+| H-1 | `apply`: Durchsatz ≥ 80 % von Fsync-Rate × mittlere Gruppengröße; p99 ≤ 2 × Fsync-Latenz bei ≤ 70 % Auslastung der Fsync-Rate | Mikrobench, variierende Schreiberzahl |
 | H-2 | Punktabfrage warm: ≤ 1 Datenblock-Read je Treffer-Level, p99 ≤ 50 µs | Zipf-Last |
 | H-3 | Kopf-Scan ohne Körper ≥ 10× Durchsatz gegenüber Scan mit Körper (≥ 4 KiB) | Scan-Bench |
 | H-4 | `page` liest ≤ 1,2 × Blöcke des Minimums | Gewichtsverteilungen; zusätzlich Aufbauzeit der RAM-Präfixsummen je SubIndex (≤ ca. 4096 Blöcke) und Traversierungskosten getrennt berichten (K-30) |
@@ -1110,18 +1208,23 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 | H-8 | Pure-Cluster löschen ≤ 100 ms je 1000 Dateien (ohne Scrub) | Drop-Bench |
 | H-9 | 1000 Cluster einer Gruppe ≤ 2 × Aufwand eines Clusters | Bündelungsbench |
 | H-10 | Rohkopie beim Purge ≥ 80 % sequentielle Plattenbandbreite | Purge-Bench |
-| H-11 | Seal ≤ 15 % CPU im Lastmix; Overhead kleiner Cluster ≤ 5 % Bytes (≥ 1 KiB) | A/B-Bench |
-| H-12 | Speicher ≤ `memtable_bytes × (1+max_immutable)` + Cache + O(offene Gruppen); ~48 B je Cluster und Datei, ~128 B je Cluster | RSS |
-| H-13 | Recovery ∝ Redo-Rückstand + Catalog; 1 GiB Redo ≤ 10 s | Recovery-Bench |
+| H-11 | Seal ≤ 15 % CPU im Lastmix; Overhead kleiner Cluster ≤ 5 % Bytes ab 4 KiB und ≤ 10 % für 1–4 KiB (`MiniSection`: ein AEAD-Rahmen je Abschnitt) | A/B-Bench |
+| H-12 | Speicher ≤ `memtable_bytes × (1+max_immutable)` + Cache + O(offene Gruppen); `ClusterIndex` ≤ 40 B je Cluster, Directory-Sparse-Index + `ClusterFilter` ≤ 1,3 B je Cluster und Datei | RSS |
+| H-13 | Recovery ∝ Redo-Rückstand + Catalog; 1 GiB Redo ≤ 10 s; Catalog-Snapshot mit 16 Mio. Clustern sequentiell bis `Running` (Cluster-Index-Aufbau) ≤ 20 s | Recovery-Bench |
 | H-15 | Zeilenabdeckung ≥ 90 %, Zweigabdeckung ≥ 85 % | `cargo-llvm-cov` |
 | H-16 | Mutationsscore ≥ 80 % auf `codec`, `recovery`, `erase`, `committer`, `branches` | `cargo-mutants` |
 | H-17 | Gate + ER2 für 10 000 Cluster ≤ 1 s bei Providerlatenz ≤ 5 ms je `destroy_many` | Batchbench |
-| H-18 | Guard-Schnellpfad ≥ 99 % bei Zipf-Last mit 1 % Konfliktrate, keine E/A im Committer | Guard-Bench |
+| H-18 | Guard-Stufe B ohne Retry ≥ 99 % bei Zipf-Last mit 1 % Konfliktrate; **0 E/A-Syscalls** im Sequencer (Fs-Zähler) | Guard-Bench |
 | H-19 | L0-Dateizahl unabhängig von der Zahl aktiver Packgruppen | Flush-Bench mit 4096 Gruppen |
 | H-23 | Restore-Matching: `Cluster der Kopie × aktive Tomb-Epochen` HMACs für 16 Mio. Cluster und 1/4 Epochen innerhalb des Restore-Budgets; Retire eines Epochenschlüssels ohne Wartungsstau | Restore-Bench, Ledger mit mehreren Epochen |
 | **H-20** | Fork < 50 µs, Speicher O(1) | Fork-Bench |
-| **H-21** | Lesen auf Branch bis zur konfigurierten Maximal-Tiefe (Default 8): ≤ 1,5 × Punktlesekosten von `main` bei 1 % geänderten Schlüsseln; Tiefen 1…8 einzeln messen | Branch-Bench mit Vorfahren-Pruning und Worst-Case-Branch-Change-Rate |
+| **H-21** | Punktlesen auf Branch bei 1 % geänderten Schlüsseln: Datenblock-Reads ≤ 1,1 × `main`; p99-Latenz ≤ 1,2 × `main` bis Tiefe 4 (Default) und ≤ 1,5 × bis Tiefe 8; Tiefen 1…8 einzeln, dazu Worst-Case (alle Kettenebenen Filter-Treffer) und Bereichs-Scan | Branch-Bench mit branch-bewusstem Filter (§7.1); als Spike vor G-F |
 | **H-22** | Merge ∝ Source-Mutationen + Target-Mutationen seit `merge_base` + Konflikte, nicht Gesamt-Clustergröße; je 10⁴ Mutationen ≤ 200 ms ohne Körper-I/O/Konfliktauflösung | ChangeIndex/Merge-Bench |
+| **H-24** | Sequencer-Abschnitt (Rang 1) p99 ≤ 20 µs für Gruppen ≤ 64 Changes ohne Gate; Gate mit `policy_epoch`-Treffer ≤ 10 µs; Selbstberechnungs-Fallback bei \|H\| = 4096 ≤ 250 µs; **0 E/A-Syscalls, 0 Provider-Aufrufe**; Commit-p99 bei parallelem 4096-Cluster-Gate ≤ 1,2 × Commit-p99 ohne Gate | Commit-Bench mit parallelem Erase-Strom, `FaultFs`-Zähler, Sim |
+| **H-25** | 16 Mio. Cluster: `ClusterIndex` ≤ 700 MiB; Directory-Sparse-Index ≤ 1 B je Cluster und Datei; Gate-Check ohne E/A; kalter Punktlesezugriff ≤ 1 zusätzlicher Directory-Seitenzugriff je Level-Datei, bei Warm-Cache 0 | RSS-/Cache-Bench mit 1/4/16 Mio. Clustern, Zipf |
+| **H-26** | Staging→L1-Schreibverstärkung je Packgruppe ≤ 1 + `spill_ratio` (≤ 5) bei 4096 Gruppen und ≈ 16 KiB Update je Gruppe und Flush; Gesamt-Metadaten-Schreibverstärkung ≤ 15 (H-5) für Millionen kleiner Cluster (90 % wenige KiB, Zipf-Updates) | Compaction-Statistik, Packgruppen-Bench |
+| **H-27** | `ClusterLocal` bei 1 Mio. Clustern (1 % beantragt): Admission lehnt über der Quote ab; Live-Dateien ≤ `max_live_files`; FD-Cache-Trefferquote ≥ 99 % bei Zipf; `open()`-Syscalls ≤ 0,01 je warmem Punktlesezugriff; Dateierzeugung ohne Verzeichnis-Degradation (Sharding gegen flach) | FS-Bench (ext4/xfs), Inode-/FD-Zähler |
+| **H-28** | je Fenster `W = 0,3 × purge_deadline` wird jede Datei höchstens einmal umgeschrieben; Purge-Bytes je `W` ≤ Σ Größen der betroffenen Dateien; bei 0,1 % Löschrate je Tag auf 16 Mio. Clustern Purge-Schreibverstärkung ≤ 1 je `W`; Huckepack-Anteil wird berichtet; Sealed-Hygiene verdrängt `maint_io_fraction` nicht | Purge-Bench mit verstreuten Löschungen, Langzeitlauf |
 
 ---
 
@@ -1141,7 +1244,7 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 | KMS-Karenzzeit (Lethe-Spec B.6) | Ticket bleibt `Blocked`, bis der Provider `Absent` attestiert; strenge SLAs verlangen sofort zerstörenden Provider |
 | Single-Sequencer-Durchsatz (Lethe-Spec B.5) | Ein Committer je Instanz; Tenant-Sharding über mehrere Instanzen oben |
 
-**Risiken:** (1) Branch-Pinning treibt Speicher und Compaction-Kosten bei vielen Langzeit-Branches (Mitigation: `ttl`, Limits, `floor`-Metrik). (2) Branch-Reads über Elternketten (H-21) können bei tiefen Ketten teuer werden (Mitigation: `max_branch_depth`, Merge/Flatten). (3) Kosten der Plain-Barriere bei häufigen Plain-Löschungen (Mitigation: Bündelung; Personal-Daten sind per Konstruktion Sealed). (4) Verzeichnis Person → Wurzelcluster bleibt nur physisch löschbar (§12.7). (5) Formatfreeze nach P2 verlangt, dass P1/P2 echte Probeläufe sind, nicht Papier. (6) Scope-Creep in obere Schichten; Mitigation: Gates strikt.
+**Risiken:** (1) Branch-Pinning treibt Speicher und Compaction-Kosten bei vielen Langzeit-Branches (Mitigation: `ttl`, Limits, `floor`-Metrik). (2) Branch-Reads über Elternketten (H-21) können bei tiefen Ketten teuer werden (Mitigation: branch-bewusster Filter und `BranchTable` §7.1, Default-Tiefe 4, Spike vor G-F). (3) Kosten der Plain-Barriere bei häufigen Plain-Löschungen (Mitigation: Bündelung; Personal-Daten sind per Konstruktion Sealed). (4) Verzeichnis Person → Wurzelcluster bleibt nur physisch löschbar (§12.7). (5) Formatfreeze nach P2 verlangt, dass P1/P2 echte Probeläufe sind, nicht Papier. (6) Scope-Creep in obere Schichten; Mitigation: Gates strikt. (7) Komplexität der Commit-Pipeline (Sequencer/Syncer/Publikation, `Retiring`); Mitigation: M1-Modell, loom, Simulation R18…R20. (8) RAM-Bedarf ab ≈ 4 Mio. Clustern (≈ 40 B je Cluster plus Hot-Records); Mitigation: Admission §4.3.1, Konvention „Session ≠ Cluster“. (9) Der Zeitplan in §14 ist für P2, P6 und P7 (Catalog/Purge/TLA+ bzw. Branches) wahrscheinlich um den Faktor 1,5–2 zu knapp; Mitigation: Gate-Kriterien bleiben, Termine werden nach P1/P2 neu geschätzt.
 
 **Externe Vorbedingungen (keine Spec-Lücken):** rechtliche Prüfung der Fristen und der Aussage „kryptografisch gelöscht“ für den Einsatzfall; zweiter Reviewer für G-0; Beschaffung eines `Strong`-Ankers und eines HSM/KMS-Providers für den Produktivbetrieb (der Kern ist ohne sie vollständig, Restrisiken sind benannt).
 
@@ -1153,7 +1256,7 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 |---|---|
 | SD-01 | Catalog als einzige Wahrheit, ein Edit = ein Durabilitätspunkt |
 | SD-02 | Clusterreine Blöcke, ein Abschnitt je Cluster und Datei, abschnittsrelative Offsets |
-| SD-03 | Bewilligte Abhängigkeiten: `crossbeam-skiplist` (hinter Trait), `bytes`, `blake3`, `chacha20poly1305`, `zeroize`; Dev: `loom`, `shuttle`, `proptest`, `cargo-mutants`; Krypto nur über Ports |
+| SD-03 | Bewilligte Abhängigkeiten. Kern: `crossbeam-skiplist` (hinter Trait), `bytes`, `zeroize`, `siphasher` (nur Guard-Fingerabdrücke). `contextra-crypto-ref`: `chacha20poly1305`, `hmac`, `sha2`, `hkdf`, `crc32c`. Dev: `loom`, `shuttle`, `proptest`, `cargo-mutants`. Krypto im Kern nur über Ports (R8.2 nannte `blake3` und `chacha20poly1305` als Kernabhängigkeiten und widersprach damit §5.2 und dem Portprinzip) |
 | SD-04 | Eine Formatversion je Dateiart, Migration als Werkzeug |
 | SD-05 | Sealed-Cluster umfasst Schlüssel, Kopf, Körper, Index, Filter, Marker, Branch-Metadaten |
 | SD-06 | `purge_deadline` Pflichtparameter |
@@ -1191,7 +1294,7 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 | SD-38 | Eine Siegelform; RootKey-Indirektion; `Cryptographic` nur bei `KeysInBackups::No` oder `Bounded` mit Statuscap (R8.2, E-77) |
 | SD-39 | Gate ohne Segmentschnitt; Barriere beim Purge, nur Plain, gebündelt |
 | SD-40 | Consumer-Feed aus Redo mit zwei Böden |
-| SD-41 | Guards zweistufig |
+| SD-41 | Guards zweistufig: Stufe A Aufrufer exakt gegen `V1`, Stufe B Sequencer nur Delta (SD-62) |
 | SD-42 | Staging-L0 und ein einheitlicher Purge-Algorithmus |
 | SD-43 | Catalog-Gruppen-Commit; Anker-Koaleszenz bis vor Receipt |
 | SD-44 | Append-Dateien nur in Vorallokation; ENOSPC vergiftet nicht |
@@ -1210,12 +1313,20 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 | **SD-57** | **Löschabsicht auf `Poisoned` über Ledger; `ErasePending`; Gate beim Neustart (E-75)** |
 | **SD-58** | **View-Lease mit `SnapshotTooOld` (E-76); `KeyAssurance`/`KeysInBackups`-Statuscaps (E-77); `MeasureKind` (E-80)** |
 | **SD-59** | **Derivation Cache als clusterlokale Konvention (K-32)** |
+| **SD-60** | **Commit-Pipeline: Sequencer (Rang 1, ohne E/A) + Syncer; Notpool statt Rang-1/3-Doppelhaltung (K-33)** |
+| **SD-61** | **`policy_epoch`; Link, Restrict, Lift und Gate als Frames im Sequencer total geordnet; Selbstberechnung der Hülle nach drei Retries (K-33)** |
+| **SD-62** | **Guards: Stufe A exakt auf dem Aufruferthread, Stufe B Delta im RAM-Konfliktfenster, nur `GuardRetry` (K-33)** |
+| **SD-63** | **Branch-bewusster Filter `(branch, user_key)`, `BranchTableBlock`, Chain-Resolve, Default-Tiefe 4, Spike vor G-F (K-34)** |
+| **SD-64** | **`ClusterIndex` 40 B, Sparse-Directory, `ClusterFilter`, `HotRecord`, `MiniSection`, Admission vor Allokation (K-35)** |
+| **SD-65** | **Staging-Spill-Policy, Fenster-Amortisierung des Purge, Sealed-Hygiene-Lane (K-36)** |
+| **SD-66** | **`ClusterLocal`-Admission, Pure-Demotion, FD-Cache, Verzeichnis-Sharding (K-37)** |
+| **SD-67** | **Idempotenz als implizite `Absent`-Guard (K-38)** |
 
 ---
 
 ## Anhang A — Referenzvektoren (Pflicht vor G-F)
 
-Je Format mindestens: leeres Objekt, ein Eintrag, Eintrag mit versiegeltem Körper (Cluster- und Space-Quelle), Cluster-Abschnitt mit zwei Blöcken, Packed-Run mit drei Clustern, Staging-Run, Tombstone, Bereichsmarker, Blob mit Loch, Catalog-Edit-Kette mit Reservierung, Gruppen-Commit und `anchor_mark`, Ledger-Kette (`tomb_id`, zwei Tomb-Epochen, ein Retire), Redo-Gruppe mit Change-/Gate-/Control-/Branch-Frame, abgeschnittener und beschädigter Frame, nicht-kanonisches `varint`, **Rohkopie-Test** (Abschnitt aus Run A in Run B, Blöcke byte-identisch, Entsiegeln gelingt). Erzeugung durch `tools/reference/generator.py` (unabhängig von Rust), Vergleich im Test `golden`. **Stand: nicht vorhanden.**
+Je Format mindestens: leeres Objekt, ein Eintrag, Eintrag mit versiegeltem Körper (Cluster- und Space-Quelle), Cluster-Abschnitt mit zwei Blöcken, Packed-Run mit drei Clustern, Staging-Run, `MiniSection`, Abschnitt mit `BranchTable` (drei Branches, einer ohne Einträge), Tombstone, Bereichsmarker, Gate-Frame mit `policy_epoch`, Control-Frame `Link`, Blob mit Loch, Catalog-Edit-Kette mit Reservierung, Gruppen-Commit und `anchor_mark`, Ledger-Kette (`tomb_id`, zwei Tomb-Epochen, ein Retire), Redo-Gruppe mit Change-/Gate-/Control-/Branch-Frame, abgeschnittener und beschädigter Frame, nicht-kanonisches `varint`, **Rohkopie-Test** (Abschnitt aus Run A in Run B, Blöcke byte-identisch, Entsiegeln gelingt). Erzeugung durch `tools/reference/generator.py` (unabhängig von Rust), Vergleich im Test `golden`. **Stand: nicht vorhanden.**
 
 ## Anhang B — Änderungen gegenüber R7 (R8-01…R8-15), R8 (R8.1-01…R8.1-09) und R8.1 (R8.2-01…R8.2-09)
 
@@ -1265,14 +1376,43 @@ Je Format mindestens: leeres Objekt, ein Eintrag, Eintrag mit versiegeltem Körp
 | R8.2-08 | Embedding-/Token-Caches kollidierten mit `INV-PRIV-1` | clusterlokaler Keyed-MAC als Konvention (K-32, §12.6) |
 | R8.2-09 | §4.1 zerriss die Vokabeltabelle mit einem Absatz; `create_cluster_key` im Text neben Batch-Trait; Konfliktzahl veraltet | bereinigt |
 
+## Anhang B.2 — Änderungen R8.2 → R9.0 (R9-Audit)
+
+| ID | R8.2-Befund | R9-Lösung |
+|---|---|---|
+| R9-01 | Rang 1 hielt die Sperre über den gesamten Redo-Sync; Tail-Latenz aller Agenten gekoppelt an Sync und Gate-Arbeit | Sequencer (Rang 1, nur RAM) + Syncer (ein Schreiber, kein Lock), Credits, Leader-Protokoll (§6.1, K-33, INV-PIPE-1/2) |
+| R9-02 | Graph-Traversierung der `DerivedFrom`-Hülle (≤ 4096) im kritischen Pfad | Hülle auf dem Aufruferthread, Sequencer prüft nur `policy_epoch`; Selbstberechnung nach 3 Retries gegen Aushungern (§6.1, §9.5, INV-POL-1) |
+| R9-03 | Guard-Langsampfad „exakt gegen Memtable ∪ Version“ unter Rang 1 widersprach K-21 und H-18 (Plattenzugriffe) | Stufe A exakt beim Aufrufer, Stufe B nur Delta im Konfliktfenster, nur `GuardRetry` (§6.3) |
+| R9-04 | `SYS_IDEM`-Prüfung im Committer, Race zweier gleicher Tokens, RAM ∝ aktive Tokens | implizite `Absent`-Guard auf den SYS_IDEM-Schlüssel (§6.5, K-38) |
+| R9-05 | Lock-Reihenfolge: Intake (Rang 2) vor Committer (Rang 1) verletzte `INV-LOCK-1`; Rang 1+3-Doppelhaltung legte den Catalog-Sync unter Rang 1 | Leader-Protokoll (Anhängen unter Rang 2, dann `try_lock` Rang 1, Leader leert Intake aufsteigend); Notpool statt Doppelhaltung (§6.1, §5.8, §11.2) |
+| R9-06 | `Link` war ein Catalog-Edit außerhalb der Stamp-Ordnung: „Quelle gelöscht, Link danach“ verletzte `INV-ERA-12` | Control-Frame `Link` im Sequencer, Quelle `Retiring`/`Retired` ⇒ `ClusterRetired` (§9.6, R22) |
+| R9-07 | Link-Admission prüfte nur die Nachfahren des neuen Kindes; die Hülle jedes Vorfahrens wächst mit | Prüfung für jeden Vorfahren-oder-selbst, Abbruch bei `max_gate_clusters + 1` Knoten (§9.6) |
+| R9-08 | Space-Drop fror die Mitgliedschaft unter Rang 1 ein (O(Cluster)); Restriction-Prüfung über unbekannte Mitgliedschaft unspezifiziert | Gate maskiert die SpaceId; `SpaceScopeFrozen` nachgelagert aus gepinnter Version; Restriction-Menge × Cluster-Dateien beim Aufrufer, `policy_epoch`-Revalidierung (§9.7, §9.8, R21) |
+| R9-09 | Bloom ohne `branch` ⇒ Block-Read je Branch-Ebene; H-21 unerreichbar | branch-bewusster Filter, `BranchTableBlock`, Chain-Resolve mit Early-Exit, Default-Tiefe 4, Spike vor G-F (§5.6, §7.1, §8.3, K-34, INV-BR-5) |
+| R9-10 | Metadaten-RAM ≈ 5 GiB bei 16 Mio. Clustern (48 B je Cluster und Datei + 128 B je Cluster); „keine zugesagte Resident-Kapazität“ ohne Mechanismus | `ClusterIndex` ≤ 40 B (≈ 640 MiB), Sparse-Directory, `ClusterFilter`, `HotRecord`, Admission vor Allokation (§4.3.1, §5.6, H-25, INV-ADM-1) |
+| R9-11 | Kleinstcluster: sechs versiegelte Blöcke je Abschnitt (≥ 240 B Overhead) widersprach H-11 (≤ 5 % ab 1 KiB) | `MiniSection` (ein AEAD-Rahmen), H-11 neu gefasst (R-PL-8) |
+| R9-12 | Entmischen Staging→L1 schrieb für ≈ 16 KiB je Gruppe bis zu 64 MiB L1 um (Faktor ≈ 4000) | Spill-Policy mit Schwelle und Altersgrenze, size-tiered Staging (R-PL-7, H-26) |
+| R9-13 | Purge-Kosten bei verstreuten Einzellöschungen; Sealed-Purge mit Klartext-Dringlichkeit | Compaction-Huckepack, Fenster-Amortisierung, Sealed-Hygiene-Lane, getrennte `t_crypto`/`t_physical` (§9.5, H-28) |
+| R9-14 | `INV-ERA-8(1)` („bei Cryptographic unlesbar“) widersprach `INV-ERA-2` (Bytes entfernt) | präzisiert: Done verlangt Entfernung auch des Ciphertexts; Unlesbarkeit ab `KeysDestroyed` (§9.5, INV-ERA-2) |
+| R9-15 | `ClusterLocal` ohne Admission ⇒ Inode- und FD-Explosion, `max_open_files` als Pseudo-Limit | Mindestgröße, Quoten, `max_live_files`, FD-Cache statt Dateilimit, `RLIMIT_NOFILE`-Prüfung (§4.3.1, §10.1) |
+| R9-16 | R-PL-3 „nie zurück“: schrumpfende Cluster hinterlassen unbegrenzt viele Kleinstdateien | Pure-Demotion mit Hysterese per `rebucket` (R-PL-3) |
+| R9-17 | §4.3 (`ClusterLocal` erzwingt eigene Dateien) widersprach R-PL-1…3 (Packed/Pure automatisch) | `ClusterLocal` = Pure-Zusage nach Admission; ausgenommen von Demotion (§4.3) |
+| R9-18 | §9.2: „`Sealed` ⇒ `Cryptographic`“ widersprach `Logical`, `escalate`, logischer Range-/Space-Löschung | Endstufenregel, `Logical` als Zwischen- bzw. Endziel für range/branch/space, Statuscap `LogicalOnly` (§9.2, §9.7) |
+| R9-19 | SD-03 (`blake3`, Kern-Abhängigkeit `chacha20poly1305`) widersprach §5.2 (HMAC-SHA256) und „Krypto nur über Ports“ | Abhängigkeiten nach Crate getrennt (SD-03) |
+| R9-20 | `destroy_many` ohne Batchgrenze, Hülle bis 4096, Provider-Batches ≤ 256 | Chunking ≤ 256, parallel (§9.4) |
+| R9-21 | Open-Zeit und Admission für Millionen Cluster nicht spezifiziert | R10-Admission, H-13 um Cluster-Index-Aufbau erweitert (§10.1, §17) |
+| R9-22 | Formatwirksame Branch-Entscheidungen wären nach G-F nur per Migration korrigierbar | Spike-Messungen als Freeze-Voraussetzung (§14, P2) |
+| R9-23 | Zeitplan §14 für P2/P6/P7 optimistisch | als Risiko (9) geführt, Neuschätzung nach P1/P2 (§18) |
+| R9-24 | Race-Nahtstellen deckten Pipeline, Leader-Wechsel, Guard-Fenster, Space-Drop und Link nicht ab | R18…R22 (§11.6), M1/M2 erweitert (§13.1) |
+
 ## Anhang C — Verworfene Vorschläge
 
-Zeitlanes `lane_min/max` und kumulative Gewichte im SubIndex (K-29, K-30) · Prolly-Tree/Merkle-DAG/Inhaltsadressierung im Kern (K-07, K-08) · CAS-Superblock ohne Log (K-10) · `mmap`/`io_uring`/GPUDirect im Kern (K-11) · Token-IDs, KV-Cache-Tensoren, feste Seitenstruktur (K-13) · gelernte Cross-Objekt-Affinität als Layout (K-17) · Slab-Sub-Allokator (K-20) · Segmentschnitt je Gate · Aufrufer-vergebene ClusterId · `eu_tag` im Klartext-Header · Poison bei ENOSPC · `rekey_clone` · Indizes (ANN, BM25, Graph) im Kern · MCP-Server, Tokenizer, Embedding-Modelle im Kern · benutzerdefinierte Merge-Operatoren im Kern.
+Zeitlanes `lane_min/max` und kumulative Gewichte im SubIndex (K-29, K-30) · mehrere parallele Redo-Logs/Striping zur Anhebung der Fsync-Rate (zerbräche Stamp-Kette und Gate-Ordnung; Skalierung bleibt Instanz-Sharding, K-18) · Branch-„Flatten“ durch Datenkopie (verletzte O(1)-Fork und Löschlokalität) · Retry-freie Langsampfad-Guards im Sequencer (Plattenzugriff unter Rang 1) · persistierter Token-Index im Sequencer (K-38) · Prolly-Tree/Merkle-DAG/Inhaltsadressierung im Kern (K-07, K-08) · CAS-Superblock ohne Log (K-10) · `mmap`/`io_uring`/GPUDirect im Kern (K-11) · Token-IDs, KV-Cache-Tensoren, feste Seitenstruktur (K-13) · gelernte Cross-Objekt-Affinität als Layout (K-17) · Slab-Sub-Allokator (K-20) · Segmentschnitt je Gate · Aufrufer-vergebene ClusterId · `eu_tag` im Klartext-Header · Poison bei ENOSPC · `rekey_clone` · Indizes (ANN, BM25, Graph) im Kern · MCP-Server, Tokenizer, Embedding-Modelle im Kern · benutzerdefinierte Merge-Operatoren im Kern.
 
 ## Anhang D — Zustände
 
 ```
-Cluster:    Live ──Gate(S)──► Retired(S) ──ER2──► Shredded ──ER6──► Purged ──cluster_trim──► (UnknownCluster)
+Cluster:    Live ──Sequencer──► Retiring(S) ──durabler Sync──► Retired(S) ──ER2──► Shredded ──ER6──► Purged ──cluster_trim──► (UnknownCluster)
             (Shredded nur Sealed/Cryptographic; nur vorwärts; Restrictions orthogonal)
 Branch:     Live ──merge──► Merged ;  Live ──drop/ttl──► Dropped ;  (alle: sterben mit dem Cluster)
 Space:      Live ──SpaceGate(S)──► Dropping(S) ──SD3──► Dropped
@@ -1284,4 +1424,6 @@ Instanz:    Normal ─free_space<Reserve─► DiskFull (Löschung läuft) ─Hy
             Poisoned ─Erase-Request─► Poisoned + ErasePending (Intent im Ledger) ─Neustart─► Gate (§9.5.2)
 Tomb-Epoche: Open ──rotate──► Closed ──Backup-Horizont + Provider-Absent──► Retired   (nur vorwärts; Default: nur Epoche 0)
 View:       Lebend ──Lease-Ablauf / Revoke──► Widerrufen (SnapshotTooOld)
+Pipeline:   Intake ─Sequencer(Stamp, Retiring)─► Syncer(write+sync) ─► Publikation (Stamp-Reihenfolge) ─► Receipt ;
+            Sync-Fehler ⇒ Gruppe und alle späteren Indeterminate/Poisoned, nichts davon veröffentlicht (INV-PIPE-2)
 ```
