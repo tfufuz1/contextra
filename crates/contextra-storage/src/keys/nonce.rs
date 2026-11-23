@@ -122,6 +122,19 @@ pub fn keys_nonce_from_entropy(entropy: &dyn Entropy) -> io::Result<[u8; 12]> {
     Ok(nonce)
 }
 
+/// Weitet eine 12-Byte-Nonce auf die 24 Byte des Ports `Cipher` (UE-10).
+///
+/// Format: `n12 || 0u96`. Die Abbildung ist injektiv, daher bleibt die Eindeutigkeit der
+/// Nonce-Tabelle (Präfixe `0x01` bis `0x05`) erhalten. Das ist die Brücke bis zur
+/// Umstellung auf 24-Byte-Zufallsnonces (SD-14), siehe PR.
+pub fn port_nonce(n12: &[u8; 12]) -> [u8; 24] {
+    let mut out = [0u8; 24];
+    if let Some(head) = out.get_mut(0..12) {
+        head.copy_from_slice(n12);
+    }
+    out
+}
+
 /// Länge der Versiegelungs-Nonce in Bytes (SPEC §10.1, UE-10: XChaCha-Familie).
 pub const SEAL_NONCE_LEN: usize = 24;
 
