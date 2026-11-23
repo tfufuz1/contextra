@@ -30,7 +30,7 @@ Der Kern ist ein eingebetteter, synchroner, crash-sicherer Schlüssel-Wert-Kern 
 
 ## 3. Ist-Stand
 
-- **Spec:** R7 ist die einzige normative Fassung (`docs/SPEC.md`). Die Vorfassungen liegen unter `docs/archive/` und sind keine Quelle. Gate G-0 gilt mit dieser Revision als erfüllt. **G-1 setzt O-12 (benannte Reviewer) voraus; O-1 ist mit D-17 entschieden** (§22, §24).
+- **Spec:** R8 ist die einzige normative Fassung (`docs/SPEC.md`); R8.1 (§27) hält die Umsetzungsentscheidungen zu IMPLEMENTATION_SPEC §11 fest. Die Vorfassungen liegen unter `docs/archive/` und sind keine Quelle. Gate G-0 gilt mit dieser Revision als erfüllt. **O-1 ist mit D-17 entschieden, O-12 mit SA-15: Freigaben erteilt der Maintainer, eine Pflicht zu zwei Reviewern gibt es nicht** (§1.5, §22, §24).
 - **Code:** Der Kern ist **noch nicht neu gebaut**. Es gibt kein Crate `contextra-storage-ports` und es entsteht keines: der Port-Katalog ist das Modul `contextra-ports::persistence` (D-02), das in G-1 eigenständig gemacht wird. `crates/contextra-storage` ist Bestand aus dem früheren Entwurf R2 (kein Cluster, kein Gate-Frame, kein Anker, kein Ledger) und zieht im Feature `testing` noch `blake3` und `aes-gcm-siv` (zu entfernen, D-05). Er ist **Vorlage**, nicht Zielzustand. Er hat keine Abhängigen; `contextra-store` wird von neun Crates genutzt (Spec §26).
 - **Tests des Bestands:** `tests/format/golden_test.rs` prüft ein FORMAT-Golden mit 51 Byte, das nicht mit R7 übereinstimmt (R7: 53 Byte bei `Plain`, §10.2). Die Tests werden in G-2 und G-4 neu erzeugt (§19.3). Bis dahin gelten sie nicht als Nachweis.
 - **Goldens:** Die Primitive CRC-32C, XXH64 und die Bloom-Positionen sind geprüft (Anhang A.1). FORMAT-, Frame- und Seal-Goldens sind **nicht verifiziert** (Anhang A.2).
@@ -41,14 +41,14 @@ Der Kern ist ein eingebetteter, synchroner, crash-sicherer Schlüssel-Wert-Kern 
 
 Die Gates G-0 bis G-F stehen in Spec §22. **Keine Phase beginnt vor dem Gate der vorherigen.** Nächste Schritte:
 
-1. O-12 entscheiden, dann Gate G-1: Port-Katalog `contextra-ports::persistence` bereinigen (D-02), `MemFs`/`FaultFs` anlegen, `contextra-durable-fs` in den Workspace aufnehmen, Konsumentenmatrix gegen den Code prüfen (Spec §26), Workspace-Build grün.
+1. Gate G-1 (O-12 ist entschieden, SA-15): Port-Katalog `contextra-ports::persistence` bereinigen (D-02), `MemFs`/`FaultFs` anlegen, `contextra-durable-fs` in den Workspace aufnehmen, Konsumentenmatrix gegen den Code prüfen (Spec §26), Workspace-Build grün.
 2. Gate G-2: Format-Codecs und Goldens aus `tools/reference/generator.py` (Pflicht vor G-F). Die Goldens in §10 vor der Übernahme gegen den Referenzcodierer abgleichen (Anhang A.2).
 3. Gate G-3 bis G-6: Redo, Catalog und Recovery, Lesen und Schreiben, Löschung.
 4. CI einrichten (`cargo-deny`, `cargo-mutants`, `loom`/`shuttle`, Absturzmatrix).
 
 ## 5. Verbindliche Regeln für Änderungen am Kern
 
-1. **Spec zuerst.** Keine Abweichung ohne Änderung von `docs/SPEC.md`. Änderungen an §4, §5, §9–§11, §14–§16, §18 brauchen zwei Reviewer, aktualisierte Goldens (Anhang A) und eine Prüfung gegen die Freeze-Liste (§10.12).
+1. **Spec zuerst.** Keine Abweichung ohne Änderung von `docs/SPEC.md`. Änderungen an §4, §5, §9–§11, §14–§16, §18 brauchen die Freigabe des Maintainers, aktualisierte Goldens (Anhang A) und eine Prüfung gegen die Freeze-Liste (§10.12).
 2. **Jede Invariante hat einen Test.** Tests zitieren die ID (`// INV-ERA-3`). Neue Invariante ⇒ Zeile in der Tabelle §18 (`tests/invariants.rs` liest sie).
 3. **Keine Panik im Produktionspfad.** `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!` und Indexzugriff sind verboten. `let _ =` auf `sync_*`, `rename`, `unlink` ist verboten.
 4. **Kein `unsafe`** im Kern (`#![forbid(unsafe_code)]`). Plattformnahes liegt hinter Ports.
@@ -71,7 +71,7 @@ Verteilung, eigene Kryptografie-Protokolle außerhalb von Ports, Schemas und Sek
 
 | Pfad | Rolle |
 |---|---|
-| `docs/SPEC.md` | **normativ** (R7) |
+| `docs/SPEC.md` | **normativ** (R8, §27 mit R8.1) |
 | `docs/IMPLEMENTATION_SPEC.md` | Umsetzungsplan (nicht normativ): Modulplan, Abläufe, Schnittstellenverträge IF-1…IF-8, Arbeitspakete je Gate, Änderungsanträge SA-n |
 | `AGENTS.md` | dieser Arbeitskontext |
 | `CLAUDE.md` | Sitzungsumgebung, Push-Ablauf, Arbeitsregeln |
@@ -79,4 +79,4 @@ Verteilung, eigene Kryptografie-Protokolle außerhalb von Ports, Schemas und Sek
 
 ## 8. Offene Entscheidungen, die den Kern blockieren
 
-Siehe Spec §24. Vor G-1 muss O-12 (benannte Reviewer) entschieden sein; O-1 ist mit D-17 erledigt. Vor G-F: O-7 (externer Anker) und O-13 (Bloom oder Ribbon). Rechtlich zu prüfen bleibt O-2; der Kern trifft dazu keine Aussage.
+Siehe Spec §24. O-1 ist mit D-17 und O-12 mit SA-15 erledigt. Vor G-F: O-7 (externer Anker) und O-13 (Bloom oder Ribbon). Rechtlich zu prüfen bleibt O-2; der Kern trifft dazu keine Aussage.

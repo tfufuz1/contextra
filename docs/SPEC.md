@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Normativ (R8).** Einzige normative Spezifikation des Speicherkerns. Ersetzt vollständig R7, `docs/archive/SPEC-R2.md` und `docs/archive/SPEC-R6-Cluster-Entwurf.md` (Herkunft siehe Anhang B). R8 behebt die inneren Widersprüche von R7 (Register §25, C-21 bis C-34; Entscheidungen D-17 bis D-30). Gate **G-0** (§22) gilt erst mit R8 als erfüllt. Gate **G-1** setzt O-12 voraus; O-1 ist mit D-17 entschieden. |
+| Status | **Normativ (R8).** Einzige normative Spezifikation des Speicherkerns. Ersetzt vollständig R7, `docs/archive/SPEC-R2.md` und `docs/archive/SPEC-R6-Cluster-Entwurf.md` (Herkunft siehe Anhang B). R8 behebt die inneren Widersprüche von R7 (Register §25, C-21 bis C-34; Entscheidungen D-17 bis D-30). Gate **G-0** (§22) gilt erst mit R8 als erfüllt. O-1 ist mit D-17 entschieden, O-12 mit SA-15 (Freigabe durch den Maintainer). |
 | Gegenstand | Eingebetteter, synchroner, crash-sicherer Schlüssel-Wert-Kern für Sprachmodell-Speicher: atomare Mehr-Space-Änderungen, MVCC-Sichten, löschlokale Datenanordnung (Cluster), kryptografische und physische Löschung mit Nachweis. |
 | Crates | `contextra-storage` (Kern). Port-Katalog: das Modul `contextra-ports::persistence` (eigenständig, keine Logik; D-02). Produktive Primitive: `contextra-crypto`; Test-Primitive: `contextra-testkit` (D-05). Es entstehen keine neuen Crates (D-18). Anbindung der bestehenden Crates: §26. |
 | Sprache | Prosa und Rustdoc deutsch, Bezeichner englisch. |
@@ -36,7 +36,7 @@ Eine Vorfassung gilt nie als Quelle. Widersprüche zwischen Dokumenten werden im
 
 ### 1.5 Änderungsprozess
 
-Änderungen an §4, §5, §9, §10, §11, §14, §15, §16 und §18 brauchen zwei Reviewer, aktualisierte Goldens (Anhang A) und, bei Formatbezug, eine Prüfung gegen die Freeze-Liste (§10.12). Reihenfolge immer: erst diese Datei, dann der Code. Nach **G-F** ist jede Formatänderung eine Migration, nie ein Zweitpfad im Kern.
+Änderungen an §4, §5, §9, §10, §11, §14, §15, §16 und §18 brauchen die Freigabe des Maintainers, aktualisierte Goldens (Anhang A) und, bei Formatbezug, eine Prüfung gegen die Freeze-Liste (§10.12). Reihenfolge immer: erst diese Datei, dann der Code. Nach **G-F** ist jede Formatänderung eine Migration, nie ein Zweitpfad im Kern.
 
 ---
 
@@ -1551,7 +1551,7 @@ Jede Hypothese hat ein Messkriterium. Eine Hypothese wird in G-8 bestätigt, ver
 | Gate | Inhalt | Voraussetzung |
 |---|---|---|
 | **G-0** | Spezifikation R7 als einzige normative Quelle, Register (§23–§25) vollständig | erfüllt mit dieser Revision |
-| **G-1** | Port-Katalog `contextra-ports::persistence` (bereinigt nach D-02), `MemFs`, `FaultFs`; Konsumentenmatrix (§26); `contextra-durable-fs` im Workspace | G-0, O-12 |
+| **G-1** | Port-Katalog `contextra-ports::persistence` (bereinigt nach D-02), `MemFs`, `FaultFs`; Konsumentenmatrix (§26); `contextra-durable-fs` im Workspace | G-0 |
 | **G-2** | Format-Codecs, Varint, Checksummen, Seal-Rahmen und Schlüsselhierarchie (§16.1–§16.3, §16.5, §16.6, mit Test-Provider), Goldens aus `tools/reference/generator.py` | G-1 |
 | **G-3** | Redo, Gruppen, Gate-Frames, Torn-Tail, Absturzmatrix | G-2 |
 | **G-4** | Catalog, Hochwassermarken, Anker, Recovery R1–R10 | G-3 |
@@ -1646,7 +1646,7 @@ Erlaubt sind nur: `std`, `contextra-ports` (nur Modul `persistence`), `zeroize`,
 | O-9 | Kompressionscodec. Das Feld ist reserviert, der Codec ist nicht spezifiziert (NZ-10). | Spezifikation, nach G-F |
 | O-10 | Anbindung eines Schlüsselverwaltungsdienstes über `KeyProvider`. | Betreiber, nach G-7 |
 | O-11 | Verhalten bei überfälligen Löschaufträgen (`Overdue`): nur Ereignis, oder Betriebsstopp. | Produkt, vor G-6 |
-| O-12 | Benannte Reviewer für G-0 und Änderungen an §4, §5, §9–§11, §14–§16, §18 (Anforderung aus §1.5). | Maintainer, vor G-1 |
+| O-12 | ~~Benannte Reviewer~~ Entschieden (SA-15): Die Pflicht zu zwei Reviewern entfällt. Änderungen an §4, §5, §9–§11, §14–§16, §18 gibt der Maintainer frei; Goldens und Freeze-Liste-Prüfung bleiben Pflicht (§1.5). | entschieden, Maintainer |
 | O-13 | Bloom- oder Ribbon-Filter. Die Entscheidung braucht eine Messung (H-3, H-14). | Maintainer, vor G-F |
 | O-14 | Löschnachweis gegen Backups des Schlüsselspeichers (`CKEYS`, externer Provider). Der Kern kann nur die Provider-Aussage prüfen (§16.4). | Betreiber, vor G-7 |
 
@@ -1737,6 +1737,33 @@ Die Abbildung leitet sich aus Crate-Namen, den gezählten Importen und dieser SP
 3. **Nach G-6:** Umschalten, `contextra-store` und die Feature-Weichen entfernen. Gate G-6 ist erst grün, wenn die Konsumentenmatrix auf den neuen Kern zeigt.
 
 ---
+
+## 27. Umsetzungsentscheidungen R8.1
+
+Diese Tabelle übernimmt die Änderungsanträge SA-1 bis SA-15 aus `docs/IMPLEMENTATION_SPEC.md` §11 und die Entscheidungen UE-1 bis UE-10. Sie ist Eingang nach §1.5. Jede Zeile ist vom Autor entschieden; die Freigabe erteilt der Maintainer (SA-15).
+
+| ID | Änderung | Status |
+|---|---|---|
+| SA-1 | §3.5: `contextra-ports` mit Feature `persistence` ohne Fremdabhängigkeiten; Kern bindet nur dieses Feature ein. | umgesetzt (PR #6061) |
+| SA-2 | §4: `Fs::hard_link` und `Fs::reflink` als optionale Methoden mit Standard `Err(Unsupported)`. | umgesetzt (PR #6065), Vertrag geprüft (PR #6067) |
+| SA-3 | §4: `File::write_all_at` und `File::truncate` statt `write_at`/`truncate`-Namensbestand. | umgesetzt (PR #6064) |
+| SA-4 | §4, P-11: `Cipher::seal_into` und `open_into` mit Standardimplementierung. | offen (WP-1.3b) |
+| SA-5 | §3.2: `MemFs` und `FaultFs` bleiben unter Feature `testing`. | entschieden, Bestand bleibt (keine Codeänderung) |
+| SA-6 | §26.2: `contextra-checkpoint` nutzt im Produktivcode kein `contextra_store`. | eingereicht; Korrektur in §26 offen |
+| SA-7 | §26.3: Zuordnungen für Löschpfad, Snapshot-Register, `last_tx_id`, `inner_storage`, `PressureLevel`, `DurabilityConfigError`. | eingereicht; Ergänzung in §26 offen |
+| SA-8 | §3.1, §26.2: `RealFs` bleibt im Kern (`env/real_fs.rs`); `contextra-durable-fs` liefert `FileAnchor` und die optionale gehärtete `Fs`. | entschieden; Umsetzung in §3.1/§26.2 offen |
+| SA-9 | §4: Trait `Runtime` gehört in den Port; `Governor` bleibt im Kern. | umgesetzt (PR #6063 Trait, PR #6065 Kernbrücke) |
+| SA-10 | D-30: Prüfauftrag „Eignung vor G-5“ ist mit dem Befund erfüllt, dass `MergeOperator` produktiv nirgends verdrahtet ist. | eingereicht |
+| SA-11 | §26.1: Umstellungsaufwand mit Prod-/Test-Spalte angeben. | eingereicht (Zählung in IMPL §2.4) |
+| SA-12 | §4: `KeyError` um `DestroyFailed` und `Unsupported` ergänzen; keine Inhaltsfelder. | offen (WP-2.3) |
+| SA-13 | §14.3, §16.7: `AnchorValue` je Instanz trennen (Dateiname aus `instance_id`). | offen (WP-4.4) |
+| SA-14 | §22 G-2: `tools/reference/generator.py` ist Lieferung von WP-2.1. | offen (WP-2.1) |
+| SA-15 | §1.5, §22 G-1, §24 O-12: Die Pflicht zu zwei benannten Reviewern entfällt; Freigabe durch den Maintainer, Goldens und Freeze-Liste-Prüfung bleiben. | entschieden (Maintainer) |
+| UE-10 | §10.1: `Cipher` mit 24-Byte-Nonce ist XChaCha20-Poly1305; AES-GCM-SIV bleibt intern in `contextra-crypto` unverändert. | offen (WP-2.4) |
+
+Stand nach den PRs #6060 bis #6067. Offen bleiben UE-10 (Cipher, WP-2.4), SA-4 (WP-1.3b) und SA-12, SA-13, SA-14 (WP-2.x bis WP-4.4).
+
+Abweichung zu WP-1.2 (nicht SA-geführt): Die zweite `Clock`-Definition (`contextra-ports/src/clock.rs`) bleibt bestehen. Sie wird über das Feature `full` vom Port-Modul `persistence` getrennt. Die Entfernung folgt, wenn die Konsumenten umgestellt sind.
 
 ## Anhang A: Goldens
 

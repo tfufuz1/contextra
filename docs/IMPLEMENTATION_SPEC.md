@@ -6,7 +6,7 @@
 | Stand | 22.11.2026, Klon `940ff86`, `rustc 1.97.0` (MSRV 1.89, Spec D-17) |
 | Sprache | Prosa deutsch, Bezeichner englisch (CLAUDE.md §0) |
 | Verifikation | Alle Zahlen in §2 sind an diesem Stand gemessen (Befehle in Anhang B). Alles, was nicht gemessen ist, steht als „zu prüfen“ oder „Vorschlag“. Leistungswerte sind Hypothesen (Spec §21). |
-| Änderungen an der Spec | Dieses Dokument ändert `docs/SPEC.md` nicht. Wo die Spec lückenhaft oder widersprüchlich ist, steht ein **Änderungsantrag SA-n** (§11). Nach Spec §1.5 gilt: erst die Spec ändern (zwei Reviewer bei §4, §5, §9–§11, §14–§16, §18), dann den Code. |
+| Änderungen an der Spec | Dieses Dokument ändert `docs/SPEC.md` nicht. Wo die Spec lückenhaft oder widersprüchlich ist, steht ein **Änderungsantrag SA-n** (§11). Nach Spec §1.5 gilt: erst die Spec ändern (Freigabe durch den Maintainer bei §4, §5, §9–§11, §14–§16, §18; Goldens und Freeze-Liste bleiben Pflicht, SA-15), dann den Code. |
 
 Kennungen dieses Dokuments: `WP-g.n` Arbeitspaket des Gates g · `IF-n` Schnittstellenvertrag · `UE-n` Umsetzungsentscheidung innerhalb des Spielraums der Spec · `SA-n` Änderungsantrag an die Spec · `OP-n` offener Parameter (Spec-Entwurfswert, in G-8 zu messen) · `R-n` Risiko.
 
@@ -506,7 +506,7 @@ Notation: `WP-g.n` — Eingang (Spec/Bestand) → Ausgang (Dateien) → Nachweis
 | WP-1.6 | `Runtime` in den Port (SA-9), `Governor` bleibt im Kern | Test `Runtime::manual()` deterministisch |
 | WP-1.7 | Konsumentenmatrix gegen Spec §26 abgleichen und SA-6/SA-7/SA-10 einreichen | §2.4 dieses Dokuments |
 | WP-1.9 | `tests/invariants.rs`: Parser auf das Format `\| INV-… \|` aus Spec §18 umstellen (59 Invarianten); Test muss danach grün sein, ohne die Schwelle (≥ 35) zu senken. Umgesetzt: 59 Invarianten gefunden, 33 zitiert; die 26 noch nicht zitierten stehen in der Ausnahmeliste `NOCH_OFFEN`, die nur schrumpfen darf (der Test schlägt fehl, sobald ein Eintrag zitiert wird oder nicht in §18 steht) | `cargo test -p contextra-storage --test invariants` |
-| WP-1.8 | O-12 (benannte Reviewer) klären — **Voraussetzung für G-1** | Eintrag in Spec §24 |
+| WP-1.8 | entfällt: O-12 ist mit SA-15 entschieden (Maintainer-Freigabe statt zwei Reviewer) | Eintrag in Spec §24 (erledigt) |
 
 ### G-2 Formate, Checksummen, Seal-Rahmen, Schlüsselhierarchie
 
@@ -592,12 +592,12 @@ Regeln: Absturztests laufen nur auf `FaultFs`, nie auf Stubs (AGENTS.md §5.10).
 | R-1 | Port-Breaking-Change `Cipher` (12 → 24 Byte) und `KeyProvider` | andere Port-Nutzer brechen | nur der Kern implementiert die alten Traits (§2.3); Änderung in **einem** Commit mit Kernanpassung (WP-1.3) |
 | R-2 | Transitive Abhängigkeiten von `contextra-ports` verletzen §3.5 | Allow-Liste nicht prüfbar | Feature `persistence` (SA-1); CI-Prüfung `cargo tree` |
 | R-3 | `tools/reference/generator.py` fehlt | keine unabhängigen Goldens, G-2/G-F blockiert | WP-2.1 zuerst in G-2 |
-| R-4 | 24-Byte-Nonce passt nicht zu AES-GCM-SIV | Krypto-Wahl für `contextra-crypto` | UE-10: XChaCha20-Poly1305; Entscheidung vor WP-2.4, Review nach §1.5 |
+| R-4 | 24-Byte-Nonce passt nicht zu AES-GCM-SIV | Krypto-Wahl für `contextra-crypto` | UE-10: XChaCha20-Poly1305; Entscheidung vor WP-2.4, Freigabe nach §1.5 durch den Maintainer |
 | R-5 | OS-Lock ohne `unsafe`/`libc` | `DirLock` in `durable-fs` ist kein echter Lock | `std::fs::File::try_lock` kompiliert und läuft auf `rustc 1.97.0` (gemessen); ob es schon unter der MSRV 1.89 stabil ist, ist vor WP-4.2 per CI-Job zu prüfen |
 | R-6 | Konsumenten nutzen mehr API als Spec §26.3 abbildet | Adapter unvollständig | SA-7; Matrix in G-1 abschließen |
 | R-7 | `contextra-store` (27 898 Zeilen) und Kern laufen parallel | doppelter Wartungsaufwand bis G-6 | Store einfrieren (Archiv-Hinweis, §7.4), nur Sicherheitsfixes |
 | R-8 | Gleichzeitige Arbeit an der Spec und am Code | Drift | Spec zuerst (§1.5); SA-n-Liste (§11) als Eingangskorb |
-| R-9 | Reviewerpflicht (O-12) offen | G-1 nicht startbar | WP-1.8 als erstes Paket |
+| R-9 | Reviewerpflicht (O-12) | entfällt mit SA-15 | erledigt (Maintainer-Freigabe) |
 | R-10 | Zeilenlimit P-6 (≤ 400) bei `committer` (1 103 Zeilen im Bestand) | Verstoß gegen P-6 | Aufspaltung in WP-1.5 |
 
 ---
@@ -622,6 +622,7 @@ Eingang für den Prozess nach Spec §1.5. Jeder Antrag nennt Stelle, Befund, Vor
 | SA-12 | §4 | `KeyError` hat im Bestand nur `NotFound`, `Unavailable`; `destroy`/`probe` brauchen weitere Fehlerfälle | Varianten festlegen (z. B. `DestroyFailed`, `Unsupported`); keine Inhaltsfelder |
 | SA-13 | §14.3, §16.7 | `AnchorValue` ohne `instance_id`, §14.3 prüft sie „gegen den Anker“ | Anker je Instanz trennen (Dateiname/Schlüssel aus `instance_id`) oder Feld aufnehmen |
 | SA-14 | §22 G-2, §19.4 | `tools/reference/generator.py` existiert nicht | Als Lieferung von WP-2.1 festhalten; G-2-Bedingung unverändert |
+| SA-15 | §1.5, §22 G-1, §24 O-12 | Die Pflicht zu zwei benannten Reviewern hält den Ablauf auf (ein Maintainer, O-12 blockiert G-1) | Entfällt; Freigabe durch den Maintainer, Goldens und Freeze-Liste-Prüfung bleiben Pflicht. Von der Spec übernommen (§27) |
 
 ---
 
