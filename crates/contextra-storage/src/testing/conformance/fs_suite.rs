@@ -18,6 +18,96 @@ pub fn run_fs_conformance_suite<F: Fs>(fs: &F, root: &Path) {
     test_directory_operations(fs, root);
     test_atomic_write(fs, root);
     test_lock_exclusivity(fs, root);
+    test_truncate_extend_zero_fills(fs, root);
+    test_open_missing_read_is_error(fs, root);
+    test_punch_hole_contract(fs, root);
+    test_hard_link_contract(fs, root);
+    test_reflink_contract(fs, root);
+}
+
+/// SPEC §4: `truncate` verlängert mit Nullen, nie mit altem Inhalt.
+fn test_truncate_extend_zero_fills<F: Fs>(fs: &F, root: &Path) {
+    let file = fs
+        .open(&root.join("extend_test.dat"), OpenMode::CreateNew(Perm::Private))
+        .expect("create succeeds");
+    file.write_all_at(b"xyz", 0).expect("write succeeds");
+    file.truncate(2).expect("shrink succeeds");
+    file.truncate(8).expect("extend succeeds");
+    assert_eq!(file.len().expect("len succeeds"), 8);
+    let mut buf = [0xFFu8; 8];
+    let n = file.read_at(&mut buf, 0).expect("read succeeds");
+    assert_eq!(n, 8);
+    assert_eq!(&buf[..2], b"xy", "bestehende Bytes bleiben");
+    assert_eq!(&buf[2..], &[0u8; 6], "verlängerter Bereich ist null");
+}
+
+/// F-6: Fehlende Datei beim Lesen ist ein Fehler, nie „leer“.
+fn test_open_missing_read_is_error<F: Fs>(fs: &F, root: &Path) {
+    let r = fs.open(&root.join("does_not_exist.dat"), OpenMode::Read);
+    assert!(
+        matches!(&r, Err(e) if e.kind() == std::io::ErrorKind::NotFound),
+        "Öffnen einer fehlenden Datei muss NotFound liefern"
+    );
+}
+
+/// Optional (SPEC §4): `punch_hole` ist `Unsupported` oder liefert Nullen im Bereich.
+fn test_punch_hole_contract<F: Fs>(fs: &F, root: &Path) {
+    let file = fs
+        .open(&root.join("punch_test.dat"), OpenMode::CreateNew(Perm::Private))
+        .expect("create succeeds");
+    file.write_all_at(&[0xAAu8; 16], 0).expect("write succeeds");
+    match file.punch_hole(4, 8) {
+        Err(e) => assert_eq!(e.kind(), std::io::ErrorKind::Unsupported),
+        Ok(()) => {
+            let mut buf = [0u8; 16];
+            file.read_at(&mut buf, 0).expect("read succeeds");
+            assert_eq!(&buf[..4], &[0xAA; 4], "Bytes vor dem Loch bleiben");
+            assert_eq!(&buf[4..12], &[0u8; 8], "gelochter Bereich ist null");
+            assert_eq!(&buf[12..], &[0xAA; 4], "Bytes nach dem Loch bleiben");
+        }
+    }
+}
+
+/// SA-2: `hard_link` ist `Unsupported` oder teilt den Inhalt beider Namen.
+fn test_hard_link_contract<F: Fs>(fs: &F, root: &Path) {
+    let from = root.join("hl_from.dat");
+    let to = root.join("hl_to.dat");
+    {
+        let f = fs
+            .open(&from, OpenMode::CreateNew(Perm::Private))
+            .expect("create succeeds");
+        f.write_all_at(b"link", 0).expect("write succeeds");
+    }
+    match fs.hard_link(&from, &to) {
+        Err(e) => assert_eq!(e.kind(), std::io::ErrorKind::Unsupported),
+        Ok(()) => {
+            let f = fs.open(&to, OpenMode::Read).expect("link readable");
+            let mut buf = [0u8; 4];
+            f.read_at(&mut buf, 0).expect("read succeeds");
+            assert_eq!(&buf, b"link");
+        }
+    }
+}
+
+/// SA-2: `reflink` ist `Unsupported` oder liefert eine inhaltsgleiche Kopie.
+fn test_reflink_contract<F: Fs>(fs: &F, root: &Path) {
+    let from = root.join("rl_from.dat");
+    let to = root.join("rl_to.dat");
+    {
+        let f = fs
+            .open(&from, OpenMode::CreateNew(Perm::Private))
+            .expect("create succeeds");
+        f.write_all_at(b"clone", 0).expect("write succeeds");
+    }
+    match fs.reflink(&from, &to) {
+        Err(e) => assert_eq!(e.kind(), std::io::ErrorKind::Unsupported),
+        Ok(()) => {
+            let f = fs.open(&to, OpenMode::Read).expect("reflink readable");
+            let mut buf = [0u8; 5];
+            f.read_at(&mut buf, 0).expect("read succeeds");
+            assert_eq!(&buf, b"clone");
+        }
+    }
 }
 
 fn test_dir_and_file_creation<F: Fs>(fs: &F, root: &Path) {
