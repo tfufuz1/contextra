@@ -40,6 +40,10 @@ impl ClusterTable {
 
     pub fn mark_retired(&mut self, id: ClusterId, stamp: Stamp) -> Result<(), Error> {
         if stamp == 0 { return Err(Error::Limit { limit: "retire stamp must be nonzero" }); }
+        let entry = self.entries.get(&id).ok_or(Error::Corrupt { place: "unknown cluster" })?;
+        if entry.state == ClusterState::Retired {
+            return if entry.state_stamp == stamp { Ok(()) } else { Err(Error::Corrupt { place: "cluster retire stamp changed" }) };
+        }
         self.transition(id, ClusterState::Retired, stamp)
     }
 

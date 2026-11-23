@@ -102,17 +102,22 @@ impl BranchTable {
 
     /// Creates an O(1) child descriptor. `id` is consumed monotonically; in a
     /// durable integration it must come from a completed durable reservation.
-    pub fn fork(&mut self, id: BranchId, parent: BranchId, point: ForkPoint, options: BranchOptions, parent_head: Stamp) -> Result<Stamp, Error> {
+    /// `commit_stamp` is the outer stamp of the SYS_BRANCH record. A `Head`
+    /// fork is pinned there, as required by the on-disk branch contract.
+    pub fn fork(&mut self, id: BranchId, parent: BranchId, point: ForkPoint, options: BranchOptions, parent_head: Stamp, commit_stamp: Stamp) -> Result<Stamp, Error> {
         if id.0 != self.next_id { return Err(Error::Limit { limit: "branch id must be the next reserved id" }); }
         if self.branches.contains_key(&id) { return Err(Error::Corrupt { place: "branch id reused" }); }
         if options.name.len() > 64 { return Err(Error::Limit { limit: "branch name exceeds 64 bytes" }); }
         if self.len() >= self.max_branches { return Err(Error::Limit { limit: "branch count limit" }); }
         let parent_meta = self.branches.get(&parent).ok_or(Error::BranchClosed)?;
         if !parent_meta.is_live() || parent_meta.head_stamp != parent_head { return Err(Error::BranchClosed); }
+        if commit_stamp <= parent_head || commit_stamp > STAMP_MAX {
+            return Err(Error::Limit { limit: "branch fork record stamp must follow parent head" });
+        }
         let depth = parent_meta.depth.checked_add(1).ok_or(Error::Limit { limit: "branch depth overflow" })?;
         if depth > self.max_depth { return Err(Error::Limit { limit: "branch depth limit" }); }
         let fork_stamp = match point {
-            ForkPoint::Head => parent_head,
+            ForkPoint::Head => commit_stamp,
             ForkPoint::At(stamp) if stamp < self.history_floor => return Err(Error::BelowFloor),
             ForkPoint::At(stamp) if stamp > parent_head => return Err(Error::Limit { limit: "fork point beyond parent head" }),
             ForkPoint::At(stamp) => stamp,
