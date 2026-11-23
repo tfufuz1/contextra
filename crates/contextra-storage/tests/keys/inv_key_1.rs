@@ -121,7 +121,7 @@ fn compute_pair(
             (*key.expose(), nonce)
         }
         CryptoOp::Keys { random } => {
-            let key = derive_keys_key(kdf, kek);
+            let key = derive_keys_key(kdf, kek, &[0x11u8; 16]);
             let nonce = keys_nonce(random);
             (*key.expose(), nonce)
         }

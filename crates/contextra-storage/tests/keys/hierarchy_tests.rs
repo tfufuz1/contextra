@@ -15,8 +15,9 @@ fn test_keys_key_derivation_deterministic() {
     let kdf = Blake3Kdf;
     let kek = Secret32::new([0x42u8; 32]);
 
-    let key1 = derive_keys_key(&kdf, &kek);
-    let key2 = derive_keys_key(&kdf, &kek);
+    let instance = [0x11u8; 16];
+    let key1 = derive_keys_key(&kdf, &kek, &instance);
+    let key2 = derive_keys_key(&kdf, &kek, &instance);
 
     assert_eq!(key1.expose(), key2.expose());
     assert_ne!(key1.expose(), kek.expose());

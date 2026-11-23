@@ -3,14 +3,13 @@
 //! Layout der Datei `KEYS`:
 //! ```text
 //! "CTXK" | version u16 | keys_generation u64 | nonce [12] | sealed_len u32 | sealed[sealed_len]
-//! sealed = Cipher.seal( key = Kdf(KEK, "ctxs keys v1"), nonce, aad = instance_id || version || keys_generation, plain )
+//! sealed = Cipher.seal( key = Kdf(KEK, "ctxs keys v1" || instance_id), nonce, aad = "CTXK" || version || instance_id || keys_generation, plain )
 //! plain  = root_key [32] | count u16 | ( space u16 | dek_gen u32 | dek [32] ) * count
 //! ```
 //!
 //! KEK-Rotation ist O(1): KEYS wird mit neuem KEK-Schlüssel und neuer Nonce ersetzt.
 
 use super::hierarchy::derive_keys_key;
-use super::nonce::port_nonce;
 use super::secret::Secret32;
 use contextra_ports::persistence::{Cipher, Entropy, Kdf};
 use std::fmt;
@@ -183,16 +182,20 @@ pub struct KeysFile {
 }
 
 impl KeysFile {
-    /// Baut AAD für die Versiegelung: `instance_id || version || keys_generation` (26 Bytes).
-    pub fn build_aad(instance_id: &[u8; 16], version: u16, keys_generation: u64) -> [u8; 26] {
-        let mut aad = [0u8; 26];
-        if let Some(target) = aad.get_mut(0..16) {
-            target.copy_from_slice(instance_id);
+    /// Baut AAD für die Versiegelung nach SPEC §10.3:
+    /// `"CTXK" || version || instance_id || keys_generation` (30 Bytes).
+    pub fn build_aad(instance_id: &[u8; 16], version: u16, keys_generation: u64) -> [u8; 30] {
+        let mut aad = [0u8; 30];
+        if let Some(target) = aad.get_mut(0..4) {
+            target.copy_from_slice(KEYS_MAGIC);
         }
-        if let Some(target) = aad.get_mut(16..18) {
+        if let Some(target) = aad.get_mut(4..6) {
             target.copy_from_slice(&version.to_le_bytes());
         }
-        if let Some(target) = aad.get_mut(18..26) {
+        if let Some(target) = aad.get_mut(6..22) {
+            target.copy_from_slice(instance_id);
+        }
+        if let Some(target) = aad.get_mut(22..30) {
             target.copy_from_slice(&keys_generation.to_le_bytes());
         }
         aad
@@ -213,11 +216,10 @@ impl KeysFile {
             .fill(&mut nonce)
             .map_err(|e| KeysError::Io(e.to_string()))?;
 
-        let keys_key = derive_keys_key(kdf, kek);
+        let keys_key = derive_keys_key(kdf, kek, instance_id);
         let aad = Self::build_aad(instance_id, KEYS_VERSION_1, keys_generation);
         let plain_bytes = plain.encode();
-        let sealed_payload =
-            cipher.seal(keys_key.expose(), &port_nonce(&nonce), &aad, &plain_bytes);
+        let sealed_payload = cipher.seal(keys_key.expose(), &nonce, &aad, &plain_bytes);
 
         Ok(Self {
             version: KEYS_VERSION_1,
@@ -235,15 +237,10 @@ impl KeysFile {
         kdf: &dyn Kdf,
         cipher: &dyn Cipher,
     ) -> Result<KeysPlain, KeysError> {
-        let keys_key = derive_keys_key(kdf, kek);
+        let keys_key = derive_keys_key(kdf, kek, instance_id);
         let aad = Self::build_aad(instance_id, self.version, self.keys_generation);
         let plain_bytes = cipher
-            .open(
-                keys_key.expose(),
-                &port_nonce(&self.nonce),
-                &aad,
-                &self.sealed_payload,
-            )
+            .open(keys_key.expose(), &self.nonce, &aad, &self.sealed_payload)
             .map_err(|e| KeysError::Cipher(e.to_string()))?;
 
         KeysPlain::decode(&plain_bytes)

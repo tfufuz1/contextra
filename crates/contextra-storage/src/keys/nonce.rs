@@ -1,9 +1,13 @@
-//! # Zentrale Nonce-Tabelle
+//! # Nonces
 //!
-//! Normative Regeln (SPEC §15.2, Golden A.6, SD-50):
-//! Nonces haben genau 12 Bytes.
-//! Jedes Präfix ist disjunkt (`0x01` bis `0x05`).
-//! Dieses Modul ist die einzige Stelle im gesamten Kern, die Nonces bildet.
+//! Normative Regeln (SPEC §10.1, §16.3, SD-14, D-28):
+//! - Jede Versiegelung zieht eine **frische 24-Byte-Zufallsnonce** aus `Entropy`.
+//!   Es gibt keinen Zählerzustand, der bei Absturz oder Kopie verloren gehen könnte.
+//! - Die Rotationsschranke je Schlüssel ist `2^32` Versiegelungen (`rotation`).
+//!
+//! **Bestand (Lücke, siehe PR-Beschreibung):** Die strukturierten 12-Byte-Konstruktoren
+//! unten (`0x01` bis `0x05`, Zähler-Nonces) gelten nur bis zur Umstellung des
+//! `Cipher`-Ports auf 24 Byte (WP-1.3 / UE-10). Sie werden nicht mehr erweitert.
 
 use contextra_ports::persistence::Entropy;
 use std::io;
@@ -118,38 +122,15 @@ pub fn keys_nonce_from_entropy(entropy: &dyn Entropy) -> io::Result<[u8; 12]> {
     Ok(nonce)
 }
 
-/// Weitet eine 12-Byte-Nonce auf die 24 Byte des Ports `Cipher` (UE-10).
+/// Länge der Versiegelungs-Nonce in Bytes (SPEC §10.1, UE-10: XChaCha-Familie).
+pub const SEAL_NONCE_LEN: usize = 24;
+
+/// Erstellt eine frische 24-Byte-Zufallsnonce für eine Versiegelung (SPEC §10.1, SD-14).
 ///
-/// Format: `n12 || 0u96`. Die Abbildung ist injektiv, daher bleibt die Eindeutigkeit der
-/// Nonce-Tabelle (Präfixe `0x01` bis `0x05`) erhalten. Das ist die Brücke bis zur
-/// Umstellung auf 24-Byte-Zufallsnonces (SD-14), siehe PR.
-pub fn port_nonce(n12: &[u8; 12]) -> [u8; 24] {
-    let mut out = [0u8; 24];
-    if let Some(head) = out.get_mut(0..12) {
-        head.copy_from_slice(n12);
-    }
-    out
-}
-
-#[cfg(test)]
-mod port_nonce_tests {
-    use super::*;
-
-    #[test]
-    fn pads_with_zero_tail_and_keeps_head() {
-        let n12 = [7u8; 12];
-        let n24 = port_nonce(&n12);
-        assert_eq!(n24.get(0..12), Some(&n12[..]));
-        assert_eq!(n24.get(12..24), Some(&[0u8; 12][..]));
-    }
-
-    #[test]
-    fn distinct_table_nonces_stay_distinct() {
-        let a = port_nonce(&run_block_nonce(1));
-        let b = port_nonce(&redo_frame_nonce(1));
-        let c = port_nonce(&catalog_record_nonce(1));
-        assert_ne!(a, b);
-        assert_ne!(a, c);
-        assert_ne!(b, c);
-    }
+/// Jeder Aufruf liefert einen neuen Wert aus `Entropy`. Der Aufrufer darf die
+/// Nonce nicht wiederverwenden, auch nicht nach einem Absturz (§16.3).
+pub fn seal_nonce_from_entropy(entropy: &dyn Entropy) -> io::Result<[u8; SEAL_NONCE_LEN]> {
+    let mut nonce = [0u8; SEAL_NONCE_LEN];
+    entropy.fill(&mut nonce)?;
+    Ok(nonce)
 }
