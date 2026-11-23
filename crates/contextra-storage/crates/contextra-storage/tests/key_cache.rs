@@ -1,12 +1,22 @@
 use contextra_storage::keys::cache::KeyCache;
-use contextra_storage::ports::traits::{Clock, Entropy};
+use contextra_storage::ports::traits::{Clock, ClockReading, ClockSkew, Entropy};
 use contextra_storage::ports::{BatchId, ClusterId, Error, KeyCreateFailure, KeyCreateResult, KeyProvider, KeyProbe};
 use contextra_storage::testing::keys::MemKeyProvider;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 struct TestClock(AtomicU64);
-impl Clock for TestClock { fn now_nanos(&self) -> u64 { self.0.load(Ordering::Acquire) } }
+impl Clock for TestClock {
+    fn read(&self) -> Result<ClockReading, Error> {
+        let monotonic_nanos = self.0.load(Ordering::Acquire);
+        Ok(ClockReading {
+            monotonic_nanos,
+            utc_millis: 1_000,
+            durable_utc_millis: 1_000,
+            skew: ClockSkew::Certain,
+        })
+    }
+}
 struct TestEntropy(AtomicU64);
 impl Entropy for TestEntropy {
     fn fill(&self, output: &mut [u8]) -> Result<(), Error> {

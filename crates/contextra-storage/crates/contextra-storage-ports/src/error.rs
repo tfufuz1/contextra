@@ -56,6 +56,8 @@ pub enum Error {
     UnknownCluster,
     #[error("Sicht liegt unterhalb des verfügbaren Historienbodens")]
     BelowFloor,
+    #[error("Daten wurden ab Stamp {at} gelöscht")]
+    Erased { at: u64 },
     #[error("Zugriff ist durch eine Restriction gesperrt")]
     Restricted,
     #[error("Guard-Konflikt")]
@@ -96,7 +98,9 @@ pub enum Error {
 impl Error {
     pub fn class(&self) -> ErrorClass {
         match self {
-            Self::Transient { .. } | Self::Io { .. } => ErrorClass::Transient,
+            Self::Transient { .. } => ErrorClass::Transient,
+            Self::Io { kind: std::io::ErrorKind::Interrupted, .. } => ErrorClass::Transient,
+            Self::Io { .. } => ErrorClass::Internal,
             Self::DiskFull => ErrorClass::DiskFull,
             Self::Poisoned { .. } => ErrorClass::Poisoned,
             Self::Indeterminate { .. } => ErrorClass::Indeterminate,
@@ -105,7 +109,8 @@ impl Error {
             Self::KeyUnavailable { .. } | Self::KeyLost | Self::Shredded => ErrorClass::Key,
             Self::Limit { .. } | Self::ClusterRetired | Self::UnknownCluster | Self::BelowFloor
             | Self::Restricted | Self::ChangeTooLarge | Self::IdemCapacity | Self::BranchClosed
-            | Self::BranchHasChildren | Self::Lagged | Self::EraseFanoutExceeded | Self::ClockUncertain => ErrorClass::Usage,
+            | Self::BranchHasChildren | Self::Lagged | Self::EraseFanoutExceeded | Self::ClockUncertain
+            | Self::Erased { .. } => ErrorClass::Usage,
             Self::ReservedSpace | Self::Exhausted => ErrorClass::Usage,
             Self::CasLost | Self::Conflict | Self::IdemConflict => ErrorClass::Conflict,
             Self::Rollback => ErrorClass::Rollback,
@@ -128,6 +133,7 @@ impl Error {
             Self::ClusterRetired => "Erasure-Ticket prüfen",
             Self::UnknownCluster => "Cluster-Registrierung prüfen",
             Self::BelowFloor => "Neuere View öffnen oder Historie wiederherstellen",
+            Self::Erased { .. } => "Löschstatus beachten; die Sicht enthält keine Daten dieses Clusters",
             Self::Restricted => "Restriction und zuständige Freigabe prüfen",
             Self::Conflict | Self::CasLost | Self::IdemConflict => "Zustand neu lesen und Request prüfen",
             Self::ChangeTooLarge => "Change in kleinere atomare Änderungen aufteilen",

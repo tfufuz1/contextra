@@ -1,11 +1,11 @@
 //! Deterministisches, nicht sparsches Dateisystem mit getrenntem durablem Abbild.
 
-use contextra_storage_ports::traits::{File, FileRole, Fs, FsCaps, IoCtx};
+use contextra_storage_ports::traits::{File, FileRole, Fs, FsCaps, FsLock, IoCtx};
 use contextra_storage_ports::Error;
 use std::collections::BTreeMap;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 #[derive(Clone)]
 pub struct MemFs {
@@ -17,6 +17,26 @@ struct FsState {
     files: BTreeMap<PathBuf, Arc<Mutex<MemFileState>>>,
     durable_files: BTreeMap<PathBuf, Arc<Mutex<MemFileState>>>,
     free_bytes: u64,
+    locks: BTreeMap<PathBuf, Arc<MemLockCell>>,
+}
+
+type MemLockCell = (Mutex<bool>, Condvar);
+
+struct MemFsLock {
+    cell: Arc<MemLockCell>,
+}
+
+impl FsLock for MemFsLock {}
+
+impl Drop for MemFsLock {
+    fn drop(&mut self) {
+        let (held, released) = &*self.cell;
+        match held.lock() {
+            Ok(mut held) => *held = false,
+            Err(poisoned) => *poisoned.into_inner() = false,
+        }
+        released.notify_one();
+    }
 }
 
 #[derive(Default)]
@@ -164,6 +184,23 @@ impl Fs for MemFs {
         Ok(())
     }
 
+    fn lock(&self, path: &Path, _ctx: IoCtx) -> Result<Box<dyn FsLock>, Error> {
+        let cell = {
+            let mut state = self.state.lock().map_err(|_| Error::Poisoned { cause: "MemFs lock" })?;
+            Arc::clone(state.locks.entry(path.to_path_buf()).or_insert_with(|| {
+                Arc::new((Mutex::new(false), Condvar::new()))
+            }))
+        };
+        let (held, released) = &*cell;
+        let mut is_held = held.lock().map_err(|_| Error::Poisoned { cause: "MemFs instance lock" })?;
+        while *is_held {
+            is_held = released.wait(is_held).map_err(|_| Error::Poisoned { cause: "MemFs instance lock" })?;
+        }
+        *is_held = true;
+        drop(is_held);
+        Ok(Box::new(MemFsLock { cell }))
+    }
+
     fn sync_dir(&self, _dir: &Path, _ctx: IoCtx) -> Result<(), Error> {
         let mut state = self.state.lock().map_err(|_| Error::Poisoned { cause: "MemFs lock" })?;
         state.durable_files = state.files.clone();
@@ -182,7 +219,7 @@ impl Fs for MemFs {
 
     fn caps(&self) -> FsCaps {
         FsCaps { durable_file_sync: true, durable_dir_sync: true, atomic_rename: true,
-            preallocation_reserves_space: true, reflink: false, punch_hole: false }
+            preallocation_reserves_space: true, hard_link: false, reflink: false, punch_hole: false }
     }
 }
 

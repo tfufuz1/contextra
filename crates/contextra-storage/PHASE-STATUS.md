@@ -28,4 +28,12 @@ Die Tabelle bildet Komponentenfortschritt ab, keine Freigabe der Phasen-Gates. E
 
 ## Compile- und Testhinweis
 
+**Aktuelle Ausführungsumgebung, 2026-11-23:** Mit freigegebener Cargo-
+Netzwerkauflösung bestanden `cargo check` und `cargo test` für alle sieben
+Storage-Crates mit `--ignore-rust-version --features testing`; der Testlauf
+benötigt `CARGO_TARGET_DIR=/tmp/contextra-storage-target`, weil das Workspace-
+`target/` schreibgeschützt ist. `rustup`, `cargo clippy`, `cargo fmt` und
+`cargo deny` sind nicht installiert; diese Basis-Gates bleiben ungeprüft. Der
+Rust-1.89.0-Pin bleibt extern offen. Details und Befehle stehen in `TRACE.md`.
+
 Die installierte Rust-Version 1.85.1 liegt unter dem Workspace-Mindeststand 1.89. Teilverifikation mit `--ignore-rust-version --offline`: `cargo check -p contextra-storage -p contextra-crypto-ref --features testing` und `cargo test -p contextra-storage --features testing` bestanden, einschließlich der gezielten Crash-, Codec-, Cache-, Canary- und Run-Dateiaufbau-Tests. Das ist keine vollständige Release-Abnahme. Nicht implementierte Besitzer-Module und alle offenen Crash-/Restore-/Format-Gates bleiben ausdrücklich offen.

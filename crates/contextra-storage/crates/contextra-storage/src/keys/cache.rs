@@ -76,7 +76,7 @@ impl KeyCache {
     }
 
     pub fn get(&self, cluster: ClusterId, epoch: u32) -> Result<Key32Handle, Error> {
-        let now = self.clock.now_nanos();
+        let now = self.clock.read()?.monotonic_nanos;
         let (generation, generation_snapshot, stale) = {
             let mut state = self.state.lock()?;
             if state.revoked.contains(&cluster) { return Err(Error::ClusterRetired); }
@@ -137,7 +137,7 @@ impl KeyCache {
     /// provider while holding the cache lock.
     pub fn prefetch(&self, request: &[(ClusterId, u32)]) -> Result<(), Error> {
         for chunk in request.chunks(MAX_PREFETCH) {
-            let now = self.clock.now_nanos();
+        let now = self.clock.read()?.monotonic_nanos;
             let (misses, generations) = {
                 let mut state = self.state.lock()?;
                 let mut misses = Vec::new();

@@ -1,8 +1,6 @@
-//! Bounded, content-free metric catalog (SPEC-R8.1 §16, Z-17).
-//!
-//! Metric names and label keys are static. Call sites must use only the finite
-//! values documented here; identifiers, tenant labels, keys, and payloads are
-//! never valid dimensions.
+//! Closed, content-free metric catalog defined by SPEC §16.
+
+use contextra_storage_ports::traits::{MetricLabel, MetricLabelKey, MetricName, MetricSample};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetricKind {
@@ -22,89 +20,83 @@ pub enum MetricUnit {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MetricDef {
-    pub name: &'static str,
+    pub name: MetricName,
     pub kind: MetricKind,
     pub unit: MetricUnit,
-    /// Comma-separated closed label keys; no call-site-defined labels.
-    pub labels: &'static str,
+    pub labels: &'static [MetricLabelKey],
 }
+
+use MetricLabelKey::{
+    Durability as D, ErrorClass as E, FileRole as F, OwnerKind as O, Phase as P,
+    ResourceClass as R, Result as Q, Stage as S,
+};
+
+const NONE: &[MetricLabelKey] = &[];
+const DURABILITY: &[MetricLabelKey] = &[D];
+const RESULT: &[MetricLabelKey] = &[Q];
+const DURABILITY_RESULT: &[MetricLabelKey] = &[D, Q];
+const FILE_ROLE: &[MetricLabelKey] = &[F];
+const RESOURCE_CLASS: &[MetricLabelKey] = &[R];
+const PHASE: &[MetricLabelKey] = &[P];
+const STAGE: &[MetricLabelKey] = &[S];
+const STAGE_RESULT: &[MetricLabelKey] = &[S, Q];
+const OWNER_KIND: &[MetricLabelKey] = &[O];
+const ERROR_CLASS: &[MetricLabelKey] = &[E];
 
 pub const METRICS: &[MetricDef] = &[
-    MetricDef { name: "ctxs_commits_total", kind: MetricKind::Counter, unit: MetricUnit::Count, labels: "durability,result" },
-    MetricDef { name: "ctxs_commit_group_size", kind: MetricKind::Histogram, unit: MetricUnit::Count, labels: "durability" },
-    MetricDef { name: "ctxs_commit_duration_nanoseconds", kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: "durability" },
-    MetricDef { name: "ctxs_durable_stamp_lag", kind: MetricKind::Gauge, unit: MetricUnit::Stamp, labels: "" },
-    MetricDef { name: "ctxs_fsync_duration_nanoseconds", kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: "file_role" },
-    MetricDef { name: "ctxs_memory_bytes", kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: "resource_class" },
-    MetricDef { name: "ctxs_memory_limit_bytes", kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: "resource_class" },
-    MetricDef { name: "ctxs_diskfull", kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: "" },
-    MetricDef { name: "ctxs_cache_hit_ratio", kind: MetricKind::Gauge, unit: MetricUnit::RatioBasisPoints, labels: "cache_kind" },
-    MetricDef { name: "ctxs_disk_reserve_bytes", kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: "reserve_kind" },
-    MetricDef { name: "ctxs_scratch_bytes", kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: "purpose" },
-    MetricDef { name: "ctxs_maintenance_bytes_total", kind: MetricKind::Counter, unit: MetricUnit::Bytes, labels: "phase" },
-    MetricDef { name: "ctxs_maintenance_duration_nanoseconds", kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: "phase,result" },
-    MetricDef { name: "ctxs_erase_open_tickets", kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: "" },
-    MetricDef { name: "ctxs_erase_oldest_pending_nanoseconds", kind: MetricKind::Gauge, unit: MetricUnit::Nanoseconds, labels: "" },
-    MetricDef { name: "ctxs_erase_deadline_breaches_total", kind: MetricKind::Counter, unit: MetricUnit::Count, labels: "stage" },
-    MetricDef { name: "ctxs_erase_gate_duration_nanoseconds", kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: "result" },
-    MetricDef { name: "ctxs_erase_key_destroy_duration_nanoseconds", kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: "result" },
-    MetricDef { name: "ctxs_erase_stage_duration_nanoseconds", kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: "stage,result" },
-    MetricDef { name: "ctxs_erase_purge_bytes_total", kind: MetricKind::Counter, unit: MetricUnit::Bytes, labels: "layout" },
-    MetricDef { name: "ctxs_anchor_lag_nanoseconds", kind: MetricKind::Gauge, unit: MetricUnit::Nanoseconds, labels: "strength" },
-    MetricDef { name: "ctxs_consumer_lag_bytes", kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: "owner_kind" },
-    MetricDef { name: "ctxs_consumer_lag_stamps", kind: MetricKind::Gauge, unit: MetricUnit::Stamp, labels: "owner_kind" },
-    MetricDef { name: "ctxs_guard_slowpath_ratio", kind: MetricKind::Gauge, unit: MetricUnit::RatioBasisPoints, labels: "guard_kind" },
-    MetricDef { name: "ctxs_branch_count", kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: "" },
-    MetricDef { name: "ctxs_branch_max_depth", kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: "" },
-    MetricDef { name: "ctxs_branch_oldest_pin_nanoseconds", kind: MetricKind::Gauge, unit: MetricUnit::Nanoseconds, labels: "" },
-    MetricDef { name: "ctxs_errors_total", kind: MetricKind::Counter, unit: MetricUnit::Count, labels: "error_class" },
-    MetricDef { name: "ctxs_poisoned", kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: "" },
+    MetricDef { name: MetricName::CommitsTotal, kind: MetricKind::Counter, unit: MetricUnit::Count, labels: DURABILITY_RESULT },
+    MetricDef { name: MetricName::CommitGroupSize, kind: MetricKind::Histogram, unit: MetricUnit::Count, labels: DURABILITY },
+    MetricDef { name: MetricName::CommitDurationNanoseconds, kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: DURABILITY_RESULT },
+    MetricDef { name: MetricName::DurableStampLag, kind: MetricKind::Gauge, unit: MetricUnit::Stamp, labels: NONE },
+    MetricDef { name: MetricName::FsyncDurationNanoseconds, kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: FILE_ROLE },
+    MetricDef { name: MetricName::MemoryBytes, kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: RESOURCE_CLASS },
+    MetricDef { name: MetricName::MemoryLimitBytes, kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: RESOURCE_CLASS },
+    MetricDef { name: MetricName::DiskFull, kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: NONE },
+    MetricDef { name: MetricName::CacheHitRatio, kind: MetricKind::Gauge, unit: MetricUnit::RatioBasisPoints, labels: RESOURCE_CLASS },
+    MetricDef { name: MetricName::DiskReserveBytes, kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: RESOURCE_CLASS },
+    MetricDef { name: MetricName::ScratchBytes, kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: RESOURCE_CLASS },
+    MetricDef { name: MetricName::MaintenanceBytesTotal, kind: MetricKind::Counter, unit: MetricUnit::Bytes, labels: PHASE },
+    MetricDef { name: MetricName::MaintenanceDurationNanoseconds, kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: PHASE },
+    MetricDef { name: MetricName::EraseOpenTickets, kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: NONE },
+    MetricDef { name: MetricName::EraseOldestPendingNanoseconds, kind: MetricKind::Gauge, unit: MetricUnit::Nanoseconds, labels: NONE },
+    MetricDef { name: MetricName::EraseDeadlineBreachesTotal, kind: MetricKind::Counter, unit: MetricUnit::Count, labels: STAGE },
+    MetricDef { name: MetricName::EraseGateDurationNanoseconds, kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: RESULT },
+    MetricDef { name: MetricName::EraseKeyDestroyDurationNanoseconds, kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: RESULT },
+    MetricDef { name: MetricName::EraseStageDurationNanoseconds, kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: STAGE_RESULT },
+    MetricDef { name: MetricName::ErasePurgeBytesTotal, kind: MetricKind::Counter, unit: MetricUnit::Bytes, labels: NONE },
+    MetricDef { name: MetricName::AnchorLagNanoseconds, kind: MetricKind::Gauge, unit: MetricUnit::Nanoseconds, labels: NONE },
+    MetricDef { name: MetricName::ConsumerLagBytes, kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: OWNER_KIND },
+    MetricDef { name: MetricName::ConsumerLagStamps, kind: MetricKind::Gauge, unit: MetricUnit::Stamp, labels: OWNER_KIND },
+    MetricDef { name: MetricName::GuardSlowpathRatio, kind: MetricKind::Gauge, unit: MetricUnit::RatioBasisPoints, labels: NONE },
+    MetricDef { name: MetricName::BranchCount, kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: NONE },
+    MetricDef { name: MetricName::BranchMaxDepth, kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: NONE },
+    MetricDef { name: MetricName::BranchOldestPinNanoseconds, kind: MetricKind::Gauge, unit: MetricUnit::Nanoseconds, labels: NONE },
+    MetricDef { name: MetricName::ErrorsTotal, kind: MetricKind::Counter, unit: MetricUnit::Count, labels: ERROR_CLASS },
+    MetricDef { name: MetricName::Poisoned, kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: NONE },
 ];
 
-/// Returns whether a label key belongs to the closed, bounded vocabulary.
-pub fn allowed_label_key(key: &str) -> bool {
-    matches!(key,
-        "durability" | "result" | "file_role" | "resource_class" | "cache_kind"
-        | "reserve_kind" | "purpose" | "phase" | "stage" | "layout"
-        | "strength" | "owner_kind" | "guard_kind" | "error_class")
-}
-
-/// Validates a metric's label keys and finite values before export.
-pub fn validate_labels(name: &str, labels: &[(&str, &str)]) -> bool {
-    let Some(def) = METRICS.iter().find(|def| def.name == name) else {
+/// Validates that a call uses the exact catalog label dimensions and no
+/// duplicates. Label values are already restricted by their Rust enums.
+pub fn validate_labels(name: MetricName, labels: &[MetricLabel]) -> bool {
+    let Some(definition) = METRICS.iter().find(|definition| definition.name == name) else {
         return false;
     };
-    let expected: &[&str] = if def.labels.is_empty() {
-        &[]
-    } else {
-        // All catalog label lists are short and static; split avoids an allocated registry.
-        let valid = labels.iter().enumerate().all(|(index, (key, value))| {
-            allowed_label_key(key)
-                && def.labels.split(',').any(|expected| expected == *key)
-                && allowed_label_value(key, value)
-                && labels[..index].iter().all(|(prior, _)| prior != key)
-        });
-        return valid && def.labels.split(',').count() == labels.len();
-    };
-    labels.is_empty() && expected.is_empty()
+    labels.len() == definition.labels.len()
+        && labels.iter().enumerate().all(|(index, label)| {
+            definition.labels.contains(&label.key())
+                && labels.iter().take(index).all(|prior| prior.key() != label.key())
+        })
 }
 
-fn allowed_label_value(key: &str, value: &str) -> bool {
-    match key {
-        "durability" => matches!(value, "durable" | "relaxed"),
-        "result" => matches!(value, "ok" | "error" | "blocked" | "incomplete"),
-        "file_role" => matches!(value, "redo" | "run" | "blob" | "catalog" | "ledger" | "checkpoint"),
-        "resource_class" => matches!(value, "memtable" | "cluster_meta" | "guard" | "block_cache" | "key_cache" | "extension_delta" | "inflight" | "purge_scratch"),
-        "cache_kind" => matches!(value, "block" | "key" | "cluster"),
-        "reserve_kind" => matches!(value, "erase" | "purge" | "redo"),
-        "purpose" => matches!(value, "purge" | "compaction" | "extension"),
-        "phase" => matches!(value, "flush" | "compaction" | "blob_gc" | "purge" | "scrub"),
-        "stage" => matches!(value, "gate" | "key_destroy" | "purge"),
-        "layout" => matches!(value, "cluster_local" | "packed_bounded"),
-        "strength" => matches!(value, "weak" | "strong"),
-        "owner_kind" => matches!(value, "vector" | "text" | "graph" | "identity" | "cache" | "other"),
-        "guard_kind" => matches!(value, "key" | "range" | "branch"),
-        "error_class" => matches!(value, "transient" | "disk_full" | "poisoned" | "indeterminate" | "corrupt" | "unsupported" | "key" | "usage" | "conflict" | "rollback" | "internal"),
-        _ => false,
-    }
+/// Checks sample representation against the catalog's aggregation kind.
+pub fn validate_sample(name: MetricName, sample: MetricSample) -> bool {
+    let Some(definition) = METRICS.iter().find(|definition| definition.name == name) else {
+        return false;
+    };
+    matches!(
+        (definition.kind, sample),
+        (MetricKind::Counter, MetricSample::Counter(_))
+            | (MetricKind::Gauge, MetricSample::Gauge(_))
+            | (MetricKind::Histogram, MetricSample::Observe(_))
+    )
 }

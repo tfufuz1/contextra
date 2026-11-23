@@ -6,6 +6,29 @@ never merely that a module compiles.
 
 ## Environment and baseline
 
+* 2026-11-23 execution in this workspace supersedes the historical partial
+  baseline below: `rustc --version` is `1.85.1`; `rustup` is not installed
+  (`rustup toolchain install 1.89.0` returned command-not-found).
+* The offline workspace test first failed at dependency resolution (`flatbuffers`
+  missing from the local index); after approved Cargo network access, the
+  seven-crate baseline check passed. Exact check command:
+  `cargo check --ignore-rust-version -p contextra-storage-ports -p contextra-storage -p contextra-crypto-ref -p contextra-keys-file -p contextra-keys-cohort -p contextra-storage-fs -p contextra-storage-bridge --features testing`.
+* Exact test command (using writable target storage) passed all unit,
+  integration, and doc tests:
+  `CARGO_TARGET_DIR=/tmp/contextra-storage-target cargo test --ignore-rust-version --offline -p contextra-storage-ports -p contextra-storage -p contextra-crypto-ref -p contextra-keys-file -p contextra-keys-cohort -p contextra-storage-fs -p contextra-storage-bridge --features testing`.
+  The default workspace `target/` is read-only here.
+* `cargo clippy`, `cargo fmt`, and `cargo deny` are unavailable as Cargo
+  subcommands in the installed toolchain. Their requested baseline gates are
+  **not verified**. No gate is declared green from this run.
+* `scripts/check_invariant_refs.sh` does run and reports 59 referenced IDs.
+  Inspection found that `tests/invariant_refs.rs` supplies those references
+  from one `assert!(true)` test; this proves only lexical coverage, not the
+  behavioural tests required by the Auftrag. The behavioural mapping below
+  remains open pending owner-test assertions.
+* `legacy-store-final` was not present in the visible tag list. Creating it
+  was attempted at current `HEAD`, but Git could not create the tag lock
+  because `.git` metadata is read-only/outside the writable roots.
+
 * 2026-11-23: installed compiler is `rustc 1.85.1`; `rustup` is unavailable.
   All locally reproducible commands therefore use `--ignore-rust-version
   --offline` and `CARGO_TARGET_DIR=/tmp/contextra-storage-target`.  This is

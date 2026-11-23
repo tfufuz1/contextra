@@ -1,6 +1,6 @@
 //! Deterministische Fehlerhülle für I/O-Operationen (SP-ENV, WP-03.2).
 
-use contextra_storage_ports::traits::{File, FileRole, Fs, FsCaps, IoCtx};
+use contextra_storage_ports::traits::{File, FileRole, Fs, FsCaps, FsLock, IoCtx};
 use contextra_storage_ports::Error;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -168,6 +168,26 @@ impl<F: Fs> Fs for FaultFs<F> {
     fn unlink(&self, path: &Path, ctx: IoCtx) -> Result<(), Error> {
         if take_fault(&self.runtime)?.is_some() { return Err(io_error(ctx.role)); }
         self.inner.unlink(path, ctx)
+    }
+
+    fn lock(&self, path: &Path, ctx: IoCtx) -> Result<Box<dyn FsLock>, Error> {
+        if take_fault(&self.runtime)?.is_some() { return Err(io_error(ctx.role)); }
+        self.inner.lock(path, ctx)
+    }
+
+    fn link(&self, from: &Path, to: &Path, ctx: IoCtx) -> Result<(), Error> {
+        if take_fault(&self.runtime)?.is_some() { return Err(io_error(ctx.role)); }
+        self.inner.link(from, to, ctx)
+    }
+
+    fn reflink(&self, from: &Path, to: &Path, ctx: IoCtx) -> Result<(), Error> {
+        if take_fault(&self.runtime)?.is_some() { return Err(io_error(ctx.role)); }
+        self.inner.reflink(from, to, ctx)
+    }
+
+    fn punch_hole(&self, path: &Path, offset: u64, length: u64, ctx: IoCtx) -> Result<(), Error> {
+        if take_fault(&self.runtime)?.is_some() { return Err(io_error(ctx.role)); }
+        self.inner.punch_hole(path, offset, length, ctx)
     }
 
     fn sync_dir(&self, dir: &Path, ctx: IoCtx) -> Result<(), Error> {
