@@ -41,6 +41,16 @@ fn zero_open_files_rejected() {
 }
 
 #[test]
+fn erase_reserve_cannot_undercut_the_durable_erase_budget() {
+    // INV-DISK-1
+    let c = Config {
+        erase_reserve_bytes: contextra_storage::ports::limits::MIN_ERASE_RESERVE_BYTES - 1,
+        ..Config::default()
+    };
+    assert!(matches!(c.validate(), Err(Error::Limit { .. })));
+}
+
+#[test]
 fn storage_open_requires_environment_before_io() {
     let r = Storage::open(Config::default());
     assert!(matches!(r, Err(Error::Limit { limit: "storage filesystem is required" })));

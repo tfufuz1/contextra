@@ -54,7 +54,7 @@ impl Default for Config {
             redo_segment_bytes: REDO_SEGMENT_BYTES,
             max_clusters: DEFAULT_MAX_CLUSTERS,
             max_open_files: DEFAULT_MAX_OPEN_FILES,
-            erase_reserve_bytes: 256 * MIB as u64,
+            erase_reserve_bytes: MIN_ERASE_RESERVE_BYTES,
             max_lag_bytes: MAX_LAG_BYTES,
             key_grace_secs: KEY_GRACE_SECS,
             root: None,
@@ -94,6 +94,11 @@ impl Config {
         if self.max_open_files == 0 {
             return Err(Error::Limit {
                 limit: "max_open_files >= 1",
+            });
+        }
+        if self.erase_reserve_bytes < MIN_ERASE_RESERVE_BYTES {
+            return Err(Error::Limit {
+                limit: "erase_reserve_bytes must be at least 2 GiB",
             });
         }
         Ok(())

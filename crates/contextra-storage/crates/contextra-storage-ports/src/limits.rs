@@ -9,6 +9,9 @@ pub const MAX_BODY_BYTES: usize = 4 * MIB;
 pub const MAX_CHANGE_BYTES: usize = 8 * MIB;
 pub const MAX_GROUP_BYTES: usize = 4 * MIB;
 pub const MAX_LAG_BYTES: u64 = GIB;
+/// Capacity reserved for erase progress, consumer retention, filesystem
+/// metadata headroom, and the dedicated purge scratch slots (SPEC §16).
+pub const MIN_ERASE_RESERVE_BYTES: u64 = 2 * GIB;
 
 pub const RUN_BLOCK_TARGET_BYTES: usize = 16 * KIB;
 pub const RUN_RESTART_INTERVAL: usize = 16;

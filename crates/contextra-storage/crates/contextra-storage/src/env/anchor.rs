@@ -1,6 +1,6 @@
 //! In-memory monotone Anchor for deterministic tests and recovery models.
 
-use contextra_storage_ports::traits::{Anchor, AnchorValue};
+use contextra_storage_ports::traits::{Anchor, AnchorStrength, AnchorValue};
 use contextra_storage_ports::Error;
 use std::sync::Mutex;
 
@@ -32,4 +32,6 @@ impl Anchor for MemAnchor {
         *current = next;
         Ok(())
     }
+
+    fn strength(&self) -> AnchorStrength { AnchorStrength::Weak }
 }

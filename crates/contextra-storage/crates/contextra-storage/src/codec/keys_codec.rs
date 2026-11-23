@@ -28,7 +28,7 @@ pub fn encode(record: &KeysRecord, root_key: &Key32, mac: &dyn Mac) -> Result<Ve
         out.extend_from_slice(&space.0.to_be_bytes());
         put_blob(&mut out, wrapped)?;
     }
-    let tag = mac.tag(root_key, &out);
+    let tag = mac.tag(root_key, &out)?;
     out.extend_from_slice(&tag);
     Ok(out)
 }
@@ -40,7 +40,7 @@ pub fn decode(input: &[u8], root_key: &Key32, mac: &dyn Mac) -> Result<KeysRecor
     let signed_len = input.len().checked_sub(MAC_LEN).ok_or(Error::Corrupt { place: "KEYS MAC" })?;
     let signed = input.get(..signed_len).ok_or(Error::Corrupt { place: "KEYS signed bytes" })?;
     let received = input.get(signed_len..).ok_or(Error::Corrupt { place: "KEYS MAC" })?;
-    let expected = mac.tag(root_key, signed);
+    let expected = mac.tag(root_key, signed)?;
     if !constant_time_eq(received, &expected) { return Err(Error::Corrupt { place: "KEYS MAC" }); }
     let mut c = Cursor { input: signed, offset: 0 };
     if c.take(8)? != MAGIC { return Err(Error::Unsupported { what: "KEYS magic" }); }

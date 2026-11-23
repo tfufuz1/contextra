@@ -8,10 +8,19 @@ pub struct AnchorValue {
     pub catalog_epoch: u64,
 }
 
+/// Strength is explicit because a local file prevents neither rollback of a
+/// copied volume nor two restored hosts from writing concurrently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnchorStrength {
+    Weak,
+    Strong,
+}
+
 pub trait Anchor: Send + Sync {
     fn read(&self) -> Result<AnchorValue, Error>;
     /// Monoton; bei verlorenem Wettlauf Error::CasLost.
     fn advance(&self, expect: AnchorValue, next: AnchorValue) -> Result<(), Error>;
+    fn strength(&self) -> AnchorStrength;
 }
 
 pub trait Clock: Send + Sync {

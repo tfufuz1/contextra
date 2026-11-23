@@ -3,6 +3,8 @@
 use crate::codec::format::IntegrityMode;
 use contextra_storage_ports::{Durability, Error, Protection, SpaceId, FIRST_USER_SPACE_ID};
 
+pub use contextra_storage_ports::DataClass;
+
 pub const DEFAULT_PURE_THRESHOLD: u64 = 8 * 1024 * 1024;
 pub const DEFAULT_VALUE_SEPARATION_MIN: u32 = 1024;
 pub const DEFAULT_MAX_KEY_BYTES: u32 = 1024;
@@ -11,10 +13,6 @@ pub const MAX_WEIGHT_SLOTS: u8 = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpaceClass { Durable, Volatile }
-
-/// Declared data sensitivity. Classification is explicit; this is not a PII detector.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DataClass { NonPersonal, Personal }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpiryBucket { Month, Quarter, Year }

@@ -23,7 +23,9 @@ pub trait Cipher: Send + Sync {
 }
 
 pub trait Mac: Send + Sync {
-    fn tag(&self, key: &Key32, data: &[u8]) -> [u8; 32];
+    /// Produces a fixed-width tag.  A fallible port avoids hiding a provider
+    /// or algorithm setup failure behind a fabricated authentication value.
+    fn tag(&self, key: &Key32, data: &[u8]) -> Result<[u8; 32], Error>;
 }
 
 pub trait Kdf: Send + Sync {

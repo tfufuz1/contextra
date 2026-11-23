@@ -74,7 +74,7 @@ pub fn seal_frame(
             let source = source.ok_or(Error::KeyUnavailable { retry_after_secs: None })?;
             out.extend_from_slice(plaintext);
             let authenticated = auth_input(mode, nonce, &aad, plaintext)?;
-            let tag = mac.tag(source, &authenticated);
+            let tag = mac.tag(source, &authenticated)?;
             out.extend_from_slice(tag.get(..TAG_LEN).ok_or(Error::Corrupt { place: "MAC tag length" })?);
         }
         SealMode::Encrypted => {
@@ -127,7 +127,7 @@ pub fn unseal_frame(
             let data = body.get(..split).ok_or(Error::Corrupt { place: "authenticated seal body" })?;
             let tag = body.get(split..).ok_or(Error::Corrupt { place: "authenticated seal tag" })?;
             let authenticated = auth_input(mode, nonce, &aad, data)?;
-            let actual = mac.tag(source, &authenticated);
+            let actual = mac.tag(source, &authenticated)?;
             if !constant_time_eq(actual.get(..TAG_LEN).ok_or(Error::Corrupt { place: "MAC tag length" })?, tag) {
                 return Err(Error::Corrupt { place: "authenticated seal tag" });
             }

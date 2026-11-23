@@ -103,7 +103,7 @@ pub fn encode_frame(frame: &EncodedFrame, previous: &[u8; 32], key: &Key32, mac:
     let mut authenticated = Vec::with_capacity(previous.len() + body.len());
     authenticated.extend_from_slice(previous);
     authenticated.extend_from_slice(&body);
-    let chain_mac = mac.tag(key, &authenticated);
+    let chain_mac = mac.tag(key, &authenticated)?;
     let frame_len = body.len().checked_add(chain_mac.len()).ok_or(Error::Limit { limit: "redo frame length" })?;
     let frame_len = u32::try_from(frame_len).map_err(|_| Error::Limit { limit: "redo frame length" })?;
     if u64::from(frame_len) > contextra_storage_ports::limits::REDO_SEGMENT_BYTES / 8 {
@@ -136,7 +136,7 @@ pub fn decode_frame<'a>(input: &'a [u8], previous: &[u8; 32], key: &Key32, mac: 
     let mut authenticated = Vec::with_capacity(previous.len() + signed.len());
     authenticated.extend_from_slice(previous);
     authenticated.extend_from_slice(signed);
-    if mac.tag(key, &authenticated) != received_mac { return Err(Error::Corrupt { place: "redo chain MAC" }); }
+    if mac.tag(key, &authenticated)? != received_mac { return Err(Error::Corrupt { place: "redo chain MAC" }); }
     let crc_bytes: [u8; 4] = input.get(crc_start..mac_start).ok_or(Error::Corrupt { place: "redo frame CRC" })?
         .try_into().map_err(|_| Error::Corrupt { place: "redo frame CRC" })?;
     let payload_region = input.get(4..crc_start).ok_or(Error::Corrupt { place: "redo frame bounds" })?;

@@ -45,7 +45,7 @@ pub fn encode_record(
             let mut authenticated = Vec::with_capacity(previous_mac.len() + body.len());
             authenticated.extend_from_slice(previous_mac);
             authenticated.extend_from_slice(&body);
-            Some(mac.tag(key, &authenticated))
+            Some(mac.tag(key, &authenticated)?)
         }
         _ => return Err(Error::Limit { limit: "catalog authenticated key and MAC" }),
     };
@@ -105,7 +105,7 @@ pub fn decode_record(
             let mut authenticated = Vec::with_capacity(previous_mac.len() + mac_offset);
             authenticated.extend_from_slice(previous_mac);
             authenticated.extend_from_slice(encoded.get(..mac_offset).ok_or(Error::Corrupt { place: "catalog MAC input" })?);
-            let actual = mac.tag(key, &authenticated);
+            let actual = mac.tag(key, &authenticated)?;
             let received: [u8; 32] = encoded.get(mac_offset..).ok_or(Error::Corrupt { place: "catalog MAC" })?
                 .try_into().map_err(|_| Error::Corrupt { place: "catalog MAC" })?;
             if actual != received { return Err(Error::Corrupt { place: "catalog chain MAC" }); }

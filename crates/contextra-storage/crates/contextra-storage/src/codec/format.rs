@@ -38,7 +38,7 @@ pub fn encode(record: FormatRecord, root_key: &Key32, kdf: &dyn Kdf, mac: &dyn M
     let crc = super::checksums::crc32c(&out);
     out.extend_from_slice(&crc.to_le_bytes());
     let mac_key = kdf.derive(root_key, MAC_LABEL)?;
-    let tag = mac.tag(&mac_key, &out);
+    let tag = mac.tag(&mac_key, &out)?;
     out.extend_from_slice(&tag);
     Ok(out)
 }
@@ -61,7 +61,7 @@ pub fn decode(input: &[u8], root_key: &Key32, kdf: &dyn Kdf, mac: &dyn Mac, supp
     }
     let authenticated = input.get(..crc_end + CRC_LEN).ok_or(Error::Corrupt { place: "FORMAT MAC input" })?;
     let mac_key = kdf.derive(root_key, MAC_LABEL)?;
-    let expected = mac.tag(&mac_key, authenticated);
+    let expected = mac.tag(&mac_key, authenticated)?;
     let received = input.get(crc_end + CRC_LEN..).ok_or(Error::Corrupt { place: "FORMAT MAC" })?;
     if !constant_time_eq(received, &expected) { return Err(Error::Corrupt { place: "FORMAT MAC" }); }
     let instance_id = input.get(15..31).ok_or(Error::Corrupt { place: "FORMAT instance id" })?

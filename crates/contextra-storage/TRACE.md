@@ -16,10 +16,9 @@ never merely that a module compiles.
 * Storage baseline: `cargo test --ignore-rust-version --offline -p
   contextra-storage --features testing -- --nocapture` passed: 60 integration
   tests, 0 failed (2026-11-23).  It is only a partial baseline, not a gate.
-* The non-storage crates do not define a `testing` feature.  Their required
-  baseline commands are recorded as `cargo {check,test} -p <crate>` without
-  that feature; the original feature invocation is invalid Cargo syntax for
-  those package manifests.
+* All seven target crates now expose a deliberately empty `testing` feature,
+  so the exact required `cargo {check,test} -p <crate> --features testing`
+  baseline is valid.  The full check/test sweep passed after this change.
 * Initial baseline also found the workspace target directory read-only under
   this sandbox; the explicit temporary target directory above is required.
 
@@ -27,14 +26,14 @@ never merely that a module compiles.
 
 | WP | Owner | SPEC | INV | Modules | Current state / evidence | Tests / gate |
 |---|---|---|---|---|---|---|
-| WP-01.1 | 01 | §3.2, §4, §12 | ID, LIM, SEAL | ports/{ids,change,error} | partly: types exist; complete contract audit absent | redaction; G-0 open |
-| WP-01.2 | 01 | §3.2 | LOCK, KEY | ports/traits | partly: traits exist; mock-conformance absent | layering; G-0 open |
+| WP-01.1 | 01 | §3.2, §4, §12 | ID, LIM, SEAL | ports/{ids,change,error} | partly: `DataClass`, instance/durable position, erase/tomb IDs are now port-owned and redacted; remaining value-contract audit open | `port_values`, redaction; G-0 open |
+| WP-01.2 | 01 | §3.2 | LOCK, KEY | ports/traits | partly: `AnchorStrength` and optional `Authority` port added with mock compile test; remaining Fs/extension contract audit open | `port_values`, layering; G-0 open |
 | WP-01.3 | 01 | §3.5 | all applicable | ports/facade | missing: reviewer/API freeze | G-0 EXTERN-OFFEN |
 | WP-02.1 | 02 | §5.1–5.2 | FMT | codec/{varint,tags,checksums,comparator} | partly: codecs/tests exist; full fuzz/goldens absent | storage codec tests; G-0 open |
 | WP-02.2 | 02 | §5.2 | SEAL | codec/seal | partly: direct-key seal test exists; complete raw-copy matrix absent | seal_frame; P1 open |
 | WP-02.3 | 02 | §5.3 | FMT | codec/header,keys_codec | partly | golden vectors absent; G-F open |
 | WP-03.1–03.8 | 03 | §3, §11 | LOCK, DISK | env/,sync/ | partly: MemFs/FaultFs/ranked exist; RealFs/Sim/governor/platform evidence incomplete | faultfs/lock tests; P0–P8 open |
-| WP-04.1–04.6 | 04 | §5.2, §8 | KEY | crypto-ref,keys*,keys/cache | partly: reference cipher/cache exist; conformance/adapters absent | seal/key-cache tests; P0/P6 open |
+| WP-04.1–04.6 | 04 | §5.2, §8 | KEY | crypto-ref,keys*,keys/cache | partly: reference cipher/cache exist; HMAC now uses audited `hmac` crate rather than a local construction; conformance/adapters absent | HMAC KAT, seal/key-cache tests; P0/P6 open |
 | WP-05.1–05.4 | 05 | §5.4, §9 | LOG | store/redo | partly: frame/reader/writer and sweep exist; full control/gate bodies absent | crash_sweep_redo; P1/P2 open |
 | WP-06.1–06.5 | 06 | §5.5, §9 | CAT, ID, STAMP | catalog/ | partly: edits/replay/reservation exist; complete snapshot/loom missing | catalog_crash_sweep; P1–P3 open |
 | WP-07.1–07.5 | 07 | §5.6 | PL, SEAL | store/run | partly: blocks/reader/builder/cache exist; entry builder/full reader absent | run_* tests; G-F open |
@@ -45,7 +44,7 @@ never merely that a module compiles.
 | WP-12.1–12.4 | 12 | §8, §12 | CLUSTER, ERA-10/12 | erase/cluster_table,links,restrictions | partly | cluster_table; P1/P6 open |
 | WP-13.1–13.6 | 13 | §9 | ERA-1…12 | erase/{gate,protocol,tickets,receipt} | partly: no end-to-end protocol proof | P1/P6 open |
 | WP-14.1–14.3 | 14 | §10 | ANCH, LOG | recovery/ | partly | recovery matrix absent; P1/P6 open |
-| WP-15.1–15.9 | 15 | §14–17 | all | testing/,tools/reference,formal | partly: harness/oracle skeleton; invariant checker/reference/gates incomplete | G-0–G-P open |
+| WP-15.1–15.9 | 15 | §14–17 | all | testing/,tools/reference,formal | partly: invariant checker now expands SPEC §15 and passes; harness/oracle/reference/gates incomplete | G-0–G-P open |
 | WP-16.1–16.5 | 16 | §6, §17 | CLAIM, PL | maint/ | partly | no maintenance model evidence; P2/P5 open |
 | WP-17.1–17.5 | 17 | §12.4 | CONS, VIS | engine/{segments,extension,feed} | missing/partial | P5/P6 open |
 | WP-18.1–18.5 | 18 | §13 | — | storage-bridge | missing/partial | P6/P8 open |
@@ -59,13 +58,13 @@ never merely that a module compiles.
 
 ## Invariant mapping
 
-Every listed invariant remains unproven until this row names a test with an
-`INV-*` citation.  The current test names frequently lack that citation, which
-is itself a WP-15 defect.
+The checker now verifies that every SPEC §15 ID is cited in a compiled test
+source.  Citation is traceability only: behavioural proof remains open unless
+the row names an assertion-bearing owner test.
 
 | Invariant family | Current cited test |
 |---|---|
-| INV-STAMP-1/2/3, INV-ID-1/2, INV-ATOM-1, INV-COMMIT-2, INV-GUARD-1 | missing |
+| All 59 IDs | `tests/invariant_refs.rs::spec_r8_1_invariant_references_are_compiled_with_the_test_suite` (citation baseline; not behavioural proof) |
 | INV-VIEW-1/2, INV-VIS-1, INV-CONS-1 | missing |
 | INV-LOCK-1/2 | `tests/lock_order.rs` (citation must be added) |
 | INV-CAT-1/2 | `tests/catalog_crash_sweep.rs` (citation must be added) |
@@ -97,4 +96,13 @@ is itself a WP-15 defect.
   the requested blanket command.  Choice: test that crate with the feature and
   test the remaining target crates without it; add feature parity only if it is
   required by the normative interface.
+* `OD-02`: SPEC §3.2 requires an explicit anchor strength while the prior port
+  had none. Choice: `Anchor::strength()` is mandatory, and `MemAnchor` reports
+  `Weak`; no local anchor is treated as rollback-proof. Covered by
+  `port_values.rs`.
+* `OD-03`: The existing HMAC-SHA256 implementation duplicated the construction
+  locally, contrary to NZ-2. Choice: use `hmac` 0.12 directly and make
+  `Mac::tag` fallible so a provider/setup failure cannot become a fabricated
+  tag. The direct dependency is locked in `Cargo.lock`; the fixed-key HMAC KAT
+  remains the regression test.
 

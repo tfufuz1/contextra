@@ -1,13 +1,14 @@
 //! MAC reference implementations; keyed hashes are never content identifiers.
 use contextra_storage_ports::{traits::Mac, Key32};
-use sha2::{Digest, Sha256};
+use hmac::{Hmac, Mac as HmacTrait};
+use sha2::Sha256;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Blake3Mac;
 
 impl Mac for Blake3Mac {
-    fn tag(&self, key: &Key32, data: &[u8]) -> [u8; 32] {
-        *blake3::keyed_hash(key.expose(), data).as_bytes()
+    fn tag(&self, key: &Key32, data: &[u8]) -> Result<[u8; 32], contextra_storage_ports::Error> {
+        Ok(*blake3::keyed_hash(key.expose(), data).as_bytes())
     }
 }
 
@@ -16,21 +17,11 @@ impl Mac for Blake3Mac {
 pub struct HmacSha256;
 
 impl Mac for HmacSha256 {
-    fn tag(&self, key: &Key32, data: &[u8]) -> [u8; 32] {
-        let mut inner_pad = [0x36u8; 64];
-        let mut outer_pad = [0x5cu8; 64];
-        for (index, byte) in key.expose().iter().copied().enumerate() {
-            if let Some(inner) = inner_pad.get_mut(index) { *inner ^= byte; }
-            if let Some(outer) = outer_pad.get_mut(index) { *outer ^= byte; }
-        }
-        let mut inner = Sha256::new();
-        inner.update(inner_pad);
-        inner.update(data);
-        let inner_digest = inner.finalize();
-        let mut outer = Sha256::new();
-        outer.update(outer_pad);
-        outer.update(inner_digest);
-        outer.finalize().into()
+    fn tag(&self, key: &Key32, data: &[u8]) -> Result<[u8; 32], contextra_storage_ports::Error> {
+        let mut mac = Hmac::<Sha256>::new_from_slice(key.expose())
+            .map_err(|_| contextra_storage_ports::Error::Limit { limit: "HMAC-SHA256 key length" })?;
+        mac.update(data);
+        Ok(mac.finalize().into_bytes().into())
     }
 }
 
@@ -42,7 +33,7 @@ mod tests {
     #[test]
     fn hmac_sha256_known_answer_for_fixed_width_key() {
         let key = Key32::from_array([0x0b; 32]);
-        let actual = HmacSha256.tag(&key, b"Hi There");
+        let actual = HmacSha256.tag(&key, b"Hi There").unwrap();
         let expected = [
             0x19, 0x8a, 0x60, 0x7e, 0xb4, 0x4b, 0xfb, 0xc6,
             0x99, 0x03, 0xa0, 0xf1, 0xcf, 0x2b, 0xbd, 0xc5,
