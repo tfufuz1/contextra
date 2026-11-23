@@ -7,7 +7,7 @@ use crate::blob::record::{
     RECORD_KIND_HOLE,
 };
 use crate::codec::crc32c::crc32c;
-use crate::keys::nonce::{blob_body_nonce, blob_record_nonce};
+use crate::keys::nonce::{blob_body_nonce, blob_record_nonce, port_nonce};
 use contextra_ports::persistence::{Cipher, File, Kdf, Mac};
 use std::fmt;
 use std::io;
@@ -198,7 +198,7 @@ impl BlobReader {
                 aad.extend_from_slice(&self.header.blob_no.to_le_bytes());
                 aad.extend_from_slice(&blob_ref.offset.to_le_bytes());
 
-                c.open(&blob_key, &nonce, &aad, &sealed)
+                c.open(&blob_key, &port_nonce(&nonce), &aad, &sealed)
                     .map_err(|_| BlobReadError::Corrupt("AEAD-Entschlüsselung fehlgeschlagen"))?
             }
             other => return Err(BlobReadError::UnsupportedMode(other)),
@@ -227,7 +227,7 @@ impl BlobReader {
             aad.extend_from_slice(&record.domain.to_le_bytes());
             aad.extend_from_slice(&record.key);
 
-            c.open(dk, &nonce, &aad, &record.body)
+            c.open(dk, &port_nonce(&nonce), &aad, &record.body)
                 .map_err(|_| BlobReadError::Corrupt("Domänenentsiegelung fehlgeschlagen"))?
         } else {
             record.body

@@ -9,7 +9,7 @@
 
 use super::error::RunError;
 use crate::codec::crc32c::crc32c;
-use crate::keys::nonce::run_block_nonce;
+use crate::keys::nonce::{port_nonce, run_block_nonce};
 use contextra_ports::persistence::{Cipher, Mac};
 use std::io;
 
@@ -131,7 +131,7 @@ pub fn encode_block(
             let mut plain = Vec::with_capacity(payload.len().saturating_add(1));
             plain.extend_from_slice(payload);
             plain.push(CODEC_NONE);
-            cipher.seal(key, &nonce, &aad, &plain)
+            cipher.seal(key, &port_nonce(&nonce), &aad, &plain)
         }
     }
 }
@@ -220,7 +220,7 @@ pub fn decode_block(
             let nonce = run_block_nonce(block_offset);
             let aad = make_block_aad(run_id, block_offset, kind, space);
             let opened = cipher
-                .open(key, &nonce, &aad, raw)
+                .open(key, &port_nonce(&nonce), &aad, raw)
                 .map_err(|e| RunError::Corrupt(format!("Cipher open fehlgeschlagen: {e}")))?;
 
             if opened.is_empty() {

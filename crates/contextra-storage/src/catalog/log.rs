@@ -8,7 +8,7 @@ pub use crate::catalog::rollover::rollover;
 use crate::catalog::state::{apply_edit, CatalogState};
 use crate::catalog::types::CatalogError;
 use crate::codec::crc32c::crc32c;
-use crate::keys::nonce::catalog_record_nonce;
+use crate::keys::nonce::{catalog_record_nonce, port_nonce};
 use contextra_ports::persistence::{Cipher, File, Kdf, Mac};
 
 /// Magic-Bytes für Katalog-Dateien ("CTXC").
@@ -262,7 +262,7 @@ impl CatalogLog {
                         aad.extend_from_slice(&catalog_no.to_le_bytes());
                         aad.extend_from_slice(&record_index.to_le_bytes());
 
-                        let plain = c.open(&cat_key, &nonce, &aad, &sealed)
+                        let plain = c.open(&cat_key, &port_nonce(&nonce), &aad, &sealed)
                             .map_err(|_| CatalogError::Corrupt("Catalog-Record-Entschlüsselung fehlgeschlagen"))?;
                         CatalogEdit::decode(&plain)
                     }
@@ -371,7 +371,7 @@ impl CatalogLog {
                 aad.extend_from_slice(&self.catalog_no.to_le_bytes());
                 aad.extend_from_slice(&self.record_index.to_le_bytes());
 
-                let sealed = c.seal(&cat_key, &nonce, &aad, &payload);
+                let sealed = c.seal(&cat_key, &port_nonce(&nonce), &aad, &payload);
                 record_bytes.extend_from_slice(&sealed);
             }
             _ => return Err(CatalogError::Corrupt("Ungültiger Integritätsmodus")),

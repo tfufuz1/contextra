@@ -14,7 +14,7 @@ use crate::catalog::log::{
 use crate::catalog::state::CatalogState;
 use crate::catalog::types::CatalogError;
 use crate::codec::crc32c::crc32c;
-use crate::keys::nonce::catalog_record_nonce;
+use crate::keys::nonce::{catalog_record_nonce, port_nonce};
 use contextra_ports::persistence::{Cipher, Fs, Kdf, Mac, OpenMode, Perm};
 use std::path::Path;
 
@@ -98,7 +98,7 @@ pub fn rollover(
             aad.extend_from_slice(&len.to_le_bytes());
             aad.extend_from_slice(&new_catalog_no.to_le_bytes());
             aad.extend_from_slice(&0u64.to_le_bytes());
-            let sealed = c.seal(&cat_key, &nonce, &aad, &payload);
+            let sealed = c.seal(&cat_key, &port_nonce(&nonce), &aad, &payload);
             record_bytes.extend_from_slice(&sealed);
         }
         _ => return Err(CatalogError::Corrupt("Ungültiger Integritätsmodus")),
