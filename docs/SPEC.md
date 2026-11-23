@@ -1700,7 +1700,24 @@ Jede Zeile beschreibt einen Widerspruch aus den Vorfassungen (Anhang B) und die 
 ### 26.1 Grundsatz
 
 - Der Neubau entsteht im vorhandenen Verzeichnis `crates/contextra-storage` (D-18). `crates/contextra-store` bleibt bis zur Ablösung unverändert. Es werden **keine** neuen Crates angelegt.
-- Alle Konsumenten sprechen heute `contextra-store` an. Nach dem Messstand dieser Revision (Zählung der Zeilen mit `contextra_store` in `*.rs`) sind es: `contextra-engine` 144, `contextra-db` 25, `contextra-graph` 16, `contextra-cognition` 15, `contextra` (Fassade) 5, `contextra-agent` 3, `contextra-checkpoint` 2, `benchmarks/contextra-bench` 1, `contextra-py` 0. Genutzt werden `LsmStorage`, `LsmConfig`, `tenant_codec::TenantScopedStorage`, `SystemPressure`, `MergeOperator`, `DurabilityMode` und `kv::delete_mode`.
+- Alle Konsumenten sprechen heute `contextra-store` an. Nach dem Messstand dieser Revision (Zählung der Zeilen mit `contextra_store` in `*.rs`, ohne `contextra-store` selbst) sind es 211 Zeilen. Die Aufteilung nach Produktiv- und Testcode zeigt die folgende Tabelle (SA-11). „Test“ umfasst `tests/`, `benches/`, `*tests.rs` und `#[cfg(test)]`-Blöcke. Zwei weitere Treffer in `xtask/src` sind Zeichenketten und Doc-Kommentare ohne Abhängigkeit und stehen deshalb nicht in der Tabelle.
+
+| Konsument | Sektion in `Cargo.toml` | Zeilen | davon Prod | davon Test |
+|---|---|---|---|---|
+| `contextra-engine` | `[dependencies]` | 144 | 26 | 118 |
+| `contextra-db` | `[dependencies]` | 25 | 0 | 25 |
+| `contextra-graph` | `[dev-dependencies]` | 16 | 0 | 16 |
+| `contextra-cognition` | `[dependencies]` | 15 | 0 | 15 |
+| `contextra` (Fassade) | `[dependencies]` | 5 | 2 | 3 |
+| `contextra-agent` | `[dependencies]` | 3 | 3 | 0 |
+| `contextra-checkpoint` | `[dev-dependencies]` | 2 | 0 | 2 |
+| `benchmarks/contextra-bench` | `[dependencies]` | 1 | 0 | 1 |
+| `contextra-py` | `[dependencies]` | 0 | 0 | 0 |
+| Summe | | 211 | 31 | 180 |
+
+Die Zählung erfasst nur Pfadnennungen. Methodenaufrufe auf Werten, die über andere Crates bezogen werden, etwa `inner_storage().last_tx_id()`, zählt sie nicht. Der Umstellungsaufwand liegt deshalb über der Zeilenzahl und ist nicht allein daraus abzuleiten.
+
+- Genutzt werden `LsmStorage`, `LsmConfig`, `tenant_codec::TenantScopedStorage`, `SystemPressure`, `MergeOperator`, `DurabilityMode` und `kv::delete_mode`.
 - `contextra-storage` hat keinen Abhängigen, `contextra-ports` etwa 26.
 
 ### 26.2 Rollen
@@ -1714,7 +1731,7 @@ Die Abbildung leitet sich aus Crate-Namen, den gezählten Importen und dieser SP
 | `contextra-testkit` | Test-Primitive, Test-`KeyProvider`, Konformitätsläufe |
 | `contextra-durable-fs` | `RealFs`, `FileAnchor`; muss in `members` aufgenommen werden (G-1) |
 | `contextra-mvcc` | bleibt obere Schicht (SSI, Transaktionspuffer, Snapshot-Register nach NZ-3); stützt sich auf `View::stamp`, `view_at`, `Guard`; der Stamp ist die einzige Ordnung |
-| `contextra-checkpoint` | nutzt `Storage::checkpoint`; benannte Checkpoints bleiben dort (NZ-18) |
+| `contextra-checkpoint` | nutzt im Produktivcode kein `contextra_store`, sondern den Port `contextra_ports::StorageEngine` (u. a. `rollback_to_tx`, `last_tx_id`); Snapshot-Pinning über `contextra_mvcc::SnapshotRegistry`. `contextra_store` steht nur als Dev-Abhängigkeit in einer Testdatei. Benannte Checkpoints bleiben dort (NZ-18); der Kern liefert `Storage::checkpoint` (§8.6) |
 | `contextra-vector`, `-text`, `-graph` | Indexstrukturen als `ExtensionBuilder` bzw. Segmente (§15.9); Kern kennt sie nicht |
 | `contextra-privacy`, `-audit-export`, `-license` | Konsumenten von `Eraser`, `ErasureReceipt`, Ledger-Bytes; Politik bleibt dort (NZ-14, NZ-16) |
 | `contextra-engine`, `-db`, `-cognition`, `-agent`, `contextra` | Konsumenten über einen Adapter (§26.3) |
@@ -1728,7 +1745,15 @@ Die Abbildung leitet sich aus Crate-Namen, den gezählten Importen und dieser SP
 | `SystemPressure` | `PressureSource` |
 | `DurabilityMode` | `Durability` (`Durable` \| `Relaxed`) je Change und `durability_default` je Space |
 | `delete_mode` | `Change::delete`, `delete_range`, `Eraser` mit `EraseLevel` |
-| `MergeOperator` | entfällt im Kern (D-30); Ersatz: Guard-gestütztes Lesen-Ändern-Schreiben |
+| `MergeOperator` | entfällt im Kern (D-30); Ersatz: Guard-gestütztes Lesen-Ändern-Schreiben. Produktiv nirgends verdrahtet: `WasmMergeOperator` (`contextra-engine`, öffentlich exportiert) wird nur in `contextra-engine/tests/wasm_merge_operator.rs` an `with_merge_operator` übergeben (SA-10) |
+| `scanner::lsm_purgers`, `scanner::lsm_scanners` (Prod: `contextra-engine/src/contextra_impl/erasure.rs`, vier Stellen) | `Eraser` mit `EraseLevel` (§8.5) |
+| `snapshot_registry.min_active_seqno()` (Prod: `erasure.rs`, zwei Stellen vor dem Purge) | Sperrprüfung über `EraseReq.views` (`ViewPolicy`: `Wait` \| `Revoke`, §8.5, §12.1). Der Bestand bricht bei offenem Snapshot ab; diese Zuordnung ist eine Annahme |
+| `snapshot_registry.register_at()` (nur Test: `contextra-engine/tests/erasure_orchestrator_tests.rs`) | entfällt im Kern; Testersatz über `View` (§8.3) |
+| `last_tx_id()` (Methode des Ports `contextra_ports::StorageEngine`; Aufrufe in `contextra-agent`) | `View::stamp()` der neuesten Sicht `Storage::view()` (§8.3). Die Semantik des Bestands (`last_committed_tx`) ist an der Stamp-Definition (§6.2) zu prüfen |
+| `inner_storage()` (`contextra-engine/src/lib.rs`; Aufrufe in `contextra-agent`) | kein Kern-Typ; Adapter-Handle (§26.4) |
+| `PressureLevel` (Prod: `contextra-engine/src/collection/crud/internal.rs`) | `Pressure`, Rückgabetyp von `PressureSource::level` |
+| `DurabilityConfigError` (Prod: `contextra/src/performance_profile.rs`) | `Error::Config{what}` (§8.7) |
+| nur Testcode: `CompactionConfig`, `compaction::*`, `sstable::*` (`contextra-db/tests/sprint2_acid_tests.rs`, `contextra-engine/tests/wasm_merge_operator.rs`) | entfällt im Adapter; Testersatz über Kern-Tests |
 
 ### 26.4 Vorgehen
 

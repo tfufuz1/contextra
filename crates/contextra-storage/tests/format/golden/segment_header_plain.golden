@@ -1,0 +1,16 @@
+# golden: segment_header_plain
+# quelle: tools/reference/generator.py (unabhängig vom Kern, nur Standardbibliothek)
+# spec: SPEC §10.4 (Segmentkopf, Plain)
+# annahmen: A-1, A-3
+# vollstaendig: ja
+# zeilen: OFFSET LAENGE FELD HEX  # BEDEUTUNG (Offsets dezimal, Hex little-endian)
+0 4 magic 4354584c  # Magic, ASCII
+4 2 ver 0100  # Version 1
+6 2 flags 0000  # Flags, Bedeutung nicht spezifiziert (0 gesetzt)
+8 8 segment_id 8877665544332211  # Segmentkennung
+16 8 first_stamp 0100000000000000  # erster Stamp
+24 4 root_gen 07000000  # Wurzelgeneration
+28 4 chain_seed ddccbbaa  # Kettenstart, 4 Byte bei Plain (A-3: u32 little-endian)
+32 4 chk e04fdb25  # CRC-32C seed 0 über die 32 Byte davor (A-1)
+# laenge: 36
+GESAMT 4354584c010000008877665544332211010000000000000007000000ddccbbaae04fdb25

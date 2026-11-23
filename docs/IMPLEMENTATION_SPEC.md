@@ -81,28 +81,31 @@ Bestehende Nähte außerhalb von `persistence`: `StorageEngine` (`storage.rs:35`
 
 ### 2.4 Konsumentenmatrix `contextra-store`
 
-Zählung: Zeilen mit `contextra_store` in `*.rs` (ohne `contextra-store` selbst), gemessen mit `rg -c`. „Prod“ = nicht in `tests/`, `benches/`, `*tests.rs` und nicht in `#[cfg(test)]` (pfadbasiert, für `contextra-engine` nicht vollständig geprüft).
+Zählung: Zeilen mit `contextra_store` in `*.rs` (ohne `contextra-store` selbst), gemessen am Basis-Commit `cf870dcd1`. Die Zahlen aus §26.1 und dieser Abschnitt reproduzieren sich damit. Befehle und Rohausgaben stehen in `NACHWEIS.md`, Abschnitte 1 bis 4. „Prod“ = nicht in `tests/`, `benches/`, `*tests.rs` und nicht in einem `#[cfg(test)]`-Block; die Zuordnung je Zeile macht `split.py` aus `NACHWEIS.md` (Klammertiefe, ohne Stringparser). Die 26 Prod-Zeilen von `contextra-engine` sind einzeln geprüft.
 
-| Konsument | `Cargo.toml` | `.rs`-Zeilen | davon Prod | Genutzte Items |
-|---|---|---|---|---|
-| `contextra-engine` | `[dependencies]` | 144 | ca. 26 | `LsmStorage`, `LsmConfig`, `tenant_codec::TenantScopedStorage`, `scanner::{lsm_purgers, lsm_scanners}`, `PressureLevel`, `SystemPressure`, `lsm::DurabilityMode` (Re-Export in `engine/lib.rs:18`), `MergeOperator` (`merge_operator_adapter.rs`); direkt `snapshot_registry.min_active_seqno()` (`erasure.rs:146, 354`) |
-| `contextra-db` | `[dependencies]` | 25 | 0 | `LsmConfig`, `LsmStorage`, `PressureLevel`, `SystemPressure`, `CompactionConfig` (nur Tests) |
-| `contextra-graph` | `[dev-dependencies]` | 16 | 0 | `LsmConfig`, `LsmStorage` (Tests) |
-| `contextra-cognition` | `[dependencies]` | 15 | 0 | `LsmStorage`, `LsmConfig` (Tests) |
-| `contextra` (Fassade) | `[dependencies]` | 5 | 2 | `lsm::DurabilityMode`, `DurabilityConfigError`, `kv::delete_mode::KvDeleteMode` |
-| `contextra-agent` | `[dependencies]` | 3 | 3 | `LsmStorage`; `db.inner_storage()`, `last_tx_id()`, `CheckpointGuard::for_agent_step` |
-| `contextra-checkpoint` | `[dev-dependencies]` | 2 | 0 | `LsmConfig`, `LsmStorage` (ein Test) |
-| `benchmarks/contextra-bench` | `[dependencies]` | 1 | Bench | `LsmConfig`, `LsmStorage` |
-| `contextra-py` | `[dependencies]` | 0 | 0 | nur `Cargo.toml` |
+| Konsument | `Cargo.toml` | Zeilen | Prod | Test | Genutzte Items in Prod |
+|---|---|---|---|---|---|
+| `contextra-engine` | `[dependencies]` | 144 | 26 (1 davon Doc-Kommentar) | 118 | `LsmStorage`, `LsmConfig`, `tenant_codec::TenantScopedStorage`, `SystemPressure`, `PressureLevel`, `MergeOperator` (Adapter `WasmMergeOperator`), `lsm::DurabilityMode` (Re-Export `lib.rs:18`), `scanner::{lsm_purgers, lsm_scanners}`; Feld `snapshot_registry` (ohne Namensnennung) |
+| `contextra-db` | `[dependencies]` | 25 | 0 | 25 | keine. Nur Tests: `LsmConfig`, `LsmStorage`, `PressureLevel`, `SystemPressure`, `CompactionConfig` |
+| `contextra-graph` | `[dev-dependencies]` | 16 | 0 | 16 | keine. Nur Tests: `LsmConfig`, `LsmStorage` |
+| `contextra-cognition` | `[dependencies]` | 15 | 0 | 15 | keine. Nur Tests: `LsmConfig`, `LsmStorage` |
+| `contextra` (Fassade) | `[dependencies]` | 5 | 2 | 3 | `lsm::config::DurabilityConfigError`, `lsm::DurabilityMode`, `kv::delete_mode::KvDeleteMode` |
+| `contextra-agent` | `[dependencies]` | 3 | 3 | 0 | `LsmStorage` (nur im `use`). Die 35 Aufrufe von `inner_storage()` (davon 11 in `src`) nennen `contextra_store` nicht; `last_tx_id()` ist eine Port-Methode, `CheckpointGuard::for_agent_step` gehört zu `contextra-checkpoint` |
+| `contextra-checkpoint` | `[dev-dependencies]` | 2 | 0 | 2 | keine. Eine Testdatei (`tests/checkpoint_systematic_crash.rs`), davon eine Zeile Kommentar |
+| `benchmarks/contextra-bench` | `[dependencies]` | 1 | 0 | 1 (`benches/`) | `LsmConfig`, `LsmStorage` (Bench) |
+| `contextra-py` | `[dependencies]` | 0 | 0 | 0 | keine (nur `Cargo.toml`) |
+| Summe | | 211 | 31 | 180 | |
 
-Summe: 211 Zeilen. Die Zahlen aus Spec §26.1 stimmen exakt. Keiner der Konsumenten macht die Abhängigkeit optional; ein Feature-Gate gibt es noch nicht.
+Zwei weitere Treffer in `xtask/src` (`symbol_exists.rs:1`, `gen_arch_docs.rs:292`) sind Zeichenketten und Doc-Kommentare; sie zählen nicht als Abhängigkeit und stehen nicht in der Summe. Keiner der Konsumenten macht die Abhängigkeit optional; ein Feature-Gate gibt es noch nicht.
 
-**Befunde gegenüber Spec §26** (daraus folgen SA-6, SA-7, SA-10):
+**Befunde gegenüber Spec §26** (daraus folgen SA-6, SA-7, SA-10, SA-11; Textänderungen in SPEC §26, Freigabe durch den Maintainer offen):
 
-1. Produktiv nutzen `contextra-store` nur `contextra-engine`, `contextra-agent` und die Fassade `contextra`. `contextra-db` und `contextra-cognition` führen es unter `[dependencies]`, nutzen es aber nur in Tests (Kandidaten für `[dev-dependencies]`).
-2. §26.2 sagt, `contextra-checkpoint` „nutzt `Storage::checkpoint`“. Der Quelltext von `contextra-checkpoint` importiert **kein** `contextra_store`; Rollbacks laufen über einen eigenen Trait (`rollback_to_tx`), der Snapshot-Typ kommt aus `contextra_mvcc::SnapshotRegistry` (`hardlink_cloner.rs:21`).
-3. §26.3 bildet nicht ab: `scanner::lsm_purgers`/`lsm_scanners` (Löschpfad in `contextra-engine/src/contextra_impl/erasure.rs`), `snapshot_registry.min_active_seqno()`/`register_at`, `last_tx_id()`, `inner_storage()`, `PressureLevel`, `DurabilityConfigError`.
-4. `MergeOperator` ist produktiv **nirgends** verdrahtet: nur der Adapter `WasmMergeOperator` in `contextra-engine` und zwei Aufrufe von `with_merge_operator` in `tests/wasm_merge_operator.rs`. D-30 (Merge entfällt im Kern) ist damit im Produktpfad folgenlos; der Prüfauftrag „Eignung vor G-5“ reduziert sich auf den Adapter und seinen Test.
+1. Produktiv nutzen `contextra-store` nur `contextra-engine` (26), `contextra-agent` (3) und die Fassade `contextra` (2). `contextra-db` und `contextra-cognition` führen es unter `[dependencies]`, nutzen es aber nur in Tests (Kandidaten für `[dev-dependencies]`). `contextra-graph` ist schon `[dev-dependencies]`.
+2. **Korrektur zu Befund 2 der Vorfassung und zu §26.2 (SA-6):** `contextra-checkpoint` importiert im Produktivcode kein `contextra_store`. Es hängt am Port `contextra_ports::StorageEngine` (Trait-Methoden `rollback_to_tx` und `last_tx_id`, Generik-Bound in `store.rs`), nicht an einem eigenen Trait. Der Snapshot-Typ kommt aus `contextra_mvcc::SnapshotRegistry`. `contextra_store` steht nur als Dev-Abhängigkeit.
+3. §26.3 bildet nicht ab (SA-7), Fundstellen: `scanner::lsm_purgers`/`lsm_scanners` (4 Prod-Stellen in `contextra_impl/erasure.rs`); `snapshot_registry.min_active_seqno()` (Prod, `erasure.rs:146, 354`) und `register_at()` (nur Test, `erasure_orchestrator_tests.rs:114`); `last_tx_id()` (Port-Methode); `inner_storage()` (`contextra-engine/src/lib.rs:369`, Adapter-Handle); `PressureLevel` (Prod, `collection/crud/internal.rs`); `DurabilityConfigError` (Prod, `contextra/src/performance_profile.rs`). Die Zielnamen `Storage::last_stamp()` und `oldest_view_stamp()` aus der Vorfassung stehen nicht in der Spec. Maßgeblich sind `View::stamp()` (§8.3), `EraseReq.views` (§8.5) und `Error::Config` (§8.7).
+4. `MergeOperator` ist produktiv **nirgends** verdrahtet (SA-10 bestätigt): nur der Adapter `WasmMergeOperator` (`contextra-engine/src/lib.rs:56`, öffentlich exportiert) und zwei Aufrufe von `with_merge_operator` in `tests/wasm_merge_operator.rs` (Zeilen 278, 354). Das Register C-34 („`contextra-engine` nutzt `MergeOperator`“) ist im Code nicht belegt.
+5. Die Zählung erfasst nur Pfadnennungen. Methodenaufrufe auf Werten aus anderen Crates (z. B. `inner_storage().last_tx_id()`, `snapshot_registry`) tauchen im Quelltext nicht als `contextra_store` auf und fehlen in der Zählung (SA-11). Der Umstellungsaufwand ist damit größer als die Zeilenzahl.
+6. Nicht in der Matrix: `crates/contextra-store/fuzz/Cargo.toml` hängt von `contextra-store` ab; es gehört zum Altcrate und entfällt mit ihm.
 
 ### 2.5 Weitere Befunde
 
@@ -613,12 +616,12 @@ Eingang für den Prozess nach Spec §1.5. Jeder Antrag nennt Stelle, Befund, Vor
 | SA-3 | §4 | `File::write_at`/`truncate` (Spec) vs. `write_all_at`/`set_len` (Bestand); `write_at` klingt wie `pwrite` mit Teilschreiben | Spec: `write_all_at`; Bestand: `set_len` → `truncate` |
 | SA-4 | §4, P-11 | `Cipher::seal` liefert `Vec<u8>`: eine Allokation je Versiegelung | `seal_into`/`open_into` mit Standardimplementierung |
 | SA-5 | §3.2 | Spec führt `MemFs`/`FaultFs` unter `env`; Bestand unter `testing` (Feature) | Unter `testing` belassen; §3.2 und `std::fs`-Regel anpassen |
-| SA-6 | §26.1, §26.2 | `contextra-checkpoint` importiert im Produktivcode kein `contextra_store`; Rollback über eigenen Trait; Prod-/Test-Nutzung nicht unterschieden | §26.1 um Prod/Test-Spalte ergänzen; §26.2-Zeile für `checkpoint` korrigieren |
-| SA-7 | §26.3 | Nicht abgebildet: `scanner::lsm_purgers/lsm_scanners`, `snapshot_registry.min_active_seqno/register_at`, `last_tx_id`, `inner_storage`, `PressureLevel`, `DurabilityConfigError` | Zeilen ergänzen (Vorschläge in IF-8) |
+| SA-6 | §26.1, §26.2 | `contextra-checkpoint` importiert im Produktivcode kein `contextra_store`; Rollback und letzte TxId laufen über den Port `contextra_ports::StorageEngine` (nicht über einen eigenen Trait, Korrektur zu §2.4); Prod-/Test-Nutzung nicht unterschieden | §26.1 um Prod/Test-Spalte ergänzen; §26.2-Zeile für `checkpoint` korrigieren. Textänderung formuliert (WP-1.7), Freigabe offen |
+| SA-7 | §26.3 | Nicht abgebildet: `scanner::lsm_purgers/lsm_scanners` (4 Prod-Stellen), `snapshot_registry.min_active_seqno` (2 Prod-Stellen), `register_at` (nur Test), `last_tx_id` (Port-Methode), `inner_storage` (Adapter-Handle), `PressureLevel` (Prod), `DurabilityConfigError` (Prod) | Zeilen in §26.3 ergänzen (Ziele: `EraseLevel`/`Eraser`, `EraseReq.views`, `View::stamp()`, `Pressure`, `Error::Config`). Die Namen `last_stamp`/`oldest_view_stamp` aus IF-8 stehen nicht in der Spec. Textänderung formuliert (WP-1.7), Freigabe offen |
 | SA-8 | §3.1, §3.2, §26.2 | `RealFs` laut §3.1/§26.2 in `contextra-durable-fs`, laut §3.2 in `env/real_fs.rs`; der Kern braucht `RealFs` für `Env::real` | `RealFs` im Kern; `contextra-durable-fs` liefert `FileAnchor` und optionale gehärtete `Fs` |
 | SA-9 | §4 | `Runtime` steht nur in den „Verträgen“, nicht im Codeblock; Bestand hat `Runtime` im Kern | Trait `Runtime` mit Signatur in den Codeblock; `Governor` bleibt im Kern |
-| SA-10 | §23.2 D-30, §26.3 | `MergeOperator` ist produktiv nirgends verdrahtet (nur Adapter + Test in `contextra-engine`) | Prüfauftrag in D-30 als erfüllt markieren; Ersatz nur für den Adapter |
-| SA-11 | §26.1 | Zeilenzählung wird als Zahl für Umstellungsaufwand genutzt, enthält Tests | Prod-/Test-Zählung angeben (Tabelle §2.4) |
+| SA-10 | §23.2 D-30, §26.3 | bestätigt: `MergeOperator` ist produktiv nirgends verdrahtet. Nur `WasmMergeOperator` (öffentlich exportiert, `contextra-engine/src/lib.rs:56`) und zwei Aufrufe von `with_merge_operator` in `tests/wasm_merge_operator.rs`. Register C-34 („`contextra-engine` nutzt `MergeOperator`“) ist im Code nicht belegt | Prüfauftrag in D-30 als erfüllt markieren; Ersatz nur für den Adapter. §26.3 ergänzt (WP-1.7), Freigabe offen; D-30 und C-34 in dieser Änderung nicht berührt |
+| SA-11 | §26.1 | Zeilenzählung erfasst nur Pfadnennungen. Prod/Test: engine 26/118, db 0/25, graph 0/16, cognition 0/15, contextra 2/3, agent 3/0, checkpoint 0/2, bench 0/1. Methodenaufrufe auf Werten aus anderen Crates (agent: 35 Aufrufe von `inner_storage()`) fehlen | Prod-/Test-Tabelle in §26.1 (Textänderung formuliert, WP-1.7), Freigabe offen. Umstellungsaufwand nicht aus Zeilen ableiten; Zählung über die API-Liste (IF-8) |
 | SA-12 | §4 | `KeyError` hat im Bestand nur `NotFound`, `Unavailable`; `destroy`/`probe` brauchen weitere Fehlerfälle | Varianten festlegen (z. B. `DestroyFailed`, `Unsupported`); keine Inhaltsfelder |
 | SA-13 | §14.3, §16.7 | `AnchorValue` ohne `instance_id`, §14.3 prüft sie „gegen den Anker“ | Anker je Instanz trennen (Dateiname/Schlüssel aus `instance_id`) oder Feld aufnehmen |
 | SA-14 | §22 G-2, §19.4 | `tools/reference/generator.py` existiert nicht | Als Lieferung von WP-2.1 festhalten; G-2-Bedingung unverändert |

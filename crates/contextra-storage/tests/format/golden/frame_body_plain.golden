@@ -1,0 +1,28 @@
+# golden: frame_body_plain
+# quelle: tools/reference/generator.py (unabhängig vom Kern, nur Standardbibliothek)
+# spec: SPEC §10.4 (Frame, Plain)
+# annahmen: A-4
+# vollstaendig: nein
+# hinweis: frame_chk fehlt: Abdeckung und Kettenwert sind in §10.4 nicht festgelegt (Lücke L-2)
+# zeilen: OFFSET LAENGE FELD HEX  # BEDEUTUNG (Offsets dezimal, Hex little-endian)
+0 4 frame_len 75000000  # Länge ab stamp bis ops_payload: 117
+4 8 stamp 6400000000000000  # Stamp
+12 1 kind 01  # 1 = Change
+13 2 n_ops 0200  # Anzahl Ops
+15 16 idem_token a0a1a2a3a4a5a6a7a8a9aaabacadaeaf  # Idempotenz-Token, 16 Byte
+31 4 key_epoch 03000000  # Schlüsselepoche
+35 1 flags 00  # Frame-Flags, Bit 7 = Siegel (hier 0)
+36 2 op0.space 0100  # Op 0: Space
+38 16 op0.cluster 101112131415161718191a1b1c1d1e1f  # Op 0: Cluster, 16 Byte
+54 1 op0.op_kind 01  # Op 0: Art
+55 16 op0.op_uid 202122232425262728292a2b2c2d2e2f  # Op 0: op_uid, 16 Byte
+71 4 op0.payload_len 03000000  # Op 0: Länge der Nutzlast
+75 2 op1.space 0200  # Op 1: Space
+77 16 op1.cluster 303132333435363738393a3b3c3d3e3f  # Op 1: Cluster, 16 Byte
+93 1 op1.op_kind 02  # Op 1: Art
+94 16 op1.op_uid 404142434445464748494a4b4c4d4e4f  # Op 1: op_uid, 16 Byte
+110 4 op1.payload_len 04000000  # Op 1: Länge der Nutzlast
+114 3 ops_payload.0 616263  # Op 0: Nutzlast, Byte-Eingabe
+117 4 ops_payload.1 deadbeef  # Op 1: Nutzlast, Byte-Eingabe
+# laenge: 121
+GESAMT 750000006400000000000000010200a0a1a2a3a4a5a6a7a8a9aaabacadaeaf03000000000100101112131415161718191a1b1c1d1e1f01202122232425262728292a2b2c2d2e2f030000000200303132333435363738393a3b3c3d3e3f02404142434445464748494a4b4c4d4e4f04000000616263deadbeef
