@@ -6,7 +6,7 @@ use contextra_storage_ports::{traits::Mac, Error, Key32};
 const RECORD_FIXED: usize = 8 + 4;
 const CRC_BYTES: usize = 4;
 const MAC_BYTES: usize = 32;
-const MAX_RECORD_BYTES: usize = 1 << 20;
+pub(super) const MAX_RECORD_BYTES: usize = 1 << 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CatalogIntegrity { Plain, Authenticated }

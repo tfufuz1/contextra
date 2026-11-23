@@ -26,7 +26,7 @@ impl RunReader {
     pub fn directory(&self) -> &ClusterDirectory;
     pub fn get(&self, c: ClusterId, b: BranchId, key: &[u8], cap: Stamp, k: &KeyScope) -> Result<Option<EntryOwned>, RunError>; // Filter → SubIndex → 1 Block
     pub fn iter(&self, c: ClusterId, range: KeyRange, caps: &BranchCaps, k: &KeyScope) -> RunIter<'_>;  // Kopf ohne Körper
-    pub fn block_skip_scan(&self, c: ClusterId, ..) -> impl Iterator<Item = BlockSummary>;              // weight_sum, ohne Entsiegeln
+    pub fn block_skip_scan(&self, c: ClusterId, ..) -> impl Iterator<Item = BlockSummary>;              // entsiegelt kleine SubIndex-Metadaten, kein Body-I/O
 }
 pub fn copy_sections(src:&RunReader, keep:&[ClusterId], dst:&mut RunBuilder<'_>) -> Result<(), RunError>; // Rohkopie: prüft nur CRC, nie AEAD
 pub struct TableCache { .. }                     // FD-LRU, Pin/Refcount, max_open_files

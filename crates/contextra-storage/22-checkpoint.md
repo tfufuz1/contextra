@@ -9,7 +9,7 @@
 | Phase | P6 (G-E) |
 
 ## 1 Auftrag
-Checkpoint ist konsistente Referenzmenge, kein neuer Datenkatalog. Nur durabel gelistete Dateien werden aufgenommen. Hardlink ist opt-in (SD-13). Backup policy gibt `keys_in_backups` wahrheitsgetreu an; cryptographic Erase darf nur zugesagt werden, wenn Schlüsselkopien ausgeschlossen sind.
+Checkpoint ist konsistente Referenzmenge, kein neuer Datenkatalog. Nur durabel gelistete Dateien werden aufgenommen. Für die physische Purge-/DiskFull-Garantie sind unabhängige `Copy`-Dateien vorgeschrieben. `Reflink`/`Hardlink` sind nur mit registriertem Owner zulässig, der vor Scratch-Recycling die Referenzen auf betroffene Extents nachweisbar entfernt und attestiert; sonst sind sie nicht verwaltete Retention-Copies und Restrisiko im Receipt. Backup policy gibt `keys_in_backups` wahrheitsgetreu an; cryptographic Erase darf nur zugesagt werden, wenn Schlüsselkopien ausgeschlossen sind.
 
 ## 2 Verträge
 `checkpoint(options)` erstellt Manifest mit Catalog-Epoche, Redo-Boden, Dateimengen und Erase-Epoch; `restore(source, anchor, ledger)` prüft Format/Integrity und reconciled jedes Ledger-`tomb_id`, sodass betroffene Cluster mindestens Retired werden. Restore schreibt nicht hinter externen Anker.

@@ -111,6 +111,7 @@ memmap2 = "0.9.11"
 ahash = { version = "0.8", features = ["serde"] }
 itoa = "1"
 parking_lot = "0.12"
+crossbeam-skiplist = "0.1"
 roaring = "0.10"
 regex = "1"
 

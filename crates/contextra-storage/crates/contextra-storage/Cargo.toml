@@ -13,6 +13,10 @@ contextra-storage-ports = { path = "../contextra-storage-ports" }
 bytes = "1"
 thiserror = "1"
 zeroize = "1"
+crossbeam-skiplist = { workspace = true }
+
+[dev-dependencies]
+contextra-crypto-ref = { path = "../contextra-crypto-ref" }
 
 [lints]
 workspace = true

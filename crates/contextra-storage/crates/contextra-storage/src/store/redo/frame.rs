@@ -18,6 +18,7 @@ pub struct OpHead {
     pub cluster: ClusterId,
     pub branch: BranchId,
     pub kind: u8,
+    pub key_epoch: u32,
     pub op_uid: [u8; 16],
     pub payload_len: u32,
 }
@@ -92,6 +93,7 @@ pub fn encode_frame(frame: &EncodedFrame, previous: &[u8; 32], key: &Key32, mac:
         body.extend_from_slice(op.cluster.as_bytes());
         body.extend_from_slice(&op.branch.0.to_le_bytes());
         body.push(op.kind);
+        body.extend_from_slice(&op.key_epoch.to_le_bytes());
         body.extend_from_slice(&op.op_uid);
         body.extend_from_slice(&payload_len.to_le_bytes());
         body.extend_from_slice(payload);
@@ -159,10 +161,11 @@ pub fn decode_frame<'a>(input: &'a [u8], previous: &[u8; 32], key: &Key32, mac: 
         let cluster = ClusterId::from_wire(cursor.array::<16>()?);
         let branch = BranchId(cursor.u32()?);
         let op_kind = cursor.u8()?;
+        let key_epoch = cursor.u32()?;
         let op_uid = cursor.array::<16>()?;
         let payload_len = cursor.u32()?;
         let payload = cursor.take(payload_len as usize)?;
-        let op = OpHead { space, cluster, branch, kind: op_kind, op_uid, payload_len };
+        let op = OpHead { space, cluster, branch, kind: op_kind, key_epoch, op_uid, payload_len };
         ops.push(op);
         payloads.push(OpPayload { head: op, bytes: payload });
     }

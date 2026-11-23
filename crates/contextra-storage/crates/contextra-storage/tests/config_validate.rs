@@ -2,6 +2,9 @@
 use contextra_storage::config::Config;
 use contextra_storage::ports::Error;
 use contextra_storage::Storage;
+use contextra_storage::env::memfs::MemFs;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 #[test]
 fn default_config_is_valid() {
@@ -38,7 +41,18 @@ fn zero_open_files_rejected() {
 }
 
 #[test]
-fn storage_open_is_placeholder_until_catalog() {
+fn storage_open_requires_environment_before_io() {
     let r = Storage::open(Config::default());
-    assert!(matches!(r, Err(Error::NotImplemented { .. })));
+    assert!(matches!(r, Err(Error::Limit { limit: "storage filesystem is required" })));
+}
+
+#[test]
+fn storage_open_creates_and_replays_catalog() {
+    let fs = Arc::new(MemFs::new());
+    let config = Config::default().with_filesystem(PathBuf::from("/db"), fs);
+    let storage = Storage::open(config.clone()).expect("open empty catalog");
+    assert!(storage.catalog().spaces().is_empty());
+    drop(storage);
+    let reopened = Storage::open(config).expect("reopen catalog");
+    assert!(reopened.catalog().spaces().is_empty());
 }

@@ -152,10 +152,8 @@ impl Fs for MemFs {
 
     fn rename(&self, from: &Path, to: &Path, ctx: IoCtx) -> Result<(), Error> {
         let mut state = self.state.lock().map_err(|_| Error::Poisoned { cause: "MemFs lock" })?;
-        if state.files.contains_key(to) {
-            return Err(Error::Io { role: role_name(ctx.role), kind: ErrorKind::AlreadyExists });
-        }
         let file = state.files.remove(from).ok_or(Error::Io { role: role_name(ctx.role), kind: ErrorKind::NotFound })?;
+        state.files.remove(to);
         state.files.insert(to.to_path_buf(), file);
         Ok(())
     }

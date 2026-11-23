@@ -21,6 +21,8 @@ pub enum ErrorClass {
     Usage,
     /// Anker-Wettlauf verloren
     Conflict,
+    /// Externer Anker liegt vor den wiederhergestellten dauerhaften Daten
+    Rollback,
     /// Platzhalter oder interner Fehler
     Internal,
 }
@@ -46,6 +48,8 @@ pub enum Error {
     Limit { limit: &'static str },
     #[error("Anker-Wettlauf verloren (CAS)")]
     CasLost,
+    #[error("Rollback erkannt: Anker liegt vor Catalog oder Ledger")]
+    Rollback,
     #[error("I/O-Fehler (Rolle {role}, Art {kind:?})")]
     Io {
         role: &'static str,
@@ -66,6 +70,7 @@ impl Error {
             Self::KeyUnavailable { .. } | Self::Shredded => ErrorClass::Key,
             Self::Limit { .. } => ErrorClass::Usage,
             Self::CasLost => ErrorClass::Conflict,
+            Self::Rollback => ErrorClass::Rollback,
             Self::NotImplemented { .. } => ErrorClass::Internal,
         }
     }
@@ -83,6 +88,7 @@ impl Error {
             Self::Shredded => "Daten sind endgültig gelöscht",
             Self::Limit { .. } => "Eingabe verkleinern",
             Self::CasLost => "Anker neu lesen und wiederholen",
+            Self::Rollback => "ReadOnly-Diagnose öffnen und Restore-Reconcile ausführen",
             Self::NotImplemented { .. } => "Komponente ist noch Platzhalter",
         }
     }

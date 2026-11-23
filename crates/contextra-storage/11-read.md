@@ -12,7 +12,7 @@
 Eine View bindet unveränderliche Version und sichtbaren Stamp konsistent. `view_durable` sowie Consumer-/Page-Reads begrenzen Ergebnisse auf `durable_stamp`. Core liefert sortierte Köpfe und Gewichte; Ranking-/Retrieval-Politik bleibt oben.
 
 ## 2 Verträge
-`Storage::view/view_at/view_durable`; `View::get`, `scan`, `page`. `page` budgetiert anhand `weights[4]` und `weight_sum`; Cursor/ResumeToken sind an View/Stamp gebunden und versiegelt, sofern sie persistiert oder weitergereicht werden. Alle Extensions werden vor Rückgabe durch `filter_visible` geführt.
+`Storage::view/view_at/view_durable`; `View::get`, `scan`, `page`. `page` budgetiert anhand `weights[4]` und `weight_sum`; bei Sealed-Clustern entschlüsselt es kleine SubIndex-Metadaten, aber keine Body-Blöcke für Skip-Entscheidungen. Cursor/ResumeToken sind an View/Stamp gebunden und versiegelt, sofern sie persistiert oder weitergereicht werden. Alle Extensions werden vor Rückgabe durch `filter_visible` geführt.
 
 ## 3 Regeln
 Branch-Kappen werden an RUN weitergegeben. Tombstone und RangeDelete werden vor Ergebnisbildung angewendet. `page` lädt Köpfe ohne Körper, sofern nicht explizit verlangt. Cache-Einträge sind versionsbezogen oder invalidiert; ein Gate kann keine bereits veröffentlichte View logisch zurückholen, aber alle Ergebnisse mit Stamp ≥ S als Erased ausweisen.

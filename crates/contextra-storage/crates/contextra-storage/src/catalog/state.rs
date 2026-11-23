@@ -1,20 +1,16 @@
 //! Deterministische Catalog-Faltung für die P1-Op-Teilmenge.
 
-use super::ops::{CatalogOp, FileKind};
+use super::ops::{CatalogOp, FileEntry};
 use super::record::CatalogRecord;
 use contextra_storage_ports::{ClusterId, Error, Protection, SpaceId, Stamp};
 use std::collections::BTreeMap;
 
+pub type FileMeta = FileEntry;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FileMeta {
-    pub file_id: u64,
-    pub space: SpaceId,
-    pub cluster: Option<ClusterId>,
-    pub kind: FileKind,
-    pub level: u8,
-    pub bytes: u64,
-    pub min_stamp: Stamp,
-    pub max_stamp: Stamp,
+pub struct GraveyardEntry {
+    pub ticket: [u8; 16],
+    pub file: FileMeta,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -22,6 +18,9 @@ pub struct CatalogState {
     spaces: BTreeMap<SpaceId, Protection>,
     clusters: BTreeMap<ClusterId, Protection>,
     files: BTreeMap<u64, FileMeta>,
+    graveyard: BTreeMap<([u8; 16], u64), GraveyardEntry>,
+    unlink_acks: std::collections::BTreeSet<([u8; 16], u64)>,
+    purge_complete: std::collections::BTreeSet<[u8; 16]>,
     replay_floor: (u64, u64),
     redo_mark: (u64, u64, Stamp),
     stamp_limit: Stamp,
@@ -38,7 +37,7 @@ impl CatalogState {
         Ok(state)
     }
 
-    pub fn apply_record(&mut self, record: &CatalogRecord) -> Result<(), Error> {
+    pub(crate) fn apply_record(&mut self, record: &CatalogRecord) -> Result<(), Error> {
         for op in &record.ops { self.apply(op)?; }
         self.epoch = self.epoch.checked_add(1).ok_or(Error::Limit { limit: "catalog epoch" })?;
         Ok(())
@@ -69,8 +68,14 @@ impl CatalogState {
                     None => { self.files.insert(*file_id, file); Ok(()) }
                 }
             }
-            CatalogOp::FilesRemove { file_id } => self.files.remove(file_id)
-                .map(|_| ()).ok_or(Error::Corrupt { place: "catalog removes non-live file" }),
+            CatalogOp::FilesRemove { file_id } => {
+                let ticket = [0; 16];
+                let key = (ticket, *file_id);
+                if self.graveyard.contains_key(&key) { return Ok(()); }
+                let file = self.files.remove(file_id).ok_or(Error::Corrupt { place: "catalog removes non-live file" })?;
+                self.graveyard.insert(key, GraveyardEntry { ticket, file });
+                Ok(())
+            }
             CatalogOp::ReplayFloor { segment, offset } => {
                 if (*segment, *offset) < self.replay_floor { return Err(Error::Corrupt { place: "catalog replay floor regressed" }); }
                 self.replay_floor = (*segment, *offset);
@@ -91,15 +96,66 @@ impl CatalogState {
                 self.id_limit = *through;
                 Ok(())
             }
+            CatalogOp::PurgeBatch { ticket, remove_file_id, replacement } => {
+                if self.purge_complete.contains(ticket) { return Err(Error::Corrupt { place: "purge batch after completion" }); }
+                let key = (*ticket, *remove_file_id);
+                if let Some(existing) = self.graveyard.get(&key) {
+                    if replacement.as_ref().is_some_and(|new| self.files.get(&new.file_id) != Some(new)) {
+                        return Err(Error::Corrupt { place: "purge batch replay mismatch" });
+                    }
+                    return if existing.file.file_id == *remove_file_id { Ok(()) } else { Err(Error::Corrupt { place: "purge graveyard identity" }) };
+                }
+                let old = self.files.get(remove_file_id).cloned().ok_or(Error::Corrupt { place: "purge batch removes non-live file" })?;
+                if let Some(new) = replacement {
+                    validate_file_refs(&self.spaces, &self.clusters, new)?;
+                    if new.file_id == *remove_file_id || self.files.contains_key(&new.file_id) {
+                        return Err(Error::Corrupt { place: "purge replacement file id" });
+                    }
+                }
+                self.files.remove(remove_file_id);
+                if let Some(new) = replacement { self.files.insert(new.file_id, new.clone()); }
+                self.graveyard.insert(key, GraveyardEntry { ticket: *ticket, file: old });
+                Ok(())
+            }
+            CatalogOp::UnlinkAck { ticket, file_id } => {
+                let key = (*ticket, *file_id);
+                if self.unlink_acks.contains(&key) { return Ok(()); }
+                self.graveyard.remove(&key).ok_or(Error::Corrupt { place: "unlink ack without graveyard entry" })?;
+                self.unlink_acks.insert(key);
+                Ok(())
+            }
+            CatalogOp::PurgeComplete { ticket } => {
+                if self.purge_complete.contains(ticket) { return Ok(()); }
+                if self.graveyard.keys().any(|(owner, _)| owner == ticket) {
+                    return Err(Error::Corrupt { place: "purge complete with pending graveyard" });
+                }
+                self.purge_complete.insert(*ticket);
+                Ok(())
+            }
         }
     }
 
     pub fn spaces(&self) -> &BTreeMap<SpaceId, Protection> { &self.spaces }
     pub fn clusters(&self) -> &BTreeMap<ClusterId, Protection> { &self.clusters }
     pub fn files(&self) -> &BTreeMap<u64, FileMeta> { &self.files }
+    pub fn graveyard(&self) -> &BTreeMap<([u8; 16], u64), GraveyardEntry> { &self.graveyard }
+    pub fn purge_is_complete(&self, ticket: &[u8; 16]) -> bool { self.purge_complete.contains(ticket) }
     pub fn replay_floor(&self) -> (u64, u64) { self.replay_floor }
     pub fn redo_mark(&self) -> (u64, u64, Stamp) { self.redo_mark }
     pub fn stamp_limit(&self) -> Stamp { self.stamp_limit }
     pub fn id_limit(&self) -> u64 { self.id_limit }
     pub fn epoch(&self) -> u64 { self.epoch }
+}
+
+fn validate_file_refs(
+    spaces: &BTreeMap<SpaceId, Protection>,
+    clusters: &BTreeMap<ClusterId, Protection>,
+    file: &FileMeta,
+) -> Result<(), Error> {
+    if !spaces.contains_key(&file.space) { return Err(Error::Corrupt { place: "catalog file references unknown space" }); }
+    if file.cluster.is_some_and(|cluster| !clusters.contains_key(&cluster)) {
+        return Err(Error::Corrupt { place: "catalog file references unknown cluster" });
+    }
+    if file.min_stamp > file.max_stamp { return Err(Error::Corrupt { place: "catalog file stamp range" }); }
+    Ok(())
 }

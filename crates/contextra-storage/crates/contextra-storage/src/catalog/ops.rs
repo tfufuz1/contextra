@@ -10,9 +10,24 @@ const TAG_REPLAY_FLOOR: u16 = 5;
 const TAG_REDO_MARK: u16 = 6;
 const TAG_RESERVE_STAMPS: u16 = 7;
 const TAG_RESERVE_IDS: u16 = 8;
+const TAG_PURGE_BATCH: u16 = 9;
+const TAG_UNLINK_ACK: u16 = 10;
+const TAG_PURGE_COMPLETE: u16 = 11;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileKind { Run, Blob }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileEntry {
+    pub file_id: u64,
+    pub space: SpaceId,
+    pub cluster: Option<ClusterId>,
+    pub kind: FileKind,
+    pub level: u8,
+    pub bytes: u64,
+    pub min_stamp: Stamp,
+    pub max_stamp: Stamp,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CatalogOp {
@@ -24,6 +39,11 @@ pub enum CatalogOp {
     RedoMark { segment: u64, offset: u64, stamp: Stamp },
     ReserveStamps { through: Stamp },
     ReserveIds { through: u64 },
+    /// Atomically swaps one live file incarnation and pins the old file in the
+    /// persistent graveyard until its unlink and parent-directory sync ack.
+    PurgeBatch { ticket: [u8; 16], remove_file_id: u64, replacement: Option<FileEntry> },
+    UnlinkAck { ticket: [u8; 16], file_id: u64 },
+    PurgeComplete { ticket: [u8; 16] },
 }
 
 impl CatalogOp {
@@ -60,6 +80,18 @@ impl CatalogOp {
             Self::RedoMark { segment, offset, stamp } => { put_u64(&mut payload, *segment); put_u64(&mut payload, *offset); put_u64(&mut payload, *stamp); TAG_REDO_MARK }
             Self::ReserveStamps { through } => { put_u64(&mut payload, *through); TAG_RESERVE_STAMPS }
             Self::ReserveIds { through } => { put_u64(&mut payload, *through); TAG_RESERVE_IDS }
+            Self::PurgeBatch { ticket, remove_file_id, replacement } => {
+                payload.extend_from_slice(ticket);
+                put_u64(&mut payload, *remove_file_id);
+                encode_optional_file(&mut payload, replacement.as_ref())?;
+                TAG_PURGE_BATCH
+            }
+            Self::UnlinkAck { ticket, file_id } => {
+                payload.extend_from_slice(ticket);
+                put_u64(&mut payload, *file_id);
+                TAG_UNLINK_ACK
+            }
+            Self::PurgeComplete { ticket } => { payload.extend_from_slice(ticket); TAG_PURGE_COMPLETE }
         };
         let length = u32::try_from(payload.len()).map_err(|_| Error::Limit { limit: "catalog op length" })?;
         put_u16(out, tag);
@@ -98,6 +130,9 @@ impl CatalogOp {
             TAG_REDO_MARK => Self::RedoMark { segment: p.u64()?, offset: p.u64()?, stamp: p.u64()? },
             TAG_RESERVE_STAMPS => Self::ReserveStamps { through: p.u64()? },
             TAG_RESERVE_IDS => Self::ReserveIds { through: p.u64()? },
+            TAG_PURGE_BATCH => Self::PurgeBatch { ticket: p.array()?, remove_file_id: p.u64()?, replacement: decode_optional_file(&mut p)? },
+            TAG_UNLINK_ACK => Self::UnlinkAck { ticket: p.array()?, file_id: p.u64()? },
+            TAG_PURGE_COMPLETE => Self::PurgeComplete { ticket: p.array()? },
             _ => return Err(Error::Unsupported { what: "catalog op tag" }),
         };
         if !p.is_empty() { return Err(Error::Corrupt { place: "catalog op trailing bytes" }); }
@@ -112,6 +147,40 @@ fn protection_from_wire(value: u8) -> Result<Protection, Error> {
 fn put_u16(out: &mut Vec<u8>, value: u16) { out.extend_from_slice(&value.to_le_bytes()); }
 fn put_u32(out: &mut Vec<u8>, value: u32) { out.extend_from_slice(&value.to_le_bytes()); }
 fn put_u64(out: &mut Vec<u8>, value: u64) { out.extend_from_slice(&value.to_le_bytes()); }
+
+fn encode_optional_file(out: &mut Vec<u8>, file: Option<&FileEntry>) -> Result<(), Error> {
+    let Some(file) = file else { out.push(0); return Ok(()); };
+    if file.min_stamp > file.max_stamp { return Err(Error::Limit { limit: "catalog file stamp range" }); }
+    out.push(1);
+    put_u64(out, file.file_id);
+    put_u16(out, file.space.0);
+    match file.cluster { Some(cluster) => { out.push(1); out.extend_from_slice(cluster.as_bytes()); }, None => out.push(0) }
+    out.push(match file.kind { FileKind::Run => 1, FileKind::Blob => 2 });
+    out.push(file.level);
+    put_u64(out, file.bytes);
+    put_u64(out, file.min_stamp);
+    put_u64(out, file.max_stamp);
+    Ok(())
+}
+
+fn decode_optional_file(c: &mut Cursor<'_>) -> Result<Option<FileEntry>, Error> {
+    match c.u8()? {
+        0 => Ok(None),
+        1 => {
+            let file_id = c.u64()?;
+            let space = SpaceId(c.u16()?);
+            let cluster = match c.u8()? { 0 => None, 1 => Some(ClusterId::from_wire(c.array()?)), _ => return Err(Error::Unsupported { what: "catalog cluster option" }) };
+            let kind = match c.u8()? { 1 => FileKind::Run, 2 => FileKind::Blob, _ => return Err(Error::Unsupported { what: "catalog file kind" }) };
+            let level = c.u8()?;
+            let bytes = c.u64()?;
+            let min_stamp = c.u64()?;
+            let max_stamp = c.u64()?;
+            if min_stamp > max_stamp { return Err(Error::Corrupt { place: "catalog file stamp range" }); }
+            Ok(Some(FileEntry { file_id, space, cluster, kind, level, bytes, min_stamp, max_stamp }))
+        }
+        _ => Err(Error::Unsupported { what: "catalog optional file" }),
+    }
+}
 
 struct Cursor<'a> { input: &'a [u8], offset: usize }
 impl<'a> Cursor<'a> {

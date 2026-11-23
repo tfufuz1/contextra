@@ -1,6 +1,6 @@
 //! Öffnet und faltet eine Catalog-Datei aus dem validen Recordpräfix.
 
-use super::record::{decode_record, CatalogIntegrity, CatalogRecord, MAX_RECORD_BYTES};
+use super::record::{decode_record, encode_record, CatalogIntegrity, MAX_RECORD_BYTES};
 use super::state::CatalogState;
 use contextra_storage_ports::traits::{File, FileRole, Fs, IoCtx, Mac};
 use contextra_storage_ports::{Error, Key32};
@@ -17,16 +17,36 @@ pub struct CatalogFile {
     path: PathBuf,
     file: Box<dyn File>,
     state: CatalogState,
-    records: Vec<CatalogRecord>,
     next_sequence: u64,
     previous_crc: u32,
     previous_mac: [u8; 32],
     append_offset: u64,
+    allocated_until: u64,
     writable: bool,
     torn_tail: bool,
 }
 
 impl CatalogFile {
+    pub fn open_current(
+        fs: &dyn Fs,
+        root: &Path,
+        mode: OpenMode,
+        integrity: CatalogIntegrity,
+        key: Option<&Key32>,
+        mac: Option<&dyn Mac>,
+    ) -> Result<Self, Error> {
+        match super::rollover::read_current(fs, root) {
+            Ok(pointer) => Self::open(fs, &root.join(format!("CATALOG-{}", pointer.generation)), mode, integrity, key, mac),
+            Err(Error::Io { kind: ErrorKind::NotFound, .. }) if mode == OpenMode::ReadWrite => {
+                let path = root.join("CATALOG-0");
+                let catalog = Self::open(fs, &path, mode, integrity, key, mac)?;
+                super::rollover::publish_current(fs, root, super::rollover::CurrentPointer { generation: 0 })?;
+                Ok(catalog)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     pub fn open(
         fs: &dyn Fs,
         path: &Path,
@@ -47,8 +67,9 @@ impl CatalogFile {
             Err(error) => return Err(error),
         };
         let mut catalog = Self {
-            path: path.to_path_buf(), file, state: CatalogState::default(), records: Vec::new(),
+            path: path.to_path_buf(), file, state: CatalogState::default(),
             next_sequence: 1, previous_crc: 0, previous_mac: [0; 32], append_offset: 0,
+            allocated_until: if created { PREALLOC_BYTES } else { 0 },
             writable: mode == OpenMode::ReadWrite && created, torn_tail: false,
         };
         if !created { catalog.scan(integrity, key, mac, mode)?; }
@@ -91,16 +112,99 @@ impl CatalogFile {
             self.previous_crc = record.crc;
             self.previous_mac = record.chain_mac.unwrap_or([0; 32]);
             offset = offset.checked_add(total).ok_or(Error::Corrupt { place: "catalog offset" })?;
-            self.records.push(record);
         }
         self.append_offset = offset;
+        self.allocated_until = offset.checked_add(PREALLOC_BYTES - 1)
+            .map(|v| (v / PREALLOC_BYTES) * PREALLOC_BYTES)
+            .ok_or(Error::Limit { limit: "catalog allocation bound" })?;
         self.writable = mode == OpenMode::ReadWrite && !self.torn_tail;
         Ok(())
     }
 
+    /// Convenience path for one caller; the group writer below is the shared
+    /// durability primitive.
+    pub fn append_durable(
+        &mut self,
+        ops: &[super::ops::CatalogOp],
+        integrity: CatalogIntegrity,
+        key: Option<&Key32>,
+        mac: Option<&dyn Mac>,
+    ) -> Result<u64, Error> {
+        self.append_group_durable(&[ops.to_vec()], integrity, key, mac)?
+            .first().copied().ok_or(Error::Corrupt { place: "catalog group result" })
+    }
+
+    /// Installs several waiting logical edits in one record, append, and sync.
+    /// Operation patterns that must remain coupled are built before submission.
+    pub fn append_group_durable(
+        &mut self,
+        edits: &[Vec<super::ops::CatalogOp>],
+        integrity: CatalogIntegrity,
+        key: Option<&Key32>,
+        mac: Option<&dyn Mac>,
+    ) -> Result<Vec<u64>, Error> {
+        if !self.writable { return Err(Error::Poisoned { cause: "catalog is read-only or poisoned" }); }
+        if edits.is_empty() { return Err(Error::Limit { limit: "catalog edit group must not be empty" }); }
+        let next_sequence = self.next_sequence.checked_add(1).ok_or(Error::Limit { limit: "catalog sequence" })?;
+        let total_ops = edits.iter().try_fold(0usize, |count, edit| count.checked_add(edit.len()))
+            .ok_or(Error::Limit { limit: "catalog group op count" })?;
+        if total_ops == 0 || total_ops > 4096 { return Err(Error::Limit { limit: "catalog ops per edit group" }); }
+        let ops: Vec<_> = edits.iter().flat_map(|edit| edit.iter().cloned()).collect();
+        let mut next_state = self.state.clone();
+        let record = super::record::CatalogRecord {
+            sequence: self.next_sequence,
+            previous_crc: self.previous_crc,
+            ops: ops.clone(),
+            crc: 0,
+            chain_mac: None,
+        };
+        next_state.apply_record(&record)?;
+        let encoded = encode_record(self.next_sequence, self.previous_crc, &ops, integrity, key, &self.previous_mac, mac)?;
+        let next_offset = self.append_offset.checked_add(encoded.len() as u64)
+            .ok_or(Error::Limit { limit: "catalog append offset" })?;
+        if next_offset > self.allocated_until {
+            let additional = next_offset.checked_add(PREALLOC_BYTES - 1)
+                .map(|v| (v / PREALLOC_BYTES) * PREALLOC_BYTES)
+                .ok_or(Error::Limit { limit: "catalog preallocation" })?;
+            self.file.preallocate(additional, IO)?;
+            self.file.sync_all(IO)?;
+            self.allocated_until = additional;
+        }
+        if let Err(error) = self.file.append_prealloc(&encoded, IO) {
+            self.writable = false;
+            return Err(error);
+        }
+        if self.file.sync_data(IO).is_err() {
+            self.writable = false;
+            return Err(Error::Poisoned { cause: "catalog edit sync failed" });
+        }
+        let (decoded, _) = decode_record(
+            &encoded, self.next_sequence, self.previous_crc, integrity, key, &self.previous_mac, mac,
+        )?;
+        self.state = next_state;
+        self.previous_crc = decoded.crc;
+        self.previous_mac = decoded.chain_mac.unwrap_or([0; 32]);
+        self.next_sequence = next_sequence;
+        self.append_offset = next_offset;
+        Ok(edits.iter().map(|_| self.state.epoch()).collect())
+    }
+
+    /// Persists typed production edits. PurgeBatch, UnlinkAck and
+    /// PurgeComplete are intentionally distinct operations and retain their
+    /// per-file lifecycle in the folded state.
+    pub fn append_edits_durable(
+        &mut self,
+        edits: &[super::edit::CatalogEdit],
+        integrity: CatalogIntegrity,
+        key: Option<&Key32>,
+        mac: Option<&dyn Mac>,
+    ) -> Result<Vec<u64>, Error> {
+        let ops = edits.iter().cloned().map(|edit| vec![edit.into_op()]).collect::<Vec<_>>();
+        self.append_group_durable(&ops, integrity, key, mac)
+    }
+
     pub fn path(&self) -> &Path { &self.path }
     pub fn state(&self) -> &CatalogState { &self.state }
-    pub fn records(&self) -> &[CatalogRecord] { &self.records }
     pub fn next_sequence(&self) -> u64 { self.next_sequence }
     pub fn append_offset(&self) -> u64 { self.append_offset }
     pub fn is_writable(&self) -> bool { self.writable }
