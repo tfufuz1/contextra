@@ -15,10 +15,12 @@ Einzige Quelle für Typen und Traits. Jede andere Komponente importiert von hier
 ## 2 Öffentliche Schnittstelle
 ```rust
 // Identität (Debug redigiert, kein Display)
-pub struct InstanceId([u8; 16]); pub struct ClusterId([u8; 16]);  pub struct SpaceId(pub u16);  pub struct BranchId(pub u32);
+pub struct InstanceId([u8; 16]); pub struct ClusterId([u8; 16]);  pub struct SpaceId(pub u64);  pub struct BranchId(pub u32);
 pub struct BatchId([u8; 16]);
+pub struct EraseRequestId([u8; 16]); // durable idempotency for erase tickets; separate from 24h write IdemToken
 pub type Stamp = u64;            pub const STAMP_MAX: Stamp = (1 << 56) - 1;
 // Stamp wird ausschließlich zusammen mit InstanceId interpretiert und ist instanzlokal.
+pub struct DurablePosition { pub instance: InstanceId, pub stamp: Stamp }
 pub struct TombId([u8; 32]);     pub struct IdemToken([u8; 16]);   pub struct Ticket([u8; 16]);
 
 pub enum Protection { Sealed, Plain }
@@ -54,7 +56,8 @@ pub enum KeyCreateResult { Created { cluster: ClusterId, epoch: u32 }, Failed { 
 1. Jede Änderung an einem Trait nach G-0 braucht Review durch SP-PORTS-Owner und alle Konsumenten (RFC im PR).
 2. Typen sind `#[non_exhaustive]` nur dort, wo R8 Erweiterung vorsieht (Op-Kinds, Fehler); Wire-Formate hängen nie an `repr` dieser Typen (→ SP-CODEC).
 3. `Debug` für `ClusterId`, `Key32`, Körper ist `Redacted<T>`.
-4. Zeitquellen: kein `SystemTime`/`Instant` in Signaturen; nur `Clock`.
+4. `SpaceId` ist `u64`, wird ausschließlich aus dem durable reservierten Allocator ausgegeben; öffentliche Storage-Pfade weisen IDs `< 256` mit `ReservedSpace` ab. Numerische IDs sind keine Autorisierung.
+5. Zeitquellen: kein `SystemTime`/`Instant` in Signaturen; nur `Clock`.
 
 ## 4 Fehlerverhalten
 Fehlerklassen und Reaktion exakt nach R8 §3.5. `Error::Poisoned` ist klebrig und trägt Ursache (`PoisonCause`) ohne Inhalte.

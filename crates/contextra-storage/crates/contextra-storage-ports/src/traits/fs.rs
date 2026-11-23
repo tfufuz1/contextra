@@ -13,6 +13,7 @@ pub enum FileRole {
     Anchor,
     Ledger,
     Format,
+    PurgeScratch,
     Other,
 }
 
@@ -24,7 +25,10 @@ pub struct IoCtx {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FsCaps {
+    pub durable_file_sync: bool,
     pub durable_dir_sync: bool,
+    pub atomic_rename: bool,
+    pub preallocation_reserves_space: bool,
     pub reflink: bool,
     pub punch_hole: bool,
 }

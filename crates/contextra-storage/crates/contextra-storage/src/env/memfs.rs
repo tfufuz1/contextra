@@ -181,7 +181,8 @@ impl Fs for MemFs {
     }
 
     fn caps(&self) -> FsCaps {
-        FsCaps { durable_dir_sync: true, reflink: false, punch_hole: false }
+        FsCaps { durable_file_sync: true, durable_dir_sync: true, atomic_rename: true,
+            preallocation_reserves_space: true, reflink: false, punch_hole: false }
     }
 }
 
@@ -195,6 +196,7 @@ fn role_name(role: FileRole) -> &'static str {
         FileRole::Anchor => "anchor",
         FileRole::Ledger => "ledger",
         FileRole::Format => "format",
+        FileRole::PurgeScratch => "purge_scratch",
         FileRole::Other => "other",
     }
 }

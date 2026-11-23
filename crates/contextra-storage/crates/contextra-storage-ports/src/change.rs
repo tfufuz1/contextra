@@ -9,6 +9,14 @@ pub enum Protection {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClusterLifecycle {
+    Live,
+    Retired { at: crate::ids::Stamp },
+    Shredded { at: crate::ids::Stamp },
+    Purged { at: crate::ids::Stamp },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Durability {
     Durable,
     Relaxed,

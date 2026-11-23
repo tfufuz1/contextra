@@ -40,6 +40,17 @@ pub struct SpaceId(pub u16);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BranchId(pub u32);
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct BatchId([u8; 16]);
+
+impl BatchId {
+    pub fn from_bytes(raw: [u8; 16]) -> Self { Self(raw) }
+}
+
+impl fmt::Debug for BatchId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str("BatchId(<redacted>)") }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IdemToken([u8; 16]);
 

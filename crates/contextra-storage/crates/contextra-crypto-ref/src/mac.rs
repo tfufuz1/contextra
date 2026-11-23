@@ -33,3 +33,22 @@ impl Mac for HmacSha256 {
         outer.finalize().into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{HmacSha256, Mac};
+    use contextra_storage_ports::Key32;
+
+    #[test]
+    fn hmac_sha256_known_answer_for_fixed_width_key() {
+        let key = Key32::from_array([0x0b; 32]);
+        let actual = HmacSha256.tag(&key, b"Hi There");
+        let expected = [
+            0x19, 0x8a, 0x60, 0x7e, 0xb4, 0x4b, 0xfb, 0xc6,
+            0x99, 0x03, 0xa0, 0xf1, 0xcf, 0x2b, 0xbd, 0xc5,
+            0xba, 0x0a, 0xa3, 0xf3, 0xd9, 0xae, 0x3c, 0x1c,
+            0x7a, 0x3b, 0x16, 0x96, 0xa0, 0xb6, 0x8c, 0xf7,
+        ];
+        assert_eq!(actual, expected);
+    }
+}

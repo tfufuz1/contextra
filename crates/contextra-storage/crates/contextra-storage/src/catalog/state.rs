@@ -2,10 +2,16 @@
 
 use super::ops::{CatalogOp, FileEntry};
 use super::record::CatalogRecord;
-use contextra_storage_ports::{ClusterId, Error, Protection, SpaceId, Stamp};
+use contextra_storage_ports::{ClusterId, ClusterLifecycle, Error, Protection, SpaceId, Stamp};
 use std::collections::BTreeMap;
 
 pub type FileMeta = FileEntry;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CatalogCluster {
+    pub protection: Protection,
+    pub lifecycle: ClusterLifecycle,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GraveyardEntry {
@@ -16,7 +22,7 @@ pub struct GraveyardEntry {
 #[derive(Debug, Clone, Default)]
 pub struct CatalogState {
     spaces: BTreeMap<SpaceId, Protection>,
-    clusters: BTreeMap<ClusterId, Protection>,
+    clusters: BTreeMap<ClusterId, CatalogCluster>,
     files: BTreeMap<u64, FileMeta>,
     graveyard: BTreeMap<([u8; 16], u64), GraveyardEntry>,
     unlink_acks: std::collections::BTreeSet<([u8; 16], u64)>,
@@ -51,10 +57,18 @@ impl CatalogState {
                 None => { self.spaces.insert(*space, *protection); Ok(()) }
             },
             CatalogOp::ClusterRegister { cluster, protection } => match self.clusters.get(cluster) {
-                Some(existing) if existing == protection => Ok(()),
+                Some(existing) if existing.protection == *protection => Ok(()),
                 Some(_) => Err(Error::Corrupt { place: "catalog conflicting cluster registration" }),
-                None => { self.clusters.insert(*cluster, *protection); Ok(()) }
+                None => { self.clusters.insert(*cluster, CatalogCluster { protection: *protection, lifecycle: ClusterLifecycle::Live }); Ok(()) }
             },
+            CatalogOp::ClusterState { cluster, state } => {
+                let entry = self.clusters.get_mut(cluster).ok_or(Error::Corrupt { place: "catalog state for unknown cluster" })?;
+                if !valid_cluster_transition(entry.protection, entry.lifecycle, *state) {
+                    return Err(Error::Corrupt { place: "catalog cluster lifecycle regression" });
+                }
+                entry.lifecycle = *state;
+                Ok(())
+            }
             CatalogOp::FilesAdd { file_id, space, cluster, kind, level, bytes, min_stamp, max_stamp } => {
                 if !self.spaces.contains_key(space) { return Err(Error::Corrupt { place: "catalog file references unknown space" }); }
                 if let Some(cluster) = cluster {
@@ -136,7 +150,7 @@ impl CatalogState {
     }
 
     pub fn spaces(&self) -> &BTreeMap<SpaceId, Protection> { &self.spaces }
-    pub fn clusters(&self) -> &BTreeMap<ClusterId, Protection> { &self.clusters }
+    pub fn clusters(&self) -> &BTreeMap<ClusterId, CatalogCluster> { &self.clusters }
     pub fn files(&self) -> &BTreeMap<u64, FileMeta> { &self.files }
     pub fn graveyard(&self) -> &BTreeMap<([u8; 16], u64), GraveyardEntry> { &self.graveyard }
     pub fn purge_is_complete(&self, ticket: &[u8; 16]) -> bool { self.purge_complete.contains(ticket) }
@@ -147,9 +161,22 @@ impl CatalogState {
     pub fn epoch(&self) -> u64 { self.epoch }
 }
 
+fn valid_cluster_transition(protection: Protection, from: ClusterLifecycle, to: ClusterLifecycle) -> bool {
+    if from == to { return true; }
+    match (from, to) {
+        (ClusterLifecycle::Live, ClusterLifecycle::Retired { at }) => at > 0,
+        (ClusterLifecycle::Retired { at: retired }, ClusterLifecycle::Shredded { at }) => {
+            protection == Protection::Sealed && at == retired
+        }
+        (ClusterLifecycle::Retired { at: retired }, ClusterLifecycle::Purged { at }) => at == retired,
+        (ClusterLifecycle::Shredded { at: shredded }, ClusterLifecycle::Purged { at }) => at == shredded,
+        _ => false,
+    }
+}
+
 fn validate_file_refs(
     spaces: &BTreeMap<SpaceId, Protection>,
-    clusters: &BTreeMap<ClusterId, Protection>,
+    clusters: &BTreeMap<ClusterId, CatalogCluster>,
     file: &FileMeta,
 ) -> Result<(), Error> {
     if !spaces.contains_key(&file.space) { return Err(Error::Corrupt { place: "catalog file references unknown space" }); }

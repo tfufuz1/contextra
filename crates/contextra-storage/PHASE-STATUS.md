@@ -4,13 +4,13 @@ Die Reihenfolge und Gates folgen [00-INDEX.md](00-INDEX.md), `SPEC.md` §14 und 
 
 | Phase | Stand | Umfang / offene Abnahme |
 |---|---|---|
-| P0 / G-0 | In Arbeit | Workspace-Verkabelung, Codec-Primitive, MemFs, FaultFs, Rang-/Epoch-Hilfen, Krypto-Referenz, Key-Wrapping und testbarer MemKeyProvider begonnen/umgesetzt. Layering-/Lock-Order-/Canary-Abnahmen bestehen; `max_body_bytes=4 MiB` ist in den PORTS-Limits umgesetzt. Offen: vollständige Ports-Review, Segmentklassen-/MemoryBudget-Ports (A-09/A-11), KeyProvider-Conformance, unabhängige Referenztests, CI-Gate und Reviewer-Freigabe. |
-| P1 / WS | In Arbeit | Catalog-Open/Record-Replay, gruppierter Record-Append mit einem Sync, provisorische Header/FORMAT/KEYS-/Seal-Codecs, Recovery-Key-/Anker-Entscheidungen und sequenzierter Committer-Publikationsadapter implementiert. `Storage::open` öffnet den Catalog mit injiziertem Fs/Root. Memtable, historische Root-Registry mit Durable-Sicht, Recovery-Replay-Brücke und begrenzende MVCC-Kompaktion begonnen. E-67 hat typisierte Batch-/UnlinkAck-/Complete-Edits plus Crash-Reopen-Abnahme für Batch, unlink und Ack. Catalog-/Redo-Crash-Sweeps für EIO/TornWrite/LostFsync/ENOSPC bestehen. Offen: Warteschlangen-Gruppenführer/Indeterminate-Waiter, vollständiger FORMAT→KEYS→CURRENT/Anker-Open-Flow, Catalog-Snapshot/Rollover, Gate-Auflösung und Recovery-Replay gegen reale Memtable/Idem/Branch-Adapter, Stamp-Reserve-Integration, redo_mark/Rotation/Reserve-Recovery sowie Ende-zu-Ende Committer/Recovery/Gate Crash-Sweep. |
-| P2 / G-F | Nicht begonnen | Catalog-Rollover/Faltung, Run-Format, Flush/Purge-Basis, Recovery-Abschluss, unabhängige Referenzvektoren und Formatfreeze. |
-| P3 / G-W | Nicht begonnen | Guard-Schnellpfad, Idempotenz, Reservierungen. |
-| P4 / G-R | Nicht begonnen | Blob, vollständiger Lesepfad und Run-Optimierungen. |
-| P5 / G-M | Nicht begonnen | Wartung, Governor, Feed und Schlüsselcache-Integration. |
-| P6 / G-E | Nicht begonnen | Cluster-/Erase-Ende-zu-Ende, Ledger, Checkpoints, Erweiterungen, Provideradapter. |
+| P0 / G-0 | In Arbeit | Ports, Codec-Grundlagen, MemFs/FaultFs, Rang-/Epoch-Hilfen, Krypto-Referenz, Key-Wrapping, MemoryBudget, SpaceOptions und testbarer MemKeyProvider sind teilweise umgesetzt. Layering-/Lock-Order-/Canary- sowie Teiltests bestehen. Offen: vollständige Ports-Review, Conformance, unabhängige Referenzvektoren, CI-Gate und Reviewer-Freigabe. |
+| P1 / WS | In Arbeit | Catalog-Open/Replay, gruppierte durabile Edits, CURRENT-Pointer, Recovery-Replay-Brücke, Teile von Memtable/MVCC und Commit-Publikation sowie E-67 Purge-Edits sind umgesetzt. Catalog-/Redo-Crash-Sweeps bestehen. Offen: vollständiger FORMAT→KEYS→CURRENT/Anker-Open-Flow, Snapshot/Rollover, Stamp-Reserve-Integration, Idempotenz-/Gate-Replay mit echten Adaptern und Ende-zu-Ende Committer/Recovery/Gate-Crash-Sweep. |
+| P2 / G-F | In Arbeit | DataBlock, SubIndex, ClusterDirectory, Footer, RangeDelBlock und opaker ExtensionBlock-Slot sind als begrenzte Codec-Bausteine implementiert; Skip-Scan-Grundlage und Catalog-Edits sind vorhanden. Offen: Header/PackMeta, vollständiger Run-Reader/Builder/Copy, Bloom-Filter, Flush, Purge-Integration, Recovery-Abschluss, unabhängige Referenzvektoren und Formatfreeze. |
+| P3 / G-W | Teilweise begonnen | Sequenzierter Commit-Publikationsadapter ist vorhanden. Guard-Fenster, vollständige SYS_IDEM-Durabilität, Admission/Reservierungen und Gruppenführer sind offen. |
+| P4 / G-R | Teilweise begonnen | Run-Block/SubIndex/Directory/Footer/RangeDel/Extension-Slot und Blob-Record-Rahmen sind Codec-Grundlagen; Blob-GC-Referenzindex liefert getestete Remove-Kandidaten. Run-Header/PackMeta, vollständige Run-/Blob-Dateiformate, Writer/Rotation, Reader/KeyScope, Bloom-Filter, Referenzabgleich sowie vollständiger Cursor/Page-Lesepfad sind offen. |
+| P5 / G-M | Teilweise begonnen | MemoryBudget, KeyCache-Grundlage und begrenzter FD-TableCache mit Pinning/LRU-Eviction sind vorhanden. Scheduler/Governor, Flush/Compaction/Blob-GC/Scrub, Feed und gemeinsame Generation-Fencing-Integration sind offen. |
+| P6 / G-E | Teilweise begonnen | Cluster-Lifecycle-Modell, Catalog-Replay und Scratch-Reserve-Grundlage sind vorhanden. Ende-zu-Ende Gate/Erase-Protokoll, Ledger, Purge, Checkpoints, Extensions und produktive Provideradapter sind offen. |
 | P7 / G-V | Nicht begonnen | Clusterlokale Branches und Merge. |
 | P8 / G-P | Nicht begonnen | Soak, Windows-Spike, Bridge und Cutover. |
 
@@ -18,12 +18,10 @@ Die Reihenfolge und Gates folgen [00-INDEX.md](00-INDEX.md), `SPEC.md` §14 und 
 
 Der Alt-Crate ist bis zur P8-Ablöse im Workspace und bleibt während dieser Zeit unverändert. Aktuelle direkte Verbraucher umfassen `contextra-db`, `contextra-agent`, `contextra-engine`, `contextra-graph`, `contextra-cognition`, `contextra-checkpoint`, `contextra` und `contextra-py`; die vollständige Cargo-Abhängigkeitsprüfung gehört zu WP-24.1. Die neuen Storage-Crates hängen nicht vom Alt-Crate ab. Seine Entfernung und Archivierung erfolgen erst, wenn sämtliche Produktions-, Test-, Beispiel- und CI-Verbraucher umgestellt sind.
 
-## Isolierte Arbeitsgrenzen
+## Arbeitsstatus
 
-- Jede Phase besitzt nur die Dateien und Verträge ihrer SPs; Abhängigkeiten werden ausschließlich über niedrigere SPs/PORTS geführt.
-- Änderungen an einer späteren Phase werden bis zum Erreichen ihrer Abhängigkeiten nicht vorgezogen.
-- P0 und P1 sind aktuell die einzigen begonnenen Phasen. Nachfolgende Abschnitte bleiben unverändert, bis ihre Phase ansteht.
+Die Tabelle bildet Komponentenfortschritt ab, keine Freigabe der Phasen-Gates. Einzelne spätere Grundlagen wurden vorgezogen, wo die aktuelle SPEC dafür bereits einen stabilen Vertrag vorgibt. Kein Gate ist dadurch automatisch abgeschlossen.
 
-## Compile-Hinweis
+## Compile- und Testhinweis
 
-Der Standard-Compile-Check ist wegen der installierten Rust-Version 1.85.1 gegenüber dem Workspace-Mindeststand 1.89 blockiert. Verifiziert mit Rust 1.85.1 (`--ignore-rust-version --offline`): `cargo check -p contextra-storage -p contextra-crypto-ref --features testing`; gezielte Config/Open-, Catalog-/Redo-Crash-Sweep-, Layering-, Lock-Order- und Canary-Tests bestanden. Andere Platzhalter- und Formatgates bleiben offen.
+Die installierte Rust-Version 1.85.1 liegt unter dem Workspace-Mindeststand 1.89. Teilverifikation mit `--ignore-rust-version --offline`: `cargo check -p contextra-storage -p contextra-crypto-ref --features testing` und `cargo test -p contextra-storage --features testing` bestanden; zuletzt zusätzlich `blob_gc_index` gezielt ausgeführt. Das ist keine vollständige Release-Abnahme. Nicht implementierte Besitzer-Module und alle offenen Crash-/Restore-/Format-Gates bleiben ausdrücklich offen.

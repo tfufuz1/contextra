@@ -28,13 +28,6 @@ pub trait Mac: Send + Sync {
 
 pub trait Kdf: Send + Sync {
     fn derive(&self, master: &Key32, label: &[u8]) -> Result<Key32, Error>;
-    /// Standardpfad für Siegel (E-07, HChaCha20-basiert).
-    fn derive_subkey_fast(
-        &self,
-        master: &Key32,
-        label: &[u8],
-        nonce: &[u8; 24],
-    ) -> Result<Key32, Error>;
 }
 
 pub trait Checksum: Send + Sync {

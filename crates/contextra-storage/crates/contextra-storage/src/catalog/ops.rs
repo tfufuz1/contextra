@@ -1,6 +1,6 @@
 //! P1-Teilmenge der Catalog-Op-Kodierung; Tags bleiben bis G-F provisorisch.
 
-use contextra_storage_ports::{ClusterId, Error, Protection, SpaceId, Stamp};
+use contextra_storage_ports::{ClusterId, ClusterLifecycle, Error, Protection, SpaceId, Stamp};
 
 const TAG_SPACE_ADD: u16 = 1;
 const TAG_CLUSTER_REGISTER: u16 = 2;
@@ -13,6 +13,7 @@ const TAG_RESERVE_IDS: u16 = 8;
 const TAG_PURGE_BATCH: u16 = 9;
 const TAG_UNLINK_ACK: u16 = 10;
 const TAG_PURGE_COMPLETE: u16 = 11;
+const TAG_CLUSTER_STATE: u16 = 12;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileKind { Run, Blob }
@@ -33,6 +34,7 @@ pub struct FileEntry {
 pub enum CatalogOp {
     SpaceAdd { space: SpaceId, protection: Protection },
     ClusterRegister { cluster: ClusterId, protection: Protection },
+    ClusterState { cluster: ClusterId, state: ClusterLifecycle },
     FilesAdd { file_id: u64, space: SpaceId, cluster: Option<ClusterId>, kind: FileKind, level: u8, bytes: u64, min_stamp: Stamp, max_stamp: Stamp },
     FilesRemove { file_id: u64 },
     ReplayFloor { segment: u64, offset: u64 },
@@ -59,6 +61,16 @@ impl CatalogOp {
                 payload.extend_from_slice(cluster.as_bytes());
                 payload.push(protection_to_wire(*protection));
                 TAG_CLUSTER_REGISTER
+            }
+            Self::ClusterState { cluster, state } => {
+                payload.extend_from_slice(cluster.as_bytes());
+                match state {
+                    ClusterLifecycle::Live => payload.push(1),
+                    ClusterLifecycle::Retired { at } => { payload.push(2); put_u64(&mut payload, *at); }
+                    ClusterLifecycle::Shredded { at } => { payload.push(3); put_u64(&mut payload, *at); }
+                    ClusterLifecycle::Purged { at } => { payload.push(4); put_u64(&mut payload, *at); }
+                }
+                TAG_CLUSTER_STATE
             }
             Self::FilesAdd { file_id, space, cluster, kind, level, bytes, min_stamp, max_stamp } => {
                 if min_stamp > max_stamp { return Err(Error::Limit { limit: "catalog file stamp range" }); }
@@ -109,6 +121,17 @@ impl CatalogOp {
         let op = match tag {
             TAG_SPACE_ADD => Self::SpaceAdd { space: SpaceId(p.u16()?), protection: protection_from_wire(p.u8()?)? },
             TAG_CLUSTER_REGISTER => Self::ClusterRegister { cluster: ClusterId::from_wire(p.array()?), protection: protection_from_wire(p.u8()?)? },
+            TAG_CLUSTER_STATE => {
+                let cluster = ClusterId::from_wire(p.array()?);
+                let state = match p.u8()? {
+                    1 => ClusterLifecycle::Live,
+                    2 => ClusterLifecycle::Retired { at: p.u64()? },
+                    3 => ClusterLifecycle::Shredded { at: p.u64()? },
+                    4 => ClusterLifecycle::Purged { at: p.u64()? },
+                    _ => return Err(Error::Unsupported { what: "catalog cluster lifecycle" }),
+                };
+                Self::ClusterState { cluster, state }
+            }
             TAG_FILES_ADD => {
                 let file_id = p.u64()?;
                 let space = SpaceId(p.u16()?);

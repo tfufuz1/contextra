@@ -6,7 +6,7 @@ use contextra_storage::catalog::{CatalogIntegrity, CatalogOp, FileKind};
 use contextra_storage::env::faultfs::{Fault, FaultFs, FaultPlan};
 use contextra_storage::env::memfs::MemFs;
 use contextra_storage_ports::traits::Fs;
-use contextra_storage_ports::{Protection, SpaceId};
+use contextra_storage_ports::{ClusterLifecycle, Protection, SpaceId};
 use std::path::Path;
 
 const PATH: &str = "/store/CATALOG-0";
@@ -219,6 +219,47 @@ fn purge_recovery_never_completes_a_batch_without_unlink_ack() {
         &[CatalogEdit::PurgeComplete(PurgeCompleteEdit::after_owner_attestations(ticket))],
         CatalogIntegrity::Plain, None, None,
     ).expect("complete after durable unlink ack");
+}
+
+#[test]
+fn cluster_lifecycle_is_catalog_durable_and_monotone() {
+    let fs = MemFs::new();
+    let cluster = contextra_storage_ports::ClusterId::from_wire([71; 16]);
+    let mut catalog = CatalogFile::open(
+        &fs, Path::new(PATH), OpenMode::ReadWrite, CatalogIntegrity::Plain, None, None,
+    ).expect("create catalog");
+    catalog.append_durable(
+        &[CatalogOp::ClusterRegister { cluster, protection: Protection::Sealed }],
+        CatalogIntegrity::Plain, None, None,
+    ).expect("register cluster");
+    catalog.append_durable(
+        &[CatalogOp::ClusterState { cluster, state: ClusterLifecycle::Retired { at: 12 } }],
+        CatalogIntegrity::Plain, None, None,
+    ).expect("retire cluster");
+    let before_shred = fs.crash_image().expect("crash before key destruction");
+    let retired_image = before_shred.crash_image().expect("snapshot retired state");
+    let mut recovered = CatalogFile::open(
+        &before_shred, Path::new(PATH), OpenMode::ReadWrite, CatalogIntegrity::Plain, None, None,
+    ).expect("reopen retired cluster");
+    assert_eq!(recovered.state().clusters().get(&cluster).map(|entry| entry.lifecycle),
+        Some(ClusterLifecycle::Retired { at: 12 }));
+    assert!(recovered.append_durable(
+        &[CatalogOp::ClusterState { cluster, state: ClusterLifecycle::Purged { at: 11 } }],
+        CatalogIntegrity::Plain, None, None,
+    ).is_err());
+    recovered.append_durable(
+        &[CatalogOp::ClusterState { cluster, state: ClusterLifecycle::Shredded { at: 12 } }],
+        CatalogIntegrity::Plain, None, None,
+    ).expect("record confirmed key destruction");
+    recovered.append_durable(
+        &[CatalogOp::ClusterState { cluster, state: ClusterLifecycle::Purged { at: 12 } }],
+        CatalogIntegrity::Plain, None, None,
+    ).expect("finish purge");
+    let reopened = CatalogFile::open(
+        &retired_image, Path::new(PATH), OpenMode::ReadOnly, CatalogIntegrity::Plain, None, None,
+    ).expect("previous crash image remains retired");
+    assert_eq!(reopened.state().clusters().get(&cluster).map(|entry| entry.lifecycle),
+        Some(ClusterLifecycle::Retired { at: 12 }));
 }
 
 #[test]

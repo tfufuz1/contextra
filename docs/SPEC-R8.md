@@ -37,7 +37,7 @@ Die Quellen widersprechen sich an 28 Stellen. Jede Entscheidung ist final; die S
 |---|---|---|---|---|
 | K-01 | Löscheinheit heißt „Cluster“ (R7, Lethe-Entwurf) bzw. „EU“ (Lethe-Spec) | **Cluster** | ein Begriff, R7 ist Referenz | §4 |
 | K-02 | ClusterId: Aufrufer-ID / HMAC-`eu_tag` (Lethe-Spec, R6) vs. vom Kern erzeugt (R7) | **Kern erzeugt 128-Bit-Zufall**, kein `eu_tag`, kein `tenant_tag_key` | keine Wiederverwendung, nicht ableitbar, kein zusätzliches Schlüsselmaterial im Klartext-Pfad | §4.3 |
-| K-03 | Ledger speichert ClusterId (R7) vs. `tomb_id = HMAC(ledger_key, id)` (Lethe-Entwurf) | **`tomb_id`** | Ledger überlebt Löschung und Backups; er darf keine Pseudonyme enthalten, die auf Dateien zeigen | §9.7 |
+| K-03 | Ledger speichert ClusterId (R7) vs. pseudonymes `tomb_id` (Lethe-Entwurf) | **domain-separiertes `tomb_id`** | Kein Klartext-Identifier im dauerhaften Ledger; das HMAC bleibt linkbares Pseudonym und wird deshalb als personenbezogenes Metadatum behandelt, nicht als anonym | §9.7 |
 | K-04 | Schlüssel: Cohort-KEK-Rewrap (Lethe-Spec) vs. Schlüssel je Cluster (R7) | **Port `KeyProvider` (je Cluster adressiert)**; Cohort-Rewrap ist eine *Strategie innerhalb* eines Providers (`keys-cohort`), nicht Kernlogik | Kern bleibt einfach; Skalierung auf Millionen Cluster bleibt möglich | §9.4 |
 | K-05 | Ein globaler Commit-Log (Lethe) vs. Redo mit Committer und Catalog-Edits (R7) | **R7-Modell** | R7 ist bis zur Absturzmatrix durchgearbeitet | §6, §10 |
 | K-06 | Segmentschnitt bei jedem Gate (R6) vs. keiner (R7) | **Kein Schnitt**; Barriere nur beim Purge von `Plain` | Commit-Pfad bleibt frei von Löschkosten | §9.5 |
@@ -115,6 +115,8 @@ NZ-1 Verteilung/Konsens in v1 · NZ-2 eigene Kryptografie · NZ-3 Schemas, Sekun
 
 **Verteilbarkeit vorbereiten, nicht vorwegnehmen:** IDs und Stamps sind instanzlokal; jedes externe Ereignis/Receipt muss daher `(instance_id, stamp)` tragen und darf Stamp allein nie als global sortierbar behandeln. Storage-Ports bleiben austauschbar und alle Zustandsänderungen laufen über versionierte Redo-/Catalog-Records. V1 verspricht weder Replikationslog, globale Reihenfolge, Split-Brain-Schutz noch automatisches Failover. Ein späteres verteiltes Profil braucht ein separates Protokoll für Leader-Epoch/Fencing, Replikationsquorum, Restore/Erase-Anker, Idempotenz über Knoten und Cluster-Platzierung; es darf die lokale Einzelknoten-Durability-Semantik nicht still ändern.
 
+NZ-19 ist eine Betriebsinvariante, keine durch den lokalen `LOCK` allein beweisbare Eigenschaft: `LOCK` verhindert zwei Prozesse am selben Dateipfad, nicht zwei wiederhergestellte Kopien auf verschiedenen Hosts. Restore erhält dieselbe `InstanceId` und darf schreibend erst nach extern belegtem Fencing des bisherigen Besitzers starten. Rollback-Anchor und Besitz-Lease sind verschiedene Verträge; fehlt der externe Fencing-Nachweis, bleibt die Kopie `RestoreQuarantine`/ReadOnly. Diese Prüfung gehört in das Contextra-Deployment-/Restore-Runbook und G-CUTOVER.
+
 ### 2.4 Bedrohungsmodell
 
 | ID | Angreifer/Fehler | Gegenmaßnahme |
@@ -128,6 +130,19 @@ NZ-1 Verteilung/Konsens in v1 · NZ-2 eigene Kryptografie · NZ-3 Schemas, Sekun
 | F-1…F-9 | Torn Write, Fsync-EIO, ENOSPC, Bit-Rot, Schlüsselverlust, Crash im Löschprotokoll, Retry-Stürme | §3.5, §10 |
 
 Annahmen: AN-01 `sync_*` macht durabel · AN-02 Schreibvorgänge können zerreißen · AN-03 Fsync-Fehler nicht wiederholbar · AN-04 `rename` atomar · AN-05 Prozessspeicher vertrauenswürdig, nicht kontrolliert gelöscht · AN-06 `destroy_many` macht Schlüssel bei Rückkehr unbenutzbar · AN-07 starker Zufall · AN-08 Anker außerhalb des Datenverzeichnisses · AN-09 Stamps nie aus Uhr; Deadline-/TTL-Zeit nutzt monotone Laufzeit, UTC und durablen `clock_floor`. Rücksprung wird geklemmt; UTC-Sprung über `max_clock_skew` friert Hold-/Retention-Abläufe ein, alarmiert und markiert Erase-Frist als `ClockUncertain`, statt vorzeitig zu löschen oder Fristtreue vorzutäuschen · AN-10 Append-Dateien schreiben nur in vorallokierte Bereiche (ENOSPC nur beim Vorallokieren).
+
+### 2.5 Produktverträge (vom sichtbaren Ergebnis rückwärts spezifiziert)
+
+| Anwender sieht | Kern-/Systemvertrag | Freigabebeweis |
+|---|---|---|
+| Erfolgreiches `Durable`-Write überlebt Crash; Timeout ist als `Indeterminate` retrybar | Receipt enthält `(instance_id,stamp)`; `EraseRequestId`/`IdemToken` verhindern Doppelwirkung; kein ACK vor Sync | FaultFs-Crash-Sweep über alle Write-/Sync-Grenzen, Idempotenzmodell |
+| Recall liefert nur sichtbare, erlaubte Records und hält Tokenbudget ein | `view_durable`, vollständiges Index-Delta bis View-Stamp, Gate-Prüfung vor Payload und Ausgabe, `page` überschreitet Budget außer `oversize_single` nicht | Differential Retrieval; Recall@Budget; Race Gate × Query; IndexLag explizit |
+| Löschauftrag ist sofort unsichtbar und später nachvollziehbar | durables Ledger-Intent vor Gate, GateApplied+Anchor vor KeyDestroy/Purge; Status benennt `Blocked`, `Incomplete` oder `CompleteWithResidual` präzise | Crash/Restore-Reconcile vor/nach jedem Schritt; ErasureOracle; unabhängige Receipt-Verifikation |
+| Branch-Experiment ist isoliert und Merge verliert keine parallele Änderung | Branches clusterlokal; direkte Child→Parent-Merges; Punkt-/Intervall-Guards und Head-Revalidation; Konflikt schreibt nichts | Referenzmodell, deterministische Race-Simulation, Branch-/Floor-Property-Tests |
+| Lastspitze verursacht kontrollierte Verzögerung statt RSS-/Disk-Explosion | gemeinsame RAM-/Scratch-/FD-/Lag-Budgets; Admission vor Allokation; Backpressure mit sichtbarem Fehlerzustand | Combined RAG-Soak mit RSS-Spitzen, Scratch, Lag und tail-latency |
+| Restore ist dieselbe Datenwahrheit wie vor dem Crash, ohne gelöschte Daten | Ledger/Anchor führen Restore; ungelöste Scope-Key-/Anchor-/Owner-Abhängigkeiten halten `RestoreQuarantine` | Restore-Matrix aus alten Backups, Intent-Präfixen, fehlendem KMS und altem Anker |
+
+Ein Produktversprechen gilt erst, wenn der benannte Beweis-Gate bestanden und reproduzierbar archiviert ist. Eine API-Funktion ohne definierte Crash-/Retry-/Restore-Semantik wird nicht als stabil exportiert.
 
 ---
 
@@ -188,7 +203,7 @@ Ein Committer (Flat-Combining, Gruppen-Fsync). Lesen lock-frei bis auf `Arc`-Klo
 | F-4 Integrität | CRC/MAC/AEAD-Fehler | kleinste Einheit vergiften (Block → Abschnitt → Datei), `Corrupt{..}`, Rest läuft |
 | F-5 Format | `Unsupported` | Öffnen verweigert |
 | F-6 Schlüssel | Provider offline / Schlüssel fehlt | `KeyUnavailable{retry_after}` bzw. `Shredded`; **`KeyLost`** wenn der Schlüssel fehlt, obwohl kein Löschnachweis existiert (Alarm, keine automatische Löschung) |
-| F-7 Aufrufer | Guard, `Restricted`, `UnknownCluster`, `BelowFloor`, `Conflicts` | typisiert mit `hint()` |
+| F-7 Aufrufer | Guard, `Restricted`, `UnknownCluster`, `BelowFloor`, `Conflicts`, `ReservedSpace` | typisiert mit `hint()` |
 | F-8 Logik | Invariante verletzt | Test: Abbruch; Produktion: Poison + Observer; **kein `panic`** |
 | F-9 Rollback | Anker höher als Catalog/Ledger | schreibend verweigert (`Err(Rollback)`), nur `ReadOnly` mit Diagnose |
 
@@ -206,18 +221,20 @@ Fehler im Kern: `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`, 
 
 | Begriff | Bedeutung |
 |---|---|
-| **Space** | benannter, physisch getrennter LSM-Baum (`SpaceId u16`, nie wiederverwendet), `Durable` oder `Volatile` |
+| **Space** | benannter, physisch getrennter LSM-Baum (`SpaceId u64`), monoton und dauerhaft reserviert, nie wiederverwendet; `Durable` oder `Volatile` |
 | **Cluster** | Löschdomäne/Schlüsseldomäne/Versionsdomäne; `Sealed` oder `Plain` |
 | **Branch** | clusterlokaler Versionszweig (`BranchId u32`, `0 = main`) |
 | **Change / Guard / Receipt** | atomare Menge von Ops / Vorbedingung / Quittung `(stamp, durable)` |
 | **Stamp** | monotone `u64` (< 2^56) = Transaktionszeit = Commit-Reihenfolge |
+
+Space-IDs `0..=255` sind für den in §5.9 versionierten System-Space-Namensraum reserviert; der persistente Benutzer-ID-Allocator beginnt bei `256`. `reserve_space_ids` schreibt den nächsten High-Water-Mark vor Vergabe eines Blocks durabel; nach Crash werden ungenutzte IDs übersprungen. Exhaustion liefert `Exhausted`, niemals Wrap oder Wiederverwendung.
 | **View / Cursor / Page** | unveränderliche Sicht / Streaming-Iterator / budgetierte Seite |
 | **Hold** | befristete **technische** Halteregel gegen Verwerfen alter Versionen |
 | **Restriction** | **rechtlicher** Sperrvermerk mit Pflichtgrund |
 | **Consumer** | persistenter Fortschrittszeiger im Redo-Feed |
 | **Segment** | vom Catalog verwaltete Datei einer oberen Schicht |
 | **Packgruppe** | `(tenant_tag, due_bucket, shard)` |
-| **tomb_id** | `HMAC(ledger_key, ClusterId)`; Löschnachweis ohne Pseudonym |
+| **tomb_id** | `HMAC(ledger_key, "ctxs cluster tomb v1" || instance_id[16] || ClusterId[16])`; instanzgebundenes, linkbares Pseudonym ohne Klartext-ID |
 
 ### 4.2 Reihenfolge, Tag, Marker
 
@@ -284,7 +301,7 @@ quelle = Clusterschlüssel(cluster, epoch)   bei Seal::Cluster
        = Space-DEK                          bei Seal::ByMode/Encrypted (Plain-Cluster)
        = gemäß IntegrityMode                bei Plain-Cluster (CRC-only, authentifiziert oder Space-DEK)
        Sealed-Cluster-Nutzlasten in Redo verwenden immer Seal::Cluster mit der im Op-Header gebundenen key_epoch.
-AAD:  Block (instance, space, cluster, key_epoch, block_uid) · Redo-Op (instance, space, cluster, key_epoch, op_uid, op_index) · Blob-Record (instance, space, cluster, key_epoch, record_uid)
+AAD:  Block (instance, space_id, space_id, cluster, key_epoch, block_uid) · Redo-Op (instance, space_id, space_id, cluster, key_epoch, op_uid, op_index) · Blob-Record (instance, space_id, space_id, cluster, key_epoch, record_uid)
 ```
 
 Pro SealFrame gibt es keine zusätzliche HKDF/HChaCha-Ableitung: XChaCha20-Poly1305 erhält den bereits scope-spezifischen Quellschlüssel, 24-Byte-Nonce und AAD direkt und führt seine spezifizierte HChaCha-Subkey-Ableitung intern aus. `Authenticated` nutzt die ersten 16 Bytes von HMAC-SHA256 über kanonisch längencodierte Domain `ctxs-auth-v1`, Modus, Nonce, AAD und Klartext; Tagvergleich ist constant-time. `Plain` nutzt CRC32C und bietet keine Manipulationsauthentizität. RootKey-abgeleiteter Redo-Schlüssel dient ausschließlich Ketten-MAC/Frame-Integrität und verschlüsselt **keine** Nutzlast eines Sealed-Clusters. AAD und Siegel hängen nicht von Dateiname, Datei-ID, Blob-ID, Offset oder Dateiposition ab; `block_uid`/`record_uid` sind bei Rohkopie stabil ⇒ Rohkopie über Dateien und neue Blob-IDs ist ohne Entschlüsselung gültig. Versiegelt wird vor Stamp-Vergabe; Stamp ist über Frame-Ketten-MAC gebunden. `INV-SEAL-1`: Sealed-Cluster haben Nutzdaten nur in `Seal::Cluster`- oder Volatile-Spaces; Plain-Cluster nie in `Seal::Cluster`-Spaces; `personal`-Spaces nehmen nur Sealed-Cluster. Folge: alle **Nutzdaten** eines Sealed-Clusters auf Platte (Redo-Op, Runs, Blobs, Kopf, Körper, Index, Filter, Branch-Nutzdaten) sind unter dessen Cluster-Epoche versiegelt. Klartext bleiben ausdrücklich: zufällige ClusterId, Routing-Header/Op-Tags, Gate-/Control-Frames, Größen/Stamp-Bereiche und Dateistruktur; dies ist das Metadaten-Leckagebudget und enthält keine Nutzwerte.
@@ -301,7 +318,7 @@ Little-endian; `varint` = kanonisches LEB128; Dateikopf `magic[8] ‖ file_kind 
 <ledger_dir>/ERASE-LEDGER/…      (Standard: <root>/ERASE-LEDGER, Produktivempfehlung: getrenntes Volume)
 ```
 
-`FORMAT` unveränderlich (+ RootKey-abgeleiteter MAC); `KEYS` = RootKey (mit KEK umhüllt) + Space-DEKs (mit RootKey umhüllt); **Clusterschlüssel stehen nie hier**. Alle Dateien `Perm::Private`. Temporäre Dateien `.building.<tmp_id>`. Verwaiste Dateien (nicht im Catalog) werden nach Recovery entfernt; sicher, weil nur ein Edit eine Datei lebendig macht (`INV-CAT-1`).
+`FORMAT` unveränderlich (+ RootKey-abgeleiteter MAC); `KEYS` = RootKey (mit KEK umhüllt) + Space-DEKs (mit RootKey umhüllt); **Clusterschlüssel stehen nie hier**. Alle Dateien `Perm::Private`. Temporäre Dateien `.building.<tmp_id>`. Verwaiste Dateien (nicht im Catalog) werden nach Recovery entfernt; sicher, weil nur ein Edit eine Datei lebendig macht (`INV-CAT-1`). `space_add` speichert die `SpaceId`; `reserve_space_ids` persistiert den High-Water-Mark vor Verwendung. Kein Recovery- oder Restore-Pfad darf IDs aus gelöschten oder alten Catalog-Ständen erneut vergeben.
 
 ### 5.5 Redo
 
@@ -310,9 +327,9 @@ Vorallokierte Segmente (64 MiB, `redo_align` 4096), am Ende gesiegelt; Gruppe = 
 ```
 Frame := head ‖ body ‖ tail
 head (Klartext, kettengeschützt): len u32 | stamp u64 | kind u8 | n_ops u16 | idem_token[16] | epoch u64 | flags u8 |
-      ops_head[]: { space u16, cluster[16], branch u32, op_kind u8, key_epoch u32, op_uid[16], payload_len u32 }
+      ops_head[]: { space_id u64, cluster[16], branch u32, op_kind u8, key_epoch u32, op_uid[16], payload_len u32 }
 kind: Change=1 | Gate=2 | Control=3 | Reserve=4
-Gate-Body (Klartext):    scope(Clusters|Space) | ticket[16] | level | n u16 | cluster[16]×n  oder space u16
+Gate-Body (Klartext):    scope(Clusters|Space) | ticket[16] | level | n u16 | cluster[16]×n oder space_id u64
 Control-Body (Klartext): op(Restrict|Lift|BranchFork|BranchDrop|BranchMerge) | … Nutzdaten der Branch-Ops sind versiegelt
 tail: crc32c | chain_mac
 ```
@@ -335,12 +352,21 @@ ClusterSection := DataBlock* · SubIndexBlock · FilterBlock · RangeDelBlock ·
 ### 5.8 Catalog
 
 Snapshot-Record + Edit-Records (Kette, CRC), nur in vorallokierten 1-MiB-Blöcken. **Gruppen-Commit:** `catalog_edit` fasst wartende Edits mit einem `write` + einem `sync_data` zusammen, entlässt die Wartenden erst danach (`INV-CAT-2`); mehrere gekoppelte Zustandsänderungen sind **ein** Edit (P-2). Rollover bei `max(8 MiB, Größe des letzten Snapshots)`; `CURRENT` per atomarem `rename`.
-Ops: `space_add | space_state | space_remove | cluster_register | cluster_state | cluster_trim | cluster_link | restriction_set | restriction_lift | pack_assign | files_add(meta.floor) | files_remove | unlink_ack(file_id) | blob_replace | blob_live_delta | replay_floor | retain_floor | redo_mark | segment_add | segment_remove | hold_set | consumer_ack | erase_pending_add | erase_stage | erase_done | erased_ranges_add | erased_ranges_trim | key_epoch | kek_id | idem_trim | reserve_stamps | reserve_ids | anchor_mark`. `files_remove` verschiebt die Datei im selben Edit in den persistenten Graveyard; `unlink_ack` entfernt sie erst nach erfolgreichem `unlink + sync_dir`. Reservierter Bereich `0xF000…0xFFFF`; unbekannte Tags ⇒ `Unsupported`. **Der Catalog enthält keine Branch-Namen und keine Nutzdaten** (§8.2).
-Reservierungen: `reserve_stamps` (2^20) und `reserve_ids` (2^16) heben Hochwassermarken vorab an (Wartungsthread bei < 50 % Rest); Fallback im Committer ist die **einzige** Doppelhaltung von Rang 1 und Rang 3.
+Ops: `space_add(space_id,options) | space_state | space_remove | cluster_register | cluster_state | cluster_trim | cluster_link | restriction_set | restriction_lift | pack_assign | files_add(meta.floor) | files_remove | unlink_ack(file_id) | blob_replace | blob_live_delta | replay_floor | retain_floor | redo_mark | segment_add | segment_remove | hold_set | consumer_ack | erase_pending_add | erase_stage | erase_done | erased_ranges_add | erased_ranges_trim | key_epoch | kek_id | idem_trim | reserve_stamps | reserve_ids | reserve_space_ids | anchor_mark`. `space_id` ist ein unveränderliches Identitätsfeld; jedes Space-Gate bindet diese ID. `files_remove` verschiebt die Datei im selben Edit in den persistenten Graveyard; `unlink_ack` entfernt sie erst nach erfolgreichem `unlink + sync_dir`. Reservierter Bereich `0xF000…0xFFFF`; unbekannte Tags ⇒ `Unsupported`. **Der Catalog enthält keine Branch-Namen und keine Nutzdaten** (§8.2).
+Reservierungen: `reserve_stamps` (2^20), `reserve_ids` (2^16) und `reserve_space_ids` (2^16) heben Hochwassermarken vorab an (Wartungsthread bei < 50 % Rest); Zuweisung ist crash-sicher und überspringt ungenutzte IDs. Fallback im Committer ist die **einzige** Doppelhaltung von Rang 1 und Rang 3.
 
 ### 5.9 Freeze-Liste (Gate G-F)
 
-Dateikopf, `FORMAT`, `KEYS`, Redo-Gruppe/Frame (inkl. `branch`, `kind`, `epoch`, `op_uid`, Gate-/Control-Body), Kette, ClusterSection, ClusterDirectory, PackMeta, SubIndex, Siegelrahmen, Blob-Record und Inkarnationsregel, Catalog-Op-Tags, `AnchorValue`, Ledger-Format, `cmp` (inkl. Branch), Tag-Kodierung. Je Format ein unabhängiger Referenzcodierer (Python) und goldene Vektoren (Anhang A). Nach G-F ist jede Änderung eine Migration.
+Dateikopf, `FORMAT`, `KEYS`, Redo-Gruppe/Frame (inkl. `space_id`, `branch`, `kind`, `epoch`, `op_uid`, Gate-/Control-Body), Kette, ClusterSection, ClusterDirectory, PackMeta, SubIndex, Siegelrahmen, Blob-Record und Inkarnationsregel, Catalog-Op-Tags einschließlich `reserve_space_ids`, `AnchorValue`, Ledger-Format einschließlich Domain-Separation und Byteordnung der Tomb-HMACs, `cmp` (inkl. Branch), Tag-Kodierung. Je Format ein unabhängiger Referenzcodierer (Python) und goldene Vektoren (Anhang A). Nach G-F ist jede Änderung eine Migration.
+
+| System-Space | SpaceId | Zweck |
+|---|---:|---|
+| `SYS_BRANCH` | 1 | clusterlokale Branch-Metadaten |
+| `SYS_IDEM` | 2 | instanzweite Idempotenz-Ergebnisse |
+| reservierte Systemzone | 0, 3…255 | für versionierte Kernspaces; normale `space_add`-Aufrufe dürfen diese IDs nie verwenden |
+
+Die Belegung dieser Tabelle ist Teil des Format-Freeze. Neue Systemspaces erhalten nur bisher unbelegte IDs dieser Zone; die User-ID-Reservierung beginnt bei 256.
+Öffentliche `spaces()`-/`apply()`-Pfade weisen jede ID `< 256` mit `ReservedSpace` ab; nur der jeweilige Systemspace-Owner darf über interne, typisierte Operationen zugreifen. Die numerische ID ist kein Autorisierungsnachweis.
 
 ---
 
@@ -369,7 +395,7 @@ Sichtbarkeit nur nach Durabilität (Ausnahme `Relaxed`, nie für Löschung). Jed
 
 ### 6.2 Memtable und Stamps
 
-Lock-freie Skiplist hinter dem Trait `Memtable`, Klartext (AN-05); 64 MiB je Space, ≤ 3 immutable, 256 MiB gesamt. Nach Absturz: `next_stamp = max(stamp_limit, letzter gültiger Redo-Stamp, max Run-Stamp) + 1`. Consumer und `view_durable` sehen nur Stamps ≤ `durable_stamp` (`INV-CONS-1`).
+Lock-freie Skiplist hinter dem Trait `Memtable`, Klartext (AN-05); 64 MiB je Space, ≤ 3 immutable, 256 MiB gesamt. Nach Absturz: `next_stamp = max(stamp_limit, letzter gültiger Redo-Stamp, max Run-Stamp) + 1`. Consumer und `view_durable` sehen nur Stamps ≤ `durable_stamp` derselben `instance_id` (`INV-CONS-1`).
 
 ### 6.3 Guards in zwei Stufen
 
@@ -466,6 +492,8 @@ Löschen ist die primäre Strukturierungsachse. Drei Schritte, unabhängig und g
 
 ### 9.2 Stufen (zwei Achsen, K-23)
 
+Jeder Löschauftrag (Cluster, Range, Branch oder Space) verlangt einen zufälligen `EraseRequestId`, der unabhängig vom 24-h-`IdemToken` ist. Das Ledger persistiert nur `request_id_hmac` und kanonischen `request_digest`; identischer Retry gibt dasselbe Ticket/Ergebnis zurück, abweichender Scope mit derselben ID ergibt `IdemConflict`. Die Zuordnung bleibt so lange erhalten wie Ticket-/Ledger-Evidence.
+
 | `EraseLevel` (Ziel) | Für | Verfahren | Schützt gegen | Schützt nicht gegen |
 |---|---|---|---|---|
 | `Logical` | beide | Gate | Lesen über die API | Inhalt auf Platte |
@@ -495,6 +523,7 @@ Die Stufe muss zur Schutzklasse passen, sonst `Err(Unsupported)`: **`Sealed` ⇒
 KEK (KeyProvider, extern)  └─ RootKey (32 B, in KEYS mit KEK umhüllt)
        ├─ Space-DEK (je Space, mit RootKey umhüllt)
        ├─ Redo-/Catalog-/FORMAT-/Ledger-Schlüssel = KDF(RootKey, Label)
+       └─ LedgerScopeKey = KDF(RootKey, "ctxs ledger scope v1") (nur AEAD für minimierte Selector-Ciphertexts)
 Clusterschlüssel: KeyProvider::cluster_key(cluster, epoch)      (NICHT in KEYS)
 ```
 
@@ -510,7 +539,7 @@ pub trait KeyProvider: Send + Sync {
 }
 ```
 
-- **`Disabled`** = unbenutzbar, nicht unumkehrbar (KMS-Karenz). ER2 gilt erst bei `Absent` als abgeschlossen; bis dahin `KeyDestroying{eta}`, das Receipt trägt `CompleteWithResidual`. Der Purge darf bei `Disabled` laufen, `Done` braucht `Absent`.
+- **`Disabled`** = unbenutzbar, nicht unumkehrbar (KMS-Karenz). ER2 gilt erst bei `Absent` als abgeschlossen; bis dahin `KeyDestroying{eta}` und Ticket/Receipt `Blocked` mit nächstem Prüfzeitpunkt und KMS-Restrisiko. Der Purge darf bei `Disabled` laufen, `Done` für ein Crypto-Erase braucht `Absent`.
 - `Cryptographic` nur bei `info().keys_in_backups == false`, sonst `Err(Unsupported)`. Das Receipt nennt `destroy` und `keys_in_backups`.
 - KEK-Rotation: nur RootKey neu umhüllen (`rotate_kek`), alle anderen Dateien bleiben. Rotation einer Cluster-Epoche: neue `key_epoch` für neue Writes; eine alte Epoche wird erst vernichtet, wenn nichts mehr mit ihr versiegelt ist (`INV-KEY-3`); `destroy_many` vernichtet **immer alle** Epochen (`INV-KEY-4`).
 - **Cohort-Strategie (Provider-intern, K-04):** `keys-cohort` darf Clusterschlüssel in Cohorts (≤ 1024) unter einer Cohort-KEK-Generation führen; `destroy_many` = Rewrap ohne die gelöschten Einträge, dann KMS-Destroy der alten Generation. Voraussetzung: **keine Keyring-Kopie in Backups** (`keys_in_backups = false`), Pflicht-Replikation des aktuellen Keyrings in ≥ 2 Failure Domains. Der Kern sieht davon nichts.
@@ -572,16 +601,19 @@ Rohkopie prüft Frame-CRCs, nie das AEAD-Tag (kein Schlüssel nötig). Blob-Reco
 
 ### 9.7 Ledger, Anker, Receipt
 
-- **Ledger:** append-only, vorallokiert, kettenverknüpft über `Mac`, **ein Schreiber**. Record ist ein kanonischer tagged union: `{seq, prev_hash, clock_sample, event, mac}`; keine Null-/Platzhalterfelder. Erase-Events enthalten nur `tomb_id = HMAC(ledger_key, ClusterId)`, Ticket, Level, Stamp/Stage und Evidence-Digest; niemals Klartext-ClusterId, SpaceId, Nutzdaten, Nutzerschlüssel oder Person-ID (`INV-LED-1`). Event-Kinds umfassen `EraseIntentBegin`, `EraseIntentMembers`, `EraseIntentSealed`, `GateApplied`, `KeyDestroyIntent`, `KeysDestroyed`, `KeyLost`, `PurgeProgress`, `UnlinkProgress`, `ExtAck`, `PurgeVerified`, `Completed`, `RestrictionSet/Lifted`, `BranchEraseDone`, `SpaceDropIntentBegin/Members/Sealed`, `SpaceDropped`, `RestoreReconciled`, `ReceiptIssued`. Member-Records enthalten sortierte Tomb-IDs, `scope_digest` und für selektive Range-/Branch-Scope einen `scope_ciphertext` (kanonische Selector-Bytes AEAD-versiegelt unter langlebigem `LedgerScopeKey`, AAD bindet Instance/Ticket/Digest); sie sind größenbegrenzt und per Intent-ID/Index/Count/Digest verkettet. Der Schlüssel bleibt außerhalb von Datenbackups und muss für Restore verfügbar bleiben. Klartext-ClusterId/SpaceId, Benutzerkeys und Nutzdaten stehen nie im Ledger. `Sealed` markiert erst das vollständige dauerhafte Intent. Ein Gate ist erst zulässig, wenn sein versiegeltes Ledger-Intent durabel ist. Reihenfolge: Restriction-/Closure-Prüfung und Sequencer-Reservierung → vollständiges Ledger-Intent durable → Gate-Catalog-Edit durable und In-Memory-Gate veröffentlichen → `GateApplied`-Ledger-Event → Anchor-CAS → erst dann KeyDestroy/Purge. Vor `destroy_many` steht ein durables `KeyDestroyIntent`; Recovery kann KMS-Ergebnis mit `probe` idempotent nachziehen. So kann weder ein altes Backup noch ein Crash ein angenommenes Gate ohne Tombstone wiederbeleben. Jeder Übergang ist crash-idempotent und vor irreversibler Folgestufe durabel. `ledger_dir` konfigurierbar (K-22).
+- **Ledger:** append-only, vorallokiert, kettenverknüpft über `Mac`, **ein Schreiber**. Record ist ein kanonischer tagged union: `{seq, prev_hash, clock_sample, event, mac}`; keine Null-/Platzhalterfelder. Erase-Events enthalten nur `tomb_id = HMAC(ledger_key, "ctxs cluster tomb v1" || instance_id[16] || ClusterId[16])`, Ticket, Level, Stamp/Stage und Evidence-Digest; niemals Klartext-ClusterId, SpaceId, Nutzdaten, Nutzerschlüssel oder Person-ID (`INV-LED-1`). Event-Kinds umfassen `EraseIntent`, `SpaceDropIntent`, `GateApplied`, `KeyDestroyIntent`, `KeysDestroyed`, `KeyLost`, `PurgeProgress`, `UnlinkProgress`, `ExtAck`, `PurgeVerified`, `Completed`, `RestrictionSet/Lifted`, `BranchEraseDone`, `SpaceDropped`, `RestoreReconciled`, `ReceiptIssued`. Ein `EraseIntent` ist genau ein kanonischer, atomar appendbarer Datensatz mit höchstens 4096 sortierten `tomb_id`s (max. 256 KiB Record); selektive Range-/Branch-Selectoren sind als `scope_ciphertext` AEAD-versiegelt unter langlebigem `LedgerScopeKey`, AAD bindet Instance/Ticket/Digest. Ein `SpaceDropIntent` trägt nur `space_tomb_id`, Scope-Digest, Count und Level. `space_tomb_id = HMAC(ledger_key, "ctxs space tomb v1" || instance_id[16] || be_u64(SpaceId))`. Weder IDs noch Nutzdaten stehen im Ledger im Klartext; bei Restore berechnet der Matcher den Pseudonymwert über Catalog-Einträge und sperrt vor Zugriff jede passende SpaceId. Ledger-Scratch ist vorallokiert; ein Intent wird erst bei vollständigem validem Record plus Sync angenommen. Der Schlüssel bleibt außerhalb von Datenbackups und muss für Restore verfügbar bleiben. Klartext-ClusterId/SpaceId, Benutzerkeys und Nutzdaten stehen nie im Ledger. `request_id_hmac` und `request_digest` machen Retry exakt idempotent; gleicher Token mit anderem Digest ⇒ `IdemConflict`. Ein Gate ist erst zulässig, wenn sein versiegeltes Ledger-Intent durabel ist. Reihenfolge: Restriction-/Closure-Prüfung und Sequencer-Reservierung → einzelnes vollständiges Ledger-Intent durable → Gate-Catalog-Edit durable und In-Memory-Gate veröffentlichen → `GateApplied`-Ledger-Event → Anchor-CAS → erst dann KeyDestroy/Purge. Vor `destroy_many` steht ein durables `KeyDestroyIntent`; Recovery kann KMS-Ergebnis mit `probe` idempotent nachziehen. So kann weder ein altes Backup noch ein Crash ein angenommenes Gate ohne Tombstone wiederbeleben. Jeder Übergang ist crash-idempotent und vor irreversibler Folgestufe durabel. `ledger_dir` konfigurierbar (K-22).
 - **Anker:** `AnchorValue = (erase_epoch, ledger_head, catalog_epoch)`. Der Anker wird nach durablem Gate-Catalog-Edit fortgeschrieben und **vor** `KeyDestroyIntent`/KeyDestroy oder Purge-Barriere muss die aktuelle Gate-/Ledger-Position verankert sein. Zusätzlich Fortschreibung bei Catalog-Rollover, `close` und spätestens `anchor_max_age` (1 s) bei ausstehendem Zustand; koalesziert. `Required` ist Standard bei Encrypted/Authenticated; wenn der erforderliche Anker vor einer irreversiblen Folgestufe nicht fortgeschrieben werden kann, bleibt das Ticket `Blocked` und diese Stufe beginnt nicht. `Weak`-Anker erfordert explizites `acknowledged_weak` und kann keinen starken Rollback-Schutz attestieren. Referenz: `MemAnchor` (Test), `FileAnchor` (`Weak`); `Strong`-Anker (TPM, Transparency-Log, Object-Lock) als getrennte Crates.
-- **`ErasureReceipt`:** `{req/ticket, scope_digest (HMAC über kanonisch sortierte Tomb-IDs und Selector-Digest), level, t_requested, t_logical, erase_epoch S, t_crypto?, t_physical?, t_verified?, stages[{stage, ledger_seq, evidence_digest}], key_attestations, provider{destroy, keys_in_backups}, ext_acks, verifier_report_digest, ledger_head, anchor{strength, value}, restrictions_encountered, status (Complete | CompleteWithResidual | Blocked | Failed), residual[§9.9], canonical_bytes}`. **Die Signatur liegt oben (NZ-14);** der Kern liefert kanonische Bytes und die reine, offline lauffähige Funktion `verify_receipt(receipt, ledger_slice, anchor_attestation) → Verdict` (Kette, Anker, Stufenreihenfolge, Zeitmonotonie).
+- **Scope-Digest:** Einzelcluster- und Batch-Erase-Digests sind HMACs über domain-separierte, sortierte Tomb-IDs plus kanonische Selector-Bytes. Beim Space-Drop fixiert der Sequencer vor dem Intent die Space-Mitgliedschaft; `scope_digest = HMAC(ledger_key, "ctxs space scope v1" || instance_id[16] || be_u64(SpaceId) || level || count || sorted_tomb_ids)`. Die HMAC-Eingabe wird gestreamt; keine Klartext-ID-Liste kommt ins Ledger. `space_tomb_id` dient dem Restore-Gate, `scope_digest` dem Nachweis der eingefrorenen Mitgliedschaft.
+- **Erase-Idempotenz:** `request_id_hmac = HMAC(ledger_key, "ctxs erase request id v1" || instance_id[16] || EraseRequestId[16])`. `request_digest = HMAC(ledger_key, "ctxs erase request digest v1" || canonical_erase_request)`, wobei `canonical_erase_request` ein versioniertes, tag- und längencodiertes Format mit sortierten eindeutigen Zielen, Erase-Level und semantischen Optionen ist. Deadlines und Retry-Metadaten sind nicht semantisch und bleiben außerhalb. Gleiche Request-ID und gleicher Digest liefern dasselbe Ticket/Resultat, gleiche ID mit anderem Digest ergibt `IdemConflict`. Die Ledger-Key-Epoche bleibt für die gesamte Ledger-Retention verfügbar.
+- **`ErasureReceipt`:** `{instance_id, req/ticket, scope_digest (HMAC über kanonisch sortierte Tomb-IDs und Selector-Digest), level, t_requested, t_logical, erase_epoch S, t_crypto?, t_physical?, t_verified?, stages[{stage, ledger_seq, evidence_digest}], key_attestations, provider{destroy, keys_in_backups}, ext_acks, verifier_report_digest, ledger_head, anchor{strength, value}, restrictions_encountered, status (Complete | CompleteWithResidual | Incomplete | Blocked | Failed), residual[§9.9], canonical_bytes}`. `Complete` verlangt jede für den angeforderten Level erforderliche Kern- und Owner-Attestation. `CompleteWithResidual` bedeutet abgeschlossen mit explizit benannten, nicht vom Vertrag abgedeckten Restrisiken. `Incomplete` bedeutet, dass ein erforderlicher Owner-/Scope-Nachweis fehlt oder der Scope nur teilweise belegt ist; es ist niemals eine erfolgreiche Löschquittung. `Blocked` bedeutet ein sicher pausierter, fortsetzbarer Auftrag; `Failed` ist ein terminaler Integritäts-/Protokollfehler. **Die Signatur liegt oben (NZ-14);** der Kern liefert kanonische Bytes und die reine, offline lauffähige Funktion `verify_receipt(receipt, ledger_slice, anchor_attestation) → Verdict` (Kette, Anker, Stufenreihenfolge, Zeitmonotonie).
 - **`Eraser::verify`:** strukturell, ohne Schlüssel: (a) keine lebende Datei/Segment/behaltenes Redo-Segment trägt ClusterDirectory-/Frame-Kopf-Eintrag für H, (b) Memtables ohne H, (c) bei Cryptographic `probe == Absent`, (d) Ledgerkette bis zum Anker gültig. Inhaltssuche ist Sache des Orakels.
 
 ### 9.8 Weitere Löschpfade
 
 - **`Eraser::range(space, cluster, range)`:** keine Branch-Argumente; `EraseRange` ist ein clusterweiter Gate-Marker, der nach durablem Frame sofort alle Branches und auch ältere Views maskiert. Für `Plain` sind `Logical|Physical|Scrubbed` verfügbar; `Physical` rewritet alle Branch-/Stamp-Versionen des Bereichs aus lebenden Run-/Blob-Dateien. `Scrubbed` ist best-effort und kein SSD-/CoW-Beweis. Für `Sealed` ist ausschließlich `Logical` zulässig: selektive Range-Key-Vernichtung existiert in v1 nicht, und ein Rewrite allein macht Backup-Kopien mit demselben Cluster-Key nicht unlesbar. Für physische/kryptografische Entfernung eines Sealed-Bereichs ist der ganze Cluster zu löschen oder der Bereich vorab in eine eigene Cluster-Löschdomäne zu legen. `EraseRange` kann nie per Merge aufgehoben werden. `erased_ranges` dürfen erst getrimmt werden, wenn `history_floor > erase_stamp` und keine Branch-/View-/Consumer-Pins darunter liegen.
 - **`Eraser::branch(cluster, branch)`:** nur terminale, leaf-Branches. Für `Plain` sind `Logical|Physical|Scrubbed` analog zu `range` möglich; physisch werden alle Versionen dieses Branches aus lebenden Run-/Blob-Dateien entfernt. Für `Sealed` nur `Logical`, da die Cluster-Keydomäne mit anderen Branches geteilt wird. Eine Crypto-Anforderung wird als Cluster-Erase ausgeführt; es gibt keine branchlokale Schlüsselvernichtung.
-- **`Storage::space_drop(space, level, deadline)`:** Sequencer friert Space-Generation und die sortierte Space-Mitgliedschaft ein, prüft alle `BLOCK_ERASE`-Restrictions und berechnet `scope_digest`; jede Restriction blockiert vor Mutation. Unterstützt werden `Logical` für beide Seal-Modi, `Physical|Scrubbed` nur für Plain sowie `Cryptographic` nur für Sealed, wenn **jeder** enthaltene Cluster ausschließlich dieser Space-Generation gehört. Bei Crypto mit clusterübergreifender Space-Mitgliedschaft ⇒ `SharedCluster`, ohne Teilwirkung. Vor dem Gate wird `SpaceDropIntent{space_tomb_id,scope_digest,count,level}` durable ins Ledger geschrieben; `space_tomb_id=HMAC(ledger_key, SpaceId‖generation)`, keine Klartext-ID. Dieses Scope-Token genügt für Restore: Backup-Reconcile berechnet es aus jeder gespeicherten SpaceId/Generation und gated/purged die ganze passende Space-Generation; bei Crypto-Exklusivität werden deren Cluster vollständig retired. Nach Intent folgen `Gate{Space(id),intent_id}`, `GateApplied` und Anchor-CAS. Erst danach starten Physical-/Crypto-Folgestufen. `SpaceDropped` ist das Abschlussereignis nach allen erforderlichen Purge-/Key-/Extension-Attesten. Kein einzelner Catalog-Edit versucht beliebig viele Dateien umzuschreiben. Space-Generation und `SpaceId` werden nie wiederverwendet; Wiederanlage erfordert neue Generation und neue Identität.
+- **`Storage::space_drop(space, request_id, level, deadline)`:** Sequencer friert SpaceId und Scope-Digest ein und prüft alle `BLOCK_ERASE`-Restrictions; jede Restriction blockiert vor Mutation. V1 unterstützt `Logical` für beide Seal-Modi und `Physical|Scrubbed` nur für Plain. `Cryptographic` auf Space-Ebene ist `Unsupported`: ein Space kann Cluster mit anderen Spaces teilen, und der Cluster-Key lässt keine sichere Teilvernichtung zu. Crypto-Erasure erfordert explizite Cluster-Tickets. Vor dem Gate wird `SpaceDropIntent{space_tomb_id,scope_digest,count,level}` durable ins Ledger geschrieben; `space_tomb_id=HMAC(ledger_key, "ctxs space tomb v1" || instance_id[16] || be_u64(SpaceId))`, ohne Klartext-ID oder Memberliste. Da SpaceId nie wiederverwendet wird, kann Restore jede alte Catalog-Kopie auf diese SpaceId matchen und ihre Sichtbarkeit vor Datenzugriff sperren; Scope-Digest/Count dienen dem Receipt-Abgleich, nicht als Ersatz für den Scope-Matcher. Nach Intent folgen `Gate{Space(id),intent_id}`, `GateApplied` und Anchor-CAS. Erst danach starten Physical-Folgestufen. `SpaceDropped` ist das Abschlussereignis nach allen erforderlichen Purge-/Extension-Attesten. Kein einzelner Catalog-Edit versucht beliebig viele Dateien umzuschreiben. Wiederanlage erfordert eine neue SpaceId.
+- **System-Space-Lifecycle:** Öffentliche Drop- und Mutations-APIs akzeptieren keine `SpaceId < 256`; sie liefern `ReservedSpace`. Änderungen oder Entfernung von `SYS_BRANCH`/`SYS_IDEM` sind nur über versionierte interne Migrationen mit eigenem Recovery-Vertrag zulässig.
 - **`pack_expired(PackKey)`:** `H` = nicht Restricted-Cluster der Packgruppe. Der Ablauf zerlegt H deterministisch in unabhängige Tickets mit höchstens `max_gate_clusters=4096`; jedes Ticket hat einen eigenen Gate-Frame und eigene Receipt-/Ledger-Kette. Es gibt keine behauptete atomare Gesamtlöschung der Packgruppe. Restricted-Cluster werden mit Grund im Aggregate ausgewiesen und separat erneut versucht, wenn die Restriction aufgehoben wird.
 - **`escalate(ticket, level)`** (z. B. Logical → Cryptographic), **`open_tickets()`** (nach Absturz des Aufrufers), **`clusters_batch`**.
 - **Mehrbetroffene Daten (K-25):** gemeinsamer Fallcluster; jede betroffene Person hat ihren Wurzelcluster; Verknüpfung per Link nur, wo die Löschung der Person den Fallcluster mitziehen **soll**; sonst Referenz. Keine mehrclustrigen Einträge.
@@ -592,9 +624,9 @@ Rohkopie prüft Frame-CRCs, nie das AEAD-Tag (kein Schlüssel nötig). Blob-Reco
 |---|---|---|
 | Prozessspeicher, Swap, Core-Dateien, noch nicht reklamierte Skiplist-Knoten | Klartext-Reste | `Zeroizing`, Cache-Drop beim Gate; `MemLock`/`DONTDUMP` im Adapter; Betreiber: Swap verschlüsseln, Core-Dumps aus |
 | Dateisystem-Journal, Flash-Wear-Leveling, Volume-Snapshots, externe Backups, Checkpoints mit bereits `Retired` Plain-Daten | Alte Blockversionen | nur Ciphertext bei Sealed; Plain: Schutz fehlt, Betreiber begrenzt Aufbewahrung |
-| KMS-Karenzzeit | Schlüssel wiederherstellbar bis Fristende | Stage `KeyDestroying`, Status `CompleteWithResidual` |
+| KMS-Karenzzeit | Schlüssel wiederherstellbar bis Fristende | Stage `KeyDestroying`, Status `Blocked`; kein Crypto-Erase-`Done` |
 | Schlüsselkopien (Escrow, HSM-Backups) | G1 hinfällig | `keys_in_backups`; Betreiber |
-| Metadaten | ClusterId (Pseudonym, bis Purge von Redo-Gate-Frames), Anzahl, Größen, Zeitpunkte, Packgruppe | zufällige IDs; Ledger nur `tomb_id`; optional Padding auf Bucket-Größen |
+| Metadaten | ClusterId (Pseudonym, bis Purge von Redo-Gate-Frames), Anzahl, Größen, Zeitpunkte, Packgruppe | zufällige IDs; Ledger enthält HMAC-`tomb_id`, scope-digests und verschlüsselte Selector-Ciphertexts, nie Klartextidentitäten/-keys; optional Padding auf Bucket-Größen |
 | Rollback über den Anker hinaus / im Ankerfenster | Ticket rückgängig | Anker-Stärke im Receipt |
 | Obere Schichten (Prompt-Caches, Embedding-Kopien, Logs, Fine-Tuning-Daten, Modellgewichte, Provider-Logs) | **nicht** im Kern lösbar | nur Daten, die über Links und `SegmentOwner` angebunden sind, werden mitgelöscht |
 | Verzeichnis Person → Wurzelcluster (§12.7) | nur physisch löschbar | Muster in §12.7 |
@@ -607,21 +639,22 @@ Rohkopie prüft Frame-CRCs, nie das AEAD-Tag (kein Schlüssel nötig). Blob-Reco
 
 ```
 R1  LOCK (exklusiv; ReadOnly geteilt)
-R2  FORMAT-Kopf lesen → KEYS entpacken (KEK ⇒ RootKey) → FORMAT-MAC prüfen
+R2  FORMAT-Kopf lesen → KEYS entpacken (KEK ⇒ RootKey) → FORMAT-MAC prüfen → LedgerScopeKey für Intent-Reconcile bereitstellen
 R2a Anker/Ledger: Catalog-Epoche < Strong-Anchor ⇒ Err(Rollback). Ledger muss mindestens E_a Einträge haben und Eintrag E_a den Hash H_a tragen.
     Durables Ledger-Intent hinter Anker ist ein Crash-Präfix: vor Schreiböffnung idempotent fortsetzen; Required-Anchor unerreichbar ⇒ Locked/Err(AnchorUnavailable), nie schwächer öffnen.
 R3  CURRENT → Catalog bis zum letzten gültigen Record (Torn Tail verwerfen)
 R4  Verzeichnisse scannen: Dateien ohne Catalog-Eintrag = verwaist (noch nicht löschen)
 R5  KeyProvider prüfen; KEK fehlt ⇒ Modus LockedKeys
-R6  Redo ab replay_floor, zwei Durchläufe; EraseIntent-Manifest aus dem Ledger ist zusätzliche Gate-Wahrheit:
-      1: Kette prüfen, Gate-/Control-Frames sammeln ⇒ retired_set = Catalog ∪ Gate-Frames ∪ versiegelte Ledger-Erase-Intents
-      2: Frames anwenden; retired Cluster überspringen (nie entsiegeln); `KeyUnavailable` ⇒ LockedKeys/retry;
+R6  Redo ab replay_floor, zwei Durchläufe; versiegelte Ledger-Intents sind zusätzliche Gate-Wahrheit:
+      1: Kette prüfen; full-cluster Retires, Range-/Branch-Masken und Space-Gates getrennt aus Catalog/Redo/Ledger sammeln
+      2: Full-retired Cluster überspringen (nie entsiegeln); Selector-Masken bei der Versionssicht anwenden;
+         `KeyUnavailable` ⇒ LockedKeys/retry;
          bestätigtes `KeyLost` ohne passendes Erase-Intent ⇒ Quarantäne/Corrupt, nie still überspringen;
          Branch-/Merge-Frames anwenden
 R7  Memtable aufbauen; visible = durable = letzter gültiger Stamp; next_stamp nach §6.2; Branch-Tabellen lazy
 R8  Vor Freigabe von Views/Schreibzugriff: alle versiegelten Ledger-Erase-/SpaceDrop-Intents idempotent in Catalog-Gates überführen;
     danach offene Löschungen = Intents ohne GateApplied ∪ erase_pending ∪ Gate-Frames ohne erase_done ∪ Retired ≠ Purged ∪ Space Dropping
-    ⇒ urgent fortsetzen; kein Body wird vor Gate-Auflösung entsiegelt, keine irreversible Stufe ohne Anchor
+    ⇒ bei fehlendem LedgerScopeKey RestoreQuarantine/LockedKeys; sonst urgent fortsetzen; kein Body wird vor Gate-Auflösung entsiegelt, keine irreversible Stufe ohne Anchor
 R9  Verwaiste Dateien und .building.* entfernen (nach R8, nie davor)
 R10 Reserven (Stamp, ID, Redo-Segment, RESERVE) herstellen, Wartung starten, OpenReport
 ```
@@ -636,9 +669,11 @@ Ehrliche Grenze: Ein beschädigter letzter quittierter Gruppenabschnitt hinter d
 | nach Redo-`sync`, vor Rückkehr | Change vorhanden (Token verhindert Doppelung) |
 | Run-Bau / vor Edit / vor Unlink | `.building` entfernt bzw. Run verwaist/entfernt, Redo spielt ein |
 | mitten in einer Catalog-Gruppe | gültiger Präfix gilt |
-| Gate durabel, Catalog-Edit fehlt | `Retired` aus Frame, Edit nachgeholt |
-| Gate durabel, Schlüssel noch da | Roll-forward |
-| Schlüssel vernichtet, `Shredded`-Edit fehlt | `probe` ≠ Present ⇒ Edit nachholen |
+| Ledger-Intent torn/Sync unbestimmt | Nur vollständiger valider Intent gilt; Retry derselben `EraseRequestId` findet Ticket oder kann sauber neu anlegen |
+| Ledger-Intent durable, Gate-Catalog-Edit fehlt | vor Open Gate aus Intent rekonstruieren, `GateApplied`/Anchor nachziehen |
+| Gate-Catalog-Edit durable, `GateApplied`/Anchor fehlt | vor Open idempotent nachziehen; keine irreversible Folge bis Anchor |
+| Anchor durable, KMS-Aufruf noch offen | `KeyDestroyIntent` prüfen, idempotent `destroy_many`/`probe` fortsetzen |
+| Schlüssel vernichtet, `KeysDestroyed`-Event fehlt | `probe == Absent` bei passendem `KeyDestroyIntent` ⇒ Event/Edit nachholen |
 | Plain-Barriere unterbrochen | ER4 neu, idempotent |
 | Purge-Edit durabel, Unlink offen | Verwaisten-Suche |
 | Edit durabel, Anker alt | Nachzug in R2a |
@@ -650,7 +685,7 @@ Ehrliche Grenze: Ein beschädigter letzter quittierter Gruppenabschnitt hinter d
 ### 10.3 Checkpoint, Restore, Rollback-Schutz
 
 - **Checkpoint:** (1) Flush-Barriere; (2) unter `catalog_edit` Version pinnen, `erase_epoch` und Ankerwert lesen; (3) Checkpoints innerhalb der physischen Purge-/DiskFull-Garantie verwenden unabhängige `Copy`-Dateien; (4) Manifest siegeln. `Reflink`/`Hardlink` sind nur zulässig, wenn ein registrierter Checkpoint-Owner vor Scratch-Recycling Referenzen auf betroffene Extents nachweislich entfernt und attestiert. Andernfalls gelten sie als nicht verwaltete Retention-Copies und erscheinen als Restrisiko im Receipt. `KEYS` ist enthalten, **KEK und Clusterschlüssel nicht** (`INV-KEY-1`). Das Ledger liegt nie im Checkpoint. Das Manifest listet bereits `Retired`, aber noch nicht gepurgte Plain-Cluster.
-- **Restore** ersetzt die Instanz (kein zweiter lebender Klon, NZ-19): Der Kern startet in `RestoreQuarantine` (keine Nutzer-Reads), wendet **alle Ledger-Einträge nach `erase_epoch` erneut an** (`INV-ERA-9`): Er berechnet `tomb_id` aller Clusterverzeichnisse der restaurierten Dateien und gleicht mit den Tomb-Einträgen ab; Treffer werden `Retired`, per Purge-Rewrite entfernt, ihre Schlüssel sind bereits vernichtet. Restrictions kommen aus dem Ledger-Anhang. Liegt das Manifest hinter dem Anker, wird es als Rollback verweigert. Erst nach `RestoreReconciled` startet `Running`.
+- **Restore** ersetzt die bisherige Instanz und erhält ihre `InstanceId` (kein zweiter lebender Klon, NZ-19): Der Kern startet in `RestoreQuarantine` (keine Nutzer-Reads), verlangt vor schreibendem Open den externen Fencing-Nachweis für den bisherigen Besitzer, validiert Ledger-Kette und External Anchor und spielt jeden vollständigen Intent scope-genau ein (`INV-ERA-9`). Cluster-Intents matchen HMAC-Tombstones und retire'n Cluster; Range-/Branch-Intents werden mit `LedgerScopeKey` entschlüsselt und als Masken auf alle restaurierten Versionen angewandt; `SpaceDropIntent` matcht die nie wiederverwendete SpaceId und gate't den gesamten Space. Kein fehlender Schlüssel/Anchor darf als Löschung ausgelegt werden: bei `KeyUnavailable`, `KeyLost`, fehlendem Scope-Key, Fencing-Nachweis oder Ledger-Mismatch bleibt Restore quarantined. Nach Gate-Reconcile werden offene KeyDestroy-/Purge-/Extension-Stufen fortgesetzt. Liegt das Manifest hinter einem Strong Anchor, wird es als Rollback verweigert. Erst nach `RestoreReconciled` startet `Running`.
 - **Ehrliche Grenze:** Wird zusätzlich der Anker-Dienst zurückgesetzt, ist Schutz nur noch kryptografisch (Schlüsselvernichtung), nicht mehr protokollarisch.
 
 ---
@@ -723,13 +758,13 @@ pub trait SegmentOwner: Send + Sync {
     fn on_gate(&self, erased: &[ClusterId], at: Stamp, gen: u64);   // Generation invalidieren/Worker wecken; nie Correctness-Quelle
     fn rewrite_without(&self, seg: &SegmentMeta, drop: &ClusterSet, io: &mut SegmentIo) -> Result<RewriteOutcome, SegErr>; // Pflicht
     fn verify_absent(&self, scope: &EraseScope, gen: u64) -> Result<EraseAttestation, SegErr>;
-    fn watermark(&self) -> DurableStamp;                           // lückenlos verarbeiteter durable Feed
+    fn watermark(&self) -> DurablePosition;                           // lückenlos verarbeiteter durable Feed
 }
 ```
 
 `SegmentClass` ist `ClusterSections | MixedPerClusterKey | MixedPerSubjectKey | Rebuildable{max_age,max_rewrite_bytes} | NoPersonalData`. `ClusterSections` liegen als cluster-sealed Blocks im Kern. `MixedPerClusterKey` nutzt je Cluster-Key-Epoche. `MixedPerSubjectKey` ist für IdentityDirectory-Einträge mit separatem EntryDEK. `Rebuildable` hält personenbezogene Nutzdaten nur verschlüsselt gemäß deklarierter Scope und bleibt bis Rebuild+Verify `Purging`. `NoPersonalData` benötigt versionierte Provenienz-/Schema-Evidence und keine bloße Selbstdeklaration.
 
-`manifest` wird vor erster Nutzung registriert und versioniert. Jeder Owner-Aufruf läuft mit Deadline und Fencing-Generation außerhalb Kernlocks. `on_gate` ist eine beschleunigende Invalidierungs-/Wakeup-Notification nach durablem Gate, niemals die Korrektheitsbarriere: jede Query prüft unabhängig davon den Kern-Gate-Zustand, bevor Index-Payload ausgewertet und bevor ein Treffer zurückgegeben wird. Timeout/Owner-Ausfall ⇒ Ticketstatus `Blocked{owner, reason, since, retry_at}`, Ledger-Ereignis `ExtBlocked`, Alarm und Eskalation; verspätete Antworten alter Generation werden verworfen. `Blocked` zählt nie als `Done`; Replacement/Unregister ist ledger-protokolliert und muss mit neuer Generation `verify_absent` erfüllen. `RewriteOutcome` allein ist kein Erase-Beweis: nur `EraseAttestation{owner, generation, scope_digest, applied_stamp, keys_destroyed, segments_rewritten, evidence_digest}` mit erfolgreichem `verify_absent` kann ein Ack liefern. Zugriff nur über das versiegelte `SegmentIo`; Owner darf keine direkten Kernpfade öffnen. Jedes Extension-Job-RAM/Scratch-Byte muss vor Allokation per `MemoryBudget`/`SegmentIo` reserviert sein. Segmente speichern Daten bevorzugt **als Cluster-Sektionen im Kern** (eigener Space): dann ist `rewrite_without` trivial.
+`manifest` wird vor erster Nutzung registriert und versioniert. Jeder Owner-Aufruf läuft mit Deadline und Fencing-Generation außerhalb Kernlocks. `on_gate` ist eine beschleunigende Invalidierungs-/Wakeup-Notification nach durablem Gate, niemals die Korrektheitsbarriere: jede Query prüft unabhängig davon den Kern-Gate-Zustand, bevor Index-Payload ausgewertet und bevor ein Treffer zurückgegeben wird. Timeout/Owner-Ausfall ⇒ Ticketstatus `Blocked{owner, reason, since, retry_at}`, Ledger-Ereignis `ExtBlocked`, Alarm und Eskalation; verspätete Antworten alter Generation werden verworfen. `Blocked` zählt nie als `Done`; Replacement/Unregister ist ledger-protokolliert und muss mit neuer Generation `verify_absent` erfüllen. `RewriteOutcome` allein ist kein Erase-Beweis: nur `EraseAttestation{owner, generation, scope_digest, applied_position=(instance_id,stamp), keys_destroyed, segments_rewritten, evidence_digest}` mit erfolgreichem `verify_absent` kann ein Ack liefern. Zugriff nur über das versiegelte `SegmentIo`; Owner darf keine direkten Kernpfade öffnen. Jedes Extension-Job-RAM/Scratch-Byte muss vor Allokation per `MemoryBudget`/`SegmentIo` reserviert sein. Segmente speichern Daten bevorzugt **als Cluster-Sektionen im Kern** (eigener Space): dann ist `rewrite_without` trivial.
 
 ### 12.2 ExtensionBlock
 
@@ -773,7 +808,7 @@ V1-Referenzarchitektur: Vektoren und kleine Ranking-Metadaten liegen clusterloka
 ### 12.7 Person → Cluster (normatives Muster)
 
 1. **Wurzelcluster je Person** (`Sealed`, `personal`-Space): enthält die Liste der Dokument-Cluster (Space `docs_index`). Dokument- und abgeleitete Cluster hängen per `link(derived, [wurzel])` an der Wurzel. **Eine Löschung der Wurzel zieht alle Cluster-Nachfahren im Gate mit.**
-2. **IdentityDirectoryOwner oberhalb des Kerns:** Die Zuordnung `person_id → root ClusterId` liegt nicht in einem `Plain`-Space. Der Directory-Key ist `HMAC(K_dir_tenant, canonical_person_id)`; `K_dir_tenant` bleibt ausschließlich im KMS, nie in Backups oder Storage. Der Directory-Wert `ClusterId` ist zusätzlich mit einem eigenen, nicht exportierbaren `EntryDEK` je Person verschlüsselt. Für Löschung nach bekanntem Cluster hält der Owner einen Reverse-Lookup `HMAC(K_reverse, ClusterId) → DirectoryKey`; `K_reverse` bleibt ebenfalls im KMS. `EntryDEK`-Key-IDs werden deterministisch aus `HMAC(K_keyid, ClusterId)` gebildet und nie persistiert. `IdentityDirectoryOwner` ist ein registrierter `SegmentOwner` mit `SegmentClass::MixedPerSubjectKey`, Gate-Filter, durablem Watermark, `destroy_entry_key`, `rewrite_without` und `verify_absent`. Bei Personenlöschung werden im selben Orchestrierungsauftrag (a) der Root-Gate samt Cluster-Nachfahren, (b) Vernichtung des EntryDEK und Entfernen beider Lookup-Einträge sowie (c) die zugehörigen Atteste abgewartet. Kein systemweites `Complete`, solange ein Owner-Attest fehlt. Backups enthalten höchstens HMAC-Pseudonyme und nicht entschlüsselbaren EntryDEK-Ciphertext; Kompromittierung eines Directory-KMS-Schlüssels bleibt als Schlüsselkompromiss im Receipt-Risiko benannt.
+2. **IdentityDirectoryOwner oberhalb des Kerns:** Die Zuordnung `person_id → root ClusterId` liegt nicht in einem `Plain`-Space. Der Directory-Key ist `HMAC(K_dir_tenant, canonical_person_id)`; `K_dir_tenant` bleibt ausschließlich im KMS, nie in Backups oder Storage. Der Directory-Wert `ClusterId` ist zusätzlich mit einem eigenen, nicht exportierbaren `EntryDEK` je Person verschlüsselt. Für Löschung nach bekanntem Cluster hält der Owner einen Reverse-Lookup `HMAC(K_reverse, ClusterId) → DirectoryKey`; `K_reverse` bleibt ebenfalls im KMS. `EntryDEK`-Key-IDs werden deterministisch aus `HMAC(K_keyid, ClusterId)` gebildet und nie persistiert. `IdentityDirectoryOwner` ist ein registrierter `SegmentOwner` mit `SegmentClass::MixedPerSubjectKey`, Gate-Filter, durablem Watermark, `destroy_entry_key`, `rewrite_without` und `verify_absent`. Bei Personenlöschung werden im selben Orchestrierungsauftrag (a) der Root-Gate samt Cluster-Nachfahren, (b) Vernichtung des EntryDEK und Entfernen beider Lookup-Einträge sowie (c) die zugehörigen Atteste abgewartet. Kein systemweites `Complete`, solange ein Owner-Attest fehlt. Backups enthalten höchstens HMAC-Pseudonyme und nicht entschlüsselbaren EntryDEK-Ciphertext. Das stabile HMAC-Indexlabel ist weiterhin pseudonyme personenbezogene Information: solange ein Backup es enthält und `K_dir_tenant` für Zuordnungsversuche verfügbar bleibt, darf das Receipt nicht `Complete` behaupten. Striktes `Complete` verlangt physisches Entfernen des Labels aus allen retained Backups oder Rotation/Vernichtung der alten Directory-Key-Epoche samt Migration aller verbleibenden Einträge; letzteres ist O(Tenant) und ein expliziter oberer Workflow. Sonst lautet der Status `CompleteWithResidual` mit Backup-Frist/Linkability-Risiko.
 3. **Aufträge nach Frist:** `Eraser::pack_expired` (Ablauf je Packgruppe `Month`) erzeugt unabhängige, deterministisch sortierte Tickets je höchstens 4096 Clustern; Restriction blockiert betroffene Cluster und wird im Aggregate ausgewiesen, der Rest läuft separat.
 4. **Keine Zuordnungstabelle außerhalb des Löschvertrags:** Jeder persistente Kennung→Cluster-Pfad muss als `IdentityDirectoryOwner` mit per-Subject-Key/Lineage registriert sein oder selbst eine gleichwertige Gate-/Destroy-/Rewrite-/Verify-Attestierung erfüllen; unregistrierte Mappings verhindern systemweites `Complete` (`ext-conformance`).
 
@@ -787,7 +822,7 @@ Diese Regeln ergänzen die bisherigen Abschnitte und gehen bei Widerspruch vor. 
 2. **Branch-Korrektheit:** `ForkPoint` ist `Head | At(Stamp)`. `Head` linearisiert im Committer. `At(S)` ist nur gültig, wenn `history_floor ≤ S ≤ parent_head` und Cluster/Branch nicht retired/closed sind; andernfalls `BelowFloor`/`InvalidForkPoint`, niemals stilles Rebasen. Merge ist v1 nur vom direkten Child zum Parent erlaubt; Source mit lebenden Kindern ist nicht mergbar. Merge-Konfliktmenge schließt Punkt- und Intervalländerungen ein: `Delete`, `RangeDelete` und jeder überlappende `EraseRange` kollidieren; ein bereits aktiver clusterweiter Erase-Marker kann durch Merge nicht überschrieben werden. Merge-Plan bindet `source_head`, `target_head` und `merge_base`; Commit prüft diese erneut atomar. Erfolgreich gemergte Source-Branches sind terminal (`Merged`); für weitere Änderungen wird ein neuer Branch geforkt.
 3. **Idempotenz-Retention:** Idempotenz-Ergebnis (Token-Scope/Hash, Request-Fingerprint, Ergebnis-Stamp/Status und pseudonymes Cluster-Scope-Digest aus sortierten `tomb_id`s) überlebt Redo-`replay_floor` unabhängig, solange TTL aktiv ist. Es wird erst nach Ablauf plus durablem `idem_trim` entfernt. Scope enthält keine Nutzdaten/Klartext-ClusterIds. Retry auf inzwischen `Retired`-Cluster liefert `Erased`/`ClusterRetired`, niemals ein scheinbar neues Apply. Token-Wiederverwendung mit anderem Request-Inhalt wird als `IdemConflict` abgelehnt.
 4. **Löschgranularität:** `Eraser::range` bietet für Plain `Logical|Physical|Scrubbed`, für Sealed ausschließlich `Logical`; es gibt **keine** kryptografische Einzelbereichslöschung. `key_epoch`-Rotation macht alte Cluster-Daten erst nach vollständigem Rewrap aller zu erhaltenden Daten und Vernichtung aller alten Epochen unlesbar; sie ist ein eigener, nicht atomarer Workflow und kein v1-Range-Versprechen. Für sofortige Crypto-Erasure müssen Daten in getrennte Cluster/Löschdomänen gelegt werden. Der Marker wirkt über alle Branches und historischen Views und kann nicht gemergt/überschrieben werden.
-5. **Space-Drop:** `SpaceDropIntent{space_tomb_id,scope_digest,count,level}` wird vor dem Space-Gate dauerhaft geschrieben; HMAC-Pseudonym plus SpaceId/Generation im Backup reichen für Restore-Reconcile der vollständigen Space-Generation. `BLOCK_ERASE` blockiert vor Intent. Crypto ist nur zulässig, wenn alle Cluster ausschließlich zu dieser Space-Generation gehören; sonst `SharedCluster` ohne Teilwirkung. Nach Intent folgen Gate, `GateApplied`, Anchor, dann KeyDestroy/Purge. `SpaceDropped` ist nur finaler Abschluss nach erforderlichen Attesten. Keine Klartext-IDs oder Einzel-Edit-/Ein-Fsync-Behauptung für beliebig große Spaces.
+5. **Space-Drop:** `SpaceDropIntent{space_tomb_id,scope_digest,count,level}` wird vor dem Space-Gate dauerhaft geschrieben; HMAC-Pseudonym plus SpaceId im Backup reicht, um das Space-Gate beim Restore wieder zu gaten. `BLOCK_ERASE` blockiert vor Intent. V1 erlaubt auf Space-Ebene kein Crypto-Erase, weil Cluster mehrere Spaces teilen können; dafür sind Cluster-Tickets nötig. Nach Intent folgen Gate, `GateApplied`, Anchor und für Plain erst danach Purge. `SpaceDropped` ist nur finaler Abschluss nach erforderlichen Attesten. Keine Klartext-IDs oder Einzel-Edit-/Ein-Fsync-Behauptung für beliebig große Spaces.
 6. **Klartext-Reclamation:** `Zeroizing` ist eine Maßnahme, kein Beweis für sämtliche Kopien. Memtable-/Cache-Interfaces verbieten unkontrollierte Clone-Pfade für Klartext; Ausgaben liegen in Zeroizing-Puffern. Gate erhöht Generation, entzieht neue Zugriffe und wartet auf Leser-Epochen bzw. weist noch aktive Leser als Exposition aus, bevor `Purged`/Receipt Abschluss behauptet. Allocator-/OS-Kopien sicher zu nullen ist keine Garantie und bleibt Restrisiko.
 7. **Blob-Purge:** Purge darf nicht auf `punch_hole` angewiesen sein. Überschreitet der zu entfernende Anteil den konfigurierten Hole-Ratio- oder Max-Fragment-Grenzwert, wird eine neue `blob_id` mit gepackten Überlebenden geschrieben und per Catalog-Edit ersetzt. Reserveplatz und maximale Rewrite-Gruppe sind harte Admission-Grenzen. `Plain`-Barriere invalidiert Consumer explizit mit Epoch-Wechsel/`Lagged`; kein Consumer darf eine Lücke als verarbeitet bestätigen.
 8. **Durable Extensions:** `watermark` darf nur bis zum höchsten angewandten `durable_stamp` reichen. Extension-Builder liest nur durable Views oder durable Feed-Frames. Query-Fassade erzwingt `filter_visible` nach Kandidatenfund und erneut vor Rückgabe (Generation-Check); ungefilterte Indexresultate sind kein unterstützter API-Pfad.
@@ -795,9 +830,9 @@ Diese Regeln ergänzen die bisherigen Abschnitte und gehen bei Widerspruch vor. 
 10. **RAG-/Audit-Grenze:** Ein `Change` kann Dokumentdaten, quantisierte Vektoren, BM25-Postings und Graph-Deltas atomar persistieren, sofern sie als Records derselben Cluster-Löschdomäne modelliert sind. Globale HNSW-Nachbarschaftsreparatur bleibt abgeleiteter Index-Job und wird nicht im selben Kern-Commit garantiert. Sie nutzt durable Watermarks, Gate-Filter und attestierten Rewrite/Rebuild. `ErasureReceipt` attestiert nur Kern und registrierte Extensions; signierte v15-`DeletionProof`s entstehen über eine versionierte Bridge aus Receipt plus Extension-Attesten. Ohne vollständige Atteste kein systemweites `Complete`.
 11. **Gesamtsystem-Ressourcenbudget:** Storage und Extensions teilen einen `MemoryBudget` mit getrennten Limits für Memtables, Cluster-Metadaten, Guard-Fenster, Block-/Key-Cache, Index-Delta, In-flight-Rewrites und temporären Purge-Platz. Admission/Backpressure erfolgt vor Commit/Index-Job; keine Schicht darf unbeschränkt RAM oder Rewrite-Scratch allokieren. Budgets werden gemeinsam im RAG-Lastprofil gemessen.
 12. **Archive-Konsolidierung:** Ältere Lethe-Entwürfe sind Designmaterial, keine zusätzliche Norm. Übernommen werden SYS_IDEM-Retention, Extension-Klassen/Atteste und gemeinsames Speicherbudget. Nicht übernommen werden globale EU-Tags/Content-Addressing, In-place-Scrub als Durability-Annahme sowie Zusagen kryptografischer Teillöschung.
-13. **Schlüsselzustände (E-56):** `KeyUnavailable`, `KeyDestroyed/Absent`, `KeyDisabled` und `KeyLost` sind getrennte Zustände. Nur bestätigtes `Absent` erfüllt Crypto-Erasure; `Unavailable`/`Lost` blockieren oder markieren `Incomplete`, `Disabled` bleibt `KeyDestroying` mit Restrisiko. Provider-Nichterreichbarkeit darf nie als Vernichtung interpretiert werden.
+13. **Schlüsselzustände (E-56):** `KeyUnavailable`, `KeyDestroyed/Absent`, `KeyDisabled` und `KeyLost` sind getrennte Zustände. Nur bestätigtes `Absent` erfüllt Crypto-Erasure; `Unavailable` blockiert mit Retry, `Lost` ergibt `Incomplete`/Quarantäne, `Disabled` bleibt `KeyDestroying`/`Blocked` mit Frist und Restrisiko. Provider-Nichterreichbarkeit darf nie als Vernichtung interpretiert werden.
 14. **Redo-Crypto-Domäne (E-57):** RootKey-abgeleiteter Redo-Key ist nur Ketten-MAC-Schlüssel. Jeder Sealed-Redo-Op ist per eigener Cluster-Key-Epoche versiegelt; Op-Header bindet `key_epoch`. Redo-Rohreste werden nach `destroy_many` unlesbar. Gate-/Routing-Header bleiben als pseudonyme Metadaten sichtbar und sind ausdrücklich kein Nutzpayload.
-15. **Blob-AAD (E-58):** Blob-AAD bindet stabile `record_uid`, `instance`, `space`, `cluster`, `key_epoch`; nie `blob_id`/Offset. Dadurch ist Survivor-Rohkopie in neue Blob-ID/Offsets gültig, ohne AEAD-Aufbrechen. Neue ID/Offsets bekommen eigene CRC/Directory.
+15. **Blob-AAD (E-58):** Blob-AAD bindet stabile `record_uid`, `instance`, `space_id`, `cluster`, `key_epoch`; nie `blob_id`/Offset. Dadurch ist Survivor-Rohkopie in neue Blob-ID/Offsets gültig, ohne AEAD-Aufbrechen. Neue ID/Offsets bekommen eigene CRC/Directory.
 16. **Diff-Kosten (E-59):** Branch-Diff- und Merge-Konfliktkandidaten kommen aus cluster-sealed, stamp-sortiertem `ChangeIndex` für Punkt-/Intervallmutationen beider Seiten. Allgemeiner Diff kostet Änderungen seit gemeinsamem Floor plus Ausgabe, nicht nur Branch-Einträge. ChangeIndex-Format, GC und Branch-Pins sind G-F-Bestandteil.
 17. **Gewichtsvertraulichkeit (E-61):** `weight_sum[W]` und Tokenprofile sind bei Sealed-Clustern mit dem Cluster-Key verschlüsselt. `page` darf kleine SubIndex-Metadatenblöcke entschlüsseln, liest aber keine Body-Blöcke. Klartext-ClusterDirectory enthält keine Gewichte.
 18. **Extension-Liveness (E-60):** Owner-Aufrufe besitzen Deadline und Fencing-Generation. Timeout erzeugt `Blocked{owner, reason, since, retry_at}` + Ledger-Ereignis/Alarm/Eskalation; verspätete alte Generation wird verworfen. Persistente Feed-Consumer, die Derivate schreiben, müssen SegmentOwner/Lineage registrieren. Nicht attestierte externe Kopien erscheinen als Residual und verhindern systemweites `Complete`.
@@ -870,7 +905,7 @@ Planungsannahme für 3–4 erfahrene Rust-Entwickler plus 1 Test-/Simulationsing
 | **P7 Versionierung** | `BRANCHES`-Feature-Bit, `SYS_BRANCH`, Fork/Drop/TTL, Branch-Lesen, Diff, Merge, `Eraser::branch`, Fork-Floor | **G-V:** Branch-Properties vs. Modell, M2/M3 mit Branches, H-20…H-22, Orakel mit Branch-Canaries | 5 Wo. |
 | **P8 Härtung** | Soak 72 h, Dauer-Fuzz, Platte voll, Fehlerinjektion, Fassade, Abdeckung, Krypto-Review, Messbericht, Bedrohungsmodell-Review | **G-P:** alle INV getestet (100 %), H-15/H-16, Messbericht §17, keine offenen Korruptionsbefunde | 5 Wo. |
 
-**G-CUTOVER (P8+, SP-CUTOVER 24):** separates Produktfreigabe-Gate nach G-P. Erst wenn sämtliche produktiven `contextra-store`-Verbraucher, Datenräume und Erasure-Witnesses migriert, Restore-/Rollback-Rehearsal und RAG-Differentialmessung bestanden sowie gemeinsames Speicherbudget belegt sind, wird `contextra-storage` alleiniger Produktions-Schreibkern. Nach ersten R8-Writes ist Rückkehr nur per geprüftem Forward-Export oder Restore möglich; kein Dual-Write. Bis dahin gelten R8-Leistungs- und Löschvorteile als unbestätigte Ziele.
+**G-CUTOVER (P8+, SP-CUTOVER 24):** separates Produktfreigabe-Gate nach G-P. Erst wenn sämtliche produktiven `contextra-store`-Verbraucher, Datenräume und Erasure-Witnesses migriert, Restore-/Rollback-Rehearsal einschließlich externem Fencing des alten Instanzbesitzers und RAG-Differentialmessung bestanden sowie gemeinsames Speicherbudget belegt sind, wird `contextra-storage` alleiniger Produktions-Schreibkern. Nach ersten R8-Writes ist Rückkehr nur per geprüftem Forward-Export oder Restore möglich; kein Dual-Write. Bis dahin gelten R8-Leistungs- und Löschvorteile als unbestätigte Ziele.
 
 Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur per Migration. In jeder Phase wird der Crash-Sweep um die neuen Fs-Operationen **erweitert, nie nachgezogen**. Erst nach G-P werden aufsetzende Komponenten (Kontext-Engine, Indizes, MCP-Server) angebunden.
 
@@ -883,13 +918,13 @@ Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur 
 | ID | Aussage |
 |---|---|
 | INV-STAMP-1/2/3 | Stamps streng monoton über angenommene Changes/Frames · kein Umbruch (`Exhausted`) · nie doppelt vergeben, auch nicht nach Absturz |
-| INV-ID-1/2 | Datei-/`tmp_id` und `SpaceId` werden nie wiederverwendet |
+| INV-ID-1/2 | Datei-/`tmp_id`, `SpaceId` werden nie wiederverwendet; Space-Gates binden die vollständige SpaceId |
 | INV-ATOM-1 | Ein Change ist ganz oder gar nicht sichtbar, auch nach Absturz, über alle Spaces und Branches (nicht für Volatile-Ziele) |
 | INV-COMMIT-2 | Ein sichtbarer Eintrag ist durabel (außer `Relaxed`) |
 | INV-GUARD-1 | Ein Change wird nur angenommen, wenn jede Guard zur Stamp-Vergabe gilt |
 | INV-VIEW-1/2 | Eine View sieht stets dieselben Daten · `visible_stamp` vor `Arc<Version>` |
 | INV-VIS-1 | Jedes Ergebnis einer Extension passiert `filter_visible`, bevor es den Aufrufer erreicht |
-| INV-CONS-1 | Consumer und `view_durable` sehen nur Stamps ≤ `durable_stamp` |
+| INV-CONS-1 | Consumer und `view_durable` sehen nur Stamps ≤ `durable_stamp` derselben `instance_id` |
 | INV-LOCK-1/2 | Sperren nur aufsteigend · Stamp-Vergabe und `Live → Retired` nur im Committer |
 | INV-CAT-1/2 | Datei lebendig ⇔ durabler `files_add` ohne `files_remove`; entfernte Datei bleibt bis `unlink_ack` im Graveyard · Edit gilt erst nach `sync_data` der Gruppe |
 | INV-FMT-1 | Nur kanonische Kodierungen; unbekannte Version/Tags ⇒ Fehler |
@@ -902,17 +937,17 @@ Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur 
 | INV-SEAL-1 | Schutzklasse ↔ Space-Siegel (§5.2) |
 | INV-ERA-1 | Logische Atomarität, `Erased{at:S}` für jede View, keine Mischsicht |
 | INV-ERA-2 | Nach `Purged` keine Version des Clusters in lebenden Runs/Redo/Memtable (Physical); bei Cryptographic zusätzlich INV-ERA-7 |
-| INV-ERA-3 | ER1 < ER2 < jedes `PurgeBatchEdit` < zugehöriger Unlink < finales ER6/`PurgeCompleteEdit`; Crypto-Purge erst bei `probe == Absent`, `Done` nur nach allen erforderlichen Attesten |
+| INV-ERA-3 | `EraseIntent` durable < Gate-Catalog-Edit < `GateApplied` < Anchor < irreversible KeyDestroy/Purge; vor KMS zusätzlich `KeyDestroyIntent`; danach jedes `PurgeBatchEdit` < Unlink+`sync_dir` < `UnlinkAck` < finales ER6/`PurgeCompleteEdit`; `Done` nur nach allen erforderlichen Attesten |
 | INV-ERA-4 | Nur Roll-forward |
 | INV-ERA-5 | Reads unter `S` in `erased_ranges` liefern `Erased`, nie Daten, nie „leer“ |
 | INV-ERA-6 | Nach `Purged` keine lebende Blob-Inkarnation mit Record des Clusters |
-| INV-ERA-7 | Nach ER2 ist alles des Sealed-Clusters ohne Schlüssel unlesbar |
+| INV-ERA-7 | Nach ER2 ist alles des Sealed-Clusters im Kern ohne Cluster-Schlüssel unlesbar; registrierte Extensions/Backups nur bei nachgewiesen identischer oder gleichwertiger Scope-Key-Vernichtung |
 | INV-ERA-8 | Receipt nur bei erfüllten Done-Bedingungen (§9.5) |
-| INV-ERA-9 | Nach Restore ist jeder Cluster aus dem Ledger wieder mindestens `Retired` |
+| INV-ERA-9 | Nach Restore werden Ledger-Intents vor Open scope-genau angewandt: Cluster ⇒ `Retired`, Range/Branch ⇒ Selector-Maske, Space ⇒ SpaceId-Gate; kein Backup wird vorher sichtbar |
 | INV-ERA-10 | Eine BLOCK_ERASE-Restriction in der Link-Hülle verhindert jede Löschung; Prüfung im Committer, kein Override |
 | INV-ERA-11 | Gate/KeyDestroy skaliert mit Zielclustern. Purge bearbeitet nur betroffene Dateien/Extents und gepinnte Redo-/Extension-Bereiche. `ClusterLocal` vermeidet fremde Run/Blob-Survivor, garantiert wegen gemeinsam genutztem Redo/Pins aber keine O(Clusterbytes)-Gesamtkosten. `PackedBounded` kostet höchstens die Summe betroffener, je `max_file_bytes` begrenzter Dateien. Kein Vollstore-Rewrite; keine pauschale Cluster-Schranke ohne Bounds für Redo-Retention, Pins und Extensions. |
 | INV-ERA-12 | Die Erase-Menge ist der transitive `DerivedFrom`-Abschluss zum Gate-Zeitpunkt, höchstens `max_gate_clusters`; Link-Admission stellt die Schranke sicher; die ganze Menge wird in einem Frame gated |
-| INV-LED-1 | Das Ledger enthält weder ClusterId noch Nutzdaten noch Nutzerschlüssel |
+| INV-LED-1 | Das Ledger enthält keine Klartext-ClusterId/SpaceId, Benutzerkeys oder Nutzdaten; selektive Scope-Selectoren sind ausschließlich AEAD-verschlüsselt unter `LedgerScopeKey` abgelegt |
 | INV-ANCH-1 | Anker monoton; Catalog/Ledger hinter dem Anker wird nicht schreibend geöffnet; Anker nie vor dem durablen Edit |
 | INV-KEY-1…4 | Schlüsselmaterial nie unverhüllt in Dateien/Checkpoints · `gen` vor und nach Entsiegeln · alte Epoche erst vernichtet, wenn nichts mehr mit ihr versiegelt · `destroy_many` vernichtet alle Epochen |
 | INV-PRIV-1 | Keine persistierten Inhalts-Hashes über Klartext (flüchtige Prozessschlüssel-Fingerabdrücke ausgenommen) |
@@ -978,7 +1013,7 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 | Eigener FTS vs. Tantivy (Mnemos O-6) | Obere Schicht; Tantivy nur als `SegmentOwner` mit `rewrite_without`/Rebuild-Intervall |
 | Embedded vs. Server (Mnemos O-7) | Embedded-Kern; Server/MCP-Wrapper oben ab G-P |
 | Keyring als Single Point of Loss (Lethe-Spec B.4) | Pflicht-Replikation im Provider, `KeyLost` unterscheidbar |
-| KMS-Karenzzeit (Lethe-Spec B.6) | `CompleteWithResidual`; strenge SLAs verlangen sofort zerstörenden Provider |
+| KMS-Karenzzeit (Lethe-Spec B.6) | Ticket bleibt `Blocked`, bis der Provider `Absent` attestiert; strenge SLAs verlangen sofort zerstörenden Provider |
 | Single-Sequencer-Durchsatz (Lethe-Spec B.5) | Ein Committer je Instanz; Tenant-Sharding über mehrere Instanzen oben |
 
 **Risiken:** (1) Branch-Pinning treibt Speicher und Compaction-Kosten bei vielen Langzeit-Branches (Mitigation: `ttl`, Limits, `floor`-Metrik). (2) Branch-Reads über Elternketten (H-21) können bei tiefen Ketten teuer werden (Mitigation: `max_branch_depth`, Merge/Flatten). (3) Kosten der Plain-Barriere bei häufigen Plain-Löschungen (Mitigation: Bündelung; Personal-Daten sind per Konstruktion Sealed). (4) Verzeichnis Person → Wurzelcluster bleibt nur physisch löschbar (§12.7). (5) Formatfreeze nach P2 verlangt, dass P1/P2 echte Probeläufe sind, nicht Papier. (6) Scope-Creep in obere Schichten; Mitigation: Gates strikt.

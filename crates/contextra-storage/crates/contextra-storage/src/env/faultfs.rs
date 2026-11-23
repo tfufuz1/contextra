@@ -198,7 +198,8 @@ fn io_error(role: FileRole) -> Error {
     let role = match role {
         FileRole::Catalog => "catalog", FileRole::Redo => "redo", FileRole::Run => "run",
         FileRole::Blob => "blob", FileRole::Keys => "keys", FileRole::Anchor => "anchor",
-        FileRole::Ledger => "ledger", FileRole::Format => "format", FileRole::Other => "other",
+        FileRole::Ledger => "ledger", FileRole::Format => "format", FileRole::PurgeScratch => "purge_scratch",
+        FileRole::Other => "other",
     };
     Error::Io { role, kind: ErrorKind::Other }
 }
@@ -207,6 +208,6 @@ fn role_index(role: FileRole) -> usize {
     match role {
         FileRole::Catalog => 0, FileRole::Redo => 1, FileRole::Run => 2,
         FileRole::Blob => 3, FileRole::Keys => 4, FileRole::Anchor => 5,
-        FileRole::Ledger => 6, FileRole::Format => 7, FileRole::Other => 8,
+        FileRole::Ledger => 6, FileRole::Format => 7, FileRole::PurgeScratch => 8, FileRole::Other => 9,
     }
 }

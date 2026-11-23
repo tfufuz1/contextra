@@ -28,7 +28,7 @@ impl BudgetLimits {
     }
 
     pub fn with_class(mut self, class: ResourceClass, bytes: u64) -> Self {
-        self.class_bytes[class_index(class)] = bytes;
+        if let Some(limit) = self.class_bytes.get_mut(class_index(class)) { *limit = bytes; }
         self
     }
 
@@ -68,10 +68,10 @@ impl Budget {
 
     pub fn used(&self) -> u64 { self.inner.total_used.load(Ordering::Acquire) }
     pub fn class_used(&self, class: ResourceClass) -> u64 {
-        self.inner.class_used[class_index(class)].load(Ordering::Acquire)
+        self.inner.class_used.get(class_index(class)).map(|used| used.load(Ordering::Acquire)).unwrap_or(0)
     }
     pub fn class_limit(&self, class: ResourceClass) -> u64 {
-        self.inner.class_limits[class_index(class)]
+        self.inner.class_limits.get(class_index(class)).copied().unwrap_or(0)
     }
 
     fn reserve_counter(counter: &AtomicU64, limit: u64, bytes: u64) -> Result<(), Error> {
@@ -91,8 +91,9 @@ impl Budget {
 impl MemoryBudget for Budget {
     fn try_reserve(&self, class: ResourceClass, bytes: u64) -> Result<ResourcePermit, Error> {
         let index = class_index(class);
-        let class_counter = &self.inner.class_used[index];
-        Self::reserve_counter(class_counter, self.inner.class_limits[index], bytes)?;
+        let class_counter = self.inner.class_used.get(index).ok_or(Error::Corrupt { place: "memory budget class index" })?;
+        let class_limit = self.inner.class_limits.get(index).copied().ok_or(Error::Corrupt { place: "memory budget class index" })?;
+        Self::reserve_counter(class_counter, class_limit, bytes)?;
         // The sum of class limits is validated <= total, so this cannot fail
         // unless the accounting invariant was violated internally.
         if let Err(error) = Self::reserve_counter(&self.inner.total_used, self.inner.total_limit, bytes) {
@@ -101,7 +102,7 @@ impl MemoryBudget for Budget {
         }
         let inner = Arc::clone(&self.inner);
         Ok(ResourcePermit::new(class, bytes, move || {
-            inner.class_used[index].fetch_sub(bytes, Ordering::AcqRel);
+            if let Some(used) = inner.class_used.get(index) { used.fetch_sub(bytes, Ordering::AcqRel); }
             inner.total_used.fetch_sub(bytes, Ordering::AcqRel);
         }))
     }

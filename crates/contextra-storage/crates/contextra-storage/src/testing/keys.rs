@@ -1,15 +1,14 @@
 //! In-memory KeyProvider for deterministic models and conformance exercises.
 
 use contextra_storage_ports::traits::Entropy;
-use contextra_storage_ports::{
-    Error, Key32, KeyLookup, KeyProbe, KeyProvider, ClusterId,
-};
+use contextra_storage_ports::{BatchId, ClusterId, Error, Key32, KeyCreateFailure, KeyCreateResult, KeyLookup, KeyProbe, KeyProvider, MAX_KEYS_PER_BATCH};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use zeroize::Zeroizing;
 
 pub struct MemKeyProvider {
     keys: Mutex<BTreeMap<ClusterId, ClusterKeys>>,
+    batches: Mutex<BTreeMap<BatchId, (Vec<ClusterId>, Vec<KeyCreateResult>)>>,
     entropy: Arc<dyn Entropy>,
 }
 
@@ -21,12 +20,23 @@ struct ClusterKeys {
 
 impl MemKeyProvider {
     pub fn new(entropy: Arc<dyn Entropy>) -> Self {
-        Self { keys: Mutex::new(BTreeMap::new()), entropy }
+        Self { keys: Mutex::new(BTreeMap::new()), batches: Mutex::new(BTreeMap::new()), entropy }
     }
 }
 
 impl KeyProvider for MemKeyProvider {
-    fn create_cluster_keys(&self, clusters: &[ClusterId]) -> Result<Vec<u32>, Error> {
+    fn create_cluster_keys(&self, request_id: BatchId, clusters: &[ClusterId]) -> Result<Vec<KeyCreateResult>, Error> {
+        if clusters.len() > MAX_KEYS_PER_BATCH { return Err(Error::Limit { limit: "key create batch <= 256" }); }
+        let mut unique = std::collections::BTreeSet::new();
+        if clusters.iter().any(|cluster| !unique.insert(*cluster)) {
+            return Err(Error::Limit { limit: "duplicate cluster in key create batch" });
+        }
+        {
+            let batches = self.batches.lock().map_err(|_| Error::Poisoned { cause: "MemKeyProvider batch lock" })?;
+            if let Some((previous, result)) = batches.get(&request_id) {
+                return if previous == clusters { Ok(result.clone()) } else { Err(Error::IdemConflict) };
+            }
+        }
         // Generate outside the provider-state lock. Races converge at insertion.
         let mut candidates = Vec::with_capacity(clusters.len());
         for _ in clusters {
@@ -34,19 +44,25 @@ impl KeyProvider for MemKeyProvider {
             self.entropy.fill(&mut *key)?;
             candidates.push(key);
         }
-        let mut state = self.keys.lock().map_err(|_| Error::Poisoned { cause: "MemKeyProvider lock" })?;
-        if clusters.iter().any(|cluster| state.get(cluster).is_some_and(|keys| keys.destroyed)) {
-            return Err(Error::Shredded);
+        let mut batches = self.batches.lock().map_err(|_| Error::Poisoned { cause: "MemKeyProvider batch lock" })?;
+        if let Some((previous, result)) = batches.get(&request_id) {
+            return if previous == clusters { Ok(result.clone()) } else { Err(Error::IdemConflict) };
         }
-        let mut epochs = Vec::with_capacity(clusters.len());
+        let mut state = self.keys.lock().map_err(|_| Error::Poisoned { cause: "MemKeyProvider lock" })?;
+        let mut results = Vec::with_capacity(clusters.len());
         for (cluster, candidate) in clusters.iter().zip(candidates) {
             let entry = state.entry(*cluster).or_default();
-            if !entry.epochs.contains_key(&1) {
+            if entry.destroyed {
+                results.push(KeyCreateResult::Failed { cluster: *cluster, error: KeyCreateFailure::Shredded });
+            } else if entry.epochs.contains_key(&1) {
+                results.push(KeyCreateResult::Created { cluster: *cluster, epoch: 1 });
+            } else {
                 entry.epochs.insert(1, Zeroizing::new(*candidate));
+                results.push(KeyCreateResult::Created { cluster: *cluster, epoch: 1 });
             }
-            epochs.push(1);
         }
-        Ok(epochs)
+        batches.insert(request_id, (clusters.to_vec(), results.clone()));
+        Ok(results)
     }
 
     fn cluster_keys(&self, req: &[(ClusterId, u32)]) -> Result<Vec<KeyLookup>, Error> {
