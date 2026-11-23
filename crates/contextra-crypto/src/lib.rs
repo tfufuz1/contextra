@@ -29,6 +29,7 @@ pub mod kdf;
 pub mod kv_cipher;
 pub mod kv_segment;
 pub mod kv_shredding;
+pub mod persistence;
 pub mod revocation_log;
 pub mod wal_completeness;
 pub mod wal_crypto;
