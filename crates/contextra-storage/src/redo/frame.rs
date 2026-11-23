@@ -8,7 +8,7 @@
 use contextra_ports::persistence::{Cipher, Mac};
 use crate::codec::crc32c::crc32c;
 use crate::codec::limits::MAX_CHANGE_BYTES;
-use crate::keys::nonce::redo_frame_nonce;
+use crate::keys::nonce::{redo_frame_nonce, port_nonce};
 use crate::redo::error::RedoError;
 use crate::redo::op::RedoOp;
 
@@ -284,7 +284,7 @@ impl RedoFrame {
         aad.extend_from_slice(&frame_index.to_le_bytes());
 
         let nonce = redo_frame_nonce(frame_index);
-        let sealed_payload = cipher.seal(redo_key, &nonce, &aad, &plain_payload);
+        let sealed_payload = cipher.seal(redo_key, &port_nonce(&nonce), &aad, &plain_payload);
 
         Ok(Self {
             len,

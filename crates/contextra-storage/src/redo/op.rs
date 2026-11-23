@@ -5,7 +5,7 @@
 
 use contextra_ports::persistence::Cipher;
 use crate::codec::varint::{decode_u64, encode_u64};
-use crate::keys::nonce::redo_op_body_nonce;
+use crate::keys::nonce::{port_nonce, redo_op_body_nonce};
 use crate::redo::error::RedoError;
 
 /// Bit 0 in `opflags`: Domäne ist angegeben (`domain u32` folgt).
@@ -127,7 +127,7 @@ impl RedoOp {
             },
         );
         let nonce = redo_op_body_nonce(seg_u32, frame_index, op_index);
-        let sealed_body = cipher.seal(domain_key, &nonce, &aad, body);
+        let sealed_body = cipher.seal(domain_key, &port_nonce(&nonce), &aad, body);
 
         let mut value = Vec::with_capacity(header.len().saturating_add(sealed_body.len()));
         value.extend_from_slice(header);
@@ -181,7 +181,7 @@ impl RedoOp {
         };
 
         cipher
-            .open(domain_key, &nonce, &aad, sealed_body)
+            .open(domain_key, &port_nonce(&nonce), &aad, sealed_body)
             .map_err(|e| RedoError::CryptoError(e.to_string()))
     }
 

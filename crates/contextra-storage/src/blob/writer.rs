@@ -6,7 +6,7 @@ use crate::blob::record::{
     BlobFooter, BlobHeader, BlobRecord, BlobRef, BLOB_FOOTER_LEN, BLOB_HEADER_LEN,
 };
 use crate::codec::crc32c::crc32c;
-use crate::keys::nonce::{blob_body_nonce, blob_record_nonce};
+use crate::keys::nonce::{blob_body_nonce, blob_record_nonce, port_nonce};
 use contextra_ports::persistence::{Cipher, File, Kdf, Mac};
 use std::fmt;
 use std::io;
@@ -108,7 +108,7 @@ impl BlobWriter {
             aad.extend_from_slice(&record.domain.to_le_bytes());
             aad.extend_from_slice(&record.key);
 
-            let sealed_body = c.seal(dk, &nonce, &aad, &record.body);
+            let sealed_body = c.seal(dk, &port_nonce(&nonce), &aad, &record.body);
             final_record.body = sealed_body;
         }
 
@@ -150,7 +150,7 @@ impl BlobWriter {
                 aad.extend_from_slice(&self.blob_no.to_le_bytes());
                 aad.extend_from_slice(&record_offset.to_le_bytes());
 
-                let sealed = c.seal(&blob_key, &nonce, &aad, &content);
+                let sealed = c.seal(&blob_key, &port_nonce(&nonce), &aad, &content);
                 record_bytes.extend_from_slice(&sealed);
             }
             other => return Err(BlobWriteError::InvalidIntegrityMode(other)),
