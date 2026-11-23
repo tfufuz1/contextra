@@ -3,8 +3,9 @@
 | | |
 |---|---|
 | Normativ | `docs/SPEC-R8.md`; je Komponente `docs/implement/NN-*.md` |
-| Status 01–05 | vorhanden (ports, codec-seal, env, keys, redo) |
-| Status 06–24 | dieser Satz |
+| Status 01–25 | Implementierungsverträge und Audit-Traceability vorhanden; SP-06–25 liegen als `NN-*.md` neben dieser Datei |
+| Status Code | R8 dokumentiert den historischen Ausgangsstand als nicht kompiliert/gemessen. Aktueller Teilcheck: Storage + Crypto-Referenz kompilieren mit `--ignore-rust-version`; die vollständigen Gates sind offen. |
+| Phasenfortschritt | [PHASE-STATUS.md](PHASE-STATUS.md) — isolierter Fortschritt und offene Gates |
 | Prinzip | **Disjunktion:** jeder Typ, jede Datei, jede Invariante hat genau einen Besitzer-SP; Fremdzugriff nur über dessen Schnittstelle (§1 dieser Datei) |
 
 ## 1 Besitzmatrix (Modul → SP)
@@ -35,6 +36,7 @@
 | CKPT | 22 | `checkpoint/` | P6 |
 | FACADE | 23 | `lib.rs`, `config`, `spaces`, Metrik-/Observer-Katalog | P1–P8 |
 | CUTOVER | 24 | `tools/migrate`, Umstellungsplan | P8+ |
+| AUDIT | 25 | SPEC-R8 §12.8 Audit-Remediation, Querschnittsverfolgung | vor G-0/G-F, danach je Besitzer-SP |
 
 Regeln: Ein Typ, der ≥ 2 SPs teilen, steht in PORTS. Ein Dateiformat gehört dem SP, dessen Datei es ist; Primitive (varint, Siegel, Tag) immer CODEC. Kein SP ruft einen höheren SP (Layering-Test `layering`, Richtung wie SPEC §3.1).
 
@@ -51,6 +53,8 @@ P6  12.2–12.4 ; 13.3–13.6 ; 20.2 ; 22.* ; 04.4/04.5 ; 17.2–17.4 ; 19.2 ; 1
 P7  21.*                                                                                            ── G-V
 P8  15.8 ; 18.5–18.7 ; 24.* ; Windows 03.8 ; Soak                                                   ── G-P
 ```
+**Audit-Abhängigkeit:** E-46 bis E-56 müssen vor G-0 als API-/Modellentscheidungen geschlossen werden. Vor G-F sind `SYS_IDEM`, Branch-Merge-Basis/ForkPoint, Blob-Repack-Inkarnation und Extension-Manifest/Attestationsformat samt Referenzvektoren eingefroren. G-E/G-P verlangt die Gesamtsystem-Erasure- und RAM-Abnahmen aus SP-AUDIT 25.
+
 Kritischer Pfad bis G-F: 01.1 → 01.2 → 02.1 → 03.1 → 03.2 → 05.1 → 05.2 → 06.x → 07.x → 19.1 → 13.2 → Freeze. Alles dahinter ist Format-stabil.
 
 ## 3 Neue Errata (blinde Flecken, Beschluss, Besitzer)
@@ -74,6 +78,17 @@ Kritischer Pfad bis G-F: 01.1 → 01.2 → 02.1 → 03.1 → 03.2 → 05.1 → 0
 | E-43 | Bulk-Import (Cutover, Ingest 10⁶ Dok.) ohne Pfad | `Origin::Migration` + `Relaxed` + `durable_barrier()`; Gruppenbündelung; Rückdruck greift | CUTOVER, COMMIT |
 | E-44 | Metrik-/Observer-Katalog nur als Liste | Ein Katalog mit Namen, Typ, Labels (keine Inhalte), Besitzer-SP in FACADE §3 | FACADE |
 | E-45 | Redo-Frame passt nicht in Restsegment | Gruppe rotiert **vor** Schreiben; Frame > `redo_segment_bytes/8` ⇒ `ChangeTooLarge` (INV-LIM-1) | REDO/COMMIT |
+| E-46 | Branch-Metadaten brauchen vorversiegelte Nutzlast, obwohl ID/Stamp sequenziert werden | `reserve_ids` außerhalb Rang 1; Branch-Frame aufruferseitig versiegeln. Commit-Stamp bleibt äußerer Record-Stamp und wird nicht im versiegelten Payload dupliziert. Sequencer validiert Reservierung und Branch-Head erneut; kein Provider unter Rang 1 | BRANCH/COMMIT |
+| E-47 | Merge-Key-Guards übersehen konkurrierende `RangeDelete`/`EraseRange`; explizite Fork-Zeit fehlt | Intervallkonflikte werden gegen Punkt- und Bereichsmutationen geprüft; `ForkPoint::At(S)` verlangt `S >= gc_floor` und `S <= parent_head`; `Head` wird im Commit linearisiert | BRANCH/COMMIT |
+| E-48 | 24-h-Idempotenz lebt nur im Replay-Bereich und kann nach `replay_floor`-Vorrücken verloren gehen | Aktive Token-Ergebnisse werden unabhängig vom Redo-Replay-Floor dauerhaft gehalten; Ablauf nur nach TTL und durabler `idem_trim`-Marke; Scope/Hash und Retired-Verhalten spezifizieren | COMMIT/CATALOG |
+| E-49 | `range` hat keine kryptografische Selektivlöschung; Blob-Lochstrategie setzt optionale Hole-Punch-Unterstützung voraus | Keine Crypto-Löschzusage für Teilbereiche eines Cluster-Schlüssels. Hole-Ratio-Schwelle und Umschreiben in neue Blob-Inkarnation; Cluster-Key-Rotation bleibt separates, teures Verfahren und ist nicht Teil v1 | ERASE/BLOB |
+| E-50 | `space_drop` umgeht in der beschriebenen Zustandsfolge Cluster-Restrictions und hat keinen Ledger-Scope | Snapshot der enthaltenen Cluster + `BLOCK_ERASE`-Prüfung atomar vor Gate; Restricted-Cluster blockieren Drop. Dedizierter pseudonymer Space-Tombstone und Receipt-Scope | ERASE/LEDGER |
+| E-51 | Memtable-Klartextreklamation ist bei Skiplist-Aliasing/`Bytes`-Clones nicht garantiert | Verbindliche Reclamation-Regel: keine unkontrollierten Klartext-Clone-Pfade; Zeroize bei letzter exklusiver Freigabe, Gate invalidiert Generation und wartet/markiert aktive Leser. OS-/Swap-Reste bleiben Restrisiko; Zeroize-Container allein ist kein Beweis | MEMVER/READ |
+| E-52 | Blob-Purge mit unveränderten Offsets ist auf FS ohne Hole-Punch unbeschränkt teuer; Plain-Barriere invalidiert Feed-Consumer | Abschnittsweise neue Inkarnation ab konfigurierter Hole-Ratio; `Plain`-Barriere liefert explizites Feed-Epoch/`Lagged`-Signal und dokumentierte Rebuild-Route, nie stilles Überspringen | BLOB/ERASE/EXT |
+| E-53 | Extension-Watermark ist nicht explizit an durable Kern-Sicht gebunden | Indexierung darf nur `durable_stamp` bestätigen; `view()`-Daten sind nicht als dauerhaft angewandt quittierbar. `filter_visible` ist obligatorisch und wird an der Query-Fassade erzwungen | EXT/READ |
+| E-54 | `Mixed`-Segmente haben keine per-Cluster-Krypto-/RAM-/Löschkosten-Garantie | Jeder Segmentbesitzer erklärt Schutzdomäne, Datenanteil, Rewrite-Kosten, RAM-Budget, Gate-Filter und Attestationsformat. Für `Sealed` nur clusterweise verschlüsselte Sektionen oder gleichwertige Schlüsselvernichtung; sonst keine Crypto-Erasure-Attestation | EXT/ERASE |
+| E-55 | Gesamtsystem-RAG-Atomarität und `DeletionProof` v3 sind nicht durch den Storage-Receipt abgedeckt | Ein Change kann KV-/Dokument-/Vektor-Payloads atomar persistieren, nicht globalen HNSW-Rewire. Derived-Index-Watermarks und signierte obere Proof-Brücke als getrennte Verträge; kein R8-Receipt behauptet Gesamtsystemlöschung | EXT/BRIDGE |
+| E-56 | Providerfehlerzustände `Unavailable`, `Destroyed`, `Disabled`, `Lost` sind semantisch nicht gleichwertig | Nur bestätigtes `Absent` erfüllt Crypto-Erasure; Nichterreichbarkeit/Verlust blockieren bzw. ergeben `Incomplete`, nie `KeysDestroyed` | KEYS/ERASE/RECOVERY |
 
 ## 4 Querschnittsregeln für alle SPs
 1. Kein `unwrap/expect/panic/indexing`; `Result` mit typisierter Fehlerklasse (F-1…F-9); Fehlertexte ohne Inhalte (Canary-Test).

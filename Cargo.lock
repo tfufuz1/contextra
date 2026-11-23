@@ -966,6 +966,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-crypto-ref"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "chacha20 0.9.1",
+ "chacha20poly1305",
+ "contextra-storage-ports",
+ "hkdf",
+ "sha2",
+ "zeroize",
+]
+
+[[package]]
 name = "contextra-db"
 version = "0.1.0"
 dependencies = [
@@ -1172,6 +1185,20 @@ dependencies = [
  "unicode-segmentation",
  "yaml-rust2",
  "zip 0.6.6",
+]
+
+[[package]]
+name = "contextra-keys-cohort"
+version = "0.1.0"
+dependencies = [
+ "contextra-storage-ports",
+]
+
+[[package]]
+name = "contextra-keys-file"
+version = "0.1.0"
+dependencies = [
+ "contextra-storage-ports",
 ]
 
 [[package]]
@@ -1396,12 +1423,34 @@ dependencies = [
 name = "contextra-storage"
 version = "0.1.0"
 dependencies = [
- "aes-gcm-siv",
- "blake3",
- "contextra-ports",
+ "bytes",
+ "contextra-storage-ports",
+ "thiserror 1.0.69",
+ "zeroize",
+]
+
+[[package]]
+name = "contextra-storage-bridge"
+version = "0.1.0"
+dependencies = [
  "contextra-storage",
- "loom",
- "proptest",
+ "contextra-storage-ports",
+]
+
+[[package]]
+name = "contextra-storage-fs"
+version = "0.1.0"
+dependencies = [
+ "contextra-storage-ports",
+]
+
+[[package]]
+name = "contextra-storage-ports"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]

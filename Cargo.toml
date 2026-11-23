@@ -1,7 +1,13 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/contextra-storage",
+    "crates/contextra-storage/crates/contextra-storage",
+    "crates/contextra-storage/crates/contextra-storage-ports",
+    "crates/contextra-storage/crates/contextra-storage-fs",
+    "crates/contextra-storage/crates/contextra-crypto-ref",
+    "crates/contextra-storage/crates/contextra-keys-file",
+    "crates/contextra-storage/crates/contextra-keys-cohort",
+    "crates/contextra-storage/crates/contextra-storage-bridge",
     "crates/contextra-wire",
     "crates/contextra-sys",
     "crates/contextra-simd",
@@ -43,6 +49,13 @@ members = [
 # Restored archived crates to default-members:
 # contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama, contextra-core
 default-members = [
+    "crates/contextra-storage/crates/contextra-storage",
+    "crates/contextra-storage/crates/contextra-storage-ports",
+    "crates/contextra-storage/crates/contextra-storage-fs",
+    "crates/contextra-storage/crates/contextra-crypto-ref",
+    "crates/contextra-storage/crates/contextra-keys-file",
+    "crates/contextra-storage/crates/contextra-keys-cohort",
+    "crates/contextra-storage/crates/contextra-storage-bridge",
     "crates/contextra-durable-fs",
     "crates/contextra-wire",
     "crates/contextra-sys",
@@ -77,6 +90,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 rust-version = "1.89"
+publish = false
 
 [workspace.dependencies]
 # Error handling
@@ -103,6 +117,11 @@ regex = "1"
 # Crypto & hashing
 blake3 = "1"
 crc32fast = "1.3"
+zeroize = "1"
+chacha20 = "0.9"
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
+sha2 = "0.10"
 
 # Concurrency
 rand = "0.8"
@@ -121,7 +140,7 @@ contextra-sys = { path = "crates/contextra-sys" }
 contextra-simd = { path = "crates/contextra-simd" }
 contextra-core = { path = "crates/contextra-core" }
 contextra-store = { path = "crates/contextra-store" }
-contextra-storage = { path = "crates/contextra-storage" }
+contextra-storage = { path = "crates/contextra-storage/crates/contextra-storage" }
 contextra-vector = { path = "crates/contextra-vector" }
 contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" } # <!-- crate-ref-ignore -->
 contextra-db = { path = "crates/contextra-db" }

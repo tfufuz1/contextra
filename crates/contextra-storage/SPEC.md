@@ -324,7 +324,7 @@ ClusterSection := DataBlock* · SubIndexBlock · FilterBlock · RangeDelBlock
 
 ### 5.7 Blob
 
-`Blob := header ‖ ClusterSection* (Record*) ‖ ClusterDirectory ‖ footer`, `Record := len u32 | SealFrame | crc32c`. Ziel ≤ 64 MiB. **Inkarnation:** Entfällt ein Abschnitt, entsteht eine neue Inkarnation derselben `blob_id` mit **gleichen Offsets** (Löcher, `punch_hole` wenn verfügbar); Catalog-Edit `blob_replace`. Blob-GC zieht in eine neue `blob_id` um und versiegelt neu. Ein Blob/eine Inkarnation wird nur entfernt, wenn **kein lebender Run** mehr einen `PutRef` darauf enthält (`INV-BLOB-1`).
+`Blob := header ‖ ClusterSection* (Record*) ‖ ClusterDirectory ‖ footer`, `Record := len u32 | SealFrame | crc32c`. Ziel ≤ 64 MiB. **Inkarnation:** Kleine Löcher dürfen bei unterstütztem Hole-Punch dieselbe `blob_id`/Offsets behalten. Überschreitet Fragment-/Hole-Ratio den Grenzwert oder fehlt effizientes Hole-Punch, wird in eine neue `blob_id` mit gepackten Überlebenden umgeschrieben; Catalog-Edit `blob_replace` aktualisiert Referenzen atomar. Blob-GC darf zusätzlich in eine neue `blob_id` umziehen und neu versiegeln. Eine Blob-Datei/Inkarnation wird nur entfernt, wenn **kein lebender Run** mehr einen `PutRef` darauf enthält (`INV-BLOB-1`).
 
 ### 5.8 Catalog
 
@@ -377,7 +377,7 @@ Je Space: Memtable einfrieren → je Cluster ein Abschnitt (**Retired-Cluster we
 
 ### 6.5 Idempotenz
 
-`IdemToken` im Frame-Kopf und in einer begrenzten Tabelle (TTL 24 h, `idem_trim`). Die Tabelle enthält **keine Inhalte und keine Cluster-Kennungen**. Wiederholung eines durablen Changes ⇒ `AlreadyApplied{stamp}`.
+`IdemToken` im Frame-Kopf; Committer emittiert zusätzlich einen internen `SYS_IDEM`-Record im **selben Redo-Frame/Commit** wie den Change. `SYS_IDEM` ist ein reservierter, instanzweiter Systemspace unter dediziertem System-DEK; Record-Schlüssel und Request-Fingerprint sind keyed HMACs, kein Nutzwert und keine Klartext-ClusterId. Systemspace-Key/HMAC-Epoche bleibt bis Ablauf aller damit markierten Tokens verfügbar. Record-Payload wird vor Rang 1 versiegelt; Ergebnis-Stamp ist der äußere MVCC-Stamp des SYS_IDEM-Records, kein im Committer zu versiegelndes Feld. Aktive Records dürfen nicht durch `replay_floor` verworfen werden: sie werden geflusht/kompaktiert und bis TTL-Ende gepinnt. Gespeichert werden Token-Scope/Hash, kanonischer Request-Fingerprint, Status, Ablaufbucket und pseudonymes Cluster-Scope-Digest aus `tomb_id`s. Catalog-`idem_trim` ist nur eine durable Trim-Wasserstands-/Epoch-Marke, kein per-Commit zweiter Fsync. Aktive Tokenanzahl und SYS_IDEM-Bytes sind konfigurationsbegrenzt; bei ausgeschöpftem Limit wird ein tokenierter Commit vor Mutation mit `IdemCapacity` abgelehnt, aktive Tokens werden nie vorzeitig verdrängt. Bei nicht verfügbarem SYS_IDEM-Schlüssel werden tokenierte Reads/Writes fail-closed abgelehnt; kein Retry darf ohne Idem-Prüfung committen. Systemspace-Format, Schlüsselableitung, TTL-Index, Limits und Trim-Recovery sind G-F-Formatbestandteil. Wiederholung desselben Changes ⇒ gespeichertes Ergebnis; Token mit abweichendem Request ⇒ `IdemConflict`; nach Cluster-Retire ⇒ `Erased`/`ClusterRetired`, niemals neues Apply.
 
 ### 6.6 Notbetrieb bei vollem Datenträger
 
@@ -416,7 +416,7 @@ Redo, Catalog und Ledger schreiben nur in **vorallokierte** Bereiche (AN-10); `E
 
 ### 8.2 Branch-Metadaten
 
-Branch-Metadaten liegen **im Cluster**, nicht im Catalog: reservierter Space `SYS_BRANCH` (SpaceId 1, clustered, `personal`-Regeln wie der Cluster), Eintrag `branch_id → { name (≤ 64 B, opak), parent, fork_stamp, state: Live|Merged|Dropped, ttl, created_by }`. Der Catalog bleibt frei von Namen und Nutzdaten. Eine In-Memory-Tabelle je Cluster (Blatt in `cluster_table`) wird beim ersten Zugriff aufgebaut.
+Branch-Metadaten liegen **im Cluster**, nicht im Catalog: reservierter Space `SYS_BRANCH` (SpaceId 1, clustered, `personal`-Regeln wie der Cluster), Eintrag `branch_id → { name (≤ 64 B, opak), parent, fork_point: Head|At(Stamp), state: Live|Merged|Dropped, ttl, created_by }`. Für `Head` ist der MVCC-Stamp des Branch-Erstellungsrecords der `fork_stamp`; der Stamp wird nicht zusätzlich im versiegelten Payload dupliziert. Der Catalog bleibt frei von Namen und Nutzdaten. Eine In-Memory-Tabelle je Cluster (Blatt in `cluster_table`) wird beim ersten Zugriff aufgebaut.
 
 ### 8.3 Lesen auf einem Branch
 
@@ -439,7 +439,7 @@ Fork ist eine Op im Committer (ID-Vergabe, `fork_stamp = aktueller Stamp`); Kost
 
 - **Diff** `(view_a, view_b, cluster)`: Menge der Schlüssel, deren sichtbare Version sich unterscheidet. Kosten ∝ Clustergröße (nicht Storegröße); für Branches ∝ Zahl der Branch-Einträge, weil nur diese seit `fork_stamp` geändert sind.
 - **Merge `source → target`** in drei Schritten:
-  1. **Berechnung:** `K` = Schlüssel der Eigeneinträge von `source` (Stamp > `fork_stamp`). Für jeden Schlüssel prüft der Merge, ob `target` seit `merge_base` (= `fork_stamp` bzw. letzter Merge) eine Änderung trägt. Gleiche Endzustände (Kopf+Körper bytegleich) sind **kein** Konflikt.
+  1. **Berechnung:** `K` = Schlüssel/Intervalle der Eigeneinträge von `source` (Stamp > `fork_stamp`). Für jeden Effekt prüft der Merge, ob `target` seit `merge_base` (= `fork_stamp`) eine überlappende Punkt- oder Bereichsänderung trägt. Gleiche Endzustände (Kopf+Körper bytegleich sowie gleiche Löschsemantik) sind **kein** Konflikt.
   2. **Ergebnis:** `Merged(Receipt)` oder `Conflicts(Vec<ConflictCell>)`; **bei Konflikten wird nichts geschrieben.** `ConflictCell { key, base, ours, theirs }` sind Daten der Aufrufer-Schicht, nicht persistiert.
   3. **Anwendung:** Die Konfliktlösung (`Source | Target | Value(NewValue)` je Schlüssel) ist ein normaler `Change` auf `target` mit Guards `Unchanged{since: merge_base}` je Schlüssel und einem Merge-Frame-Flag `merge_of = (source, source_head_stamp)`; danach wird `source` `Merged(at stamp)`. Alles **atomar in einem Frame**.
 - **Core-Modi:** `FailOnConflict`, `PreferSource`, `PreferTarget`. **Typisierte Strategien (LWW, Union, Summe, Textmerge, semantischer LLM-Merge) liegen oben** und liefern die Auflösung; Tag `Merge=6` bleibt reserviert (NZ-4).
@@ -547,7 +547,7 @@ purge(plan: Dateien mit Claims, D: Dropmenge):
      keep = ∅  → files_remove(F)
      sonst     → F' aus roh kopierten Abschnitten von keep (neue file_id, neues Directory, sync_all, rename, sync_dir);
                  files_add(F'), files_remove(F)
-  Blobs: Inkarnation mit Löchern bzw. entfernen · Segmente: SegmentOwner::rewrite_without
+  Blobs: optionale Hole-Punch-Inkarnation nur unter Fragmentgrenze, sonst Repack in neue blob_id · Segmente: SegmentOwner::rewrite_without
   alles in EINEM Edit (ER6)
 ```
 
@@ -756,6 +756,24 @@ Jeder abgeleitete Index führt `applied_stamp = watermark()`. Eine Abfrage unter
 
 ---
 
+### 12.8 Verbindliche Korrekturen aus dem R8-Audit (vor G-0/G-F)
+
+Diese Regeln ergänzen die bisherigen Abschnitte und gehen bei Widerspruch vor. Detaillierte Arbeitspakete und Abnahmen stehen in `crates/contextra-storage/25-r8-audit-remediation.md`.
+
+1. **Branch-Vorbereitung:** Branch-IDs werden per bestehendem `reserve_ids` außerhalb Rang 1 reserviert. SYS_BRANCH-Payload wird auf dem Aufruferthread versiegelt; kein `KeyProvider`, Cipher oder KDF-Aufruf unter Rang 1. Commit-Stamp wird ausschließlich im Sequencer vergeben und steht als äußerer MVCC-/Frame-Stamp bereit, nicht als stamp-abhängiges Feld im versiegelten Payload: `Head`-Fork leitet `fork_stamp` aus dem SYS_BRANCH-Record-Stamp ab, `Merged`-Status ebenfalls. Sequencer validiert Reservierung, Parent-Head, Cluster-Generation und Branch-Zustand erneut. Stamp-Vorreservierung pro Branch ist nicht erforderlich und darf keine Commit-Reihenfolge vortäuschen.
+2. **Branch-Korrektheit:** `ForkPoint` wird normativ als `Head | At(Stamp)` definiert. `Head` linearisiert im Committer. `At(S)` ist nur gültig, wenn `gc_floor ≤ S ≤ parent_head` und Cluster/Branch nicht retired/closed sind. Merge-Konfliktmenge schließt Punkt- und Intervalländerungen ein: `Delete`, `RangeDelete` und `EraseRange` kollidieren mit überlappenden Mutationen seit `merge_base`. Merge-Plan bindet `source_head`, `target_head` und `merge_base`; Commit prüft diese erneut atomar. Erfolgreich gemergte Source-Branches sind terminal (`Merged`); für weitere Änderungen wird ein neuer Branch geforkt, daher bleibt `merge_base=fork_stamp` eindeutig.
+3. **Idempotenz-Retention:** Idempotenz-Ergebnis (Token-Scope/Hash, Request-Fingerprint, Ergebnis-Stamp/Status und pseudonymes Cluster-Scope-Digest aus sortierten `tomb_id`s) überlebt Redo-`replay_floor` unabhängig, solange TTL aktiv ist. Es wird erst nach Ablauf plus durablem `idem_trim` entfernt. Scope enthält keine Nutzdaten/Klartext-ClusterIds. Retry auf inzwischen `Retired`-Cluster liefert `Erased`/`ClusterRetired`, niemals ein scheinbar neues Apply. Token-Wiederverwendung mit anderem Request-Inhalt wird als `IdemConflict` abgelehnt.
+4. **Löschgranularität:** `Eraser::range` bietet `Logical`, `Physical` und `Scrubbed`, aber **keine kryptografische Einzelbereichslöschung**. `key_epoch`-Rotation macht alte Cluster-Daten erst nach vollständigem Rewrap aller zu erhaltenden Daten und Vernichtung aller alten Epochen unlesbar; sie ist ein eigener, ressourcenintensiver Workflow und kein v1-Range-Versprechen. Für sofortige Crypto-Erasure müssen Daten in getrennte Cluster/Löschdomänen gelegt werden.
+5. **Space-Drop:** Vor dem Gate wird die vollständige Cluster-Menge unter Sequencer-Ordnung eingefroren und auf `BLOCK_ERASE` geprüft. Eine Restriction blockiert den gesamten Drop atomar; teilweise Drops sind explizite Cluster-Tickets. Für Restore-Abgleich erhält jeder Cluster einen pseudonymen Tombstone-Eintrag (`tomb_id`) und zusätzlich `SpaceDropped` als Aggregate mit Scope-Digest/Anzahl/Evidence; nur ein Aggregat könnte keine einzelnen wiederkehrenden Cluster in alten Backups identifizieren. Keine Nutzdaten oder Klartext-Clusterliste im Ledger. Receipt weist den tatsächlich erfassten Scope aus.
+6. **Klartext-Reclamation:** `Zeroizing` ist eine Maßnahme, kein Beweis für sämtliche Kopien. Memtable-/Cache-Interfaces verbieten unkontrollierte Clone-Pfade für Klartext; Ausgaben liegen in Zeroizing-Puffern. Gate erhöht Generation, entzieht neue Zugriffe und wartet auf Leser-Epochen bzw. weist noch aktive Leser als Exposition aus, bevor `Purged`/Receipt Abschluss behauptet. Allocator-/OS-Kopien sicher zu nullen ist keine Garantie und bleibt Restrisiko.
+7. **Blob-Purge:** Purge darf nicht auf `punch_hole` angewiesen sein. Überschreitet der zu entfernende Anteil den konfigurierten Hole-Ratio- oder Max-Fragment-Grenzwert, wird eine neue `blob_id` mit gepackten Überlebenden geschrieben und per Catalog-Edit ersetzt. Reserveplatz und maximale Rewrite-Gruppe sind harte Admission-Grenzen. `Plain`-Barriere invalidiert Consumer explizit mit Epoch-Wechsel/`Lagged`; kein Consumer darf eine Lücke als verarbeitet bestätigen.
+8. **Durable Extensions:** `watermark` darf nur bis zum höchsten angewandten `durable_stamp` reichen. Extension-Builder liest nur durable Views oder durable Feed-Frames. Query-Fassade erzwingt `filter_visible` nach Kandidatenfund und erneut vor Rückgabe (Generation-Check); ungefilterte Indexresultate sind kein unterstützter API-Pfad.
+9. **Mixed-Segment-Erasure:** Jeder `SegmentOwner` deklariert `SegmentClass = ClusterSections | MixedPerClusterKey | Rebuildable{max_age} | NoPersonalData`, Schutzdomäne, Löschgranularität, RAM-Budget, Rewrite-/Rebuild-Obergrenze und Attestationsformat. Für `Sealed` muss jeder clusterbezogene Payload mit Cluster-Schlüssel/Epoche oder gleichwertig isoliertem Schlüssel geschützt sein; ein globaler Segment-Key reicht nicht für `INV-ERA-7`. `Rebuildable` bleibt bis zum bestätigten Rebuild `Purging`, nie `Done`. `NoPersonalData` ist deklarativ und erhält keine Crypto-Erasure-Zusage.
+10. **RAG-/Audit-Grenze:** Ein `Change` kann Dokumentdaten, quantisierte Vektoren, BM25-Postings und Graph-Deltas atomar persistieren, sofern sie als Records derselben Cluster-Löschdomäne modelliert sind. Globale HNSW-Nachbarschaftsreparatur bleibt abgeleiteter Index-Job und wird nicht im selben Kern-Commit garantiert. Sie nutzt durable Watermarks, Gate-Filter und attestierten Rewrite/Rebuild. `ErasureReceipt` attestiert nur Kern und registrierte Extensions; signierte v15-`DeletionProof`s entstehen über eine versionierte Bridge aus Receipt plus Extension-Attesten. Ohne vollständige Atteste kein systemweites `Complete`.
+11. **Gesamtsystem-Ressourcenbudget:** Storage und Extensions teilen einen `MemoryBudget` mit getrennten Limits für Memtables, Cluster-Metadaten, Guard-Fenster, Block-/Key-Cache, Index-Delta, In-flight-Rewrites und temporären Purge-Platz. Admission/Backpressure erfolgt vor Commit/Index-Job; keine Schicht darf unbeschränkt RAM oder Rewrite-Scratch allokieren. Budgets werden gemeinsam im RAG-Lastprofil gemessen.
+12. **Archive-Konsolidierung:** Ältere Lethe-Entwürfe sind Designmaterial, keine zusätzliche Norm. Übernommen werden SYS_IDEM-Retention, Extension-Klassen/Atteste und gemeinsames Speicherbudget. Nicht übernommen werden globale EU-Tags/Content-Addressing, In-place-Scrub als Durability-Annahme sowie Zusagen kryptografischer Teillöschung.
+13. **Schlüsselzustände (E-56):** `KeyUnavailable`, `KeyDestroyed/Absent`, `KeyDisabled` und `KeyLost` sind getrennte Zustände. Nur bestätigtes `Absent` erfüllt Crypto-Erasure; `Unavailable`/`Lost` blockieren oder markieren `Incomplete`, `Disabled` bleibt `KeyDestroying` mit Restrisiko. Provider-Nichterreichbarkeit darf nie als Vernichtung interpretiert werden.
+
 ## 13. Verifikation
 
 ### 13.1 Ebenen
@@ -815,6 +833,8 @@ Planungsannahme für 3–4 erfahrene Rust-Entwickler plus 1 Test-/Simulationsing
 | **P6 Löschung komplett** | Links, Restrictions (`LiftPolicy`), Abwurf, Space-Drop, `range`, Ledger/Anker, Checkpoint/Restore, `keys-file`, `keys-cohort`, `SegmentOwner`/`ExtensionBlock`, Receipt + `verify_receipt`, volle Orakel | **G-E:** M2/M4/M5/M6 geprüft, Orakel 0 Treffer, INV-ERA-11 (Lokalität), H-6…H-11, H-17, Konformanzsuite grün | 6 Wo. |
 | **P7 Versionierung** | `BRANCHES`-Feature-Bit, `SYS_BRANCH`, Fork/Drop/TTL, Branch-Lesen, Diff, Merge, `Eraser::branch`, Fork-Floor | **G-V:** Branch-Properties vs. Modell, M2/M3 mit Branches, H-20…H-22, Orakel mit Branch-Canaries | 5 Wo. |
 | **P8 Härtung** | Soak 72 h, Dauer-Fuzz, Platte voll, Fehlerinjektion, Fassade, Abdeckung, Krypto-Review, Messbericht, Bedrohungsmodell-Review | **G-P:** alle INV getestet (100 %), H-15/H-16, Messbericht §17, keine offenen Korruptionsbefunde | 5 Wo. |
+
+**G-CUTOVER (P8+, SP-CUTOVER 24):** separates Produktfreigabe-Gate nach G-P. Erst wenn sämtliche produktiven `contextra-store`-Verbraucher, Datenräume und Erasure-Witnesses migriert, Restore-/Rollback-Rehearsal und RAG-Differentialmessung bestanden sowie gemeinsames Speicherbudget belegt sind, wird `contextra-storage` alleiniger Produktions-Schreibkern. Nach ersten R8-Writes ist Rückkehr nur per geprüftem Forward-Export oder Restore möglich; kein Dual-Write. Bis dahin gelten R8-Leistungs- und Löschvorteile als unbestätigte Ziele.
 
 Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur per Migration. In jeder Phase wird der Crash-Sweep um die neuen Fs-Operationen **erweitert, nie nachgezogen**. Erst nach G-P werden aufsetzende Komponenten (Kontext-Engine, Indizes, MCP-Server) angebunden.
 

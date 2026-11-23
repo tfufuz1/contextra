@@ -32,6 +32,7 @@ impl Storage {
     /// SP-CATALOG (WP-06.2). Validiert zuerst die Konfiguration.
     pub fn open(config: Config) -> Result<Storage, Error> {
         config.validate()?;
+        // TODO: CATALOG open (SP-CATALOG WP-06.2)
         Err(Error::NotImplemented { sp: "CATALOG open" })
     }
 }
