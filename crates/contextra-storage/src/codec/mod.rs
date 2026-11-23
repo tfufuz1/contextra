@@ -7,6 +7,7 @@ pub mod bytes;
 pub mod crc32c;
 pub mod keyrange;
 pub mod limits;
+pub mod seal;
 pub mod tag;
 pub mod varint;
 pub mod xxh64;
