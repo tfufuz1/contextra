@@ -3,7 +3,6 @@ pub mod canary;
 pub mod crash_sweep;
 pub mod ghost;
 pub mod inspector;
-pub mod keys;
 pub mod model;
 pub mod oracle;
 pub mod workload;

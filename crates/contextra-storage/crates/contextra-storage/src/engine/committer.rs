@@ -96,7 +96,10 @@ impl<'a> Committer<'a> {
         }
         if frames.is_empty() { return Err(Error::Limit { limit: "commit group must not be empty" }); }
         if frames.first().is_some_and(|frame| frame.head.stamp <= self.last_published)
-            || frames.windows(2).any(|pair| pair[0].head.stamp >= pair[1].head.stamp)
+            || frames.windows(2).any(|pair| {
+                pair.first().zip(pair.get(1))
+                    .is_some_and(|(first, second)| first.head.stamp >= second.head.stamp)
+            })
         {
             return Err(Error::Limit { limit: "commit stamps must increase" });
         }

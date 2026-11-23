@@ -1,6 +1,6 @@
 //! Open-time integrity decisions, including the E-57 key-loss distinction.
 
-use contextra_storage_ports::{Error, KeyProbe};
+use contextra_storage_ports::{Error, KeyState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyRecoveryState { Available, Shredded }
@@ -8,13 +8,12 @@ pub enum KeyRecoveryState { Available, Shredded }
 /// A provider error must be propagated as `KeyUnavailable` by its adapter.
 /// Absence alone is never evidence of deletion: only a durable erase record
 /// permits recovery to classify it as Shredded.
-pub fn reconcile_cluster_key(probe: KeyProbe, erase_proven: bool) -> Result<KeyRecoveryState, Error> {
+pub fn reconcile_cluster_key(probe: KeyState, erase_proven: bool) -> Result<KeyRecoveryState, Error> {
     match (probe, erase_proven) {
-        (KeyProbe::Present, _) => Ok(KeyRecoveryState::Available),
-        (KeyProbe::Absent, true) => Ok(KeyRecoveryState::Shredded),
-        (KeyProbe::Absent, false) => Err(Error::Corrupt { place: "cluster key lost without erase proof" }),
-        (KeyProbe::Disabled, true) => Err(Error::KeyUnavailable { retry_after_secs: None }),
-        (KeyProbe::Disabled, false) => Err(Error::Corrupt { place: "cluster key disabled without erase proof" }),
+        (KeyState::Present, _) => Ok(KeyRecoveryState::Available),
+        (KeyState::Absent, true) => Ok(KeyRecoveryState::Shredded),
+        (KeyState::Absent, false) => Err(Error::KeyLost),
+        (KeyState::Disabled, _) => Err(Error::KeyUnavailable { retry_after_secs: None }),
     }
 }
 

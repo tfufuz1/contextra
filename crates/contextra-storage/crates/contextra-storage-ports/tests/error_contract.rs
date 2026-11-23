@@ -17,3 +17,10 @@ fn indeterminate_and_disk_full_keep_their_recovery_classes() {
     );
     assert_eq!(Error::DiskFull.class(), ErrorClass::DiskFull);
 }
+
+#[test]
+fn erased_error_has_a_static_action_hint() {
+    let error = Error::Erased { at: 123 };
+    assert_eq!(error.class(), ErrorClass::Usage);
+    assert!(!error.hint().contains("123"));
+}

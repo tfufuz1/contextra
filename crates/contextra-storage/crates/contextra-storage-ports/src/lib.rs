@@ -14,8 +14,10 @@ pub use change::{
 };
 pub use error::{Error, ErrorClass};
 pub use ids::{
-    BatchId, BranchId, ClusterId, DataClass, DurablePosition, EraseRequestId,
+    BranchId, ClusterId, DataClass, DurablePosition, EraseRequestId,
     IdemToken, InstanceId, Redacted, SpaceId, Stamp, Ticket, TombId,
     FIRST_USER_SPACE_ID, STAMP_MAX, SYSTEM_SPACE_ID_MAX,
 };
-pub use keys::{Key32, KeyCreateFailure, KeyCreateResult, KeyLookup, KeyProbe, KeyProvider, MAX_KEYS_PER_BATCH};
+pub use keys::{
+    DestroyBehavior, DestroyReceipt, KekId, Key32, KeyProvider, KeyProviderInfo, KeyState,
+};

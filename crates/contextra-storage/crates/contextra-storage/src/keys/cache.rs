@@ -2,7 +2,7 @@
 
 use crate::sync::ranked::Ranked;
 use contextra_storage_ports::traits::Clock;
-use contextra_storage_ports::{ClusterId, Error, Key32, KeyLookup, KeyProvider};
+use contextra_storage_ports::{ClusterId, Error, Key32, KeyProvider};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -95,10 +95,10 @@ impl KeyCache {
             (generation, snapshot, stale)
         };
 
-        let lookup = self.provider.cluster_keys(&[(cluster, epoch)]);
-        let lookup = match lookup {
-            Ok(mut results) if results.len() == 1 => results.pop().ok_or(Error::Corrupt { place: "key provider batch length" })?,
-            Ok(_) => return Err(Error::Corrupt { place: "key provider batch length" }),
+        let lookup = self.provider.cluster_key(cluster, epoch);
+        let key = match lookup {
+            Ok(Some(key)) => key,
+            Ok(None) => return Err(Error::KeyLost),
             Err(error) => {
                 if error.class() == contextra_storage_ports::ErrorClass::Transient {
                     if let Some(entry) = stale.filter(|entry| within_grace(now, entry.expires_at, self.grace_nanos)) {
@@ -110,11 +110,6 @@ impl KeyCache {
                 }
                 return Err(error);
             }
-        };
-        let key = match lookup {
-            KeyLookup::Present(key) => key,
-            KeyLookup::Shredded => { self.invalidate(cluster)?; return Err(Error::Shredded); }
-            KeyLookup::Missing => return Err(Error::KeyLost),
         };
         let generation_value = generation.load(Ordering::Acquire);
         let expires_at = now.checked_add(self.ttl_nanos).ok_or(Error::Limit { limit: "key cache TTL overflow" })?;
@@ -133,8 +128,8 @@ impl KeyCache {
         Ok(make_handle(&*result_key, generation, generation_value))
     }
 
-    /// Batch fetches misses in provider-sized groups and never calls the
-    /// provider while holding the cache lock.
+    /// Fetches bounded groups of misses without holding the cache lock across
+    /// provider calls.
     pub fn prefetch(&self, request: &[(ClusterId, u32)]) -> Result<(), Error> {
         for chunk in request.chunks(MAX_PREFETCH) {
         let now = self.clock.read()?.monotonic_nanos;
@@ -155,21 +150,13 @@ impl KeyCache {
                 (misses, generations)
             };
             if misses.is_empty() { continue; }
-            let results = self.provider.cluster_keys(&misses)?;
-            if results.len() != misses.len() { return Err(Error::Corrupt { place: "key provider batch length" }); }
             let expires_at = now.checked_add(self.ttl_nanos).ok_or(Error::Limit { limit: "key cache TTL overflow" })?;
-            let mut resolved = Vec::with_capacity(results.len());
-            for ((cluster, epoch), lookup) in misses.iter().zip(results) {
-                let index = resolved.len();
+            let mut resolved = Vec::with_capacity(misses.len());
+            for (index, (cluster, epoch)) in misses.iter().enumerate() {
                 let (generation, expected) = generations.get(index).ok_or(Error::Corrupt { place: "key cache prefetch generation" })?;
-                match lookup {
-                    KeyLookup::Present(key) => {
-                        if generation.load(Ordering::Acquire) != *expected { return Err(Error::ClusterRetired); }
-                        resolved.push((*cluster, *epoch, Zeroizing::new(*key.expose())));
-                    }
-                    KeyLookup::Shredded => { self.invalidate(*cluster)?; return Err(Error::Shredded); }
-                    KeyLookup::Missing => return Err(Error::KeyLost),
-                }
+                let key = self.provider.cluster_key(*cluster, *epoch)?.ok_or(Error::KeyLost)?;
+                if generation.load(Ordering::Acquire) != *expected { return Err(Error::ClusterRetired); }
+                resolved.push((*cluster, *epoch, Zeroizing::new(*key.expose())));
             }
             let mut state = self.state.lock()?;
             for (index, (cluster, epoch, key)) in resolved.into_iter().enumerate() {

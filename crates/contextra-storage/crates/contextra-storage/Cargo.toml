@@ -16,7 +16,7 @@ zeroize = "1"
 crossbeam-skiplist = { workspace = true }
 
 [dev-dependencies]
-contextra-crypto-ref = { path = "../contextra-crypto-ref" }
+contextra-crypto-ref = { path = "../contextra-crypto-ref", features = ["testing"] }
 
 [lints]
 workspace = true

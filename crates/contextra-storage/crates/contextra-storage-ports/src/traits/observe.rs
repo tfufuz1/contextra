@@ -21,18 +21,23 @@ pub enum MetricName {
     MaintenanceDurationNanoseconds,
     EraseOpenTickets,
     EraseOldestPendingNanoseconds,
+    EraseOperationsTotal,
     EraseDeadlineBreachesTotal,
     EraseGateDurationNanoseconds,
     EraseKeyDestroyDurationNanoseconds,
     EraseStageDurationNanoseconds,
     ErasePurgeBytesTotal,
+    EraseReserveFreeBytes,
+    EraseReserveUsedBytes,
     AnchorLagNanoseconds,
     ConsumerLagBytes,
     ConsumerLagStamps,
+    ExtensionBlockedOwners,
     GuardSlowpathRatio,
     BranchCount,
     BranchMaxDepth,
     BranchOldestPinNanoseconds,
+    BranchHistoryFloor,
     ErrorsTotal,
     Poisoned,
 }
@@ -55,18 +60,23 @@ impl MetricName {
             Self::MaintenanceDurationNanoseconds => "ctxs_maintenance_duration_nanoseconds",
             Self::EraseOpenTickets => "ctxs_erase_open_tickets",
             Self::EraseOldestPendingNanoseconds => "ctxs_erase_oldest_pending_nanoseconds",
+            Self::EraseOperationsTotal => "ctxs_erase_operations_total",
             Self::EraseDeadlineBreachesTotal => "ctxs_erase_deadline_breaches_total",
             Self::EraseGateDurationNanoseconds => "ctxs_erase_gate_duration_nanoseconds",
             Self::EraseKeyDestroyDurationNanoseconds => "ctxs_erase_key_destroy_duration_nanoseconds",
             Self::EraseStageDurationNanoseconds => "ctxs_erase_stage_duration_nanoseconds",
             Self::ErasePurgeBytesTotal => "ctxs_erase_purge_bytes_total",
+            Self::EraseReserveFreeBytes => "ctxs_erase_reserve_free_bytes",
+            Self::EraseReserveUsedBytes => "ctxs_erase_reserve_used_bytes",
             Self::AnchorLagNanoseconds => "ctxs_anchor_lag_nanoseconds",
             Self::ConsumerLagBytes => "ctxs_consumer_lag_bytes",
             Self::ConsumerLagStamps => "ctxs_consumer_lag_stamps",
+            Self::ExtensionBlockedOwners => "ctxs_extension_blocked_owners",
             Self::GuardSlowpathRatio => "ctxs_guard_slowpath_ratio",
             Self::BranchCount => "ctxs_branch_count",
             Self::BranchMaxDepth => "ctxs_branch_max_depth",
             Self::BranchOldestPinNanoseconds => "ctxs_branch_oldest_pin_nanoseconds",
+            Self::BranchHistoryFloor => "ctxs_branch_history_floor",
             Self::ErrorsTotal => "ctxs_errors_total",
             Self::Poisoned => "ctxs_poisoned",
         }
@@ -76,11 +86,11 @@ impl MetricName {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetricResult { Ok, Error, Blocked, Incomplete }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MaintenancePhase { Flush, Compact, BlobGc, Scrub, Purge }
+pub enum MaintenancePhase { Flush, Compaction, BlobGc, Scrub, Purge }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EraseStage { Gate, KeyDestroy, Purge, Verify, Done }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OwnerKind { Index, Feed, Backup, Other }
+pub enum OwnerKind { Vector, Text, Graph, Identity, Cache, Feed, Backup, Other }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetricLabelKey {
@@ -162,7 +172,7 @@ impl MetricLabel {
             Self::ResourceClass(ResourceClass::Inflight) => "inflight",
             Self::ResourceClass(ResourceClass::PurgeScratch) => "purge_scratch",
             Self::MaintenancePhase(MaintenancePhase::Flush) => "flush",
-            Self::MaintenancePhase(MaintenancePhase::Compact) => "compaction",
+            Self::MaintenancePhase(MaintenancePhase::Compaction) => "compaction",
             Self::MaintenancePhase(MaintenancePhase::BlobGc) => "blob_gc",
             Self::MaintenancePhase(MaintenancePhase::Scrub) => "scrub",
             Self::MaintenancePhase(MaintenancePhase::Purge) => "purge",
@@ -171,7 +181,11 @@ impl MetricLabel {
             Self::EraseStage(EraseStage::Purge) => "purge",
             Self::EraseStage(EraseStage::Verify) => "verify",
             Self::EraseStage(EraseStage::Done) => "done",
-            Self::OwnerKind(OwnerKind::Index) => "index",
+            Self::OwnerKind(OwnerKind::Vector) => "vector",
+            Self::OwnerKind(OwnerKind::Text) => "text",
+            Self::OwnerKind(OwnerKind::Graph) => "graph",
+            Self::OwnerKind(OwnerKind::Identity) => "identity",
+            Self::OwnerKind(OwnerKind::Cache) => "cache",
             Self::OwnerKind(OwnerKind::Feed) => "feed",
             Self::OwnerKind(OwnerKind::Backup) => "backup",
             Self::OwnerKind(OwnerKind::Other) => "other",

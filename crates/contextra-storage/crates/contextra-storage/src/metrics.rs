@@ -59,18 +59,23 @@ pub const METRICS: &[MetricDef] = &[
     MetricDef { name: MetricName::MaintenanceDurationNanoseconds, kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: PHASE },
     MetricDef { name: MetricName::EraseOpenTickets, kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: NONE },
     MetricDef { name: MetricName::EraseOldestPendingNanoseconds, kind: MetricKind::Gauge, unit: MetricUnit::Nanoseconds, labels: NONE },
+    MetricDef { name: MetricName::EraseOperationsTotal, kind: MetricKind::Counter, unit: MetricUnit::Count, labels: STAGE_RESULT },
     MetricDef { name: MetricName::EraseDeadlineBreachesTotal, kind: MetricKind::Counter, unit: MetricUnit::Count, labels: STAGE },
     MetricDef { name: MetricName::EraseGateDurationNanoseconds, kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: RESULT },
     MetricDef { name: MetricName::EraseKeyDestroyDurationNanoseconds, kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: RESULT },
     MetricDef { name: MetricName::EraseStageDurationNanoseconds, kind: MetricKind::Histogram, unit: MetricUnit::Nanoseconds, labels: STAGE_RESULT },
     MetricDef { name: MetricName::ErasePurgeBytesTotal, kind: MetricKind::Counter, unit: MetricUnit::Bytes, labels: NONE },
+    MetricDef { name: MetricName::EraseReserveFreeBytes, kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: NONE },
+    MetricDef { name: MetricName::EraseReserveUsedBytes, kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: NONE },
     MetricDef { name: MetricName::AnchorLagNanoseconds, kind: MetricKind::Gauge, unit: MetricUnit::Nanoseconds, labels: NONE },
     MetricDef { name: MetricName::ConsumerLagBytes, kind: MetricKind::Gauge, unit: MetricUnit::Bytes, labels: OWNER_KIND },
     MetricDef { name: MetricName::ConsumerLagStamps, kind: MetricKind::Gauge, unit: MetricUnit::Stamp, labels: OWNER_KIND },
+    MetricDef { name: MetricName::ExtensionBlockedOwners, kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: OWNER_KIND },
     MetricDef { name: MetricName::GuardSlowpathRatio, kind: MetricKind::Gauge, unit: MetricUnit::RatioBasisPoints, labels: NONE },
     MetricDef { name: MetricName::BranchCount, kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: NONE },
     MetricDef { name: MetricName::BranchMaxDepth, kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: NONE },
     MetricDef { name: MetricName::BranchOldestPinNanoseconds, kind: MetricKind::Gauge, unit: MetricUnit::Nanoseconds, labels: NONE },
+    MetricDef { name: MetricName::BranchHistoryFloor, kind: MetricKind::Gauge, unit: MetricUnit::Stamp, labels: NONE },
     MetricDef { name: MetricName::ErrorsTotal, kind: MetricKind::Counter, unit: MetricUnit::Count, labels: ERROR_CLASS },
     MetricDef { name: MetricName::Poisoned, kind: MetricKind::Gauge, unit: MetricUnit::Count, labels: NONE },
 ];
@@ -93,10 +98,11 @@ pub fn validate_sample(name: MetricName, sample: MetricSample) -> bool {
     let Some(definition) = METRICS.iter().find(|definition| definition.name == name) else {
         return false;
     };
-    matches!(
-        (definition.kind, sample),
-        (MetricKind::Counter, MetricSample::Counter(_))
-            | (MetricKind::Gauge, MetricSample::Gauge(_))
-            | (MetricKind::Histogram, MetricSample::Observe(_))
-    )
+    match (definition.kind, definition.unit, sample) {
+        (MetricKind::Counter, _, MetricSample::Counter(_)) => true,
+        (MetricKind::Gauge, MetricUnit::RatioBasisPoints, MetricSample::Gauge(value)) => value <= 10_000,
+        (MetricKind::Gauge, _, MetricSample::Gauge(_)) => true,
+        (MetricKind::Histogram, _, MetricSample::Observe(_)) => true,
+        _ => false,
+    }
 }

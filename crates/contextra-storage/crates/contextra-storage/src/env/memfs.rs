@@ -103,7 +103,10 @@ impl File for MemFile {
             return Ok(0);
         }
         let count = buf.len().min(state.logical_len - start);
-        buf[..count].copy_from_slice(&state.data[start..start + count]);
+        let end = start.checked_add(count).ok_or(Error::Limit { limit: "read range" })?;
+        let source = state.data.get(start..end).ok_or(Error::Corrupt { place: "MemFs logical length" })?;
+        let target = buf.get_mut(..count).ok_or(Error::Corrupt { place: "MemFs read buffer" })?;
+        target.copy_from_slice(source);
         Ok(count)
     }
 
@@ -114,7 +117,8 @@ impl File for MemFile {
             return Err(Error::Io { role: role_name(self.role), kind: ErrorKind::InvalidData });
         }
         let start = state.logical_len;
-        state.data[start..end].copy_from_slice(data);
+        let target = state.data.get_mut(start..end).ok_or(Error::Corrupt { place: "MemFs allocation length" })?;
+        target.copy_from_slice(data);
         state.logical_len = end;
         Ok(())
     }

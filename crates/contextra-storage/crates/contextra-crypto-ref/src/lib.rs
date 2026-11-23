@@ -4,3 +4,5 @@ pub mod checksum;
 pub mod cipher;
 pub mod kdf;
 pub mod mac;
+#[cfg(feature = "testing")]
+pub mod mem_key_provider;

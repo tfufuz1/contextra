@@ -25,8 +25,12 @@ impl Cipher for XChaCha20Poly1305Cipher {
             .ok_or(Error::Corrupt { place: "AEAD frame" })?;
         let cipher = XChaCha20Poly1305::new_from_slice(key.expose())
             .map_err(|_| Error::Limit { limit: "XChaCha20-Poly1305 key length" })?;
-        let mut plaintext = Zeroizing::new(ciphertext_and_tag[..tag_start].to_vec());
-        let tag = chacha20poly1305::Tag::from_slice(&ciphertext_and_tag[tag_start..]);
+        let ciphertext = ciphertext_and_tag.get(..tag_start)
+            .ok_or(Error::Corrupt { place: "AEAD frame" })?;
+        let tag_bytes = ciphertext_and_tag.get(tag_start..)
+            .ok_or(Error::Corrupt { place: "AEAD frame" })?;
+        let mut plaintext = Zeroizing::new(ciphertext.to_vec());
+        let tag = chacha20poly1305::Tag::from_slice(tag_bytes);
         cipher.decrypt_in_place_detached(XNonce::from_slice(nonce), aad, &mut plaintext, tag)
             .map_err(|_| Error::Corrupt { place: "AEAD authentication" })?;
         out.extend_from_slice(&plaintext);

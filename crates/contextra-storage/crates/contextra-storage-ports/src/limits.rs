@@ -23,7 +23,6 @@ pub const ID_RESERVE: u64 = 1 << 16;
 pub const DEFAULT_MAX_CLUSTERS: u64 = 4_000_000;
 pub const DEFAULT_MAX_OPEN_FILES: usize = 1024;
 pub const KEY_GRACE_SECS: u64 = 600;
-pub const MAX_KEYS_PER_BATCH: usize = 256;
 pub const COHORT_MAX: usize = 1024;
 
 const _: () = assert!(MAX_BODY_BYTES * 2 <= MAX_CHANGE_BYTES);

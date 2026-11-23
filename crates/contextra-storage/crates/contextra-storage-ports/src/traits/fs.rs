@@ -1,5 +1,4 @@
-//! Fs/File-Port (SP-ENV). Jede Operation trägt IoCtx für FaultFs-Indizierung.
-//! Lock-Operation (flock/OFD) folgt in WP-03.3.
+//! Fs/File-Port (SPEC §3.2). Jede Operation trägt IoCtx für FaultFs-Indizierung.
 use crate::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -47,7 +46,8 @@ pub trait File: Send + Sync {
     /// preserved in each `bytes_read`; implementations must not reorder.
     fn read_ranges(&self, ranges: &mut [ReadRange<'_>], ctx: IoCtx) -> Result<(), Error> {
         for range in ranges {
-            range.bytes_read = self.read_at(range.offset, range.buffer, ctx)?;
+            let count = self.read_at(range.offset, &mut *range.buffer, ctx)?;
+            range.bytes_read = count;
         }
         Ok(())
     }

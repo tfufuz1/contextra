@@ -30,4 +30,6 @@ fn metric_names_are_unique_and_labels_match_the_spec_catalog() {
 fn metric_sample_kind_must_match_catalog() {
     assert!(validate_sample(MetricName::CommitsTotal, MetricSample::Counter(1)));
     assert!(!validate_sample(MetricName::CommitsTotal, MetricSample::Gauge(1)));
+    assert!(validate_sample(MetricName::CacheHitRatio, MetricSample::Gauge(10_000)));
+    assert!(!validate_sample(MetricName::CacheHitRatio, MetricSample::Gauge(10_001)));
 }

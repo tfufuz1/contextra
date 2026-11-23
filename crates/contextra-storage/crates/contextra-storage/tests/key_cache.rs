@@ -1,7 +1,7 @@
 use contextra_storage::keys::cache::KeyCache;
 use contextra_storage::ports::traits::{Clock, ClockReading, ClockSkew, Entropy};
-use contextra_storage::ports::{BatchId, ClusterId, Error, KeyCreateFailure, KeyCreateResult, KeyProvider, KeyProbe};
-use contextra_storage::testing::keys::MemKeyProvider;
+use contextra_storage::ports::{ClusterId, DestroyBehavior, Error, KeyProvider, KeyState};
+use contextra_crypto_ref::mem_key_provider::MemKeyProvider;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -29,9 +29,9 @@ impl Entropy for TestEntropy {
 #[test]
 fn key_cache_batch_prefetch_and_generation_fence() -> Result<(), Error> {
     let entropy = Arc::new(TestEntropy(AtomicU64::new(1)));
-    let provider = Arc::new(MemKeyProvider::new(entropy));
+    let provider = Arc::new(MemKeyProvider::new(Arc::clone(&entropy)));
     let clusters = [ClusterId::from_wire([1; 16]), ClusterId::from_wire([2; 16])];
-    provider.create_cluster_keys(BatchId::from_bytes([99; 16]), &clusters)?;
+    for cluster in &clusters { provider.create_cluster_key(*cluster, entropy.as_ref())?; }
     let clock = Arc::new(TestClock(AtomicU64::new(10)));
     let cache = KeyCache::new(provider, clock, 100, 50, 8)?;
     cache.prefetch(&[(clusters[0], 1), (clusters[1], 1)])?;
@@ -56,17 +56,47 @@ fn missing_cluster_key_is_key_lost_not_shredded() -> Result<(), Error> {
 }
 
 #[test]
-fn key_creation_batch_is_idempotent_and_reports_per_cluster_failure() -> Result<(), Error> {
-    let provider = MemKeyProvider::new(Arc::new(TestEntropy(AtomicU64::new(8))));
-    let batch = BatchId::from_bytes([21; 16]);
+fn cluster_key_creation_is_idempotent_until_all_epochs_are_destroyed() -> Result<(), Error> {
+    let entropy = Arc::new(TestEntropy(AtomicU64::new(8)));
+    let provider = MemKeyProvider::new(Arc::clone(&entropy));
     let live = ClusterId::from_wire([22; 16]);
-    let destroyed = ClusterId::from_wire([23; 16]);
-    provider.destroy_many(&[destroyed])?;
-    let first = provider.create_cluster_keys(batch, &[live, destroyed])?;
-    assert_eq!(provider.create_cluster_keys(batch, &[live, destroyed])?, first);
-    assert_eq!(first.get(0), Some(&KeyCreateResult::Created { cluster: live, epoch: 1 }));
-    assert_eq!(first.get(1), Some(&KeyCreateResult::Failed { cluster: destroyed, error: KeyCreateFailure::Shredded }));
-    assert!(matches!(provider.create_cluster_keys(batch, &[live]), Err(Error::IdemConflict)));
-    assert_eq!(provider.probe(live, 1)?, KeyProbe::Present);
+    assert_eq!(provider.create_cluster_key(live, entropy.as_ref())?, 1);
+    assert_eq!(provider.create_cluster_key(live, entropy.as_ref())?, 1);
+    let first = provider.cluster_key(live, 1)?.ok_or(Error::KeyLost)?;
+    let second = provider.cluster_key(live, 1)?.ok_or(Error::KeyLost)?;
+    assert_eq!(first.expose(), second.expose());
+    assert_eq!(provider.probe(live)?, KeyState::Present);
+    Ok(())
+}
+
+#[test]
+fn provider_reports_scope_wide_absence_only_after_destroy() -> Result<(), Error> {
+    let entropy = Arc::new(TestEntropy(AtomicU64::new(40)));
+    let provider = MemKeyProvider::new(Arc::clone(&entropy));
+    let cluster = ClusterId::from_wire([41; 16]);
+    assert_eq!(provider.info().destroy, DestroyBehavior::Immediate);
+    assert!(!provider.info().keys_in_backups);
+    assert_eq!(provider.create_cluster_key(cluster, entropy.as_ref())?, 1);
+    assert_eq!(provider.probe(cluster)?, KeyState::Present);
+    assert!(provider.cluster_key(cluster, 1)?.is_some());
+    let receipt = provider.destroy_many(&[cluster])?;
+    assert_eq!(receipt.requested_clusters, 1);
+    assert_eq!(receipt.absent_clusters, 1);
+    assert_eq!(provider.probe(cluster)?, KeyState::Absent);
+    assert!(provider.cluster_key(cluster, 1)?.is_none());
+    Ok(())
+}
+
+#[test]
+fn destroy_many_removes_every_epoch_for_the_cluster() -> Result<(), Error> {
+    // INV-KEY-4: provider destruction covers every stored epoch.
+    let provider = MemKeyProvider::new(Arc::new(TestEntropy(AtomicU64::new(51))));
+    let cluster = ClusterId::from_wire([52; 16]);
+    provider.insert_epoch_for_test(cluster, 1, [1; 32])?;
+    provider.insert_epoch_for_test(cluster, 2, [2; 32])?;
+    provider.destroy_many(&[cluster])?;
+    assert!(provider.cluster_key(cluster, 1)?.is_none());
+    assert!(provider.cluster_key(cluster, 2)?.is_none());
+    assert_eq!(provider.probe(cluster)?, KeyState::Absent);
     Ok(())
 }

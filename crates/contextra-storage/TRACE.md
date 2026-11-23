@@ -47,6 +47,35 @@ never merely that a module compiles.
 
 ## Work-package matrix
 
+### Aktuelle SPEC-basierte Änderungen (noch unverifiziert)
+
+* P0 / WP-01.2 und WP-03.1/03.2 sind in Arbeit: `Clock` liefert jetzt eine
+  monotone Zeit, UTC, dauerhaften UTC-Floor und Skew-Status; deadlinefähige UTC
+  wird bei Rollback/Unsicherheit fail-closed abgewiesen. Der KeyCache verwendet
+  weiterhin ausschließlich monotone Laufzeit.
+* `Fs`-Ports enthalten jetzt geordnetes `read_ranges` in caller-owned Puffern,
+  RAII-Locks und optionale Hardlink/Reflink/Hole-Punch-Fähigkeiten. `MemFs`
+  implementiert den prozesslokalen Lock; `FaultFs` zählt und injiziert Fehler
+  bei diesen Dateisystemoperationen. Die Default-Range-Lesung läuft über
+  `read_at`, sodass jede Teiloperation im Fault-Sweep bleibt.
+* Fehler `Error::Io(Interrupted)` wird transient klassifiziert; andere rohe
+  I/O-Fehler werden nicht automatisch als transient wiederholbar eingestuft.
+  `Erased{at}` wurde als typisierter Aufruferfehler ergänzt.
+* WP-04.1/04.2 werden ebenfalls gegen SPEC §5.2/§9.4 ausgerichtet: direkte
+  Provider-Operationen (`info`, `kek`, `create_cluster_key`, `cluster_key`,
+  `probe`, `list`, `destroy_many`) ersetzen die zuvor nichtnormative
+  Batch-/`KeyProbe`-Signatur. Die In-Memory-Implementierung liegt jetzt im
+  `contextra-crypto-ref`-Crate; Recovery unterscheidet `Disabled`, bestätigtes
+  `Absent` und `KeyLost` ohne Erasure-Beleg. `KeyProviderConformance` deckt
+  Epoch-Zerstörung und Providerzustände ab.
+* Metriknamen und -dimensionen sind nun geschlossene Port-Enums; die
+  Metrikdefinitionen und Sample-/Labelprüfung richten sich nach den in SPEC
+  §16 genannten Dimensionen. Standard-Observer-Events nehmen keine Strings
+  oder beliebigen Payloads entgegen.
+* Neue Port-/Storage-Tests decken diese Verträge ab. Sie sind absichtlich noch
+  nicht kompiliert oder ausgeführt; die Verifikation folgt nach Abschluss der
+  Implementierungsänderungen.
+
 | WP | Owner | SPEC | INV | Modules | Current state / evidence | Tests / gate |
 |---|---|---|---|---|---|---|
 | WP-01.1 | 01 | §3.2, §4, §12 | ID, LIM, SEAL | ports/{ids,change,error} | partly: `DataClass`, instance/durable position, erase/tomb IDs are now port-owned and redacted; remaining value-contract audit open | `port_values`, redaction; G-0 open |

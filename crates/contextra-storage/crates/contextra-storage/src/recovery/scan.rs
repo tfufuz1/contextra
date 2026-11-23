@@ -98,7 +98,9 @@ impl<'a> Cursor<'a> {
         self.offset = end;
         Ok(slice)
     }
-    fn u8(&mut self) -> Result<u8, Error> { Ok(self.array::<1>()?[0]) }
+    fn u8(&mut self) -> Result<u8, Error> {
+        self.array::<1>()?.first().copied().ok_or(Error::Corrupt { place: "recovery byte" })
+    }
     fn u16(&mut self) -> Result<u16, Error> { Ok(u16::from_le_bytes(self.array()?)) }
     fn u64_be(&mut self) -> Result<u64, Error> { Ok(u64::from_be_bytes(self.array()?)) }
     fn array<const N: usize>(&mut self) -> Result<[u8; N], Error> {

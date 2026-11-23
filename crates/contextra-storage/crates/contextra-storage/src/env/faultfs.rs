@@ -57,7 +57,9 @@ impl<F: Fs> FaultFs<F> {
     }
 
     pub fn bytes_read(&self, role: FileRole) -> u64 {
-        self.runtime.bytes_read[role_index(role)].load(Ordering::Relaxed)
+        self.runtime.bytes_read.get(role_index(role))
+            .map(|counter| counter.load(Ordering::Relaxed))
+            .unwrap_or(0)
     }
 
     pub fn inner(&self) -> &F { &self.inner }
@@ -87,14 +89,17 @@ impl File for FaultFile {
         let fault = take_fault(&self.runtime)?;
         if matches!(fault, Some(Fault::Eio)) { return Err(io_error(self.role)); }
         let limit = if matches!(fault, Some(Fault::ShortRead)) && !buf.is_empty() { buf.len() - 1 } else { buf.len() };
-        let read = self.inner.read_at(off, &mut buf[..limit], _ctx)?;
+        let read_buffer = buf.get_mut(..limit).ok_or(Error::Corrupt { place: "FaultFs read range" })?;
+        let read = self.inner.read_at(off, read_buffer, _ctx)?;
         if let Some(Fault::BitFlip { offset }) = fault {
             if offset >= off && offset - off < read as u64 {
                 let index = (offset - off) as usize;
                 if let Some(byte) = buf.get_mut(index) { *byte ^= 1; }
             }
         }
-        self.runtime.bytes_read[role_index(self.role)].fetch_add(read as u64, Ordering::Relaxed);
+        if let Some(counter) = self.runtime.bytes_read.get(role_index(self.role)) {
+            counter.fetch_add(read as u64, Ordering::Relaxed);
+        }
         Ok(read)
     }
 
@@ -102,7 +107,8 @@ impl File for FaultFile {
         match take_fault(&self.runtime)? {
             Some(Fault::Eio | Fault::RenameReorder | Fault::BitFlip { .. } | Fault::ShortRead | Fault::LostFsync | Fault::Enospc) => Err(io_error(self.role)),
             Some(Fault::TornWrite { keep }) => {
-                self.inner.append_prealloc(&data[..keep.min(data.len())], ctx)?;
+                let partial = data.get(..keep.min(data.len())).ok_or(Error::Corrupt { place: "FaultFs torn write range" })?;
+                self.inner.append_prealloc(partial, ctx)?;
                 #[cfg(feature = "testing")]
                 if let Ok(mut ghost) = self.runtime.ghost.lock() { ghost.push(data.to_vec()); }
                 Err(io_error(self.role))
