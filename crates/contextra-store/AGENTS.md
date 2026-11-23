@@ -3,7 +3,7 @@
 
 > **ARCHIV (Stand 22.11.2026).** `contextra-store` ist Bestand und wird durch `contextra-storage` ersetzt (Spec D-18, §26). Es wird nicht weiterentwickelt: nur Sicherheitsfixes, bis Gate G-6 erreicht und die Konsumenten umgestellt sind; danach wird das Crate samt Feature-Weichen entfernt (Spec §26.4). Neue Funktionen entstehen ausschließlich im Kern. Normativ: `docs/SPEC.md` (R8); Umsetzungsplan: `docs/IMPLEMENTATION_SPEC.md`. Der Inhalt unten beschreibt den Altstand und ist keine Anforderungsquelle für den Kern.
 >
-> Abhängige (Zeilen mit `contextra_store` in `*.rs`, gemessen 22.11.2026): `contextra-engine` 144, `contextra-db` 25, `contextra-graph` 16, `contextra-cognition` 15, `contextra` 5, `contextra-agent` 3, `contextra-checkpoint` 2, `contextra-bench` 1, `contextra-py` 0. Produktiv genutzt nur von `contextra-engine`, `contextra-agent` und `contextra`.
+> Abhängige (Zeilen mit `contextra_store` in `*.rs`, gemessen 23.11.2026): `contextra-engine` 145, `contextra-db` 25, `contextra-graph` 16, `contextra-cognition` 15, `contextra` 5, `contextra-agent` 3, `contextra-checkpoint` 2, `contextra-bench` 1, `contextra-py` 0. Produktiv genutzt nur von `contextra-engine`, `contextra-agent` und `contextra`.
 
 ## 1. Zweck & Architekturrolle
 
