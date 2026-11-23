@@ -47,6 +47,9 @@ pub trait File: Send + Sync {
     fn read_ranges(&self, ranges: &mut [ReadRange<'_>], ctx: IoCtx) -> Result<(), Error> {
         for range in ranges {
             let count = self.read_at(range.offset, &mut *range.buffer, ctx)?;
+            if count > range.buffer.len() {
+                return Err(Error::Corrupt { place: "filesystem read length" });
+            }
             range.bytes_read = count;
         }
         Ok(())

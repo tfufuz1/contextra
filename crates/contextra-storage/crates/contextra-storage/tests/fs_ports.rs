@@ -1,6 +1,6 @@
 use contextra_storage::env::faultfs::{Fault, FaultFs, FaultPlan};
 use contextra_storage::env::memfs::MemFs;
-use contextra_storage::ports::traits::{File, FileRole, Fs, IoCtx, ReadRange};
+use contextra_storage::ports::traits::{FileRole, Fs, IoCtx, ReadRange};
 use contextra_storage::ports::Error;
 use std::path::Path;
 
@@ -63,4 +63,18 @@ fn faultfs_counts_and_injects_lock_operations() {
     let fs = FaultFs::new(MemFs::new(), FaultPlan { at_op: 0, fault: Fault::Eio });
     assert!(matches!(fs.lock(Path::new("instance.lock"), ctx()), Err(Error::Io { .. })));
     assert_eq!(fs.op_count(), 1);
+}
+
+#[test]
+fn faultfs_injects_each_optional_fs_operation() {
+    let operations: [fn(&FaultFs<MemFs>) -> Result<(), Error>; 3] = [
+        |fs| fs.link(Path::new("source"), Path::new("target"), ctx()),
+        |fs| fs.reflink(Path::new("source"), Path::new("target"), ctx()),
+        |fs| fs.punch_hole(Path::new("source"), 0, 1, ctx()),
+    ];
+    for operation in operations {
+        let fs = FaultFs::new(MemFs::new(), FaultPlan { at_op: 0, fault: Fault::Eio });
+        assert!(matches!(operation(&fs), Err(Error::Io { .. })));
+        assert_eq!(fs.op_count(), 1);
+    }
 }

@@ -24,7 +24,7 @@ impl Entropy for TestEntropy {
 /// KeyProviderConformance: exercises the normative §9.4 provider contract.
 #[test]
 fn memory_provider_conforms_to_spec_scope_and_destroy_semantics() -> Result<(), Error> {
-    let entropy = Arc::new(TestEntropy(AtomicU64::new(1)));
+    let entropy: Arc<dyn Entropy> = Arc::new(TestEntropy(AtomicU64::new(1)));
     let provider = MemKeyProvider::new(Arc::clone(&entropy));
     assert_eq!(provider.info().destroy, DestroyBehavior::Immediate);
     assert!(!provider.info().keys_in_backups);

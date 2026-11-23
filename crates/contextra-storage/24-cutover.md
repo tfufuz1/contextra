@@ -42,3 +42,20 @@ Der Bericht enthält Vollständigkeitszählung, Schlüssel-/Clusterzuordnung, Sa
 ## 6 Arbeitspakete
 
 WP-24.1 Verbraucher-/Namespace-Inventar (P8) · WP-24.2 API-Entkopplung und Bridge-Mapping (P8) · WP-24.3 resumierbarer Export/Import (P8) · WP-24.4 Differentialaudit + Rehearsal (P8) · WP-24.5 stufenweiser Single-Writer-Cutover (P8+) · WP-24.6 Dependency-/Default-Member-Bereinigung und Legacy-Archiv (P8+) · WP-24.7 Gesamtsystem-Erase-/DeletionProof-/RAG-Abnahme (P8+). Abnahme: reproduzierbarer Bericht, keine produktive `contextra-store`-Dependency, erfolgreicher Restore-/Recovery-Soak; G-CUTOVER nur mit vollständigem Proof-Mapping und Ressourcenbudget.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §3.5, §9.5.2, §10.4, §11.4; E-75, E-76, E-81.
+
+Die übrigen Crates (`contextra-db`, `-agent`, `-engine`, `-graph` u. a.) bauen bisher auf `contextra-store`. Für die Umstellung sind die R8.2-Schnittstellen in die Caller-Matrix (WP-24.1) aufzunehmen:
+
+- Neue Fehlerpfade, die Verbraucher behandeln müssen: `SnapshotTooOld` (lange Scans über `ResumeToken` neu aufsetzen statt Views offenzuhalten), `ErasePending` (Löschabsicht aufgenommen, Neustart nötig), `BackupBeyondHorizon` (Restore-Runbooks).
+- Backup-Werkzeuge müssen `Storage::backup_mark()` bei jeder Kopie speichern und `backup_horizon` einhalten; sonst ist Retire nicht aktivierbar.
+- `OpenProfile::Production` verlangt `Hardware`/`Kms`-Provider für `Personal`-Daten und ein vom Datenverzeichnis getrenntes Ledger-Gerät; Betriebsdokumentation und Rehearsals (WP-24.4) prüfen beides.
+- Derivation-Caches (Embeddings/Token) der oberen Schicht folgen der Konvention aus SPEC §12.6 (clusterlokales Zufallssecret); der Altbestand darf nicht über Cluster hinweg dedupliziert importiert werden.
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-24.8 | R8.2-Caller-Matrix: Fehlerpfade, Backup-Marken, Production-Anforderungen, Cache-Konvention | 1.0 | WP-24.1, WP-23.5 | P8 | Matrix ohne ungeklärte Semantik, Runbook-Review |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

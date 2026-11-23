@@ -22,3 +22,18 @@ Decoder: Fuzz + Rundreise + Golden; Persistenz: FaultFs Sweep; Concurrency: Loom
 
 ## 5 Arbeitspakete
 WP-15.1 Forbidden API/layering (P0) · WP-15.2 FaultFs/Crash harness (P0) · WP-15.3 Modellorakel + Invariant-Mapping (P1) · WP-15.4 Referenzgenerator/goldens (vor G-F) · WP-15.5 TLA+ M1–M6 (laufend) · WP-15.6 Performance/coverage/mutation gates (P8). Abnahme: Gate-Evidenz archiviert und reproduzierbar.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §13.2.1, §15, §17 (H-4, H-23); neue IDs `INV-ERA-13`, `INV-LED-2`, `INV-KEY-5`, `INV-VIEW-3`, `INV-PRUNE-1`, `INV-VER-1`.
+
+- **Invarianten-Mapping:** die sechs neuen IDs werden in `check_invariant_refs.sh` erst grün, wenn die Besitzer-SPs behaviorale Tests zitieren (WP-13.7, WP-20.4, WP-04.7, WP-11.6, WP-13.8). Lexikalische Platzhalter-Tests zählen nicht als Abnahme (TRACE-Befund zu `invariant_refs.rs`).
+- **Orakel:** Messarten je Orakel (SPEC §13.2.1); CI-Prüfung „kein `Complete` bei Pflichtmessung ≠ `Complete`“.
+- **Modelltest:** Poisoned-Erase-Modell (Intent → Neustart → Gate), Tomb-Epochen-Modell (Retire/Restore-Floor), Lease-Modell (Ablauf ⇒ `SnapshotTooOld`).
+- **H-23:** Restore-Matching-Benchmark (16 Mio. Cluster × 1/4 Epochen).
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-15.10 | R8.2-Testlücken: Orakel-Messarten, Modelle (Poisoned/Tomb/Lease), Pruner-Property, H-23 | 2.0 | WP-15.3, WP-13.7, WP-20.4, WP-11.6 | P6 | neue INV-IDs von Verhaltenstests zitiert, H-23-Bericht |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

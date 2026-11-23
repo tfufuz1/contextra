@@ -14,6 +14,7 @@ pub enum Kind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TagError {
+    StampZero,
     StampOutOfRange,
     UnknownKind(u8),
     ReservedMerge,
@@ -22,6 +23,9 @@ pub enum TagError {
 /// Kodiert Stamp und Operationstyp. Stampwerte oberhalb der 56-Bit-Grenze
 /// werden abgewiesen, damit ein Überlauf nie einen alten Tag reproduziert.
 pub fn tag(stamp: Stamp, kind: Kind) -> Result<u64, TagError> {
+    if stamp == 0 {
+        return Err(TagError::StampZero);
+    }
     if stamp > STAMP_MAX {
         return Err(TagError::StampOutOfRange);
     }
@@ -31,6 +35,9 @@ pub fn tag(stamp: Stamp, kind: Kind) -> Result<u64, TagError> {
 /// Dekodiert nur bekannte kanonische Tags; Typ 6 ist explizit reserviert.
 pub fn untag(value: u64) -> Result<(Stamp, Kind), TagError> {
     let stamp = value >> 8;
+    if stamp == 0 {
+        return Err(TagError::StampZero);
+    }
     let raw_kind = (value & 0xff) as u8;
     let kind = match raw_kind {
         1 => Kind::Put,

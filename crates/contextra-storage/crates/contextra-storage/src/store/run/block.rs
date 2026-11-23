@@ -4,6 +4,7 @@
 //! this codec never interprets or persists file offsets or key material.
 
 use crate::codec::checksums::crc32c;
+use crate::codec::tags::{untag, Kind, TagError};
 use crate::codec::varint::{varint_get, varint_put};
 use contextra_storage_ports::{BranchId, Error, Stamp};
 use core::fmt;
@@ -41,6 +42,9 @@ pub fn encode(entries: &[BlockEntry], max_bytes: usize) -> Result<Vec<u8>, Error
     if entries.is_empty() { return Err(Error::Limit { limit: "data block must contain entries" }); }
     if max_bytes == 0 || max_bytes > MAX_DECODED_BLOCK_BYTES {
         return Err(Error::Limit { limit: "data block size bound" });
+    }
+    for entry in entries {
+        validate_tag(entry.tag)?;
     }
     for pair in entries.windows(2) {
         let left = pair.first().ok_or(Error::Corrupt { place: "data block pair" })?;
@@ -123,6 +127,7 @@ pub fn decode(bytes: &[u8], max_bytes: usize) -> Result<Vec<BlockEntry>, Error> 
         if key_len > max_bytes { return Err(Error::Corrupt { place: "data block key length" }); }
         let branch = BranchId(cursor.u32()?);
         let tag = cursor.u64()?;
+        validate_tag(tag)?;
         let header = Zeroizing::new(cursor.bytes(max_bytes)?.to_vec());
         let body = Zeroizing::new(cursor.bytes(max_bytes)?.to_vec());
         decoded_allocation = decoded_allocation.checked_add(key_len)
@@ -147,6 +152,21 @@ pub fn decode(bytes: &[u8], max_bytes: usize) -> Result<Vec<BlockEntry>, Error> 
         if read_u32(bytes, offset)? != expected { return Err(Error::Corrupt { place: "data block restart offset" }); }
     }
     Ok(entries)
+}
+
+fn validate_tag(value: u64) -> Result<(), Error> {
+    match untag(value) {
+        Ok((_, Kind::Put | Kind::Delete | Kind::PutRef)) => Ok(()),
+        Ok((_, Kind::RangeDelete | Kind::EraseRange)) => {
+            Err(Error::Unsupported { what: "data block tag kind" })
+        }
+        Err(TagError::UnknownKind(_) | TagError::ReservedMerge) => {
+            Err(Error::Unsupported { what: "data block tag" })
+        }
+        Err(TagError::StampZero | TagError::StampOutOfRange) => {
+            Err(Error::Corrupt { place: "data block tag" })
+        }
+    }
 }
 
 pub fn compare(left: &BlockEntry, right: &BlockEntry) -> std::cmp::Ordering {

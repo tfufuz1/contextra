@@ -69,3 +69,16 @@ pub mod sync { pub struct Ranked<T, const R: u8>; pub struct RankStack; pub stru
 
 ## 8 Abnahme
 Kein `std::fs`/`SystemTime`/`rand` im Kern (Lint grün); Konformanzsuite auf allen Fs-Varianten identisch; Crash-Sweep-Treiber nutzbar für SP-REDO ab P1.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §3.2 (`HostProbe`), §9.7 (Geräte-IDs), §9.9; E-78, E-81.
+
+- `RealFs`/Linux-Adapter implementieren `HostProbe`: Swap aktiv/verschlüsselt (soweit ermittelbar), `core_pattern`/`RLIMIT_CORE`, `RLIMIT_MEMLOCK`, Dateisystemtyp je Verzeichnis, `st_dev` von Daten- und Ledger-Verzeichnis. Nicht ermittelbare Werte werden `Unknown`, nie geraten. `MemFs`/`FaultFs` liefern konfigurierbare Reports für Tests (gleiche/getrennte Geräte, Swap an/aus).
+- Der Kern ruft `probe` nur bei `open` (Diagnose, `LedgerSameDevice`-Prüfung in `OpenProfile::Production`) und beim Receipt-Bau auf; kein Pfad hängt für Korrektheit vom Ergebnis ab.
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-03.9 | `HostProbe` für Linux-`RealFs` und Test-Fs | 1.0 | WP-03.3, WP-01.5 | P5 | Unit-Tests mit `FaultFs`-Reports; `Unknown` bleibt `Unknown`; kein Probe-Aufruf unter Kernsperren (Lock-Rang-Test) |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

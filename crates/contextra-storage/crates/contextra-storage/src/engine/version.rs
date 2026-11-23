@@ -94,6 +94,27 @@ impl Version {
         None
     }
 
+    /// Resolves point mutations through a cluster-local branch ancestry.
+    /// The first branch in the chain wins even when the entry is a tombstone;
+    /// callers must apply tombstone, range-delete, and erase-mask semantics
+    /// before returning a value. This keeps a child delete from revealing its
+    /// parent's older value.
+    pub fn get_on_branch<'a>(
+        &'a self,
+        branches: &super::branches::BranchTable,
+        cluster: ClusterId,
+        branch: BranchId,
+        key: &[u8],
+        view_stamp: Stamp,
+    ) -> Result<Option<&'a VersionEntry>, Error> {
+        for (branch_id, cap) in branches.visibility_chain(branch, view_stamp)? {
+            if let Some(entry) = self.get(cluster, branch_id, key, cap) {
+                return Ok(Some(entry));
+            }
+        }
+        Ok(None)
+    }
+
     pub fn at_stamp(&self, stamp: Stamp) -> Result<Self, Error> {
         if stamp < self.gc_floor {
             return Err(Error::Limit { limit: "view stamp outside version bounds" });

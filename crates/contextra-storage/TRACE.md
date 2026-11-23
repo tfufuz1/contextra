@@ -50,8 +50,9 @@ never merely that a module compiles.
 ### Aktuelle SPEC-basierte Änderungen (noch unverifiziert)
 
 * P0 / WP-01.2 und WP-03.1/03.2 sind in Arbeit: `Clock` liefert jetzt eine
-  monotone Zeit, UTC, dauerhaften UTC-Floor und Skew-Status; deadlinefähige UTC
-  wird bei Rollback/Unsicherheit fail-closed abgewiesen. Der KeyCache verwendet
+  monotone Zeit, UTC, dauerhaften UTC-Floor und Skew-Status; der Floor wird per
+  monotonem CAS durabel fortgeschrieben. Deadline-UTC wird bei
+  Rollback/Unsicherheit fail-closed abgewiesen. Der KeyCache verwendet
   weiterhin ausschließlich monotone Laufzeit.
 * `Fs`-Ports enthalten jetzt geordnetes `read_ranges` in caller-owned Puffern,
   RAII-Locks und optionale Hardlink/Reflink/Hole-Punch-Fähigkeiten. `MemFs`
@@ -72,9 +73,27 @@ never merely that a module compiles.
   Metrikdefinitionen und Sample-/Labelprüfung richten sich nach den in SPEC
   §16 genannten Dimensionen. Standard-Observer-Events nehmen keine Strings
   oder beliebigen Payloads entgegen.
-* Neue Port-/Storage-Tests decken diese Verträge ab. Sie sind absichtlich noch
-  nicht kompiliert oder ausgeführt; die Verifikation folgt nach Abschluss der
-  Implementierungsänderungen.
+* WP-02.1 ist im SPEC-Abgleich: Tag-Codec lehnt Stamp 0 (SPEC §4.2: erster
+  Stamp 1) und reservierte Merge-Tags ab. Neue Primitive-Tests decken
+  kanonische Varint-Grenzwerte, CRC32C-Checkvektor und Entry-Ordnung ab;
+  Verifikation ist bis zum vereinbarten Schlusslauf offen.
+* Neue Port-/Storage-Tests decken diese Verträge ab. Schlusslauf nach den
+  Änderungen: der 7-Crate-`cargo check`-Befehl und der entsprechende
+  `cargo test`-Befehl (siehe oben unter „Environment and baseline“) sind
+  erfolgreich. Die Gate-Beweise bleiben dennoch unvollständig.
+* Der bisherige Governor-Stub ist durch eine atomare Admission-Komponente mit
+  DiskFull-Eintritt und Recovery-Hysterese ersetzt. Er sperrt normale Writes
+  und Wartung im Notbetrieb, lässt Reads und `UrgentErase` zu und validiert
+  den konfigurierten Maintenance-I/O-Anteil. `tests/governor_hysteresis.rs`
+  zitiert `INV-DISK-1`; Kompilierung, Fault-Sweep-Integration und Scheduler-
+  Anbindung bleiben offen, daher ist WP-03.7 weiterhin `teilweise`.
+* Der aktuelle Schlusslauf 2026-11-23 bestand für alle sieben Storage-Crates
+  mit `--ignore-rust-version --offline --features testing`; der vollständige
+  Integrationstest- und Doc-Test-Lauf war grün. Die Tests decken die zuletzt
+  ergänzten Clock-, Error-, Fs-, KeyProvider-, Metrik-, Codec- und
+  Governor-Verträge ab. Das belegt nur die vorhandene Testsuite, nicht die
+  fehlenden Modell-, Crash-Matrix-, Fuzz-, Benchmark- und Review-Anforderungen;
+  kein Gate P0–P8 wird hierdurch als bestanden erklärt.
 
 | WP | Owner | SPEC | INV | Modules | Current state / evidence | Tests / gate |
 |---|---|---|---|---|---|---|

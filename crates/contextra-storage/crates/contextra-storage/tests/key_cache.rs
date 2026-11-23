@@ -5,16 +5,31 @@ use contextra_crypto_ref::mem_key_provider::MemKeyProvider;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-struct TestClock(AtomicU64);
+struct TestClock(AtomicU64, AtomicU64);
+
+impl TestClock {
+    fn new(monotonic_nanos: u64) -> Self {
+        Self(AtomicU64::new(monotonic_nanos), AtomicU64::new(1_000))
+    }
+}
+
 impl Clock for TestClock {
     fn read(&self) -> Result<ClockReading, Error> {
         let monotonic_nanos = self.0.load(Ordering::Acquire);
+        let durable_utc_millis = self.1.load(Ordering::Acquire);
         Ok(ClockReading {
             monotonic_nanos,
-            utc_millis: 1_000,
-            durable_utc_millis: 1_000,
+            utc_millis: durable_utc_millis,
+            durable_utc_millis,
             skew: ClockSkew::Certain,
         })
+    }
+
+    fn advance_utc_floor(&self, expect_millis: u64, next_millis: u64) -> Result<(), Error> {
+        if next_millis < expect_millis { return Err(Error::ClockUncertain); }
+        self.1.compare_exchange(expect_millis, next_millis, Ordering::AcqRel, Ordering::Acquire)
+            .map(|_| ())
+            .map_err(|_| Error::CasLost)
     }
 }
 struct TestEntropy(AtomicU64);
@@ -28,11 +43,11 @@ impl Entropy for TestEntropy {
 
 #[test]
 fn key_cache_batch_prefetch_and_generation_fence() -> Result<(), Error> {
-    let entropy = Arc::new(TestEntropy(AtomicU64::new(1)));
+    let entropy: Arc<dyn Entropy> = Arc::new(TestEntropy(AtomicU64::new(1)));
     let provider = Arc::new(MemKeyProvider::new(Arc::clone(&entropy)));
     let clusters = [ClusterId::from_wire([1; 16]), ClusterId::from_wire([2; 16])];
     for cluster in &clusters { provider.create_cluster_key(*cluster, entropy.as_ref())?; }
-    let clock = Arc::new(TestClock(AtomicU64::new(10)));
+    let clock = Arc::new(TestClock::new(10));
     let cache = KeyCache::new(provider, clock, 100, 50, 8)?;
     cache.prefetch(&[(clusters[0], 1), (clusters[1], 1)])?;
     let handle = cache.get(clusters[0], 1)?;
@@ -48,16 +63,26 @@ fn key_cache_batch_prefetch_and_generation_fence() -> Result<(), Error> {
 }
 
 #[test]
+fn clock_floor_advancement_is_monotone_and_cas_guarded() -> Result<(), Error> {
+    let clock = TestClock::new(0);
+    clock.advance_utc_floor(1_000, 1_100)?;
+    assert_eq!(clock.read()?.deadline_utc_millis()?, 1_100);
+    assert!(matches!(clock.advance_utc_floor(1_000, 1_200), Err(Error::CasLost)));
+    assert!(matches!(clock.advance_utc_floor(1_100, 1_099), Err(Error::ClockUncertain)));
+    Ok(())
+}
+
+#[test]
 fn missing_cluster_key_is_key_lost_not_shredded() -> Result<(), Error> {
     let provider = Arc::new(MemKeyProvider::new(Arc::new(TestEntropy(AtomicU64::new(4)))));
-    let cache = KeyCache::new(provider, Arc::new(TestClock(AtomicU64::new(0))), 100, 50, 8)?;
+    let cache = KeyCache::new(provider, Arc::new(TestClock::new(0)), 100, 50, 8)?;
     assert!(matches!(cache.get(ClusterId::from_wire([9; 16]), 1), Err(Error::KeyLost)));
     Ok(())
 }
 
 #[test]
 fn cluster_key_creation_is_idempotent_until_all_epochs_are_destroyed() -> Result<(), Error> {
-    let entropy = Arc::new(TestEntropy(AtomicU64::new(8)));
+    let entropy: Arc<dyn Entropy> = Arc::new(TestEntropy(AtomicU64::new(8)));
     let provider = MemKeyProvider::new(Arc::clone(&entropy));
     let live = ClusterId::from_wire([22; 16]);
     assert_eq!(provider.create_cluster_key(live, entropy.as_ref())?, 1);
@@ -71,7 +96,7 @@ fn cluster_key_creation_is_idempotent_until_all_epochs_are_destroyed() -> Result
 
 #[test]
 fn provider_reports_scope_wide_absence_only_after_destroy() -> Result<(), Error> {
-    let entropy = Arc::new(TestEntropy(AtomicU64::new(40)));
+    let entropy: Arc<dyn Entropy> = Arc::new(TestEntropy(AtomicU64::new(40)));
     let provider = MemKeyProvider::new(Arc::clone(&entropy));
     let cluster = ClusterId::from_wire([41; 16]);
     assert_eq!(provider.info().destroy, DestroyBehavior::Immediate);

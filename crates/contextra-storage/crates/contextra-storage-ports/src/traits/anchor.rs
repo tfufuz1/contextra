@@ -62,6 +62,9 @@ pub trait Clock: Send + Sync {
     /// Storage uses monotonic time for process-local expiry. Durable deadlines
     /// must fail closed when `skew` is `Uncertain`.
     fn read(&self) -> Result<ClockReading, Error>;
+    /// Durably advances the UTC high-water mark with compare-and-swap
+    /// semantics. A lower value is rejected; a lost race returns `CasLost`.
+    fn advance_utc_floor(&self, expect_millis: u64, next_millis: u64) -> Result<(), Error>;
 }
 
 pub trait Entropy: Send + Sync {

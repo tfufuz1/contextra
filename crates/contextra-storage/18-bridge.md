@@ -24,3 +24,9 @@ INV-ATOM-1, INV-COMMIT-2, INV-BR-2. Test cancellation/retry nach Retire, duplica
 
 ## 5 Arbeitspakete
 WP-18.1 Blocking executor + idempotent async apply (P6) · WP-18.2 Key/space mapping (P6) · WP-18.3 transaction/rollback mapping (P7) · WP-18.4 API/signature + DeletionProof bridge (P8) · WP-18.5 differential cutover audit (P8). Abnahme: Differentialdatenvergleich, Proof-Verify-Vektoren und dokumentierte Unsupported-Matrix.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §9.7, §13.2.1; E-77, E-80.
+
+Der `DeletionProof` (v15) übernimmt aus dem `ErasureReceipt` Status, Statuscaps (`BoundedBackupKeys`, `WeakKeyAssurance`, Host-/Geräterest) und `MeasureKind` je Messung unverändert; die Bridge darf einen Cap weder entfernen noch einen `Declared`-Befund als „verifiziert“ formulieren. Neue Fehlerklassen (`SnapshotTooOld`, `ErasePending`, `BackupBeyondHorizon`, `LedgerUnavailable`, `LedgerSameDevice`, `ProviderAssuranceInsufficient`) werden 1:1 auf Bridge-Fehler abgebildet. Keine neuen Arbeitspakete; die Abbildung wird in WP-18.4 mitgeführt.

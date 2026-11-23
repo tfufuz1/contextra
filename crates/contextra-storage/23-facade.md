@@ -5,7 +5,7 @@
 | Modul | `lib.rs`, `config.rs`, `spaces.rs`, `metrics.rs` |
 | Besitzt | `Storage`-Fassade, Builder/Config validation, stabile Re-Exports, Metrik-/Observer-Katalog |
 | Konsumiert | alle internen SPs; ist oberste Kernschicht |
-| Spec-Bezug | R8.1 §3, §4.7, §16; Z-16…Z-18; E-35, E-40, E-41, E-44 |
+| Spec-Bezug | R8.2 §3, §4.7, §16; Z-16…Z-18; E-35, E-40, E-41, E-44, E-74…E-81 |
 | Phase | P1 Basis bis P8 (G-P) |
 
 ## 1 Auftrag
@@ -22,3 +22,18 @@ INV-LIM-1, INV-SEAL-1, INV-ANCH-1. Config table tests; public API doctests; Obse
 
 ## 5 Arbeitspakete
 WP-23.1 Config/open skeleton (P1) · WP-23.2 komplette Typisierte API (P3–P6) · WP-23.3 Metrikkatalog + Label-Validator (P6) · WP-23.4 stabiler API-/Doc-Freeze (P8). Abnahme: keine Fassade ohne Besitzer-SP und Configfehler vor I/O.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §3.5, §9.4, §9.5.2, §9.7, §10.4, §11.4, §16; E-74…E-77, E-81.
+
+- **Config:** `OpenProfile::{Development, Production}` (Default `Production` bei persistentem Open), `view_lease`, `view_lease_max`, `tomb_epoch_rotation`, `backup_horizon` (Pflicht, sobald Retire aktiv), `max_active_tomb_epochs`, `acknowledged_weak_keys`, `ledger_same_device_ack`. Validierung vor I/O; `Production` prüft `ProviderAssuranceInsufficient` und `LedgerSameDevice`, `Development` warnt.
+- **API:** `Storage::erase_epoch() -> u64`, `Storage::backup_mark() -> BackupMark`, `View::renew()`, Poisoned-Erase-Pfad (Aufnahme über Ledger, §9.5.2), `rotate_tomb_epoch`/`retire_tomb_epoch` als administrative, capability-geschützte Aufrufe.
+- **Fehler:** `SnapshotTooOld`, `ErasePending`, `LedgerUnavailable`, `LedgerSameDevice`, `BackupBeyondHorizon`, `ProviderAssuranceInsufficient` mit `hint()`.
+- **Metriken (geschlossene Labels):** abgelaufene View-Leases, offene Poisoned-Löschabsichten, Anzahl/Alter aktiver Tomb-Epochen; keine IDs.
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-23.5 | R8.2-Fassade: Config/`OpenProfile`, `erase_epoch`, `backup_mark`, `renew`, Poisoned-Erase-Pfad, Fehler, Metriken | 1.5 | WP-23.2, WP-13.7, WP-20.4 | P6 | Config-Validierungstests, Leakage-/Kardinalitätstest der neuen Metriken, `hint()`-Katalogtest |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

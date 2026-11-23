@@ -1,4 +1,4 @@
-# INDEX — Implementierungsspezifikationen `contextra-storage` (R8.1)
+# INDEX — Implementierungsspezifikationen `contextra-storage` (R8.2)
 
 | | |
 |---|---|
@@ -54,7 +54,7 @@ P6  12.2–12.4 ; 13.3–13.6 ; 20.2 ; 22.* ; 04.4/04.5 ; 17.2–17.4 ; 19.2 ; 1
 P7  21.*                                                                                            ── G-V
 P8  15.8 ; 18.5–18.7 ; 24.* ; Windows 03.8 ; Soak                                                   ── G-P
 ```
-**Audit-Abhängigkeit:** E-46 bis E-73 werden am jeweils ausgewiesenen Gate geschlossen. Alle API-/Port-Entscheidungen (insbesondere `SpaceId u64`, E-72) sind vor G-0 normativ; G-F friert `SYS_IDEM`, Branch-Merge-Basis/ForkPoint/ChangeIndex, positionsunabhängiges Blob-AAD, Space-ID-Allocator, PurgeBatch-/Complete-Edits, Ledger-Domänen/Byteordnung und Extension-Manifest/Attestationsformat samt Referenzvektoren ein. G-E/G-P verlangt die Gesamtsystem-Erasure-, DiskFull-, Lokalitäts- und RAM-Abnahmen; A-24/Fencing wird bei G-CUTOVER operational nachgewiesen.
+**Audit-Abhängigkeit:** E-46 bis E-82 werden am jeweils ausgewiesenen Gate geschlossen. Alle API-/Port-Entscheidungen (insbesondere `SpaceId u64`, E-72) sind vor G-0 normativ; G-F friert `SYS_IDEM`, Branch-Merge-Basis/ForkPoint/ChangeIndex, positionsunabhängiges Blob-AAD, Space-ID-Allocator, PurgeBatch-/Complete-Edits, Ledger-Domänen/Byteordnung und Extension-Manifest/Attestationsformat samt Referenzvektoren ein. G-E/G-P verlangt die Gesamtsystem-Erasure-, DiskFull-, Lokalitäts- und RAM-Abnahmen; A-24/Fencing wird bei G-CUTOVER operational nachgewiesen.
 
 Kritischer Pfad bis G-F: 01.1 → 01.2 → 02.1 → 03.1 → 03.2 → 05.1 → 05.2 → 06.x → 07.x → 19.1 → 13.2 → Freeze. Alles dahinter ist Format-stabil.
 
@@ -118,3 +118,26 @@ Kritischer Pfad bis G-F: 01.1 → 01.2 → 02.1 → 03.1 → 03.2 → 05.1 → 0
 
 ## 5 Aufwand (PW, Summe je SP; Schätzung, keine Zusage)
 01–05 ≈ 39 · 06: 8 · 07: 11 · 08: 7 · 09: 9 · 10: 12 · 11: 12 · 12: 9 · 13: 12 · 14: 8 · 15: 18 · 16: 12 · 17: 8 · 18: 12 · 19: 8 · 20: 6 · 21: 12 · 22: 7 · 23: 8 · 24: 10 ⇒ **≈ 266 PW** (≈ 15 Monate bei 4 Entwicklern + 1 Test; deckt SPEC §14 ± Verifikationsaufwand).
+
+## 3 R8.2-Arbeitspakete (Ergänzung zum Graphen)
+
+Normativ: SPEC §12.8 Punkte 27–35 (E-74…E-82), Konfliktregister K-29…K-32. Jeder SP führt seine Pakete in seinem „R8.2-Nachtrag“; Zuordnung und Abnahmen im Audit-Register A-25…A-34.
+
+| WP | SP | Phase | Voraussetzung | Inhalt |
+|---|---|---|---|---|
+| 01.5 | PORTS | P0 (vor G-0) | 01.2 | Typen: `KeyProvider`-Angleichung, `HostProbe`, `BlockPruner`, `MeasureKind`, `BackupMark`, Fehlerklassen |
+| 20.4 | LEDGER | Slot vor G-F, Ablauf P6 | 20.1, 04.7 | Tomb-Epochen, Retire, `restore_floor`, Gerätetrennung |
+| 03.9 | ENV | P5 | 03.3, 01.5 | `HostProbe`-Adapter |
+| 07.6 | RUN | P4 | 07.5 | RAM-Präfixsummen (K-30) |
+| 11.6 | READ | P4 | 11.4, 01.5 | View-Lease, Pruner-Hook |
+| 04.7 | KEYS | P6 (Deklaration P0) | 04.2, 01.5 | Assurance/KeysInBackups/Tomb in Providern |
+| 13.7 | ERASE | P6 | 13.1, 20.4, 14.4 | Löschauftrag auf `Poisoned` |
+| 13.8 | ERASE | P6 | 13.5, 04.7 | Statuscaps, `MeasureKind` |
+| 14.4 | RECOVERY | P6 | 14.3, 20.4 | R2a/R8-Ergänzungen, Restore-Floor |
+| 22.4 | CKPT | P6 | 22.3, 20.4 | `BackupMark`, Restore-Prüfung |
+| 17.6 / 17.7 | EXT | P6 | 17.2, 11.6 / 17.3 | `block_boundary`, Cache-Konvention |
+| 23.5 | FACADE | P6 | 23.2, 13.7, 20.4 | Config/`OpenProfile`, API, Fehler, Metriken |
+| 15.10 | VERIFY | P6 | 15.3, 13.7, 20.4, 11.6 | Messarten, Modelle, neue INV-Tests, H-23 |
+| 24.8 | CUTOVER | P8 | 24.1, 23.5 | Caller-Matrix für R8.2-Schnittstellen |
+
+Kritischer Pfad bis G-F ändert sich nur um den Format-Slot `tomb_epoch` in 20.4 (Ledger-Format ist Teil des Freeze, SPEC §5.9); alles andere liegt hinter G-F oder ist rein typbezogen (01.5, vor G-0).

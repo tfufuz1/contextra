@@ -5,7 +5,7 @@
 | Modul | `erase/{gate,protocol,tickets,receipt}.rs` |
 | Besitzt | Erase-Zustandsmaschine, Gate-Frame, ER1/ER2/ER6-Koordination, Ticket, kanonisches Receipt |
 | Konsumiert | PORTS, COMMIT, CLUSTER, KEYS, LEDGER, PURGE, CATALOG, ANCHOR |
-| Spec-Bezug | R8 §9; INV-ERA-1…12, INV-ANCH-1, INV-LED-1 |
+| Spec-Bezug | R8.2 §9; INV-ERA-1…13, INV-ANCH-1, INV-LED-1/2, INV-VER-1 |
 | Phase | P1 gate skeleton; P2 ER4/ER6; P6 G-E |
 
 ## 1 Auftrag
@@ -22,3 +22,19 @@ INV-ERA-1…12, INV-ANCH-1, INV-LED-1. FaultFs-Sweep an jedem Persistenz-/Rename
 
 ## 5 Arbeitspakete
 WP-13.1 atomarer Gate/Visibility (P1) · WP-13.2 Roll-forward ER4/ER6 (P2) · WP-13.3 Provider-Key-Batch/Probe (P6) · WP-13.4 Restrictions + Extension-Verifikation (P6) · WP-13.5 Receipt/Offline-Verifikation (P6) · WP-13.6 Deadline-/Metrikpfad (P6). Abnahme: alle Crash-Punkte konvergieren monoton zu sicherem Zustand.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §9.4, §9.5.2, §9.7, §13.2.1; `INV-ERA-13`, `INV-VER-1`; E-75, E-77, E-80.
+
+1. **Löschauftrag auf `Poisoned` (E-75, §9.5.2):** ERASE besitzt die Zustandsmaschine `IntentRecorded → (Neustart) → Gated → …`. Die Aufnahme erfolgt in der Fassade/dem Ledger-Writer, nicht im Committer; ERASE definiert die Prüfung gegen den RAM-Restrictions-Stand, die `pending_erase`-Menge und `ErasePending` für READ. KeyDestroy, Purge und Anker sind auf dem vergifteten Handle gesperrt (`INV-ERA-3`). Nach Neustart gilt unverändert ER1–ER7.
+2. **Statuscaps (E-77):** Receipt-Berechnung setzt `CompleteWithResidual` bei `BoundedBackupKeys{until}`, `WeakKeyAssurance`, deklarierter Host-/Geräte-Restexposition; nach Ablauf von `until` entfällt der erste Cap bei neu berechnetem Receipt.
+3. **Messarten (E-80):** Pflichtmessungen sind (a)–(d) von `Eraser::verify`; `MeasureKind` je Messung im `verifier_report_digest`. `Complete` nur, wenn alle Pflichtmessungen `Complete` sind (`INV-VER-1`); fehlende Pflichtmessung ⇒ `Incomplete`.
+4. **ER2 je Epoche:** `KeysDestroyed` erst bei `probe(c, e) == Absent` für alle Epochen `≤ key_epoch`.
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-13.7 | Löschauftrag auf `Poisoned` (Intent, `pending_erase`, `ErasePending`, Gate beim Neustart) | 2.0 | WP-13.1, WP-20.4, WP-14.4 | P6 | Fehlerinjektion: `EIO` auf Redo + Erase-Request (Ledger gesund/vergiftet), Crash zwischen Intent und Neustart, Doppelaufnahme; `INV-ERA-13` |
+| WP-13.8 | Receipt-Statuscaps und `MeasureKind`-Bericht | 1.0 | WP-13.5, WP-04.7, WP-01.5 | P6 | Matrix Provider-Zusicherung × Status, `INV-VER-1`-Property, `verify_receipt` ohne Tomb-Schlüssel |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

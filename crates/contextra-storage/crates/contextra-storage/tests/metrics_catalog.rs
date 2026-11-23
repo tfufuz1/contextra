@@ -1,7 +1,5 @@
 use contextra_storage::metrics::{validate_labels, validate_sample, METRICS};
-use contextra_storage::ports::traits::{
-    Durability, MetricLabel, MetricName, MetricResult, MetricSample,
-};
+use contextra_storage::ports::{Durability, traits::{MetricLabel, MetricName, MetricResult, MetricSample}};
 use std::collections::BTreeSet;
 
 #[test]

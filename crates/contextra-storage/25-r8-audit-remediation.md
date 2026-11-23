@@ -1,4 +1,4 @@
-# SP-AUDIT — Verbindliche R8.1-Audit-Remediation
+# SP-AUDIT — Verbindliche R8.1/R8.2-Audit-Remediation
 
 | | |
 |---|---|
@@ -37,6 +37,16 @@ Dieses Dokument führt keine Parallelimplementierung ein. Ein Patch wird in der 
 | A-22 | Rollback-/Restore-sichere Löschung braucht Ledger-Intent vor Catalog-Gate; selektive Range-/Branch-Scope wird nur verschlüsselt im Ledger abgelegt, nie als Klartext | LEDGER, ERASE, RECOVERY, ANCHOR | P0/P1/P6 | Crash an jeder Intent/Gate/Anchor/KMS-Grenze konvergiert vor Open zur Gate-Wahrheit; ältere Backups bleiben gefiltert; Ankerfehler stoppt irreversible Folgestufe |
 | A-23 | `SpaceId` ist für eine langlebige Embedded-Instanz ein monoton reservierter `u64`; die bisherige `u16`-Grenze und Wiederverwendung nach Catalog-Trim sind ausgeschlossen | PORTS, CATALOG, CODEC, ERASE, RECOVERY | P0/G-F | `reserve_space_ids` ist vor Vergabe durabel; alle Space-Frames, Catalog-Tags, Gates und Tomb-HMACs nutzen eine kanonische 64-Bit-ID; Crash-/Restore-Vektoren beweisen keine Wiedervergabe und `Exhausted` statt Wrap |
 | A-24 | Lokaler `LOCK` verhindert keine zwei aktiven Kopien einer restaurierten `InstanceId`; Rollback-Anchor ist kein Eigentümer-Lease | RECOVERY, CKPT, CUTOVER | P0/P8+ | Schreibender Restore erhält externen Fencing-Nachweis; Zwei-Host-Rehearsal weist eine aktive Kopie nach, die zweite bleibt `RestoreQuarantine` |
+| A-25 | `tomb_epoch`-Format-Slot, Provider-Tomb-Schlüssel, Retire nur nach Backup-Horizont mit `restore_floor`; Restore verweigert `BackupBeyondHorizon` (E-74, K-31) | LEDGER, KEYS, CKPT, RECOVERY | Slot vor G-F, Ablauf P6 | `INV-LED-2`, `INV-KEY-5`; Crash-Matrix Retire; Vektoren mit zwei Epochen |
+| A-26 | Löschauftrag auf `Poisoned`: durabler Intent im Ledger, `ErasePending`, Gate beim Neustart, kein KeyDestroy/Purge ohne Gate (E-75) | ERASE, LEDGER, FACADE, RECOVERY, READ | P6 | `INV-ERA-13`; Fehlerinjektion `EIO` + Erase, Ledger gesund/vergiftet |
+| A-27 | View-Lease mit `SnapshotTooOld`, getrennt von `BelowFloor`; Ablauf wirkt wie Revoke (E-76) | READ, MEMVER, FACADE | P4 | `INV-VIEW-3`; Lease-Test mit Sim-Clock, Graveyard-Freigabe |
+| A-28 | `KeysInBackups`/`KeyAssurance`, Statuscaps, `ProviderAssuranceInsufficient` (E-77); `KeyProvider`-Trait an SPEC §9.4 angleichen | PORTS, KEYS, ERASE, FACADE | P0/P6 | Konformanzsuite, Matrix Provider × Receipt-Status |
+| A-29 | Optionaler `HostProbe` (Swap, Core-Dumps, memlock, Dateisystem, Geräte-IDs), nie Korrektheitsquelle (E-78) | PORTS, ENV, ERASE | P5 | `Unknown` bleibt `Unknown`; Receipt-Restexposition `Declared` |
+| A-30 | `BlockPruner`/`block_boundary` nur für deklariert schattensichere Besitzer auf `main`; keine Zeitlanes im Kernformat (E-79, K-29) | EXT, READ, RUN, PORTS | P6 | `INV-PRUNE-1`; Property „mit ≡ ohne Pruner“ |
+| A-31 | `MeasureKind` je Messung; Pflichtmessungen (a)–(d) müssen `Complete` sein (E-80) | ERASE, VERIFY, BRIDGE | P6 | `INV-VER-1`; CI-Prüfung der Receipt-Cap-Regeln |
+| A-32 | Backup-Marke (`erase_epoch`, `created_at`), `LedgerSameDevice`/`LedgerUnavailable`, `Storage::erase_epoch()` (E-81) | FACADE, CKPT, LEDGER, RECOVERY | P6 | Restore-/Open-Tests, Production-Profil-Test |
+| A-33 | Derivation Cache als clusterlokale Konvention; `INV-PRIV-1` präzisiert (E-82, K-32) | EXT, BRIDGE, CUTOVER | P6/P8 | Canary nach Cluster-Erase, kein Cross-Cluster-Treffer |
+| A-34 | Kumulative SubIndex-Summen im RAM statt im Format (K-30) | RUN, READ, VERIFY | P4 | H-4-Bericht trennt Aufbau/Traversierung |
 
 ## R8.1-Querschnittsverträge
 

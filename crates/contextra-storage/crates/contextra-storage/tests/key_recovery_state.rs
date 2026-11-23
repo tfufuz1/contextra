@@ -4,7 +4,7 @@ use contextra_storage::recovery::integrity::{reconcile_cluster_key, KeyRecoveryS
 #[test]
 fn provider_absence_requires_durable_erase_evidence() {
     assert!(matches!(reconcile_cluster_key(KeyState::Absent, false), Err(Error::KeyLost)));
-    assert_eq!(reconcile_cluster_key(KeyState::Absent, true), Ok(KeyRecoveryState::Shredded));
+    assert!(matches!(reconcile_cluster_key(KeyState::Absent, true), Ok(KeyRecoveryState::Shredded)));
 }
 
 #[test]

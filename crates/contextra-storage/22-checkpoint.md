@@ -22,3 +22,16 @@ INV-ANCH-1, INV-ERA-9, INV-KEY-1…4. Crash-Sweep Checkpoint-Create; tamper/part
 
 ## 5 Arbeitspakete
 WP-22.1 manifest/snapshot capture (P6) · WP-22.2 optional hardlink/reflink (P6) · WP-22.3 restore verification/reconcile (P6). Abnahme: kein wiederhergestellter Tombstone-Cluster wird Live.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §10.3, §10.4; `INV-LED-2`; E-74, E-81.
+
+- Das Manifest enthält `erase_epoch`, `created_at` und die höchste offene `tomb_epoch` (`BackupMark`); externe Backups müssen die Marke über `Storage::backup_mark()` mitführen.
+- Restore verweigert eine Kopie mit `mark.erase_epoch < restore_floor` oder ohne Marke (sobald eine Epoche retired ist) mit `BackupBeyondHorizon`; kein Override. Gegen nicht retired Epochen wird abgeglichen; Tomb-Schlüssel sind nicht im Checkpoint (`INV-KEY-5`).
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-22.4 | `BackupMark` im Manifest, Restore-Floor-Prüfung, Epochen-Matching | 1.0 | WP-22.3, WP-20.4 | P6 | Restore-Test: Kopie unter Floor abgelehnt, ohne Marke abgelehnt bei Retire, zwei Epochen korrekt abgeglichen |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

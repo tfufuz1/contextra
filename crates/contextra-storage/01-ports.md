@@ -5,7 +5,7 @@
 | Crate | `crates/contextra-storage-ports` (keine Logik, `#![forbid(unsafe_code)]`) |
 | Besitzt | alle Werttypen und Traits, die ≥ 2 Komponenten teilen; das `Storage`-Fassadenprofil (Signaturen, nicht Rümpfe) |
 | Konsumiert | nichts (nur `bytes`, `zeroize`, `thiserror`) |
-| Spec-Bezug | R8.1 §3.2, §3.5, §4.7, §12, §15–16 |
+| Spec-Bezug | R8.2 §3.2, §3.5, §4.7, §9.4, §12, §15–16 |
 | Phase | P0, Gate G-0 (API-Review-Freeze) |
 
 ## 1 Auftrag und Abgrenzung
@@ -80,3 +80,20 @@ Fehlerklassen und Reaktion exakt nach R8 §3.5. `Error::Poisoned` ist klebrig un
 
 ## 8 Abnahme
 Crate baut ohne Abhängigkeit auf Altstand-Crates; `cargo doc` vollständig; `layering`-Test grün; jede in R8 §3.2 genannte Port-Fähigkeit hat genau einen Trait.
+
+## R8.2-Nachtrag
+
+Besitzer der geteilten R8.2-Typen (E-74, E-76…E-81; Spec R8.2 §3.2, §3.5, §9.4, §12.2, §13.2.1):
+
+- **`KeyProvider`** wird an SPEC §9.4 angeglichen: `info() -> KeyProviderInfo { destroy: DestroyMode, keys_in_backups: KeysInBackups, assurance: KeyAssurance }`, `kek`, `create_cluster_keys(request_id, clusters, entropy)`, `cluster_keys`, `destroy_many`, `probe(cluster, epoch)`, `list`, neu `create_tomb_epoch`, `tomb_key`, `retire_tomb_epoch`. `KeysInBackups::{No, Bounded{until: Duration}, Yes}`, `KeyAssurance::{Hardware, Kms, FilePassphrase}`. Der Code in `contextra-storage-ports/src/keys.rs` führt bisher nur die vier Batch-Methoden; `info`, `kek`, `list` und die Tomb-Methoden sind vor G-0 nachzuziehen.
+- **`HostProbe`** (optional): `fn probe(&self) -> HostReport` (Swap, Core-Dumps, `RLIMIT_MEMLOCK`, Dateisystemtyp, Geräte-IDs; `Unknown` ist ein gültiger Wert). Nur Adapter, kein Aufruf aus dem Kern, wo Korrektheit davon abhängt.
+- **`ExtensionBuilder::block_boundary(block_uid, entries) -> Option<AggBytes>`** und **`BlockPruner::may_skip(block_uid, agg) -> bool`** samt `PruneContract::{None, ShadowSafe{reason}}` (K-29): Typen werden von RUN und EXT geteilt und stehen deshalb hier.
+- **Fehlerklassen** (F-7) ergänzt: `SnapshotTooOld`, `ErasePending`, `LedgerUnavailable`, `LedgerSameDevice`, `BackupBeyondHorizon`, `ProviderAssuranceInsufficient`; jede mit stabilem `hint()` und Fehlertext ohne Schlüssel/Körper.
+- **`MeasureKind { Complete, Sample{n, N}, Declared, NotMeasured, NotImplemented }`**, Receipt-Statuscaps `ResidualKind::{BoundedBackupKeys{until}, WeakKeyAssurance, HostExposure{..}, LedgerSameDevice}`.
+- `BackupMark { instance_id, erase_epoch, created_at, tomb_epoch }` als Typ; `Storage::erase_epoch() -> u64` und `Storage::backup_mark()` sind Fassade (SP-FACADE), Typen hier.
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-01.5 | R8.2-Typen (`KeyProvider`-Angleichung, `HostProbe`, `BlockPruner`/`PruneContract`, `MeasureKind`, `BackupMark`, neue Fehlerklassen) | 1.0 | WP-01.2 | P0 (vor G-0) | Mock-Impl je Trait, Layering-Test, `trybuild`-Negativtests, Konformanz-Skelett `KeyProviderConformance` für Tomb-Methoden |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

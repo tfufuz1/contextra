@@ -20,10 +20,19 @@ fn data_block_round_trip_crosses_prefix_restart_boundaries() -> Result<(), Error
 
 #[test]
 fn data_block_rejects_unsorted_duplicate_oversized_and_corrupt_input() {
-    assert!(encode(&[entry(b"z", 1), entry(b"a", 1)], 1024).is_err());
-    assert!(encode(&[entry(b"a", 1), entry(b"a", 1)], 1024).is_err());
-    assert!(encode(&[entry(b"a", 1)], 8).is_err());
-    let mut bytes = encode(&[entry(b"a", 1)], 1024).expect("encode");
+    assert!(encode(&[entry(b"z", 0x101), entry(b"a", 0x101)], 1024).is_err());
+    assert!(encode(&[entry(b"a", 0x101), entry(b"a", 0x101)], 1024).is_err());
+    assert!(encode(&[entry(b"a", 0x101)], 8).is_err());
+    let mut bytes = encode(&[entry(b"a", 0x101)], 1024).expect("encode");
     if let Some(last) = bytes.last_mut() { *last ^= 1; }
     assert!(decode(&bytes, 1024).is_err());
+}
+
+#[test]
+fn data_block_rejects_noncanonical_or_reserved_tags() {
+    assert!(encode(&[entry(b"a", 1)], 1024).is_err());
+    assert!(encode(&[entry(b"a", 0x106)], 1024).is_err());
+    assert!(encode(&[entry(b"a", 0x1ff)], 1024).is_err());
+    assert!(encode(&[entry(b"a", 0x103)], 1024).is_err());
+    assert!(encode(&[entry(b"a", 0x104)], 1024).is_err());
 }

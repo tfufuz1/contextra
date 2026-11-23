@@ -74,6 +74,7 @@ impl MemFs {
                 durable_files: files.clone(),
                 files,
                 free_bytes: state.free_bytes,
+                locks: BTreeMap::new(),
             })),
         })
     }

@@ -1,6 +1,6 @@
 //! Cluster-section range-delete markers (R8 §4.2 and §5.6).
 
-use crate::codec::tags::{untag, Kind};
+use crate::codec::tags::{untag, Kind, TagError};
 use contextra_storage_ports::{BranchId, Error, Stamp};
 use core::fmt;
 use zeroize::Zeroizing;
@@ -27,7 +27,10 @@ impl fmt::Debug for RangeMarker {
 
 impl RangeMarker {
     pub fn stamp(&self) -> Result<Stamp, Error> {
-        let (stamp, kind) = untag(self.tag).map_err(|_| Error::Corrupt { place: "range marker tag" })?;
+        let (stamp, kind) = untag(self.tag).map_err(|error| match error {
+            TagError::UnknownKind(_) | TagError::ReservedMerge => Error::Unsupported { what: "range marker tag" },
+            TagError::StampZero | TagError::StampOutOfRange => Error::Corrupt { place: "range marker tag" },
+        })?;
         if kind != Kind::RangeDelete { return Err(Error::Corrupt { place: "range marker kind" }); }
         Ok(stamp)
     }

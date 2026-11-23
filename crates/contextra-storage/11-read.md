@@ -22,3 +22,16 @@ INV-VIEW-1/2, INV-VIS-1, INV-CONS-1. Tests: Snapshot bleibt stabil bei parallele
 
 ## 5 Arbeitspakete
 WP-11.1 View-Snapshot und Punktlese (P1) · WP-11.2 Iterator/Merge + Tombstone (P4) · WP-11.3 Page/Weight Budget (P4) · WP-11.4 Cursor/ResumeToken (P4) · WP-11.5 Cache/Invalidierung (P4). Abnahme: Referenzmodellgleichheit, keine Sichtbarkeitslecks.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §7, §11.4 (View-Lease), §12.2 (BlockPruner-Aufruf); `INV-VIEW-3`, `INV-PRUNE-1`; E-76, E-79.
+
+- **View-Lease (E-76):** `View`/`Cursor` tragen `lease_deadline` (monotone `Clock`, Standard `view_lease` 60 s, `renew()` bis `view_lease_max` 10 min). Ablauf setzt dieselbe Widerrufsmechanik wie `ViewPolicy::Revoke` (Referenz lösen, Graveyard freigeben); jede weitere Nutzung (`get`, `body`, `page`, `poll`, `filter_visible`) liefert `SnapshotTooOld{stamp, floor_hint}`. Cursor prüfen die Lease zwischen Blöcken zusammen mit Gate und Widerruf. `SnapshotTooOld` ≠ `BelowFloor`. `ViewPolicy::Wait(timeout)` wartet höchstens bis `min(timeout, Lease-Ende)`. Zeit nie aus UTC.
+- **BlockPruner (K-29):** `page`/`Cursor` akzeptieren einen optionalen `&dyn BlockPruner`, rufen ihn nur für `ShadowSafe`-Besitzer und nur auf `branch == 0` auf und lassen Gate/Restriction/`filter_visible` unabhängig davon laufen.
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-11.6 | View-Lease, `renew`, `SnapshotTooOld`; Pruner-Hook in `page`/`Cursor` | 1.5 | WP-11.4, WP-01.5 | P4 | Lease-Ablauf-Test mit Sim-Clock, Graveyard-Freigabe nach Ablauf, Cursor-Abbruch zwischen Blöcken, Property „mit Pruner ≡ ohne Pruner“ (`INV-PRUNE-1`), `INV-VIEW-3` |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

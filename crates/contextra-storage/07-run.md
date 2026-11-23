@@ -69,3 +69,17 @@ INV-PL-1/2/3/5 (Builder verweigert Verstöße; Property), INV-SEAL-1, INV-FMT-1;
 
 ## 8 Abnahme
 Keine `unwrap/expect/panic/indexing`; jeder Decoder Fuzz-Ziel; `rawcopy_roundtrip` und goldene Vektoren grün (G-F); H-2/H-3/H-4 messbar.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §7 (K-30), §8.6/§12.2 (K-29); H-4.
+
+- **K-30:** Das SubIndex-Format bleibt unverändert; es gibt **keine** persistierten `cum_weight`/`cum_count`. `RunReader` berechnet beim Laden eines SubIndex die Präfixsummen im RAM (≤ ca. 4096 Blöcke je Abschnitt) und zählt sie gegen das `MemoryBudget` (Klasse Cluster-Metadaten). Sie sind eine Obergrenze und nie Korrektheitsquelle; `page` bleibt gegen das Referenzmodell prüfbar.
+- **K-29:** Keine Zeitlanes im Format. `block_skip_scan` bleibt rein weights-/Bloom-basiert; Pruner-Aufrufe erfolgen in `page`/`Cursor` (SP-READ), die Aggregate liegen im ExtensionBlock (SP-EXT).
+- H-4 misst Aufbauzeit der RAM-Präfixsummen und Traversierung getrennt vom Block-Read-Verhältnis.
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-07.6 | RAM-Präfixsummen beim SubIndex-Laden + H-4-Messung | 0.5 | WP-07.5 | P4 | `page`-Property gegen Referenzmodell unverändert; Budget-Test; H-4-Bericht trennt Aufbau/Traversierung |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

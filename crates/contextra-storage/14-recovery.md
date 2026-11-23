@@ -22,3 +22,17 @@ INV-LOG-5/7/8/9, INV-ANCH-1, INV-ERA-9, INV-CONS-1. Crash-Sweep jede Write-Grenz
 
 ## 5 Arbeitspakete
 WP-14.1 Format/Catalog/Redo Open-Reihenfolge (P1) · WP-14.2 Replayfloor/Torn-tail/Recovery-Scan (P2) · WP-14.3 Anker-Rollback und Restore-Reconcile (P6). Abnahme: Recovery nur aus durablen Präfixen und kein Rollback-Schreibzugriff.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §9.5.2, §10.1 (R2a, R8), §10.3/§10.4; `INV-ERA-13`, `INV-LED-2`; E-74, E-75, E-81.
+
+- **R2a:** Ledger-Gerät nicht lesbar ⇒ schreibend `Err(LedgerUnavailable)`; `ReadOnly` nur mit Diagnose, Catalog-Gates gelten weiter.
+- **R8:** `EraseIntent{origin: Poisoned}` ohne `GateApplied` wird wie jeder andere Intent idempotent in ein Gate überführt; zuvor lösen R6/R7 `Indeterminate`-Changes auf, damit das Gate über dem endgültigen Zustand liegt.
+- **Restore (WP-22.4):** Matching gegen alle nicht retired Tomb-Epochen; Kopie unter `restore_floor` ⇒ `BackupBeyondHorizon`; fehlender oder verlorener Tomb-Schlüssel einer nicht retired Epoche ⇒ Quarantäne.
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-14.4 | R8.2-Open/Restore: `LedgerUnavailable`, Poisoned-Intents in R8, Epochen-Matching, `BackupBeyondHorizon` | 1.5 | WP-14.3, WP-20.4 | P6 | Absturzmatrix um R2a/R8-Fälle erweitert, Restore-Reconcile mit zwei Epochen und einem Retire |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

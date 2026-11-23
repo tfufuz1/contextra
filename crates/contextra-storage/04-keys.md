@@ -63,3 +63,18 @@ INV-KEY-1 (Canary-Suche über alle Dateien/Checkpoints), INV-KEY-2 (loom: Gate z
 
 ## 8 Abnahme
 Kein Schlüsselmaterial außerhalb `Zeroizing`/Provider (Test mit Canary-Schlüsseln, O-Files); Konformanzsuite für jeden Provider Gate-Pflicht; Batch-API vorhanden und in Recovery/Flush genutzt.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §9.4, §10.4; `INV-KEY-5`, `INV-LED-2` (Schlüsselseite); E-74, E-77.
+
+1. **`KeyAssurance` und `KeysInBackups` (E-77):** Jeder Provider deklariert beides in `info()`. `keys-file` liefert `FilePassphrase`; es kann Vernichtung auf Journal-/CoW-/Flash-Dateisystemen nicht beweisen, daher setzt ERASE den Statuscap `CompleteWithResidual{WeakKeyAssurance}`, und `open` in `OpenProfile::Production` weist `Personal`+`Seal::Cluster` mit `ProviderAssuranceInsufficient` ab (Prüfung in SP-FACADE). `Bounded{until}` verlangt, dass Backup-Schlüsselexporte unter einem Epochenschlüssel liegen, der nach `until` vernichtet wird; `keys-cohort` deklariert `No`.
+2. **Tomb-Epochen (K-31, E-74):** `create_tomb_epoch`, `tomb_key`, `retire_tomb_epoch` sind idempotent und durabel. Tomb-Schlüssel stehen nie in `KEYS`, Checkpoints oder Backups des Kerns (`INV-KEY-5`, Canary-Suche auf Tomb-Schlüsselmaterial erweitern). `tomb_key == None` nur nach Retire; Provider-Neustart verliert keine Epoche; `retire` liefert erst bei `Absent` Erfolg.
+3. **`probe` je Epoche:** ER2 verlangt `Absent` für jede Epoche `≤ key_epoch`; Konformanz deckt Teilzustände ab (eine Epoche `Absent`, eine `Disabled`).
+4. **Konformanz:** `KeyProviderConformance` um Tomb-Epochen, `KeysInBackups`/`KeyAssurance`-Deklaration und Crashverhalten beim Retire erweitert; `SimKms` kann Karenz und `Bounded`-Exporte simulieren.
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-04.7 | Provider-Angleichung R8.2: `info()` mit `KeysInBackups`/`KeyAssurance`, Tomb-Epochen in `keys-file`, `keys-cohort`, `SimKms`, Konformanz | 2.0 | WP-04.2, WP-01.5 | P6 (Tomb/Assurance-Deklaration schon P0 im `MemKeyProvider`) | Konformanzsuite grün, Canary-Test ohne Tomb-Schlüssel in Dateien, Retire-Crash-Matrix |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).

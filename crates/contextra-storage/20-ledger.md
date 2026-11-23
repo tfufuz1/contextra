@@ -5,7 +5,7 @@
 | Modul | `erase/ledger.rs`, `env/anchor.rs` |
 | Besitzt | append-only Ledger-Kette, `tomb_id`, Segmentseal/archive, Ankersequenzierung |
 | Konsumiert | PORTS, CODEC, ENV, CATALOG, ERASE, ColdTier |
-| Spec-Bezug | R8 §9.7, §10.3; INV-LED-1, INV-ANCH-1 |
+| Spec-Bezug | R8.2 §9.7, §10.3, §10.4; INV-LED-1/2, INV-ANCH-1 |
 | Phase | P1 Minimal ledger; P6 Segmente/Archiv (G-E) |
 
 ## 1 Auftrag
@@ -26,3 +26,18 @@ INV-LED-1, INV-ANCH-1, INV-ERA-8. Crash-Sweep an Intent-Append/Sync, Catalog-Gat
 
 ## 5 Arbeitspakete
 WP-20.1 Ledgerappend + Hashkette (P1) · WP-20.2 Rotation/seg_digest/ColdTier (P6) · WP-20.3 Ankerkoordination und Receipt-Slice (P6). Abnahme: kein Anker vor durabler Wahrheit und kein identifizierender Inhalt im Ledger.
+
+## R8.2-Nachtrag
+
+**Spec-Bezug ergänzt:** R8.2 §4.1, §9.7, §10.4; `INV-LED-2`, `INV-KEY-5` (Ledger-Seite); K-31; E-74, E-81.
+
+1. **Format-Slot (vor G-F):** `tomb_epoch u32` in jedem Event mit `tomb_id`; `tomb_id = HMAC(tomb_key(epoch), "ctxs cluster tomb v1" || instance_id || ClusterId)`; neue Event-Kinds `TombEpochOpened`, `TombEpochClosed`, `TombEpochRetireIntent{epoch, restore_floor}`, `TombEpochRetired`. Die Kette nutzt weiter `ledger_key`; `space_tomb_id` bleibt unter `ledger_key`. Referenzvektoren: zwei Epochen, ein Retire (SPEC Anhang A).
+2. **Retire-Ablauf (§10.4):** Bedingungen prüft der Ledger-Writer (Epoche `Closed`, `now − closed_at ≥ backup_horizon` bei verifizierter Uhr, keine offenen Tickets/Intents/Restores mit dieser Epoche). Reihenfolge: `RetireIntent` durabel < Anker < `retire_tomb_epoch` = `Absent` < `Retired`; Roll-forward nach Absturz.
+3. **Geräte-/Verfügbarkeitsregeln:** `LedgerSameDevice` (Production) und `LedgerUnavailable` (schreibendes Open) laut §9.7/§10.1.
+4. `restore_floor` ist Teil des Ledger-Zustands und wird von RECOVERY/CKPT gelesen.
+
+| ID | Titel | PW | Phase | Abnahme |
+|---|---|---|---|---|
+| WP-20.4 | Tomb-Epochen: Format-Slot, Events, Rotation, Retire-Ablauf, `restore_floor`, Same-Device-/Unavailable-Prüfung | 2.5 | WP-20.1, WP-04.7 | Slot vor G-F, Ablauf P6 | Goldene Vektoren, Crash-Matrix des Retire, `INV-LED-2`, `verify_receipt` ohne Tomb-Schlüssel |
+
+PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
