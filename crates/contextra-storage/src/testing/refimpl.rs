@@ -9,8 +9,7 @@
 //! `AesGcmSivCipher` nutzt AES-256-GCM-SIV (32 Byte Schlüssel, 12 Byte Nonce,
 //! 16 Byte Tag), passend zum AEAD-Vertrag von `Cipher` (SPEC §4).
 
-use contextra_ports::persistence::{Cipher, Kdf, Mac};
-use std::io;
+use contextra_ports::persistence::{Cipher, CryptoError, Kdf, Key32, Mac};
 
 use aes_gcm_siv::aead::{Aead, KeyInit, Payload};
 use aes_gcm_siv::{Aes256GcmSiv, Nonce};
@@ -58,7 +57,27 @@ impl Kdf for Blake3Kdf {
     }
 }
 
+/// Verdichtet die 24-Byte-Nonce des Ports auf die 12 Byte, die AES-GCM-SIV braucht.
+///
+/// PLATZHALTER bis WP-2.4, kein Produktivpfad. Die Verdichtung läuft über BLAKE3,
+/// damit jedes der 24 Nonce-Bytes in die Prüfung eingeht. Eine Verdichtung durch
+/// Abschneiden würde Nonces, die sich nur in Byte 13 bis 24 unterscheiden,
+/// gleich behandeln. Annahme: Für Testzwecke ist die Kollisionswahrscheinlichkeit
+/// der 96-Bit-Verdichtung vernachlässigbar.
+fn nonce12(nonce: &[u8; 24]) -> [u8; 12] {
+    let digest = blake3::hash(nonce);
+    let mut out = [0u8; 12];
+    for (dst, src) in out.iter_mut().zip(digest.as_bytes().iter()) {
+        *dst = *src;
+    }
+    out
+}
+
 /// AES-256-GCM-SIV als AEAD (Testdouble für `Cipher`).
+///
+/// PLATZHALTER bis WP-2.4, kein Produktivpfad: Der Port verlangt 24-Byte-Nonces
+/// (UE-10, XChaCha20-Poly1305), dieses Testdouble arbeitet mit AES-GCM-SIV und
+/// verdichtet die Nonce über `nonce12`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AesGcmSivCipher;
 
@@ -66,23 +85,28 @@ impl Cipher for AesGcmSivCipher {
     /// Verschlüsselt. Ein Fehler ist nur bei unzulässiger Länge möglich und
     /// ergibt dann eine leere Ausgabe. Das Öffnen schlägt dann fehl, daher
     /// fällt der Fehler im Test auf.
-    fn seal(&self, key: &[u8; 32], nonce: &[u8; 12], aad: &[u8], plain: &[u8]) -> Vec<u8> {
+    fn seal(&self, key: &Key32, nonce: &[u8; 24], aad: &[u8], plain: &[u8]) -> Vec<u8> {
         let cipher = Aes256GcmSiv::new(key.into());
+        let n12 = nonce12(nonce);
         cipher
-            .encrypt(Nonce::from_slice(nonce), Payload { msg: plain, aad })
+            .encrypt(Nonce::from_slice(&n12), Payload { msg: plain, aad })
             .unwrap_or_default()
     }
 
     fn open(
         &self,
-        key: &[u8; 32],
-        nonce: &[u8; 12],
+        key: &Key32,
+        nonce: &[u8; 24],
         aad: &[u8],
         sealed: &[u8],
-    ) -> io::Result<Vec<u8>> {
+    ) -> Result<Vec<u8>, CryptoError> {
+        if sealed.len() < 16 {
+            return Err(CryptoError::Malformed);
+        }
         let cipher = Aes256GcmSiv::new(key.into());
+        let n12 = nonce12(nonce);
         cipher
-            .decrypt(Nonce::from_slice(nonce), Payload { msg: sealed, aad })
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "AEAD-Prüfung fehlgeschlagen"))
+            .decrypt(Nonce::from_slice(&n12), Payload { msg: sealed, aad })
+            .map_err(|_| CryptoError::AuthenticationFailed)
     }
 }

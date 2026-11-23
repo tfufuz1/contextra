@@ -1,0 +1,142 @@
+warning: unused workspace dependency `contextra-agent`
+   --> Cargo.toml:136:1
+    |
+136 | contextra-agent = { path = "crates/contextra-agent" }
+    | ^^^^^^^^^^^^^^^
+    |
+    = note: `cargo::unused_workspace_dependencies` is set to `warn` by default
+help: consider removing the workspace dependency `contextra-agent`
+warning: unused workspace dependency `contextra-candle`
+   --> Cargo.toml:141:1
+    |
+141 | contextra-candle = { package = "contextra-infer-candle", path = "crates/contextra-infer-candle" } # <!-- crate-ref-ignore -->
+    | ^^^^^^^^^^^^^^^^
+    |
+help: consider removing the workspace dependency `contextra-candle`
+warning: unused workspace dependency `contextra-embed`
+   --> Cargo.toml:134:1
+    |
+134 | contextra-embed = { package = "contextra-infer-onnx", path = "crates/contextra-infer-onnx" } # <!-- crate-ref-ignore -->
+    | ^^^^^^^^^^^^^^^
+    |
+help: consider removing the workspace dependency `contextra-embed`
+warning: unused workspace dependency `contextra-index`
+   --> Cargo.toml:126:1
+    |
+126 | contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" } # <!-- crate-ref-ignore -->
+    | ^^^^^^^^^^^^^^^
+    |
+help: consider removing the workspace dependency `contextra-index`
+warning: unused workspace dependency `contextra-ingest`
+   --> Cargo.toml:157:1
+    |
+157 | contextra-ingest = { path = "crates/contextra-ingest" }
+    | ^^^^^^^^^^^^^^^^
+    |
+help: consider removing the workspace dependency `contextra-ingest`
+warning: unused workspace dependency `contextra-kvcache`
+   --> Cargo.toml:150:1
+    |
+150 | contextra-kvcache = { path = "crates/contextra-kvcache" }
+    | ^^^^^^^^^^^^^^^^^
+    |
+help: consider removing the workspace dependency `contextra-kvcache`
+warning: unused workspace dependency `contextra-mcp`
+   --> Cargo.toml:135:1
+    |
+135 | contextra-mcp   = { path = "crates/contextra-mcp" }
+    | ^^^^^^^^^^^^^
+    |
+help: consider removing the workspace dependency `contextra-mcp`
+warning: unused workspace dependency `contextra-ollama`
+   --> Cargo.toml:138:1
+    |
+138 | contextra-ollama = { package = "contextra-infer-ollama", path = "crates/contextra-infer-ollama" } # <!-- crate-ref-ignore -->
+    | ^^^^^^^^^^^^^^^^
+    |
+help: consider removing the workspace dependency `contextra-ollama`
+warning: unused workspace dependency `contextra-py`
+   --> Cargo.toml:143:1
+    |
+143 | contextra-py = { path = "crates/contextra-py" }
+    | ^^^^^^^^^^^^
+    |
+help: consider removing the workspace dependency `contextra-py`
+warning: unused workspace dependency `contextra-storage`
+   --> Cargo.toml:124:1
+    |
+124 | contextra-storage = { path = "crates/contextra-storage" }
+    | ^^^^^^^^^^^^^^^^^
+    |
+help: consider removing the workspace dependency `contextra-storage`
+warning: workspace (manifest) generated 10 warnings
+   Compiling contextra-storage v0.1.0 (/tmp/g1-int/crates/contextra-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.59s
+     Running tests/env/main.rs (target/debug/build/contextra-storage/661a5bced6b969b1/out/env-661a5bced6b969b1)
+
+running 10 tests
+test test_clock_now_and_monotonic ... ok
+test test_entropy_fill ... ok
+test test_inv_fs_1_env_open_enforces_strict_policy ... ok
+test test_inv_fs_1_strict_unsupported ... ok
+test test_macos_f_fullfsync_equivalence ... ignored, A-05: Zusage für F_FULLFSYNC-Äquivalenz auf Apple-Plattformen bleibt in V1 offen (R-8)
+test test_real_fs_conformance ... ok
+test test_real_fs_shared_and_exclusive_locks ... ok
+test test_real_fs_verify_root ... ok
+test test_umask_independence ... 
+running 1 test
+test test_umask_worker ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_umask_worker ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+ok
+test test_umask_worker ... ok
+
+test result: ok. 9 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/run/main.rs (target/debug/build/contextra-storage/174ac5c326a220d7/out/run-174ac5c326a220d7)
+
+running 8 tests
+test bitflip::test_bitflip_all_bytes ... ok
+test eio::test_eio_reported_as_error_never_empty ... ok
+test golden::test_golden_a6_blobref_vector ... ok
+test golden::test_golden_run_plain_layout ... ok
+test roundtrip::test_basic_roundtrip ... ok
+test roundtrip::test_multiblock_roundtrip_with_cache ... ok
+test roundtrip::test_rangedel_coverage_in_reader ... ok
+test roundtrip::test_read_batch_operation ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/testing/main.rs (target/debug/build/contextra-storage/301b56b1daab57e5/out/testing-301b56b1daab57e5)
+
+running 20 tests
+test determinism_tests::test_determinism_different_seeds_produce_different_traces ... ok
+test determinism_tests::test_determinism_identical_seed_produces_identical_hash ... ok
+test determinism_tests::test_xorshift64_reproducibility ... ok
+test fault_fs_tests::test_fault_fs_crash_at_op_n ... ok
+test fault_fs_tests::test_fault_fs_crash_reordered ... ok
+test fault_fs_tests::test_fault_fs_eio_and_bit_rot_at_offset ... ok
+test fault_fs_tests::test_fault_fs_enospc_and_short_write ... ok
+test fault_fs_tests::test_fault_fs_f10_rollback_older_state ... ok
+test fault_fs_tests::test_fault_fs_fail_sync_poison ... ok
+test fault_fs_tests::test_fault_fs_hooks_sequence ... ok
+test fault_fs_tests::test_fault_fs_lost_write ... ok
+test fault_fs_tests::test_fault_fs_misdirected_write ... ok
+test fault_fs_tests::test_fault_fs_torn_write_sector_sizes ... ok
+test mem_fs_tests::test_mem_fs_conformance_suite ... ok
+test mem_fs_tests::test_mem_fs_remove_without_sync_dir_reverted ... ok
+test mem_fs_tests::test_mem_fs_rename_without_sync_dir_reverted ... ok
+test mem_fs_tests::test_mem_fs_snapshot_f10_rollback ... ok
+test mem_fs_tests::test_mem_fs_sync_dir_granularity ... ok
+test mem_fs_tests::test_mem_fs_synced_data_survives_crash ... ok
+test mem_fs_tests::test_mem_fs_unsynced_data_lost_after_crash ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

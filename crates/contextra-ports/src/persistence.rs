@@ -2,8 +2,9 @@
 //!
 //! Dieses Modul liegt im bestehenden Crate `contextra-ports`, damit der Kern
 //! ausschließlich von `contextra-ports` abhängt (SPEC §3.3). Es enthält nur
-//! Traits und kleine Wertetypen, keine Logik. Ausnahme: der Standard-Körper von
-//! `File::read_batch` und `File::preallocate` (Spec-Vorgabe).
+//! Traits und kleine Wertetypen, keine Logik. Ausnahmen sind die Standard-Körper
+//! von `File::read_batch` und `File::preallocate` (Spec-Vorgabe) sowie die
+//! Standardmethoden `Cipher::seal_into` und `Cipher::open_into` (SA-4).
 //!
 //! Die Trait-Namen sind bewusst identisch mit der Spec. Der Modulpfad
 //! `contextra_ports::persistence::*` ersetzt den früheren Platzhalter
@@ -217,12 +218,89 @@ pub trait PressureSource: Send + Sync {
     fn level(&self) -> Pressure;
 }
 
-/// AEAD mit 32-Byte-Schlüssel, 12-Byte-Nonce, 16-Byte-Tag (SPEC §4).
+/// Schlüssel für `Cipher`, `Mac` und `Kdf` (SPEC §4).
+///
+/// Typalias auf `[u8; 32]` (IMPL §2.2.1). Die Geheimnis-Eigenschaft trägt
+/// `Secret32` bzw. `SecretCell`, nicht dieser Alias.
+pub type Key32 = [u8; 32];
+
+/// Fehler eines AEAD-Vorgangs (SPEC §4).
+///
+/// Trägt keine Inhalte: weder Schlüssel, Nonce, AAD noch Klartext oder
+/// Chiffrat (INV-KEY-3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CryptoError {
+    /// Die Tag-Prüfung schlägt fehl: falscher Schlüssel, Nonce oder AAD, oder
+    /// das Chiffrat wurde verändert.
+    AuthenticationFailed,
+    /// Das Chiffrat ist kürzer als der 16-Byte-Tag und kann nicht geprüft werden.
+    Malformed,
+}
+
+impl std::fmt::Display for CryptoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AuthenticationFailed => write!(f, "Authentisierung fehlgeschlagen"),
+            Self::Malformed => write!(f, "Chiffrat zu kurz"),
+        }
+    }
+}
+
+impl std::error::Error for CryptoError {}
+
+/// AEAD mit 32-Byte-Schlüssel, 24-Byte-Nonce und 16-Byte-Tag (SPEC §4, §10.1, UE-10).
+///
+/// Verträge:
+/// - `seal` liefert `plain.len() + 16` Bytes. Der Tag steht am Ende.
+/// - `open` liefert `CryptoError::Malformed`, wenn `sealed` kürzer als 16 Byte ist.
+///   Jede andere Abweichung von Schlüssel, Nonce, AAD oder Chiffrat ergibt
+///   `CryptoError::AuthenticationFailed`.
+/// - `seal_into` und `open_into` haben Standardimplementierungen über `seal` und
+///   `open` (SA-4, SPEC §20.5). Sie allokieren daher. Der Heißpfad (`submit`, `get`)
+///   überschreibt beide Methoden, damit er aus einem vorab angelegten Puffer arbeitet.
+/// - Der zählende Allokator-Test nach SPEC §20.5 läuft gegen die Implementierung in
+///   `contextra-crypto` (WP-2.4). Er läuft nicht gegen die Standardmethoden, die
+///   per Konstruktion allokieren.
 pub trait Cipher: Send + Sync {
-    /// Verschlüsselt und authentisiert.
-    fn seal(&self, key: &[u8; 32], nonce: &[u8; 12], aad: &[u8], plain: &[u8]) -> Vec<u8>;
+    /// Verschlüsselt und authentisiert. Hängt keine Länge an.
+    fn seal(&self, key: &Key32, nonce: &[u8; 24], aad: &[u8], plain: &[u8]) -> Vec<u8>;
+
     /// Prüft und entschlüsselt.
-    fn open(&self, key: &[u8; 32], nonce: &[u8; 12], aad: &[u8], sealed: &[u8]) -> io::Result<Vec<u8>>;
+    fn open(
+        &self,
+        key: &Key32,
+        nonce: &[u8; 24],
+        aad: &[u8],
+        sealed: &[u8],
+    ) -> Result<Vec<u8>, CryptoError>;
+
+    /// Verschlüsselt und hängt das Ergebnis an `out` an. Der Aufrufer leert `out`
+    /// vorher, wenn er den Puffer wiederverwendet. Standard: über `seal`.
+    fn seal_into(
+        &self,
+        key: &Key32,
+        nonce: &[u8; 24],
+        aad: &[u8],
+        plain: &[u8],
+        out: &mut Vec<u8>,
+    ) {
+        out.extend_from_slice(&self.seal(key, nonce, aad, plain));
+    }
+
+    /// Prüft, entschlüsselt und hängt den Klartext an `out` an. Bei Fehler bleibt
+    /// `out` unverändert. Standard: über `open`.
+    fn open_into(
+        &self,
+        key: &Key32,
+        nonce: &[u8; 24],
+        aad: &[u8],
+        sealed: &[u8],
+        out: &mut Vec<u8>,
+    ) -> Result<(), CryptoError> {
+        let plain = self.open(key, nonce, aad, sealed)?;
+        out.extend_from_slice(&plain);
+        Ok(())
+    }
 }
 
 /// MAC mit 16-Byte-Tag (SPEC §4).
