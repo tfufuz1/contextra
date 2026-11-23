@@ -1,0 +1,24 @@
+# SP-CKPT — Checkpoint, Backup, Restore und Reconcile
+
+| | |
+|---|---|
+| Modul | `checkpoint/` |
+| Besitzt | Checkpointmanifest, konsistente Dateimenge, Restoreprüfung, Ledger-Reconcile |
+| Konsumiert | PORTS, CATALOG, LEDGER, ANCHOR, RUN, BLOB, KEYS |
+| Spec-Bezug | R8 §10.2–10.3; INV-ANCH-1, INV-ERA-9, INV-KEY-1…4 |
+| Phase | P6 (G-E) |
+
+## 1 Auftrag
+Checkpoint ist konsistente Referenzmenge, kein neuer Datenkatalog. Nur durabel gelistete Dateien werden aufgenommen. Für die physische Purge-/DiskFull-Garantie sind unabhängige `Copy`-Dateien vorgeschrieben. `Reflink`/`Hardlink` sind nur mit registriertem Owner zulässig, der vor Scratch-Recycling die Referenzen auf betroffene Extents nachweisbar entfernt und attestiert; sonst sind sie nicht verwaltete Retention-Copies und Restrisiko im Receipt. Backup policy gibt `keys_in_backups` wahrheitsgetreu an; cryptographic Erase darf nur zugesagt werden, wenn Schlüsselkopien ausgeschlossen sind.
+
+## 2 Verträge
+`checkpoint(options)` erstellt Manifest mit Catalog-Epoche, Redo-Boden, Dateimengen und Erase-Epoch; `restore(source, anchor, ledger)` erhält dieselbe `InstanceId`, prüft Format/Integrity und reconciled alle durable `EraseIntent`-/`SpaceDropIntent`-Records vor jeder Sichtbarkeit. Cluster-Tombstones retire'n Cluster; verschlüsselte Range-/Branch-Selector werden via `LedgerScopeKey` angewandt; Space-Tombstone gated die komplette SpaceId. Vor schreibendem Restore muss das Deployment den bisherigen Instanzbesitzer extern gefenced haben; lokales `LOCK` verhindert keine Kopie auf einem zweiten Host, und ein Rollback-Anchor ist keine Besitz-Lease. Fehlendes Ledger, LedgerScopeKey, erforderlicher Anchor oder Fencing-Nachweis ⇒ `RestoreQuarantine`, kein Read-/Write-Open. Restore schreibt nicht hinter externen Anker.
+
+## 3 Regeln
+Keine Schlüssel im Manifest; versiegelte Inhalte bleiben bytegenau. Restore kann fehlende Schlüssel als KeyUnavailable/KeyLost differenzieren. Anker/Catalog/Ledger werden als zusammenpassender Stand validiert; mismatch ⇒ read-only/rollback diagnosis.
+
+## 4 Invarianten / Umsetzung
+INV-ANCH-1, INV-ERA-9, INV-KEY-1…4. Crash-Sweep Checkpoint-Create; tamper/partial backup cases; Restore vor/nach Intent/Gate/ER2, für Cluster/Range/Branch/Space; no resurrection test und Scope-Selector-Canary.
+
+## 5 Arbeitspakete
+WP-22.1 manifest/snapshot capture (P6) · WP-22.2 optional hardlink/reflink (P6) · WP-22.3 restore verification/reconcile (P6). Abnahme: kein wiederhergestellter Tombstone-Cluster wird Live.

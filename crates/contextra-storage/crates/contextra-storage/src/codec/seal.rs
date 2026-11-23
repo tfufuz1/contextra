@@ -31,11 +31,11 @@ impl Aad<'_> {
             Self::RedoOp { instance, space, cluster, key_epoch, .. } => (2, instance, space, cluster, key_epoch),
             Self::BlobRecord { instance, space, cluster, key_epoch, .. } => (3, instance, space, cluster, key_epoch),
         };
-        let mut out = Vec::with_capacity(4 + 16 + 2 + 16 + 4 + 18);
+        let mut out = Vec::with_capacity(4 + 1 + 16 + 8 + 16 + 4 + 18);
         out.extend_from_slice(b"R8AD");
         out.push(domain);
         out.extend_from_slice(instance);
-        out.extend_from_slice(&space.0.to_le_bytes());
+        out.extend_from_slice(&space.0.to_be_bytes());
         out.extend_from_slice(cluster.as_bytes());
         out.extend_from_slice(&epoch.to_le_bytes());
         match self {

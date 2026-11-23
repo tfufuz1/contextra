@@ -28,7 +28,7 @@ pub struct FaultPlan {
 struct Runtime {
     next_op: AtomicU64,
     plan: Mutex<Option<FaultPlan>>,
-    bytes_read: [AtomicU64; 9],
+    bytes_read: [AtomicU64; 10],
     #[cfg(feature = "testing")]
     ghost: Mutex<Vec<Vec<u8>>>,
 }
@@ -45,7 +45,7 @@ impl<F: Fs> FaultFs<F> {
             runtime: Arc::new(Runtime {
                 next_op: AtomicU64::new(0),
                 plan: Mutex::new(Some(plan)),
-                bytes_read: [const { AtomicU64::new(0) }; 9],
+                bytes_read: [const { AtomicU64::new(0) }; 10],
                 #[cfg(feature = "testing")]
                 ghost: Mutex::new(Vec::new()),
             }),

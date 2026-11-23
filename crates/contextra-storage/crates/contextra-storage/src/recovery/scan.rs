@@ -80,7 +80,7 @@ fn parse_gate(bytes: &[u8], retired: &mut BTreeSet<ClusterId>, resolver: Option<
         }
         2 => {
             if count != 0 { return Err(Error::Corrupt { place: "redo gate space header" }); }
-            let space = SpaceId(c.u16()?);
+            let space = SpaceId(c.u64_be()?);
             let resolver = resolver.ok_or(Error::Unsupported { what: "space gate requires catalog resolver" })?;
             retired.extend(resolver.clusters_in_space(space)?);
         }
@@ -100,6 +100,7 @@ impl<'a> Cursor<'a> {
     }
     fn u8(&mut self) -> Result<u8, Error> { Ok(self.array::<1>()?[0]) }
     fn u16(&mut self) -> Result<u16, Error> { Ok(u16::from_le_bytes(self.array()?)) }
+    fn u64_be(&mut self) -> Result<u64, Error> { Ok(u64::from_be_bytes(self.array()?)) }
     fn array<const N: usize>(&mut self) -> Result<[u8; N], Error> {
         self.take(N)?.try_into().map_err(|_| Error::Corrupt { place: "redo gate field" })
     }

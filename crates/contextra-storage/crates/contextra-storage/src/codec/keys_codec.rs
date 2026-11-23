@@ -25,7 +25,7 @@ pub fn encode(record: &KeysRecord, root_key: &Key32, mac: &dyn Mac) -> Result<Ve
     let count = u32::try_from(record.wrapped_space_deks.len()).map_err(|_| Error::Limit { limit: "KEYS entry count" })?;
     out.extend_from_slice(&count.to_le_bytes());
     for (space, wrapped) in &record.wrapped_space_deks {
-        out.extend_from_slice(&space.0.to_le_bytes());
+        out.extend_from_slice(&space.0.to_be_bytes());
         put_blob(&mut out, wrapped)?;
     }
     let tag = mac.tag(root_key, &out);
@@ -50,7 +50,7 @@ pub fn decode(input: &[u8], root_key: &Key32, mac: &dyn Mac) -> Result<KeysRecor
     if count > MAX_SPACE_KEYS { return Err(Error::Limit { limit: "KEYS entry count" }); }
     let mut wrapped_space_deks = BTreeMap::new();
     for _ in 0..count {
-        let space = SpaceId(c.u16()?);
+        let space = SpaceId(c.u64_be()?);
         let key = c.blob()?.to_vec();
         if wrapped_space_deks.insert(space, key).is_some() { return Err(Error::Corrupt { place: "duplicate KEYS space" }); }
     }
@@ -89,6 +89,7 @@ impl<'a> Cursor<'a> {
         Ok(value)
     }
     fn u16(&mut self) -> Result<u16, Error> { Ok(u16::from_le_bytes(self.take(2)?.try_into().map_err(|_| Error::Corrupt { place: "KEYS u16" })?)) }
+    fn u64_be(&mut self) -> Result<u64, Error> { Ok(u64::from_be_bytes(self.take(8)?.try_into().map_err(|_| Error::Corrupt { place: "KEYS space id" })?)) }
     fn u32(&mut self) -> Result<u32, Error> { Ok(u32::from_le_bytes(self.take(4)?.try_into().map_err(|_| Error::Corrupt { place: "KEYS u32" })?)) }
     fn blob(&mut self) -> Result<&'a [u8], Error> {
         let len = self.u32()? as usize;

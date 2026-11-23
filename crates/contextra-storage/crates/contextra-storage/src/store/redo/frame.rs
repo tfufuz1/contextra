@@ -89,7 +89,7 @@ pub fn encode_frame(frame: &EncodedFrame, previous: &[u8; 32], key: &Key32, mac:
     for (op, payload) in frame.head.ops.iter().zip(&frame.payloads) {
         let payload_len = u32::try_from(payload.len()).map_err(|_| Error::Limit { limit: "redo payload length" })?;
         if payload_len != op.payload_len { return Err(Error::Limit { limit: "redo payload/head mismatch" }); }
-        body.extend_from_slice(&op.space.0.to_le_bytes());
+        body.extend_from_slice(&op.space.0.to_be_bytes());
         body.extend_from_slice(op.cluster.as_bytes());
         body.extend_from_slice(&op.branch.0.to_le_bytes());
         body.push(op.kind);
@@ -157,7 +157,7 @@ pub fn decode_frame<'a>(input: &'a [u8], previous: &[u8; 32], key: &Key32, mac: 
     let mut ops = Vec::with_capacity(op_count);
     let mut payloads = Vec::with_capacity(op_count);
     for _ in 0..op_count {
-        let space = SpaceId(cursor.u16()?);
+        let space = SpaceId(cursor.u64_be()?);
         let cluster = ClusterId::from_wire(cursor.array::<16>()?);
         let branch = BranchId(cursor.u32()?);
         let op_kind = cursor.u8()?;
@@ -192,6 +192,7 @@ impl<'a> Cursor<'a> {
     fn u16(&mut self) -> Result<u16, Error> { Ok(u16::from_le_bytes(self.array()?)) }
     fn u32(&mut self) -> Result<u32, Error> { Ok(u32::from_le_bytes(self.array()?)) }
     fn u64(&mut self) -> Result<u64, Error> { Ok(u64::from_le_bytes(self.array()?)) }
+    fn u64_be(&mut self) -> Result<u64, Error> { Ok(u64::from_be_bytes(self.array()?)) }
     fn is_empty(&self) -> bool { self.offset == self.bytes.len() }
 }
 

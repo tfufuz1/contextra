@@ -1,7 +1,7 @@
 //! Immutable Space configuration and pre-mutation validation (SP-FACADE §4.5).
 
 use crate::codec::format::IntegrityMode;
-use contextra_storage_ports::{Durability, Error, Protection, SpaceId};
+use contextra_storage_ports::{Durability, Error, Protection, SpaceId, FIRST_USER_SPACE_ID};
 
 pub const DEFAULT_PURE_THRESHOLD: u64 = 8 * 1024 * 1024;
 pub const DEFAULT_VALUE_SEPARATION_MIN: u32 = 1024;
@@ -11,6 +11,10 @@ pub const MAX_WEIGHT_SLOTS: u8 = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpaceClass { Durable, Volatile }
+
+/// Declared data sensitivity. Classification is explicit; this is not a PII detector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataClass { NonPersonal, Personal }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpiryBucket { Month, Quarter, Year }
@@ -34,7 +38,7 @@ pub enum Compression { None }
 pub struct SpaceOptions {
     pub class: SpaceClass,
     pub clustered: bool,
-    pub personal: bool,
+    pub data_class: DataClass,
     pub packing: PackPolicy,
     pub pure_threshold: u64,
     pub seal: SealPolicy,
@@ -51,7 +55,7 @@ impl Default for SpaceOptions {
         Self {
             class: SpaceClass::Durable,
             clustered: true,
-            personal: false,
+            data_class: DataClass::NonPersonal,
             packing: PackPolicy::None,
             pure_threshold: DEFAULT_PURE_THRESHOLD,
             seal: SealPolicy::ByMode,
@@ -72,7 +76,7 @@ impl SpaceOptions {
 
     /// Validates the immutable option set before any catalog, key, or file I/O.
     pub fn validate(&self, integrity: IntegrityMode) -> Result<(), Error> {
-        if self.personal {
+        if self.data_class == DataClass::Personal {
             if !self.clustered { return Err(Error::Limit { limit: "personal spaces must be clustered" }); }
             if integrity != IntegrityMode::Encrypted {
                 return Err(Error::Limit { limit: "personal data requires encrypted integrity mode" });
@@ -105,11 +109,8 @@ impl SpaceOptions {
     }
 
     pub fn protection_allowed(&self, protection: Protection) -> bool {
-        match (self.personal, self.seal, protection) {
-            (true, _, Protection::Plain) => false,
-            (_, SealPolicy::Cluster, Protection::Plain) => false,
-            _ => true,
-        }
+        !(protection == Protection::Plain
+            && (self.data_class == DataClass::Personal || self.seal == SealPolicy::Cluster))
     }
 }
 
@@ -122,6 +123,7 @@ pub struct SpaceSpec {
 
 impl SpaceSpec {
     pub fn validate(&self, integrity: IntegrityMode) -> Result<(), Error> {
+        if self.id.0 < FIRST_USER_SPACE_ID { return Err(Error::ReservedSpace); }
         if self.name.is_empty() || self.name.len() > 64 {
             return Err(Error::Limit { limit: "space name length must be 1..=64 bytes" });
         }

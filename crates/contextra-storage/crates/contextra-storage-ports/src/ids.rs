@@ -1,6 +1,9 @@
 //! Identitätstypen. Debug ist redigiert, wo Kennungen Rückschlüsse erlauben (SP-PORTS §3.3).
 use core::fmt;
 
+pub const SYSTEM_SPACE_ID_MAX: u64 = 255;
+pub const FIRST_USER_SPACE_ID: u64 = SYSTEM_SPACE_ID_MAX + 1;
+
 /// Stamp = globale Versionsmarke, 56 Bit nutzbar.
 pub type Stamp = u64;
 pub const STAMP_MAX: Stamp = (1u64 << 56) - 1;
@@ -35,7 +38,16 @@ impl fmt::Debug for ClusterId {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SpaceId(pub u16);
+pub struct SpaceId(pub u64);
+
+impl SpaceId {
+    pub const fn is_system(self) -> bool { self.0 <= SYSTEM_SPACE_ID_MAX }
+
+    pub fn user(value: u64) -> Result<Self, crate::Error> {
+        if value < FIRST_USER_SPACE_ID { return Err(crate::Error::ReservedSpace); }
+        Ok(Self(value))
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BranchId(pub u32);

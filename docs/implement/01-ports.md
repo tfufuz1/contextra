@@ -5,7 +5,7 @@
 | Crate | `crates/contextra-storage-ports` (keine Logik, `#![forbid(unsafe_code)]`) |
 | Besitzt | alle Werttypen und Traits, die ≥ 2 Komponenten teilen; das `Storage`-Fassadenprofil (Signaturen, nicht Rümpfe) |
 | Konsumiert | nichts (nur `bytes`, `zeroize`, `thiserror`) |
-| Spec-Bezug | R8 §3.2, §3.5, §4, §12, §15 |
+| Spec-Bezug | R8.1 §3.2, §3.5, §4.7, §12, §15–16 |
 | Phase | P0, Gate G-0 (API-Review-Freeze) |
 
 ## 1 Auftrag und Abgrenzung
@@ -44,7 +44,7 @@ pub enum KeyCreateResult { Created { cluster: ClusterId, epoch: u32 }, Failed { 
 **Traits** (Signaturen in R8 §3.2/§9.4/§12.1; Abweichungen/Ergänzungen hier):
 - `Fs`/`File`: `read_at`, `read_ranges`, `append_prealloc`, `preallocate` (**Nullen schreiben**, nie sparse), `sync_data/sync_all/sync_dir`, `rename`, `lock`, `list`, `free_space`, `caps() -> FsCaps`, optionale `link/reflink/punch_hole`. `read_ranges` hat eine geordnete Default-Schleife über `read_at`; Optimierungen ändern weder Semantik noch Ergebnisreihenfolge. Jede Operation trägt einen `IoCtx` (Datei-Rolle, Zweck) für `FaultFs`-Indizierung.
 - `KeyProvider`: R8 §9.4 **plus** `create_cluster_keys(&self, request_id: BatchId, clusters: &[ClusterId], entropy: &dyn Entropy) -> Result<Vec<KeyCreateResult>, KeyError>` (idempotenter Batch, max. 256 IDs; pro Cluster expliziter Erfolg/Epoch oder Fehler; jeder Erfolg ist vor Rückgabe durable). Der Batch ist kein All-or-None-Transaction-Vertrag; Teil-Erfolge werden retrybar und verwaiste Schlüssel durch `orphan_key_grace` bereinigt (E-02).
-- `Anchor`, `Clock`, `Entropy`, `Cipher`, `Mac`, `Kdf`, `Checksum`, `Authority`, `Metrics`, `Observer`, `ColdTier`, `Spawner`.
+- `Anchor`, `Clock`, `Entropy`, `Cipher`, `Mac`, `Kdf`, `Checksum`, `Authority`, `Metrics` (statischer Metrikkatalog + `MetricSample::{Counter,Gauge,Observe}` mit endlichen Labels), `Observer`, `ColdTier`, `Spawner`.
 - `Memtable` (Skiplist hinter Trait), `SegmentOwner`, `ExtensionBuilder`, `ConsumerFeed` (Verträge §12).
 - `MemoryBudget`: gemeinsamer, thread-sicherer Admission-Port; `try_reserve(class, bytes) -> ResourcePermit`, dessen `Drop` Budget exakt freigibt. Klassen sind `Memtable`, `ClusterMeta`, `Guard`, `BlockCache`, `KeyCache`, `ExtensionDelta`, `Inflight`, `PurgeScratch`; kein Besitzer darf vor erfolgreicher Reservation allozieren.
 - `Error` (Klassen F-1…F-9) mit `hint() -> &'static str` und `class() -> ErrorClass`; Texte ohne Schlüssel/Nutzdaten (Test mit Canaries).

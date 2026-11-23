@@ -6,6 +6,7 @@
 use crate::codec::checksums::crc32c;
 use crate::codec::varint::{varint_get, varint_put};
 use contextra_storage_ports::{BranchId, Error, Stamp};
+use core::fmt;
 use zeroize::Zeroizing;
 
 const MAGIC: &[u8; 8] = b"CTXBLK01";
@@ -13,13 +14,20 @@ const RESTART_INTERVAL: usize = 16;
 pub const MAX_DECODED_BLOCK_BYTES: usize = 8 * 1024 * 1024;
 pub const TARGET_BLOCK_BYTES: usize = 16 * 1024;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct BlockEntry {
     pub branch: BranchId,
     pub key: Zeroizing<Vec<u8>>,
     pub tag: u64,
     pub header: Zeroizing<Vec<u8>>,
     pub body: Zeroizing<Vec<u8>>,
+}
+
+impl fmt::Debug for BlockEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BlockEntry").field("branch", &self.branch).field("key", &"<redacted>")
+            .field("tag", &self.tag).field("header", &"<redacted>").field("body", &"<redacted>").finish()
+    }
 }
 
 impl BlockEntry {

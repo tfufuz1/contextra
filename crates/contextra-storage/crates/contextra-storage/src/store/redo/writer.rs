@@ -45,6 +45,10 @@ impl<'a> RedoWriter<'a> {
 
     pub fn durable_stamp(&self) -> Stamp { self.durable_stamp }
 
+    /// True only when an append or sync error made the writer unsafe to reuse.
+    /// Validation/rotation errors before I/O leave the writer healthy.
+    pub fn is_poisoned(&self) -> bool { self.poisoned }
+
     pub fn append_group(&mut self, frames: &[EncodedFrame], durability: Durability) -> Result<GroupAck, Error> {
         if self.poisoned { return Err(Error::Poisoned { cause: "redo writer is poisoned" }); }
         if frames.is_empty() { return Err(Error::Limit { limit: "redo group must contain a frame" }); }

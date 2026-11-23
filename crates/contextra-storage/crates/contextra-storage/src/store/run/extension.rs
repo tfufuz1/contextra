@@ -1,16 +1,24 @@
 //! Opaque, versioned ExtensionBlock records (R8 §5.6, SP-EXT boundary).
 
 use contextra_storage_ports::Error;
+use core::fmt;
 use zeroize::Zeroizing;
 
 const MAGIC: &[u8; 8] = b"CTXEXT01";
 pub const MAX_EXTENSION_BLOCKS: usize = 4096;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ExtensionBlock {
     pub tag: u16,
     pub version: u16,
     pub payload: Zeroizing<Vec<u8>>,
+}
+
+impl fmt::Debug for ExtensionBlock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ExtensionBlock").field("tag", &self.tag)
+            .field("version", &self.version).field("payload", &"<redacted>").finish()
+    }
 }
 
 impl ExtensionBlock {

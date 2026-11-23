@@ -104,13 +104,24 @@ impl<'a> Committer<'a> {
         let ack = match self.writer.append_group(frames, durability) {
             Ok(ack) => ack,
             Err(error) => {
-                self.poisoned = true;
+                if self.writer.is_poisoned() {
+                    self.poisoned = true;
+                    let first_stamp = frames.first().map(|frame| frame.head.stamp)
+                        .ok_or(Error::Corrupt { place: "empty commit group after validation" })?;
+                    let last_stamp = frames.last().map(|frame| frame.head.stamp)
+                        .ok_or(Error::Corrupt { place: "empty commit group after validation" })?;
+                    return Err(Error::Indeterminate { first_stamp, last_stamp });
+                }
                 return Err(error);
             }
         };
         if self.publisher.publish(frames, ack).is_err() {
             self.poisoned = true;
-            return Err(Error::Poisoned { cause: "durable commit could not be published" });
+            let first_stamp = frames.first().map(|frame| frame.head.stamp)
+                .ok_or(Error::Corrupt { place: "empty commit group after validation" })?;
+            let last_stamp = frames.last().map(|frame| frame.head.stamp)
+                .ok_or(Error::Corrupt { place: "empty commit group after validation" })?;
+            return Err(Error::Indeterminate { first_stamp, last_stamp });
         }
         self.last_published = ack.last_stamp;
         Ok(ack)

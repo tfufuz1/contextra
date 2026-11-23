@@ -1,12 +1,13 @@
 //! Cluster-sealed per-block summaries used for one-block reads and skipping.
 
 use contextra_storage_ports::{Error, Stamp};
+use core::fmt;
 use zeroize::Zeroizing;
 
 const MAGIC: &[u8; 8] = b"CTXSUB01";
 const FIXED_ENTRY_BYTES: usize = 8 + 4 + 4 + 8 + 8 + 16 + 4 * 8;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct SubIndexEntry {
     pub last_key: Zeroizing<Vec<u8>>,
     pub offset: u64,
@@ -16,6 +17,15 @@ pub struct SubIndexEntry {
     pub min_stamp: Stamp,
     pub max_stamp: Stamp,
     pub block_uid: [u8; 16],
+}
+
+impl fmt::Debug for SubIndexEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SubIndexEntry").field("last_key", &"<redacted>")
+            .field("offset", &self.offset).field("len", &self.len).field("entries", &self.entries)
+            .field("weight_sum", &"<redacted>").field("min_stamp", &self.min_stamp)
+            .field("max_stamp", &self.max_stamp).field("block_uid", &"<redacted>").finish()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

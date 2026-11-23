@@ -14,6 +14,7 @@ const TAG_PURGE_BATCH: u16 = 9;
 const TAG_UNLINK_ACK: u16 = 10;
 const TAG_PURGE_COMPLETE: u16 = 11;
 const TAG_CLUSTER_STATE: u16 = 12;
+const TAG_RESERVE_SPACE_IDS: u16 = 13;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileKind { Run, Blob }
@@ -41,6 +42,7 @@ pub enum CatalogOp {
     RedoMark { segment: u64, offset: u64, stamp: Stamp },
     ReserveStamps { through: Stamp },
     ReserveIds { through: u64 },
+    ReserveSpaceIds { through: u64 },
     /// Atomically swaps one live file incarnation and pins the old file in the
     /// persistent graveyard until its unlink and parent-directory sync ack.
     PurgeBatch { ticket: [u8; 16], remove_file_id: u64, replacement: Option<FileEntry> },
@@ -53,7 +55,7 @@ impl CatalogOp {
         let mut payload = Vec::new();
         let tag = match self {
             Self::SpaceAdd { space, protection } => {
-                put_u16(&mut payload, space.0);
+                put_u64_be(&mut payload, space.0);
                 payload.push(protection_to_wire(*protection));
                 TAG_SPACE_ADD
             }
@@ -75,7 +77,7 @@ impl CatalogOp {
             Self::FilesAdd { file_id, space, cluster, kind, level, bytes, min_stamp, max_stamp } => {
                 if min_stamp > max_stamp { return Err(Error::Limit { limit: "catalog file stamp range" }); }
                 put_u64(&mut payload, *file_id);
-                put_u16(&mut payload, space.0);
+                put_u64_be(&mut payload, space.0);
                 match cluster {
                     Some(id) => { payload.push(1); payload.extend_from_slice(id.as_bytes()); }
                     None => payload.push(0),
@@ -92,6 +94,7 @@ impl CatalogOp {
             Self::RedoMark { segment, offset, stamp } => { put_u64(&mut payload, *segment); put_u64(&mut payload, *offset); put_u64(&mut payload, *stamp); TAG_REDO_MARK }
             Self::ReserveStamps { through } => { put_u64(&mut payload, *through); TAG_RESERVE_STAMPS }
             Self::ReserveIds { through } => { put_u64(&mut payload, *through); TAG_RESERVE_IDS }
+            Self::ReserveSpaceIds { through } => { put_u64_be(&mut payload, *through); TAG_RESERVE_SPACE_IDS }
             Self::PurgeBatch { ticket, remove_file_id, replacement } => {
                 payload.extend_from_slice(ticket);
                 put_u64(&mut payload, *remove_file_id);
@@ -119,7 +122,7 @@ impl CatalogOp {
         let payload = cursor.take(len)?;
         let mut p = Cursor::new(payload);
         let op = match tag {
-            TAG_SPACE_ADD => Self::SpaceAdd { space: SpaceId(p.u16()?), protection: protection_from_wire(p.u8()?)? },
+            TAG_SPACE_ADD => Self::SpaceAdd { space: SpaceId(p.u64_be()?), protection: protection_from_wire(p.u8()?)? },
             TAG_CLUSTER_REGISTER => Self::ClusterRegister { cluster: ClusterId::from_wire(p.array()?), protection: protection_from_wire(p.u8()?)? },
             TAG_CLUSTER_STATE => {
                 let cluster = ClusterId::from_wire(p.array()?);
@@ -134,7 +137,7 @@ impl CatalogOp {
             }
             TAG_FILES_ADD => {
                 let file_id = p.u64()?;
-                let space = SpaceId(p.u16()?);
+                let space = SpaceId(p.u64_be()?);
                 let cluster = match p.u8()? {
                     0 => None,
                     1 => Some(ClusterId::from_wire(p.array()?)),
@@ -153,6 +156,7 @@ impl CatalogOp {
             TAG_REDO_MARK => Self::RedoMark { segment: p.u64()?, offset: p.u64()?, stamp: p.u64()? },
             TAG_RESERVE_STAMPS => Self::ReserveStamps { through: p.u64()? },
             TAG_RESERVE_IDS => Self::ReserveIds { through: p.u64()? },
+            TAG_RESERVE_SPACE_IDS => Self::ReserveSpaceIds { through: p.u64_be()? },
             TAG_PURGE_BATCH => Self::PurgeBatch { ticket: p.array()?, remove_file_id: p.u64()?, replacement: decode_optional_file(&mut p)? },
             TAG_UNLINK_ACK => Self::UnlinkAck { ticket: p.array()?, file_id: p.u64()? },
             TAG_PURGE_COMPLETE => Self::PurgeComplete { ticket: p.array()? },
@@ -170,13 +174,14 @@ fn protection_from_wire(value: u8) -> Result<Protection, Error> {
 fn put_u16(out: &mut Vec<u8>, value: u16) { out.extend_from_slice(&value.to_le_bytes()); }
 fn put_u32(out: &mut Vec<u8>, value: u32) { out.extend_from_slice(&value.to_le_bytes()); }
 fn put_u64(out: &mut Vec<u8>, value: u64) { out.extend_from_slice(&value.to_le_bytes()); }
+fn put_u64_be(out: &mut Vec<u8>, value: u64) { out.extend_from_slice(&value.to_be_bytes()); }
 
 fn encode_optional_file(out: &mut Vec<u8>, file: Option<&FileEntry>) -> Result<(), Error> {
     let Some(file) = file else { out.push(0); return Ok(()); };
     if file.min_stamp > file.max_stamp { return Err(Error::Limit { limit: "catalog file stamp range" }); }
     out.push(1);
     put_u64(out, file.file_id);
-    put_u16(out, file.space.0);
+    put_u64_be(out, file.space.0);
     match file.cluster { Some(cluster) => { out.push(1); out.extend_from_slice(cluster.as_bytes()); }, None => out.push(0) }
     out.push(match file.kind { FileKind::Run => 1, FileKind::Blob => 2 });
     out.push(file.level);
@@ -191,7 +196,7 @@ fn decode_optional_file(c: &mut Cursor<'_>) -> Result<Option<FileEntry>, Error> 
         0 => Ok(None),
         1 => {
             let file_id = c.u64()?;
-            let space = SpaceId(c.u16()?);
+            let space = SpaceId(c.u64_be()?);
             let cluster = match c.u8()? { 0 => None, 1 => Some(ClusterId::from_wire(c.array()?)), _ => return Err(Error::Unsupported { what: "catalog cluster option" }) };
             let kind = match c.u8()? { 1 => FileKind::Run, 2 => FileKind::Blob, _ => return Err(Error::Unsupported { what: "catalog file kind" }) };
             let level = c.u8()?;
@@ -221,6 +226,7 @@ impl<'a> Cursor<'a> {
     fn u16(&mut self) -> Result<u16, Error> { Ok(u16::from_le_bytes(self.array()?)) }
     fn u32(&mut self) -> Result<u32, Error> { Ok(u32::from_le_bytes(self.array()?)) }
     fn u64(&mut self) -> Result<u64, Error> { Ok(u64::from_le_bytes(self.array()?)) }
+    fn u64_be(&mut self) -> Result<u64, Error> { Ok(u64::from_be_bytes(self.array()?)) }
     fn is_empty(&self) -> bool { self.offset == self.input.len() }
     fn offset(&self) -> usize { self.offset }
 }

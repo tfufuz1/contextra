@@ -1,8 +1,8 @@
-# SPEC.md — `contextra-storage` (Speicherkern), Revision R8 (Konsolidierung)
+# SPEC.md — `contextra-storage` (Speicherkern), Revision R8.1
 
 | | |
 |---|---|
-| Status | **Entwurf zur Freigabe als Gate G-0.** Ersetzt SPEC R7 und konsolidiert fünf Quellen: R7 (`SPEC(18).md`), Lethe-Architekturentwurf, Lethe-Engine-Spec, Mnemos-Konzept, „Optimal-LLM-Datenbank“ (Engram, AetherStore ×2, CairnDB). |
+| Status | **Revision R8.1, Entwurf zur Freigabe als Gate G-0.** Ersetzt SPEC R7 und konsolidiert fünf Quellen: R7 (`SPEC(18).md`), Lethe-Architekturentwurf, Lethe-Engine-Spec, Mnemos-Konzept, „Optimal-LLM-Datenbank“ (Engram, AetherStore ×2, CairnDB). |
 | Gegenstand | Eingebetteter, synchroner, crash-sicherer Speicherkern für LLM-/Agenten-Workloads mit atomaren Mehr-Space-Änderungen, MVCC-Sichten, **versionskontrollartigen Branches und Merges (clusterlokal)** und **vollständiger, nachweisbarer Löschung personenbezogener Daten** (logisch, kryptografisch, physisch). |
 | Verifikation | Der in `crates/contextra-storage/PHASE-STATUS.md` dokumentierte Teilcheck umfasst Storage-/Crypto-Compile sowie ausgewählte Config-, Catalog-/Redo-Crash-Sweeps und Strukturtests; vollständige Release-Gates sind offen. Keine Leistungszahl ist als gemessen anzusehen. R7-Messungen wurden nicht neu erhoben. Formate brauchen vor **G-F** Referenzvektoren aus einem unabhängigen Codierer. |
 | Rechtlicher Vorbehalt | Der Kern liefert technische Eigenschaften, keine Rechtsaussage zu Art. 17 DSGVO, Fristen oder Ausnahmen. „Gelöscht“ ist immer an eine Stufe aus §9.2 gebunden. |
@@ -12,7 +12,9 @@
 
 ## 0. Kurzfassung
 
-**Ein Cluster ist die Einheit, in der Daten leben, versioniert werden und sterben.** Alles zu einer Person, einem Fall oder einem Arbeitskontext liegt in einem Cluster: Nutzdaten, Verlauf, Branches, abgeleitete Strukturen. Der Cluster ist zugleich **Löschdomäne, Schlüsseldomäne, Versionsdomäne und Platzierungseinheit**. Daraus folgt die ganze Architektur:
+**Contextra ist als europäische Datenbank für Unternehmens-LLM-Systeme konzipiert: Dokumente, Vektoren, Text, Metadaten und Graphbeziehungen werden mit einer gemeinsamen Versions-, Sichtbarkeits- und Löschsemantik verbunden.** `contextra-storage` ersetzt den bisherigen `contextra-store` als crash-sicheres Fundament. Es speichert kanonische RAG-Daten und deren Lineage atomar; Retrieval-Indizes bleiben obere, über Watermarks und Löschatteste angebundene Komponenten. So entsteht eine integrierte Datenbankerfahrung ohne zu behaupten, ANN, BM25 oder Graphsuche seien Teil des KV-Kerns.
+
+**Ein Cluster ist die Einheit, in der Daten leben, versioniert werden und sterben.** Alles zu einer Person, einem Fall oder einem Arbeitskontext liegt in einem Cluster: Nutzdaten, Verlauf, Branches und clustergebundene Ableitungen. Der Cluster ist zugleich **Löschdomäne, Schlüsseldomäne, Versionsdomäne und Platzierungseinheit**. Daraus folgt die Architektur:
 
 | Eigenschaft | Wie sie entsteht |
 |---|---|
@@ -104,10 +106,11 @@ Die Quellen widersprechen sich an 28 Stellen. Jede Entscheidung ist final; die S
 | L17 | **Branches sind clusterlokal und löschen mit dem Cluster.** Keine instanzweiten Commit-DAGs. |
 | L18 | TLA+-Modelle und deterministische Simulation sind Gate-Bestandteil. |
 | L19 | Der Kern ruft kein Modell auf und kennt keine Politik. |
+| L20 | **Open-Core-Grenze:** Formate, Kernsemantik, Ports, Test-/Simulationsverträge und Referenzverhalten bleiben offen und vollständig genug, um ein interoperables System ohne proprietäre Erweiterung zu betreiben. Monetarisierbare Produkte implementieren dieselben offenen Ports und dürfen keine Kerninvariante abschwächen oder für Basis-Durability/Löschung erforderliche Funktion hinter eine Bezahlschranke legen. |
 
 ### 2.2 Ziele
 
-Z-1 Atomarität über Spaces und Branches · Z-2 Durability (sichtbar nur nach Fsync) · Z-3 Snapshot-Isolation ohne Lesesperren · Z-4 Gate/KeyDestroy unabhängig von Storegröße, Purge bounded durch betroffene Datei-/Extension-Partitionen · Z-5 Ablauf einer Packgruppe als O(Dateien) · Z-6 Nachweisbarkeit (Receipt, `verify`, Orakel, Ledger, Anker) · Z-7 Kopf ohne Körper-I/O, Budgetseiten ohne Body-Block-Lesen · Z-8 Race-Freiheit durch Konstruktion, belegt durch Modell, Simulation, Loom · Z-9 begrenzte Ressourcen · Z-10 stabile Verträge nach oben · Z-11 flüchtige Arbeitsbereiche · Z-12 Idempotenz für Agenten-Retries · Z-13 **Gate/KeyDestroy bei vollem Datenträger; physischer Purge nutzt vorgehaltene Scratch-Reserve** · Z-14 überwachbare Löschfristen · **Z-15 O(1)-Fork, indexierter Diff und konfliktgeprüfter Merge je Cluster.**
+Z-1 Atomarität über Spaces und Branches · Z-2 Durability (sichtbar nur nach Fsync) · Z-3 Snapshot-Isolation ohne Lesesperren · Z-4 Gate/KeyDestroy unabhängig von Storegröße, Purge bounded durch betroffene Datei-/Extension-Partitionen · Z-5 Ablauf einer Packgruppe als O(Dateien) · Z-6 Nachweisbarkeit (Receipt, `verify`, Orakel, Ledger, Anker) · Z-7 Kopf ohne Körper-I/O, Budgetseiten ohne Body-Block-Lesen · Z-8 Race-Freiheit durch Konstruktion, belegt durch Modell, Simulation, Loom · Z-9 begrenzte Ressourcen · Z-10 stabile Verträge nach oben · Z-11 flüchtige Arbeitsbereiche · Z-12 Idempotenz für Agenten-Retries · Z-13 **Gate/KeyDestroy bei vollem Datenträger; physischer Purge nutzt vorgehaltene Scratch-Reserve** · Z-14 überwachbare Löschfristen · **Z-15** O(1)-Fork, indexierter Diff und konfliktgeprüfter Merge je Cluster. **Z-16 (Datenklassifikation):** `DataClass` ist ein geschlossenes Enum; ungültige Kombinationen (Personal ohne Cluster/Encrypted, bei Durable ohne Cluster-Seal) werden vor dem ersten I/O abgewiesen und durch API-/Property-Tests abgedeckt. **Z-17 (Observability):** Gate, KeyDestroy und Purge haben getrennte Dauer-/Ergebnis-/Byte-Metriken; feste Label-Allowlist, keine IDs/Inhalte; Katalogprüfung weist unzulässige Labels zurück. **Z-18 (Entwicklerdiagnose):** jeder öffentliche Fehler hat stabilen Typ und sichere `hint()`-Handlung; Fassade kann eine typisierte `suggested_call` ergänzen. Simulationsfehler enthalten reproduzierbaren Seed und Inspector-Ausgaben bleiben inhaltsfrei; Gates prüfen Reproduzierbarkeit und Leakage.
 
 ### 2.3 Nicht-Ziele
 
@@ -146,6 +149,12 @@ Ein Produktversprechen gilt erst, wenn der benannte Beweis-Gate bestanden und re
 
 ---
 
+### 2.6 Open-Core-Produktgrenze
+
+Open-Core ist ein Packaging- und Betriebsmodell, keine technische Abhängigkeit des Datenformats. Offen bleiben: Storage- und Receipt-Formate, Kern- und Port-Crates, Referenz-Provider/-Anker, Konformanzvektoren, lokale Simulation, grundlegende Sicht-/Branch-/Erase-Semantik sowie notwendige Werkzeuge für Export und Restore. Die offene Edition muss lokal eingebettet, getestet, gesichert und aus einem dokumentierten Format wiederhergestellt werden können.
+
+Kommerzielle Pakete können optionale Implementierungen/Services anbieten: HSM-/Cloud-KMS- und starker Anchor-Adapter, Replikation/Failover nach eigenem Verteilungs-Gate, zentrale Tenant-Orchestrierung, verwaltete Betriebskonsole/SLA-Telemetrie, zusätzliche Audit-Export- und Signaturadapter, Cold-Tier-/Backup-Integrationen sowie Enterprise-Support. Die Schnittstellen, Wire-/On-Disk-Formate, Verifikation öffentlicher Belege und ein Exportpfad bleiben offen; ein kommerzieller Adapter ist austauschbar und darf keine geheimen Semantiken voraussetzen. Signierte gesetzliche Nachweise und die Erfüllung konkreter Compliance-Pflichten werden nicht allein durch ein Paket behauptet. Lizenzierung, Marken und Preisgestaltung sind Produktentscheidungen außerhalb dieser technischen Spec.
+
 ## 3. Architektur
 
 ### 3.1 Crates und Schichten
@@ -181,7 +190,7 @@ env (Fs, Clock, Entropy, Governor, Metrics, Anchor; MemFs, RealFs, FaultFs, Sim)
 | `KeyProvider` | §9.4 |
 | `Cipher`/`Mac`/`Kdf`/`Checksum` | AEAD (XChaCha20-Poly1305, 24-Byte-Zufallsnonce), Ketten-MAC, HKDF, CRC32C |
 | `Authority` (optional) | prüft Signaturen für `LiftPolicy::FourEyes` |
-| `Metrics`, `Observer` | nicht blockierend, nie unter Sperren |
+| `Metrics`, `Observer` | nicht blockierend, nie unter Sperren; geschlossener, low-cardinality Metrikkatalog §16 |
 | `MemoryBudget` | gemeinsamer RAM-Admission-Port; `try_reserve(class, bytes) -> ResourcePermit`, Drop gibt exakt frei |
 | `ColdTier` (optional) | Auslagerung kalter Dateien, Garantien des Ports gelten |
 
@@ -199,7 +208,7 @@ Ein Committer (Flat-Combining, Gruppen-Fsync). Lesen lock-frei bis auf `Arc`-Klo
 |---|---|---|
 | F-1 transient | `EINTR` | Wiederholung mit Backoff |
 | F-2 Ressource | `ENOSPC` beim Vorallokieren | **kein Poison**; `DiskFull`; Löschung/Wartung laufen weiter (§6.6) |
-| F-3 E/A-hart | `EIO`, Fsync-Fehler | **nie wiederholen**, `Poisoned`, Recovery per Neustart |
+| F-3 E/A-hart | `EIO`, Fsync-Fehler | **nie auf demselben Handle wiederholen**; laufender Handle wird `Poisoned`. Für Changes, deren Write/Sync begonnen hat, ist der Rückgabestatus `Indeterminate{first_stamp,last_stamp}`; Neustart-Recovery bestimmt den Commitstatus. Idempotenz-Token löst denselben unveränderten Request auf, blindes Retry ohne Token ist verboten |
 | F-4 Integrität | CRC/MAC/AEAD-Fehler | kleinste Einheit vergiften (Block → Abschnitt → Datei), `Corrupt{..}`, Rest läuft |
 | F-5 Format | `Unsupported` | Öffnen verweigert |
 | F-6 Schlüssel | Provider offline / Schlüssel fehlt | `KeyUnavailable{retry_after}` bzw. `Shredded`; **`KeyLost`** wenn der Schlüssel fehlt, obwohl kein Löschnachweis existiert (Alarm, keine automatische Löschung) |
@@ -260,7 +269,7 @@ Wert = `header ‖ body`, getrennt durch `header_len`. **Der Kern interpretiert 
 pub struct SpaceOptions {
     pub class: SpaceClass,          // Durable | Volatile
     pub clustered: bool,
-    pub personal: bool,             // erzwingt clustered, nur Sealed-Cluster, bei Durable seal = Cluster
+    pub data_class: DataClass,      // NonPersonal | Personal; Personal erzwingt Cluster und Sealed
     pub packing: PackPolicy,        // None | ByTenantAndExpiry{ bucket: Month|Quarter|Year, shards: u8 }
     pub pure_threshold: u64,        // Standard 8 MiB
     pub seal: Seal,                 // ByMode | Cluster
@@ -272,8 +281,19 @@ pub struct SpaceOptions {
 }
 ```
 
-`personal = true` verlangt `integrity_mode = Encrypted`. **Volatile-Spaces:** kein Redo/Run/Blob, im Catalog nur der Name, sofort sichtbar, Inhalt verschwindet bei Schließen/Absturz, Erase = Freigabe mit Überschreiben (best-effort). Mischchanges mit Volatile- und Durable-Zielen nur mit `allow_mixed`, nur `durable`, wenn alle Ziele Durable sind (`INV-VOL-1`).
+`DataClass::Personal` verlangt `integrity_mode = Encrypted`; bei Durable verlangt es `seal = Cluster`. Die Enum verhindert ungültige boolesche Zustände in der API, die Validierung der Kombinationen erfolgt vor I/O und ist kein automatischer PII-Detektor. **Volatile-Spaces:** kein Redo/Run/Blob, im Catalog nur der Name, sofort sichtbar, Inhalt verschwindet bei Schließen/Absturz, Erase = Freigabe mit Überschreiben (best-effort). Mischchanges mit Volatile- und Durable-Zielen nur mit `allow_mixed`, nur `durable`, wenn alle Ziele Durable sind (`INV-VOL-1`).
 `compression=None` ist die einzige v1-Option; nicht unterstützte Kompression wird vor Mutation mit `Unsupported` abgewiesen. Kompression erfordert später ein versioniertes Format mit unkomprimierter Ziellänge und hartem Expansionslimit.
+
+### 4.7 Datenklassen
+
+`DataClass` ist ein geschlossenes Enum mit `NonPersonal` und `Personal`; fehlende oder unbekannte Klassifikation wird beim Erstellen eines Spaces abgewiesen (kein impliziter Default an externen API-Grenzen). Der Default des internen Builders darf `NonPersonal` nur für explizit nicht-personenbezogene System-/Anwendungsdaten wählen. Die deklarierende Contextra-Schicht ist für die inhaltliche Klassifikation verantwortlich; der Storage-Kern führt keine Erkennung personenbezogener Daten durch.
+
+| Klasse | Zulässige Ablage | Lösch-/Schutzsemantik |
+|---|---|---|
+| `NonPersonal` | geclusterte oder nicht geclusterte Spaces gemäß übrigen Optionen | Schutz folgt `SealPolicy`; keine personenbezogene Löschzusage allein aus der Klassifikation |
+| `Personal` | ausschließlich geclusterter Space; `IntegrityMode::Encrypted`; Durable zusätzlich `SealPolicy::Cluster` und ausschließlich `Sealed`-Cluster | Cluster ist kleinste Crypto-Erasure-Domäne; abgeleitete Inhalte erben die strengere Klasse und benötigen `DerivedFrom`-Lineage bzw. registrierten Owner |
+
+Ein `Personal`-Space im `Volatile`-Modus bleibt nur im Prozessspeicher, hat keine Durability und erzeugt keinen dauerhaften Erasure-Nachweis; sein Schutz während der Laufzeit folgt dem konfigurierten verschlüsselten Modus. Ein Space-Wechsel oder Export darf Klassifikation nie stillschweigend herabstufen. Cross-Cluster-Referenzen zwischen unterschiedlichen Personen sind keine Erlaubnis zur gemeinsamen Schlüssel-/Löschdomäne; gemeinsam verantwortete Falldaten benötigen eine ausdrücklich modellierte gemeinsame Löschdomäne und dokumentierte Betroffenenbeziehungen.
 
 ### 4.6 Limits
 
@@ -301,10 +321,10 @@ quelle = Clusterschlüssel(cluster, epoch)   bei Seal::Cluster
        = Space-DEK                          bei Seal::ByMode/Encrypted (Plain-Cluster)
        = gemäß IntegrityMode                bei Plain-Cluster (CRC-only, authentifiziert oder Space-DEK)
        Sealed-Cluster-Nutzlasten in Redo verwenden immer Seal::Cluster mit der im Op-Header gebundenen key_epoch.
-AAD:  Block (instance, space_id, space_id, cluster, key_epoch, block_uid) · Redo-Op (instance, space_id, space_id, cluster, key_epoch, op_uid, op_index) · Blob-Record (instance, space_id, space_id, cluster, key_epoch, record_uid)
+AAD: Block `(instance_id, space_id, cluster_id, key_epoch, block_uid)` · Redo-Op `(instance_id, space_id, cluster_id, key_epoch, op_uid, op_index)` · Blob-Record `(instance_id, space_id, cluster_id, key_epoch, record_uid)`. `space_id` ist kanonisch unsigned BE-u64; AAD-Domain und Feldreihenfolge sind Teil der Referenzvektoren.
 ```
 
-Pro SealFrame gibt es keine zusätzliche HKDF/HChaCha-Ableitung: XChaCha20-Poly1305 erhält den bereits scope-spezifischen Quellschlüssel, 24-Byte-Nonce und AAD direkt und führt seine spezifizierte HChaCha-Subkey-Ableitung intern aus. `Authenticated` nutzt die ersten 16 Bytes von HMAC-SHA256 über kanonisch längencodierte Domain `ctxs-auth-v1`, Modus, Nonce, AAD und Klartext; Tagvergleich ist constant-time. `Plain` nutzt CRC32C und bietet keine Manipulationsauthentizität. RootKey-abgeleiteter Redo-Schlüssel dient ausschließlich Ketten-MAC/Frame-Integrität und verschlüsselt **keine** Nutzlast eines Sealed-Clusters. AAD und Siegel hängen nicht von Dateiname, Datei-ID, Blob-ID, Offset oder Dateiposition ab; `block_uid`/`record_uid` sind bei Rohkopie stabil ⇒ Rohkopie über Dateien und neue Blob-IDs ist ohne Entschlüsselung gültig. Versiegelt wird vor Stamp-Vergabe; Stamp ist über Frame-Ketten-MAC gebunden. `INV-SEAL-1`: Sealed-Cluster haben Nutzdaten nur in `Seal::Cluster`- oder Volatile-Spaces; Plain-Cluster nie in `Seal::Cluster`-Spaces; `personal`-Spaces nehmen nur Sealed-Cluster. Folge: alle **Nutzdaten** eines Sealed-Clusters auf Platte (Redo-Op, Runs, Blobs, Kopf, Körper, Index, Filter, Branch-Nutzdaten) sind unter dessen Cluster-Epoche versiegelt. Klartext bleiben ausdrücklich: zufällige ClusterId, Routing-Header/Op-Tags, Gate-/Control-Frames, Größen/Stamp-Bereiche und Dateistruktur; dies ist das Metadaten-Leckagebudget und enthält keine Nutzwerte.
+Pro SealFrame gibt es keine zusätzliche HKDF/HChaCha-Ableitung: XChaCha20-Poly1305 erhält den bereits scope-spezifischen Quellschlüssel, 24-Byte-Nonce und AAD direkt und führt seine spezifizierte HChaCha-Subkey-Ableitung intern aus. `Authenticated` nutzt die ersten 16 Bytes von HMAC-SHA256 über kanonisch längencodierte Domain `ctxs-auth-v1`, Modus, Nonce, AAD und Klartext; Tagvergleich ist constant-time. `Plain` nutzt CRC32C und bietet keine Manipulationsauthentizität. RootKey-abgeleiteter Redo-Schlüssel dient ausschließlich Ketten-MAC/Frame-Integrität. Nutzlasten eines Sealed-Clusters im Redo sind zusätzlich mit dessen Cluster-Epoche versiegelt; ein unter dem RootKey allein verschlüsselter Nutzwert wäre mit `INV-ERA-7` unvereinbar. AAD und Siegel hängen nicht von Dateiname, Datei-ID, Blob-ID, Offset oder Dateiposition ab; `block_uid`/`record_uid` sind bei Rohkopie stabil ⇒ Rohkopie über Dateien und neue Blob-IDs ist ohne Entschlüsselung gültig. Versiegelt wird vor Stamp-Vergabe; Stamp ist über Frame-Ketten-MAC gebunden. `INV-SEAL-1`: Sealed-Cluster haben Nutzdaten nur in `Seal::Cluster`- oder Volatile-Spaces; Plain-Cluster nie in `Seal::Cluster`-Spaces; `personal`-Spaces nehmen nur Sealed-Cluster. Folge: alle **Nutzdaten** eines Sealed-Clusters auf Platte (Redo-Op, Runs, Blobs, Kopf, Körper, Index, Filter, Branch-Nutzdaten) sind unter dessen Cluster-Epoche versiegelt. Klartext bleiben ausdrücklich: zufällige ClusterId, Routing-Header/Op-Tags, Gate-/Control-Frames, Größen/Stamp-Bereiche und Dateistruktur; dies ist das Metadaten-Leckagebudget und enthält keine Nutzwerte.
 
 ### 5.3 Konventionen aller Formate
 
@@ -448,7 +468,7 @@ Redo, Catalog und Ledger schreiben nur in **vorallokierte** Bereiche (AN-10); `E
 
 ### 8.2 Branch-Metadaten
 
-Branch-Metadaten liegen **im Cluster**, nicht im Catalog: reservierter Space `SYS_BRANCH` (SpaceId 1, clustered, `personal`-Regeln wie der Cluster), Eintrag `branch_id → { name (≤ 64 B, opak), parent, fork_point: Head|At(Stamp), state: Live|Merged|Dropped, ttl, created_by }`. Für `Head` ist der MVCC-Stamp des Branch-Erstellungsrecords der `fork_stamp`; der Stamp wird nicht zusätzlich im versiegelten Payload dupliziert. Der Catalog bleibt frei von Namen und Nutzdaten. Eine In-Memory-Tabelle je Cluster (Blatt in `cluster_table`) wird beim ersten Zugriff aufgebaut.
+Branch-Metadaten liegen **im Cluster**, nicht im Catalog: reservierter Space `SYS_BRANCH` (SpaceId 1, clustered, `DataClass::Personal`-Regeln wie der Cluster), Eintrag `branch_id → { name (≤ 64 B, opak), parent, fork_point: Head|At(Stamp), state: Live|Merged|Dropped, ttl, created_by }`. Für `Head` ist der MVCC-Stamp des Branch-Erstellungsrecords der `fork_stamp`; der Stamp wird nicht zusätzlich im versiegelten Payload dupliziert. Der Catalog bleibt frei von Namen und Nutzdaten. Eine In-Memory-Tabelle je Cluster (Blatt in `cluster_table`) wird beim ersten Zugriff aufgebaut.
 
 ### 8.3 Lesen auf einem Branch
 
@@ -786,6 +806,16 @@ Jedes Indexelement, jede Kante und jeder Posting-Eintrag muss einer Quell-`Clust
 
 V1-Referenzarchitektur: Vektoren und kleine Ranking-Metadaten liegen clusterlokal versiegelt für subject-/fallgebundene Queries; tenantweite ANN/FTS/Graph-Indizes sind partitionierte, bounded `Rebuildable`-Derivate mit durablem Delta und Gate-Filter. Alternativ kann die obere Schicht vollständig clusterlokale Mikroindizes verwenden. Ein globaler HNSW-/CSR-Neubau ist kein O(Cluster)-Erase-Versprechen. Für token-budgetierte Suche bleiben `header`/`weights`/`page` die Kernprimitive; Modellwahl, Embedding, BM25, ANN und Ranking sind obere, messbare Services.
 
+### 12.4.2 Ende-zu-Ende-Vertrag für Contextra-RAG
+
+Der Storage-Kern ist der transaktionale Datensatz- und Lineage-Anker, nicht der ANN-/BM25-/Graph-Algorithmus. Ein fachlicher Ingest-`Change` darf Dokument-/Chunk-Records, quantisierte Vektoren, Text-/Term-Quelldaten, Metadaten und Graph-Deltas atomar schreiben, wenn sie derselben Cluster-Löschdomäne angehören und das Change-Limit einhalten. Der Kern berechnet weder Embeddings noch BM25-Postings, HNSW-Nachbarschaften, CSR-Kompression oder Communities. Solche Repräsentationen sind abgeleitete Indexgenerationen und werden über `SegmentOwner`/Change-Feed betrieben.
+
+Der verpflichtende Ablauf lautet: (1) validiere DataClass, Tenant-/Zugriffskontext in der oberen Schicht, Budget und Lineage; (2) committe kanonische Quelldaten durable; (3) konsumieren Extensions mindestens-einmal und idempotent nur bis `durable_stamp`; (4) veröffentliche Indexgeneration samt `(instance_id, applied_stamp)` erst nach vollständig applizierten Deltas; (5) Query bindet eine `view_durable()`-Sicht, begrenzt sie durch Watermark/Delta, wendet Tenant-/Rechtefilter vor Indexexploration an und prüft jeden Kandidaten über Gate + `filter_visible` vor Scoring/Traversal und erneut vor Ausgabe; (6) Lücken oder zu alte Generationen liefern `IndexLag`/Retry bzw. explizite Fallback-Suche, nie stillschweigend unvollständige Treffer.
+
+Quelldaten und externe Indexgeneration sind nicht gemeinsam atomar. Der Vertrag stellt Durability, Wiederaufbau, Idempotenz, Sichtbarkeit und Löschbeleg her, nicht Null-Lag. Ein Index darf erst als aktuell beworben werden, wenn sein Watermark die angefragte durable Position abdeckt oder die Delta-/Fallback-Abfrage die Lücke schließt. Gate invalidiert Treffer synchron auf dem Querypfad; physische Bereinigung und Krypto-Erasure benötigen weiterhin Owner-Atteste und Backup-Scope. Ein Owner darf nicht zugleich `NoPersonalData` deklarieren und personenbezogene Lineage verarbeiten.
+
+Alle Komponenten beziehen RAM-, Scratch-, I/O- und Lag-Grenzen aus dem gemeinsamen `MemoryBudget`/Governor. Unter Druck wird Indexaufbau gedrosselt oder abgewiesen, bevor unbeschränkte Allokation stattfindet; die kanonische Storage-Schreibbarkeit und Gate-Priorität bleiben erhalten. Tenant-/Cluster-IDs, Querytext, Schlüssel, Dokumentinhalte und Embeddings sind niemals Metric-Labels oder Standard-Observer-Payloads.
+
 ### 12.5 Kopf, Gewichte, Budget
 
 `header`, `weights`, `page`, `weight_sum` sind die Schnittstelle für Rang- und Budgetlogik. Die obere Schicht legt fest, was ein Gewicht bedeutet (Token je Tokenizer-Familie: je ein Slot, bis 4). Token-Budget-Packing (Knapsack, Redundanzabzug, präfix-stabile Ordnung) liegt oben und nutzt `page` für die Kandidaten.
@@ -907,7 +937,7 @@ Planungsannahme für 3–4 erfahrene Rust-Entwickler plus 1 Test-/Simulationsing
 
 **G-CUTOVER (P8+, SP-CUTOVER 24):** separates Produktfreigabe-Gate nach G-P. Erst wenn sämtliche produktiven `contextra-store`-Verbraucher, Datenräume und Erasure-Witnesses migriert, Restore-/Rollback-Rehearsal einschließlich externem Fencing des alten Instanzbesitzers und RAG-Differentialmessung bestanden sowie gemeinsames Speicherbudget belegt sind, wird `contextra-storage` alleiniger Produktions-Schreibkern. Nach ersten R8-Writes ist Rückkehr nur per geprüftem Forward-Export oder Restore möglich; kein Dual-Write. Bis dahin gelten R8-Leistungs- und Löschvorteile als unbestätigte Ziele.
 
-Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur per Migration. In jeder Phase wird der Crash-Sweep um die neuen Fs-Operationen **erweitert, nie nachgezogen**. Erst nach G-P werden aufsetzende Komponenten (Kontext-Engine, Indizes, MCP-Server) angebunden.
+Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur per Migration. In jeder Phase wird der Crash-Sweep um die neuen Fs-Operationen **erweitert, nie nachgezogen**. Kontext-Engine, Vektor-/Volltext-/Graph-Indizes, Cache und MCP-Bridge dürfen parallel auf Basis freigegebener Verträge entwickelt und in P4–P8 integriert werden; sie müssen die gemeinsamen Durability-, Watermark-, MemoryBudget- und Erasure-Gates bestehen. G-P bewertet den vollständigen Storage-plus-RAG-Stack, und erst G-CUTOVER macht R8 zum alleinigen Produktions-Schreibkern.
 
 **Sofortmaßnahmen vor P1:** (1) `contextra-storage` in den Workspace aufnehmen, fehlende Crates `contextra-storage-ports`, `contextra-crypto-ref` anlegen; (2) Bestand (R2-Entwurf ohne Cluster) modulweise auf R8 umstellen (`redo`, `run`, `blob`, `catalog`, `committer` formatbetroffen); (3) `unwrap/expect/panic` aus Produktionscode entfernen (Altstand 1260 + 16 Treffer, R7-Anhang B); (4) `deny.toml`, CI, Toolchain-Pin (1.89.0); (5) fehlende Verweisdateien anlegen oder Verweise entfernen; (6) Altstand `contextra-store` per Tag `legacy-store-final` archivieren, **kein Code wird übernommen**.
 
@@ -966,7 +996,9 @@ Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur 
 `block_target` 16 KiB · `memtable_total_bytes` ≤ 256 MiB · `redo_segment_bytes` 64 MiB, `redo_mark_bytes` 8 MiB, `redo_max_age` 1 h · `run_target_bytes` 64 MiB · `blob_max_bytes` 64 MiB · `max_pack_groups` 4096 · `pure_threshold` 8 MiB · `max_gate_clusters` 4096 · `max_open_files` 1024 · `maint_io_fraction` 0,5 · `purge_batch_min` 16 · `purge_rewrite_concurrency` 1 · `purge_scratch_reserve_bytes` ≥128 MiB (zwei Slots, keine normale Allokation) · **`purge_deadline` kein Standard (Pflichtparameter)** · Reservierungen 2^20 / 2^16 · `max_links` 8 · `max_hold_ttl` / `idem_ttl` 24 h · `anchor` Required bei Encrypted/Authenticated, `anchor_max_age` 1 s · `guard_window_entries` ≤ 1 Mio. und durch MemoryBudget begrenzt · `max_lag_bytes` 1 GiB · `erase_reserve_bytes` ≥2 GiB (inklusive Scratch 128 MiB, Consumer-Retention 1 GiB, Emergency-Reserve und FS-Metadaten-Headroom) · `max_clock_skew` 5 min default, strenger nur explizit · `key_grace` 10 min · `orphan_key_grace` 24 h · `revoke_grace` 5 s · `max_branches_per_cluster` 1024, `max_branch_depth` 8 · `LiftPolicy` OwnerOrAdmin.
 
 **Gemeinsames RAM-Budget:** `memory_budget_bytes` defaultet auf `min(1 GiB, max(256 MiB, 20 % des effektiven cgroup-/Job-Limits))`; kann der Adapter kein verlässliches Limit liefern, ist der Wert beim Öffnen Pflicht. Unterbudgets sind Obergrenzen am selben Budget: 25 % Memtables, 15 % Cluster-/Branch-Metadaten, 2 % Guard-Fenster, 20 % Block-Cache, 1 % Key-Cache, 20 % Extension-/Indexdelta und 10 % In-flight-Changes/Rewrite-Buffer; 7 % bleiben als Allocator-/Runtime-Headroom unangetastet. Jede Allokation reserviert atomar beim `MemoryBudget` und gibt per RAII frei. `max_clusters`, Branch-Limits und Extension-Admission werden zusätzlich durch tatsächliche Metadatenbytes begrenzt; `max_clusters=16 Mio.` ist eine Obergrenze, keine zugesagte Resident-Kapazität. Ein Extension-Owner ohne Budget-Token darf keine Indexarbeit oder Cache-Allokation starten.
-**Metriken (Pflicht, Z-14):** `erase_open_tickets`, `erase_oldest_pending_age`, `erase_deadline_breaches_total`, `gate_latency`, `key_destroy_latency`, `purge_bytes_copied`, `anchor_lag_ms`, `disk_free_vs_reserve`, `consumer_lag_bytes`, `guard_slowpath_ratio`, `key_cache_hit_ratio`, `diskfull_state`, `branch_count`, `branch_oldest_age`. Keine Metrik und kein Ereignis enthält Schlüssel, Nutzerschlüssel oder Inhalte.
+**Metrikvertrag (Pflicht, Z-14/Z-17):** Der feste Katalog in `metrics.rs` definiert Name, Typ, Einheit, begrenzte Labels und Bedeutung. Pflichtfamilien: Commits (Anzahl, Gruppengröße, Latenz nach `durability`/`result`), Erase-Stufen (Gate- und KeyDestroy-Latenz, getrennte Zähler nach Status), Durability (sichtbar-durable Stamp-Lag, Fsync-Latenz nach festem `file_role`), Ressourcen (Bytes/Limit nach festem `resource_class`, Memtable/Cache-Belegung und Trefferquote, Reserve frei/benutzt, Scratch belegt), Wartung (Flush/Compaction/Purge-Bytes und Laufzeit nach `phase`), Erase (offene Tickets, ältestes Alter, Fristverletzungen, Dauer und Ergebnis je `stage`, Gate-Latenz, KeyDestroy-Latenz, Purge-Bytes, Anchor-Lag), Extensions (Feed-/Index-Watermark-Lag und blockierte Owner nach festem `owner_kind`), Guards (Fast-/Slowpath-Anteil), Branches (Anzahl, Tiefe, ältester Pin/History-Floor) sowie Fehler/Poison-Zustand nach geschlossenem `ErrorClass`. Jede Zeitreihe hat definierte Einheit und monotone Counter-Semantik; Histogramm-Buckets sind pro Release versioniert.
+
+Labelwerte stammen ausschließlich aus kleinen geschlossenen Enums (`durability`, `result`, `file_role`, `resource_class`, `phase`, `stage`, `owner_kind`, `ErrorClass`). Keine IDs, Namen, Tenant-/Cluster-/Space-Kennung, Schlüssel, Request-Token, Querytexte, Dokumentinhalte oder Embeddings als Label oder Standard-Event. `Metrics`/`Observer` sind best-effort, nicht blockierend und werden außerhalb aller Kernlocks aufgerufen; Telemetrie-Ausfall ändert keine Storage-Semantik. Der Inspector ist administrative Diagnose, standardmäßig nur aggregierte/opaque Werte, benötigt Capability und darf keine Inhalte entsiegeln. Metrik-Katalog-Review und Kardinalitäts-/Leakage-Test sind Release-Gates.
 
 ---
 
@@ -1062,7 +1094,7 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 | SD-34 | Eine normative Spec plus `AGENTS.md`; Vorfassungen in `docs/archive/` |
 | SD-35 | Redo-AAD mit `op_uid` statt Stamp |
 | SD-36 | `AdminCap`/`RestrictedReadCap` als nicht klonbare Fähigkeiten |
-| SD-37 | Kern erzeugt `ClusterId`; Sealed/Plain; `personal` erzwingt Sealed |
+| SD-37 | Kern erzeugt `ClusterId`; Sealed/Plain; `DataClass::Personal` erzwingt Cluster-Seal |
 | SD-38 | Eine Siegelform; RootKey-Indirektion; `Cryptographic` nur bei `keys_in_backups == false` |
 | SD-39 | Gate ohne Segmentschnitt; Barriere beim Purge, nur Plain, gebündelt |
 | SD-40 | Consumer-Feed aus Redo mit zwei Böden |

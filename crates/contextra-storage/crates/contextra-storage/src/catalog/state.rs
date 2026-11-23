@@ -2,7 +2,7 @@
 
 use super::ops::{CatalogOp, FileEntry};
 use super::record::CatalogRecord;
-use contextra_storage_ports::{ClusterId, ClusterLifecycle, Error, Protection, SpaceId, Stamp};
+use contextra_storage_ports::{ClusterId, ClusterLifecycle, Error, Protection, SpaceId, Stamp, SYSTEM_SPACE_ID_MAX};
 use std::collections::BTreeMap;
 
 pub type FileMeta = FileEntry;
@@ -19,7 +19,7 @@ pub struct GraveyardEntry {
     pub file: FileMeta,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct CatalogState {
     spaces: BTreeMap<SpaceId, Protection>,
     clusters: BTreeMap<ClusterId, CatalogCluster>,
@@ -31,7 +31,18 @@ pub struct CatalogState {
     redo_mark: (u64, u64, Stamp),
     stamp_limit: Stamp,
     id_limit: u64,
+    space_id_limit: u64,
     epoch: u64,
+}
+
+impl Default for CatalogState {
+    fn default() -> Self {
+        Self { spaces: BTreeMap::new(), clusters: BTreeMap::new(), files: BTreeMap::new(),
+            graveyard: BTreeMap::new(), unlink_acks: std::collections::BTreeSet::new(),
+            purge_complete: std::collections::BTreeSet::new(), replay_floor: (0, 0),
+            redo_mark: (0, 0, 0), stamp_limit: 0, id_limit: 0,
+            space_id_limit: SYSTEM_SPACE_ID_MAX, epoch: 0 }
+    }
 }
 
 impl CatalogState {
@@ -52,6 +63,7 @@ impl CatalogState {
     pub fn apply(&mut self, op: &CatalogOp) -> Result<(), Error> {
         match op {
             CatalogOp::SpaceAdd { space, protection } => match self.spaces.get(space) {
+                _ if space.0 > self.space_id_limit => Err(Error::Corrupt { place: "catalog space id not reserved" }),
                 Some(existing) if existing == protection => Ok(()),
                 Some(_) => Err(Error::Corrupt { place: "catalog conflicting space registration" }),
                 None => { self.spaces.insert(*space, *protection); Ok(()) }
@@ -110,6 +122,11 @@ impl CatalogState {
                 self.id_limit = *through;
                 Ok(())
             }
+            CatalogOp::ReserveSpaceIds { through } => {
+                if *through < self.space_id_limit { return Err(Error::Corrupt { place: "catalog space id reserve regressed" }); }
+                self.space_id_limit = *through;
+                Ok(())
+            }
             CatalogOp::PurgeBatch { ticket, remove_file_id, replacement } => {
                 if self.purge_complete.contains(ticket) { return Err(Error::Corrupt { place: "purge batch after completion" }); }
                 let key = (*ticket, *remove_file_id);
@@ -158,6 +175,7 @@ impl CatalogState {
     pub fn redo_mark(&self) -> (u64, u64, Stamp) { self.redo_mark }
     pub fn stamp_limit(&self) -> Stamp { self.stamp_limit }
     pub fn id_limit(&self) -> u64 { self.id_limit }
+    pub fn space_id_limit(&self) -> u64 { self.space_id_limit }
     pub fn epoch(&self) -> u64 { self.epoch }
 }
 

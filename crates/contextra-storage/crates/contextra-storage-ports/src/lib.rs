@@ -13,5 +13,5 @@ pub use change::{
     CallerMeta, Change, ClusterLifecycle, Durability, Guard, Op, Origin, Precondition, Protection, Receipt,
 };
 pub use error::{Error, ErrorClass};
-pub use ids::{BatchId, BranchId, ClusterId, IdemToken, Redacted, SpaceId, Stamp, STAMP_MAX};
+pub use ids::{BatchId, BranchId, ClusterId, IdemToken, Redacted, SpaceId, Stamp, FIRST_USER_SPACE_ID, STAMP_MAX, SYSTEM_SPACE_ID_MAX};
 pub use keys::{Key32, KeyCreateFailure, KeyCreateResult, KeyLookup, KeyProbe, KeyProvider, MAX_KEYS_PER_BATCH};

@@ -1,4 +1,8 @@
 //! contextra-storage: Speicherkern. Fassade und Modulwurzel (SP-FACADE).
+//! Komponentenbesitz, Abhängigkeitsgraph und Implementierungsreihenfolge stehen in
+//! [`IMPLEMENTATION-FOUNDATION.md`](IMPLEMENTATION-FOUNDATION.md). Das Crate ist
+//! ein synchroner, eingebetteter Kern; Subsysteme werden erst nach ihren Recovery-
+//! und Durability-Verträgen über die öffentliche Fassade freigegeben.
 #![forbid(unsafe_code)]
 
 pub use contextra_storage_ports as ports;

@@ -11,6 +11,8 @@ pub enum ErrorClass {
     DiskFull,
     /// F-3: Sync-Fehler, Handle vergiftet
     Poisoned,
+    /// Write/Sync wurde begonnen, Persistenz des Changes ist unbekannt
+    Indeterminate,
     /// F-4: Prüfsumme, Siegel, Kette
     Corrupt,
     /// F-5: unbekannte Version oder Tag
@@ -36,6 +38,8 @@ pub enum Error {
     DiskFull,
     #[error("Handle vergiftet nach fehlgeschlagenem Sync ({cause})")]
     Poisoned { cause: &'static str },
+    #[error("Commit-Ergebnis ist für Stamps {first_stamp}..={last_stamp} unbestimmt; Recovery/Idempotenz prüfen")]
+    Indeterminate { first_stamp: u64, last_stamp: u64 },
     #[error("beschädigte Daten in {place}")]
     Corrupt { place: &'static str },
     #[error("nicht unterstützt: {what}")]
@@ -72,6 +76,10 @@ pub enum Error {
     EraseFanoutExceeded,
     #[error("Uhrabweichung verhindert sichere Fristberechnung")]
     ClockUncertain,
+    #[error("Space-ID ist dem Systemnamensraum vorbehalten")]
+    ReservedSpace,
+    #[error("monotone ID- oder Stamp-Reserve ist ausgeschöpft")]
+    Exhausted,
     #[error("Eingabe verletzt Grenze: {limit}")]
     Limit { limit: &'static str },
     #[error("Anker-Wettlauf verloren (CAS)")]
@@ -91,12 +99,14 @@ impl Error {
             Self::Transient { .. } | Self::Io { .. } => ErrorClass::Transient,
             Self::DiskFull => ErrorClass::DiskFull,
             Self::Poisoned { .. } => ErrorClass::Poisoned,
+            Self::Indeterminate { .. } => ErrorClass::Indeterminate,
             Self::Corrupt { .. } => ErrorClass::Corrupt,
             Self::Unsupported { .. } => ErrorClass::Unsupported,
             Self::KeyUnavailable { .. } | Self::KeyLost | Self::Shredded => ErrorClass::Key,
             Self::Limit { .. } | Self::ClusterRetired | Self::UnknownCluster | Self::BelowFloor
             | Self::Restricted | Self::ChangeTooLarge | Self::IdemCapacity | Self::BranchClosed
             | Self::BranchHasChildren | Self::Lagged | Self::EraseFanoutExceeded | Self::ClockUncertain => ErrorClass::Usage,
+            Self::ReservedSpace | Self::Exhausted => ErrorClass::Usage,
             Self::CasLost | Self::Conflict | Self::IdemConflict => ErrorClass::Conflict,
             Self::Rollback => ErrorClass::Rollback,
         }
@@ -107,6 +117,7 @@ impl Error {
             Self::Transient { .. } | Self::Io { .. } => "Mit Backoff erneut versuchen",
             Self::DiskFull => "Platz schaffen oder Erase-Reserve prüfen",
             Self::Poisoned { .. } => "Speicher neu öffnen; Wiederholung nie auf demselben Handle",
+            Self::Indeterminate { .. } => "Store neu öffnen und denselben IdemToken zum Auflösen wiederverwenden",
             Self::Corrupt { .. } => {
                 "Integritätsbericht prüfen, Datei aus Sicherung wiederherstellen"
             }
@@ -126,6 +137,8 @@ impl Error {
             Self::Lagged => "Consumer ab einem vollständigen Snapshot neu aufbauen",
             Self::EraseFanoutExceeded => "Löschdomäne verkleinern oder Grenze prüfen",
             Self::ClockUncertain => "Uhrquelle prüfen; Fristen bleiben bis dahin angehalten",
+            Self::ReservedSpace => "Space-IDs 0 bis 255 sind dem System vorbehalten",
+            Self::Exhausted => "ID-Raum ist erschöpft; IDs werden niemals wiederverwendet",
             Self::Limit { .. } => "Eingabe verkleinern",
             Self::Rollback => "ReadOnly-Diagnose öffnen und Restore-Reconcile ausführen",
         }

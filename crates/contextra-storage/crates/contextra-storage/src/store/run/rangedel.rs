@@ -2,18 +2,27 @@
 
 use crate::codec::tags::{untag, Kind};
 use contextra_storage_ports::{BranchId, Error, Stamp};
+use core::fmt;
 use zeroize::Zeroizing;
 
 const MAGIC: &[u8; 8] = b"CTXRNG01";
 pub const MAX_RANGE_MARKERS: usize = 1_000_000;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct RangeMarker {
     pub branch: BranchId,
     pub start: Zeroizing<Vec<u8>>,
     /// Exclusive upper bound.
     pub end: Zeroizing<Vec<u8>>,
     pub tag: u64,
+}
+
+impl fmt::Debug for RangeMarker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RangeMarker").field("branch", &self.branch)
+            .field("start", &"<redacted>").field("end", &"<redacted>")
+            .field("tag", &self.tag).finish()
+    }
 }
 
 impl RangeMarker {

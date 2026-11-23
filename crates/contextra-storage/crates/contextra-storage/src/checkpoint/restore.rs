@@ -1,4 +1,4 @@
 //! Checkpoint wiederherstellen
 //!
-//! Besitzer: SP-CKPT · Phase P6 · Arbeitspaket WP-22.x (Spezifikation 22 fehlt)
-//! Status: PLATZHALTER. Keine Logik; Verträge gemäß docs/implement/.
+//! Besitzer: SP-CKPT · Phase P6 · Arbeitspaket WP-22.x (siehe Besitzer-SP 22)
+//! Implementierung ist offen; verbindliche Schnittstelle, Invarianten und Abnahme stehen im zugehörigen Besitzer-SP.

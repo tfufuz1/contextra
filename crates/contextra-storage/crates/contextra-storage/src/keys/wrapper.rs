@@ -1,7 +1,7 @@
 //! AEAD-Umhüllung von RootKey und Space-DEK (SP-KEYS, INV-KEY-1).
 
 use contextra_storage_ports::traits::{Cipher, Entropy};
-use contextra_storage_ports::{Error, Key32};
+use contextra_storage_ports::{Error, Key32, SpaceId};
 use zeroize::Zeroizing;
 
 const MAGIC: &[u8; 4] = b"KWR1";
@@ -28,10 +28,10 @@ pub fn wrap_space_dek(
     root: &Key32,
     dek: &Key32,
     entropy: &dyn Entropy,
-    space: u16,
+    space: SpaceId,
 ) -> Result<Vec<u8>, Error> {
     let mut label = b"contextra space dek v1".to_vec();
-    label.extend_from_slice(&space.to_le_bytes());
+    label.extend_from_slice(&space.0.to_be_bytes());
     wrap_key(cipher, root, dek, entropy, &label)
 }
 
@@ -39,10 +39,10 @@ pub fn unwrap_space_dek(
     cipher: &dyn Cipher,
     root: &Key32,
     wrapped: &[u8],
-    space: u16,
+    space: SpaceId,
 ) -> Result<Key32, Error> {
     let mut label = b"contextra space dek v1".to_vec();
-    label.extend_from_slice(&space.to_le_bytes());
+    label.extend_from_slice(&space.0.to_be_bytes());
     unwrap_key(cipher, root, wrapped, &label)
 }
 

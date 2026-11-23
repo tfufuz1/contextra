@@ -1,4 +1,9 @@
-//! Belege (Receipts)
+//! Kanonische ErasureReceipt-Kodierung und Offline-Prüfung (SP-ERASE §9.7).
 //!
-//! Besitzer: SP-ERASE · Phase P6 · Arbeitspaket WP-13.x (Spezifikation 13 fehlt)
-//! Status: PLATZHALTER. Keine Logik; Verträge gemäß docs/implement/.
+//! Implementierergrenze: kanonische, versionsgebundene Bytes aus Ledger-Slice,
+//! Anchor-Attestation und attestierten Owner-Belegen prüfen. Keine Signatur- oder
+//! KMS-Implementierung im Kern. `Complete` verlangt alle geforderten Belege;
+//! fehlender Owner-/Scope-Nachweis ist `Incomplete`, retrybarer Halt `Blocked`,
+//! und `CompleteWithResidual` ist nur für explizit benannte Restrisiken zulässig.
+//! Debug-/Error-Ausgaben dürfen weder Selector noch IDs, Schlüssel oder Payloads
+//! offenlegen.

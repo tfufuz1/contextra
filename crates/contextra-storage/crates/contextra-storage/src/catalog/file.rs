@@ -203,6 +203,23 @@ impl CatalogFile {
         self.append_group_durable(&ops, integrity, key, mac)
     }
 
+    /// Durably reserves a user SpaceId interval before returning it to an
+    /// allocator. Callers must serialize allocation through this mutable
+    /// CatalogFile handle; after reopen, unused IDs in the interval are lost.
+    pub fn reserve_space_ids_durable(
+        &mut self,
+        amount: u64,
+        integrity: CatalogIntegrity,
+        key: Option<&Key32>,
+        mac: Option<&dyn Mac>,
+    ) -> Result<super::reserve::Reservation, Error> {
+        let (op, reservation) = super::reserve::next_space_id_reservation(
+            self.state.space_id_limit(), amount,
+        )?;
+        self.append_durable(&[op], integrity, key, mac)?;
+        Ok(reservation)
+    }
+
     pub fn path(&self) -> &Path { &self.path }
     pub fn state(&self) -> &CatalogState { &self.state }
     pub fn next_sequence(&self) -> u64 { self.next_sequence }

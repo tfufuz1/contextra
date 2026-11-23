@@ -1,4 +1,4 @@
-# SP-AUDIT — Verbindliche R8-Audit-Remediation
+# SP-AUDIT — Verbindliche R8.1-Audit-Remediation
 
 | | |
 |---|---|
@@ -38,10 +38,19 @@ Dieses Dokument führt keine Parallelimplementierung ein. Ein Patch wird in der 
 | A-23 | `SpaceId` ist für eine langlebige Embedded-Instanz ein monoton reservierter `u64`; die bisherige `u16`-Grenze und Wiederverwendung nach Catalog-Trim sind ausgeschlossen | PORTS, CATALOG, CODEC, ERASE, RECOVERY | P0/G-F | `reserve_space_ids` ist vor Vergabe durabel; alle Space-Frames, Catalog-Tags, Gates und Tomb-HMACs nutzen eine kanonische 64-Bit-ID; Crash-/Restore-Vektoren beweisen keine Wiedervergabe und `Exhausted` statt Wrap |
 | A-24 | Lokaler `LOCK` verhindert keine zwei aktiven Kopien einer restaurierten `InstanceId`; Rollback-Anchor ist kein Eigentümer-Lease | RECOVERY, CKPT, CUTOVER | P0/P8+ | Schreibender Restore erhält externen Fencing-Nachweis; Zwei-Host-Rehearsal weist eine aktive Kopie nach, die zweite bleibt `RestoreQuarantine` |
 
+## R8.1-Querschnittsverträge
+
+| Ziel | Besitzer-SP | Abnahme |
+|---|---|---|
+| `DataClass`-Enum und Vor-I/O-Validierung; keine implizite PII-Erkennung oder Herabstufung | PORTS, FACADE, COMMIT | Personal-Kombinationen und Export-/Space-Übergänge sind typisiert und vor Mutation abgewiesen |
+| Erase-Metriken für Gate/KeyDestroy/Purge, endliche Label-Allowlist, leakagefreier Inspector und sichere Fehlerhinweise | PORTS, FACADE, ERASE, VERIFY | unbekannte Namen/Labels verworfen; keine Kennungen/Inhalte; Observer-Ausfall verändert keine Commit-/Erase-Semantik |
+| Open-Core-Technikgrenze und optionale kommerzielle Adapter ohne semantische Abhängigkeit | PORTS, BRIDGE, CUTOVER | offenes Format, lokaler Betrieb, Export/Restore und Konformanz ohne kommerzielle Adapter möglich |
+| RAG Ende-zu-Ende: atomare kanonische Records, durable Watermarks, prefilter, Gate-Filter, Delta/Fallback und gemeinsames Budget | COMMIT, EXT, READ, FACADE | Index hinter Watermark meldet Lag oder schließt Lücke; keine gated Treffer, kein unbeschränktes Budget |
+
 ## Gate-Auswertung
 
 - **G-0:** A-01/A-09/A-11 benötigen stabile Ports-Entscheidungen und klare Rückruf-/Budgetverträge; A-12 ist Teil des Architekturchecks.
-- **G-F:** A-01/A-02/A-03/A-04/A-07/A-09 sind in Format, Tag- und Receipt-Freeze zu berücksichtigen.
+- **G-F:** A-01/A-02/A-03/A-04/A-07/A-09/A-15/A-18/A-19/A-23 sind in Format-, Tag-, AAD- und Receipt-Freeze zu berücksichtigen. Insbesondere werden Systemspace-Belegung, `SpaceId u64` samt Allocator, Domain-Separation/Byteordnung aller Ledger-HMACs und Request-Digests, Receipt-Status/Canonicalisierung sowie Purge-Batch-/Graveyard-Tags und Extension-Manifest-/Attestationsformat eingefroren. Es gibt kein G-F bei `SpaceId u16` in Ports oder einem Wire-Codec.
 - **G-W bis G-P:** restliche Abnahmen folgen dem Besitzer-SP und den Test-/Soak-Gates aus SPEC §13–14.
 - Eine Zeile gilt erst als erledigt, wenn Code, Testreferenz mit A-ID und Gate-Evidenz vorhanden sind.
 
@@ -89,7 +98,7 @@ Zahlen wie „12 GB/s pro Kern“, „2,5–4× Zstd“ oder „70 % Speicherers
 
 **Vor G-0:** API- und Modellreview für A-01–A-13; klare Zusageebenen `Core`, `Registered Extension`, `Gesamtsystem`; Resource-Budget-Ports; Key-Statusmodell inklusive `Unavailable`, `Destroyed`, `Disabled`, `Lost`.
 
-**Vor G-F:** Golden Vectors/Feature-Bits für `SYS_IDEM`, `ForkPoint`/Merge-Basis, Blob-Repack mit neuer Blob-ID/Offsets, Extension-Klassen/Atteste und Receipt-Bridge. `COMPRESSION=0` und Bloom `filter_kind=1` sind die einzigen v1-Werte. Hole-Punch, AES-Hardware und spätere Kompression dürfen nicht als implizite Plattformannahmen im Format stecken.
+**Vor G-F:** Golden Vectors/Feature-Bits für Systemspace-Belegung samt `SpaceId u64`/Reservierung, `SYS_IDEM`, `ForkPoint`/Merge-Basis/ChangeIndex, Blob-Repack mit stabiler Record-AAD, Extension-Klassen/Atteste, Ledger- und Request-HMAC-Domänen/Byteordnung, Receipt-Status und -Canonicalisierung sowie Purge-Batch-/Graveyard-Ablauf. `COMPRESSION=0` und Bloom `filter_kind=1` sind die einzigen v1-Werte. Hole-Punch, AES-Hardware und spätere Kompression dürfen nicht als implizite Plattformannahmen im Format stecken.
 
 **Vor G-E:** Fault-Sweep Ledger-Intent append/sync → Catalog-Gate → `GateApplied` → Anchor-CAS → `KeyDestroyIntent` → KMS destroy/probe → PurgeBatchEdit/Repack → Reader-Drain → Unlink+`sync_dir` → UnlinkAck → Extension-Attest → finaler Complete-Edit → Receipt-Signatur. Restore aus Backups vor/nach jedem durablem Präfix; zusätzlich Extension-Ausfall, fehlender Scratch, aktiver Cursor/Reader und Anker-Ausfall. Jede Injektion prüft Vorwärtskonvergenz vor Open, Statusmonotonie und dass kein Ticket vor erfüllten Attesten `Done` wird.
 

@@ -8,6 +8,8 @@ use std::sync::{Arc, Condvar, Mutex};
 
 const IO: IoCtx = IoCtx { role: FileRole::Run, purpose: "run_table_cache_open" };
 
+pub(crate) fn run_io() -> IoCtx { IoCtx { role: FileRole::Run, purpose: "run_table_read" } }
+
 struct Entry { file: Arc<dyn File>, last_used: u64 }
 #[derive(Default)]
 struct State {

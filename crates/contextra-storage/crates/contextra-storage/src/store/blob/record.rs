@@ -1,15 +1,23 @@
 //! Position-independent blob record framing from R8 §5.7.
 
 use contextra_storage_ports::Error;
+use core::fmt;
 use zeroize::Zeroizing;
 
 pub const RECORD_UID_LEN: usize = 16;
 pub const RECORD_OVERHEAD: usize = RECORD_UID_LEN + 4 + 4;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct BlobRecord {
     pub record_uid: [u8; RECORD_UID_LEN],
     pub seal_frame: Zeroizing<Vec<u8>>,
+}
+
+impl fmt::Debug for BlobRecord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BlobRecord").field("record_uid", &"<redacted>")
+            .field("seal_frame", &"<redacted>").finish()
+    }
 }
 
 impl BlobRecord {
