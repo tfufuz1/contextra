@@ -1,0 +1,12 @@
+[package]
+name = "contextra-keys-cohort"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+contextra-storage-ports = { path = "../contextra-storage-ports" }
+
+[lints]
+workspace = true

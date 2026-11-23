@@ -1,0 +1,18 @@
+[package]
+name = "contextra-storage"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[features]
+testing = []
+
+[dependencies]
+contextra-storage-ports = { path = "../contextra-storage-ports" }
+bytes = "1"
+thiserror = "1"
+zeroize = "1"
+
+[lints]
+workspace = true

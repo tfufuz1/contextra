@@ -1,0 +1,13 @@
+[package]
+name = "contextra-storage-bridge"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+contextra-storage-ports = { path = "../contextra-storage-ports" }
+contextra-storage = { path = "../contextra-storage" }
+
+[lints]
+workspace = true
