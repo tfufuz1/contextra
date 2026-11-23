@@ -3,6 +3,11 @@
 //! Portabler, sicherer Prüfsummenalgorithmus ohne externe Abhängigkeiten (SD-64).
 //! Polynom: 0x82F63B78 (reflektiert).
 //!
+//! Diese Funktion ist die **Standardimplementierung** des `Checksum`-Ports (SPEC §4):
+//! `crc32c(seed, data)` entspricht `Checksum::crc32c`. Kopfprüfwerte im Codec werden nicht
+//! hier berechnet, sondern über einen Parameter, der die Port-Funktion durchreicht
+//! (siehe `codec::format_header`). Beschleunigte Varianten müssen dieselben Goldens bestehen (SD-64).
+//!
 //! Verifiziert gegen Referenzvektoren aus SPEC Anhang A.1:
 //! - CRC32C("123456789", 0) = 0xE3069283
 //! - CRC32C("", 0) = 0x00000000

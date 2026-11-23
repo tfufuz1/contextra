@@ -1,6 +1,9 @@
 #![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
 use contextra_storage::codec::bloom::BloomFilter;
+use contextra_storage::codec::comparator::EntryKey;
+use contextra_storage::codec::crc32c::crc32c;
+use contextra_storage::codec::format_header::decode_format_plain;
 use contextra_storage::codec::tag::{InternalKey, Tag, TagKind};
 use contextra_storage::codec::varint::{decode_u64, encode_u64};
 use proptest::prelude::*;
@@ -78,3 +81,35 @@ proptest! {
         let _ = BloomFilter::decode(&bytes);
     }
 }
+
+proptest! {
+    // 6. Property: FORMAT-Dekodierung ist total (P-4): Ok oder Err, nie Panik.
+    #[test]
+    fn prop_format_decode_total(bytes in proptest::collection::vec(any::<u8>(), 0..80)) {
+        let _ = decode_format_plain(&bytes, &crc32c);
+    }
+
+    // 7. Property: Comparator (§6.2) ist antisymmetrisch und folgt der Feldordnung
+    //    (Cluster ↑, Schlüssel ↑ bytelexikografisch, Tag ↓).
+    #[test]
+    fn prop_entry_key_order(
+        ca in any::<u8>(), cb in any::<u8>(),
+        ka in proptest::collection::vec(any::<u8>(), 0..8),
+        kb in proptest::collection::vec(any::<u8>(), 0..8),
+        sa in 1u64..1000, sb in 1u64..1000,
+    ) {
+        use contextra_storage::codec::tag::{Tag, TagKind};
+        use std::cmp::Ordering;
+        let a = EntryKey { cluster: [ca; 16], user_key: &ka, tag: Tag::new(sa, TagKind::Put) };
+        let b = EntryKey { cluster: [cb; 16], user_key: &kb, tag: Tag::new(sb, TagKind::Put) };
+        prop_assert_eq!(a.cmp(&b), b.cmp(&a).reverse());
+        let expected = ca.cmp(&cb)
+            .then_with(|| ka.cmp(&kb))
+            .then_with(|| sb.cmp(&sa));
+        prop_assert_eq!(a.cmp(&b), expected);
+        if expected == Ordering::Equal {
+            prop_assert_eq!(a, b);
+        }
+    }
+}
+

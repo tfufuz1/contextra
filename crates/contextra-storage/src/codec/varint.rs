@@ -1,6 +1,6 @@
 //! # Kanonischer Varint (LEB128 für u64)
 //!
-//! Normative Regeln (INV-FMT-1, SPEC §9.1):
+//! Normative Regeln (INV-FMT-1, SPEC §10.1):
 //! - Nur kanonische Kodierungen sind gültig.
 //! - Keine überflüssigen Fortsetzungen (`0x80 ... 0x00`).
 //! - Das zehnte Byte darf ausschließlich `0x01` sein.
@@ -130,5 +130,25 @@ mod tests {
         assert_eq!(decode_u64(&[0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x02]), Err(VarintError::NonCanonical));
         assert_eq!(decode_u64(&[]), Err(VarintError::UnexpectedEof));
         assert_eq!(decode_u64(&[0x80]), Err(VarintError::UnexpectedEof));
+    }
+
+    #[test]
+    fn test_randfall_zweierpotenz_63_ist_zehn_bytes() {
+        // 2^63 belegt 10 Bytes: neun Fortsetzungsbytes 0x80, dann 0x01.
+        let mut buf = [0u8; 10];
+        let len = encode_u64(1u64 << 63, &mut buf);
+        assert_eq!(&buf[..len], &[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01]);
+        assert_eq!(decode_u64(&buf[..len]), Ok((1u64 << 63, 10)));
+    }
+
+    #[test]
+    fn test_randfall_nicht_kanonisch_endet_auf_null() {
+        // Überflüssiges Null-Endbyte nach einer Fortsetzung ist nicht kanonisch.
+        assert_eq!(decode_u64(&[0x80, 0x80, 0x00]), Err(VarintError::NonCanonical));
+        // Zehntes Byte 0x81 (Fortsetzungsbit gesetzt) ist ungültig.
+        assert_eq!(
+            decode_u64(&[0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x81]),
+            Err(VarintError::NonCanonical)
+        );
     }
 }

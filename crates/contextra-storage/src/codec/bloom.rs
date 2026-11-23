@@ -1,6 +1,6 @@
 //! # Bloom-Filter
 //!
-//! Doppel-Hashing über XXH64 nach SPEC §9.5 und Anhang A.6.
+//! Doppel-Hashing über XXH64 nach SPEC §10.5.1 und Anhang A.1.
 //! Layout: `k u8 | nbits u64 | bits[nbits / 8]`
 //! Keine Integer-Casts (M-02 = 0).
 
@@ -9,12 +9,15 @@ use std::fmt;
 
 const SEED2: u64 = 0x9E3779B97F4A7C15;
 
+/// Hashanzahl laut SPEC §10.5.1 (fest, nicht konfigurierbar im Format).
+pub const FORMAT_K: u8 = 7;
+
 /// Fehler beim Dekodieren eines Bloom-Filters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BloomError {
     /// Puffer zu kurz für Header oder Bits.
     UnexpectedEof,
-    /// Ungültiges k oder unpassende Bitanzahl.
+    /// `k` abweichend von 7, `nbits` kleiner als 64 oder kein Vielfaches von 64, oder falsche Bitlänge.
     Corrupt,
 }
 
@@ -60,7 +63,7 @@ impl BloomFilter {
         Self { k, nbits, bits }
     }
 
-    /// Kodiert den Bloom-Filter in ein Byte-Vektor nach SPEC §9.5.
+    /// Kodiert den Bloom-Filter in ein Byte-Vektor nach SPEC §10.5.1.
     ///
     /// Layout: `k u8 | nbits u64 | bits`
     pub fn encode(&self) -> Vec<u8> {
@@ -81,8 +84,8 @@ impl BloomFilter {
         if bytes.len() < 9 {
             return Err(BloomError::UnexpectedEof);
         }
-        let k = *bytes.get(0).ok_or(BloomError::UnexpectedEof)?;
-        if k == 0 {
+        let k = *bytes.first().ok_or(BloomError::UnexpectedEof)?;
+        if k != FORMAT_K {
             return Err(BloomError::Corrupt);
         }
 
@@ -90,6 +93,10 @@ impl BloomFilter {
         let nbits_slice = bytes.get(1..9).ok_or(BloomError::UnexpectedEof)?;
         nbits_arr.copy_from_slice(nbits_slice);
         let nbits = u64::from_le_bytes(nbits_arr);
+        // SPEC §10.5.1: nbits = max(64, ...) aufgerundet auf ein Vielfaches von 64.
+        if nbits < 64 || nbits % 64 != 0 {
+            return Err(BloomError::Corrupt);
+        }
 
         let expected_bytes = usize::try_from(nbits.div_ceil(8)).map_err(|_| BloomError::Corrupt)?;
         let bits_slice = bytes.get(9..).ok_or(BloomError::UnexpectedEof)?;
@@ -107,6 +114,10 @@ impl BloomFilter {
 
     /// Fügt einen Nutzerschlüssel in den Bloom-Filter ein.
     pub fn insert(&mut self, key: &[u8]) {
+        if self.nbits == 0 {
+            // Ein Filter ohne Bits kann nichts aufnehmen (kein Division durch 0).
+            return;
+        }
         let h1 = xxh64(key, 0);
         let h2 = xxh64(key, SEED2) | 1;
 

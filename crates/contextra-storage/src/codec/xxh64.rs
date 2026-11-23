@@ -1,10 +1,11 @@
 //! # XXH64
 //!
-//! Portables 64-Bit-XXHash nach Spezifikation (SD-04, SPEC §9.1).
+//! Portables 64-Bit-XXHash nach Spezifikation (SD-04, SPEC §10.5.1, Anhang A.1).
 //! Verifiziert gegen Referenzvektoren aus SPEC Anhang A.1:
 //! - XXH64("", 0) = 0xEF46DB3751D8E999
 //! - XXH64("a", 0) = 0xD24EC4F1A98C6E5B
 //! - XXH64("abc", 0) = 0x44BC2CF5AD770999
+//!
 //! Keine Integer-Casts (M-02 = 0).
 
 
