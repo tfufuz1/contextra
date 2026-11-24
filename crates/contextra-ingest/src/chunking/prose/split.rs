@@ -1,12 +1,19 @@
+//! Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Aufspaltung übergroßer Blöcke (Code, Tabelle, Absatz, Liste) über dem Hard-Limit (WP M3 / SPEC C-11.7).
 // INVARIANTEN: Zero-Panic, UTF-8-sicher, Sprachsynthese von Code-Fences und Tabellenköpfen, Deterministisch.
 // STAND: TS:2026-10-31T00:00:00Z
 
-use crate::chunking::common::{token_count, window_split};
-use crate::chunking::config::ChunkingConfig;
 use super::markdown_parse::ParsedListItem;
 use super::sentence::{split_sentences, SentenceSpan};
+use crate::chunking::common::{token_count, window_split};
+use crate::chunking::config::ChunkingConfig;
 use crate::chunking::ChunkDraft;
 use crate::ir::Locator;
 use serde_json::{Map, Value};
@@ -14,6 +21,8 @@ use std::ops::Range;
 
 /// Kontextdaten für das Aufspalten übergroßer Blöcke.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-ingest:CHK-0230]
+// struct `SplitContext` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub struct SplitContext<'a> {
     pub span: Range<usize>,
     pub locator: Locator,
@@ -24,6 +33,8 @@ pub struct SplitContext<'a> {
 }
 
 /// Erzeugt Teil-Drafts für einen übergroßen Codeblock.
+// ANCHOR[contextra-ingest:CHK-0231]
+// fn `split_oversized_code` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub fn split_oversized_code(
     fence_head: &str,
     fence_tail: &str,
@@ -109,6 +120,8 @@ pub fn split_oversized_code(
 }
 
 /// Erzeugt Teil-Drafts für eine übergroße Tabelle.
+// ANCHOR[contextra-ingest:CHK-0232]
+// fn `split_oversized_table` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub fn split_oversized_table(
     header_lines: &[String],
     body_lines: &[String],
@@ -203,10 +216,9 @@ pub fn split_oversized_table(
 }
 
 /// Erzeugt Teil-Drafts für eine übergroße Liste an Item-Grenzen.
-pub fn split_oversized_list(
-    items: &[ParsedListItem],
-    sctx: &SplitContext<'_>,
-) -> Vec<ChunkDraft> {
+// ANCHOR[contextra-ingest:CHK-0233]
+// fn `split_oversized_list` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
+pub fn split_oversized_list(items: &[ParsedListItem], sctx: &SplitContext<'_>) -> Vec<ChunkDraft> {
     let mut drafts = Vec::new();
     let mut current_items = Vec::new();
     let mut current_tokens = 0usize;
@@ -223,8 +235,14 @@ pub fn split_oversized_list(
                 .collect::<Vec<_>>()
                 .join("\n");
 
-            let start_span = items_buf.first().map(|i| i.span.start).unwrap_or(sctx.span.start);
-            let end_span = items_buf.last().map(|i| i.span.end).unwrap_or(sctx.span.end);
+            let start_span = items_buf
+                .first()
+                .map(|i| i.span.start)
+                .unwrap_or(sctx.span.start);
+            let end_span = items_buf
+                .last()
+                .map(|i| i.span.end)
+                .unwrap_or(sctx.span.end);
 
             target.push(ChunkDraft {
                 text: combined_text,
@@ -269,10 +287,9 @@ pub fn split_oversized_list(
 }
 
 /// Erzeugt Teil-Drafts für einen übergroßen Absatz.
-pub fn split_oversized_paragraph(
-    para_text: &str,
-    sctx: &SplitContext<'_>,
-) -> Vec<ChunkDraft> {
+// ANCHOR[contextra-ingest:CHK-0234]
+// fn `split_oversized_paragraph` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
+pub fn split_oversized_paragraph(para_text: &str, sctx: &SplitContext<'_>) -> Vec<ChunkDraft> {
     let mut drafts = Vec::new();
     let sentences = split_sentences(para_text, sctx.span.start);
 
@@ -296,7 +313,10 @@ pub fn split_oversized_paragraph(
     let flush_para = |sents: &mut Vec<SentenceSpan>, target: &mut Vec<ChunkDraft>| {
         if !sents.is_empty() {
             let combined_text: String = sents.iter().map(|s| s.text.as_str()).collect();
-            let start_span = sents.first().map(|s| s.span.start).unwrap_or(sctx.span.start);
+            let start_span = sents
+                .first()
+                .map(|s| s.span.start)
+                .unwrap_or(sctx.span.start);
             let end_span = sents.last().map(|s| s.span.end).unwrap_or(sctx.span.end);
 
             target.push(ChunkDraft {
@@ -363,10 +383,13 @@ pub fn split_oversized_paragraph(
             continue;
         }
 
-        if current_tokens.saturating_add(sent_tok) > sctx.hard_limit && !current_sentences.is_empty() {
+        if current_tokens.saturating_add(sent_tok) > sctx.hard_limit
+            && !current_sentences.is_empty()
+        {
             flush_para(&mut current_sentences, &mut drafts);
 
-            let overlap_count = calculate_sentence_overlap(&current_sentences, sctx.cfg.overlap_pct);
+            let overlap_count =
+                calculate_sentence_overlap(&current_sentences, sctx.cfg.overlap_pct);
             let keep_start = current_sentences.len().saturating_sub(overlap_count);
             current_sentences = current_sentences.get(keep_start..).unwrap_or(&[]).to_vec();
 
@@ -385,10 +408,7 @@ pub fn split_oversized_paragraph(
     drafts
 }
 
-fn calculate_sentence_overlap(
-    sentences: &[SentenceSpan],
-    overlap_pct: u32,
-) -> usize {
+fn calculate_sentence_overlap(sentences: &[SentenceSpan], overlap_pct: u32) -> usize {
     if sentences.is_empty() || overlap_pct == 0 {
         return 0;
     }

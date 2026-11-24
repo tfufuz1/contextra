@@ -1,4 +1,16 @@
-use contextra_types::TxId;
+//! MVCC-Sichtbarkeitsprüfungen und Transaktionsfilterung für Graphelemente.
+//!
+//! # Zweck
+//! Entscheidet, ob eine Kante oder ein Knoten zum Transaktionszeitpunkt `at_tx` sichtbar ist.
+
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+use crate::types::TxId;
 
 /// Untere Schranke für Wall-Clock-abgeleitete TxId-Heuristik.
 ///
@@ -8,6 +20,9 @@ use contextra_types::TxId;
 /// TxId-Origin-Invariant (AGT-GRAPH-001).
 ///
 /// Wert gewählt als `1_400_000_000 * 1_000_000_000` (1. Jan 2014 UTC in ns).
+// ANCHOR[contextra-graph:SRC-CSR-VISIBILITY-001]
+
+// SECTION Visibility Core Implementation
 pub const WALLCLOCK_TX_HEURISTIC_MIN: u64 = 1_400_000_000_000_000_000;
 
 /// Prüft, ob `tx` aus einem verdächtigen (wall-clock-ähnlichen) Bereich stammt.
@@ -28,6 +43,7 @@ pub const WALLCLOCK_TX_HEURISTIC_MIN: u64 = 1_400_000_000_000_000_000;
 /// ANWEISUNG: Bei verdächtigen TxIds => tracing::warn! loggen. In Debug-Builds schlägt debug_assert! fehl.
 /// ID: AGT-GRAPH-001
 #[inline]
+// ANCHOR[contextra-graph:SRC-CSR-VISIBILITY-002]
 pub fn is_suspicious_tx_id(tx: TxId) -> bool {
     let v = tx.inner();
     v == 0 || (WALLCLOCK_TX_HEURISTIC_MIN..TxId::INTERNAL_BASE).contains(&v)
@@ -35,6 +51,7 @@ pub fn is_suspicious_tx_id(tx: TxId) -> bool {
 
 /// Prüft ob eine Kante bezogen auf die Transaktionszeit (MVCC / Systemzeit) zum Zeitpunkt `as_of` sichtbar ist.
 #[inline]
+// ANCHOR[contextra-graph:SRC-CSR-VISIBILITY-003]
 pub fn is_edge_visible(
     tx_valid_from: Option<TxId>,
     tx_valid_to: Option<TxId>,
@@ -45,6 +62,7 @@ pub fn is_edge_visible(
 
 /// Prüft ob eine Kante bezogen auf die Businesszeit zum Zeitpunkt `business_as_of` gültig ist.
 #[inline]
+// ANCHOR[contextra-graph:SRC-CSR-VISIBILITY-004]
 pub fn is_edge_visible_business(
     business_valid_from: Option<i64>,
     business_valid_to: Option<i64>,
@@ -59,6 +77,7 @@ pub fn is_edge_visible_business(
 /// Business-Zeit wird nur ausgewertet, wenn `business_as_of` angegeben ist UND mindestens
 /// ein Business-Zeit-Feld (`business_valid_from` oder `business_valid_to`) auf der Kante gesetzt ist.
 #[inline]
+// ANCHOR[contextra-graph:SRC-CSR-VISIBILITY-005]
 pub fn is_edge_visible_bitemporal(
     tx_valid_from: Option<TxId>,
     tx_valid_to: Option<TxId>,
@@ -77,3 +96,5 @@ pub fn is_edge_visible_bitemporal(
     }
     true
 }
+
+// !SECTION Visibility Core Implementation

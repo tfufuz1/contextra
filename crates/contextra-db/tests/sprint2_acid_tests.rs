@@ -54,7 +54,7 @@ async fn test_drop_collection_frees_storage() {
 
     // 2. Collection droppen
     let tenant_id = TenantId::try_new(1).unwrap();
-    db.drop_collection("to_drop", tenant_id, &[0u8; 32])
+    db.drop_collection("to_drop", tenant_id)
         .await
         .expect("drop collection");
 
@@ -82,13 +82,15 @@ async fn test_drop_collection_frees_storage() {
 async fn test_drop_default_collection_is_rejected() {
     let (db, _tmp) = setup_db(3).await;
     let tenant_id = TenantId::try_new(1).unwrap();
-    let result = db.drop_collection("default", tenant_id, &[0u8; 32]).await;
+    let result = db.drop_collection("default", tenant_id).await;
     assert!(
         result.is_err(),
         "Dropping the default collection must return an error"
     );
 }
 
+// ANCHOR[contextra-db:TEST-SPRINT2_ACID_TESTS-01-TEST_DROP_COLLECTION_REMOVES_ALL_DATA]
+// Testet die Funktionalität von `test_drop_collection_removes_all_data`.
 #[tokio::test]
 async fn test_drop_collection_removes_all_data() {
     let (db, _tmp) = setup_db(3).await;
@@ -113,7 +115,7 @@ async fn test_drop_collection_removes_all_data() {
 
     // 2. drop_collection() aufrufen
     let tenant_id = TenantId::try_new(1).unwrap();
-    db.drop_collection(name, tenant_id, &[0u8; 32])
+    db.drop_collection(name, tenant_id)
         .await
         .expect("drop collection");
 
@@ -136,6 +138,8 @@ async fn test_drop_collection_removes_all_data() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-SPRINT2_ACID_TESTS-02-TEST_PARTIAL_COMPACTION_PRESERVES_TOMBSTONES]
+// Testet die Funktionalität von `test_partial_compaction_preserves_tombstones`.
 #[tokio::test]
 async fn test_partial_compaction_preserves_tombstones() {
     use contextra_store::{CompactionConfig, LsmConfig};

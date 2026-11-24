@@ -1,5 +1,9 @@
+//! # MemTable-Flush-Mechanismus (Ring 1)
+//!
+//! Schreibt volle MemTables als neue L0-SSTables asynchron auf Platte.
+
 use super::*;
-use contextra_types::Result;
+use crate::error::StoreResult as Result;
 
 impl LsmStorage {
     pub async fn force_flush(&self) -> Result<()> {

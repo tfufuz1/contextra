@@ -10,6 +10,8 @@ use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -82,7 +84,7 @@ async fn test_hnsw_recall_matrix() {
     let dimensions = [64, 128, 384, 768, 1536];
     let k_values = [1, 5, 10, 50];
 
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(0x4321_8765_ABCD_EF01);
 
     println!("\n=== HNSW RECALL AUDIT MATRIX ===");
     println!("N\tDim\tk=1\tk=5\tk=10\tk=50");
@@ -158,7 +160,7 @@ async fn test_diskann_recall_matrix() {
     let dataset_sizes = [100, 1000];
     let dimensions = [64, 128, 384];
 
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(0x4321_8765_ABCD_EF01);
 
     println!("\n=== DISKANN RECALL AUDIT MATRIX ===");
     println!("N\tDim\tRecall@10");
@@ -216,7 +218,7 @@ async fn test_diskann_recall_matrix() {
 async fn test_insert_order_insensitivity() {
     let dim = 128;
     let n = 300;
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(0x4321_8765_ABCD_EF01);
 
     let mut vectors = Vec::with_capacity(n);
     let mut ids = Vec::with_capacity(n);

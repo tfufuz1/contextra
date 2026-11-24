@@ -1,3 +1,7 @@
+//! # Doppelter Trigger-Schutz bei Gedächtniskonsolidierung
+//!
+//! Verifiziert, dass parallele Konsolidierungs-Trigger idempotent und sperrfrei behandelt werden.
+//!
 // FILE-CONTEXT
 // ZWECK: Integrierter Test zur Verifizierung des Double-Trigger-Schutzes zwischen ConsolidationEngine und MaintenanceScheduler.
 // INVARIANTEN: P14-Compliance (Zuständigkeiten dokumentiert & koordiniert); M-1 double-trigger protection.
@@ -17,6 +21,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-db:TEST-CONSOLIDATION_DOUBLE_TRIGGER_TEST-01-CREATE_TEST_COLLECTION]
+// Testet die Funktionalität von `create_test_collection`.
 async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir) {
     let dir = tempdir().expect("tempdir");
     let storage = Arc::new(
@@ -49,6 +55,8 @@ async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, te
     (col, dir)
 }
 
+// ANCHOR[contextra-db:TEST-CONSOLIDATION_DOUBLE_TRIGGER_TEST-02-TEST_CONSOLIDATION_DOUBLE_TRIGGER_MUTUAL_EXCLUSION]
+// Testet die Funktionalität von `test_consolidation_double_trigger_mutual_exclusion`.
 #[tokio::test]
 async fn test_consolidation_double_trigger_mutual_exclusion() {
     let (col, _dir) = create_test_collection().await;
@@ -128,6 +136,8 @@ async fn test_consolidation_double_trigger_mutual_exclusion() {
     cancel_token.cancel();
 }
 
+// ANCHOR[contextra-db:TEST-CONSOLIDATION_DOUBLE_TRIGGER_TEST-03-TEST_CONSOLIDATION_LOCK_GUARD_PANIC_SAFETY]
+// Testet die Funktionalität von `test_consolidation_lock_guard_panic_safety`.
 #[tokio::test]
 async fn test_consolidation_lock_guard_panic_safety() {
     let (col, _dir) = create_test_collection().await;

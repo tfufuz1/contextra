@@ -1,9 +1,17 @@
+//! # Integrationstest: filter metadata eval
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_types::FilterExpr;
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST16-001]
+/// Testblock zur Überprüfung von `test_filter_metadata_expression_evaluation_and_error_paths`.
 #[tokio::test]
 async fn test_filter_metadata_expression_evaluation_and_error_paths() -> contextra_types::Result<()>
 {

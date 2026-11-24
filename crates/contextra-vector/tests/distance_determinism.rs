@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: Proptest-Verifikation der numerischen Äquivalenz von SIMD- und Skalarkernen.
+// INVARIANTEN: Relative Differenz |SIMD - Skalar| <= EPSILON * sqrt(len).
+// HOTSPOTS: 15-60
+// STAND: 2026-11-12
 use contextra_types::DistanceMetric;
 use contextra_vector::distance::{
     compute_distance, cosine_distance_scalar, dot_product_scalar, euclidean_distance_scalar,

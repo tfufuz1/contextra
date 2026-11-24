@@ -1,3 +1,5 @@
+// FILE-CONTEXT
+// ZWECK: Skalar-Referenztests fuer alle Kernel, ISA-Pfade, Kantenlaengen und Unaligned-Slices.
 
 //! # Kernel-Referenztests: `kernel_reference_tests`
 //!
@@ -60,6 +62,7 @@ where
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-REF-EXPLICIT-LENGTHS-F32]
 // Prueft L2, Cosine und Dot Product fuer explizite Kantenlaengen 0, 1, 7, 8, 15, 16, 31, 33 gegen Skalar-Referenz.
 fn test_explicit_lengths_f32_all_kernels() {
     run_across_isa_targets(|dispatcher| {
@@ -111,6 +114,7 @@ fn test_explicit_lengths_f32_all_kernels() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-REF-EXPLICIT-LENGTHS-F32-BYTES]
 // Prueft f32_bytes-Kernel fuer explizite Kantenlaengen 0, 1, 7, 8, 15, 16, 31, 33 gegen Skalar-Referenz.
 fn test_explicit_lengths_f32_bytes_all_kernels() {
     run_across_isa_targets(|dispatcher| {
@@ -153,6 +157,7 @@ fn test_explicit_lengths_f32_bytes_all_kernels() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-REF-EXPLICIT-LENGTHS-U8]
 // Prueft u8-Kernel fuer explizite Kantenlaengen 0, 1, 7, 8, 15, 16, 31, 33 auf bitgenaue Gleichheit.
 fn test_explicit_lengths_u8_all_kernels() {
     run_across_isa_targets(|dispatcher| {
@@ -180,6 +185,7 @@ fn test_explicit_lengths_u8_all_kernels() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-REF-UNALIGNED-SLICES]
 // Prueft unaligned Slices mit wechselnden Byte- und Element-Offsets (1..7) fuer alle Kantenlaengen.
 fn test_unaligned_slices_all_lengths() {
     run_across_isa_targets(|dispatcher| {
@@ -248,6 +254,7 @@ fn test_unaligned_slices_all_lengths() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-PROPTEST-FIXED-SEED-F32]
 // Proptest mit festem deterministischem Seed fuer Zufallseingaben ueber variable Laengen.
 fn test_proptest_fixed_seed_f32() {
     let fixed_seeds = [[0x42; 32], [0x99; 32], [0xAA; 32]];
@@ -304,6 +311,7 @@ fn test_proptest_fixed_seed_f32() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-PROPTEST-FIXED-SEED-U8]
 // Proptest mit festem deterministischem Seed fuer u8-Zufallseingaben.
 fn test_proptest_fixed_seed_u8() {
     let fixed_seeds = [[0x17; 32], [0x55; 32], [0xFE; 32]];

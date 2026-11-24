@@ -1,8 +1,65 @@
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+// ANCHOR[contextra-graph:SRC-CSR-PATH-GRAPH-001]
+//! Implementierung des `PathGraph`-Traits für den CSR-Graphen.
+//!
+//! # Zweck
+//! Stellt standardisierte Nachbarschafts-Iteratoren für die Path-RAG-Engine bereit.
+
 use std::sync::Arc;
 
-use contextra_types::EntityId;
+use crate::types::EntityId;
 
 use super::graph_write::CsrGraph;
+
+
+// SECTION Path Graph Core Implementation
+#[cfg(any(feature = "types-compat", feature = "ports-compat"))]
+impl crate::provider::GraphProvider for CsrGraph {
+    fn node_ids(&self) -> Vec<EntityId> {
+        let inner = self.inner_read();
+        let mut ids = Vec::new();
+        for (idx, &eid) in inner.reverse_map.iter().enumerate() {
+            if inner.entity_at(idx).is_some() {
+                ids.push(eid);
+            }
+        }
+        ids
+    }
+
+    fn contains_node(&self, node: EntityId) -> bool {
+        let inner = self.inner_read();
+        inner
+            .id_map
+            .get(&node)
+            .and_then(|&idx| inner.entity_at(idx))
+            .is_some()
+    }
+
+    fn outgoing_edges(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+        <Self as crate::path_rag::PathGraph>::neighbors_with_weights(self, node)
+    }
+
+    fn incoming_edges(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+        <Self as crate::path_rag::PathGraph>::predecessors_with_weights(self, node)
+    }
+
+    fn hyperedges_for_entity(&self, node: EntityId) -> Vec<crate::hyperedge::HyperEdgeId> {
+        self.hyperedges_for_entity(node)
+    }
+
+    fn get_hyperedge(
+        &self,
+        id: crate::hyperedge::HyperEdgeId,
+    ) -> Option<Arc<crate::hyperedge::HyperEdge>> {
+        self.get_hyperedge(id)
+    }
+}
 
 impl crate::path_rag::PathGraph for CsrGraph {
     fn neighbors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)> {
@@ -151,3 +208,5 @@ impl crate::path_rag::PathGraph for Arc<CsrGraph> {
         self.as_ref().get_hyperedge(id)
     }
 }
+
+// !SECTION Path Graph Core Implementation

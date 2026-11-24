@@ -1,3 +1,7 @@
+//! # Benchmark: WAL Schreibdurchsatz
+//!
+//! Testet Append- und fsync-Performance des Write-Ahead-Logs unter Last.
+
 use contextra_store::wal::{KeyManager, Wal, WalConfig, WalFlusherConfig, WalOp};
 use contextra_types::TxId;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};

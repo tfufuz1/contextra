@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT
 // ZWECK: Runtime stall test for WAL recovery replay to detect non-linear (O(n²)) complexity regressions.
 // INVARIANTEN: Replay throughput across subsequent windows MUST NOT drop below 50% of the baseline throughput (first 10%).

@@ -1,3 +1,17 @@
+//! # Integrationstest: Semantische Aggregations-Fassade (`tests/semantic_aggregation_facade.rs`)
+//!
+//! Validiert die freie Fassadenfunktion `consolidate_semantic_hyperedges` zur
+//! Hyperkanten-Konsolidierung (LeanRAG Stage 3) unter Einhaltung von Budgetgrenzen und Seed-Determinismus.
+
+
+// FILE-CONTEXT
+// ZWECK: Tests fuer die Fassadenschnittstelle der semantischen Aggregation.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Semantic Aggregation Facade Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -12,15 +26,15 @@
 
 use contextra_cognition::aggregation_phase::AggregationConfig;
 use contextra_cognition::consolidate_semantic_hyperedges;
-use contextra_engine::collection::Collection;
+use contextra_cognition::collection::Collection;
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
-use contextra_store::LsmStorage;
 use contextra_testkit::MockEmbedder;
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
 use contextra_types::{DocId, EntityId};
-use contextra_vector::HnswIndex;
+
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -51,24 +65,13 @@ impl LlmTextGenerator for CountingMockLlm {
     }
 }
 
-async fn create_test_collection(
-) -> Option<(Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir)> {
+async fn create_test_collection() -> Option<(
+    Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>,
+    tempfile::TempDir,
+)> {
     let dir = tempdir().ok()?;
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .ok()?,
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .ok()?,
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new(4));
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
@@ -79,11 +82,13 @@ async fn create_test_collection(
         graph,
         next_tx,
         4,
-        contextra_engine::Language::English,
+        contextra_text::Language::English,
     ));
     Some((col, dir))
 }
 
+// ANCHOR[contextra-cognition:TEST-SEMANTIC-086]
+// Prüft Testfall `test_consolidate_semantic_hyperedges_successful_clustering_and_superedge`.
 #[tokio::test]
 async fn test_consolidate_semantic_hyperedges_successful_clustering_and_superedge() {
     let (col, _dir) = match create_test_collection().await {
@@ -171,6 +176,8 @@ async fn test_consolidate_semantic_hyperedges_successful_clustering_and_superedg
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-SEMANTIC-087]
+// Prüft Testfall `test_consolidate_semantic_hyperedges_budget_exceeded_aborts_before_llm`.
 #[tokio::test]
 async fn test_consolidate_semantic_hyperedges_budget_exceeded_aborts_before_llm() {
     let (col, _dir) = match create_test_collection().await {
@@ -204,6 +211,8 @@ async fn test_consolidate_semantic_hyperedges_budget_exceeded_aborts_before_llm(
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-SEMANTIC-088]
+// Prüft Testfall `test_consolidate_semantic_hyperedges_deterministic_seed`.
 #[tokio::test]
 async fn test_consolidate_semantic_hyperedges_deterministic_seed() {
     let (col1, _dir1) = match create_test_collection().await {
@@ -296,3 +305,4 @@ async fn test_consolidate_semantic_hyperedges_deterministic_seed() {
         "Identical inputs with identical gmm_deterministic_seed must produce bit-identical results"
     );
 }
+// !SECTION: Semantic Aggregation Facade Tests

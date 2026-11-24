@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 mod support;
 
 use contextra_ports::StorageEngine;

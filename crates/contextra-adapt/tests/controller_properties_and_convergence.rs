@@ -1,4 +1,14 @@
-//! Deterministic tests for adaptive controllers, PID regulators, bandits, Lyapunov watchers, and shadow mode.
+#![allow(clippy::field_reassign_with_default, clippy::expect_used, clippy::unwrap_used, clippy::indexing_slicing, clippy::cast_sign_loss)]
+#![cfg(all(feature = "bandit-routing", feature = "flow-corrected-thompson"))]
+#![allow(clippy::field_reassign_with_default)]
+//! # Deterministische Eigenschafts- und Konvergenztests für Regler
+//!
+//! Überprüft Konvergenzeigenschaften, Schrittantworten und Invarianten aller
+//! adaptiven Controller in `contextra-adapt`:
+//! - PID-Controller und Anti-Windup-Schranken
+//! - Catoni M-Schätzer Einflussfunktionen
+//! - LinUCB- und FC-TS-Bandit-Konvergenz auf synthetischen Umgebungen
+//! - Shadow-Mode-Nichtbeeinflussungsinvariante
 
 use contextra_adapt::flow_thompson::{
     FcTsArmSet, FcTsConfig, FcTsRng, FlowCorrectedThompsonBandit, SplitMix64,
@@ -8,11 +18,11 @@ use contextra_adapt::pid_latency_controller::{
     LatencyBudgetGuard, PidLatencyController, MAX_SCALING_FACTOR, MIN_SCALING_FACTOR,
 };
 use contextra_adapt::shadow_mode::{ShadowDiscrepancy, ShadowSink};
+use contextra_adapt::Clock;
 use contextra_adapt::{
     AdaptiveDecayController, AntiWindupController, BanditProfileState, CatoniDriftDetector,
     DecayControllerConfig, DecaySignalInputs, DriftDetector, DriftPolicyBridge, PidController,
 };
-use contextra_ports::Clock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -391,7 +401,7 @@ fn test_adaptive_decay_controller_effective_score_zero_elapsed() {
 
 #[test]
 fn test_sketched_bandit_feature_gated_initialization() {
-    #[cfg(feature = "sketched-bandit")]
+    #[cfg(feature = "bandit-routing")]
     {
         let mut state = BanditProfileState::cold_start(4, 0.5);
         state.implementation =

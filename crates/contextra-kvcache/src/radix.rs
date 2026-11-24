@@ -1,25 +1,38 @@
-// FILE-CONTEXT
-// ZWECK: Prefix-Radix-Baum über Token-Sequenzen, RAII-Guards & KvReusePolicy (§9.2).
-// STAND: TS:2026-09-15T00:00:00Z
-
 //! # Prefix-Radix-Baum für KV-Block-Reuse
 //!
-//! Dieses Modul implementiert einen komprimierten Radix-Trie über Token-Sequenzen (`&[u32]`).
-//! Es ermittelt das längste gemeinsame Präfix (LCP) zwischen einer Anfragesequenz und bereits
-//! gecachten KV-Blöcken im Speicher.
+//! ANCHOR[contextra-kvcache:RADIX-001]
+//!
+//! Dieses Modul implementiert einen speichereffizienten, komprimierten Radix-Trie über Token-Sequenzen (`&[u32]`).
+//! Es ermittelt das längste gemeinsame Präfix (LCP = Longest Common Prefix) zwischen einer Anfragesequenz und bereits
+//! gecachten KV-Blöcken im Hauptspeicher.
+//!
+//! ## Funktionsweise
+//! Wenn ein Benutzer einen Prompt an das System sendet, beginnt dieser oft mit Standard-Anweisungen
+//! (z. B. System-Prompts, Formatierungsvorgaben oder lange Dokumente). Der Radix-Baum speichert
+//! diese Token-Ketten hierarchisch ab. Wenn eine neue Sequenz eintrifft, wird in O(L) Schritten
+//! (wobei L die Länge der Token-Sequenz ist) geprüft, welcher Teil der Sequenz bereits berechnet
+//! und als KV-Block im RAM hinterlegt wurde.
 //!
 //! ## Hauptkomponenten
-//! - **`KvReusePolicy`**: Steuert die Aggressivität von Prefix-Reuse (`Always`, `CostBased`, `Never`).
-//! - **`KvBlockGuard`**: RAII-Guard mit atomarer Referenzzählung, der bei `Drop` den Block freigibt.
-//! - **`PrefixRadixTree`**: Komprimierter Radix-Trie für schnelle O(L) LCP-Suche und Blockzuweisung.
+//! - **[`KvReusePolicy`]**: Steuert die Mindestlänge für die Wiederverwendung (`Always`, `CostBased`, `Never`).
+//! - **[`KvBlockGuard`]**: RAII-Guard (Resource Acquisition Is Initialization) mit atomarer Referenzzählung,
+//!   der bei `Drop` den Block zur Verdrängung freigibt.
+//! - **[`PrefixRadixTree`]**: Komprimierter Radix-Trie für schnelle O(L) LCP-Suche und Blockzuweisung.
+//! - **`ContentAddressedKvStore`**: Erweiterter Store mit BLAKE3-Content-Hashing und optionaler
+//!   semantischer Ähnlichkeitssuche (unter Feature `content-addressed-kv-cache`).
 
-use contextra_types::{ContextraError, TenantId};
+use crate::error::{KvCacheError, Result};
+use crate::types::TenantId;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use super::eviction_worker::EvictionWorker;
 
+// ANCHOR[contextra-kvcache:RADIX-002]
 /// Policy zur Steuerung von Prefix-Reuse (§9.2).
+///
+/// Definiert, ab wann ein gefundener Präfix-Treffer lohnend genug ist, um einen Cache-Treffer
+/// zu melden (da kurze Treffer von 1–3 Tokens oft mehr Lookup-Overhead erzeugen als Inferenzzeit sparen).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum KvReusePolicy {
     /// Wiederverwendung aller Treffer mit `matched_len > 0`.
@@ -38,6 +51,12 @@ impl Default for KvReusePolicy {
 
 impl KvReusePolicy {
     /// Prüft, ob ein Treffer mit der Länge `matched_len` wiederverwendet werden soll.
+    ///
+    /// # Parameter
+    /// - `matched_len`: Anzahl übereinstimmender Tokens.
+    ///
+    /// # Rückgabe
+    /// `true`, wenn die Policy eine Wiederverwendung empfiehlt.
     pub fn should_reuse(&self, matched_len: usize) -> bool {
         match self {
             KvReusePolicy::Always => matched_len > 0,
@@ -47,17 +66,25 @@ impl KvReusePolicy {
     }
 }
 
+// ANCHOR[contextra-kvcache:RADIX-003]
 /// RAII-Guard für ausgeliehene/gematchte KV-Blöcke.
-/// Dekrementiert bei `Drop` atomar die Referenzzählung des Blocks und benachrichtigt ggf. den `EvictionWorker`.
+///
+/// Verhindert, dass ein Block während einer laufenden Modell-Inferenz vom `EvictionWorker`
+/// verdrängt wird. Dekrementiert bei `Drop` atomar die Referenzzählung des Blocks und
+/// benachrichtigt ggf. den `EvictionWorker`, wenn der Zähler auf 0 fällt.
 pub struct KvBlockGuard {
+    /// Eindeutige ID des geschützten Blocks.
     pub block_id: u64,
+    /// Mandanten-ID des Eigentümers.
     pub tenant_id: TenantId,
+    /// Atomarer Referenzzähler, geteilt mit dem Block.
     ref_counter: Arc<AtomicUsize>,
+    /// Optionaler Worker zur Benachrichtigung bei Freigabe.
     worker: Option<Arc<EvictionWorker>>,
 }
 
 impl KvBlockGuard {
-    /// Erstellt einen neuen Guard und inkrementiert den Referenzzähler.
+    /// Erstellt einen neuen Guard und inkrementiert den Referenzzähler atomar (`SeqCst`).
     pub fn new(
         block_id: u64,
         tenant_id: TenantId,
@@ -67,7 +94,7 @@ impl KvBlockGuard {
         ref_counter.fetch_add(1, Ordering::SeqCst);
         Self {
             block_id,
-            tenant_id,
+            tenant_id: tenant_id.into(),
             ref_counter,
             worker,
         }
@@ -90,6 +117,9 @@ impl KvBlockGuard {
 }
 
 impl Drop for KvBlockGuard {
+    /// Dekrementiert den Zähler bei Verlassen des Gültigkeitsbereichs.
+    ///
+    /// Fällt der Zähler auf 0, wird der Hintergrund-Worker benachrichtigt.
     fn drop(&mut self) {
         let prev = self.ref_counter.fetch_sub(1, Ordering::SeqCst);
         if prev == 1 {
@@ -115,6 +145,7 @@ impl std::fmt::Debug for KvBlockGuard {
     }
 }
 
+// ANCHOR[contextra-kvcache:RADIX-004]
 /// Ergebnis eines Präfix-Matches im Radix-Baum.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrefixMatch {
@@ -127,6 +158,9 @@ pub struct PrefixMatch {
 }
 
 /// Knoten im komprimierten Prefix-Radix-Baum.
+///
+/// Hält einen Token-Pfadabschnitt (`tokens`), optional eine zugeordnete `block_id`
+/// (wenn dieser Pfad ein gespeichertes Sequenz-Ende darstellt) und Kindknoten.
 struct RadixNode {
     tokens: Vec<u32>,
     block_id: Option<u64>,
@@ -142,12 +176,17 @@ impl RadixNode {
         }
     }
 
+    /// Berechnet die Länge des längsten gemeinsamen Präfixes (LCP) zweier Slices.
     fn lcp_len(a: &[u32], b: &[u32]) -> usize {
         a.iter().zip(b.iter()).take_while(|(&x, &y)| x == y).count()
     }
 }
 
+// ANCHOR[contextra-kvcache:RADIX-005]
 /// Komprimierter Prefix-Radix-Baum für Token-Sequenzen.
+///
+/// Bietet schnelle Präfixsuche und automatische Knoten-Aufspaltung (Node Splitting),
+/// wenn sich Sequenzen in gemeinsame Teilpfade verzweigen.
 pub struct PrefixRadixTree {
     tenant_id: TenantId,
     children: Vec<RadixNode>,
@@ -155,24 +194,30 @@ pub struct PrefixRadixTree {
 }
 
 impl PrefixRadixTree {
-    /// Erstellt einen neuen Prefix-Radix-Baum für den angegebenen Tenant.
-    pub fn new(tenant_id: TenantId) -> Self {
-        Self {
-            tenant_id,
+    /// Erstellt einen neuen Prefix-Radix-Baum für den angegebenen Mandanten.
+    pub fn new(tenant_id: impl Into<TenantId>) -> Self {
+        let tenant_id = tenant_id.into(); Self {
+            tenant_id: tenant_id.into(),
             children: Vec::new(),
             total_entries: 0,
         }
     }
 
-    /// Gibt die Tenant-ID des Radix-Baums zurück.
+    /// Gibt die Mandanten-ID des Radix-Baums zurück.
     pub fn tenant_id(&self) -> TenantId {
         self.tenant_id
     }
 
     /// Fügt eine Token-Sequenz mit assoziierter KV-Block-ID ein.
-    pub fn insert(&mut self, tokens: &[u32], block_id: u64) -> Result<(), ContextraError> {
+    ///
+    /// # Ablauf
+    /// 1. Prüfen, ob die Sequenz nicht leer ist (leere Sequenzen erzeugen [`KvCacheError::InvalidInput`]).
+    /// 2. Rekursiv durch Kindknoten traversieren und LCP berechnen.
+    /// 3. Falls ein partieller LCP existiert, Knoten aufspalten (Node Split).
+    /// 4. Block-ID am Endknoten setzen und Gesamtzähler inkrementieren.
+    pub fn insert(&mut self, tokens: &[u32], block_id: u64) -> Result<()> {
         if tokens.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(KvCacheError::InvalidInput(
                 "Cannot insert empty token sequence into PrefixRadixTree".to_string(),
             ));
         }
@@ -186,6 +231,7 @@ impl PrefixRadixTree {
         Ok(())
     }
 
+    /// Rekursive interne Hilfsfunktion zum Einfügen und Aufspalten in Vektorknoten.
     fn insert_into_vec(
         nodes: &mut Vec<RadixNode>,
         tokens: &[u32],
@@ -211,7 +257,7 @@ impl PrefixRadixTree {
                 return;
             }
 
-            // Node split required
+            // Node split required: Der bestehende Knoten wird an Stelle `lcp` geteilt.
             let child_remaining = node.tokens[lcp..].to_vec();
             let parent_tokens = node.tokens[..lcp].to_vec();
 
@@ -234,12 +280,19 @@ impl PrefixRadixTree {
             return;
         }
 
-        // No matching child prefix found -> add new branch
+        // Kein passender Präfix gefunden -> neuen Ast anlegen
         nodes.push(RadixNode::new(tokens.to_vec(), Some(block_id)));
         *total_entries += 1;
     }
 
-    /// Sucht das längste übereinstimmende Präfix unter Anwendung der `KvReusePolicy`.
+    /// Sucht das längste übereinstimmende Präfix unter Anwendung der [`KvReusePolicy`].
+    ///
+    /// # Ablauf
+    /// 1. Schnellausstieg bei leeren Tokens oder Policy `Never`.
+    /// 2. Iteratives Absteigen entlang der Knoten mit maximaler Übereinstimmung.
+    /// 3. Gefundene Teilsequenz kumulieren.
+    /// 4. Sobald ein Knoten eine `block_id` besitzt und die Policy erfüllt ist, Treffer merken.
+    /// 5. Längsten Treffer als [`PrefixMatch`] zurückgeben.
     pub fn find_longest_prefix(
         &self,
         tokens: &[u32],
@@ -293,7 +346,7 @@ impl PrefixRadixTree {
         best_match
     }
 
-    /// Entfernt eine Token-Sequenz aus dem Baum.
+    /// Entfernt eine Token-Sequenz aus dem Baum und gibt die bisherige Block-ID zurück.
     pub fn remove(&mut self, tokens: &[u32]) -> Option<u64> {
         if tokens.is_empty() {
             return None;
@@ -301,6 +354,7 @@ impl PrefixRadixTree {
         Self::remove_from_vec(&mut self.children, tokens, &mut self.total_entries)
     }
 
+    /// Rekursive interne Hilfsfunktion zum Austragen von Block-IDs.
     fn remove_from_vec(
         nodes: &mut [RadixNode],
         tokens: &[u32],
@@ -333,7 +387,7 @@ impl PrefixRadixTree {
         self.total_entries == 0
     }
 
-    /// Leert den gesamten Baum.
+    /// Leert den gesamten Baum vollständig.
     pub fn clear(&mut self) {
         self.children.clear();
         self.total_entries = 0;
@@ -344,6 +398,7 @@ impl PrefixRadixTree {
 mod tests {
     use super::*;
 
+    // Prüft die Auswertungslogik der verschiedenen KvReusePolicy-Varianten.
     #[test]
     fn test_kv_reuse_policy_evaluations() {
         assert!(KvReusePolicy::Always.should_reuse(1));
@@ -360,6 +415,7 @@ mod tests {
         assert!(!KvReusePolicy::Never.should_reuse(10));
     }
 
+    // Prüft grundlegendes Einfügen und Suchen von Präfixen im PrefixRadixTree.
     #[test]
     fn test_radix_tree_basic_insert_and_match() {
         let tenant = TenantId::try_new(1).unwrap();
@@ -393,6 +449,7 @@ mod tests {
         assert_eq!(pm_always.matched_len, 5);
     }
 
+    // Prüft das korrekte Aufspalten von Radix-Knoten bei sich verzweigenden Token-Sequenzen.
     #[test]
     fn test_radix_tree_node_splitting() {
         let tenant = TenantId::try_new(1).unwrap();
@@ -419,6 +476,7 @@ mod tests {
         assert_eq!(match2.matched_len, 5);
     }
 
+    // Stresstest mit 10.000 Schlüsseln zur Verifikation der Aufspaltungs- und Treffsicherheit.
     #[test]
     fn test_v1_radix_split_correctness_10k_keys() {
         let tenant = TenantId::try_new(1).unwrap();
@@ -457,11 +515,12 @@ mod tests {
         assert_eq!(
             hits,
             10_000,
-            "Expected 100% hit rate across 10,000 inserted keys, got hit rate {:.2}%",
+            "Expected full hit rate across 10,000 inserted keys, got hit rate {:.2}%",
             hit_rate * 100.0
         );
     }
 
+    // Prüft atomares Inkrementieren und Dekrementieren der Referenzen im KvBlockGuard.
     #[test]
     fn test_kv_block_guard_raii_refcounting() {
         let tenant = TenantId::try_new(42).unwrap();
@@ -484,6 +543,7 @@ mod tests {
         assert_eq!(ref_counter.load(Ordering::SeqCst), 0);
     }
 
+    // Prüft das Entfernen von Sequenzen und vollständiges Zurücksetzen des Baums.
     #[test]
     fn test_radix_tree_remove_and_clear() {
         let tenant = TenantId::try_new(10).unwrap();
@@ -503,11 +563,11 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "content-addressed-kv-cache")]
+    #[cfg(feature = "exp-content-addressed")]
     fn test_content_addressed_kv_store_lookup_cascade() {
         struct MockEmbedder;
         impl SemanticEmbedder for MockEmbedder {
-            fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>, ContextraError> {
+            fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>> {
                 // Return simple normalized embedding based on sum of tokens
                 let sum: f32 = tokens.iter().map(|&t| t as f32).sum();
                 Ok(vec![sum / 100.0, 1.0])
@@ -571,25 +631,29 @@ mod tests {
 }
 
 // -----------------------------------------------------------------------------
-// Content-Addressed KV Cache Extension (feature = "content-addressed-kv-cache")
+// Content-Addressed KV Cache Extension (feature = "exp-content-addressed")
 // -----------------------------------------------------------------------------
 
-#[cfg(feature = "content-addressed-kv-cache")]
-/// Referenz auf ein gecachtes KV-Segment.
+#[cfg(feature = "exp-content-addressed")]
+// ANCHOR[contextra-kvcache:RADIX-006]
+/// Referenz auf ein gecachtes KV-Segment im content-adressierten Store.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct KvSegmentRef {
+    /// Zugeordnete Segment-ID.
     pub segment_id: u64,
+    /// Eigentümer-Mandant.
     pub tenant_id: TenantId,
+    /// Gematchte Token-Kette.
     pub matched_tokens: Vec<u32>,
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 impl KvSegmentRef {
     /// Erstellt eine neue Segment-Referenz.
     pub fn new(segment_id: u64, tenant_id: TenantId, matched_tokens: Vec<u32>) -> Self {
         Self {
             segment_id,
-            tenant_id,
+            tenant_id: tenant_id.into(),
             matched_tokens,
         }
     }
@@ -600,8 +664,9 @@ impl KvSegmentRef {
     }
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
-/// Ergebnis eines KV-Cache-Lookups mit `ContentAddressedKvStore`.
+#[cfg(feature = "exp-content-addressed")]
+// ANCHOR[contextra-kvcache:RADIX-007]
+/// Ergebnis eines KV-Cache-Lookups mit [`ContentAddressedKvStore`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum KvLookupResult {
     /// Exakter Präfix-Treffer im PositionIndex (< 100 µs).
@@ -613,26 +678,32 @@ pub enum KvLookupResult {
         segment: KvSegmentRef,
         similarity: f32,
     },
-    /// Cache-Miss.
+    /// Cache-Miss (keine passende Sequenz im Cache vorhanden).
     Miss,
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
+// ANCHOR[contextra-kvcache:RADIX-008]
 /// Trait für semantische Embedding-Generierung auf KV-Cache-Keys.
 pub trait SemanticEmbedder: Send + Sync {
-    fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>, ContextraError>;
+    /// Erzeugt ein Embedding für eine Token-Sequenz.
+    fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>>;
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
+// ANCHOR[contextra-kvcache:RADIX-009]
 /// Konfiguration für opt-in semantische Vektor-Cache-Lookups.
 #[derive(Clone)]
 pub struct SemanticCacheConfig {
+    /// Schnittstelle zur Vektorerzeugung.
     pub embedder: Arc<dyn SemanticEmbedder>,
+    /// Schwellenwert der Kosinus-Ähnlichkeit (z. B. 0.95 für 95% Übereinstimmung).
     pub similarity_threshold: f32,
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 impl SemanticCacheConfig {
+    /// Erstellt eine neue Konfiguration mit Embedder und Mindestähnlichkeit.
     pub fn new(embedder: Arc<dyn SemanticEmbedder>, similarity_threshold: f32) -> Self {
         Self {
             embedder,
@@ -641,8 +712,14 @@ impl SemanticCacheConfig {
     }
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
-/// Content-adressierter KV-Store mit Zwei-Ebenen-Lookup (Position, Content-Hash, Semantic-Search).
+#[cfg(feature = "exp-content-addressed")]
+// ANCHOR[contextra-kvcache:RADIX-010]
+/// Content-adressierter KV-Store mit mehrstufiger Lookup-Kaskade.
+///
+/// Unterstützt:
+/// 1. Schnelle Präfix-Suche im Radix-Baum.
+/// 2. Inhalts-Hash-Suche via BLAKE3 für exakt gleiche Token-Slices an anderer Position.
+/// 3. Optionale semantische Ähnlichkeitssuche mittels Embeddings.
 pub struct ContentAddressedKvStore {
     pub content_index: ahash::AHashMap<(TenantId, blake3::Hash), KvSegmentRef>,
     pub position_index: PrefixRadixTree,
@@ -652,9 +729,9 @@ pub struct ContentAddressedKvStore {
     semantic_entries: Vec<(TenantId, Vec<f32>, KvSegmentRef)>,
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 impl ContentAddressedKvStore {
-    /// Erstellt einen neuen `ContentAddressedKvStore` für den primären Tenant.
+    /// Erstellt einen neuen `ContentAddressedKvStore` für den primären Mandanten.
     pub fn new(primary_tenant: TenantId) -> Self {
         Self {
             content_index: ahash::AHashMap::new(),
@@ -683,7 +760,7 @@ impl ContentAddressedKvStore {
         &self.position_index
     }
 
-    /// Konvertiert Token-IDs deterministisch in LE-Bytes und berechnet den BLAKE3-Hash.
+    /// Konvertiert Token-IDs deterministisch in LE-Bytes (Little Endian) und berechnet den BLAKE3-Hash.
     pub fn hash_tokens(tokens: &[u32]) -> blake3::Hash {
         let mut hasher = blake3::Hasher::new();
         for token in tokens {
@@ -693,14 +770,15 @@ impl ContentAddressedKvStore {
     }
 
     /// Fügt eine Token-Sequenz und Segment-Referenz in den Store ein.
-    pub fn insert(
-        &mut self,
-        tenant: TenantId,
-        tokens: &[u32],
-        segment_id: u64,
-    ) -> Result<(), ContextraError> {
+    ///
+    /// # Ablauf
+    /// 1. Validieren, dass die Sequenz nicht leer ist.
+    /// 2. In den mandantenspezifischen `position_index` (PrefixRadixTree) einfügen.
+    /// 3. BLAKE3-Hash berechnen und in den `content_index` unter `(tenant, hash)` einfügen.
+    /// 4. Optional semantisches Embedding berechnen und registrieren.
+    pub fn insert(&mut self, tenant: TenantId, tokens: &[u32], segment_id: u64) -> Result<()> {
         if tokens.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(KvCacheError::InvalidInput(
                 "Cannot insert empty token sequence into ContentAddressedKvStore".to_string(),
             ));
         }
@@ -731,10 +809,10 @@ impl ContentAddressedKvStore {
     }
 
     /// Lookup-Kaskade:
-    /// 1) Exact prefix hit via `position_index`
-    /// 2) Content hash hit via `content_index.get(&(tenant, blake3::hash(token_ids_as_bytes)))`
-    /// 3) Semantic similarity hit via Vektorsuche gegen Cache-Key-Embeddings (opt-in)
-    /// 4) Fallback zu `KvLookupResult::Miss`
+    /// 1. **Exact prefix hit** via `position_index`
+    /// 2. **Content hash hit** via `content_index.get(&(tenant, blake3::hash(tokens)))`
+    /// 3. **Semantic similarity hit** via Vektorsuche gegen Cache-Key-Embeddings (opt-in)
+    /// 4. Fallback zu [`KvLookupResult::Miss`]
     pub fn lookup(&self, tenant: TenantId, token_ids: &[u32]) -> KvLookupResult {
         if token_ids.is_empty() {
             return KvLookupResult::Miss;
@@ -828,7 +906,8 @@ impl ContentAddressedKvStore {
     }
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
+/// Berechnet die Kosinus-Ähnlichkeit zwischen zwei Vektoren.
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     if a.len() != b.len() || a.is_empty() {
         return 0.0;
@@ -845,4 +924,275 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
         return 0.0;
     }
     dot / (norm_a.sqrt() * norm_b.sqrt())
+}
+
+// ---------------------------------------------------------------------------
+// MISSION KV-1: INV-KV-PREFIX-1 & Namespace Partition Isolation
+// ---------------------------------------------------------------------------
+
+/// Referenzzählungs- und Segment-Tracking-Struktur für `INV-KV-PREFIX-1`.
+#[derive(Debug, Clone)]
+pub struct SharedSegmentRef {
+    /// Physische Segment-ID oder Block-ID.
+    pub segment_id: u64,
+    /// Anzahl aktiver Referenzierungen über Pfade/Knoten hinweg.
+    pub ref_count: Arc<AtomicUsize>,
+}
+
+impl SharedSegmentRef {
+    /// Erstellt eine neue geteilte Referenz mit initialem Referenzzähler 1.
+    pub fn new(segment_id: u64) -> Self {
+        Self {
+            segment_id,
+            ref_count: Arc::new(AtomicUsize::new(1)),
+        }
+    }
+
+    /// Klont die Referenz und inkrementiert den Zähler atomar.
+    pub fn retain(&self) -> Self {
+        self.ref_count.fetch_add(1, Ordering::SeqCst);
+        Self {
+            segment_id: self.segment_id,
+            ref_count: Arc::clone(&self.ref_count),
+        }
+    }
+
+    /// Gibt die aktuelle Anzahl von Referenzen zurück.
+    pub fn current_refs(&self) -> usize {
+        self.ref_count.load(Ordering::SeqCst)
+    }
+
+    /// Dekrementiert den Zähler und gibt den verbleibenden Wert zurück.
+    pub fn release(&self) -> usize {
+        let prev = self.ref_count.fetch_sub(1, Ordering::SeqCst);
+        prev.saturating_sub(1)
+    }
+}
+
+/// Knoten im partitionsisolierten Radix-Baum mit geteilten Segment-Referenzen.
+struct NamespaceRadixNode {
+    tokens: Vec<u32>,
+    segment: Option<SharedSegmentRef>,
+    children: Vec<NamespaceRadixNode>,
+}
+
+impl NamespaceRadixNode {
+    fn new(tokens: Vec<u32>, segment: Option<SharedSegmentRef>) -> Self {
+        Self {
+            tokens,
+            segment,
+            children: Vec::new(),
+        }
+    }
+
+    fn lcp_len(a: &[u32], b: &[u32]) -> usize {
+        a.iter().zip(b.iter()).take_while(|(&x, &y)| x == y).count()
+    }
+}
+
+/// Partitionsisolierter Radix-Baum über `namespace: u64`.
+pub struct NamespaceRadixTree {
+    namespace: u64,
+    children: Vec<NamespaceRadixNode>,
+    total_entries: usize,
+    segment_registry: ahash::AHashMap<Vec<u32>, SharedSegmentRef>,
+}
+
+impl NamespaceRadixTree {
+    /// Erstellt einen neuen partitionsisolierten Radix-Baum.
+    pub fn new(namespace: u64) -> Self {
+        Self {
+            namespace,
+            children: Vec::new(),
+            total_entries: 0,
+            segment_registry: ahash::AHashMap::new(),
+        }
+    }
+
+    /// Gibt den zugehörigen Namespace zurück.
+    #[inline]
+    pub fn namespace(&self) -> u64 {
+        self.namespace
+    }
+
+    /// Fügt eine Token-Sequenz ein.
+    pub fn insert(&mut self, tokens: &[u32], segment_id: u64) -> Result<SharedSegmentRef> {
+        if tokens.is_empty() {
+            return Err(KvCacheError::InvalidInput(
+                "Cannot insert empty token sequence".to_string(),
+            ));
+        }
+
+        let key = tokens.to_vec();
+        let shared_ref = match self.segment_registry.get(&key) {
+            Some(existing) => existing.retain(),
+            None => {
+                let r = SharedSegmentRef::new(segment_id);
+                self.segment_registry.insert(key, r.clone());
+                r
+            }
+        };
+
+        Self::insert_internal(
+            &mut self.children,
+            tokens,
+            shared_ref.clone(),
+            &mut self.total_entries,
+        );
+        Ok(shared_ref)
+    }
+
+    fn insert_internal(
+        nodes: &mut Vec<NamespaceRadixNode>,
+        tokens: &[u32],
+        segment: SharedSegmentRef,
+        total_entries: &mut usize,
+    ) {
+        for node in nodes.iter_mut() {
+            let lcp = NamespaceRadixNode::lcp_len(&node.tokens, tokens);
+            if lcp == 0 {
+                continue;
+            }
+
+            if lcp == node.tokens.len() {
+                let remaining = &tokens[lcp..];
+                if remaining.is_empty() {
+                    if node.segment.is_none() {
+                        *total_entries += 1;
+                    }
+                    node.segment = Some(segment);
+                } else {
+                    Self::insert_internal(&mut node.children, remaining, segment, total_entries);
+                }
+                return;
+            }
+
+            let child_remaining = node.tokens[lcp..].to_vec();
+            let parent_tokens = node.tokens[..lcp].to_vec();
+
+            let mut old_child = NamespaceRadixNode::new(child_remaining, node.segment.take());
+            old_child.children = std::mem::take(&mut node.children);
+
+            node.tokens = parent_tokens;
+            node.children = vec![old_child];
+
+            let query_remaining = &tokens[lcp..];
+            if query_remaining.is_empty() {
+                node.segment = Some(segment);
+                *total_entries += 1;
+            } else {
+                let new_child = NamespaceRadixNode::new(query_remaining.to_vec(), Some(segment));
+                node.children.push(new_child);
+                *total_entries += 1;
+            }
+            return;
+        }
+
+        nodes.push(NamespaceRadixNode::new(tokens.to_vec(), Some(segment)));
+        *total_entries += 1;
+    }
+
+    /// Sucht das längste übereinstimmende Präfix im Namespace.
+    pub fn find_longest_prefix(
+        &self,
+        tokens: &[u32],
+        policy: KvReusePolicy,
+    ) -> Option<PrefixMatch> {
+        if tokens.is_empty() || matches!(policy, KvReusePolicy::Never) {
+            return None;
+        }
+
+        let mut current_nodes = &self.children;
+        let mut remaining = tokens;
+        let mut accumulated_tokens: Vec<u32> = Vec::new();
+        let mut best_match: Option<PrefixMatch> = None;
+
+        while !remaining.is_empty() {
+            let mut matched_child = None;
+            for node in current_nodes {
+                let lcp = NamespaceRadixNode::lcp_len(&node.tokens, remaining);
+                if lcp > 0 {
+                    matched_child = Some((node, lcp));
+                    break;
+                }
+            }
+
+            let (node, lcp) = match matched_child {
+                Some(p) => p,
+                None => break,
+            };
+
+            accumulated_tokens.extend_from_slice(&node.tokens[..lcp]);
+
+            if lcp == node.tokens.len() {
+                if let Some(ref seg) = node.segment {
+                    let len = accumulated_tokens.len();
+                    if policy.should_reuse(len) {
+                        best_match = Some(PrefixMatch {
+                            matched_tokens: accumulated_tokens.clone(),
+                            matched_len: len,
+                            block_id: seg.segment_id,
+                        });
+                    }
+                }
+                remaining = &remaining[lcp..];
+                current_nodes = &node.children;
+            } else {
+                break;
+            }
+        }
+
+        best_match
+    }
+
+    /// Entfernt eine Sequenz und dekrementiert die geteilte Referenz.
+    pub fn remove(&mut self, tokens: &[u32]) -> Option<u64> {
+        if tokens.is_empty() {
+            return None;
+        }
+        let seg_ref = Self::remove_internal(&mut self.children, tokens, &mut self.total_entries)?;
+        let seg_id = seg_ref.segment_id;
+        let remaining_refs = seg_ref.release();
+        if remaining_refs == 0 {
+            self.segment_registry.remove(tokens);
+        }
+        Some(seg_id)
+    }
+
+    fn remove_internal(
+        nodes: &mut [NamespaceRadixNode],
+        tokens: &[u32],
+        total_entries: &mut usize,
+    ) -> Option<SharedSegmentRef> {
+        for node in nodes.iter_mut() {
+            let lcp = NamespaceRadixNode::lcp_len(&node.tokens, tokens);
+            if lcp == node.tokens.len() {
+                let remaining = &tokens[lcp..];
+                if remaining.is_empty() {
+                    if let Some(seg) = node.segment.take() {
+                        *total_entries = total_entries.saturating_sub(1);
+                        return Some(seg);
+                    }
+                    return None;
+                }
+                return Self::remove_internal(&mut node.children, remaining, total_entries);
+            }
+        }
+        None
+    }
+
+    /// Gibt die Gesamtzahl gespeicherter Präfixe zurück.
+    pub fn len(&self) -> usize {
+        self.total_entries
+    }
+
+    /// Prüft, ob der Baum leer ist.
+    pub fn is_empty(&self) -> bool {
+        self.total_entries == 0
+    }
+
+    /// Gibt eine Referenz auf die interne Segment-Registrierung zurück.
+    pub fn segment_registry(&self) -> &ahash::AHashMap<Vec<u32>, SharedSegmentRef> {
+        &self.segment_registry
+    }
 }

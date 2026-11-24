@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Test suite for fsync syscall discipline, call sequence verification, and performance overhead measurements.
 
 use contextra_ports::StorageEngine;

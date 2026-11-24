@@ -17,17 +17,20 @@ fuzz_target!(|input: FuzzInput| {
         input.offsets_start,
         input.num_offsets,
         &input.key,
+        false,
     );
     let _ = contextra_store::sstable::binary_search_entry_in_block(
         &input.block_data,
         input.offsets_start,
         input.num_offsets,
         &input.key,
+        false,
     );
     let _ = contextra_store::sstable::block_binary_search(
         &input.block_data,
         input.offsets_start,
         input.num_offsets,
         &input.key,
+        false,
     );
 });

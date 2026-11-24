@@ -1,3 +1,7 @@
+//! # Eigenschaftsbasierte Tests für Suchinvarianten
+//!
+//! Generiert zufällige Daten via Proptest zur Verifikation fundamentaler Suchinvarianten.
+//!
 // FILE-CONTEXT
 // STAND: 2026-09-15
 // ZWECK: Property-based Tests für Retrieval- & Search-Invarianten in contextra-db (RRF, BM25, End-to-End).

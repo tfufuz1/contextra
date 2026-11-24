@@ -1,9 +1,16 @@
-//! Vector index trait definition and statistics.
-
-// FILE-CONTEXT
-// STAND: 2026-09-15T00:00:00Z
-// ZWECK: VectorIndex Trait & VectorIndexStats für HNSW/Vektor-Indizes.
-// INVARIANTEN: Rebuild-Triggering & Filtered Search Fallback.
+//! # Vector Index Port (Ring 0 / Class B)
+//!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/text_index.rs
+//!
+//! Abstrakter Vertrag für hochperformante Vektor-Indizes (z. B. HNSW in `contextra-vector`).
+//!
+//! // ANCHOR[contextra-ports:VEC-001]
+//! // SECTION vector-index-contracts
+//! // NOTE: Verwendet AFIT / impl Future für null Overhead bei statischer Bindung.
+//! // Invarianten:
+//! // 1. INV-VEC-DETERMINISM: Gleiche Abfragevektoren liefern bei identischem Indexstand bit-gleiche Scores.
+//! // 2. INV-VEC-REBUILD: Rebuild-Triggering bei Akkumulation gelöschter Vektoren.
 
 use super::BoxFuture;
 use crate::types::{ContextChunk, DocId, ScoredDocument, TxId};
@@ -11,6 +18,7 @@ use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
+// ANCHOR[contextra-ports:VEC-STATS-001]
 /// Statistics for a vector index.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct VectorIndexStats {
@@ -29,13 +37,15 @@ pub struct VectorIndexStats {
 }
 
 // INVARIANT: Implementor: HnswIndex (contextra-index/src/hnsw.rs)
-// Rebuild: Automatisch bei >20% gelöschten Nodes.
+// Rebuild: Automatisch bei >20% bereinigten Nodes.
 
+// ANCHOR[contextra-ports:VEC-TRAIT-001]
 /// Vector Index Trait — abstrahiert die HNSW-Vektorsuche.
 ///
 /// # Dyn-Kompatibilität
 /// Verwendet native `async fn` (AFIT) für statischen Dispatch.
 pub trait VectorIndex: Send + Sync + 'static {
+    // ANCHOR[contextra-ports:VEC-MUT-001]
     /// Inserts a vector with an associated document ID.
     fn insert(
         &self,
@@ -45,6 +55,11 @@ pub trait VectorIndex: Send + Sync + 'static {
     ) -> impl Future<Output = Result<()>> + Send;
 
     /// Returns all active (non-deleted) document IDs in the index.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei Lesefehlern der Node-Arena.
+    /// # Crash
+    /// Reiner Lesevorgang ohne Modifikation.
     fn all_doc_ids(&self) -> impl Future<Output = Result<Vec<DocId>>> + Send {
         async { Ok(Vec::new()) }
     }
@@ -63,6 +78,7 @@ pub trait VectorIndex: Send + Sync + 'static {
         }
     }
 
+    // ANCHOR[contextra-ports:VEC-SEARCH-001]
     /// Searches for the k nearest neighbors to a query vector.
     fn search(
         &self,
@@ -122,41 +138,92 @@ pub trait VectorIndex: Send + Sync + 'static {
     }
 
     /// Deletes a vector by its document ID.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei Transaktions- oder Arena-Fehlern.
+    /// # Crash
+    /// Gemäß VETO-F02 strictly tombstone + slot-zeroization; Teilausfälle vor Commit verwerfen Puffer.
     fn delete(&self, tx: TxId, id: DocId) -> impl Future<Output = Result<()>> + Send;
 
     /// Commits a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei WAL-, Flush- oder Fsync-Fehlern.
+    /// # Crash
+    /// WAL-first; nach erfolgreichem fsync atomar persistent.
     fn commit(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Rolls back a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei Transaktionsverwaltungsproblemen.
+    /// # Crash
+    /// Verwirft uncommittete Änderungen im RAM; Graph bleibt unverändert konsistent.
     fn rollback(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Rolls back the entire index state to a specific transaction ID.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` falls der Ziel-Transaktionszustand nicht auffindbar ist.
+    /// # Crash
+    /// Atomarer Rollback; Recovery stellt bei Unterbrechung den sauberen Zustand her.
     fn rollback_to_tx(&self, tx_id: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Returns the last transaction ID processed by the index.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei Lesefehlern der Index-Metadaten.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn last_tx_id(&self) -> impl Future<Output = Result<TxId>> + Send;
 
     /// Returns the number of vectors in the index.
+    ///
+    /// # Fehler
+    /// Keine; panikfrei.
+    /// # Crash
+    /// Reiner Statusabruf aus Header oder RAM-Zustand.
     fn len(&self) -> impl Future<Output = usize> + Send;
 
     /// Returns true if the index is empty.
+    ///
+    /// # Fehler
+    /// Keine; delegiert panikfrei an `len`.
+    /// # Crash
+    /// Reiner Statusabruf ohne Seiteneffekte.
     fn is_empty(&self) -> impl Future<Output = bool> + Send {
         async { self.len().await == 0 }
     }
 
     /// Returns index statistics.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` falls Statistiken nicht ermittelt werden können.
+    /// # Crash
+    /// Reiner Lesevorgang ohne Zustandsänderung.
     fn stats(&self) -> impl Future<Output = Result<VectorIndexStats>> + Send;
 
     /// Returns true if the index requires a background rebuild (e.g. due to tombstone accumulation).
+    ///
+    /// # Fehler
+    /// Keine; panikfrei.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn is_rebuild_required(&self) -> bool {
         false
     }
 
+    // ANCHOR[contextra-ports:VEC-REBUILD-001]
     /// Triggers an asynchronous background rebuild of the index if supported.
+    ///
+    /// # Fehler
+    /// Keine synchronen Fehler; asynchroner Hintergrundtask.
+    /// # Crash
+    /// Snapshot-isoliert; parallele Leser sehen bit-identische Ergebnisse während und nach Rebuild.
     fn trigger_rebuild_async(&self) {}
 }
 
-// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von contextra-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
+// ANCHOR[contextra-ports:HYBRID-SEARCH-001]
 /// Contract for executing hybrid (vector + text) queries for profile routing.
 pub trait HybridSearchProvider: Send + Sync {
     /// Executes a hybrid query returning matched context chunks with relevance scores.
@@ -167,6 +234,7 @@ pub trait HybridSearchProvider: Send + Sync {
         top_k: usize,
     ) -> BoxFuture<'a, Result<Vec<ContextChunk>>>;
 }
+// !SECTION vector-index-contracts
 
 #[cfg(test)]
 mod tests {

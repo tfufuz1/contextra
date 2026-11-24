@@ -1,8 +1,11 @@
+//! # Kompaktierungs-Unit-Tests (Ring 1)
+//!
+//! Testsuite fuer grundlegende und fortgeschrittene Kompaktierungsszenarien.
+
 use super::*;
 use crate::sstable::{create_block_cache, BlockCache, SstableBuilder, SstableReader};
+use contextra_ids::TOMBSTONE_BIT;
 use contextra_mvcc::SnapshotRegistry;
-use contextra_ports::StorageEngine;
-use contextra_types::TOMBSTONE_BIT;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -33,3 +36,6 @@ mod basic;
 
 #[cfg(test)]
 mod advanced;
+
+#[cfg(test)]
+mod candidate_selection;

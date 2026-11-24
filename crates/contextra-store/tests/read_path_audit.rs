@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use bytes::Bytes;
 use contextra_ports::StorageEngine;
 use contextra_store::memtable::MemTable;

@@ -1,8 +1,18 @@
+//! # Integrationstest: `tenant_isolation_facade`
+//!
+//! Prüft die strikte Mandantentrennung (Multi-Tenancy Isolation) über die Fassadenschnittstelle:
+//! - Get-Operationen von Mandant B sehen keine Daten von Mandant A.
+//! - Kollidierende Primärschlüssel zwischen Mandanten existieren vollständig getrennt.
+//! - Vektor-Suchen, Scans und Löschungen sind mandantenisoliert.
+//! - Das Löschen einer Collection für Mandant A tangiert Mandant B in keiner Weise.
+
 use contextra::{open_with_config, ContextraConfig};
-use contextra_core::{ContextraError, TenantId};
+use contextra_types::{ContextraError, TenantId};
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra:TEST-TIF-001]
+// Prüft die vollständige Mandantentrennung für Get, Search, Scan, Delete und DropCollection zwischen zwei Mandanten.
 #[tokio::test]
 async fn tenant_a_cannot_read_tenant_b() -> Result<(), ContextraError> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -104,11 +114,7 @@ async fn tenant_a_cannot_read_tenant_b() -> Result<(), ContextraError> {
     assert!(col_b.get("doc1").await?.is_some());
 
     // 8. Drop collection for Tenant A does not affect Tenant B
-    let proof_key = b"secret_proof_key_32bytes_1234567";
-    let proof = db
-        .drop_collection("shared_col", tenant_a, proof_key)
-        .await?;
-    assert_eq!(proof.tenant_id(), tenant_a);
+    db.drop_collection("shared_col", tenant_a).await?;
 
     assert!(
         col_b.get("doc1").await?.is_some(),
@@ -119,6 +125,8 @@ async fn tenant_a_cannot_read_tenant_b() -> Result<(), ContextraError> {
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-TIF-002]
+// Startet eine Datenbank und verifiziert den fehlerfreien Zugriff auf LsmStorage mit SSI-Tracking.
 #[tokio::test]
 async fn startup_ssi_tracking_check() -> Result<(), ContextraError> {
     let tmp = TempDir::new().expect("Failed to create tempdir");

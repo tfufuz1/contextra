@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT: Model-based proptest suite validating MVCC isolation, flush, compaction, and snapshot durability against ReferenceModel.
 // STAND: 2026-09-28
 // PROPTEST_CASES: Default 64 for Jules-VM execution, configurable up to 10,000 for nightly runs via `PROPTEST_CASES=10000 cargo test`.

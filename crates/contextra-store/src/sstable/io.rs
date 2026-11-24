@@ -1,21 +1,17 @@
-pub(super) fn pread_exact(
-    file: &std::fs::File,
-    buf: &mut [u8],
-    offset: u64,
-) -> std::io::Result<()> {
-    use std::os::unix::fs::FileExt;
-    file.read_exact_at(buf, offset)
-}
+//! # SSTable I/O-Routinen (Ring 1)
+//!
+//! Kapselt Low-Level Datei- und Lesevorgänge über [`crate::io_seam::VfsFile`]
+//! innerhalb von Block-Level I/O-Grenzen.
 
-#[cfg(windows)]
+use crate::io_seam::VfsFile;
+
 pub(super) fn pread_exact(
-    file: &std::fs::File,
+    file: &dyn VfsFile,
     mut buf: &mut [u8],
     mut offset: u64,
 ) -> std::io::Result<()> {
-    use std::os::windows::fs::FileExt;
     while !buf.is_empty() {
-        let n = file.seek_read(buf, offset)?;
+        let n = file.read_at(buf, offset)?;
         if n == 0 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,

@@ -1,8 +1,26 @@
+#![allow(
+    clippy::all,
+    clippy::type_complexity,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+//! # Benchmarking der Cache-Hitrate durch Content-Addressed KV-Stores
+//!
+//! ANCHOR[contextra-kvcache:TEST-CONTENT-HIT-001]
+//!
+//! Vergleicht die Cache-Hitrate von rein positionsbasierten Radix-Bäumen mit
+//! dem content-adressierten Store bei agentischen Workloads mit dynamischen Nutzer-Turn-Präfixen.
+
 #![cfg(feature = "content-addressed-kv-cache")]
 
 use contextra_kvcache::{ContentAddressedKvStore, KvLookupResult, KvReusePolicy, PrefixRadixTree};
 use contextra_types::TenantId;
 
+// Prüft, dass der ContentAddressedKvStore bei agentischen Workloads eine mindestens 20% höhere Hitrate erzielt.
 #[test]
 fn test_content_hash_hit_rate_improvement_agentic_workload() {
     let tenant = TenantId::try_new(42).expect("valid tenant");

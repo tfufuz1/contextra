@@ -13,21 +13,22 @@ description = "Contextra — Embedded hybrid-search for AI agents"
 ring = "3"
 
 [dependencies]
-contextra-engine = { workspace = true }
-contextra-cognition = { workspace = true }
-contextra-sys = { workspace = true }
+contextra-vault = { path = "../contextra-vault" }
+contextra-cognition = { path = "../contextra-cognition", optional = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
-bytes = { workspace = true }
-contextra-crypto = { workspace = true }
-contextra-store = { workspace = true }
-blake3 = { workspace = true }
-contextra-vector = { workspace = true }
-contextra-text = { workspace = true }
+contextra-mvcc = { workspace = true }
+contextra-store = { workspace = true, features = ["workspace"] }
+contextra-vector = { workspace = true, features = ["workspace"] }
+contextra-text = { workspace = true, features = ["workspace"] }
 contextra-checkpoint = { workspace = true }
-contextra-graph = { workspace = true }
-contextra-rank = { workspace = true }
-contextra-adapt = { workspace = true }
+contextra-rank = { workspace = true, features = ["workspace"] }
+contextra-graph = { workspace = true, features = ["workspace"] }
+contextra-sandbox = { workspace = true, optional = true }
+contextra-infer-onnx = { workspace = true, optional = true }
+contextra-adapt = { workspace = true, optional = true }
+bytes = { workspace = true }
+blake3 = { workspace = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
@@ -38,31 +39,40 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
 thiserror = { workspace = true }
 
-
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 proptest = "1.4"
-contextra-vector = { workspace = true, features = ["experimental-diskann"] }
+contextra-vector = { workspace = true }
 contextra-testkit = { workspace = true }
-ed25519-dalek = "2"
+contextra-store = { workspace = true }
+contextra-graph = { workspace = true }
+contextra-text = { workspace = true, features = ["workspace"] }
+contextra-adapt = { workspace = true }
+contextra-checkpoint = { workspace = true }
+contextra-ingest = { workspace = true }
+wat = "1"
+sha2 = "0.10"
 
 [features]
+cognition = ["dep:contextra-cognition"]
 default = []
 bench = []
-sandbox = ["contextra-engine/sandbox"]
+sandbox = ["dep:contextra-sandbox"]
 reranking = []
-onnx = []
+onnx = ["dep:contextra-infer-onnx", "contextra-infer-onnx/onnx"]
 experimental-diskann = ["contextra-vector/experimental-diskann"]
-background-maintenance = ["contextra-engine/background-maintenance"]
-graph-connectivity-health = ["contextra-graph/physio-percolation"]
+background-maintenance = []
+graph-connectivity-health = ["contextra-graph/graph-connectivity-health"]
 coherence-bonus-fusion = []
-adaptive-candidate-pool-sizing = []
+adaptive-candidate-pool-sizing = ["dep:contextra-adapt"]
 volatile-vault = []
-# RESOLVED: AGT-DB-897f3a5c — Forward edge-reinforcement-learning feature to contextra-graph/edge-reinforcement-learning (TS: 2026-09-09T15:48:51Z) (SESSION: 2c31404a)
-edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
-
+edge-reinforcement-learning = []
+exp-extraction = []
+entity-extraction = ["exp-extraction"]
+auto-extraction-opt-out = []
+license = []
 
 [[example]]
 name = "quickstart"
@@ -76,6 +86,3 @@ required-features = ["experimental-diskann"]
 
 [[example]]
 name = "collections"
-
-[[example]]
-name = "verify_deletion_proof_external"

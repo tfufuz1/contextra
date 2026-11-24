@@ -6,6 +6,7 @@
 use thiserror::Error;
 
 // SECTION ERROR-ENUM
+// ANCHOR[contextra-simd:SIMD-ERROR-ENUM]
 /// Aufzählungs-Typ für alle im Crate auftretenden Fehlerzustände.
 ///
 /// Alle Varianten sind Fail-Closed konstruiert.
@@ -32,6 +33,7 @@ pub enum SimdError {
 // !SECTION ERROR-ENUM
 
 // SECTION RESULT-ALIAS
+// ANCHOR[contextra-simd:SIMD-RESULT-ALIAS]
 /// Crate-lokales Result-Alias mit `SimdError` als Standard-Fehlertyp.
 pub type Result<T> = core::result::Result<T, SimdError>;
 

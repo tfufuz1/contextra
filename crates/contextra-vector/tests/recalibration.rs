@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: Rekalibrierung von Bias und Schwellwerten bei inkrementellen Updates.
+// INVARIANTEN: Automatische Rekalibrierung verhindert Drift des SQ8-Bias über Toleranz.
+// HOTSPOTS: 20-60
+// STAND: 2026-11-12
 use contextra_ports::VectorIndex;
 use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
@@ -51,7 +56,7 @@ async fn test_quantizer_recalibration() {
     index.commit(TxId(2)).await.unwrap();
 
     // Trigger rebuild to recalibrate
-    index.rebuild().await.unwrap();
+    index.rebuild().unwrap();
 
     // Verify new quantizer state (codebook stability preserved; drift counters reset)
     let q_after = index.quantizer().expect("Quantizer must be trained");

@@ -1,3 +1,7 @@
+//! # Integrationstests für Gedächtniskonsolidierung
+//!
+//! Testet den vollständigen Konsolidierungszyklus von Turn-Segmenten zu konsolidiertem Wissen.
+//!
 use contextra_db::{
     execute_background_consolidation, execute_consolidation_pass, CommunityStabilityTracker,
     ConsolidationConfig, Contextra, ContextraConfig, MaintenanceConfig, MaintenanceScheduler,
@@ -10,6 +14,8 @@ use std::time::Duration;
 use tempfile::tempdir;
 use tokio::time::sleep;
 
+// ANCHOR[contextra-db:TEST-CONSOLIDATION_INTEGRATION_TEST-01-TEST_CONSOLIDATION_PASS_TOMBSTONES_DUPLICATES]
+// Testet die Funktionalität von `test_consolidation_pass_tombstones_duplicates`.
 #[tokio::test]
 async fn test_consolidation_pass_tombstones_duplicates() {
     let dir = tempdir().unwrap();
@@ -58,6 +64,8 @@ async fn test_consolidation_pass_tombstones_duplicates() {
     assert!(collection.get("chunk_10").await.unwrap().is_some());
 }
 
+// ANCHOR[contextra-db:TEST-CONSOLIDATION_INTEGRATION_TEST-02-TEST_CONSOLIDATION_WORKER_PERIODIC_EXECUTION_AND_CANCELLATION]
+// Testet die Funktionalität von `test_consolidation_worker_periodic_execution_and_cancellation`.
 #[tokio::test]
 async fn test_consolidation_worker_periodic_execution_and_cancellation() {
     let dir = tempdir().unwrap();
@@ -125,6 +133,8 @@ async fn test_consolidation_worker_periodic_execution_and_cancellation() {
 struct TestLlmGenerator;
 
 impl LlmTextGenerator for TestLlmGenerator {
+    // ANCHOR[contextra-db:TEST-CONSOLIDATION_INTEGRATION_TEST-03-GENERATE]
+    // Testet die Funktionalität von `generate`.
     fn generate<'a>(&'a self, prompt: &'a str) -> BoxFuture<'a, contextra_types::Result<String>> {
         Box::pin(async move {
             Ok(format!(

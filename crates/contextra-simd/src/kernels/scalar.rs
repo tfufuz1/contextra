@@ -1,3 +1,6 @@
+// FILE-CONTEXT
+// ZWECK: Skalare Fallback-Implementierung der Distanzmetriken (f32, f32_bytes, u8, f32_u8).
+// INVARIANTEN: Mathematisch exakt und deterministisch; Null-Division-Schutz für Cosine.
 
 //! # Modul `kernels::scalar`
 //!
@@ -19,6 +22,7 @@
 //! - Gemischte Präzision (`f32` und `u8`) mit Dequantisierungs-Parametern ($\alpha_i$, $\min_i$).
 
 // SECTION SCALAR-PARTS-STRUCTS
+// ANCHOR[contextra-simd:SCAL-PARTS-U8]
 /// Struct holding raw integer sum components for u8 cosine similarity calculation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CosineSimilarityPartsU8 {
@@ -30,6 +34,7 @@ pub struct CosineSimilarityPartsU8 {
     pub norm_b_sq: u32,
 }
 
+// ANCHOR[contextra-simd:SCAL-PARTS-F32-U8]
 /// Struct holding raw float sum components for f32/u8 mixed cosine similarity calculation.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CosineSimilarityPartsF32U8 {
@@ -43,6 +48,7 @@ pub struct CosineSimilarityPartsF32U8 {
 // !SECTION SCALAR-PARTS-STRUCTS
 
 // SECTION SCALAR-F32-DISTANCES
+// ANCHOR[contextra-simd:SCAL-COSINE-F32]
 /// Scalar reference implementation for cosine distance on `f32` slices.
 ///
 /// # Semantics
@@ -76,6 +82,7 @@ pub fn cosine_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
     1.0 - sim
 }
 
+// ANCHOR[contextra-simd:SCAL-EUCLIDEAN-F32]
 /// Scalar reference implementation for Euclidean distance on `f32` slices.
 ///
 /// # Semantics
@@ -95,6 +102,7 @@ pub fn euclidean_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
     sum.sqrt()
 }
 
+// ANCHOR[contextra-simd:SCAL-DOT-F32]
 /// Scalar reference implementation for dot product distance on `f32` slices.
 ///
 /// # Semantics
@@ -115,6 +123,7 @@ pub fn dot_product_scalar(a: &[f32], b: &[f32]) -> f32 {
 // !SECTION SCALAR-F32-DISTANCES
 
 // SECTION SCALAR-BYTES-DISTANCES
+// ANCHOR[contextra-simd:SCAL-COSINE-F32-BYTES]
 /// Scalar reference implementation for cosine distance between `f32` slice and raw LE `f32` byte slice.
 ///
 /// # Semantics
@@ -151,6 +160,7 @@ pub fn cosine_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
     1.0 - sim
 }
 
+// ANCHOR[contextra-simd:SCAL-EUCLIDEAN-F32-BYTES]
 /// Scalar reference implementation for Euclidean distance between `f32` slice and raw LE `f32` byte slice.
 ///
 /// # Semantics
@@ -176,6 +186,7 @@ pub fn euclidean_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
     sum.sqrt()
 }
 
+// ANCHOR[contextra-simd:SCAL-DOT-F32-BYTES]
 /// Scalar reference implementation for dot product distance between `f32` slice and raw LE `f32` byte slice.
 ///
 /// # Semantics
@@ -202,6 +213,7 @@ pub fn dot_product_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
 // !SECTION SCALAR-BYTES-DISTANCES
 
 // SECTION SCALAR-U8-DISTANCES
+// ANCHOR[contextra-simd:SCAL-DOT-U8]
 /// Scalar reference implementation for unsigned integer dot product between two `u8` byte slices.
 ///
 /// # Semantics
@@ -220,6 +232,7 @@ pub fn dot_product_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
     dot
 }
 
+// ANCHOR[contextra-simd:SCAL-EUCLIDEAN-SQ-U8]
 /// Scalar reference implementation for squared Euclidean distance between two `u8` byte slices.
 ///
 /// # Semantics
@@ -240,6 +253,7 @@ pub fn euclidean_distance_sq_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
     sum
 }
 
+// ANCHOR[contextra-simd:SCAL-COSINE-PARTS-U8]
 /// Scalar reference implementation for `u8` cosine similarity component parts.
 ///
 /// # Semantics
@@ -272,6 +286,7 @@ pub fn cosine_similarity_parts_u8_scalar(a: &[u8], b: &[u8]) -> CosineSimilarity
 // !SECTION SCALAR-U8-DISTANCES
 
 // SECTION SCALAR-MIXED-PRECISION
+// ANCHOR[contextra-simd:SCAL-DOT-F32-U8]
 /// Scalar reference implementation for mixed `f32`/`u8` dot product.
 ///
 /// # Semantics
@@ -290,6 +305,7 @@ pub fn dot_product_f32_u8(a: &[f32], b: &[u8]) -> f32 {
     dot
 }
 
+// ANCHOR[contextra-simd:SCAL-EUCLIDEAN-SQ-F32-U8]
 /// Scalar reference implementation for mixed `f32`/`u8` scalar dequantized squared Euclidean distance.
 ///
 /// # Semantics
@@ -312,6 +328,7 @@ pub fn euclidean_distance_sq_f32_u8(a: &[f32], b: &[u8], alphas: &[f32], mins: &
     sum
 }
 
+// ANCHOR[contextra-simd:SCAL-COSINE-PARTS-F32-U8]
 /// Scalar reference implementation for mixed `f32`/`u8` cosine similarity component parts.
 ///
 /// # Semantics
@@ -341,6 +358,7 @@ pub fn cosine_similarity_parts_f32_u8(a: &[f32], b: &[u8]) -> CosineSimilarityPa
     }
 }
 
+// ANCHOR[contextra-simd:SCAL-NORMALIZE-INPLACE]
 /// Normalizes a vector in-place to unit L2 length.
 ///
 /// # Semantics

@@ -1,3 +1,14 @@
+//! Dokumente, Chunks, Vektor-Embeddings und Distanzmetriken.
+//!
+//! # Architektur-Rolle: Typen-Fundament (Vektormatrizen & Ähnlichkeitsberechnung)
+//!
+//! Dieses Modul implementiert:
+//! - `DistanceMetric`: Mathematische Metriken zur Vektor-Distanzberechnung (Kosinus, Euklidisch, Skalarprodukt)
+//!   für Gleitkomma (`f32`) und quantisierte Vektoren (`u8`).
+//! - `Embedding`: Vektor-Container mit L2-Normierung und Schutz vor Division durch Subnormalwerte.
+//! - `ScoredDocument`: Ergebnis einer Ähnlichkeitsabfrage mit Dokument-ID und Score.
+//! - `RerankResult`: Kalibriertes Ergebnis nach einem Cross-Encoder-Reranking.
+
 use crate::error::{ContextraError, Result};
 use crate::types::domain::DocId;
 use serde::{Deserialize, Serialize};
@@ -5,6 +16,7 @@ use serde::{Deserialize, Serialize};
 /// Distance metric for vector comparison.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
 #[non_exhaustive]
+// ANCHOR[contextra-types:DOC-METRIC]
 pub enum DistanceMetric {
     /// Cosine distance (`1.0 - cos(angle)`).
     #[default]
@@ -91,7 +103,7 @@ impl DistanceMetric {
     ///   `compute()`'s `-dot` convention so that smaller return values consistently mean higher similarity.
     ///
     /// # Cross-Crate Caller Dependency Notice
-    /// Callers in `contextra-index` (such as `hnsw.rs` or `quantize.rs`) expecting raw squared Euclidean distance or
+    /// Callers in vector indices or quantization layers expecting raw squared Euclidean distance or
     /// non-inverted raw dot products must account for this unified "smaller = closer" distance metric semantics.
     // DECISION-REF: AGT-CORE-001 — Overflow-Schutz in compute_u8() bereits implementiert.
     // KONTEXT: Alle drei Zweige akkumulieren in u64 (Euclidean: diff²-Summe, DotProduct: Produkt-Summe)
@@ -158,6 +170,7 @@ impl DistanceMetric {
 
 /// Vector embedding representation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-types:DOC-EMBEDDING]
 pub struct Embedding {
     /// Raw vector data elements.
     pub data: Vec<f32>,
@@ -204,6 +217,7 @@ impl Embedding {
 
 /// A scored search result.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+// ANCHOR[contextra-types:DOC-SCORED]
 pub struct ScoredDocument {
     /// Identifier of the scored document.
     pub doc_id: DocId,
@@ -220,6 +234,7 @@ impl ScoredDocument {
 
 /// Result of cross-encoder reranking operation for a candidate item.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:DOC-RERANK]
 pub struct RerankResult {
     /// Rank position after reranking (0-based).
     pub index: usize,

@@ -1,0 +1,22 @@
+[
+  {
+    "arm": 0,
+    "strategy_debug": "Vector"
+  },
+  {
+    "arm": 1,
+    "strategy_debug": "Text"
+  },
+  {
+    "arm": 2,
+    "strategy_debug": "Graph"
+  },
+  {
+    "arm": 3,
+    "strategy_debug": "Hybrid"
+  },
+  {
+    "arm": 4,
+    "strategy_debug": "Global { max_community_nodes: None, min_community_size: None }"
+  }
+]

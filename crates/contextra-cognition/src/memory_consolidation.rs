@@ -1,9 +1,33 @@
+//! # Gedächtniskonsolidierung (`memory_consolidation.rs`)
+//!
+//! Implementiert den deterministischen Structural Consolidation Pass (strukturierte,
+//! mathematisch-statistische Bereinigung) sowie Schnittstellen zur Aufnahme vorverdichteter Eingaben.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2). Keine direkte Abhängigkeit zu `contextra-graph`
+//! im strukturellen Durchlauf (P1-DAG-Integrität).
+//!
+//! ## Kernkonzepte
+//! - **Sliding-Window-Clustering:** Gruppierung zeitlich benachbarter Turns in thematische Segmente
+//!   ([`TurnSegment`]) anhand eines Zentroiden-Embeddings und eines Kohäsionsschwellenwerts.
+//! - **Near-Duplicate-Detection:** Paarweiser Cosine-Similarity-Vergleich innerhalb eines Segments.
+//!   Der ältere Turn wird als Duplikat für das Tombstoning markiert.
+//! - **Pre-Condensed Input Intake:** Mandantengeschützte Aufnahme vorverdichteter externer Knoten
+//!   (z. B. aus Scratchpads) mit Längenprüfung, Sortierung und Grounding-Validierung (VETO-F10).
+//!
+//! ## Invarianten
+//! - **Keine LLM-Aufrufe im Structural Pass:** Der strukturelle Konsolidierungslauf arbeitet
+//!   vollständig deterministisch und offline.
+//! - **Chronologische Ordnung:** Das übergebene Slice muss chronologisch aufsteigend sortiert sein.
+//! - **Mandantentrennung (VETO-F10):** Fremde Mandanten-IDs werden strikt abgewiesen.
+
 // FILE-CONTEXT
 // ZWECK: Structural Consolidation Pass & Generative Synthesis Pass Architecture — Memory Consolidation (Near-Duplicate-Detection & Segmentation).
 // INVARIANTEN: Strikte Trennung von Structural Consolidation Pass (strukturierte statische/statistische Konsolidierung) und Generative Synthesis Pass (generative Wissenssynthese).
 //              Keine LLM-API-Aufrufe im Structural Consolidation Pass. Keine Abhängigkeit zu contextra-graph (P1-DAG-Integrität).
 // STAND: TS:2026-08-29T18:00:00Z
 
+// TODO(baukasten): Memory Consolidation Kernlogik (Near-Duplicate-Detection) isolieren (AD-8/F6). Reine Algorithmen arbeiten auf Vektor-Slices; Datenbank-Integration gehört in den Executor.
 //! Structural Consolidation Pass — deterministische, LLM-freie Bereinigung (Near-Duplicate-Detection, Sliding-Window-Clustering, verwaiste Kanten identifizieren). Analog zu Garbage Collection / Index Compaction.
 //!
 //! # Architektur-Hinweis (Generative Synthesis Pass vs. Structural Consolidation Pass)
@@ -19,12 +43,15 @@
 //! - `synthesis_phase::run_synthesis_pass()` in `synthesis_phase.rs` ist der LLM-basierte Generative Synthesis Pass über Segmenten (erzeugt `SynthesizedChunk`s via `SegmentSynthesizer`-Trait).
 
 use crate::context_compaction::{CompactedContext, ContextCompactor};
+use crate::error::CognitionError;
+use crate::ports_local::{LlmTextGenerator, ResponseGroundingValidator};
+use crate::types_local::{ContextChunk, DocId, TxId};
 use ahash::{AHashMap, AHashSet};
-use contextra_ports::{LlmTextGenerator, ResponseGroundingValidator};
-use contextra_types::{ContextChunk, DocId, TxId};
 
 /// Konfiguration für den Structural Consolidation Pass.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-cognition:MEM-001]
+/// Konfiguration für den Structural Consolidation Pass.
 pub struct ConsolidationConfig {
     /// Mindestanzahl von Turns pro Segment (Default: 3).
     pub min_turns_per_segment: usize,
@@ -56,6 +83,8 @@ impl Default for ConsolidationConfig {
 
 /// Repräsentiert ein semantisch zusammenhängendes Segment aus aufeinanderfolgenden Turns.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-cognition:MEM-002]
+/// Semantisch zusammenhängendes Segment aufeinanderfolgender Turns.
 pub struct TurnSegment {
     /// Liste aller DocIds der Turns in diesem Segment.
     pub turn_ids: Vec<DocId>,
@@ -67,15 +96,17 @@ pub struct TurnSegment {
 
 /// Ergebnis des Structural Consolidation Pass.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-cognition:MEM-003]
+/// Ergebnis des Structural Consolidation Pass.
 pub struct ConsolidationPhaseResult {
     /// Anzahl der erzeugten Segmente.
     pub segments_created: usize,
-    /// Liste aller DocIds, die als Duplikate markiert/tombstoned wurden.
-    pub duplicates_tombstoned: Vec<DocId>,
+    /// Liste aller DocIds, die als Duplikate markiert/superseded wurden.
+    pub duplicates_superseded: Vec<DocId>,
     /// Chunks, für die abhängige Graph-Kanten via Kaskadierungslogik nachgezogen werden müssen.
     /// Zur Einhaltung der P1-DAG-Integrität liefert dieses Modul NUR die Liste und ruft `contextra-graph`
     /// nicht selbst auf, um Crate-Zyklen zu vermeiden.
-    pub cascade_edge_tombstones_needed: Vec<DocId>,
+    pub cascade_edge_invalidations_needed: Vec<DocId>,
     /// Aggregierte Fehler beim Kaskadieren von Graph-Kanten-Tombstones.
     pub cascade_errors: Vec<String>,
 }
@@ -141,6 +172,8 @@ impl WorkingSegment {
 /// **Sonderregel zur Segment-Kohäsion:**
 /// Ein Segment unter `min_turns_per_segment` wird NICHT isoliert als Mikro-Segment belassen,
 /// sondern mit dem Nachbarsegment zusammengeführt (vorrangig mit dem vorausgehenden, andernfalls mit dem nachfolgenden).
+// ANCHOR[contextra-cognition:MEM-004]
+/// Gruppiert benachbarte Turns via Sliding-Window-Clustering.
 pub fn group_turns_into_segments(
     turns: &[(DocId, Vec<f32>)],
     config: &ConsolidationConfig,
@@ -237,7 +270,14 @@ pub fn group_turns_into_segments(
 /// DocId-Zahlenwerts als Ordnungskriterium für älter/neuer verwendet, da DocId via DocId::from_key
 /// aus BLAKE3-Hashes abgeleitet wird und keine Erstellungszeit-Korrelation besitzt. (TS: 2026-09-07T08:00:00Z)
 ///
-/// RÜCKGABE: `Vec<(DocId /* zu tombstonen: älterer Turn */, DocId /* Original: neuerer/wichtigerer Turn */)>`
+/// RÜCKGABE: `Vec<(DocId /* zu superseden: älterer Turn */, DocId /* Original: neuerer/wichtigerer Turn */)>`
+// ANCHOR[contextra-cognition:MEM-005]
+/// Führt segmentlokale Duplikatserkennung via Cosine-Similarity durch.
+// !SECTION: Konsolidierungs-Pass & Segmentierung
+
+// =========================================================================
+// SECTION: Near-Duplicate-Erkennung & Cosine-Aehnlichkeit
+// =========================================================================
 pub fn detect_near_duplicates(turns: &[(DocId, Vec<f32>)], threshold: f32) -> Vec<(DocId, DocId)> {
     let mut pairs = Vec::new();
     let n = turns.len();
@@ -277,6 +317,8 @@ pub fn detect_near_duplicates(turns: &[(DocId, Vec<f32>)], threshold: f32) -> Ve
 /// Die Segmentierung und Near-Duplicate-Detection stützen sich auf die zeitliche Abfolge der Slice-Indizes.
 ///
 /// Führt KEINE LLM-API-Aufrufe durch (Structural Consolidation Pass ist rein strukturell/statistisch).
+// ANCHOR[contextra-cognition:MEM-006]
+/// Orchestriert den deterministischen Structural Consolidation Pass.
 pub fn run_consolidation_pass(
     turns: &[(DocId, Vec<f32>)],
     config: &ConsolidationConfig,
@@ -284,8 +326,8 @@ pub fn run_consolidation_pass(
     if turns.is_empty() {
         return ConsolidationPhaseResult {
             segments_created: 0,
-            duplicates_tombstoned: Vec::new(),
-            cascade_edge_tombstones_needed: Vec::new(),
+            duplicates_superseded: Vec::new(),
+            cascade_edge_invalidations_needed: Vec::new(),
             cascade_errors: Vec::new(),
         };
     }
@@ -316,18 +358,20 @@ pub fn run_consolidation_pass(
     duplicates.sort_unstable_by_key(|d| d.inner());
     duplicates.dedup();
 
-    let cascade_edge_tombstones_needed = duplicates.clone();
+    let cascade_edge_invalidations_needed = duplicates.clone();
 
     ConsolidationPhaseResult {
         segments_created: segments.len(),
-        duplicates_tombstoned: duplicates,
-        cascade_edge_tombstones_needed,
+        duplicates_superseded: duplicates,
+        cascade_edge_invalidations_needed,
         cascade_errors: Vec::new(),
     }
 }
 
 /// Konfiguration für den Generative Synthesis Pass.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-cognition:MEM-007]
+/// Konfiguration für den Generative Synthesis Pass.
 pub struct SynthesisConfig {
     /// Mindestanzahl von Chunks/Dokumenten in einer Community (Default: 4).
     pub min_community_size: usize,
@@ -352,6 +396,8 @@ impl Default for SynthesisConfig {
 
 /// Verfolgt die Stabilität von Graph-Communities über aufeinanderfolgende Zyklen hinweg.
 #[derive(Debug, Clone, Default)]
+// ANCHOR[contextra-cognition:MEM-008]
+/// Verfolgt die Stabilität von Graph-Communities über Zyklen hinweg.
 pub struct CommunityStabilityTracker {
     history: AHashMap<u64, u32>,
 }
@@ -379,6 +425,8 @@ impl CommunityStabilityTracker {
 
 /// Ein generativ synthetisierter Wissens-Chunk (MetaChunk) aus dem Generative Synthesis Pass.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-cognition:MEM-009]
+/// Generativ synthetisierter Wissens-Chunk mit Provenienz.
 pub struct MetaChunk {
     /// Der synthetisierte, abstrakte Inhalt (MUSS mit `[SYNTHESIZED FROM {n} SOURCES] ` beginnen).
     pub content: String,
@@ -394,6 +442,8 @@ pub struct MetaChunk {
 
 /// Ergebnis des Generative Synthesis Pass.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-cognition:MEM-010]
+/// Ergebnis des Generative Synthesis Pass.
 pub struct SynthesisPhaseResult {
     /// Neu generierte MetaChunks.
     pub synthesized: Vec<MetaChunk>,
@@ -402,6 +452,8 @@ pub struct SynthesisPhaseResult {
 }
 
 /// Berechnet einen deterministischen 64-Bit-Hash für eine Liste von Member-DocIds.
+// ANCHOR[contextra-cognition:MEM-011]
+/// Berechnet einen deterministischen 64-Bit-Hash für Member-DocIds.
 pub fn compute_community_hash(member_doc_ids: &[DocId]) -> u64 {
     let mut sorted_ids: Vec<u64> = member_doc_ids.iter().map(|d| d.inner()).collect();
     sorted_ids.sort_unstable();
@@ -541,6 +593,8 @@ async fn synthesize_single_community(
 /// Dies ist der DETERMINISTISCHE, LLM-FREIE Structural Consolidation Pass. Für den LLM-basierten Generative Synthesis Pass siehe `synthesis_phase::run_synthesis_pass()`.
 ///
 /// Führt den Generative Synthesis Pass (generative Wissenssynthese) über stabile Graph-Communities aus.
+// ANCHOR[contextra-cognition:MEM-012]
+/// Führt den Syntheselauf über stabile Graph-Communities aus.
 pub async fn run_structural_synthesis_pass(
     stable_communities: &[(u64, Vec<DocId>)],
     source_texts: &AHashMap<DocId, String>,
@@ -590,16 +644,27 @@ pub async fn run_structural_synthesis_pass(
 }
 
 /// Maximum allowed length in bytes for text_digest in pre-condensed input.
+// ANCHOR[contextra-cognition:MEM-013]
+/// Maximale Länge für text_digest in PreCondensedInput.
 pub const MAX_PRE_CONDENSED_DIGEST_LEN: usize = 8192;
 
 /// Maximum allowed length in bytes for source_label in pre-condensed input.
+// ANCHOR[contextra-cognition:MEM-014]
+/// Maximale Länge für source_label in PreCondensedInput.
 pub const MAX_PRE_CONDENSED_LABEL_LEN: usize = 512;
 
 /// Maximum allowed provenance count in pre-condensed input.
+// ANCHOR[contextra-cognition:MEM-015]
+/// Maximale Anzahl an Provenienz-IDs in PreCondensedInput.
 pub const MAX_PRE_CONDENSED_PROVENANCE_COUNT: usize = 256;
 
 /// Agent-independent pre-condensed input structure (e.g. from agent scratchpad checkpoint or external pipeline).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-cognition:MEM-016]
+/// Struktur für vorverdichtete externe Eingabeknoten.
+// =========================================================================
+// SECTION: PreCondensedInput & Eingangsstrukturen
+// =========================================================================
 pub struct PreCondensedInput {
     pub tenant_id: contextra_types::TenantId,
     pub source_label: String,
@@ -613,35 +678,38 @@ fn validate_pre_condensed_input_bounds(
     input: &PreCondensedInput,
 ) -> contextra_types::Result<()> {
     if &input.tenant_id != target_tenant_id {
-        return Err(contextra_types::ContextraError::PolicyViolation(format!(
+        return Err(CognitionError::PolicyViolation(format!(
             "VETO-F10: Tenant boundary violation. Input tenant_id '{}' does not match target tenant_id '{}'",
             input.tenant_id,
             target_tenant_id
-        )));
+        )).into());
     }
 
     if input.text_digest.len() > MAX_PRE_CONDENSED_DIGEST_LEN {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(CognitionError::InvalidInput(format!(
             "PreCondensedInput text_digest length {} exceeds limit {}",
             input.text_digest.len(),
             MAX_PRE_CONDENSED_DIGEST_LEN
-        )));
+        ))
+        .into());
     }
 
     if input.source_label.len() > MAX_PRE_CONDENSED_LABEL_LEN {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(CognitionError::InvalidInput(format!(
             "PreCondensedInput source_label length {} exceeds limit {}",
             input.source_label.len(),
             MAX_PRE_CONDENSED_LABEL_LEN
-        )));
+        ))
+        .into());
     }
 
     if input.provenance.len() > MAX_PRE_CONDENSED_PROVENANCE_COUNT {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(CognitionError::InvalidInput(format!(
             "PreCondensedInput provenance count {} exceeds limit {}",
             input.provenance.len(),
             MAX_PRE_CONDENSED_PROVENANCE_COUNT
-        )));
+        ))
+        .into());
     }
 
     Ok(())
@@ -730,6 +798,13 @@ fn process_pre_condensed_input_node(
 /// - **Length & Bound Limits**: `text_digest`, `source_label`, and `provenance` count are checked against constants.
 /// - **Grounding Check**: When `min_grounding_score` is configured, inputs undergo grounding validation against `source_label`.
 /// - **Deterministic Ordering**: Inputs are sorted canonically by `tenant_id`, then `text_digest`, then `source_label`.
+// ANCHOR[contextra-cognition:MEM-017]
+/// Nimmt vorverdichtete Eingabeknoten mandantengeschützt in die Pipeline auf.
+// !SECTION: PreCondensedInput & Eingangsstrukturen
+
+// =========================================================================
+// SECTION: Vorverdichtungs-Intake & Validierung
+// =========================================================================
 pub fn intake_pre_condensed_inputs(
     target_tenant_id: &contextra_types::TenantId,
     inputs: &[PreCondensedInput],
@@ -767,6 +842,8 @@ pub fn intake_pre_condensed_inputs(
 /// Adapterfunktion zur Kompaktierung eines Segments via des bereits vorhandenen `ContextCompactor`.
 ///
 /// Wählt Chunks aus `chunks`, die zu `segment.turn_ids` gehören, und führt `ContextCompactor::compact` aus.
+// ANCHOR[contextra-cognition:MEM-018]
+/// Kompaktiert ein einzelnes Segment via ContextCompactor.
 pub fn compact_segment_via_context_compactor(
     segment: &TurnSegment,
     compactor: &ContextCompactor,
@@ -792,6 +869,8 @@ pub fn compact_segment_via_context_compactor(
 mod tests {
     use super::*;
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-026]
+    // Prüft Testfall `test_group_turns_into_segments_two_clusters`.
     #[test]
     fn test_group_turns_into_segments_two_clusters() {
         // 10 synthetic embeddings: 5 in Cluster A, 5 in Cluster B
@@ -825,8 +904,10 @@ mod tests {
         assert_eq!(segments.get(1).map(|s| s.turn_ids.len()), Some(5));
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-027]
+    // Prüft Testfall `test_detect_near_duplicates_older_superseded`.
     #[test]
-    fn test_detect_near_duplicates_older_tombstoned() {
+    fn test_detect_near_duplicates_older_superseded() {
         let emb = vec![1.0, 0.0, 0.0, 0.0];
         // Index 0 is chronologically older than Index 1
         let turns = vec![(DocId::new(10), emb.clone()), (DocId::new(20), emb.clone())];
@@ -842,6 +923,8 @@ mod tests {
         assert_eq!(newer, DocId::new(20));
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-028]
+    // Prüft Testfall `test_detect_near_duplicates_inverse_doc_id_order`.
     #[test]
     fn test_detect_near_duplicates_inverse_doc_id_order() {
         let emb = vec![1.0, 0.0, 0.0, 0.0];
@@ -863,6 +946,8 @@ mod tests {
         assert_eq!(newer, DocId::new(100));
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-029]
+    // Prüft Testfall `test_detect_near_duplicates_sub_threshold`.
     #[test]
     fn test_detect_near_duplicates_sub_threshold() {
         let emb_a = vec![1.0, 0.0, 0.0, 0.0];
@@ -876,15 +961,19 @@ mod tests {
         );
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-030]
+    // Prüft Testfall `test_empty_input_no_panic`.
     #[test]
     fn test_empty_input_no_panic() {
         let config = ConsolidationConfig::default();
         let res = run_consolidation_pass(&[], &config);
         assert_eq!(res.segments_created, 0);
-        assert!(res.duplicates_tombstoned.is_empty());
-        assert!(res.cascade_edge_tombstones_needed.is_empty());
+        assert!(res.duplicates_superseded.is_empty());
+        assert!(res.cascade_edge_invalidations_needed.is_empty());
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-031]
+    // Prüft Testfall `test_min_turns_per_segment_merging`.
     #[test]
     fn test_min_turns_per_segment_merging() {
         // Seg 1: 5 turns (Cluster A)
@@ -914,6 +1003,8 @@ mod tests {
         assert_eq!(segments.get(0).map(|s| s.turn_ids.len()), Some(6));
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-032]
+    // Prüft Testfall `test_group_turns_moderate_similarity_uses_cohesion_threshold`.
     #[test]
     fn test_group_turns_moderate_similarity_uses_cohesion_threshold() {
         // Turns mit ~0.75 Ähnlichkeit sollen zu EINEM Segment gruppiert werden
@@ -952,6 +1043,8 @@ mod tests {
         );
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-033]
+    // Prüft Testfall `test_default_config_produces_meaningful_segmentation`.
     #[test]
     fn test_default_config_produces_meaningful_segmentation() {
         // Mit Default-Config müssen semantisch unterschiedliche Turns in separate Segmente
@@ -987,9 +1080,7 @@ mod tests {
             Box::pin(async move {
                 if let Some(ref fail_str) = self.fail_community_contains {
                     if prompt.contains(fail_str) {
-                        return Err(contextra_types::ContextraError::Internal(
-                            "Simulated LLM error".into(),
-                        ));
+                        return Err(CognitionError::Internal("Simulated LLM error".into()).into());
                     }
                 }
                 Ok("Summary of community memories.".to_string())
@@ -997,6 +1088,8 @@ mod tests {
         }
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-034]
+    // Prüft Testfall `test_run_synthesis_pass_community_under_min_size_ignored`.
     #[tokio::test]
     async fn test_run_synthesis_pass_community_under_min_size_ignored() {
         let llm = MockLlmGenerator {
@@ -1024,6 +1117,8 @@ mod tests {
         assert_eq!(res.deferred_community_hashes.len(), 0);
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-035]
+    // Prüft Testfall `test_community_stability_tracker_cycles_and_reset`.
     #[test]
     fn test_community_stability_tracker_cycles_and_reset() {
         let mut tracker = CommunityStabilityTracker::new();
@@ -1047,6 +1142,8 @@ mod tests {
         assert_eq!(tracker.observe(hash_b), 1);
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-036]
+    // Prüft Testfall `test_run_synthesis_pass_max_llm_calls_per_cycle_limits_and_defers`.
     #[tokio::test]
     async fn test_run_synthesis_pass_max_llm_calls_per_cycle_limits_and_defers() {
         let llm = MockLlmGenerator {
@@ -1086,6 +1183,8 @@ mod tests {
         );
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-037]
+    // Prüft Testfall `test_run_synthesis_pass_meta_chunk_has_required_prefix_and_abstracts_from`.
     #[tokio::test]
     async fn test_run_synthesis_pass_meta_chunk_has_required_prefix_and_abstracts_from() {
         let llm = MockLlmGenerator {
@@ -1123,6 +1222,8 @@ mod tests {
         assert_eq!(chunk.source_community_hash, hash);
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-038]
+    // Prüft Testfall `test_run_synthesis_pass_error_on_one_community_continues_others`.
     #[tokio::test]
     async fn test_run_synthesis_pass_error_on_one_community_continues_others() {
         let llm = MockLlmGenerator {
@@ -1171,6 +1272,8 @@ mod tests {
         }
     }
 
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-039]
+    // Prüft Testfall `test_run_synthesis_pass_ungrounded_response_discarded`.
     #[tokio::test]
     async fn test_run_synthesis_pass_ungrounded_response_discarded() {
         let llm = MockLlmGenerator {
@@ -1209,3 +1312,4 @@ mod tests {
         );
     }
 }
+// !SECTION: Near-Duplicate-Erkennung & Cosine-Aehnlichkeit

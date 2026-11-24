@@ -1,3 +1,14 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (id_gen_determinism_test.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
+//! # Tests für die deterministische Generierung von Entscheidungs-IDs
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Tests für die deterministische Generierung von Entscheidungs-IDs.
+
+// ANCHOR[contextra-router:TST-IDG-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
@@ -11,6 +22,8 @@
 use contextra_ports::{IdGen, SequentialIdGen};
 use std::sync::Arc;
 
+// ANCHOR[contextra-router:TST-IDG-T01]
+// Test `test_router_id_gen_determinism`: Prüft das erwartete Verhalten und Invarianten für tests für die deterministische generierung von entscheidungs-ids.
 #[test]
 fn test_router_id_gen_determinism() {
     let seed = 777u64;

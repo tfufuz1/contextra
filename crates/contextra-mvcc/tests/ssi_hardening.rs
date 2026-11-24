@@ -1,14 +1,19 @@
-//! Hardening and concurrency tests for Serializable Snapshot Isolation (SSI) pruning, limits, and watermarks.
+// ANCHOR[contextra-mvcc:TEST-SSI-HARDENING-ROOT]
+//! # Härtungs- und Concurrency-Tests für Serializable Snapshot Isolation (SSI)
+//!
+//! Prüft Pruning-Mechanik, atomares Validate-and-Record, Fail-Closed-Verhalten
+//! bei alten Snapshots und Shard-übergreifendes Wasserstand-Tracking.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_mvcc::error::ContextraError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::tx_buffer::TxBuffer;
 use contextra_mvcc::types::TxId;
+use contextra_mvcc::MvccError;
 use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
+// Prüft die strikte Atomarität von validate_and_record unter nebenläufiger Thread-Verschränkung.
 #[test]
 fn test_validate_and_record_atomicity() {
     for _ in 0..500 {
@@ -49,6 +54,7 @@ fn test_validate_and_record_atomicity() {
     }
 }
 
+// Prüft die genaue Funktionsweise von prune_through und das Entfernen historischer Sequenzen.
 #[test]
 fn test_prune_through_mechanics() {
     let validator = SequenceLogSsiValidator::new();
@@ -70,6 +76,7 @@ fn test_prune_through_mechanics() {
     assert_eq!(validator.pruned_through(), 20);
 }
 
+// Prüft das Fail-Closed-Verhalten: Transaktionen mit Snapshots älter als pruned_through werden deterministisch abgewiesen.
 #[test]
 fn test_fail_closed_validation() {
     let validator = SequenceLogSsiValidator::new();
@@ -81,13 +88,13 @@ fn test_fail_closed_validation() {
 
     let res_old = validator.validate(TxId::new(1), &old_rs);
     assert!(res_old.is_err());
-    if let Err(ContextraError::Conflict(msg)) = res_old {
+    if let Err(MvccError::Conflict(msg)) = res_old {
         assert!(
             msg.contains("snapshot too old"),
             "Expected 'snapshot too old' in error message: {msg}"
         );
     } else {
-        panic!("Expected ContextraError::Conflict");
+        panic!("Expected MvccError::Conflict");
     }
 
     let mut valid_rs = ReadSet::new();
@@ -96,6 +103,7 @@ fn test_fail_closed_validation() {
     assert!(res_valid.is_ok());
 }
 
+// Prüft die Ermittlung des kleinsten Lese-Snapshots über mehrere Shards hinweg.
 #[test]
 fn test_min_read_snapshot_across_shards() {
     let buffer = TxBuffer::<String>::new_with_config(64, Duration::from_secs(30));
@@ -119,6 +127,7 @@ fn test_min_read_snapshot_across_shards() {
     assert_eq!(buffer.min_read_snapshot(), None);
 }
 
+// Prüft die Durchsetzung von max_keys bei try_register_read und das Aktualisieren bestehender Schlüssel.
 #[test]
 fn test_try_register_read_limit_and_updates() {
     let buffer = TxBuffer::<String>::new();
@@ -130,10 +139,7 @@ fn test_try_register_read_limit_and_updates() {
 
     // 3rd new key fails when max_keys is 2
     let res_overflow = buffer.try_register_read(tx, b"k3".to_vec(), 30, 2);
-    assert!(matches!(
-        res_overflow,
-        Err(ContextraError::LimitExceeded { .. })
-    ));
+    assert!(matches!(res_overflow, Err(MvccError::LimitExceeded { .. })));
 
     let rs = buffer.get_read_set(tx).unwrap();
     assert_eq!(rs.len(), 2);
@@ -146,6 +152,7 @@ fn test_try_register_read_limit_and_updates() {
 }
 
 proptest::proptest! {
+    // Eigenschaftstest: Verifiziert, dass Bereinigungen unterhalb des Wasserstands die Validierung oberhalb unberührt lassen.
     #[test]
     fn prop_prune_equivalence_above_watermark(
         commits in proptest::collection::vec((proptest::collection::vec(0..255u8, 1..8), 1..100u64), 1..30),
@@ -173,7 +180,7 @@ proptest::proptest! {
 
         match (res_unpruned, res_pruned) {
             (Ok(()), Ok(())) => {},
-            (Err(ContextraError::Conflict(_)), Err(ContextraError::Conflict(_))) => {},
+            (Err(MvccError::Conflict(_)), Err(MvccError::Conflict(_))) => {},
             (un, pr) => proptest::prop_assert!(false, "Mismatch above watermark: unpruned={:?}, pruned={:?}", un, pr),
         }
     }

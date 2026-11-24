@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: HNSW-Recall-Validierung gegen Brute-Force-Oracle für alle Metriken.
+// INVARIANTEN: Recall@10 >= 0.95 für Cosine, Euclidean und DotProduct.
+// HOTSPOTS: 30-140
+// STAND: 2026-11-12
 use std::collections::HashSet;
 use std::error::Error;
 
@@ -64,6 +69,64 @@ fn brute_force_knn(
 }
 
 /// Helper to build and query index against brute force ground truth.
+
+async fn run_recall_test_with_params(
+    metric: DistanceMetric,
+    k: usize,
+    num_vectors: usize,
+    num_queries: usize,
+    dim: usize,
+    seed: u64,
+    m: usize,
+    ef_construction: usize,
+    ef_search: usize,
+) -> Result<f64, Box<dyn Error>> {
+    let config = HnswConfig {
+        dimension: dim,
+        max_elements: num_vectors + 1000,
+        m,
+        ef_construction,
+        ef_search,
+        distance_metric: metric,
+        quantize: false,
+        ..Default::default()
+    };
+
+    let index = HnswIndex::try_new(config)?;
+    let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+
+    let mut data = Vec::with_capacity(num_vectors);
+    for _ in 0..num_vectors {
+        let v: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        data.push(v);
+    }
+
+    let tx = TxId::new(1);
+    for (i, v) in data.iter().enumerate() {
+        index.insert(tx, DocId::new((i as u64).into()), v).await?;
+    }
+    index.commit(tx).await?;
+
+    let mut total_recall = 0.0;
+    for _ in 0..num_queries {
+        let query: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
+
+        let ground_truth_indices = brute_force_knn(&data, &query, k, metric);
+        let ground_truth_set: HashSet<u64> =
+            ground_truth_indices.iter().map(|&i| i as u64).collect();
+
+        let hnsw_results = index.search(&query, k).await?;
+        let hits = hnsw_results
+            .iter()
+            .filter(|r| ground_truth_set.contains(&(r.doc_id.inner() as u64)))
+            .count();
+
+        total_recall += hits as f64 / k as f64;
+    }
+
+    Ok(total_recall / num_queries as f64)
+}
+
 async fn run_recall_test(
     metric: DistanceMetric,
     k: usize,
@@ -165,6 +228,32 @@ async fn recall_at_1_vs_brute_force() -> Result<(), Box<dyn Error>> {
     assert!(
         avg_recall >= 0.99,
         "Recall@1 too low: {:.4} (expected >= 0.99)",
+        avg_recall
+    );
+    Ok(())
+}
+
+
+#[tokio::test]
+async fn test_hnsw_recall_at_10_target_10k_vectors() -> Result<(), Box<dyn Error>> {
+    // Target per AUFTRAG P03:
+    // 10 000 Vektoren, 128 d, fester Seed (42), Brute-Force-Orakel, Recall@10 >= 0,95
+    // Dokumentierte Parameter: M = 32, ef_construction = 200, ef_search = 150.
+    let avg_recall = run_recall_test_with_params(
+        DistanceMetric::Cosine,
+        10,
+        10_000,
+        100,
+        128,
+        42,
+        32,
+        200,
+        150,
+    ).await?;
+    println!("10k Vectors Cosine Average Recall@10 (M=32, ef_c=200, ef_s=150): {:.4}", avg_recall);
+    assert!(
+        avg_recall >= 0.95,
+        "10k Vectors Recall@10 too low: {:.4} (expected >= 0.95)",
         avg_recall
     );
     Ok(())

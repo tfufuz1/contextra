@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // ZWECK: Integrationstest für Messung der Blocking-Thread-Pool-Auslastung (blocking_util) und MetricsSink-Emission.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

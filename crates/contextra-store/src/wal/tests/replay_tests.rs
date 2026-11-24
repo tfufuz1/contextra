@@ -1,5 +1,10 @@
+//! # Tests fuer WAL Replay (Ring 1)
+//!
+//! Prueft deterministisches Replay ueber Sequenzgrenzen hinweg.
+
 use super::*;
-use contextra_types::TxId;
+use contextra_ids::TxId;
+use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -96,14 +101,14 @@ async fn test_wal_crc_middle_corruption() {
 
     // Should fail because corruption is in the middle (before the last entry)
     assert!(
-        matches!(result, Err(ContextraError::WalCorruption { .. })),
+        matches!(result, Err(StoreError::WalCorruption { .. })),
         "Expected WalCorruption error, got {:?}",
         result
     );
 }
 
 #[tokio::test]
-async fn wal_tolerates_truncated_tail() {
+async fn test_wal_tolerates_truncated_tail() {
     let dir = tempdir().expect("tempdir"); // expect
     let path = dir.path().join("test.wal");
 
@@ -224,9 +229,9 @@ async fn test_wal_header_systematic_fuzzing() {
                     assert!(
                         matches!(
                             e,
-                            ContextraError::Serialization(_)
-                                | ContextraError::WalCorruption { .. }
-                                | ContextraError::Storage(_)
+                            StoreError::Serialization(_)
+                                | StoreError::WalCorruption { .. }
+                                | StoreError::Storage(_)
                         ),
                         "Unexpected error type at byte {}, bit {}: {:?}",
                         byte_idx,
@@ -325,9 +330,13 @@ async fn test_wal_legacy_key_fallback_migration() {
             key: b"legacy_key".to_vec(),
             value: b"legacy_val".to_vec(),
         };
-        let legacy_entry =
-            WalEntry::try_new(op, 1, &Wal::legacy_integrity_key_for_test(), [0u8; 32])
-                .expect("legacy entry"); // expect
+        let legacy_entry = WalEntry::try_new(
+            op,
+            1,
+            &Wal::legacy_integrity_key_for_test().expect("legacy key"),
+            [0u8; 32],
+        )
+        .expect("legacy entry"); // expect
 
         let mut wal_bytes = Vec::new();
         wal_bytes.extend_from_slice(&WAL_V3_HEADER);
@@ -444,7 +453,7 @@ async fn test_old_v1_format_backward_compatibility() {
     // Manually construct an old V1 encrypted WAL file (no MFW2 header, each entry encrypted separately)
     let integrity_key = sub_km
         .integrity_key()
-        .map_err(ContextraError::from)
+        .map_err(StoreError::from)
         .expect("integrity key"); // expect
 
     let op1 = WalOp::Put {
@@ -601,8 +610,13 @@ async fn test_wal_v1_auto_migration_on_min_version_v3() {
             key: b"mig_key".to_vec(),
             value: b"mig_val".to_vec(),
         };
-        let entry = WalEntry::try_new(op, 1, &Wal::legacy_integrity_key_for_test(), [0u8; 32])
-            .expect("v1 entry"); // expect
+        let entry = WalEntry::try_new(
+            op,
+            1,
+            &Wal::legacy_integrity_key_for_test().expect("legacy key"),
+            [0u8; 32],
+        )
+        .expect("v1 entry"); // expect
 
         let mut v1_bytes = Vec::new();
         // V1 WAL file has no MFW3 or MFW2 header prefix
@@ -689,8 +703,13 @@ async fn test_full_rewrite_crash_recovery_pipeline() {
         key: b"k_crash".to_vec(),
         value: b"v_crash".to_vec(),
     };
-    let entry = WalEntry::try_new(op, 1, &Wal::legacy_integrity_key_for_test(), [0u8; 32])
-        .expect("v1 entry");
+    let entry = WalEntry::try_new(
+        op,
+        1,
+        &Wal::legacy_integrity_key_for_test().expect("legacy key"),
+        [0u8; 32],
+    )
+    .expect("v1 entry");
     let v1_bytes = entry.to_bytes().expect("to_bytes");
     tokio::fs::write(&wal_path, &v1_bytes)
         .await
@@ -749,8 +768,13 @@ async fn test_v1_plaintext_rejected_when_key_manager_active() {
         key: b"unencrypted_key".to_vec(),
         value: b"unencrypted_val".to_vec(),
     };
-    let entry =
-        WalEntry::try_new(op, 1, &Wal::legacy_integrity_key_for_test(), [0u8; 32]).expect("entry");
+    let entry = WalEntry::try_new(
+        op,
+        1,
+        &Wal::legacy_integrity_key_for_test().expect("legacy key"),
+        [0u8; 32],
+    )
+    .expect("entry");
     let entry_bytes = entry.to_bytes().expect("to_bytes");
 
     // Write directly to file (bypassing Wal API)
@@ -806,7 +830,7 @@ async fn test_split_brain_legacy_fallback_chain_continuity() {
     let wal_path = dir.path().join("split_brain.wal");
 
     let normal_key = b"normal-integrity-key-32-bytes---";
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
 
     // 1. Entry 1: created with normal key, prev_hmac = [0u8; 32]
     let op1 = WalOp::Put {
@@ -854,7 +878,7 @@ async fn test_split_brain_legacy_fallback_chain_continuity() {
     };
 
     assert!(
-            matches!(replay_err, ContextraError::WalCorruption { .. }),
+            matches!(replay_err, StoreError::WalCorruption { .. }),
             "Forged entry 3 with prev_hmac=[0;32] must be rejected during fallback because chain state was non-zero! Got: {:?}",
             replay_err
         );
@@ -1029,7 +1053,7 @@ async fn test_attack_a_swap_blocks_unencrypted_detected() {
     );
     let err = open_res.unwrap_err();
     assert!(
-        matches!(err, ContextraError::WalCorruption { .. }),
+        matches!(err, StoreError::WalCorruption { .. }),
         "Expected WalCorruption error, got: {:?}",
         err
     );
@@ -1083,7 +1107,7 @@ async fn test_attack_a_swap_blocks_encrypted_detected() {
     );
     assert!(matches!(
         open_res.unwrap_err(),
-        ContextraError::WalCorruption { .. }
+        StoreError::WalCorruption { .. }
     ));
 }
 
@@ -1149,7 +1173,7 @@ async fn test_attack_c_duplicate_block_3_unencrypted_detected() {
     );
     let err = open_res.unwrap_err();
     assert!(
-        matches!(err, ContextraError::WalCorruption { .. }),
+        matches!(err, StoreError::WalCorruption { .. }),
         "Expected WalCorruption error, got: {:?}",
         err
     );
@@ -1186,7 +1210,7 @@ async fn test_attack_d_cross_file_replay_unencrypted_detected() {
     );
     let err = open_res.unwrap_err();
     assert!(
-        matches!(err, ContextraError::WalCorruption { .. }),
+        matches!(err, StoreError::WalCorruption { .. }),
         "Expected WalCorruption error, got: {:?}",
         err
     );
@@ -1256,7 +1280,7 @@ async fn test_attack_d_cross_file_replay_encrypted_detected() {
     );
     let err = open_res.unwrap_err();
     assert!(
-        matches!(err, ContextraError::WalCorruption { .. }),
+        matches!(err, StoreError::WalCorruption { .. }),
         "Expected WalCorruption error due to per-file UUID key isolation failure, got: {:?}",
         err
     );
@@ -1496,7 +1520,7 @@ async fn test_mmap_slice_bounds_mismatch_no_panic() {
 
     // Verify it handles the truncated slice gracefully without panic
     assert!(
-        res.is_ok() || matches!(res, Err(ContextraError::WalCorruption { .. })),
+        res.is_ok() || matches!(res, Err(StoreError::WalCorruption { .. })),
         "parse_mmap_slice with slice shorter than file_size must not panic"
     );
 }

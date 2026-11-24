@@ -9,7 +9,14 @@
 
 //! Persistent Dead-Letter-Queue for failed agent step executions.
 
+// =========================================================================
+// SECTION: Persistent Dead-Letter Queue
+// =========================================================================
+// ANCHOR[contextra-agent:dlq-primitives]
+
+
 use crate::step::StepDeadLetter;
+// TODO(baukasten): Dead Letter Queue (DLQ) entkoppeln (AD-8). Persistenz über schmalen Speicher-Port abstrahieren statt harter Bindung an db::Collection.
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -407,3 +414,5 @@ mod tests {
         Ok(())
     }
 }
+
+// !SECTION

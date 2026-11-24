@@ -1,9 +1,15 @@
+//! # Kaskadierende Invalidierungs-Integrationstests
+//!
+//! Prüft das kaskadierende Invalidieren abhängiger Indizes bei Dokumentlöschungen.
+//!
 use contextra_db::{execute_consolidation_pass, ConsolidationConfig, Contextra, ContextraConfig};
 use contextra_graph::path_rag::PathRAGEngine;
 use contextra_ports::GraphIndex;
 use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use tempfile::tempdir;
 
+// ANCHOR[contextra-db:TEST-CASCADE_INVALIDATION_INTEGRATION-01-TEST_CONSOLIDATION_PASS_CASCADES_EDGE_INVALIDATION]
+// Testet die Funktionalität von `test_consolidation_pass_cascades_edge_invalidation`.
 #[tokio::test]
 async fn test_consolidation_pass_cascades_edge_invalidation() {
     let dir = tempdir().expect("Failed to create temp directory");

@@ -1,3 +1,21 @@
+//! # LeanRAG Eingabeextraktion (`leanrag_input.rs`)
+//!
+//! Dieses Modul bereitet Eingabedaten für die LeanRAG Stage-3-Hyperkantenaggregation
+//! vor. Es liest Dokumente und Turns aus der Collection, gleicht sie mit dem
+//! Graphen ab und erzeugt deterministisch sortierte Knoten ([`AggregationNode`])
+//! und Kanten ([`AggregationEdge`]).
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2), greift auf `contextra-graph` und `contextra-engine` zu.
+//!
+//! ## Invarianten
+//! - **Kein Unsafe-Code:** Vollständig sichere Rust-Implementierung.
+//! - **Synchrone Reinheit:** Keine asynchronen Sperren innerhalb der Extraktionsfunktion.
+//! - **Deterministische Sortierung:** Knoten werden strikt aufsteigend nach `EntityId` sortiert,
+//!   Kanten nach `HyperEdgeId`.
+//! - **Vollständige Kanten-Teilnehmerschaft:** Eine Hyperkante wird nur übernommen, wenn
+//!   alle ihre Teilnehmerknoten in der gefilterten Knotenmenge vorhanden sind.
+
 // FILE-CONTEXT
 // ZWECK: Extraktion von LeanRAG-Eingabedaten (AggregationNode/AggregationEdge) aus einer Collection (Spec §21.4).
 // INVARIANTEN: No unsafe code; keine Async-Locks in der synchronen Extraktionsfunktion; deterministische Sortierung.
@@ -5,17 +23,24 @@
 //! Extraktion von LeanRAG-Eingabedaten ([`AggregationNode`], [`AggregationEdge`]) aus einer [`Collection`].
 
 use crate::aggregation_phase::{AggregationEdge, AggregationNode};
+use crate::engine_local::collection::Collection;
+use crate::graph_local::hyperedge::HyperEdgeId;
+use crate::ports_local::{StorageEngine, VectorIndex};
+use crate::types_local::{DocId, EntityId};
 use ahash::{AHashMap, AHashSet};
-use contextra_engine::collection::Collection;
-use contextra_graph::hyperedge::HyperEdgeId;
-use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_types::{DocId, EntityId};
 
 /// Standardmäßige Obergrenze für die Anzahl extrahierter Knoten im LeanRAG-Input.
+// ANCHOR[contextra-cognition:INPUT-001]
+/// Standard-Obergrenze für LeanRAG-Knoten.
 pub const DEFAULT_MAX_LEANRAG_NODES: usize = 10_000;
 
 /// Extrahiertes Eingabepaket für die LeanRAG Stage-3-Aggregation.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-cognition:INPUT-002]
+/// Eingabepaket für die LeanRAG Stage-3-Aggregation.
+// =========================================================================
+// SECTION: LeanRagInputs Datenstruktur
+// =========================================================================
 pub struct LeanRagInputs {
     /// Liste der zugrundeliegenden Entitätsknoten.
     pub nodes: Vec<AggregationNode>,
@@ -39,6 +64,8 @@ pub struct LeanRagInputs {
 ///   auf `u32` (die ersten 4 Bytes) konvertiert.
 /// - **Determinismus**: Knoten werden kanonisch nach `EntityId` (aufsteigend) sortiert und auf `max_nodes` gekappt;
 ///   Kanten werden kanonisch nach `HyperEdgeId` sortiert.
+// ANCHOR[contextra-cognition:INPUT-003]
+/// Baut LeanRagInputs aus Turns und Graphendaten deterministisch auf.
 pub fn build_leanrag_inputs<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     turns: &[(DocId, Vec<f32>)],
@@ -110,3 +137,4 @@ pub fn build_leanrag_inputs<S: StorageEngine, V: VectorIndex>(
 
     LeanRagInputs { nodes, edges }
 }
+// !SECTION: Input-Aufbereitung

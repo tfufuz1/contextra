@@ -1,3 +1,20 @@
+//! # Transitivitäts-Veto (`transitivity_veto.rs`)
+//!
+//! Dieses Modul schützt die Gedächtniskonsolidierung vor Fehlzusammenführungen
+//! (False-Positive-Merges) durch transitive Ähnlichkeitsketten. Wenn Element A ähnlich zu B
+//! ist und B ähnlich zu C ist, bedeutet das nicht zwingend, dass A auch hinreichend ähnlich
+//! zu C ist. Bei festgestellter Transitivitätsverletzung wird ein Veto eingelegt.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2). Nutzt Aggregations- und Domänentypen.
+//!
+//! ## Invarianten
+//! - **P24-Lokalität:** Die kubische Komplexität O(N^3) der Dreiecksprüfung wird ausschließlich
+//!   auf einer kleinen, per Cosine-Similarity vorgefilterten Kandidatenmenge ausgeführt.
+//! - **Speicherbudget-Schutz:** Überschreitet die Kandidatenmenge `max_compaction_peak_memory_mb`,
+//!   wird die Dreiecksprüfung sicher übersprungen und nicht abgebrochen.
+//! - **Zero-Panic-Doktrin:** Keine Panikzustände bei Randwerten oder leeren Mengen.
+
 // FILE-CONTEXT
 // ZWECK: Transitivity Veto Inspection & Orchestration for Near-Duplicate Memory Consolidation.
 // INVARIANTEN: Zero-Panic; P24-Lokalität (O(N^3) nur auf vorgefilterten, budgetbegrenzten Kandidatenmengen).
@@ -10,8 +27,9 @@
 
 use crate::aggregation_phase::{AggregationConfig, AggregationNode};
 use crate::memory_consolidation::{cosine_similarity, detect_near_duplicates};
+// TODO(baukasten): Transitivity-Veto als eigenständige mathematische Invariante kapseln (AD-8). Null Kopplung an Aggregationsphasen-Pipeline.
+use crate::types_local::{DocId, EntityId};
 use ahash::{AHashMap, AHashSet};
-use contextra_types::{DocId, EntityId};
 
 /// Reine, synchrone Funktion, die für drei `AggregationNode`-Kandidaten (A, B, C)
 /// und einen Ähnlichkeits-Schwellenwert prüft, ob eine transitive Verkettung
@@ -21,6 +39,11 @@ use contextra_types::{DocId, EntityId};
 /// **Rückgabe**:
 /// - `false` (Veto: NICHT mergen), wenn eine transitive Verkettung mit Endpunkte-Unähnlichkeit vorliegt.
 /// - `true` (Kein Veto: Merge zulässig), wenn keine transitive Diskrepanz vorliegt.
+// ANCHOR[contextra-cognition:VETO-001]
+/// Reine Funktion zur Prüfung von Transitivitätsverletzungen bei Dreieckskonstellationen.
+// =========================================================================
+// SECTION: Dreiecks-Transitivitaetspruefung
+// =========================================================================
 pub fn validate_transitivity_veto(
     node_a: &AggregationNode,
     node_b: &AggregationNode,
@@ -102,6 +125,13 @@ fn build_candidate_nodes(
 ///     übersprungen (kein Abbrechen der Konsolidierung).
 /// (c) Führt erst dann `validate_transitivity_veto`-Aufrufe ausschließlich innerhalb der vorgefilterten,
 ///     budgetbegrenzten Menge durch.
+// ANCHOR[contextra-cognition:VETO-002]
+/// Orchestriert die Transitivitätsprüfung unter Einhaltung der P24-Lokalität.
+// !SECTION: Dreiecks-Transitivitaetspruefung
+
+// =========================================================================
+// SECTION: Kandidaten-Filterung
+// =========================================================================
 pub fn filter_candidates_with_transitivity_veto(
     turns: &[(DocId, Vec<f32>)],
     threshold: f32,
@@ -145,3 +175,4 @@ pub fn filter_candidates_with_transitivity_veto(
 
     filtered_pairs
 }
+// !SECTION: Kandidaten-Filterung

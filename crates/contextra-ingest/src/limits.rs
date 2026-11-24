@@ -1,3 +1,14 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: Limits und Extraktions-Policies für contextra-ingest (WP M2).
 // INVARIANTEN: Defensiver Startzustand, Zero-Panic, #[non_exhaustive], Serialize/Deserialize.
@@ -31,6 +42,8 @@ pub struct IngestLimits {
     pub max_pages: u32,
     /// Maximale Anzahl extrahierter Tabellenzellen (Standard: 5_000_000)
     pub max_table_cells: u64,
+    /// Maximale Pfadlänge von Einträgen in Archiven (Standard: 1024 Zeichen)
+    pub max_path_len: usize,
 }
 
 impl Default for IngestLimits {
@@ -47,6 +60,7 @@ impl Default for IngestLimits {
             max_text_bytes: 64 * 1024 * 1024,
             max_pages: 5_000,
             max_table_cells: 5_000_000,
+            max_path_len: 1024,
         }
     }
 }
@@ -59,7 +73,7 @@ pub struct ExtractPolicy {
     pub include_hidden: bool,
     /// Kommentare im Dokument extrahieren? (Standard: true)
     pub include_comments: bool,
-    /// Nachverfolgte Löschungen (Tracked Deletions) einbeziehen? (Standard: false)
+    /// Nachverfolgte Streichungen (Tracked Deletions) einbeziehen? (Standard: false)
     pub include_tracked_deletions: bool,
     /// Kopf- und Fußzeilen extrahieren? (Standard: false)
     pub include_headers_footers: bool,

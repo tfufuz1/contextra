@@ -1,3 +1,7 @@
+// =========================================================================
+// SECTION: io
+// =========================================================================
+// ANCHOR[contextra-mcp:IO-001]
 use tokio::io::AsyncBufReadExt;
 
 /// Maximum allowed single JSON-RPC message size via stdio (4 MB).
@@ -80,3 +84,5 @@ pub async fn read_line_bounded<R: tokio::io::AsyncBufRead + Unpin>(
         )),
     }
 }
+
+// !SECTION: io

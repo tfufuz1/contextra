@@ -1,14 +1,31 @@
+//! Pfadbasierte Relevanzsuche (Path-RAG) auf dem CSR-Graphen.
+//!
+//! # Zweck
+//! Identifiziert erklärende Pfade zwischen Entitäten für Retrieval-Augmented Generation.
+
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::super::graph_write::CsrGraph;
 use ahash::AHashMap;
-use contextra_types::{EntityId, Result, TxId};
+use crate::error::Result;
+use crate::storage::GraphFuture;
+use crate::types::{EntityId, TxId};
 
+
+// SECTION Path Rag Core Implementation
 impl CsrGraph {
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-PATH-RAG-001]
     pub fn path_rag_at<'a>(
         &'a self,
         start_nodes: &'a [EntityId],
         max_hops: usize,
         seq_no: u64,
-    ) -> contextra_ports::BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+    ) -> GraphFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
             let as_of_tx = TxId::new(seq_no);
             if super::super::visibility::is_suspicious_tx_id(as_of_tx) {
@@ -43,10 +60,7 @@ impl CsrGraph {
                 let paths = engine.find_all_paths(start);
                 let rrf_signal = engine.to_rrf_signal(&paths);
                 for (doc_id, score) in rrf_signal {
-                    #[cfg(not(feature = "docid-128"))]
-                    let entity_id = EntityId::new(doc_id.0);
-                    #[cfg(feature = "docid-128")]
-                    let entity_id = EntityId::new(doc_id.0 as u64);
+                    let entity_id = EntityId::new(doc_id.as_u64());
 
                     combined
                         .entry(entity_id)
@@ -65,3 +79,5 @@ impl CsrGraph {
         })
     }
 }
+
+// !SECTION Path Rag Core Implementation

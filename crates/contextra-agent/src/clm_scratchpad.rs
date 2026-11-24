@@ -14,11 +14,17 @@
 //! # Port-Entscheidung & Lokale Traits
 //! `ContextEditAuditSink` und `ScratchpadCacheInvalidator` sind als schlanke, lokale Traits
 //! in diesem Modul definiert, da die endgültige Entscheidung über eine Auslagerung in `contextra-ports`
-//! noch aussteht (siehe ADR-106). Sie verhindern direkte Ring-Verstöße gegen `contextra-privacy`
+//! noch aussteht (siehe ADR-106). Sie verhindern direkte Schichtungs-Verstöße gegen `contextra-privacy`
 //! und `contextra-kvcache`.
 
+// =========================================================================
+// SECTION: Context-Language-Model Scratchpad
+// =========================================================================
+// ANCHOR[contextra-agent:clm-scratchpad]
+
+
 use contextra_db::volatile_vault::{
-    PurgeReceipt, SignalModality, VaultChunk, VaultConfig, VolatileContextVault,
+    SignalModality, VaultChunk, VaultConfig, VaultDocId, VaultTxId, VolatileContextVault,
 };
 use contextra_ports::{Clock, SystemClock};
 use contextra_types::{ContextraError, DocId, Result, TenantId, TxId};
@@ -174,6 +180,17 @@ pub enum ScratchpadEditOp {
     },
 }
 
+/// Quittung über das Zurücksetzen des flüchtigen Kontext-Speichers.
+#[derive(Debug)]
+pub struct VaultResetReceipt {
+    /// Anzahl bereinigter Chunks.
+    pub chunks_purged: usize,
+    /// Anzahl überschriebener Bytes im Speicher.
+    pub bytes_zeroed: usize,
+    /// Zeitpunkt des Zurücksetzens.
+    pub reset_at: std::time::Instant,
+}
+
 /// Zusammenfassung eines Subgoal-Checkpoints vor dem Zurücksetzen des Scratchpads.
 ///
 /// Dieser Typ dient als Übergabeobjekt für nachfolgende Stufen (z. B. Speicher-Konsolidierung).
@@ -184,7 +201,7 @@ pub struct ScratchpadCheckpoint {
     /// Index des erfolgreich abgeschlossenen Teilziels.
     pub completed_subgoal_index: u64,
     /// Löschquittung nach dem Leeren des VolatileContextVault.
-    pub purge_receipt: PurgeReceipt,
+    pub reset_receipt: VaultResetReceipt,
     /// Anzahl der Chunks zum Zeitpunkt des Checkpoints.
     pub chunk_count_at_checkpoint: usize,
 }
@@ -214,7 +231,7 @@ fn clone_chunk(chunk: &VaultChunk) -> VaultChunk {
         chunk.id,
         chunk.content.clone(),
         chunk.modality.clone(),
-        TxId(chunk.captured_tx),
+        VaultTxId(chunk.captured_tx),
     );
     if let Some(ref label) = chunk.label {
         cloned = cloned.with_label(label.as_str());
@@ -355,7 +372,13 @@ impl ClmScratchpad {
         let doc_id = DocId::new(self.next_chunk_id);
         self.next_chunk_id += 1;
 
-        let mut chunk = VaultChunk::new(doc_id, content, SignalModality::TextInput, captured_tx);
+        // Vault-Typen sind eigene Newtypes. Die Umwandlung erfolgt an dieser Grenze.
+        let mut chunk = VaultChunk::new(
+            VaultDocId(doc_id.inner()),
+            content,
+            SignalModality::TextInput,
+            VaultTxId(captured_tx.0),
+        );
         if let Some(lbl) = label {
             chunk = chunk.with_label(lbl);
         }
@@ -481,7 +504,7 @@ impl ClmScratchpad {
 
         let new_vault = VolatileContextVault::open(self.config.clone());
         let old_vault = std::mem::replace(&mut self.vault, new_vault);
-        let purge_receipt = old_vault.purge();
+        let raw_receipt = old_vault.purge();
 
         let completed_subgoal = self.current_subgoal_index;
 
@@ -506,7 +529,11 @@ impl ClmScratchpad {
         Ok(ScratchpadCheckpoint {
             task_id: self.task_id.clone(),
             completed_subgoal_index: completed_subgoal,
-            purge_receipt,
+            reset_receipt: VaultResetReceipt {
+                chunks_purged: raw_receipt.chunks_purged,
+                bytes_zeroed: raw_receipt.bytes_zeroed,
+                reset_at: raw_receipt.purged_at,
+            },
             chunk_count_at_checkpoint: chunk_count,
         })
     }
@@ -644,7 +671,7 @@ mod tests {
         assert_eq!(checkpoint.task_id, "task-reset");
         assert_eq!(checkpoint.completed_subgoal_index, 0);
         assert_eq!(checkpoint.chunk_count_at_checkpoint, 2);
-        assert_eq!(checkpoint.purge_receipt.chunks_purged, 2);
+        assert_eq!(checkpoint.reset_receipt.chunks_purged, 2);
 
         // total_bytes ist nun 0, current_subgoal_index inkrementiert
         assert_eq!(pad.total_bytes(), 0);
@@ -761,3 +788,5 @@ mod tests {
         assert!(err_remove.is_err());
     }
 }
+
+// !SECTION

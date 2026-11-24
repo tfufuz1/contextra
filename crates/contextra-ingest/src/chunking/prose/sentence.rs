@@ -1,3 +1,10 @@
+//! Satzgrenzen-Erkennung (Sentence Boundary Detection) fuer Textzerlegung.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Satzsegmentierung für übergroße Absätze mit Abkürzungsbehandlung (de/en) (WP M3 / SPEC C-11.7).
 // INVARIANTEN: Zero-Panic, UTF-8-sicher, keine Satzteilung bei bekannten Abkürzungen.
@@ -8,20 +15,23 @@ use unicode_segmentation::UnicodeSegmentation;
 
 /// Bekannte deutsche und englische Abkürzungen (in Kleinbuchstaben).
 const ABBREVIATIONS: &[&str] = &[
-    "z. b.", "z.b.", "dr.", "bzw.", "e. g.", "e.g.", "i. e.", "i.e.",
-    "vs.", "mr.", "mrs.", "ms.", "prof.", "str.", "etc.", "ca.", "vgl.",
-    "st.", "s.", "u. a.", "u.a.", "d. h.", "d.h.", "incl.", "excl.",
-    "min.", "max.", "approx.", "nr.", "no.", "art.", "abs.", "sog.",
+    "z. b.", "z.b.", "dr.", "bzw.", "e. g.", "e.g.", "i. e.", "i.e.", "vs.", "mr.", "mrs.", "ms.",
+    "prof.", "str.", "etc.", "ca.", "vgl.", "st.", "s.", "u. a.", "u.a.", "d. h.", "d.h.", "incl.",
+    "excl.", "min.", "max.", "approx.", "nr.", "no.", "art.", "abs.", "sog.",
 ];
 
 /// Repräsentiert einen Satz innerhalb eines Textes mit dessen Byte-Span.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-ingest:CHK-0228]
+// struct `SentenceSpan` fuer Satzgrenzen-Erkennung (Sentence Boundary Detection) fuer Textzerlegung.
 pub struct SentenceSpan {
     pub text: String,
     pub span: Range<usize>,
 }
 
 /// Zerlegt einen Text unter Berücksichtigung von Abkürzungen in Sätze.
+// ANCHOR[contextra-ingest:CHK-0229]
+// fn `split_sentences` fuer Satzgrenzen-Erkennung (Sentence Boundary Detection) fuer Textzerlegung.
 pub fn split_sentences(text: &str, base_offset: usize) -> Vec<SentenceSpan> {
     if text.is_empty() {
         return Vec::new();
@@ -110,7 +120,7 @@ fn ends_with_abbreviation(text: &str) -> bool {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing, clippy::get_first)]
 mod tests {
     use super::*;
 
@@ -119,7 +129,7 @@ mod tests {
         let text = "Das ist z. B. ein Test. Dr. Müller geht nach Hause. Er kommt bzw. bleibt hier.";
         let result = split_sentences(text, 0);
         assert_eq!(result.len(), 3);
-        assert_eq!(result.get(0).unwrap().text, "Das ist z. B. ein Test. ");
+        assert_eq!(result.first().unwrap().text, "Das ist z. B. ein Test. ");
         assert_eq!(result.get(1).unwrap().text, "Dr. Müller geht nach Hause. ");
         assert_eq!(result.get(2).unwrap().text, "Er kommt bzw. bleibt hier.");
     }
@@ -130,8 +140,10 @@ mod tests {
         let result = split_sentences(text, 10);
         assert_eq!(result.len(), 2);
         assert_eq!(
-            text.get(result.get(0).unwrap().span.start - 10..result.get(0).unwrap().span.end - 10)
-                .unwrap(),
+            text.get(
+                result.first().unwrap().span.start - 10..result.first().unwrap().span.end - 10
+            )
+            .unwrap(),
             "Erster Satz. "
         );
         assert_eq!(

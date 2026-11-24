@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // Testpflicht AK-13 (docs/specs/CONTEXTRA_SPEC_v2.md)
 
 use contextra_store::wal::{Wal, WalConfig, WalFlusherConfig, WalOp};

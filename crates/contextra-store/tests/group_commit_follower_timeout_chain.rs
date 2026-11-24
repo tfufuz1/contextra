@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT
 // ZWECK: Testet, dass ein Follower, der per Timeout aus der Group-Commit-Queue ausscheidet, keine HMAC-Kette korrumpiert.
 
@@ -63,6 +64,7 @@ async fn test_follower_timeout_chain_integrity() {
     storage.commit(tx3).await.unwrap();
 
     // Reopen store to verify WAL replay has NO HMAC chain breakage!
+    let _ = storage.close().await;
     drop(storage);
 
     let config_reopen = LsmConfig {

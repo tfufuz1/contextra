@@ -1,3 +1,7 @@
+// =========================================================================
+// SECTION: config
+// =========================================================================
+// ANCHOR[contextra-mcp:CONFIG-001]
 // FILE-CONTEXT
 // STAND:       2026-10-31T00:00:00Z
 // ZWECK:       Dynamic Provider Construction for Embedding & LLM backends (Ollama, ONNX, Candle, Mock)
@@ -905,3 +909,5 @@ mod tests {
         assert!(msg.contains("Provider 'onnx' ist nicht einkompiliert"));
     }
 }
+
+// !SECTION: config

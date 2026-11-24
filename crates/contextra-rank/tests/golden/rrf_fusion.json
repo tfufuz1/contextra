@@ -1,0 +1,110 @@
+[
+  {
+    "id": "doc-1",
+    "matched_signals": [
+      "vector",
+      "text"
+    ],
+    "metadata": null,
+    "provenance": {
+      "bm25_score": 0.6000000238418579,
+      "coherence_bonus": 0.0,
+      "index_type": "hnsw",
+      "signal_contributions": {
+        "text": {
+          "rank": 3,
+          "raw_score": 0.6000000238418579,
+          "rrf_contribution": 0.01587301678955555
+        },
+        "vector": {
+          "rank": 1,
+          "raw_score": 0.8999999761581421,
+          "rrf_contribution": 0.016393441706895828
+        }
+      },
+      "signal_ranks": {
+        "text": 3,
+        "vector": 1
+      },
+      "vector_distance": 0.8999999761581421
+    },
+    "score": 0.03226646035909653
+  },
+  {
+    "id": "doc-2",
+    "matched_signals": [
+      "vector",
+      "text"
+    ],
+    "metadata": null,
+    "provenance": {
+      "bm25_score": 0.8500000238418579,
+      "coherence_bonus": 0.0,
+      "index_type": "hnsw",
+      "signal_contributions": {
+        "text": {
+          "rank": 2,
+          "raw_score": 0.8500000238418579,
+          "rrf_contribution": 0.016129031777381897
+        },
+        "vector": {
+          "rank": 2,
+          "raw_score": 0.800000011920929,
+          "rrf_contribution": 0.016129031777381897
+        }
+      },
+      "signal_ranks": {
+        "text": 2,
+        "vector": 2
+      },
+      "vector_distance": 0.800000011920929
+    },
+    "score": 0.032258063554763794
+  },
+  {
+    "id": "doc-tie-a",
+    "matched_signals": [
+      "text"
+    ],
+    "metadata": null,
+    "provenance": {
+      "bm25_score": 0.8999999761581421,
+      "coherence_bonus": 0.0,
+      "index_type": "bm25",
+      "signal_contributions": {
+        "text": {
+          "rank": 1,
+          "raw_score": 0.8999999761581421,
+          "rrf_contribution": 0.016393441706895828
+        }
+      },
+      "signal_ranks": {
+        "text": 1
+      }
+    },
+    "score": 0.016393441706895828
+  },
+  {
+    "id": "doc-tie-b",
+    "matched_signals": [
+      "vector"
+    ],
+    "metadata": null,
+    "provenance": {
+      "coherence_bonus": 0.0,
+      "index_type": "hnsw",
+      "signal_contributions": {
+        "vector": {
+          "rank": 3,
+          "raw_score": 0.699999988079071,
+          "rrf_contribution": 0.01587301678955555
+        }
+      },
+      "signal_ranks": {
+        "vector": 3
+      },
+      "vector_distance": 0.699999988079071
+    },
+    "score": 0.01587301678955555
+  }
+]

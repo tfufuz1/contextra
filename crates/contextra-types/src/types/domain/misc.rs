@@ -1,3 +1,14 @@
+//! Wissensgraphen-Elemente (`Entity`, `Edge`), `MemoryType`, `WorkflowState` und Verfallskonstanten.
+//!
+//! # Architektur-Rolle: Typen-Fundament (Wissensgraph & Gedächtnismodelle)
+//!
+//! Dieses Modul enthält Strukturen für:
+//! - `WorkflowState`: Eingefrorener Workflow-Zustand mit Transaktions- und Graph-Hash als Savepoint.
+//! - `Entity`, `Edge`, `LinkRelation`: Wissensgraphen- und Zettelkasten-Primitive (A-MEM).
+//! - `MemoryType`: Kognitive Einteilung (episodisch, semantisch, prozedural, working) mit Verfallsraten.
+//! - `PprConfig`, `TlHfdParams`: Konfigurationsparameter für Graph-Diffusionsalgorithmen (Personalized PageRank).
+//! - `ConfigFingerprint`: Bit-exakte Konfigurations-Fingerabdrücke zur Vermeidung von Score-Kalibrierungs-Drift.
+
 use crate::error::{ContextraError, Result};
 use crate::types::domain::{DocId, EntityId, TxId};
 use serde::{Deserialize, Serialize};
@@ -46,6 +57,7 @@ mod hex {
 
 /// Defines a frozen workflow state acting as a savepoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:MISC-WORKFLOW]
 pub struct WorkflowState {
     /// Associated transaction.
     pub tx: TxId,
@@ -56,26 +68,38 @@ pub struct WorkflowState {
 
 // INVARIANT: Bit 63 der SeqNo markiert Tombstones.
 /// Bit mask for identifying tombstones in sequence numbers.
-pub const TOMBSTONE_BIT: u64 = 1 << 63;
+///
+/// # Deprecation
+/// Moved to [`contextra_ids::TOMBSTONE_BIT`] per ADR-0120.
+/// This re-export remains until S-70 (INV-2 / R9).
+// ANCHOR[contextra-types:MISC-TOMBSTONE-BIT]
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `contextra_ids::TOMBSTONE_BIT` per ADR-0120. This re-export will be removed in S-70."
+)]
+pub use contextra_ids::TOMBSTONE_BIT;
 
 /// Reserved metadata key for sequence-based document TTL expiration.
+// ANCHOR[contextra-types:MISC-EXPIRY-KEY]
 pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 
 /// Maximum number of search results that any hybrid/vector/text search may return.
 ///
-/// Callers in contextra-mcp and contextra-db both enforce this limit before forwarding k to HNSW/BM25.
+/// Callers in contextra-mcp and contextra-db both enforce this limit before forwarding k to index sub-searches.
 /// Duplicating the literal 1000 anywhere else in the workspace is prohibited — always import this constant.
 ///
 /// This cap is applied at the orchestration layer (contextra-db) before forwarding `k`
-/// to HNSW and BM25 sub-searches. All upstream layers (contextra-mcp, contextra-py,
-/// contextra-py) MUST reference this constant — never duplicate the literal `1000`.
+/// to vector and lexical sub-searches. All upstream layers (contextra-mcp, contextra-py)
+/// MUST reference this constant — never duplicate the literal `1000`.
 ///
 /// # DECISION-REF
 /// AGT-DB-003 — Boundary defence at Layer 2 against unbounded `k` from untrusted JSON-RPC.
+// ANCHOR[contextra-types:MISC-MAX-SEARCH-K]
 pub const MAX_SEARCH_K: usize = 1_000;
 
 /// Relationship types between Zettelkasten memory chunks (A-MEM).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// ANCHOR[contextra-types:MISC-LINK]
 pub enum LinkRelation {
     /// Target memory provides more detail or context.
     Elaborates,
@@ -89,6 +113,7 @@ pub enum LinkRelation {
 
 /// A directional link to another memory chunk in the Zettelkasten.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:MISC-MEMLINK]
 pub struct MemoryLink {
     /// The target document ID.
     pub target: DocId,
@@ -100,6 +125,7 @@ pub struct MemoryLink {
 
 /// Represents a canonical node in the knowledge graph.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:MISC-ENTITY]
 pub struct Entity {
     /// Unique entity ID.
     pub id: EntityId,
@@ -156,12 +182,13 @@ impl Entity {
 /// Graph directed edge representation with explicit bitemporal axis separation.
 ///
 /// # Abgrenzung
-/// Dieser Typ `contextra_types::Edge` ist die domänenzentrierte Hyperedge-Repräsentation in Ring 0
+/// Dieser Typ `contextra_types::Edge` ist die domänenzentrierte Hyperedge-Repräsentation auf Vertragsebene
 /// mit Entitäts-IDs, Beziehungslabel, Quell-Dokumenten-ID und bitemporalen Gültigkeitsachsen
 /// (`tx_valid_from`/`tx_valid_to`, `business_valid_from`/`business_valid_to`).
 /// Im Gegensatz dazu ist `contextra_graph::csr::types::Edge` (bzw. `CsrEdge`) ein speicherkompakter
 /// Adjazenz-Eintrag der CSR-Graphengine für hochperformante SIMD-Traversierungen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:MISC-EDGE]
 pub struct Edge {
     /// Source entity identifier.
     pub from: EntityId,
@@ -284,6 +311,7 @@ impl Edge {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
+// ANCHOR[contextra-types:MISC-MEMTYPE]
 pub enum MemoryType {
     /// Episodisches Gedächtnis: Erlebnisse, Unterhaltungen, zeitlich verankerte Ereignisse.
     /// Retrieval: Zeitliche Nähe und Relevanz zur aktuellen Session.
@@ -292,7 +320,7 @@ pub enum MemoryType {
     Episodic,
 
     /// Semantisches Gedächtnis: Fakten, Konzepte, dauerhaftes Wissen.
-    /// Retrieval: Inhaltliche Ähnlichkeit (Vektor + BM25).
+    /// Retrieval: Inhaltliche Ähnlichkeit (Vektor + lexikalischer Text).
     /// Decay: Keine automatische Decay (Fakten bleiben gültig bis Widerspruch).
     #[default]
     #[serde(alias = "Semantic")]
@@ -350,17 +378,14 @@ impl MemoryType {
 
 /// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 ///
-/// # Ring Architecture
-/// Defined in `contextra-types` (Ring 0) to avoid dependency on `contextra-graph` (Ring 1).
-/// Graph algorithms in `contextra-graph` map this configuration to `contextra_graph::TlHfdParams`.
-///
-/// # Abgrenzung
-/// Dieser Typ `contextra_types::TlHfdParams` ist die Ring-0-Konfigurationsstruktur
-/// (`sigma`, `delta`, `gamma`, `max_iterations`, `max_top_k_expansion`, `max_hyperedge_sort_size`),
-/// die über API-Parameter und JSON-Optionen übergeben wird.
-/// Im Gegensatz dazu ist `contextra_graph::tl_hfd::params::TlHfdParams` die Graph-Engine-Spezifische
-/// Parameterstruktur in Ring 1 mit Ausführungs- und Diffusionsmatrix-Validierungen.
+/// # Deprecation
+/// In S-51 nach `contextra-graph` migriert. Bleibt bis S-70 (INV-2).
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_graph::TlHfdParams` per S-51. This re-export will be removed in S-70."
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:MISC-TLHFD]
 pub struct TlHfdParams {
     /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
     #[serde(default = "default_tl_hfd_sigma")]
@@ -401,6 +426,7 @@ fn default_tl_hfd_max_hyperedge_sort_size() -> usize {
     64
 }
 
+#[allow(deprecated)]
 impl Default for TlHfdParams {
     fn default() -> Self {
         Self {
@@ -415,8 +441,17 @@ impl Default for TlHfdParams {
 }
 
 /// Selection of algorithm strategy for Personalized PageRank (PPR).
+///
+/// # Deprecation
+/// In S-51 nach `contextra-graph` migriert. Bleibt bis S-70 (INV-2).
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_graph::PprAlgorithm` per S-51. This re-export will be removed in S-70."
+)]
+#[allow(deprecated)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+// ANCHOR[contextra-types:MISC-PPRALG]
 pub enum PprAlgorithm {
     /// Auto heuristic dispatch based on seed count (ForwardPush for <= 100 seeds, DensePowerIteration otherwise).
     #[default]
@@ -436,7 +471,16 @@ pub enum PprAlgorithm {
 }
 
 /// Configuration parameters for Personalized PageRank (PPR).
+///
+/// # Deprecation
+/// In S-51 nach `contextra-graph` migriert. Bleibt bis S-70 (INV-2).
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_graph::PprConfig` per S-51. This re-export will be removed in S-70."
+)]
+#[allow(deprecated)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:MISC-PPRCFG]
 pub struct PprConfig {
     /// Damping factor (probability of continuing random walk vs restarting). Default: 0.85.
     pub damping_factor: f32,
@@ -459,6 +503,7 @@ fn default_warn_on_non_convergence() -> bool {
     true
 }
 
+#[allow(deprecated)]
 impl Default for PprConfig {
     fn default() -> Self {
         Self {
@@ -480,6 +525,7 @@ impl Default for PprConfig {
 /// BEGRÜNDUNG: arXiv:2608.01460 — Coverage-Kollaps unter Konfigurations-Drift.
 /// Q4 und Q8 bei identischem model_id erzeugen unterschiedliche Score-Verteilungen.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// ANCHOR[contextra-types:MISC-FINGERPRINT]
 pub struct ConfigFingerprint {
     /// LLM-Modell-ID (z.B. "llama-3.2-3b-instruct")
     pub model_id: String,
@@ -548,6 +594,7 @@ impl Default for ConfigFingerprint {
 /// Mode for automatic OpenIE entity extraction during document ingestion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+// ANCHOR[contextra-types:MISC-EXTRACTMODE]
 pub enum AutoExtractionMode {
     /// Automatic entity extraction is enabled.
     Enabled,

@@ -1,5 +1,14 @@
-//! Deprecated: temporary local port traits have moved to `contextra-ports`.
+//! # Lokale Port-Re-Exports (Veraltet)
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Rückwärtskompatible Re-Exports für Port-Traits, die im Rahmen der Architektur-Bereinigung
+//! (Ring-Modell Welle 2) vollständig in das Crate `contextra-ports` (Ring 0) überführt wurden.
+//!
+//! **Abhängigkeiten:**
+//! - Upstream: `contextra_ports`.
+//! - Downstream: Veraltete Aufrufer, die noch auf `contextra_router::ports_local` verweisen.
 
+// ANCHOR[contextra-router:PRT-001]
 #[deprecated(
     since = "0.1.0",
     note = "Moved to contextra_ports as part of Ring-Modell Welle 2 (siehe docs/refactor/router-db-edge-audit.md)"
@@ -14,6 +23,8 @@ mod tests {
     #[allow(deprecated)]
     use super::*;
 
+    // ANCHOR[contextra-router:PRT-T01]
+    // Prüft zur Compile-Zeit, dass die re-exportierten Typen die Trait-Signaturen aus contextra-ports erfüllen.
     #[test]
     fn test_ports_local_reexports() {
         fn _assert_community_resolver<T: CommunityResolver + ?Sized>() {}

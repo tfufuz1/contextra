@@ -1,0 +1,13 @@
+[crates.contextra-rank]
+group = "retrieval"
+level = 1
+tier = "stable"
+path = "crates/contextra-rank"
+unsafe_island = false
+allowed_internal = ["contextra-ids", "contextra-env"]
+
+[crates.contextra-rank.feature_closure_allowed]
+workspace = ["contextra-types", "contextra-ports"]
+
+[crates.contextra-rank.dev_allowed]
+test = "cargo test -p contextra-rank --locked"

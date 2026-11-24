@@ -1,6 +1,12 @@
+//! Kompatibilitätstest für Port-Typdefinitionen zwischen `contextra-ports` und `contextra-graph`.
+//!
+//! # Zweck
+//! Stellt Binärkompatibilität und saubere Typ-Konvertierungen über Crate-Grenzen hinweg sicher.
+
 use contextra_graph::hyperedge::{HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::EntityId;
 
+// ANCHOR[contextra-graph:TESTS-GOLDEN-PORTS-TYPE-COMPATIBILITY-001]
 #[test]
 fn test_golden_hyperedge_id_serde_bincode_compatibility() {
     let id = HyperEdgeId::new(0xDEAD_BEEF_1234_5678);
@@ -25,6 +31,7 @@ fn test_golden_hyperedge_id_serde_bincode_compatibility() {
     assert_eq!(deserialized_json, id);
 }
 
+// ANCHOR[contextra-graph:TESTS-GOLDEN-PORTS-TYPE-COMPATIBILITY-002]
 #[test]
 fn test_golden_role_id_serde_bincode_compatibility() {
     let role = RoleId::new(42);
@@ -46,6 +53,7 @@ fn test_golden_role_id_serde_bincode_compatibility() {
     assert_eq!(deserialized_json, role);
 }
 
+// ANCHOR[contextra-graph:TESTS-GOLDEN-PORTS-TYPE-COMPATIBILITY-003]
 #[test]
 fn test_golden_role_binding_serde_bincode_compatibility() {
     let binding = RoleBinding::new(RoleId::new(10), EntityId::new(200));

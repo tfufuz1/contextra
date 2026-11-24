@@ -1,3 +1,14 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Benchmark / Beispiel für contextra-router (cost_routing_savings_bench.rs).
+// INVARIANTEN: Deterministische Ausführung, Latenz- und Budgetüberwachung.
+
+//! # Benchmark für Ressourceneinsparungen durch intelligentes Routing
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Benchmark für Ressourceneinsparungen durch intelligentes Routing.
+
+// ANCHOR[contextra-router:BN-COST-001]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, dead_code)]
 
 //! Benchmark to quantify simulated cost savings of cost-aware SLM routing vs. a static single-model baseline.
@@ -165,5 +176,7 @@ fn bench_cost_routing_savings(c: &mut Criterion) {
     group.finish();
 }
 
+// ANCHOR[contextra-router:BN-COST-CRIT]
+// Benchmark-Gruppe für Performance- und Regressionsmessungen.
 criterion_group!(benches, bench_cost_routing_savings);
 criterion_main!(benches);

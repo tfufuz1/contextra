@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `contract_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Integrationstests für Verträge, Formate, Kanonisierung, Pipeline & Fallback-Chunker (WP M5).
 // INVARIANTEN: All-targets / All-features Lints strikt einhalten.
@@ -10,10 +16,11 @@
     clippy::panic
 )]
 
-use contextra_engine::chunker::{ChunkerConfig as EngineConfig, MarkdownChunker as EngineChunker};
 use contextra_ingest::canonical::sanitize_text;
 use contextra_ingest::chunking::config::ChunkingConfig;
 use contextra_ingest::chunking::fallback::FallbackChunker;
+use contextra_ingest::chunking::prose::ProseChunker;
+use contextra_ingest::chunking::types::DocId;
 use contextra_ingest::chunking::IrChunker;
 use contextra_ingest::error::IngestError;
 use contextra_ingest::extractor::{DocumentExtractor, ExtractContext};
@@ -24,7 +31,6 @@ use contextra_ingest::ir::{
 use contextra_ingest::limits::IngestLimits;
 use contextra_ingest::pipeline::{ingest, IngestConfig, IngestRequest};
 use contextra_ingest::registry::ExtractorRegistry;
-use contextra_types::{ContextraError, DocId};
 
 struct MockTextExtractor;
 impl DocumentExtractor for MockTextExtractor {
@@ -76,6 +82,8 @@ impl DocumentExtractor for PanickingExtractor {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0344]
+// Testet die Funktionsfaehigkeit von `test_contract_1_format_id_consistency`.
 #[test]
 fn test_contract_1_format_id_consistency() {
     let formats = [
@@ -104,6 +112,8 @@ fn test_contract_1_format_id_consistency() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0345]
+// Testet die Funktionsfaehigkeit von `test_contract_2_canonical_golden_and_slicing`.
 #[test]
 fn test_contract_2_canonical_golden_and_slicing() {
     let mut ir = DocumentIr::new(FormatId::Markdown);
@@ -197,6 +207,8 @@ fn test_contract_2_canonical_golden_and_slicing() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0346]
+// Testet die Funktionsfaehigkeit von `test_contract_3_sanitize_text_cases`.
 #[test]
 fn test_contract_3_sanitize_text_cases() {
     let raw = "Hello\r\nWorld\rBOM\u{FEFF} Tag\u{E0001} Bidi\u{202A} C0\u{0007}End";
@@ -205,6 +217,8 @@ fn test_contract_3_sanitize_text_cases() {
     assert!(count >= 5);
 }
 
+// ANCHOR[contextra-ingest:TST-0347]
+// Testet die Funktionsfaehigkeit von `test_contract_4_pipeline_mock_end_to_end_determinism`.
 #[test]
 fn test_contract_4_pipeline_mock_end_to_end_determinism() {
     let mut reg = ExtractorRegistry::new_empty();
@@ -232,6 +246,8 @@ fn test_contract_4_pipeline_mock_end_to_end_determinism() {
     assert_eq!(meta1["chunk_id"], meta2["chunk_id"]);
 }
 
+// ANCHOR[contextra-ingest:TST-0348]
+// Testet die Funktionsfaehigkeit von `test_contract_5_panic_catching`.
 #[test]
 fn test_contract_5_panic_catching() {
     let mut reg = ExtractorRegistry::new_empty();
@@ -255,6 +271,8 @@ fn test_contract_5_panic_catching() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0349]
+// Testet die Funktionsfaehigkeit von `test_contract_6_error_mapping`.
 #[test]
 fn test_contract_6_error_mapping() {
     let limit_err = IngestError::LimitExceeded {
@@ -262,10 +280,13 @@ fn test_contract_6_error_mapping() {
         limit: 100,
         observed: 200,
     };
-    let c_err: ContextraError = limit_err.into();
-    assert!(matches!(c_err, ContextraError::LimitExceeded { .. }));
+    assert!(limit_err
+        .to_string()
+        .contains("Ressourcenlimit überschritten"));
 }
 
+// ANCHOR[contextra-ingest:TST-0350]
+// Testet die Funktionsfaehigkeit von `test_contract_7_fallback_chunker_markdown_chunker_equality`.
 #[test]
 fn test_contract_7_fallback_chunker_markdown_chunker_equality() {
     let _markdown = "# Section 1\nFirst paragraph text.\n## Section 2\nSecond paragraph text.";
@@ -305,22 +326,17 @@ fn test_contract_7_fallback_chunker_markdown_chunker_equality() {
     cfg.min_tokens = 0;
 
     let fallback_drafts = FallbackChunker.draft(&ir, &canon, &cfg).unwrap();
+    let prose_drafts = ProseChunker.draft(&ir, &canon, &cfg).unwrap();
 
-    let engine_cfg = EngineConfig {
-        max_tokens: 512,
-        min_tokens: 0,
-        include_breadcrumbs: true,
-        split_levels: vec![1, 2, 3],
-    };
-
-    let engine_chunks = EngineChunker::new(engine_cfg).chunk(DocId::new(1), &canon.text);
-
-    assert_eq!(fallback_drafts.len(), engine_chunks.len());
-    for (draft, chunk) in fallback_drafts.iter().zip(engine_chunks.iter()) {
-        assert_eq!(draft.text, chunk.content);
+    assert_eq!(fallback_drafts.len(), prose_drafts.len());
+    for (draft, expected) in fallback_drafts.iter().zip(prose_drafts.iter()) {
+        assert_eq!(draft.text, expected.text);
+        assert_eq!(draft.breadcrumb, expected.breadcrumb);
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0351]
+// Testet die Funktionsfaehigkeit von `test_contract_8_stubs_return_unsupported_and_fuzz_support_panics_free`.
 #[test]
 fn test_contract_8_stubs_return_unsupported_and_fuzz_support_panics_free() {
     let reg = ExtractorRegistry::with_defaults();
@@ -335,9 +351,19 @@ fn test_contract_8_stubs_return_unsupported_and_fuzz_support_panics_free() {
         filename: None,
     };
 
-    let err = reg.extract(FormatId::Pptx, b"dummy", &ctx).unwrap_err();
-    assert!(matches!(err, IngestError::UnsupportedFormat { .. }));
+    #[cfg(not(feature = "fmt-pptx"))]
+    {
+        let err = reg.extract(FormatId::Pptx, b"dummy", &ctx).unwrap_err();
+        assert!(matches!(err, IngestError::UnsupportedFormat { .. }));
+    }
+    #[cfg(feature = "fmt-pptx")]
+    {
+        // Wenn fmt-pptx aktiv ist, führt dummy byte input zu Corrupt/Limit
+        let err = reg.extract(FormatId::Pptx, b"dummy", &ctx).unwrap_err();
+        assert!(matches!(err, IngestError::Corrupt { .. }));
+    }
 
     // Fuzz support muss für beliebige Bytes panikfrei sein
+    #[cfg(feature = "fuzz")]
     contextra_ingest::fuzz_support::run(FormatId::Txt, b"random noise 12345");
 }

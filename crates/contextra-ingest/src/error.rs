@@ -1,10 +1,20 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: Fehler-Typen und Limit-Kategorien für contextra-ingest (WP M2).
 // INVARIANTEN: Zero-Panic, #[non_exhaustive], deutschsprachige thiserror-Meldungen, Mapping zu ContextraError.
 // STAND: TS:2026-10-31T00:00:00Z
 
 use crate::format::FormatId;
-use contextra_types::ContextraError;
 use serde::{Deserialize, Serialize};
 
 /// Kategorien von Ressourceneinschränkungen.
@@ -33,6 +43,8 @@ pub enum LimitKind {
     TableCells,
     /// Maximale Anzahl erzeugter Chunks
     Chunks,
+    /// Maximale Pfadlänge von Einträgen im Archiv
+    PathLength,
 }
 
 /// Einheitlicher Fehler-Enum für alle Ingestion- und Chunking-Vorgänge.
@@ -71,50 +83,24 @@ pub enum IngestError {
     Chunking { detail: String },
 }
 
-impl From<IngestError> for ContextraError {
-    fn from(err: IngestError) -> Self {
-        match err {
-            IngestError::LimitExceeded {
-                kind,
-                limit,
-                observed,
-            } => ContextraError::limit_exceeded(
-                usize::try_from(limit).unwrap_or(usize::MAX),
-                format!("Ingestion limit {:?} exceeded: observed {}", kind, observed),
-            ),
-            IngestError::ParserPanic { format } => {
-                ContextraError::Internal(format!("Parser panic during ingestion of {:?}", format))
-            }
-            other => ContextraError::InvalidInput(other.to_string()),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_ingest_error_conversion() {
+    fn test_ingest_error_display() {
         let limit_err = IngestError::LimitExceeded {
             kind: LimitKind::DocumentBytes,
             limit: 16 * 1024 * 1024,
             observed: 20 * 1024 * 1024,
         };
-        let ce: ContextraError = limit_err.into();
-        assert!(matches!(ce, ContextraError::LimitExceeded { .. }));
+        assert!(limit_err
+            .to_string()
+            .contains("Ressourcenlimit überschritten"));
 
         let panic_err = IngestError::ParserPanic {
             format: FormatId::Pdf,
         };
-        let ce2: ContextraError = panic_err.into();
-        assert!(matches!(ce2, ContextraError::Internal(_)));
-
-        let corrupt_err = IngestError::Corrupt {
-            format: Some(FormatId::Docx),
-            detail: "Bad header".into(),
-        };
-        let ce3: ContextraError = corrupt_err.into();
-        assert!(matches!(ce3, ContextraError::InvalidInput(_)));
+        assert!(panic_err.to_string().contains("Unerwarteter Parser-Fehler"));
     }
 }

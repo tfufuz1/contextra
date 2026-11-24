@@ -1,3 +1,10 @@
+//! Tabellen-Chunking fuer Zeilen-, Spalten- und Zellensegmente.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Tabular Chunking Strategy Implementation (WP-ING-13 / P00A / P06).
 // INVARIANTEN: Zero-Panic, deterministisch, Spans im kanonischen Text, Fail-Closed.
@@ -31,6 +38,8 @@ struct TableContext<'a> {
     block_span: &'a Range<usize>,
 }
 
+// ANCHOR[contextra-ingest:CHK-0241]
+// fn `draft_tabular` fuer Tabellen-Chunking fuer Zeilen-, Spalten- und Zellensegmente.
 pub fn draft_tabular(
     ir: &DocumentIr,
     canon: &CanonicalText,

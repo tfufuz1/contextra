@@ -1,5 +1,9 @@
 #![forbid(unsafe_code)]
 //! Campaign J-27 MCP Server Test Suite — Prompt Injection Guard & Tool Dispatch Matrix
+// =========================================================================
+// SECTION: campaign_j27_mcp_test
+// =========================================================================
+// ANCHOR[contextra-mcp:ITEST-CAMPAIGN-J-001]
 
 use contextra_mcp::prompt_injection::PromptInjectionGuard;
 use contextra_mcp::sandbox::{McpSandbox, SandboxPolicy, TOOL_REGISTRY};
@@ -129,7 +133,7 @@ fn test_h9_mcp_tool_registry_and_sandbox_classification() {
 
 #[test]
 fn test_h9_destructive_tools_confirm_flag_strictness() {
-    // Test helper logic for boolean confirm parameter requirement in contextra_forget / contextra_drop_collection
+    // Test helper logic for boolean confirm parameter requirement in contextra_drop_collection
     let valid_confirm = json!({
         "collection": "test_col",
         "confirm": true
@@ -168,3 +172,5 @@ fn test_h9_destructive_tools_confirm_flag_strictness() {
         None
     );
 }
+
+// !SECTION: campaign_j27_mcp_test

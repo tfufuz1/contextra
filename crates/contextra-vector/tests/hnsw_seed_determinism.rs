@@ -2,8 +2,9 @@
 
 use contextra_ports::SeededRng;
 use contextra_ports::VectorIndex;
-use contextra_types::{DistanceMetric, DocId, TxId};
+use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
+use contextra_vector::types::DistanceMetric;
 use std::sync::Arc;
 
 struct SimpleRng {
@@ -274,8 +275,8 @@ async fn test_hnsw_seed_determinism_rebuild_reproducibility() {
     idx2.commit(tx2).await.expect("commit idx2 tx2");
 
     // Rebuild both indices explicitly given identical initial seed
-    idx1.rebuild().await.expect("rebuild idx1");
-    idx2.rebuild().await.expect("rebuild idx2");
+    idx1.rebuild().expect("rebuild idx1");
+    idx2.rebuild().expect("rebuild idx2");
 
     // Compare layer assignments of rebuilt indices
     let layers1 = idx1.all_doc_ids_and_layers();

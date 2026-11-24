@@ -1,3 +1,10 @@
+//! Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Konfiguration für das Ingestion-Chunking und Fingerprinting (WP M3).
 // INVARIANTEN: Zero-Panic, blake3-Fingerprint für Caching, SPEC-Abweichungen isoliert.
@@ -10,6 +17,8 @@ use serde::{Deserialize, Serialize};
 /// Gesamtkonfiguration für das Ingestion-Chunking.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-ingest:CHK-0204]
+// struct `ChunkingConfig` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct ChunkingConfig {
     pub strategy: Option<ChunkStrategy>,
     pub max_tokens: usize,
@@ -28,6 +37,8 @@ pub struct ChunkingConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-ingest:CHK-0205]
+// struct `ProseOptions` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct ProseOptions {
     pub sentence_aware_windows: bool,
     pub footnotes_with_section: bool,
@@ -46,6 +57,8 @@ impl Default for ProseOptions {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-ingest:CHK-0206]
+// enum `TabularMode` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub enum TabularMode {
     Auto,
     RowGroups,
@@ -54,6 +67,8 @@ pub enum TabularMode {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-ingest:CHK-0207]
+// struct `TabularOptions` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct TabularOptions {
     pub mode: TabularMode,
     pub wide_table_cols: u32,
@@ -74,6 +89,8 @@ impl Default for TabularOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-ingest:CHK-0208]
+// struct `PagedOptions` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct PagedOptions {
     pub merge_small_pages: bool,
     pub join_cross_page_paragraphs: bool,
@@ -92,6 +109,8 @@ impl Default for PagedOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-ingest:CHK-0209]
+// struct `StructuredOptions` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct StructuredOptions {
     pub group_depth: u32,
     pub batch_small_records: bool,
@@ -108,6 +127,8 @@ impl Default for StructuredOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-ingest:CHK-0210]
+// struct `EmailOptions` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct EmailOptions {
     pub include_quoted: bool,
     pub header_context: bool,

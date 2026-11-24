@@ -1,5 +1,24 @@
+#![allow(
+    clippy::all,
+    clippy::type_complexity,
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+//! # Tests für Segment-zu-Anfrage-Zuordnung bei der Verdrängung
+//!
+//! ANCHOR[contextra-kvcache:TEST-EVICT-MAP-001]
+//!
+//! Verifiziert die Verknüpfung von Segmenten mit `RequestId`s und Aufmerksamkeitsscores
+//! sowie die korrekte Verdrängung des Segments mit dem niedrigsten Score.
+
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used)]
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::unwrap_used)]
 
 use contextra_kvcache::{segment::KvSegment, EvictionWorker, TenantIsolatedKvStore};
 use contextra_ports::{AttentionExporter, RequestId};
@@ -26,6 +45,7 @@ impl AttentionExporter for MockAttentionExporter {
     }
 }
 
+// Prüft, dass das Segment mit dem geringsten Attention-Score zuerst verdrängt wird, ungeachtet des LRU-Alters.
 #[test]
 fn test_registered_segment_mapping_evicts_lowest_attention_score() {
     let store = Arc::new(TenantIsolatedKvStore::new());
@@ -78,6 +98,7 @@ fn test_registered_segment_mapping_evicts_lowest_attention_score() {
     assert!(remaining.contains(&30));
 }
 
+// Prüft das Fallback-Verhalten nach Deregistrierung einer Segment-Zuordnung.
 #[test]
 fn test_unregister_segment_request_falls_back() {
     let store = Arc::new(TenantIsolatedKvStore::new());
@@ -116,6 +137,7 @@ fn test_unregister_segment_request_falls_back() {
     assert_eq!(store.get_segments(tenant), vec![20]);
 }
 
+// Prüft, dass Aufmerksamkeitsgewichte strikt mandantenisoliert ausgewertet werden.
 #[test]
 fn test_cross_tenant_attention_weights_isolation() {
     let store = Arc::new(TenantIsolatedKvStore::new());

@@ -1,4 +1,5 @@
 // =========================================================================
+// ANCHOR[id=sys-error-main,epic=sys-error,seq=0] Crate-level structured error types
 // =========================================================================
 // LINK crates/contextra-sys/src/lib.rs
 // NOTE: Crate-level structured error types for contextra-sys (Ring 0 / E0 / docs/SPEC.md v3 §3.1 / R3).
@@ -15,6 +16,7 @@
 use thiserror::Error;
 
 // SECTION Error Enum
+// ANCHOR[id=sys-error-enum,epic=sys-error,seq=1] Error Definition
 
 /// Typisierter Systemfehler für Low-Level-OS-Operationen.
 #[derive(Debug, Error)]
@@ -57,6 +59,7 @@ pub enum Error {
 // !SECTION Error Enum
 
 // SECTION Type Aliases & Standard Conversions
+// ANCHOR[id=sys-error-aliases,epic=sys-error,seq=2] Typ-Aliase und Konvertierungen
 
 /// Typ-Alias für das Crate-Fehlermodell gemäß Baukasten-Spezifikation (docs/SPEC.md §3.1 / R3).
 pub type SysError = Error;
@@ -64,6 +67,7 @@ pub type SysError = Error;
 /// Spezifischer Result-Typ für `contextra-sys`.
 pub type Result<T> = std::result::Result<T, Error>;
 
+// ANCHOR[id=sys-error-from-io,epic=sys-error,seq=3] Konvertierung in std::io::Error
 // NOTE: Ermöglicht nahtlose Interoperabilität mit der Rust-Standardbibliothek (std::io).
 impl From<Error> for std::io::Error {
     fn from(err: Error) -> Self {

@@ -8,6 +8,8 @@ use contextra_db::{Contextra, ContextraConfig};
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-SNAPSHOT_RECOVERY-01-TEST_DB]
+// Testet die Funktionalität von `test_db`.
 async fn test_db(dim: usize) -> (Contextra, TempDir) {
     let tmp = TempDir::new().expect("tmp dir");
     let cfg = ContextraConfig {

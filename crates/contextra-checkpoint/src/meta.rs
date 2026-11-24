@@ -1,44 +1,132 @@
-use contextra_types::{ContextraError, Result, TxId, WorkflowState};
+//! # Checkpoint-Metadaten und Zustandsmodelle
+//!
+//! Dieses Modul definiert die Datenstrukturen für benannte Checkpoints und transaktionale Agenten-Zustände.
+//!
+//! ## Ring & Rolle
+//! Gehört zu **Ring 1 (Persistenz)**. Definiert die serialisierbaren Metadatenstrukturen für persistente Checkpoints
+//! (`CheckpointMeta`) sowie transaktionale Zwischenzustände (`StateCheckpoint`).
+//!
+//! ## Hauptkomponenten
+//! - [`CheckpointMeta`]: Enthält Name, Mandanten-Collection-ID, LSM-Sequenznummer, Transaktions-ID und Freiform-Metadaten.
+//! - [`StateCheckpoint`]: Minimaler Transaktions-Snapshot mit Zeitstempel und optionalem Namespace.
+//! - [`validate_identifier`]: Validierungsfunktion für sichere String-Bezeichner.
+
+use crate::error::{CheckpointError, Result};
+use contextra_ids::TxId;
+/// Defines a frozen workflow state acting as a savepoint.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkflowState {
+    /// Associated transaction.
+    pub tx: TxId,
+    /// Agent memory graph state footprint (BLAKE3 hash digest).
+    pub graph_hash: [u8; 32],
+}
+
 use serde::{Deserialize, Serialize};
 
 // RESOLVED: AGT-CKPT-001 — UTF-8 char counting used for 256 char limit (TS: 2026-09-01T23:07:05Z) (SESSION: 358e3b0a)
-/// Validates identifier strings (checkpoint name, collection ID) against empty/whitespace or size limits.
+// ANCHOR[contextra-checkpoint:VAL-001]
+/// Validiert Bezeichner-Strings (z. B. Checkpoint-Namen, Collection-IDs) gegen leere Eingaben und Längenbeschränkungen.
+///
+/// # Zweck
+/// Verhindert ungültige oder schädliche Pfade/Schlüssel in der Speicher-Engine und sichert
+/// wohldefinierte Namensräume ab.
+///
+/// # Ablauf von `validate_identifier`:
+/// 1. Prüfen, ob der getrimmte Wert leer oder reines Whitespace ist -> Fehler `InvalidInput`.
+/// 2. Zählen der Unicode-Zeichen (UTF-8 Scalar Values).
+/// 3. Prüfen, ob die Zeichenanzahl maximal 256 beträgt -> bei Überschreitung Fehler `InvalidInput`.
+///
+/// # Fehler
+/// Gibt [`CheckpointError::InvalidInput`] zurück, wenn der String leer ist oder mehr als 256 Zeichen enthält.
 pub(crate) fn validate_identifier(field_name: &str, value: &str) -> Result<()> {
+    // NOTE: Whitespace-Prüfung verhindert versehentliche Leerzeichen als Bezeichner
     if value.trim().is_empty() {
-        return Err(ContextraError::InvalidInput(format!(
+        return Err(CheckpointError::InvalidInput(format!(
             "{field_name} cannot be empty or whitespace-only"
         )));
     }
     let char_count = value.chars().count();
+    // NOTE: 256 Zeichen Begrenzung schützt vor DoS und Pufferüberläufen in Speicherformaten
     if char_count > 256 {
-        return Err(ContextraError::InvalidInput(format!(
+        return Err(CheckpointError::InvalidInput(format!(
             "{field_name} exceeds maximum length of 256 characters (got {char_count})"
         )));
     }
     Ok(())
 }
 
-/// Metadata for a persistent checkpoint.
+// ANCHOR[contextra-checkpoint:META-001]
+/// Metadaten für einen persistenten, benannten Checkpoint.
+///
+/// # Zweck
+/// Speichert alle Identifikations-, Versions- und Audit-Informationen zu einem Snapshot
+/// im LSM-Tree und Vektor-Index.
+///
+/// # Felder
+/// - `name`: Eindeutiger Name des Checkpoints (z. B. "pre_migration").
+/// - `collection_id`: Eindeutige Kennung der Collection bzw. des Mandanten.
+/// - `seq_no`: LSM-Sequenznummer (MVCC-Schnittlinie für Lese-Isolation).
+/// - `tx_id`: Transaktions-ID, die den Zustand erzeugt hat.
+/// - `metadata`: JSON-Objekt für anwendungsspezifische Kontextdaten (z. B. Modell-Version, Prompt-ID).
+/// - `created_at`: Unix-Zeitstempel der Erstellung in Millisekunden.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CheckpointMeta {
+    /// Eindeutiger Name des Checkpoints.
     pub name: String,
+    /// ID der zugeordneten Collection.
     pub collection_id: String,
+    /// LSM-Sequenznummer zum Erstellungszeitpunkt.
     pub seq_no: u64,
+    /// Transaktions-ID zum Erstellungszeitpunkt.
     pub tx_id: TxId,
+    /// Zusätzliche anwendungsspezifische Metadaten als JSON.
     pub metadata: serde_json::Value,
+    /// Erstellungszeitpunkt in Millisekunden seit der Epoche.
     pub created_at: u64,
+    /// ID-Breite in Bits (SPEC §5.2). 64 oder 128 Bit.
+    #[serde(default = "default_id_width_bits")]
+    pub id_width_bits: u16,
+}
+
+/// Aktuelle ID-Breite in Bits (SPEC §5.2).
+pub const CURRENT_ID_WIDTH_BITS: u16 = if cfg!(feature = "docid-128") { 128 } else { 64 };
+
+fn default_id_width_bits() -> u16 {
+    CURRENT_ID_WIDTH_BITS
 }
 
 impl CheckpointMeta {
-    /// Converts metadata into a [`WorkflowState`].
-    /// Retained taking `&self` for backwards compatibility with external caller crates (ADR-011).
+    /// Validiert die ID-Breite gegen die aktuelle Build-Konfiguration (SPEC §5.2).
+    pub fn validate_id_width(&self) -> Result<()> {
+        let expected = CURRENT_ID_WIDTH_BITS;
+        if self.id_width_bits != expected {
+            return Err(CheckpointError::IdWidthMismatch {
+                stored: self.id_width_bits,
+                build: expected,
+            });
+        }
+        Ok(())
+    }
+
+    /// Konvertiert die Metadaten in einen [`WorkflowState`].
+    ///
+    /// # Kompatibilität
+    /// Behält `&self` für Rückwärtskompatibilität mit externen Aufrufern bei (ADR-011).
     #[allow(clippy::wrong_self_convention)]
     pub fn into_workflow_state(&self) -> WorkflowState {
         self.to_workflow_state()
     }
 
-    /// Converts metadata into a [`WorkflowState`].
+    // ANCHOR[contextra-checkpoint:META-002]
+    /// Konvertiert die Metadaten in einen [`WorkflowState`].
+    ///
+    /// # Ablauf:
+    /// 1. Transaktions-ID aus `tx_id` übernehmen.
+    /// 2. Deterministic Hash aus der Sequenznummer mit BLAKE3 bilden (`seq-<seq_no>`).
+    /// 3. [`WorkflowState`] mit Transaktion und Graph-Hash zurückliefern.
     pub fn to_workflow_state(&self) -> WorkflowState {
+        // NOTE: Der Hash wird deterministisch aus der Sequenznummer erzeugt, um Graph-Zustände abzugleichen
         WorkflowState {
             tx: self.tx_id,
             graph_hash: *blake3::hash(format!("seq-{}", self.seq_no).as_bytes()).as_bytes(),
@@ -46,11 +134,24 @@ impl CheckpointMeta {
     }
 }
 
-/// Point-in-Time Checkpoint representing an agent step or transaction boundary.
+// ANCHOR[contextra-checkpoint:STATE-001]
+/// Point-in-Time Checkpoint für einen Agenten-Schritt oder eine Transaktionsgrenze.
+///
+/// # Zweck
+/// Repräsentiert einen leichten Transaktions-Zwischenstand zur Laufzeit, z. B. während
+/// mehrstufiger Agenten-Schleifen.
+///
+/// # Felder
+/// - `tx_id`: Transaktions-ID des Zwischenschritts.
+/// - `timestamp_ms`: Monotoner Zeitstempel in Millisekunden (über injected Clock-Port generiert).
+/// - `namespace`: Optionaler logischer Namensraum zur Isolation von Workflows.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StateCheckpoint {
+    /// Transaktions-ID des Zustands-Snapshots.
     pub tx_id: TxId,
+    /// Zeitstempel der Erstellung in Millisekunden.
     pub timestamp_ms: u64,
+    /// Optionaler Namespace bzw. Mandant des Checkpoints.
     #[serde(default)]
     pub namespace: Option<String>,
 }
@@ -67,6 +168,7 @@ pub struct StateCheckpoint {
 mod tests {
     use super::*;
 
+    // Prüft die fehlerfreie JSON-Serialisierung und -Deserialisierung von CheckpointMeta (Roundtrip).
     #[allow(non_snake_case)]
     #[test]
     fn checkpoint_meta_CASE_serialization_roundtrip() {
@@ -77,6 +179,7 @@ mod tests {
             tx_id: TxId::new(1001),
             metadata: serde_json::json!({"step": 42, "env": "prod"}),
             created_at: 1690000000,
+            id_width_bits: CURRENT_ID_WIDTH_BITS,
         };
 
         let json = serde_json::to_string(&meta).expect("// expect #[cfg(test)]");
@@ -92,6 +195,7 @@ mod tests {
         assert_eq!(deserialized.created_at, 1690000000);
     }
 
+    // Prüft die fehlerfreie JSON-Serialisierung und -Deserialisierung von StateCheckpoint mit Namespace.
     #[allow(non_snake_case)]
     #[test]
     fn state_checkpoint_CASE_serialization_roundtrip() {
@@ -110,6 +214,7 @@ mod tests {
         assert_eq!(deserialized.namespace, Some("test_ns".to_string()));
     }
 
+    // Prüft die Rückwärtskompatibilität beim Deserialisieren alter JSON-Zustände ohne Namespace-Feld.
     #[test]
     fn state_checkpoint_deserializes_legacy_json_without_namespace() {
         let legacy_json = r#"{"tx_id": 999, "timestamp_ms": 1700000000000}"#;
@@ -121,6 +226,7 @@ mod tests {
         assert_eq!(deserialized.namespace, None);
     }
 
+    // Prüft die korrekte Ableitung eines WorkflowState aus CheckpointMeta inklusive deterministischem Graph-Hash.
     #[allow(non_snake_case)]
     #[test]
     fn into_workflow_state_CASE_valid_conversion() {
@@ -131,6 +237,7 @@ mod tests {
             tx_id: TxId::new(2026),
             metadata: serde_json::json!({"agent_phase": "reasoning"}),
             created_at: 5000,
+            id_width_bits: CURRENT_ID_WIDTH_BITS,
         };
 
         let state = meta.into_workflow_state();
@@ -140,6 +247,7 @@ mod tests {
         assert_ne!(state.graph_hash, [0u8; 32]);
     }
 
+    // Prüft Grenzwerte für Identifier-Längen (exakt 256 Zeichen erlaubt, 257 Zeichen abgewiesen).
     #[test]
     fn test_validate_identifier_boundary_oversized_257() {
         let name_256 = "a".repeat(256);
@@ -147,15 +255,16 @@ mod tests {
 
         let name_257 = "a".repeat(257);
         let res = validate_identifier("field", &name_257);
-        assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
+        assert!(matches!(res, Err(CheckpointError::InvalidInput(_))));
     }
 
+    // Prüft, dass leere Strings oder reine Whitespace-Strings als Identifier abgewiesen werden.
     #[test]
     fn test_validate_identifier_empty_or_whitespace() {
         let res_empty = validate_identifier("field", "");
-        assert!(matches!(res_empty, Err(ContextraError::InvalidInput(_))));
+        assert!(matches!(res_empty, Err(CheckpointError::InvalidInput(_))));
 
         let res_ws = validate_identifier("field", "   \t\n  ");
-        assert!(matches!(res_ws, Err(ContextraError::InvalidInput(_))));
+        assert!(matches!(res_ws, Err(CheckpointError::InvalidInput(_))));
     }
 }

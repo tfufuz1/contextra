@@ -1,10 +1,17 @@
-// FILE-CONTEXT
-// ZWECK: Trait LayerScanner und Modul-Export für gesperrte Scanner-Messungen (SPEC §12.7.4, INV-WITNESS-MINT-1).
-// INVARIANTEN: LayerScanner::scan besitzt eine Default-Implementierung, die begin_scan, scan_units und finish ausführt.
-// HOTSPOTS: [1-120]
+//! # Storage Layer Scanner & Maintenance Ports (Ring 0 / Class B)
+//!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/scanner/layer.rs
+//! LINK crates/contextra-ports/src/scanner/witness.rs
+//! LINK crates/contextra-ports/src/scanner/session.rs
+//!
+//! // ANCHOR[contextra-ports:SCANNER-001]
+//! // SECTION scanner-witness-contracts
+//! // NOTE: Verifiziert physische Bereinigungen und Restmengen-Messungen (SPEC §12.7.4, INV-WITNESS-MINT-1).
 
 #![forbid(unsafe_code)]
 
+// ANCHOR[contextra-ports:SCANNER-MODS-001]
 /// Layer and technique descriptor types.
 pub mod layer;
 /// ScanSession state and finish gate.
@@ -17,8 +24,9 @@ pub use session::*;
 pub use witness::*;
 
 use crate::clock::Clock;
-use contextra_types::Result;
+use crate::Result;
 
+// ANCHOR[contextra-ports:LAYER-SCANNER-001]
 /// Trait für Storage-Scanner zur Durchführung von Restmengen-Messungen.
 ///
 /// # Doctests (Compile Fail Checks)
@@ -51,14 +59,20 @@ use contextra_types::Result;
 /// ```
 pub trait LayerScanner: Send + Sync {
     /// Gibt die von diesem Scanner bediente Schicht zurück.
+    ///
+    /// # Fehler
+    /// Keine; statische Schichtabfrage.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn layer(&self) -> WitnessLayer;
 
     /// Führt das Scannen von Einheiten auf der übergebenen `ScanSession` aus.
-    fn scan_units(
-        &self,
-        session: &mut ScanSession,
-        ctx: &contextra_types::RequestContext,
-    ) -> Result<()>;
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei I/O- oder Verifizierungsfehlern.
+    /// # Crash
+    /// Reiner Lese- und Messzugriff auf Speicherschichten; verändert niemals persistente Daten.
+    fn scan_units(&self, session: &mut ScanSession, ctx: &crate::RequestContext) -> Result<()>;
 
     /// Default-Implementierung von `scan`, die `begin`, `scan_units` und `finish` ausführt.
     fn scan(
@@ -73,12 +87,13 @@ pub trait LayerScanner: Send + Sync {
         session.finish(clock)
     }
 }
+// !SECTION scanner-witness-contracts
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::clock::SystemClock;
-    use contextra_types::{RequestContext, TenantId, TxId};
+    use crate::{RequestContext, TenantId, TxId};
 
     struct TestScanner;
 

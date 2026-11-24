@@ -100,6 +100,7 @@ impl FaultInjector for FailInjector {
     }
 }
 
+// ANCHOR[contextra-durable-fs:TEST-FAULT-NO-FAULT-DEFAULT]
 /// Verifiziert das no-op Standardverhalten von NoFault.
 #[test]
 fn test_no_fault_default_behavior() -> std::io::Result<()> {
@@ -111,6 +112,7 @@ fn test_no_fault_default_behavior() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-FAULT-COUNTING]
 /// Prüft die Zählung aller I/O-Hook-Aufrufe über CountingFaultInjector.
 #[test]
 fn test_counting_fault_injector_tracks_operations() -> std::io::Result<()> {
@@ -148,6 +150,7 @@ fn test_counting_fault_injector_tracks_operations() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-FAULT-HANDLE-POISON]
 /// Prüft das Vergiften des DurableHandle bei injiziertem fsync-Fehler.
 #[test]
 fn test_durable_handle_fsync_failure_poisons_handle() -> std::io::Result<()> {
@@ -187,6 +190,7 @@ fn test_durable_handle_fsync_failure_poisons_handle() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-FAULT-ENOSPC-WRITE]
 /// Prüft die Fehlerpropagation von ENOSPC bei Schreibzugriffen während atomic_replace.
 #[test]
 fn test_atomic_replace_enospc_write_failure_propagation() -> std::io::Result<()> {
@@ -208,6 +212,7 @@ fn test_atomic_replace_enospc_write_failure_propagation() -> std::io::Result<()>
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-FAULT-RENAME-FAIL]
 /// Prüft die Fehlerpropagation bei Fehlern während des atomaren Umbenennens.
 #[test]
 fn test_atomic_replace_rename_failure_propagation() -> std::io::Result<()> {
@@ -231,6 +236,7 @@ fn test_atomic_replace_rename_failure_propagation() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-FAULT-REMOVE-DIR-FSYNC]
 /// Prüft die Fehlerbehandlung bei Verzeichnis-Sync-Fehlern während durable_remove.
 #[test]
 fn test_durable_remove_dir_fsync_failure() -> std::io::Result<()> {
@@ -252,6 +258,7 @@ fn test_durable_remove_dir_fsync_failure() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-FAULT-SYNC-DIR-FAIL]
 /// Prüft die Fehlerpropagation bei Verzeichnis-Sync-Fehlern in sync_dir.
 #[test]
 fn test_sync_dir_fsync_failure() -> std::io::Result<()> {
@@ -271,6 +278,7 @@ fn test_sync_dir_fsync_failure() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-FAULT-SCRUB-INJECTOR]
 /// Prüft die Fehlerpropagation bei Fehlerinjektion während scrub_and_remove.
 #[test]
 fn test_scrub_and_remove_injector_fault() -> std::io::Result<()> {

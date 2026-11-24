@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-docx")]
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

@@ -1,0 +1,10 @@
+[crates.contextra-text]
+group = "retrieval"
+level = 1
+tier = "beta"
+allowed_internal = ["contextra-ids", "contextra-env"]
+feature_closure_allowed = ["contextra-types", "contextra-ports"]
+dev_allowed = ["contextra-testkit"]
+klasse = "A"
+may_depend_on = ["contextra-ids", "contextra-env"]
+transitional = ["workspace", "types-compat", "ports-compat"]

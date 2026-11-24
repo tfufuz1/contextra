@@ -1,0 +1,12 @@
+{
+  "name": "golden_snapshot_v1",
+  "collection_id": "coll_golden_001",
+  "seq_no": 42000,
+  "tx_id": 1337,
+  "metadata": {
+    "env": "golden_production",
+    "retention_days": 30
+  },
+  "created_at": 1700000000000,
+  "id_width_bits": 64
+}

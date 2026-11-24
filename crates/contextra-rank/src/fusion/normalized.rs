@@ -1,4 +1,10 @@
-use super::resonance::{apply_resonance_bonus, ResonanceConfig};
+//! # Score-Normalisierte Fusion (`normalized`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Implementiert die lineare Score-Kombination nach Min-Max-Normalisierung.
+
+use super::{apply_resonance_bonus, ResonanceConfig};
 use super::rrf::{
     format_fused_results_from_top_k, update_fused_entry_from_doc,
     weighted_reciprocal_rank_fusion_with_options,
@@ -116,6 +122,7 @@ fn check_signal_set_degradation(active_sets: &[&(String, Vec<SearchResult>, f32)
 }
 
 /// Score-normalized fusion (CombSUM with MinMax normalization).
+/// Führt eine score-normalisierte lineare Fusion mehrerer Signal-Ergebnismengen durch.
 pub fn score_normalized_fusion_with_options(
     mut result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
@@ -177,11 +184,13 @@ pub fn score_normalized_fusion_with_options(
 }
 
 /// Converts optional `FusionWeights` into (vector, text, graph) weight tuple.
+/// Konvertiert relative Signalgewichte in Normalisierungsfaktoren.
 pub fn weights_to_signal_factors(
-    weights: Option<&contextra_types::FusionWeights>,
+    weights: Option<&crate::local_types::FusionWeights>,
 ) -> (f32, f32, f32) {
     match weights {
-        Some(w) => (w.vector(), w.text(), w.graph()),
+        Some(w) => (w.vector, w.text, w.graph),
         None => (1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0),
     }
 }
+

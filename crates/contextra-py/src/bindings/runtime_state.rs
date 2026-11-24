@@ -1,13 +1,37 @@
+//! # Laufzeitumgebungs-Zustand für Python (`PyRuntimeState`)
+//!
+//! Dieses Modul verwaltet die per-Interpreter isolierte Tokio-Runtime (`tokio::runtime::Runtime`).
+//!
+//! ## Ring-Zugehörigkeit
+//! Ring 4 (FFI-Boundary / Bindings).
+//!
+//! ## Hintergrund & Relevanz (PEP 684)
+//! In Python 3.12+ (Sub-Interpreters) teilen sich Sub-Interpreter unter Umständen
+//! nicht denselben Speicher. Um Datenrennen und Ressourcen-Lecks zu verhindern,
+//! wird der asynchrone Tokio-Threadpool an das jeweilige Python-Modul `_contextra` geheftet.
+//! So hat jeder Python-Interpreter seine eigene, saubere Async-Laufzeitumgebung.
+
 use pyo3::prelude::*;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use crate::bindings::common::{MAX_WORKER_THREADS, MIN_WORKER_THREADS};
 
-/// Parses and clamps `CONTEXTRA_WORKER_THREADS` environment variable to `[MIN_WORKER_THREADS, MAX_WORKER_THREADS]`.
+// ANCHOR[contextra-py:RNT-001]
+/// Liest und begrenzt die Umgebungsvariable `CONTEXTRA_WORKER_THREADS` auf den Bereich `[MIN_WORKER_THREADS, MAX_WORKER_THREADS]`.
 ///
-/// If `CONTEXTRA_WORKER_THREADS` is unset, invalid, or 0, clamps to `MIN_WORKER_THREADS..=MAX_WORKER_THREADS`
-/// to guarantee that Tokio multi-thread runtime builder is never called with 0 worker threads.
+/// # Zweck
+/// Bestimmt die Anzahl der Hintergrund-Worker-Threads für die Tokio-Laufzeitumgebung.
+///
+/// # Ablauf
+/// 1. Standardwert ermitteln: Halbe Anzahl verfügbarer CPU-Kerne (`available_parallelism`),
+///    mindestens jedoch auf `[MIN_WORKER_THREADS, MAX_WORKER_THREADS]` begrenzt (z. B. 2 bis 32).
+/// 2. Liest die Umgebungsvariable `CONTEXTRA_WORKER_THREADS`.
+/// 3. Parst den String zu `usize` und klemmt den Wert in die Schranken `MIN_WORKER_THREADS..=MAX_WORKER_THREADS`.
+/// 4. Liefert bei Fehlern oder fehlendem Eintrag den berechneten Standardwert zurück.
+///
+/// # Garantien
+/// Stellt sicher, dass die Tokio-Runtime niemals mit 0 Threads initialisiert wird (Fail-Safe).
 pub fn parse_worker_threads_env() -> usize {
     let default_threads = (std::thread::available_parallelism()
         .map(|n| n.get())
@@ -22,7 +46,12 @@ pub fn parse_worker_threads_env() -> usize {
         .unwrap_or(default_threads)
 }
 
-/// Holds the per-interpreter/per-module Tokio runtime state and worker thread configuration.
+// ANCHOR[contextra-py:RNT-002]
+/// Kapselt die Tokio-Laufzeitumgebung und die Thread-Konfiguration pro Python-Modul.
+///
+/// # Felder
+/// - `runtime`: Referenzgezählter Handle (`Arc<Runtime>`) auf den Tokio-Multi-Thread-Pool.
+/// - `worker_threads`: Anzahl konfigurierter Worker-Threads in diesem Pool.
 #[pyclass(name = "RuntimeState")]
 #[derive(Clone)]
 pub struct PyRuntimeState {
@@ -30,11 +59,21 @@ pub struct PyRuntimeState {
     pub worker_threads: usize,
 }
 
-/// Retrieves or initializes the per-interpreter Tokio runtime attached to the `_contextra` module state.
+// ANCHOR[contextra-py:RNT-003]
+/// Ruft die Tokio-Runtime für den aktuellen Python-Interpreter ab oder initialisiert sie bei Bedarf.
 ///
-/// Reads `CONTEXTRA_WORKER_THREADS` on initialization for the current interpreter/module context.
-/// Evaluates the `Result` of attaching `_runtime_state` to the `_contextra` module via `setattr`.
-/// On failure, propagates a `PyRuntimeError` to prevent runtime leaks and repeated runtime instantiation.
+/// # Zweck
+/// Stellt sicher, dass asynchrone Rust-Operationen in Python synchron ausgeführt werden können.
+///
+/// # Ablauf in Schritten:
+/// 1. Sucht nach dem bereits geladenen Modul `contextra._contextra` oder `_contextra`.
+/// 2. Prüft, ob das Modulattribut `_runtime_state` bereits existiert und extrahiert den Handle.
+/// 3. Falls noch nicht vorhanden: Ermittelt Worker-Threads via `parse_worker_threads_env()`.
+/// 4. Erzeugt eine neue Multi-Thread-Tokio-Runtime mit dem Thread-Präfix `contextra-py-worker`.
+/// 5. Bindet die neue Runtime an das Modulattribut `_runtime_state` via `setattr`.
+///
+/// # Fehlerfälle
+/// - `PyRuntimeError` bei Scheitern des Runtime-Builds oder beim Setzen des Modulattributs.
 pub fn get_runtime(py: Python<'_>) -> PyResult<Arc<Runtime>> {
     let module = py
         .import("contextra._contextra")

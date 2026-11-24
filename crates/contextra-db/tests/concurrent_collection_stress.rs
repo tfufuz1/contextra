@@ -7,6 +7,8 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
 
+// ANCHOR[contextra-db:TEST-CONCURRENT_COLLECTION_STRESS-01-TEST_CONCURRENT_COLLECTION_OPS]
+// Testet die Funktionalität von `test_concurrent_collection_ops`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_concurrent_collection_ops() {
     let tmp = TempDir::new().expect("temp dir");

@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use contextra_store::wal::{KeyManager, Wal, WalOp};
 use contextra_types::{ContextraError, TxId};
 use std::sync::Arc;

@@ -1,0 +1,32 @@
+[
+  {
+    "doc_id": "ERR:Invalid input: Key cannot be empty",
+    "entity_id": "ERR:Invalid input: Key cannot be empty",
+    "key_len": 0,
+    "key_preview": ""
+  },
+  {
+    "doc_id": "OK:a2eec37a71655d9253a469d9dd2f7617",
+    "entity_id": "OK:53a469d9dd2f7617",
+    "key_len": 1,
+    "key_preview": "a"
+  },
+  {
+    "doc_id": "OK:d1aebe1377cacddcd6a3209fa7868a28",
+    "entity_id": "OK:d6a3209fa7868a28",
+    "key_len": 13,
+    "key_preview": "Hello, World!"
+  },
+  {
+    "doc_id": "OK:ccf79e2fd670742cd80729be7af09766",
+    "entity_id": "OK:d80729be7af09766",
+    "key_len": 26,
+    "key_preview": "Mandant_Übersicht_42_🚀"
+  },
+  {
+    "doc_id": "OK:e240459ab4790957717a3eb9ae578f9b",
+    "entity_id": "OK:717a3eb9ae578f9b",
+    "key_len": 4096,
+    "key_preview": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+  }
+]

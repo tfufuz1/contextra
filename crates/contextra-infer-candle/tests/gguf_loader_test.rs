@@ -2,6 +2,12 @@
 // STAND: 2026-09-09T12:44:49Z (SESSION: c74a1828)
 // ZWECK: Unit tests for GGUF metadata parsing error paths.
 
+//! Unit-Tests für GGUF-Metadaten-Fehlerpfade.
+//!
+//! # Zweck
+//! Prüft die Fehlerbehandlung bei nicht existierenden oder korrupten GGUF-Modelldateien.
+
+// ANCHOR[contextra-infer-candle:TEST-GGUF-LOADER-ERROR-PATHS]
 use contextra_infer_candle::gguf_loader::parse_gguf_metadata;
 use std::io::Write;
 use std::path::Path;

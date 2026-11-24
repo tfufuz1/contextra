@@ -1,19 +1,45 @@
-//! Aggregation Phase (Consolidation Stage 3) — Spec §21.4
+//! # Aggregationsphase / LeanRAG Stage 3 (`aggregation_phase.rs`)
 //!
-//! Implementiert Ring-3-Consolidation:
-//! - Type-Denoising (self-supervised)
-//! - Deterministisches Diagonal-GMM Clustering
-//! - LLM-Synthese von Alpha-Knoten mit P12-Kostenschutz
-//! - Super-Hyperkanten-Entwürfe via `SuperEdgeSink`-Trait
+//! Implementiert die semantische Aggregationsphase (Consolidation Stage 3) nach Spezifikation §21.4.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2). Koordiniert Entitäten, GMM-Clustering und Wissenssynthese.
+//!
+//! ## Kernfunktionen
+//! - **Typ-Denoising:** Selbstüberwachte Bereinigung inkompatibler Kanten-Prädikate.
+//! - **Deterministisches Diagonal-GMM Clustering:** Gauss'sches Mischmodell (GMM) mit
+//!   Diagonal-Kovarianzmatrix und deterministischem SplitMix64-Pseudozufallsgenerator.
+//! - **Alpha-Knoten-Synthese:** LLM-basierte Konzeptabstraktion stabiler Communities mit
+//!   P12-Kostenschutz (Budgetierung maximaler Aufrufe).
+//! - **Super-Hyperkanten-Synthese:** Bündelung dicht verknüpfter Teilcluster zu abstrakten Kanten
+//!   über das [`SuperEdgeSink`]-Trait.
+//!
+//! ## Invarianten
+//! - **P12-Kostenschutz:** Obergrenze für LLM-Aufrufe pro Zyklus ([`AggregationConfig::max_llm_calls_per_cycle`]).
+//! - **Speicherbudget-Schutz:** Vorprüfung des maximalen Spitzenbedarfs via [`check_compaction_budget`].
+//! - **Deterministische Sortierung:** Alle Knoten und Kanten werden kanonisch sortiert, um identische
+//!   Ergebnisse bei gleichen Ausgangsdaten zu garantieren.
 
+// FILE-CONTEXT
+// ZWECK: LeanRAG Stage 3 semantische Aggregation, deterministisches GMM-Clustering und Alpha-Knoten-Synthese.
+// INVARIANTEN: P12 LLM-Kostenschutz; Speicherbudget-Vorabpruefung; deterministische Sortierung via SplitMix64.
+// STAND: 2026-11-11
+
+use crate::error::CognitionError;
+use crate::graph_local::HyperEdgeId;
 use crate::memory_consolidation::{CommunityStabilityTracker, ConsolidationPhaseResult};
+use crate::ports_local::LlmTextGenerator;
+use crate::types_local::{EntityId, Result};
+// TODO(baukasten): LeanRAG Diagonal-GMM Clustering in autarken Algorithmen-Baustein extrahieren (AD-8). Reines mathematisches Denoising ohne Kognitions-Monolith-Bindung.
 use ahash::{AHashMap, AHashSet};
-use contextra_graph::HyperEdgeId;
-use contextra_ports::LlmTextGenerator;
-use contextra_types::{ContextraError, EntityId, Result};
 
 /// Konfiguration für die Aggregation-Phase.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-cognition:AGG-001]
+/// Konfiguration für die Aggregationsphase (LeanRAG Stage 3).
+// =========================================================================
+// SECTION: Aggregations-Konfiguration & Datenstrukturen
+// =========================================================================
 pub struct AggregationConfig {
     /// Maximal zulässiger Speicherverbrauch für Compaction/Aggregation in MB (Default: 512).
     pub max_compaction_peak_memory_mb: usize,
@@ -58,45 +84,45 @@ impl AggregationConfig {
     /// Validiert die Konfigurationseinstellungen.
     pub fn validate(&self) -> Result<()> {
         if self.max_compaction_peak_memory_mb == 0 {
-            return Err(ContextraError::InvalidInput(
+            return Err(CognitionError::InvalidInput(
                 "max_compaction_peak_memory_mb must be > 0".into(),
-            ));
+            )
+            .into());
         }
         if !self.clustering_tau_threshold.is_finite()
             || self.clustering_tau_threshold < 0.0
             || self.clustering_tau_threshold > 1.0
         {
-            return Err(ContextraError::InvalidInput(
+            return Err(CognitionError::InvalidInput(
                 "clustering_tau_threshold must be finite and in [0.0, 1.0]".into(),
-            ));
+            )
+            .into());
         }
         if self.max_clusters == 0 {
-            return Err(ContextraError::InvalidInput(
-                "max_clusters must be > 0".into(),
-            ));
+            return Err(CognitionError::InvalidInput("max_clusters must be > 0".into()).into());
         }
         if self.min_cluster_size == 0 {
-            return Err(ContextraError::InvalidInput(
-                "min_cluster_size must be > 0".into(),
-            ));
+            return Err(CognitionError::InvalidInput("min_cluster_size must be > 0".into()).into());
         }
         if self.em_max_iterations == 0 {
-            return Err(ContextraError::InvalidInput(
-                "em_max_iterations must be > 0".into(),
-            ));
+            return Err(
+                CognitionError::InvalidInput("em_max_iterations must be > 0".into()).into(),
+            );
         }
         if !self.em_tolerance.is_finite() || self.em_tolerance <= 0.0 {
-            return Err(ContextraError::InvalidInput(
+            return Err(CognitionError::InvalidInput(
                 "em_tolerance must be finite and > 0.0".into(),
-            ));
+            )
+            .into());
         }
         if !self.min_type_compat_score.is_finite()
             || self.min_type_compat_score < 0.0
             || self.min_type_compat_score > 1.0
         {
-            return Err(ContextraError::InvalidInput(
+            return Err(CognitionError::InvalidInput(
                 "min_type_compat_score must be finite and in [0.0, 1.0]".into(),
-            ));
+            )
+            .into());
         }
         Ok(())
     }
@@ -104,9 +130,11 @@ impl AggregationConfig {
 
 /// Ergebnis der Aggregation-Phase.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-cognition:AGG-002]
+/// Ergebnis der Aggregationsphase.
 pub struct AggregationPhaseResult {
     /// Anzahl tombstonierter Kanten wegen Inkompatibilität.
-    pub raw_edges_tombstoned: usize,
+    pub raw_edges_invalidated: usize,
     /// Anzahl erzeugter abstrakter Super-Hyperkanten.
     pub abstract_hyperedges_created: usize,
     /// Geschätzter Maximalverbrauch an Speicher in MB.
@@ -117,6 +145,8 @@ pub struct AggregationPhaseResult {
 
 /// Gesamtergebnis der Konsolidierungspipeline (Spec §21.4).
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-cognition:AGG-003]
+/// Gesamtergebnis der dreistufigen Konsolidierungspipeline.
 pub struct ConsolidationPipelineResult {
     /// Ergebnis des Structural Pass.
     pub structural: ConsolidationPhaseResult,
@@ -128,6 +158,8 @@ pub struct ConsolidationPipelineResult {
 
 /// Eingabe-Knoten für die Aggregationsphase.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-cognition:AGG-004]
+/// Eingabeknoten für die Aggregationsphase.
 pub struct AggregationNode {
     /// Eindeutige EntityId des Knotens.
     pub entity: EntityId,
@@ -139,6 +171,8 @@ pub struct AggregationNode {
 
 /// Eingabe-Kante für die Aggregationsphase.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-cognition:AGG-005]
+/// Eingabekante für die Aggregationsphase.
 pub struct AggregationEdge {
     /// Eindeutige ID der Hyperkante.
     pub id: HyperEdgeId,
@@ -150,6 +184,8 @@ pub struct AggregationEdge {
 
 /// Entwurf einer abstrakten Super-Hyperkante.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-cognition:AGG-006]
+/// Entwurf einer abstrakten Super-Hyperkante.
 pub struct SuperEdgeDraft {
     /// Indizes der beiden beteiligten Cluster `(j, k)`.
     pub cluster_pair: (usize, usize),
@@ -163,6 +199,8 @@ pub struct SuperEdgeDraft {
 
 /// Ein synthetisierter Alpha-Knoten (abstraktes Community-Konzept).
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-cognition:AGG-007]
+/// Synthetisierter abstrakter Alpha-Knoten.
 pub struct AlphaNode {
     /// Cluster-Index.
     pub cluster_id: usize,
@@ -173,9 +211,11 @@ pub struct AlphaNode {
 }
 
 /// Trait zur Abstraktion des Speicherziels für Superkanten und Tombstones.
+// ANCHOR[contextra-cognition:AGG-008]
+/// Senkentrait für Superkanten und Tombstones.
 pub trait SuperEdgeSink {
-    /// Markiert eine Kante als tombstoned.
-    fn tombstone_edge(&mut self, id: HyperEdgeId) -> Result<()>;
+    /// Markiert eine Kante als invalidiert (superseded).
+    fn invalidate_edge(&mut self, id: HyperEdgeId) -> Result<()>;
     /// Schreibt eine neue Super-Hyperkante und gibt deren zugewiesene ID zurück.
     fn write_super_edge(&mut self, draft: SuperEdgeDraft) -> Result<HyperEdgeId>;
     /// Atomarer Commit aller Änderungen.
@@ -183,13 +223,16 @@ pub trait SuperEdgeSink {
 }
 
 /// Prüft, ob der geschätzte Compaction-Speicherbedarf das konfigurierte Budget überschreitet.
+// ANCHOR[contextra-cognition:AGG-009]
+/// Prüft den geschätzten Speicherbedarf gegen das konfigurierte Budget.
 pub fn check_compaction_budget(peak_bytes: usize, cfg: &AggregationConfig) -> Result<()> {
     let used_mb = peak_bytes.div_ceil(1024 * 1024);
     if used_mb > cfg.max_compaction_peak_memory_mb {
-        return Err(ContextraError::MemoryBudgetExceeded {
-            used_mb: used_mb as u64,
-            limit_mb: cfg.max_compaction_peak_memory_mb as u64,
-        });
+        return Err(CognitionError::BudgetExceeded {
+            peak_bytes,
+            max_bytes: cfg.max_compaction_peak_memory_mb * 1024 * 1024,
+        }
+        .into());
     }
     Ok(())
 }
@@ -221,6 +264,13 @@ impl SplitMix64 {
 ///
 /// Im Gegensatz zu `compute_community_hash(&[DocId])` verwendet diese Funktion
 /// `EntityId`s, da in Stage 3 Entitäts-Knoten verarbeitet werden.
+// ANCHOR[contextra-cognition:AGG-010]
+/// Berechnet einen deterministischen Hash über eine Liste von EntityIds.
+// !SECTION: Aggregations-Konfiguration & Datenstrukturen
+
+// =========================================================================
+// SECTION: Community-Hashing & Budgetierung
+// =========================================================================
 pub fn compute_entity_community_hash(members: &[EntityId]) -> u64 {
     let mut sorted_ids: Vec<u64> = members.iter().map(|e| e.inner()).collect();
     sorted_ids.sort_unstable();
@@ -252,9 +302,9 @@ fn validate_and_sort_aggregation_inputs(
 
     let dim = sorted_nodes.first().map(|n| n.embedding.len()).unwrap_or(0);
     if dim == 0 {
-        return Err(ContextraError::InvalidInput(
-            "Node embedding dimension must be > 0".into(),
-        ));
+        return Err(
+            CognitionError::InvalidInput("Node embedding dimension must be > 0".into()).into(),
+        );
     }
 
     let node_type_map: AHashMap<EntityId, u32> =
@@ -262,15 +312,17 @@ fn validate_and_sort_aggregation_inputs(
 
     for node in &sorted_nodes {
         if node.embedding.len() != dim {
-            return Err(ContextraError::InvalidInput(
+            return Err(CognitionError::InvalidInput(
                 "Inconsistent embedding dimensions across nodes".into(),
-            ));
+            )
+            .into());
         }
         for &val in &node.embedding {
             if !val.is_finite() {
-                return Err(ContextraError::InvalidInput(
+                return Err(CognitionError::InvalidInput(
                     "NaN or Infinity detected in node embedding".into(),
-                ));
+                )
+                .into());
             }
         }
     }
@@ -300,7 +352,7 @@ fn perform_type_denoising(
     }
 
     let mut active_edges = Vec::new();
-    let mut raw_edges_tombstoned = 0;
+    let mut raw_edges_invalidated = 0;
 
     for edge in sorted_edges {
         let mut min_compat = 1.0f32;
@@ -322,14 +374,14 @@ fn perform_type_denoising(
         }
 
         if min_compat < cfg.min_type_compat_score {
-            sink.tombstone_edge(edge.id)?;
-            raw_edges_tombstoned += 1;
+            sink.invalidate_edge(edge.id)?;
+            raw_edges_invalidated += 1;
         } else {
             active_edges.push(edge);
         }
     }
 
-    Ok((active_edges, raw_edges_tombstoned))
+    Ok((active_edges, raw_edges_invalidated))
 }
 
 fn build_clusters_from_assignments(
@@ -522,6 +574,13 @@ fn build_and_write_super_edges(
 }
 
 /// Führt die Aggregation (Consolidation Stage 3) aus.
+// ANCHOR[contextra-cognition:AGG-011]
+/// Führt den vollständigen Aggregationspass aus.
+// !SECTION: Community-Hashing & Budgetierung
+
+// =========================================================================
+// SECTION: Phasen-Ausfuehrung
+// =========================================================================
 pub async fn run_aggregation_pass(
     nodes: &[AggregationNode],
     edges: &[AggregationEdge],
@@ -536,7 +595,7 @@ pub async fn run_aggregation_pass(
         sink.commit()?;
         return Ok((
             AggregationPhaseResult {
-                raw_edges_tombstoned: 0,
+                raw_edges_invalidated: 0,
                 abstract_hyperedges_created: 0,
                 peak_memory_used_mb: 0,
                 child_edge_ids_written: 0,
@@ -548,7 +607,7 @@ pub async fn run_aggregation_pass(
     let (sorted_nodes, sorted_edges, dim, node_type_map) =
         validate_and_sort_aggregation_inputs(nodes, edges)?;
 
-    let (active_edges, raw_edges_tombstoned) =
+    let (active_edges, raw_edges_invalidated) =
         perform_type_denoising(sorted_edges, &node_type_map, cfg, sink)?;
 
     let n = sorted_nodes.len();
@@ -583,7 +642,7 @@ pub async fn run_aggregation_pass(
 
     Ok((
         AggregationPhaseResult {
-            raw_edges_tombstoned,
+            raw_edges_invalidated,
             abstract_hyperedges_created,
             peak_memory_used_mb,
             child_edge_ids_written,
@@ -842,3 +901,30 @@ fn run_deterministic_diagonal_gmm(
 
     assign_clusters_from_gmm(nodes, k, dim, &pi, &mu, &sigma_sq)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_splitmix64_determinism() {
+        let mut rng1 = SplitMix64::new(42);
+        let mut rng2 = SplitMix64::new(42);
+
+        for _ in 0..100 {
+            assert_eq!(rng1.next_u64(), rng2.next_u64());
+            assert_eq!(rng1.next_f64(), rng2.next_f64());
+        }
+    }
+
+    #[test]
+    fn test_compute_entity_community_hash_permutation_invariant() {
+        let list1 = vec![EntityId::new(10), EntityId::new(2), EntityId::new(50)];
+        let list2 = vec![EntityId::new(50), EntityId::new(10), EntityId::new(2)];
+        assert_eq!(
+            compute_entity_community_hash(&list1),
+            compute_entity_community_hash(&list2)
+        );
+    }
+}
+// !SECTION: Hash- & Budget-Hilfsfunktionen

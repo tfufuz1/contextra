@@ -10,8 +10,13 @@
 //! Carries task identity, graph position, token budget, DB references, and
 //! accumulated step memory across the entire lifecycle of a single workflow run.
 
+// =========================================================================
+// SECTION: AgentContext & Execution State
+// =========================================================================
+// ANCHOR[contextra-agent:context-primitives]
+
+
 use contextra_db::{Collection, Contextra};
-use contextra_store::LsmStorage;
 use contextra_types::error::{CacheDirective, StepId};
 use contextra_types::{ContextraError, Result, TokenBudget};
 use std::collections::{BTreeMap, VecDeque};
@@ -91,7 +96,7 @@ pub struct AgentContext {
     /// Contextra DB handle providing collection storage.
     pub db: Arc<Contextra>,
     /// State storage collection where workflow history and audit traces are persisted.
-    pub state_collection: Arc<Collection<LsmStorage>>,
+    pub state_collection: Arc<Collection>,
     /// Token budget manager enforcing execution cost limits.
     pub budget: TokenBudget,
     /// Active operational status of the workflow execution.
@@ -122,7 +127,7 @@ impl AgentContext {
         task_id: impl Into<String>,
         start_node: impl Into<String>,
         db: Arc<Contextra>,
-        state_collection: Arc<Collection<LsmStorage>>,
+        state_collection: Arc<Collection>,
         budget: TokenBudget,
     ) -> contextra_types::Result<Self> {
         let task_id_str = task_id.into();
@@ -571,3 +576,5 @@ mod tests {
         Ok(())
     }
 }
+
+// !SECTION

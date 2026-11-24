@@ -1,4 +1,18 @@
-//! Storage engine subsystem trait definitions and statistics.
+//! # Storage Engine Port (Ring 0 / Class B)
+//!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/kv.rs
+//!
+//! Definiert die kanonischen asynchronen Speicherverträge für relationale und
+//! Key-Value-Speicher-Engines (z. B. `contextra-store::LsmStorage`).
+//!
+//! // ANCHOR[contextra-ports:STORAGE-001]
+//! // SECTION storage-engine-contracts
+//! // NOTE: Alle Methoden nutzen `BoxFuture` für dynamische Polymorphie (dyn-Safety).
+//! // Invarianten:
+//! // 1. Transaktionsisolation wird über `TxId` und Sequenznummern garantiert.
+//! // 2. Fail-Closed: Unverarbeitete oder fehlerhafte Operationen führen zum Rollback.
+//! // 3. Bounds-Protection via `MAX_SCAN_MERGE_ACCUMULATOR`.
 
 use super::BoxFuture;
 use crate::types::*;
@@ -6,6 +20,7 @@ use crate::Result;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
+// ANCHOR[contextra-ports:STORAGE-STATS-001]
 /// Statistics for the storage engine.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StorageStats {
@@ -20,6 +35,7 @@ pub struct StorageStats {
 // INVARIANT: Implementor: LsmStorage (contextra-store/src/lsm.rs)
 // Lifecycle: put/delete → commit/rollback → flush(background).
 
+// ANCHOR[contextra-ports:STORAGE-ACCUM-001]
 /// Harte Obergrenze für die Anzahl distinkter Keys, die eine StorageEngine-
 /// Implementierung während eines einzelnen scan()/scan_prefix_bounded()-Aufrufs
 /// intern akkumulieren darf, BEVOR limit/cursor angewendet wird. Verhindert
@@ -28,6 +44,7 @@ pub struct StorageStats {
 /// um normale paginierte Nutzung nicht zu beeinträchtigen.
 pub const MAX_SCAN_MERGE_ACCUMULATOR: usize = 100_000;
 
+// ANCHOR[contextra-ports:STORAGE-TRAIT-001]
 /// Unified Storage Engine trait — retained for backward compatibility across higher layers.
 ///
 /// # Dyn-Kompatibilität
@@ -84,6 +101,11 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// Returns `true` if this storage engine implementation actively tracks read-sets for SSI validation.
     ///
     /// Default implementation returns `false`.
+    ///
+    /// # Fehler
+    /// Keine; statische Fähigkeitsabfrage.
+    /// # Crash
+    /// Reiner Statusabruf ohne persistente Mutation.
     fn supports_ssi_tracking(&self) -> bool {
         false
     }
@@ -149,6 +171,7 @@ pub trait StorageEngine: Send + Sync + 'static {
         })
     }
 
+    // ANCHOR[contextra-ports:STORAGE-TX-001]
     /// Commits a transaction.
     fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;
 
@@ -170,12 +193,14 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// Returns the last transaction ID committed to storage.
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>>;
 
+    // ANCHOR[contextra-ports:STORAGE-CKPT-001]
     /// Pins a checkpoint for sequence number.
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>>;
 
     /// Unpins a checkpoint for sequence number.
     fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>>;
 
+    // ANCHOR[contextra-ports:STORAGE-SCAN-001]
     /// Scans a range of keys with given prefix.
     #[allow(clippy::type_complexity)]
     fn scan_prefix<'a>(
@@ -257,6 +282,13 @@ pub trait StorageEngine: Send + Sync + 'static {
             ))
         })
     }
+}
+// !SECTION storage-engine-contracts
+
+/// Prelude for storage engine ports.
+pub mod prelude {
+    pub use super::{StorageEngine, StorageStats, MAX_SCAN_MERGE_ACCUMULATOR};
+    pub use crate::kv::KvPrefixStore;
 }
 
 #[cfg(test)]

@@ -1,3 +1,14 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (engine_part1.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
+//! # Tests für Kernfunktionen der RouterEngine (Teil 1)
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Tests für Kernfunktionen der RouterEngine (Teil 1).
+
+// ANCHOR[contextra-router:TST-ENG1-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
@@ -10,29 +21,16 @@
 )]
 use super::super::fixtures::*;
 use crate::{RouterEngine, SlmProfile};
-use contextra_db::{Contextra, ContextraConfig};
-use contextra_ports::StorageEngine;
+
 use contextra_types::{ContextraError, EntityId, TokenBudget};
 use serde_json::json;
 use std::sync::Arc;
 
+// ANCHOR[contextra-router:TST-ENG1-T01]
+// Test `test_router_engine_instantiation_with_mock_storage`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_router_engine_instantiation_with_mock_storage() {
-    let storage = Arc::new(MockStorageEngine);
-    let mut hnsw_config = contextra_vector::HnswConfig::default();
-    hnsw_config.dimension = 4;
-    let hnsw = Arc::new(contextra_vector::HnswIndex::try_new(hnsw_config).unwrap());
-    let graph = Arc::new(contextra_graph::CsrGraph::new());
-    let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
-    let collection = Arc::new(contextra_db::Collection::new(
-        "test_collection".to_string(),
-        storage,
-        hnsw,
-        graph,
-        next_tx,
-        4,
-        contextra_text::Language::English,
-    ));
+    let collection = Arc::new(TestCollection::new(4));
 
     let profile = SlmProfile::new(
         "mock-slm",
@@ -50,6 +48,8 @@ async fn test_router_engine_instantiation_with_mock_storage() {
     assert_eq!(router.profiles()[0].name, "mock-slm");
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T02]
+// Test `test_route_deterministic_community_assignment`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_route_deterministic_community_assignment() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -154,6 +154,8 @@ async fn test_route_deterministic_community_assignment() {
     assert!(!decision_docs.context.chunks.is_empty());
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T03]
+// Test `test_route_fallback_error_on_low_relevance`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_route_fallback_error_on_low_relevance() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -197,6 +199,8 @@ async fn test_route_fallback_error_on_low_relevance() {
     }
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T04]
+// Test `test_route_hot_reload_concurrent_safety`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_route_hot_reload_concurrent_safety() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -277,6 +281,8 @@ async fn test_route_hot_reload_concurrent_safety() {
     writer_handle.await.unwrap(); // unwrap
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T05]
+// Test `test_route_hot_reload_atomic_snapshot_determinism`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_route_hot_reload_atomic_snapshot_determinism() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -341,6 +347,8 @@ async fn test_route_hot_reload_atomic_snapshot_determinism() {
     let d2 = router.route(&vec_data, "test content").await.unwrap(); // unwrap
     assert_eq!(d2.profile.name, "profile-c");
 }
+// ANCHOR[contextra-router:TST-ENG1-T06]
+// Test `test_route_empty_profiles_err`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_route_empty_profiles_err() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -358,6 +366,8 @@ async fn test_route_empty_profiles_err() {
     assert!(matches!(err, Err(ContextraError::NotFound(msg)) if msg.contains("Keine SLM-Profile")));
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T07]
+// Test `test_route_empty_search_results_err`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_route_empty_search_results_err() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -385,6 +395,8 @@ async fn test_route_empty_search_results_err() {
     );
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T08]
+// Test `test_route_unparseable_entity_id`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_route_unparseable_entity_id() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -421,6 +433,8 @@ async fn test_route_unparseable_entity_id() {
     assert!(matches!(result, Err(ContextraError::NotFound(_))));
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T09]
+// Test `test_route_threshold_boundaries`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_route_threshold_boundaries() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -465,6 +479,8 @@ async fn test_route_threshold_boundaries() {
     assert!(res.is_ok());
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T10]
+// Test `test_route_determinism_and_tie_breaking`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[test]
 fn test_route_determinism_and_tie_breaking() -> Result<(), Box<dyn std::error::Error>> {
     use crate::router::select_profile_from_chunks;
@@ -517,6 +533,8 @@ fn test_route_determinism_and_tie_breaking() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T11]
+// Test `test_route_1_and_50_profiles`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_route_1_and_50_profiles() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -574,6 +592,8 @@ async fn test_route_1_and_50_profiles() {
     assert_eq!(decision_single.profile.name, "profile-single");
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T12]
+// Test `test_router_engine_profiles_accessor`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_router_engine_profiles_accessor() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -599,6 +619,8 @@ async fn test_router_engine_profiles_accessor() {
     assert_eq!(profiles[0].name, "p-acc");
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T13]
+// Test `test_select_profile_from_chunks_empty_chunks`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[test]
 fn test_select_profile_from_chunks_empty_chunks() {
     use crate::router::select_profile_from_chunks;
@@ -615,6 +637,8 @@ fn test_select_profile_from_chunks_empty_chunks() {
     );
 }
 
+// ANCHOR[contextra-router:TST-ENG1-T14]
+// Test `test_select_profile_max_score_meets_threshold_when_aggregated_does_not`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[test]
 fn test_select_profile_max_score_meets_threshold_when_aggregated_does_not() {
     use crate::router::select_profile_from_chunks;

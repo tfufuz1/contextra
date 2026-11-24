@@ -1,3 +1,9 @@
+//! Benchmark für Traversierungsoperationen im Compressed Sparse Row (CSR) Graphen.
+//!
+//! # Zweck
+//! Evaluiert Latenzen und Speichereffizienz bei BFS-Nachbarschaftsabfragen (1-Hop, 2-Hop)
+//! und Pfadprüfungen auf synthetischen und dichten Graphen.
+
 use contextra_graph::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{DocId, Entity, EntityId, TxId};
@@ -6,6 +12,7 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 // Helper trait to support benchmark invocation syntax `graph.bfs(...)` and `graph.get_neighbors(...)`
+// ANCHOR[contextra-graph:BENCHES-CSR-TRAVERSAL-BENCH-001]
 pub trait CsrGraphBenchExt {
     #[allow(clippy::type_complexity)]
     fn bfs(

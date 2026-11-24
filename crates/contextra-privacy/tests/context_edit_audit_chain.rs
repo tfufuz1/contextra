@@ -1,3 +1,4 @@
+//! Integritätstests für die kryptografische Hash-Verkettung von Kontextbearbeitungs-Auditspuren.
 // FILE-CONTEXT
 // ZWECK: Integrationstest für ContextEditAuditRecord-Verkettung, Hash-Integrität, Clock-Port-Injektion und Manipulationserkennung.
 // INVARIANTEN: Zeitstempel wird ausschließlich über Clock bezogen;
@@ -5,14 +6,18 @@
 //              Verifizierung liefert exakt den ersten fehlerhaften Index bei Manipulation.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::panic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing
+)]
 
-use contextra_ports::Clock;
 use contextra_privacy::context_edit_audit::{
     build_context_edit_audit_record, render_audit_line, verify_audit_chain, ContextEditAuditError,
     ContextEditInput, ContextEditKind,
 };
-use contextra_types::TenantId;
+use contextra_privacy::{Clock, TenantId};
 
 struct MockSequenceClock {
     timestamps: std::sync::atomic::AtomicU64,
@@ -38,6 +43,8 @@ impl Clock for MockSequenceClock {
 }
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-CEAC-001]
+// Prüft: Prüft die Gültigkeit der BLAKE3-Kette und stellt sicher, dass kein Klartext protokolliert wird.
 fn test_audit_chain_validity_and_no_plaintext_leak() {
     let tenant = TenantId(42);
     let clock = MockSequenceClock::new(1_700_000_000_000_000_000);
@@ -101,6 +108,8 @@ fn test_audit_chain_validity_and_no_plaintext_leak() {
 }
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-CEAC-002]
+// Prüft: Prüft die Erkennung von Datenmanipulationen an beliebigen Gliedern der Audit-Kette.
 fn test_audit_chain_tampering_at_index_i() {
     let tenant = TenantId(100);
     let clock = MockSequenceClock::new(10_000_000);

@@ -1,0 +1,9 @@
+metadata:
+  title: YAML Beispieldokument
+  created: 2026-11-11
+database:
+  host: localhost
+  port: 5432
+  tables:
+    - users
+    - logs

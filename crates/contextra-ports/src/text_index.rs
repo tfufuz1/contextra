@@ -1,9 +1,16 @@
-//! Text index and segment synthesizer traits.
-
-// FILE-CONTEXT
-// STAND: 2026-09-15T00:00:00Z
-// ZWECK: TextIndex & SegmentSynthesizer Trait-Definitionen für BM25/Inverted Index.
-// INVARIANTEN: AFIT for TextIndex, BoxFuture for SegmentSynthesizer.
+//! # Text Index Port (Ring 0 / Class B)
+//!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/vector_index.rs
+//!
+//! Abstrakter Vertrag für Volltext- und Inverted-Index-Engines (z. B. BM25 in `contextra-text`).
+//!
+//! // ANCHOR[contextra-ports:TXT-001]
+//! // SECTION text-index-contracts
+//! // NOTE: Verwendet AFIT / impl Future für statische Bindung in Hot-Paths.
+//! // Invarianten:
+//! // 1. INV-TXT-SEARCH: Deterministische Score-Berechnung nach BM25-Formel.
+//! // 2. INV-TXT-MVCC: Snapshot-Isolation via `search_at`.
 
 use super::BoxFuture;
 use crate::types::{DocId, ScoredDocument, TxId};
@@ -13,6 +20,7 @@ use std::future::Future;
 
 pub use crate::embedding::TextEmbeddingEngine;
 
+// ANCHOR[contextra-ports:SEG-SYNTH-001]
 /// Trait-Abstraktion für LLM-Synthesizer zur Segment-Zusammenfassung (REM-Phase).
 pub trait SegmentSynthesizer: Send + Sync {
     /// Synthetisiert ein Segment von Texten zu einer abstrakten Zusammenfassung.
@@ -21,9 +29,15 @@ pub trait SegmentSynthesizer: Send + Sync {
         segment_texts: &'a [&'a str],
     ) -> BoxFuture<'a, Result<String>>;
     /// Gibt die Modell-ID des Synthesizers zurück.
+    ///
+    /// # Fehler
+    /// Keine; statische Identifikator-Abfrage.
+    /// # Crash
+    /// Reiner Statusabruf ohne persistente Mutation.
     fn model_id(&self) -> &str;
 }
 
+// ANCHOR[contextra-ports:TXT-STATS-001]
 /// Statistics for a text index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextIndexStats {
@@ -35,11 +49,13 @@ pub struct TextIndexStats {
     pub memory_usage_bytes: usize,
 }
 
+// ANCHOR[contextra-ports:TXT-TRAIT-001]
 /// Text-Index Trait — abstrahiert BM25/Inverted-Index-Operationen.
 ///
 /// # Dyn-Kompatibilität
 /// Verwendet native `async fn` (AFIT) für statischen Dispatch.
 pub trait TextIndex: Send + Sync + 'static {
+    // ANCHOR[contextra-ports:TXT-SEARCH-001]
     /// Searches for documents matching the query.
     fn search(
         &self,
@@ -69,34 +85,80 @@ pub trait TextIndex: Send + Sync + 'static {
     }
 
     /// Inserts or updates a document in the index.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei I/O-, Tokenisierungs- oder Speicherfehlern.
+    /// # Crash
+    /// Transaktional gepuffert bis zum Commit; vor Commit kein persistenter Schaden.
     fn insert(&self, tx: TxId, id: DocId, text: &str) -> impl Future<Output = Result<()>> + Send;
 
     /// Deletes a document from the index.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei Transaktions- oder I/O-Fehlern.
+    /// # Crash
+    /// Transaktional isoliert; bei Crash vor Commit bleibt der Vorzustand erhalten.
     fn delete(&self, tx: TxId, id: DocId) -> impl Future<Output = Result<()>> + Send;
 
     /// Commits a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei WAL-, Flush- oder Fsync-Fehlern.
+    /// # Crash
+    /// WAL-first; Commit ist nach erfolgreichem Fsync dauerhaft wiederherstellbar.
     fn commit(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Rolls back a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei Transaktionsverwaltungsproblemen.
+    /// # Crash
+    /// Verwirft uncommittete Schreibpuffer im RAM; Zustand bleibt konsistent.
     fn rollback(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Rolls back the entire index state to a specific transaction ID.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` falls der Zielzustand nicht auffindbar oder korrupt ist.
+    /// # Crash
+    /// Atomarer Rollback; bei Unterbrechung stellt Recovery den sauberen Zustand her.
     fn rollback_to_tx(&self, tx_id: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Returns the last transaction ID processed by the index.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei Lesefehlern des Manifests/Indexheaders.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn last_tx_id(&self) -> impl Future<Output = Result<TxId>> + Send;
 
     /// Returns the number of documents in the index.
+    ///
+    /// # Fehler
+    /// Keine; panikfrei.
+    /// # Crash
+    /// Reiner Statusabruf aus Header oder RAM-Zustand.
     fn len(&self) -> impl Future<Output = usize> + Send;
 
     /// Returns true if the index is empty.
+    ///
+    /// # Fehler
+    /// Keine; delegiert panikfrei an `len`.
+    /// # Crash
+    /// Reiner Statusabruf ohne Seiteneffekte.
     fn is_empty(&self) -> impl Future<Output = bool> + Send {
         async { self.len().await == 0 }
     }
 
     /// Returns index statistics.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` falls Statistiken nicht aggregiert werden können.
+    /// # Crash
+    /// Reiner Lesevorgang ohne Zustandsänderung.
     fn stats(&self) -> impl Future<Output = Result<TextIndexStats>> + Send;
 }
+// !SECTION text-index-contracts
 
 #[cfg(test)]
 mod tests {

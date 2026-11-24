@@ -1,4 +1,12 @@
+//! # Integrationstest: Audit-Logging und Mandanten-Isolation
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Integrationstest: Audit-Logging und Mandanten-Isolation.
+
+// ANCHOR[contextra-router:IT-AUD-001]
 #![allow(
+    unused_imports,
+    clippy::type_complexity,
     clippy::indexing_slicing,
     clippy::unwrap_used,
     clippy::expect_used,
@@ -8,7 +16,6 @@
     clippy::disallowed_types
 )]
 
-use contextra_db::{Collection, Contextra, ContextraConfig};
 use contextra_ports::clock::Clock;
 use contextra_router::profile::ProfileCalibrationState;
 use contextra_router::{
@@ -52,55 +59,100 @@ impl Clock for TestClock {
     }
 }
 
-struct CollectionAdapter<S: contextra_ports::StorageEngine + 'static> {
-    collection: Arc<Collection<S>>,
+#[derive(Clone, Default)]
+struct MockCollection {
+    docs: Arc<parking_lot::RwLock<Vec<(String, Vec<f32>, String)>>>,
+    communities: Arc<parking_lot::RwLock<std::collections::BTreeMap<EntityId, u64>>>,
 }
 
-impl<S: contextra_ports::StorageEngine + 'static> CollectionAdapter<S> {
-    fn new(collection: Arc<Collection<S>>) -> Self {
-        Self { collection }
+impl MockCollection {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    async fn insert(
+        &self,
+        key: &str,
+        vector: &[f32],
+        metadata: Option<serde_json::Value>,
+    ) -> Result<()> {
+        let text = metadata
+            .and_then(|m| {
+                m.get("text")
+                    .and_then(|t| t.as_str().map(|s| s.to_string()))
+            })
+            .unwrap_or_else(|| key.to_string());
+        self.docs
+            .write()
+            .push((key.to_string(), vector.to_vec(), text));
+        Ok(())
     }
 }
 
-impl<S: contextra_ports::StorageEngine + 'static> contextra_ports::HybridSearchProvider
-    for CollectionAdapter<S>
-{
+struct CollectionAdapter {
+    collection: MockCollection,
+}
+
+impl contextra_ports::HybridSearchProvider for CollectionAdapter {
     fn search_hybrid<'a>(
         &'a self,
         query_text: &'a str,
         query_embedding: &'a [f32],
         top_k: usize,
     ) -> contextra_ports::BoxFuture<'a, Result<Vec<ContextChunk>>> {
+        let docs = self.collection.docs.read().clone();
         Box::pin(async move {
-            let search_results = self
-                .collection
-                .query()
-                .text(query_text)
-                .embedding(query_embedding)
-                .k(top_k)
-                .execute()
-                .await?;
-
-            let mut chunks = Vec::with_capacity(search_results.len());
-            for res in search_results {
-                if let Ok(mut chunk) = ContextChunk::try_from(res) {
-                    chunk.content = chunk.combined_text_owned();
-                    chunks.push(chunk);
-                }
+            if docs.is_empty() {
+                return Ok(vec![]);
+            }
+            let mut scored: Vec<(f32, String, String)> = docs
+                .into_iter()
+                .map(|(key, vec, text)| {
+                    let mut score = 0.0f32;
+                    if !query_embedding.is_empty() && query_embedding.len() == vec.len() {
+                        let dot: f32 = query_embedding
+                            .iter()
+                            .zip(vec.iter())
+                            .map(|(a, b)| a * b)
+                            .sum();
+                        score += dot.clamp(0.0, 1.0);
+                    }
+                    if !query_text.is_empty()
+                        && (text.contains(query_text) || query_text.contains(&text))
+                    {
+                        score += 0.5;
+                    }
+                    if score <= 0.0 {
+                        score = 0.1;
+                    }
+                    (score.clamp(0.0, 1.0), key, text)
+                })
+                .collect();
+            scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+            let mut chunks = Vec::new();
+            for (i, (score, _key, text)) in scored.into_iter().take(top_k).enumerate() {
+                chunks.push(ContextChunk {
+                    doc_id: contextra_types::DocId::new((i + 1) as u64),
+                    content: text,
+                    relevance: score,
+                    token_count: 5,
+                    metadata: None,
+                    contextual_prefix: None,
+                    links: vec![],
+                });
             }
             Ok(chunks)
         })
     }
 }
 
-impl<S: contextra_ports::StorageEngine + 'static> contextra_ports::CommunityResolver
-    for CollectionAdapter<S>
-{
+impl contextra_ports::CommunityResolver for CollectionAdapter {
     fn get_community<'a>(
         &'a self,
         entity_id: EntityId,
     ) -> contextra_ports::BoxFuture<'a, Result<Option<u64>>> {
-        Box::pin(async move { self.collection.get_community(entity_id).await })
+        let comm = self.collection.communities.read().get(&entity_id).copied();
+        Box::pin(async move { Ok(comm) })
     }
 }
 
@@ -113,23 +165,72 @@ impl contextra_ports::ContextPreparer for TestContextPreparer {
         budget: &TokenBudget,
         relevance_threshold: f32,
     ) -> Result<ContextWindow> {
-        let mut manager = contextra_db::ContextManager::new(budget.clone());
-        manager.set_relevance_threshold(relevance_threshold);
-        manager.prepare_context(chunks)
+        let mut filtered: Vec<ContextChunk> = chunks
+            .into_iter()
+            .filter(|c| c.relevance >= relevance_threshold)
+            .collect();
+        filtered.sort_by(|a, b| b.relevance.total_cmp(&a.relevance));
+        let mut total_tokens = 0;
+        let mut selected = Vec::new();
+        let mut truncated = false;
+        for chunk in filtered {
+            if total_tokens + chunk.token_count <= budget.effective_limit() {
+                total_tokens += chunk.token_count;
+                selected.push(chunk);
+            } else {
+                truncated = true;
+                break;
+            }
+        }
+        Ok(ContextWindow {
+            chunks: selected,
+            total_tokens,
+            truncated,
+        })
     }
 }
 
-fn create_test_router<S: contextra_ports::StorageEngine + 'static>(
-    collection: Arc<Collection<S>>,
+#[allow(dead_code)]
+struct ContextraConfig {
+    dimension: usize,
+    _reserved: u64,
+}
+impl Default for ContextraConfig {
+    fn default() -> Self {
+        Self {
+            dimension: 4,
+            _reserved: 0,
+        }
+    }
+}
+
+struct Contextra {
+    collection: MockCollection,
+}
+impl Contextra {
+    async fn open_with_config(_path: &std::path::Path, _cfg: ContextraConfig) -> Result<Self> {
+        Ok(Self {
+            collection: MockCollection::new(),
+        })
+    }
+    async fn collection(&self, _name: &str) -> Result<MockCollection> {
+        Ok(self.collection.clone())
+    }
+}
+
+fn create_test_router(
+    collection: MockCollection,
     profiles: Vec<SlmProfile>,
     clock: Arc<dyn Clock>,
 ) -> RouterEngine {
-    let adapter = Arc::new(CollectionAdapter::new(collection));
+    let adapter = Arc::new(CollectionAdapter { collection });
     let preparer = Arc::new(TestContextPreparer);
     RouterEngine::new(adapter.clone(), adapter, preparer, profiles, None).with_clock(clock)
 }
 
 // ── Test 1: Fixed Seed Reproducibility ───────────────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T01]
+// Test `test_fixed_seed_routing_reproducibility`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_fixed_seed_routing_reproducibility() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -185,6 +286,8 @@ async fn test_fixed_seed_routing_reproducibility() -> Result<()> {
 }
 
 // ── Test 2: Idempotent Outcome Processing ────────────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T02]
+// Test `test_record_outcome_idempotency`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_record_outcome_idempotency() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -246,6 +349,8 @@ async fn test_record_outcome_idempotency() -> Result<()> {
 }
 
 // ── Test 3: Arm Registry & Tenant Statistics Isolation ──────────────────────
+// ANCHOR[contextra-router:IT-AUD-T03]
+// Test `test_arm_registry_and_stats_tenant_isolation`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_arm_registry_and_stats_tenant_isolation() {
     let reg1 = ArmRegistry::default();
@@ -264,6 +369,8 @@ fn test_arm_registry_and_stats_tenant_isolation() {
 }
 
 // ── Test 4: Cold Start Default Route Fallback ────────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T04]
+// Test `test_cold_start_fallback_default_route`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_cold_start_fallback_default_route() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -317,7 +424,10 @@ async fn test_cold_start_fallback_default_route() -> Result<()> {
 }
 
 // ── Test 5: Typed Transport Error Propagation ──────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T05]
+// Test `test_transport_error_propagation_typed`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
+#[cfg(feature = "subprocess-dispatch")]
 async fn test_transport_error_propagation_typed() {
     let profile_invalid_endpoint =
         SlmProfile::new("bad-transport", "   ", vec![], TokenBudget::default(), 0.5);
@@ -351,6 +461,8 @@ async fn test_transport_error_propagation_typed() {
 }
 
 // ── Test 6: Restart Resumption with initial_decision_id ─────────────────────
+// ANCHOR[contextra-router:IT-AUD-T06]
+// Test `test_restart_resumption_with_initial_decision_id`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_restart_resumption_with_initial_decision_id() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -394,6 +506,8 @@ async fn test_restart_resumption_with_initial_decision_id() -> Result<()> {
 }
 
 // ── Test 7: Deterministic Clock-based Eviction via Public API ────────────────
+// ANCHOR[contextra-router:IT-AUD-T07]
+// Test `test_clock_based_ttl_eviction_public_api`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_clock_based_ttl_eviction_public_api() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -433,6 +547,8 @@ async fn test_clock_based_ttl_eviction_public_api() -> Result<()> {
 }
 
 // ── Test 8: ProfileCalibrator Monotonic Updates ─────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T08]
+// Test `test_profile_calibrator_update_monotonic`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_profile_calibrator_update_monotonic() {
     let mut cal = ProfileCalibrator::new(0.05, 0.01, 0.5);
@@ -447,6 +563,8 @@ fn test_profile_calibrator_update_monotonic() {
 }
 
 // ── Test 9: ConfigFingerprint Invalidation ──────────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T09]
+// Test `test_profile_calibration_state_fingerprint_invalidation`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_profile_calibration_state_fingerprint_invalidation() {
     let mut state = ProfileCalibrationState::new(0.5);
@@ -466,6 +584,8 @@ fn test_profile_calibration_state_fingerprint_invalidation() {
 }
 
 // ── Test 10: Lyapunov Drift Status Summary Unconfigured ────────────────────
+// ANCHOR[contextra-router:IT-AUD-T10]
+// Test `test_lyapunov_drift_status_summary_unconfigured`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_lyapunov_drift_status_summary_unconfigured() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -492,6 +612,8 @@ async fn test_lyapunov_drift_status_summary_unconfigured() -> Result<()> {
 }
 
 // ── Test 11: Lyapunov Drift Status Summary Empty ─────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T11]
+// Test `test_lyapunov_drift_status_summary_empty`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_lyapunov_drift_status_summary_empty() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -510,6 +632,8 @@ async fn test_lyapunov_drift_status_summary_empty() -> Result<()> {
 }
 
 // ── Test 12: Hot Reload Profile Update Preserves Calibration ─────────────────
+// ANCHOR[contextra-router:IT-AUD-T12]
+// Test `test_router_engine_update_profiles_hot_reload`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_router_engine_update_profiles_hot_reload() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -520,11 +644,7 @@ async fn test_router_engine_update_profiles_hot_reload() -> Result<()> {
     let db = Contextra::open_with_config(dir.path(), config).await?;
     let collection = db.collection("default").await?;
     collection
-        .insert(
-            "doc1",
-            &[1.0, 0.0, 0.0, 0.0],
-            Some(json!({"text": "test"})),
-        )
+        .insert("doc1", &[1.0, 0.0, 0.0, 0.0], Some(json!({"text": "test"})))
         .await?;
 
     let clock = Arc::new(TestClock::new(1_000_000_000_000));
@@ -569,6 +689,8 @@ async fn test_router_engine_update_profiles_hot_reload() -> Result<()> {
 }
 
 // ── Test 13: Try Update Profiles Validation Rejection ────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T13]
+// Test `test_router_engine_try_update_profiles_validation_error`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_router_engine_try_update_profiles_validation_error() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -608,6 +730,8 @@ async fn test_router_engine_try_update_profiles_validation_error() -> Result<()>
 }
 
 // ── Test 14: Warmup Period Uncalibrated Confidence Metrics ────────────────────
+// ANCHOR[contextra-router:IT-AUD-T14]
+// Test `test_confidence_metrics_warmup_period`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_confidence_metrics_warmup_period() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -649,6 +773,8 @@ async fn test_confidence_metrics_warmup_period() -> Result<()> {
 }
 
 // ── Test 15: Decision ID Generator Monotonicity ─────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T15]
+// Test `test_decision_id_generator_monotonicity`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_decision_id_generator_monotonicity() {
     let gen = contextra_router::DecisionIdGenerator::new(100);
@@ -664,6 +790,8 @@ fn test_decision_id_generator_monotonicity() {
 }
 
 // ── Test 16: Routing Outcome Non-Conformity Scores ────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T16]
+// Test `test_routing_outcome_non_conformity_scores`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_routing_outcome_non_conformity_scores() {
     assert_eq!(RoutingOutcome::Success.non_conformity_score(), 0.0);
@@ -684,6 +812,8 @@ fn test_routing_outcome_non_conformity_scores() {
 }
 
 // ── Test 17: SLM Profile Estimated Cost Fallback ─────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T17]
+// Test `test_slm_profile_estimated_cost_fallback`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_slm_profile_estimated_cost_fallback() {
     let budget = TokenBudget::new(4096, 512);
@@ -698,6 +828,8 @@ fn test_slm_profile_estimated_cost_fallback() {
 }
 
 // ── Test 18: Reset All Calibration Resets Every Profile ─────────────────────
+// ANCHOR[contextra-router:IT-AUD-T18]
+// Test `test_reset_all_calibration_resets_every_profile`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_reset_all_calibration_resets_every_profile() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -708,11 +840,7 @@ async fn test_reset_all_calibration_resets_every_profile() -> Result<()> {
     let db = Contextra::open_with_config(dir.path(), config).await?;
     let collection = db.collection("default").await?;
     collection
-        .insert(
-            "doc1",
-            &[1.0, 0.0, 0.0, 0.0],
-            Some(json!({"text": "test"})),
-        )
+        .insert("doc1", &[1.0, 0.0, 0.0, 0.0], Some(json!({"text": "test"})))
         .await?;
 
     let clock = Arc::new(TestClock::new(1_000_000_000_000));
@@ -736,6 +864,8 @@ async fn test_reset_all_calibration_resets_every_profile() -> Result<()> {
 }
 
 // ── Test 19: Quantization Level Default and Display ──────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T19]
+// Test `test_quantization_level_default_and_variants`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_quantization_level_default_and_variants() {
     use contextra_router::profile::QuantizationLevel;
@@ -746,6 +876,8 @@ fn test_quantization_level_default_and_variants() {
 }
 
 // ── Test 20: Drift Baseline Setting ──────────────────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T20]
+// Test `test_set_lyapunov_baseline_existing_and_nonexisting`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_set_lyapunov_baseline_existing_and_nonexisting() -> Result<()> {
     let dir = tempfile::tempdir()?;

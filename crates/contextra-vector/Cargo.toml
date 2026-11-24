@@ -6,19 +6,21 @@ name = "contextra-vector"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version.workspace = true
+rust-version = "1.89"
 description = "HNSW vector index with SIMD distance computation for Contextra"
 
 [package.metadata.contextra]
 ring = "0"
+klasse = "A"
 
 [dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
+contextra-types = { workspace = true, optional = true }
+contextra-ports = { workspace = true, optional = true }
 contextra-mvcc = { workspace = true }
-contextra-crypto = { workspace = true }
-contextra-simd = { workspace = true }
-contextra-sys = { workspace = true }
+contextra-simd = { workspace = true, optional = true }
+contextra-sys = { workspace = true, optional = true }
 subtle = "2.6"
 ahash = { workspace = true }
 parking_lot = { workspace = true }
@@ -28,26 +30,44 @@ tracing = { workspace = true }
 memmap2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 zeroize = "1.8"
+thiserror = { workspace = true }
 blake3 = { workspace = true }
 
 [features]
-default = []
-docid-128 = ["contextra-types/docid-128"]
+default = ["std"]
+std = []
+simd = ["dep:contextra-simd", "contextra-simd?/serde"]
+serde = []
+tracing = []
+inspect = []
+experimental = ["experimental-diskann", "experimental-rabitq", "experimental-predicate-augmented-search"]
+mmap = ["dep:contextra-sys"]
+diskann = ["experimental-diskann"]
+quantize-rabitq = ["experimental-rabitq"]
+workspace = [
+    "dep:contextra-ports",
+    "dep:contextra-types",
+    "dep:contextra-sys",
+    "mmap",
+]
+ports-compat = ["workspace"]
+docid-128 = ["contextra-ids/docid-128"]
 experimental-diskann = []
 experimental-rabitq = []
 experimental-predicate-augmented-search = []
 graph = []
-# ACHTUNG: partial-index-rebuild aktiviert F-02 (Partial HNSW Rebuild), das gegen ein
-# dokumentiertes Architektur-Veto verstößt (siehe VETOES.md, falls vorhanden, sonst
-# docs/decisions/ nach "Nucleation" durchsuchen). Der aktuelle rebuild_region()
-# implementiert reines Tombstone-Pruning ohne Re-Wiring — Risiko: Grad-Verlust ohne
-# Navigierbarkeits-Wiederherstellung. NICHT als default-Feature aktivieren bis
+experimental-all = ["experimental-diskann", "experimental-rabitq", "experimental-predicate-augmented-search"]
+# ACHTUNG: partial-index-rebuild aktiviert den lokalen Partial-Rebuild-Pfad (F-02).
+# Gemäß VETOES.md (VETO-F02, bestätigt 2026-11-08) und SPEC §11.4 sind Tombstone-Pruning,
+# sofortige Slot-Nullung (INV-VEC-ZEROIZE-1) und inkrementeller Neuaufbau unter Erhalt
+# der Konnektivität (INV-VEC-CONNECTIVITY-1) zulässig. Slots werden erst nach Rebuild
+# wiederverwendet (INV-HNSW-SLOT-1). NICHT als default-Feature aktivieren bis
 # test_partial_rebuild_recall_regression() in crates/contextra-vector/tests/partial_rebuild_recall_regression.rs
-# für > 30 Tage stabil grün ist UND ein ADR das ursprüngliche Veto explizit revidiert oder
-# bestätigt einschränkt.
+# für > 30 Tage stabil grün ist UND ein ADR die Freigabe als Standard-Pfad bestätigt.
 partial-index-rebuild = []
 
 [dev-dependencies]
+serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 criterion = "0.5"
 tempfile = "3"
@@ -92,6 +112,14 @@ harness = false
 name = "filtered_search_selectivity_bench"
 harness = false
 required-features = ["experimental-diskann"]
+
+[[test]]
+name = "hnsw_tests"
+required-features = ["workspace"]
+
+[[test]]
+name = "simd_differential_test"
+required-features = ["simd"]
 
 [[test]]
 name = "diskann_fault_injection_test"

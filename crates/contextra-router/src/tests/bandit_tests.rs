@@ -1,3 +1,14 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (bandit_tests.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
+//! # Einheitentests für Bandit-Routing und Richtlinien
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Einheitentests für Bandit-Routing und Richtlinien.
+
+// ANCHOR[contextra-router:TST-BND-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
@@ -13,14 +24,14 @@ use super::fixtures::*;
 #[cfg(feature = "bandit-routing")]
 use crate::SlmProfile;
 #[cfg(feature = "bandit-routing")]
-use contextra_db::{Contextra, ContextraConfig};
-#[cfg(feature = "bandit-routing")]
 use contextra_types::TokenBudget;
 #[cfg(feature = "bandit-routing")]
 use serde_json::json;
 #[cfg(feature = "bandit-routing")]
 use std::sync::Arc;
 
+// ANCHOR[contextra-router:TST-BND-T01]
+// Test `test_route_triggers_bandit_drift_reaction`: Prüft das erwartete Verhalten und Invarianten für einheitentests für bandit-routing und richtlinien.
 #[tokio::test]
 #[cfg(feature = "bandit-routing")]
 async fn test_route_triggers_bandit_drift_reaction() -> Result<(), Box<dyn std::error::Error>> {
@@ -48,7 +59,7 @@ async fn test_route_triggers_bandit_drift_reaction() -> Result<(), Box<dyn std::
         TokenBudget::new(1000, 100),
         0.01,
     );
-    profile.bandit_state = Some(crate::bandit::BanditProfileState::cold_start(4, 0.5));
+    profile.bandit_state = Some(contextra_adapt::BanditProfileState::cold_start(4, 0.5));
 
     let router = create_test_router(collection, vec![profile], None);
 
@@ -70,7 +81,7 @@ async fn test_route_triggers_bandit_drift_reaction() -> Result<(), Box<dyn std::
     let decision = router.route(&vec_data, "drift reaction content").await?;
     assert!(matches!(
         decision.drift_status,
-        Some(crate::lyapunov::LyapunovResult::DriftDetected { .. })
+        Some(contextra_adapt::LyapunovResult::DriftDetected { .. })
     ));
 
     // Verifiziere, dass drift_steps_remaining im Bandit-Zustand des Profils aktiviert wurde

@@ -1,0 +1,11 @@
+[crates.contextra-types]
+group = "contracts"
+level = 2
+tier = "stable"
+path = "crates/contextra-types"
+unsafe_island = false
+allowed_internal = ["contextra-ids"]
+[crates.contextra-types.feature_closure_allowed]
+docid-128 = ["contextra-ids"]
+[crates.contextra-types.dev_allowed]
+test = "cargo test -p contextra-types --locked"

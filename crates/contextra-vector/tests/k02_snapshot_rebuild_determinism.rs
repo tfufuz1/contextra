@@ -37,7 +37,7 @@ async fn run_snapshot_rebuild_determinism_for_seed(seed: u64) {
         ef_construction: 64,
         ef_search: 64,
         rebuild_threshold: 0.50,
-        distance_metric: contextra_types::DistanceMetric::Euclidean,
+        distance_metric: contextra_vector::types::DistanceMetric::Euclidean,
         ..Default::default()
     };
 
@@ -149,7 +149,7 @@ async fn run_snapshot_rebuild_determinism_for_seed(seed: u64) {
     });
 
     // Trigger rebuild
-    index.rebuild().await.expect("rebuild must succeed");
+    index.rebuild().expect("rebuild must succeed");
 
     // Wait for concurrent task to finish
     let concurrent_runs = concurrent_search_task

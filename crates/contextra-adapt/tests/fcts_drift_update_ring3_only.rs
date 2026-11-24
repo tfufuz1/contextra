@@ -5,21 +5,25 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-fn find_workspace_root() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+fn find_source_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let direct_path = manifest_dir.join("src/flow_thompson.rs");
+    if direct_path.exists() {
+        return Ok(direct_path);
+    }
+    let mut dir = manifest_dir;
     while !dir.join("Cargo.toml").exists() || !dir.join("crates").exists() {
         if !dir.pop() {
             return Err("Workspace root not found!".into());
         }
     }
-    Ok(dir)
+    Ok(dir.join("crates/contextra-adapt/src/flow_thompson.rs"))
 }
 
 #[test]
 fn test_ak18_drift_rate_assignment_restricted_to_recompute(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let workspace_root = find_workspace_root()?;
-    let flow_thompson_path = workspace_root.join("crates/contextra-adapt/src/flow_thompson.rs");
+    let flow_thompson_path = find_source_file()?;
     let content = fs::read_to_string(&flow_thompson_path)?;
 
     // (a) Zuweisung an drift_rate kommt nur innerhalb von recompute_drift_rate_from_window vor
@@ -61,8 +65,7 @@ fn test_ak18_drift_rate_assignment_restricted_to_recompute(
 
 #[test]
 fn test_ak18_recompute_signature_requires_ring3_token() -> Result<(), Box<dyn std::error::Error>> {
-    let workspace_root = find_workspace_root()?;
-    let flow_thompson_path = workspace_root.join("crates/contextra-adapt/src/flow_thompson.rs");
+    let flow_thompson_path = find_source_file()?;
     let content = fs::read_to_string(&flow_thompson_path)?;
 
     // (b) recompute_drift_rate_from_window verlangt &Ring3Token (Signatur-Check per Text)
@@ -93,7 +96,23 @@ fn scan_rs_files(dir: &Path, files: &mut Vec<PathBuf>) {
 
 #[test]
 fn test_ak18_ring3_token_not_called_in_ring0_crates() -> Result<(), Box<dyn std::error::Error>> {
-    let workspace_root = find_workspace_root()?;
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut dir = manifest_dir;
+    let in_workspace = loop {
+        if dir.join("Cargo.toml").exists() && dir.join("crates").exists() {
+            break true;
+        }
+        if !dir.pop() {
+            break false;
+        }
+    };
+
+    if !in_workspace {
+        // Standalone Export hat keine Geschwister-Crates
+        return Ok(());
+    }
+
+    let workspace_root = dir;
     let ring0_crate_names = [
         "contextra-text",
         "contextra-graph",

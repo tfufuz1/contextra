@@ -5,6 +5,7 @@
 use contextra_graph::ppr::cost::{estimate_ppr_cost, GraphStats, PprCostEstimate};
 use contextra_types::{PprAlgorithm, PprConfig};
 
+// ANCHOR[contextra-graph:TESTS-PPR-COST-MODEL-SELECTION-001]
 #[test]
 fn test_ppr_cost_model_selection_sparse_vs_dense() {
     let config = PprConfig::default();
@@ -22,6 +23,7 @@ fn test_ppr_cost_model_selection_sparse_vs_dense() {
     assert!(est_large.forward_push < est_large.power_iteration);
 }
 
+// ANCHOR[contextra-graph:TESTS-PPR-COST-MODEL-SELECTION-002]
 #[test]
 fn test_ppr_cost_model_tie_break() {
     // When forward_push == power_iteration, ForwardPush MUST be chosen deterministically
@@ -32,6 +34,7 @@ fn test_ppr_cost_model_tie_break() {
     assert_eq!(est.cheapest_strategy(), PprAlgorithm::ForwardPush);
 }
 
+// ANCHOR[contextra-graph:TESTS-PPR-COST-MODEL-SELECTION-003]
 #[test]
 fn test_ppr_cost_model_fallback_when_stats_missing() {
     let config = PprConfig::default();
@@ -45,6 +48,7 @@ fn test_ppr_cost_model_fallback_when_stats_missing() {
     assert_eq!(algo_fallback_large, PprAlgorithm::DensePowerIteration);
 }
 
+// ANCHOR[contextra-graph:TESTS-PPR-COST-MODEL-SELECTION-004]
 #[test]
 fn test_ppr_cost_model_forward_push_cost_monotonicity() {
     let config = PprConfig::default();

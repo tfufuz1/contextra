@@ -1,6 +1,11 @@
+//! # Tests fuer den WAL-Flusher (Ring 1)
+//!
+//! Prueft Flush-Backpressure, Batch-Grouping und Fehlerweitergabe.
+
 use super::*;
 use crate::wal::{PreparedBatch, WalConfig, WalEntry, WalOp};
-use contextra_types::TxId;
+use contextra_ids::TxId;
+use std::sync::Arc;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -28,7 +33,7 @@ async fn test_wal_flusher_actor_coalescing() -> Result<()> {
 
     for h in handles {
         h.await
-            .map_err(|e| ContextraError::Storage(e.to_string()))??;
+            .map_err(|e| StoreError::Storage(e.to_string()))??;
     }
 
     let replayed = wal.replay().await?;
@@ -78,7 +83,7 @@ async fn test_flusher_batch_window_coalesces_writes() -> Result<()> {
 
     for h in handles {
         h.await
-            .map_err(|e| ContextraError::Storage(e.to_string()))??;
+            .map_err(|e| StoreError::Storage(e.to_string()))??;
     }
 
     let replayed = wal.replay().await?;
@@ -342,7 +347,6 @@ async fn test_wal_fsync_failure_poisons_handle() -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "encryption-at-rest")]
 #[tokio::test]
 async fn test_wal_rewrite_multi_frame_chunking_encrypted() -> Result<()> {
     let dir = tempdir()?;

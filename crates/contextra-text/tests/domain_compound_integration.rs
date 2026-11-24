@@ -1,8 +1,15 @@
+//! Testsuite `domain_compound_integration.rs` für contextra-text.
+//!
+//! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
+
 // FILE-CONTEXT: Integrationspruefung fuer GermanCompoundSplitter mit Domaenenvokabularen.
 // ZWECK: Verifiziert, dass der GermanCompoundSplitter mit den ausgebauten Vokabularen mindestens 20 reprasentative Komposita je Domaene (Recht & Medizin) korrekt zerlegt und geschuetzte Begriffe unangetastet laesst.
 
 use contextra_text::morphology::{GermanCompoundSplitter, MorphologicalTokenizer};
 
+// ANCHOR[contextra-text:TEST-156]
+// Testfall `test_legal_compounds_decomposition_at_least_20_cases`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_legal_compounds_decomposition_at_least_20_cases() {
     let splitter = GermanCompoundSplitter::new_with_all_domains();
@@ -48,6 +55,8 @@ fn test_legal_compounds_decomposition_at_least_20_cases() {
     }
 }
 
+// ANCHOR[contextra-text:TEST-157]
+// Testfall `test_medical_compounds_decomposition_at_least_20_cases`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_medical_compounds_decomposition_at_least_20_cases() {
     let splitter = GermanCompoundSplitter::new_with_all_domains();
@@ -93,6 +102,8 @@ fn test_medical_compounds_decomposition_at_least_20_cases() {
     }
 }
 
+// ANCHOR[contextra-text:TEST-158]
+// Testfall `test_protected_terms_are_not_decomposed`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_protected_terms_are_not_decomposed() {
     let splitter = GermanCompoundSplitter::new_with_all_domains();

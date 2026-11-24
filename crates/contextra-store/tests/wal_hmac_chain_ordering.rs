@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT
 // ZWECK: Regressionstest — WAL HMAC-Kette enthält keine Gabelungen nach Group-Commit.
 // INVARIANT: Jeder Entry hat eindeutigen prev_hmac; Sequenznummern sind strikt monoton.

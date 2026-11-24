@@ -5,13 +5,21 @@
 
 //! Tool management subsystem for persistent agent workflows.
 
+// =========================================================================
+// SECTION: Tool Submodule Exports
+// =========================================================================
+// ANCHOR[contextra-agent:tools-mod]
+
+
 pub mod manifest;
 pub mod registry;
 pub mod retrieve;
 
 pub use manifest::ToolManifest;
 pub use registry::ToolRegistry;
-pub use retrieve::RetrieveTool;
+pub use retrieve::{ContextRetriever, RetrieveTool};
 
 #[cfg(test)]
 mod tests;
+
+// !SECTION

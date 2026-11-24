@@ -1,3 +1,7 @@
+//! # Löschung von Graph-Entitäten
+//!
+//! Prüft das saubere Entfernen von Entitätsknoten und inzidenten Kanten im CSR-Graph.
+//!
 use contextra_db::transaction::DbTransaction;
 use contextra_db::Collection;
 use contextra_graph::CsrGraph;
@@ -11,6 +15,8 @@ use tempfile::tempdir;
 
 type TestTx = DbTransaction<LsmStorage, HnswIndex>;
 
+// ANCHOR[contextra-db:TEST-GRAPH_ENTITY_DELETE_TEST-01-CREATE_TEST_COLLECTION]
+// Testet die Funktionalität von `create_test_collection`.
 async fn create_test_collection(
     dir: &tempfile::TempDir,
 ) -> (Collection<LsmStorage, HnswIndex>, Arc<LsmStorage>) {
@@ -41,6 +47,8 @@ async fn create_test_collection(
     (col, storage)
 }
 
+// ANCHOR[contextra-db:TEST-GRAPH_ENTITY_DELETE_TEST-02-TEST_DELETE_ENTITY_REMOVES_OUTGOING_EDGES]
+// Testet die Funktionalität von `test_delete_entity_removes_outgoing_edges`.
 #[tokio::test]
 async fn test_delete_entity_removes_outgoing_edges() {
     let dir = tempdir().unwrap();
@@ -97,6 +105,8 @@ async fn test_delete_entity_removes_outgoing_edges() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-GRAPH_ENTITY_DELETE_TEST-03-TEST_DELETE_ENTITY_REMOVES_INCOMING_EDGES]
+// Testet die Funktionalität von `test_delete_entity_removes_incoming_edges`.
 #[tokio::test]
 async fn test_delete_entity_removes_incoming_edges() {
     let dir = tempdir().unwrap();
@@ -138,6 +148,8 @@ async fn test_delete_entity_removes_incoming_edges() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-GRAPH_ENTITY_DELETE_TEST-04-TEST_ENTITY_DELETE_PERSISTS_AFTER_RESTART]
+// Testet die Funktionalität von `test_entity_delete_persists_after_restart`.
 #[tokio::test]
 async fn test_entity_delete_persists_after_restart() {
     let dir = tempdir().unwrap();

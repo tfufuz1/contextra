@@ -1,10 +1,23 @@
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::disallowed_types)]
+//! # Tests für die konfigurierte Standard-AttentionSource im KV-Store
+//!
+//! ANCHOR[contextra-kvcache:TEST-DEF-ATTN-001]
+//!
+//! Verifiziert, dass die am `TenantIsolatedKvStore` hinterlegte `AttentionScoreSource`
+//! sowohl bei manueller `evict_lru_fair`-Verdrängung als auch bei automatischer
+//! Verdrängung beim Einfügen (Overflow) aktiv ausgewertet wird.
+
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used)]
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::unwrap_used)]
 
 use contextra_kvcache::{
     attention_score::AttentionScoreSource, segment::KvSegment, TenantIsolatedKvStore,
 };
-use contextra_types::TenantId;
+use contextra_kvcache::types::TenantId;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -23,6 +36,7 @@ impl AttentionScoreSource for MockMapScoreSource {
     }
 }
 
+// Prüft, dass ein unkonfigurierter Store strikt nach LRU-Ordnung das älteste Segment verdrängt.
 #[test]
 fn test_unconfigured_store_behaves_as_pure_lru() {
     let store = TenantIsolatedKvStore::new();
@@ -47,6 +61,7 @@ fn test_unconfigured_store_behaves_as_pure_lru() {
     assert!(remaining.contains(&30));
 }
 
+// Prüft, dass eine konfigurierte AttentionSource das Verhalten von evict_lru_fair beeinflusst und wichtige Segmente schützt.
 #[test]
 fn test_configured_default_attention_source_affects_evict_lru_fair() {
     let store = TenantIsolatedKvStore::new();
@@ -83,6 +98,7 @@ fn test_configured_default_attention_source_affects_evict_lru_fair() {
     assert!(remaining.contains(&30));
 }
 
+// Prüft, dass die konfigurierte AttentionSource auch bei automatischer Verdrängung durch Speicherüberlauf greift.
 #[test]
 fn test_configured_default_attention_source_affects_auto_eviction_on_insert() {
     // Store capacity = 3

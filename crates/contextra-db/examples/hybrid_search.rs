@@ -1,12 +1,24 @@
 //! # Hybrid Search — BM25 + Vector Fusion
 //!
-//! Demonstrates Contextra's 4-Signal Fusion: combining semantic vector search
-//! with keyword-based BM25 scoring via Reciprocal Rank Fusion (RRF).
+//! # Zweck des Beispiels
+//! Demonstriert die hybride Multi-Signal-Suche in Contextra:
+//! - Kombination aus dichten Vektoren (semantische Ähnlichkeit via HNSW)
+//! - und Volltext-Keyword-Scoring (BM25 auf dem Text-Feld der JSON-Metadaten).
+//! - Beide Ranglisten werden mathematisch via **Reciprocal Rank Fusion (RRF)** fusioniert.
 //!
-//! Run with: `cargo run --example hybrid_search`
+//! # Warum RRF?
+//! RRF eliminiert das Problem unterschiedlicher Score-Skalen (Kosinus-Distanz vs. BM25-Log-Odds),
+//! indem nur die Rangpositionen der Treffer in den jeweiligen Teillisten gewichtet werden:
+//! `RRF(d) = sum( 1 / (60 + rank_i(d)) )`.
+//!
+//! Ausführen mit: `cargo run --example hybrid_search`
 
 use contextra_db::{Contextra, ContextraConfig};
 
+// ANCHOR[contextra-db:EXAMPLE-HYBRID-001]
+/// Einstiegspunkt für die Demonstration der Hybrid-Suche.
+///
+/// Vergleicht eine reine Vektorsuche mit einer kombinierten Hybrid-Suche (BM25 + Vektor).
 #[tokio::main]
 async fn main() -> contextra_types::Result<()> {
     let config = ContextraConfig {
@@ -15,8 +27,8 @@ async fn main() -> contextra_types::Result<()> {
     };
     let db = Contextra::open_with_config("./hybrid_data", config).await?;
 
-    // Insert documents with both embeddings AND text metadata.
-    // Contextra automatically indexes the "text" field for BM25 search.
+    // Dokumente mit Vektor UND Text-Metadaten einfügen.
+    // Contextra indiziert das Feld "text" automatisch im BM25-Invertierten-Index.
     let docs = vec![
         (
             "doc-rust".to_string(),
@@ -52,14 +64,14 @@ async fn main() -> contextra_types::Result<()> {
         ),
     ];
 
-    // Batch insert for efficiency
+    // Batch-Insert zur effizienten Ablage mehrerer Dokumente in einem Durchlauf
     db.insert_many(&docs).await?;
 
     // --- Hybrid Search ---
-    // Combines:
-    //   • BM25 keyword matching on "memory safety garbage collection"
-    //   • Vector similarity to the query embedding [0.9, 0.1, 0.0, 0.0]
-    // Results are fused via Reciprocal Rank Fusion (RRF) — no manual tuning needed.
+    // Kombiniert:
+    //   • BM25-Stichwortabgleich auf "memory safety garbage collection"
+    //   • Vektorähnlichkeit zur Anfrage-Einbettung [0.9, 0.1, 0.0, 0.0]
+    // Ergebnisse werden via Reciprocal Rank Fusion (RRF) zusammengeführt.
     let text_query = "memory safety garbage collection";
     let vector_query = [0.9, 0.1, 0.0, 0.0];
 
@@ -80,7 +92,7 @@ async fn main() -> contextra_types::Result<()> {
         }
     }
 
-    // --- Compare: Pure vector search (no text) ---
+    // --- Vergleich: Reine Vektorsuche (ohne Textfilterung) ---
     let vector_only = db.search(&vector_query, 3).await?;
 
     println!("\n=== Vector-Only Search (same embedding) ===");

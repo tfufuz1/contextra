@@ -1,0 +1,12 @@
+[crates.contextra-mvcc]
+group = "foundation"
+level = 1
+tier = "stable"
+path = "crates/contextra-mvcc"
+unsafe_island = false
+allowed_internal = ["contextra-ids", "contextra-env"]
+feature_closure_allowed = ["contextra-types", "contextra-ports"]
+dev_allowed = []
+klasse = "A"
+may_depend_on = ["contextra-ids", "contextra-env"]
+transitional = ["workspace", "types-compat", "ports-compat"]

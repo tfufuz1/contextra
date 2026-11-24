@@ -1,3 +1,14 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: RTF (Rich Text Format) Extractor ohne externe Abhängigkeiten (WP M4).
 // INVARIANTEN: Zero-Panic, Stack-Tiefe aus max_xml_depth, \u/\'hh/\v/Tabellen/\info Handling.
@@ -31,7 +42,11 @@ impl Default for RtfGroupState {
 }
 
 /// Extrahiert RTF-Dokumente unter Einhaltung des Verschachtelungslimits und der ExtractPolicy.
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::indexing_slicing)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::indexing_slicing
+)]
 pub fn parse_rtf(input: &[u8], ctx: &ExtractContext<'_>) -> Result<DocumentIr, IngestError> {
     let mut ir = DocumentIr::new(FormatId::Rtf);
     let max_depth = ctx.limits.max_xml_depth as usize;
@@ -117,7 +132,8 @@ pub fn parse_rtf(input: &[u8], ctx: &ExtractContext<'_>) -> Result<DocumentIr, I
             if next_b == b'\'' {
                 idx = idx.saturating_add(1);
                 if idx.saturating_add(2) <= input.len() {
-                    let hex_str = std::str::from_utf8(&input[idx..idx.saturating_add(2)]).unwrap_or_default();
+                    let hex_str =
+                        std::str::from_utf8(&input[idx..idx.saturating_add(2)]).unwrap_or_default();
                     if let Ok(byte_val) = u8::from_str_radix(hex_str, 16) {
                         let ch = decode_cp1252(byte_val, codepage);
                         push_char(

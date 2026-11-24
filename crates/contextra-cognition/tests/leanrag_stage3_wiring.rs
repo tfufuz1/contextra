@@ -1,3 +1,17 @@
+//! # Integrationstest: LeanRAG Stage 3 Verdrahtung (`tests/leanrag_stage3_wiring.rs`)
+//!
+//! Validiert die Ausführung von `execute_leanrag_aggregation_stage` und
+//! das persistente Schreiben von synthetischen Super-Hyperkanten in den `CsrGraph`.
+
+
+// FILE-CONTEXT
+// ZWECK: Wiring- und Verknuepfungstests fuer LeanRAG Stage 3.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: LeanRAG Stage 3 Wiring Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -13,14 +27,14 @@
 use contextra_cognition::aggregation_phase::{AggregationConfig, AggregationEdge, AggregationNode};
 use contextra_cognition::consolidation_executor::execute_leanrag_aggregation_stage;
 use contextra_cognition::memory_consolidation::CommunityStabilityTracker;
-use contextra_engine::collection::Collection;
+use contextra_cognition::collection::Collection;
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
-use contextra_store::LsmStorage;
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
 use contextra_types::{EntityId, TxId};
-use contextra_vector::HnswIndex;
+
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -33,24 +47,13 @@ impl LlmTextGenerator for TestMockLlm {
     }
 }
 
-async fn create_test_collection(
-) -> Option<(Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir)> {
+async fn create_test_collection() -> Option<(
+    Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>,
+    tempfile::TempDir,
+)> {
     let dir = tempdir().ok()?;
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .ok()?,
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .ok()?,
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new(4));
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
@@ -61,11 +64,13 @@ async fn create_test_collection(
         graph,
         next_tx,
         4,
-        contextra_engine::Language::English,
+        contextra_text::Language::English,
     ));
     Some((col, dir))
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-070]
+// Prüft Testfall `test_execute_leanrag_aggregation_stage_creates_superedge_in_csr_graph`.
 #[tokio::test]
 async fn test_execute_leanrag_aggregation_stage_creates_superedge_in_csr_graph() {
     let (collection, _dir) = match create_test_collection().await {
@@ -199,3 +204,4 @@ async fn test_execute_leanrag_aggregation_stage_creates_superedge_in_csr_graph()
         assert!(!edge.child_edge_ids.is_empty());
     }
 }
+// !SECTION: LeanRAG Stage 3 Wiring Tests

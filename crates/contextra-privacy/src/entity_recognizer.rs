@@ -1,33 +1,65 @@
-// FILE-CONTEXT
-// ZWECK: Handgeschriebener, regex-freier RuleBasedEntityRecognizer für PII (E-Mail, IBAN, Phone, CC, Steuer-ID, IP, PLZ, Kennzeichen, Gazetteer).
-// INVARIANTEN: Zero Panic, no unsafe code, strict fail-closed, byte-boundary safe character mapping on original text.
+//! `entity_recognizer` — Regex-freier, regelbasierter PII-Erkenner (`RuleBasedEntityRecognizer`).
+//!
+//! # Zweck
+//! Erkennt Kategorien personenbezogener Daten (PII = Personally Identifiable Information)
+//! wie E-Mail-Adressen, IBANs, BICs, Telefonnummern, Kreditkartennummern, deutsche Steuer-IDs,
+//! IP-Adressen (IPv4/IPv6), Postleitzahlen, deutsche Kfz-Kennzeichen sowie benutzerdefinierte
+//! Begriffe (Gazetteer).
+//!
+//! # Invarianten
+//! - **INV-PRIVACY-FAILCLOSED-1**: Bei internen Fehlern, Limit-Überschreitung oder fehlerhaften
+//!   Daten wird blockiert und niemals eine ungesäuberte Freigabe erteilt.
+//! - **Zero Panic**: Verhindert Laufzeitabbrüche und Indexüberläufe durch strikte Grenzprüfungen.
+//! - **Kein Unsafe**: `#![forbid(unsafe_code)]` - vollständig in sicherem Rust implementiert.
+//! - **UTF-8 Byte-Boundary Safety**: Zeichenbereinigung und Homoglyphen-Ersetzung halten
+//!   über den internen `Normalizer` exakte Byte-Mappings auf die Original-Byte-Offsets im Rohstring.
+//! - **ReDoS-Resistenz**: Alle Erkennungsroutinen arbeiten mit linearem Aufwand O(N) ohne Backtracking.
 
 use crate::egress_vault::{EntityRecognizer, MAX_CLASSIFY_PAYLOAD_BYTES};
 use crate::error::EgressError;
 use std::collections::BTreeSet;
 use std::ops::Range;
 
-/// Default maximum input length in bytes for entity recognition (65,536 bytes).
+// ANCHOR[contextra-privacy:ER-001]
+/// Standardmäßige maximale Eingabelänge in Bytes für die Entitätserkennung (65.536 Bytes = 64 KiB).
 pub const DEFAULT_MAX_INPUT_LENGTH: usize = MAX_CLASSIFY_PAYLOAD_BYTES;
 
-/// Alias for `RuleBasedEntityRecognizer` to serve as standard rule-based pattern recognizer.
+// ANCHOR[contextra-privacy:ER-002]
+/// Alias für [`RuleBasedEntityRecognizer`] als standardmäßiger Mustererkenner.
 pub type PatternRecognizer = RuleBasedEntityRecognizer;
 
-/// Extension point for custom term, name, or company recognition lists.
+/// Strukturierte Information über eine erkannte Entität.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EntityMatch {
+    /// Byte-Bereich im Originaltext (auf gültigen UTF-8 Zeichengrenzen).
+    pub range: Range<usize>,
+    /// Entitätstyp (z. B. "EMAIL", "IBAN", "CREDIT_CARD", "STEUER_ID").
+    pub entity_type: String,
+    /// Regel-Identifikator der auslösenden Heuristik.
+    pub rule_id: &'static str,
+    /// Konfidenzwert der Erkennung zwischen 0.0 und 1.0.
+    pub confidence: f32,
+}
+
+// ANCHOR[contextra-privacy:ER-003]
+/// Erweiterungspunkt für benutzerdefinierte Begriff-, Namens- oder Unternehmenslisten (Wörterbuch-Abgleich).
 #[derive(Debug, Clone, Default)]
 pub struct Gazetteer {
     terms: BTreeSet<String>,
 }
 
 impl Gazetteer {
-    /// Creates a new empty `Gazetteer`.
+    // ANCHOR[contextra-privacy:ER-004]
+    /// Erstellt eine neue leere [`Gazetteer`]-Instanz.
     pub fn new() -> Self {
         Self {
             terms: BTreeSet::new(),
         }
     }
 
-    /// Adds a term to the gazetteer (stored in lowercase for case-insensitive matching).
+    // ANCHOR[contextra-privacy:ER-005]
+    /// Fügt dem Verzeichnis einen Begriff hinzu (wird für case-insensitiven Abgleich in Kleinbuchstaben normalisiert).
     pub fn add_term(&mut self, term: impl Into<String>) {
         let t = term.into().trim().to_lowercase();
         if !t.is_empty() {
@@ -35,15 +67,22 @@ impl Gazetteer {
         }
     }
 
-    /// Returns `true` if the gazetteer contains no terms.
+    // ANCHOR[contextra-privacy:ER-006]
+    /// Prüft, ob das Begriffsverzeichnis leer ist.
     pub fn is_empty(&self) -> bool {
         self.terms.is_empty()
     }
+
+    /// Liefert die Anzahl der Begriffe im Gazetteer.
+    pub fn len(&self) -> usize {
+        self.terms.len()
+    }
 }
 
-/// A rule-based entity recognizer without regex dependencies.
+// ANCHOR[contextra-privacy:ER-007]
+/// Regelbasierter PII-Erkenner ohne externe Regex-Laufzeitabhängigkeit.
 ///
-/// Detects PII categories: EMAIL, IBAN, BIC, PHONE, CREDIT_CARD, STEUER_ID, IPV4, IPV6, PLZ, PLZ_ORT, LICENSE_PLATE, GAZETTEER.
+/// Erkennt Kategorien personenbezogener Daten: EMAIL, IBAN, BIC, PHONE, CREDIT_CARD, STEUER_ID, IPV4, IPV6, PLZ, PLZ_ORT, LICENSE_PLATE, GAZETTEER.
 #[derive(Debug, Clone)]
 pub struct RuleBasedEntityRecognizer {
     gazetteer: Gazetteer,
@@ -60,12 +99,14 @@ impl Default for RuleBasedEntityRecognizer {
 }
 
 impl RuleBasedEntityRecognizer {
-    /// Creates a new `RuleBasedEntityRecognizer` with default max input length limit and no gazetteer terms.
+    // ANCHOR[contextra-privacy:ER-008]
+    /// Erstellt eine neue Instanz von [`RuleBasedEntityRecognizer`] mit Standard-Längenlimit und leerem Gazetteer.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Creates a new `RuleBasedEntityRecognizer` with the specified gazetteer.
+    // ANCHOR[contextra-privacy:ER-009]
+    /// Erstellt einen Erkenner mit einem vorkonfigurierten Begriffsverzeichnis ([`Gazetteer`]).
     pub fn with_gazetteer(gazetteer: Gazetteer) -> Self {
         Self {
             gazetteer,
@@ -73,32 +114,47 @@ impl RuleBasedEntityRecognizer {
         }
     }
 
-    /// Configures maximum input length limit in bytes for input size bounding.
+    // ANCHOR[contextra-privacy:ER-010]
+    /// Konfiguriert das maximale Längenlimit in Bytes zur Begrenzung von DoS-Risiken.
     pub fn with_max_input_length(mut self, limit: usize) -> Self {
         self.max_input_length = limit;
         self
     }
 
-    /// Returns the maximum input length limit in bytes.
+    // ANCHOR[contextra-privacy:ER-011]
+    /// Liefert die Obergrenze für Eingabetexte in Bytes.
     pub fn max_input_length(&self) -> usize {
         self.max_input_length
     }
 
-    /// Builder method to add a gazetteer term.
+    // ANCHOR[contextra-privacy:ER-012]
+    /// Ergänzt einen Begriff für das Verzeichnis über ein Builder-Muster.
     pub fn add_gazetteer_term(mut self, term: impl Into<String>) -> Self {
         self.gazetteer.add_term(term);
         self
     }
 
-    /// Recognizes entities in `text` and returns byte ranges and category labels.
+    // ANCHOR[contextra-privacy:ER-013]
+    /// Führt die Erkennung auf dem übergebenen Text aus und liefert Byte-Bereiche und Kategorielabels.
     pub fn recognize(&self, text: &str) -> Vec<(Range<usize>, String)> {
         EntityRecognizer::recognize(self, text)
     }
 
-    /// Recognizes entities in `text` returning an explicit `EgressError::InvalidParams` if `text` exceeds `max_input_length`.
-    pub fn recognize_bounded(&self, text: &str) -> Result<Vec<(Range<usize>, String)>, EgressError> {
+    /// Führt die Erkennung aus und liefert detaillierte [`EntityMatch`]-Objekte inklusive Regel-ID und Konfidenz.
+    pub fn recognize_detailed(&self, text: &str) -> Vec<EntityMatch> {
+        self.scan_entities_internal(text)
+    }
+
+    // ANCHOR[contextra-privacy:ER-014]
+    /// Führt die Erkennung mit strikter Längenprüfung aus und liefert `Err(EgressError::CapacityExceeded)` bei Überschreitung.
+    ///
+    /// Gemäß `INV-PRIVACY-FAILCLOSED-1` wird bei Limitüberschreitung sofort blockiert.
+    pub fn recognize_bounded(
+        &self,
+        text: &str,
+    ) -> Result<Vec<(Range<usize>, String)>, EgressError> {
         if text.len() > self.max_input_length {
-            return Err(EgressError::invalid_params(format!(
+            return Err(EgressError::capacity_exceeded(format!(
                 "Payload size exceeds limit: {} > {}",
                 text.len(),
                 self.max_input_length
@@ -106,15 +162,26 @@ impl RuleBasedEntityRecognizer {
         }
         Ok(self.recognize(text))
     }
-}
 
-impl EntityRecognizer for RuleBasedEntityRecognizer {
-    fn recognize(&self, text: &str) -> Vec<(Range<usize>, String)> {
+    /// Führt die detaillierte Erkennung mit strikter Längenprüfung aus.
+    pub fn recognize_detailed_bounded(&self, text: &str) -> Result<Vec<EntityMatch>, EgressError> {
+        if text.len() > self.max_input_length {
+            return Err(EgressError::capacity_exceeded(format!(
+                "Payload size exceeds limit: {} > {}",
+                text.len(),
+                self.max_input_length
+            )));
+        }
+        Ok(self.recognize_detailed(text))
+    }
+
+    fn scan_entities_internal(&self, text: &str) -> Vec<EntityMatch> {
         if text.is_empty() {
             return Vec::new();
         }
 
         if text.len() > self.max_input_length {
+            #[cfg(feature = "tracing")]
             tracing::warn!(
                 length = text.len(),
                 limit = self.max_input_length,
@@ -141,18 +208,29 @@ impl EntityRecognizer for RuleBasedEntityRecognizer {
 
         // Step 3: Validate and deduplicate byte ranges
         let mut valid_results = Vec::with_capacity(results.len());
-        for (range, label) in results {
-            if range.start < range.end
-                && range.end <= text.len()
-                && text.is_char_boundary(range.start)
-                && text.is_char_boundary(range.end)
+        for m in results {
+            if m.range.start < m.range.end
+                && m.range.end <= text.len()
+                && text.is_char_boundary(m.range.start)
+                && text.is_char_boundary(m.range.end)
             {
-                valid_results.push((range, label));
+                valid_results.push(m);
             }
         }
 
         // Deduplicate overlapping ranges preferring longer / earlier spans
-        deduplicate_spans(valid_results)
+        deduplicate_matches(valid_results)
+    }
+}
+
+// ANCHOR[contextra-privacy:ER-015]
+// Implementierung des allgemeinen EntityRecognizer-Traits für den EgressVault.
+impl EntityRecognizer for RuleBasedEntityRecognizer {
+    fn recognize(&self, text: &str) -> Vec<(Range<usize>, String)> {
+        self.scan_entities_internal(text)
+            .into_iter()
+            .map(|m| (m.range, m.entity_type))
+            .collect()
     }
 }
 
@@ -162,7 +240,7 @@ struct Normalizer {
     chars: Vec<char>,
     /// Maps character index in `chars` to start byte offset in raw text
     char_start_bytes: Vec<usize>,
-    /// Maps character index in `chars` to end byte offset in raw text
+    /// Maps character index in `chars` to end byte offset in raw text (inclusive of trailing ignored characters)
     char_end_bytes: Vec<usize>,
 }
 
@@ -178,6 +256,10 @@ impl Normalizer {
 
             // Strip zero-width & non-printing control characters
             if is_zero_width_or_control(c) {
+                // Extend the end_byte boundary of the previous valid character so that trailing combining marks/zero-widths are included in the span
+                if let Some(last_end) = char_end_bytes.last_mut() {
+                    *last_end = end_byte;
+                }
                 continue;
             }
 
@@ -219,19 +301,26 @@ impl Normalizer {
     }
 }
 
+// ANCHOR[contextra-privacy:ER-016]
+// Prüft auf unsichtbare Steuerzeichen, Zero-Width-Zeichen und diakritische Markierungen (Zalgo) zur Verhinderung von Obfuskation.
 fn is_zero_width_or_control(c: char) -> bool {
     matches!(
         c,
-        '\u{200B}' // Zero Width Space
-        | '\u{200C}' // Zero Width Non-Joiner
-        | '\u{200D}' // Zero Width Joiner
+        '\u{200B}'..='\u{200F}' // Zero Width Space, ZWNJ, ZWJ, LRM, RLM
+        | '\u{202A}'..='\u{202E}' // Bidi embedding & override controls
+        | '\u{2060}'..='\u{2064}' // Word Joiner, Invisible operators
+        | '\u{2066}'..='\u{2069}' // Bidi isolate controls
         | '\u{FEFF}' // Zero Width No-Break Space / BOM
         | '\u{00AD}' // Soft Hyphen
-        | '\u{200E}' // Left-to-Right Mark
-        | '\u{200F}' // Right-to-Left Mark
+        | '\u{0300}'..='\u{036F}' // Combining Diacritical Marks (Zalgo striping)
+        | '\u{1DC0}'..='\u{1DFF}' // Combining Diacritical Marks Supplement
+        | '\u{20D0}'..='\u{20FF}' // Combining Diacritical Marks for Symbols
+        | '\u{FE00}'..='\u{FE0F}' // Variation Selectors
     )
 }
 
+// ANCHOR[contextra-privacy:ER-017]
+// Normalisiert kyrillische, griechische und lateinische Homoglyphen sowie Fullwidth- und Mathe-Zeichen auf ASCII.
 fn fold_homoglyph(c: char) -> char {
     match c {
         // Cyrillic lookalikes
@@ -245,11 +334,54 @@ fn fold_homoglyph(c: char) -> char {
         'с' | 'С' => 'c',
         'т' | 'Т' => 'T',
         'х' | 'Х' => 'x',
+        'і' | 'І' => 'i',
+        'ј' | 'Ј' => 'j',
+        'ѕ' | 'Ѕ' => 's',
+        'у' | 'У' => 'y',
+        // Greek lookalikes
+        'Α' | 'α' => 'a',
+        'Β' => 'B',
+        'Ε' | 'ε' => 'e',
+        'Η' | 'η' => 'H',
+        'Ι' | 'ι' => 'i',
+        'Κ' | 'κ' => 'K',
+        'Μ' => 'M',
+        'Ν' => 'N',
+        'Ο' | 'ο' => 'o',
+        'Ρ' | 'ρ' => 'p',
+        'Τ' | 'τ' => 'T',
+        'Χ' | 'χ' => 'x',
+        'Υ' => 'Y',
+        'Ζ' => 'Z',
+        // Fullwidth Latin letters
+        'Ａ'..='Ｚ' => {
+            let offset = c as u32 - 'Ａ' as u32;
+            char::from_u32('A' as u32 + offset).unwrap_or(c)
+        }
+        'ａ'..='ｚ' => {
+            let offset = c as u32 - 'ａ' as u32;
+            char::from_u32('a' as u32 + offset).unwrap_or(c)
+        }
         // Fullwidth digits
         '０'..='９' => {
             let offset = c as u32 - '０' as u32;
-            let ascii_code = '0' as u32 + offset;
-            char::from_u32(ascii_code).unwrap_or(c)
+            char::from_u32('0' as u32 + offset).unwrap_or(c)
+        }
+        // Mathematical Alphanumeric Symbols (Bold / Monospace / Double-struck common subsets)
+        '\u{1D400}'..='\u{1D419}' => {
+            // Mathematical Bold Capital
+            let offset = c as u32 - 0x1D400;
+            char::from_u32('A' as u32 + offset).unwrap_or(c)
+        }
+        '\u{1D41A}'..='\u{1D433}' => {
+            // Mathematical Bold Small
+            let offset = c as u32 - 0x1D41A;
+            char::from_u32('a' as u32 + offset).unwrap_or(c)
+        }
+        '\u{1D7CE}'..='\u{1D7D7}' => {
+            // Mathematical Bold Digits
+            let offset = c as u32 - 0x1D7CE;
+            char::from_u32('0' as u32 + offset).unwrap_or(c)
         }
         _ => c,
     }
@@ -260,7 +392,9 @@ fn fold_homoglyph(c: char) -> char {
 // ============================================================================
 
 /// Detects email addresses.
-fn detect_emails(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
+// ANCHOR[contextra-privacy:ER-018]
+// Zustandsbasierte Erkennung von E-Mail-Adressen (Local-Part, @, Domain, TLD-Prüfung).
+fn detect_emails(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
     let mut idx = 0;
 
@@ -318,7 +452,12 @@ fn detect_emails(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
                         if let Some(byte_range) =
                             norm.char_span_to_byte_range(local_start, domain_end)
                         {
-                            results.push((byte_range, "EMAIL".to_string()));
+                            results.push(EntityMatch {
+                                range: byte_range,
+                                entity_type: "EMAIL".to_string(),
+                                rule_id: "PII-EMAIL-01",
+                                confidence: 0.99,
+                            });
                         }
                     }
                 }
@@ -337,7 +476,9 @@ fn is_email_domain_char(c: char) -> bool {
 }
 
 /// Detects IBANs (country length check + Mod-97 checksum, optional spaces/hyphens).
-fn detect_ibans(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
+// ANCHOR[contextra-privacy:ER-019]
+// Erkennt internationale Bankkontonummern (IBAN) mit länderspezifischer Längen- und Modulo-97-Prüfziffernvalidierung.
+fn detect_ibans(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
     let mut i = 0;
 
@@ -385,7 +526,12 @@ fn detect_ibans(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
                     if validate_iban_checksum(&iban_str) {
                         let end_char_idx = last_alnum_idx + 1;
                         if let Some(byte_range) = norm.char_span_to_byte_range(i, end_char_idx) {
-                            results.push((byte_range, "IBAN".to_string()));
+                            results.push(EntityMatch {
+                                range: byte_range,
+                                entity_type: "IBAN".to_string(),
+                                rule_id: "PII-IBAN-MOD97",
+                                confidence: 1.0,
+                            });
                             i = end_char_idx;
                             continue;
                         }
@@ -453,7 +599,9 @@ fn validate_iban_checksum(iban: &str) -> bool {
 }
 
 /// Detects credit card numbers (13-19 digits, optional spaces/hyphens, Luhn algorithm).
-fn detect_credit_cards(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
+// ANCHOR[contextra-privacy:ER-020]
+// Erkennt Kreditkartennummern (Visa, MasterCard, Amex) und validiert sie via Luhn-Algorithmus (Modulo 10).
+fn detect_credit_cards(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
     let mut i = 0;
 
@@ -490,7 +638,12 @@ fn detect_credit_cards(norm: &Normalizer, results: &mut Vec<(Range<usize>, Strin
             if (13..=19).contains(&num_digits) && validate_luhn_checksum(&digits) {
                 let end_char_idx = last_digit_idx + 1;
                 if let Some(byte_range) = norm.char_span_to_byte_range(i, end_char_idx) {
-                    results.push((byte_range, "CREDIT_CARD".to_string()));
+                    results.push(EntityMatch {
+                        range: byte_range,
+                        entity_type: "CREDIT_CARD".to_string(),
+                        rule_id: "PII-CC-LUHN",
+                        confidence: 0.98,
+                    });
                     i = end_char_idx;
                     continue;
                 }
@@ -520,7 +673,9 @@ fn validate_luhn_checksum(digits: &[u8]) -> bool {
 }
 
 /// Detects German Steuer-ID (11 digits, TIN Mod 11 checksum).
-fn detect_steuer_ids(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
+// ANCHOR[contextra-privacy:ER-021]
+// Erkennt 11-stellige deutsche steuerliche Identifikationsnummern (IdNr) mit Ziffernverteilung und ISO-7064-Prüfziffer.
+fn detect_steuer_ids(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
     let mut i = 0;
 
@@ -564,7 +719,12 @@ fn detect_steuer_ids(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)
 
                 if next_ok && validate_german_steuer_id(&digits) {
                     if let Some(byte_range) = norm.char_span_to_byte_range(i, end_char_idx) {
-                        results.push((byte_range, "STEUER_ID".to_string()));
+                        results.push(EntityMatch {
+                            range: byte_range,
+                            entity_type: "STEUER_ID".to_string(),
+                            rule_id: "PII-TAX-DE-ISO7064",
+                            confidence: 0.99,
+                        });
                         i = end_char_idx;
                         continue;
                     }
@@ -628,7 +788,9 @@ fn validate_german_steuer_id(digits: &[u64]) -> bool {
 }
 
 /// Detects DE/EU phone numbers (+49..., 0049..., 0170...).
-fn detect_phone_numbers(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
+// ANCHOR[contextra-privacy:ER-022]
+// Erkennt deutsche und internationale Telefonnummern mit Ländervorwahlen (+49, 0049) und Formatierungszeichen.
+fn detect_phone_numbers(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
     let mut i = 0;
 
@@ -678,7 +840,12 @@ fn detect_phone_numbers(norm: &Normalizer, results: &mut Vec<(Range<usize>, Stri
 
             if next_ok && (7..=15).contains(&digit_count) {
                 if let Some(byte_range) = norm.char_span_to_byte_range(i, end_char_idx) {
-                    results.push((byte_range, "PHONE".to_string()));
+                    results.push(EntityMatch {
+                        range: byte_range,
+                        entity_type: "PHONE".to_string(),
+                        rule_id: "PII-PHONE-ITU",
+                        confidence: 0.90,
+                    });
                     i = end_char_idx;
                     continue;
                 }
@@ -689,7 +856,9 @@ fn detect_phone_numbers(norm: &Normalizer, results: &mut Vec<(Range<usize>, Stri
 }
 
 /// Detects IPv4 and IPv6 addresses.
-fn detect_ip_addresses(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
+// ANCHOR[contextra-privacy:ER-023]
+// Erkennt IPv4-Adressen (mit Oktettbereichsprüfung 0..=255) und IPv6-Adressen.
+fn detect_ip_addresses(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
     let mut i = 0;
 
@@ -752,7 +921,12 @@ fn detect_ip_addresses(norm: &Normalizer, results: &mut Vec<(Range<usize>, Strin
 
                     if next_ok {
                         if let Some(byte_range) = norm.char_span_to_byte_range(i, scan_idx) {
-                            results.push((byte_range, "IPV4".to_string()));
+                            results.push(EntityMatch {
+                                range: byte_range,
+                                entity_type: "IPV4".to_string(),
+                                rule_id: "PII-NET-IPV4",
+                                confidence: 0.92,
+                            });
                             i = scan_idx;
                             continue;
                         }
@@ -793,7 +967,12 @@ fn detect_ip_addresses(norm: &Normalizer, results: &mut Vec<(Range<usize>, Strin
 
                 if next_ok {
                     if let Some(byte_range) = norm.char_span_to_byte_range(i, scan_idx) {
-                        results.push((byte_range, "IPV6".to_string()));
+                        results.push(EntityMatch {
+                            range: byte_range,
+                            entity_type: "IPV6".to_string(),
+                            rule_id: "PII-NET-IPV6",
+                            confidence: 0.95,
+                        });
                         i = scan_idx;
                         continue;
                     }
@@ -805,7 +984,9 @@ fn detect_ip_addresses(norm: &Normalizer, results: &mut Vec<(Range<usize>, Strin
 }
 
 /// Detects BIC / SWIFT codes (ISO 9362: 8 or 11 alphanumeric characters).
-fn detect_bics(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
+// ANCHOR[contextra-privacy:ER-024]
+// Erkennt Business Identifier Codes (BIC / SWIFT) im 8- oder 11-stelligen Format mit gültigem Ländercode.
+fn detect_bics(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
     let mut i = 0;
 
@@ -861,8 +1042,14 @@ fn detect_bics(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
                     };
 
                     if next_ok {
-                        if let Some(byte_range) = norm.char_span_to_byte_range(i, i + bic_char_len) {
-                            results.push((byte_range, "BIC".to_string()));
+                        if let Some(byte_range) = norm.char_span_to_byte_range(i, i + bic_char_len)
+                        {
+                            results.push(EntityMatch {
+                                range: byte_range,
+                                entity_type: "BIC".to_string(),
+                                rule_id: "PII-BIC-ISO9362",
+                                confidence: 0.95,
+                            });
                             i += bic_char_len;
                             continue;
                         }
@@ -941,7 +1128,9 @@ fn scan_city_name_after_plz(norm: &Normalizer, start_char_idx: usize) -> Option<
 
             if !w2_chars.is_empty() {
                 let w2_str: String = w2_chars.iter().collect();
-                let is_capitalized = w2_chars.first().is_some_and(|&c| is_german_city_start_char(c));
+                let is_capitalized = w2_chars
+                    .first()
+                    .is_some_and(|&c| is_german_city_start_char(c));
                 let is_connector = matches!(
                     w2_str.to_lowercase().as_str(),
                     "am" | "an" | "der" | "dem" | "im" | "in"
@@ -970,7 +1159,9 @@ fn scan_city_name_after_plz(norm: &Normalizer, start_char_idx: usize) -> Option<
                         }
 
                         if !w3_chars.is_empty() {
-                            let is_w3_cap = w3_chars.first().is_some_and(|&c| is_german_city_start_char(c));
+                            let is_w3_cap = w3_chars
+                                .first()
+                                .is_some_and(|&c| is_german_city_start_char(c));
                             if is_w3_cap {
                                 city_end = w3_curr;
                             }
@@ -994,7 +1185,9 @@ fn scan_city_name_after_plz(norm: &Normalizer, start_char_idx: usize) -> Option<
 }
 
 /// Detects German PLZ (5-digit), German PLZ + Ort (e.g. 10115 Berlin), and German license plates (e.g. B-MW 1234).
-fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
+// ANCHOR[contextra-privacy:ER-025]
+// Erkennt deutsche Postleitzahlen (PLZ / PLZ_ORT) sowie Kfz-Kennzeichen.
+fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
     let mut i = 0;
 
@@ -1018,7 +1211,12 @@ fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<(Range<usi
                     // Check for optional city name (Ort) following PLZ
                     if let Some(city_end_idx) = scan_city_name_after_plz(norm, scan_idx) {
                         if let Some(byte_range) = norm.char_span_to_byte_range(i, city_end_idx) {
-                            results.push((byte_range, "PLZ_ORT".to_string()));
+                            results.push(EntityMatch {
+                                range: byte_range,
+                                entity_type: "PLZ_ORT".to_string(),
+                                rule_id: "PII-LOC-DE-PLZ-ORT",
+                                confidence: 0.96,
+                            });
                             i = city_end_idx;
                             continue;
                         }
@@ -1031,7 +1229,12 @@ fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<(Range<usi
 
                     if next_ok {
                         if let Some(byte_range) = norm.char_span_to_byte_range(i, scan_idx) {
-                            results.push((byte_range, "PLZ".to_string()));
+                            results.push(EntityMatch {
+                                range: byte_range,
+                                entity_type: "PLZ".to_string(),
+                                rule_id: "PII-LOC-DE-PLZ",
+                                confidence: 0.85,
+                            });
                             i = scan_idx;
                             continue;
                         }
@@ -1094,7 +1297,12 @@ fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<(Range<usi
                             if next_ok {
                                 if let Some(byte_range) = norm.char_span_to_byte_range(i, scan_idx)
                                 {
-                                    results.push((byte_range, "LICENSE_PLATE".to_string()));
+                                    results.push(EntityMatch {
+                                        range: byte_range,
+                                        entity_type: "LICENSE_PLATE".to_string(),
+                                        rule_id: "PII-VEHICLE-DE-PLATE",
+                                        confidence: 0.92,
+                                    });
                                     i = scan_idx;
                                     continue;
                                 }
@@ -1110,11 +1318,9 @@ fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<(Range<usi
 }
 
 /// Detects custom gazetteer terms in the text using character index alignment.
-fn detect_gazetteer(
-    norm: &Normalizer,
-    gazetteer: &Gazetteer,
-    results: &mut Vec<(Range<usize>, String)>,
-) {
+// ANCHOR[contextra-privacy:ER-026]
+// Gleicht Wörterbuch-Begriffe des Gazetteers mit dem normalisierten Text ab.
+fn detect_gazetteer(norm: &Normalizer, gazetteer: &Gazetteer, results: &mut Vec<EntityMatch>) {
     if gazetteer.is_empty() {
         return;
     }
@@ -1140,7 +1346,12 @@ fn detect_gazetteer(
 
             if prev_ok && next_ok {
                 if let Some(byte_range) = norm.char_span_to_byte_range(abs_start, abs_end) {
-                    results.push((byte_range, "GAZETTEER".to_string()));
+                    results.push(EntityMatch {
+                        range: byte_range,
+                        entity_type: "GAZETTEER".to_string(),
+                        rule_id: "PII-CUSTOM-GAZETTEER",
+                        confidence: 1.0,
+                    });
                 }
             }
 
@@ -1149,31 +1360,31 @@ fn detect_gazetteer(
     }
 }
 
-/// Deduplicates byte ranges preferring longer spans and earlier positions.
-fn deduplicate_spans(mut spans: Vec<(Range<usize>, String)>) -> Vec<(Range<usize>, String)> {
-    if spans.len() <= 1 {
-        return spans;
+/// Deduplicates matches preferring longer spans and earlier positions.
+fn deduplicate_matches(mut matches: Vec<EntityMatch>) -> Vec<EntityMatch> {
+    if matches.len() <= 1 {
+        return matches;
     }
 
     // Sort by start position ascending, then by length descending
-    spans.sort_by(|a, b| {
-        if a.0.start != b.0.start {
-            a.0.start.cmp(&b.0.start)
+    matches.sort_by(|a, b| {
+        if a.range.start != b.range.start {
+            a.range.start.cmp(&b.range.start)
         } else {
-            (b.0.end - b.0.start).cmp(&(a.0.end - a.0.start))
+            (b.range.end - b.range.start).cmp(&(a.range.end - a.range.start))
         }
     });
 
-    let mut result: Vec<(Range<usize>, String)> = Vec::with_capacity(spans.len());
+    let mut result: Vec<EntityMatch> = Vec::with_capacity(matches.len());
 
-    for span in spans {
+    for m in matches {
         if let Some(last) = result.last() {
             // Check if current span overlaps with last span
-            if span.0.start < last.0.end {
+            if m.range.start < last.range.end {
                 continue;
             }
         }
-        result.push(span);
+        result.push(m);
     }
 
     result

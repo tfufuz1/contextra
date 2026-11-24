@@ -1,11 +1,21 @@
-//! KV prefix store port trait definitions and types (Spec §9.2).
+//! # Key-Value Prefix Store Port (Ring 0 / Class B)
+//!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/kv_bridge_port.rs
+//!
+//! Definiert Verträge für Modell-KV-Cache-Präfix-Wiederverwendung und Block-Eviction (SPEC §9.2).
+//!
+//! // ANCHOR[contextra-ports:KV-001]
+//! // SECTION kv-prefix-contracts
+//! // NOTE: Vollständige Trennung von konkreten KV-Caches (`contextra-kvcache`).
 
+use crate::model_fingerprint::ModelFingerprint;
+use crate::types::domain::TenantId;
+use crate::ContextraError;
 use bytes::Bytes;
-use contextra_types::model_fingerprint::ModelFingerprint;
-use contextra_types::types::domain::TenantId;
-use contextra_types::ContextraError;
 use serde::{Deserialize, Serialize};
 
+// ANCHOR[contextra-ports:KV-LAYOUT-001]
 /// KV cache layer and dimensions layout configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct KvLayout {
@@ -39,6 +49,7 @@ impl std::hash::Hash for RopeConfig {
     }
 }
 
+// ANCHOR[contextra-ports:PREFIX-KEY-001]
 /// Key identifying a model KV cache prefix structure.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrefixKey {
@@ -70,7 +81,7 @@ where
     serializer.serialize_bytes(bytes)
 }
 
-fn deserialize_bytes<'de, D>(deserializer: D) -> Result<Bytes, D::Error>
+pub(crate) fn deserialize_bytes<'de, D>(deserializer: D) -> Result<Bytes, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -132,12 +143,18 @@ pub struct KvPrefixHit {
     pub blocks: Vec<KvBlock>,
 }
 
+// ANCHOR[contextra-ports:KV-STORE-TRAIT-001]
 /// Trait defining the contract for KV prefix caching and block reuse (Spec §9.2).
 ///
 /// # Dyn-Kompatibilität
 /// Dieser Trait ist durch synchrone Schnittstellen vtable-kompatibel (dyn-safe).
 pub trait KvPrefixStore: Send + Sync + 'static {
     /// Returns the longest exact matching prefix in blocks for the prompt tokens, if any.
+    ///
+    /// # Fehler
+    /// Keine; liefert `None` falls kein übereinstimmendes Präfix gefunden wurde.
+    /// # Crash
+    /// Reiner Lesevorgang aus dem Speicher oder Cache ohne persistente Mutation.
     fn lookup(&self, tenant: TenantId, key: &PrefixKey, tokens: &[u32]) -> Option<KvPrefixHit>;
 
     /// Inserts KV blocks for a given token prefix into the store.
@@ -151,8 +168,14 @@ pub trait KvPrefixStore: Send + Sync + 'static {
 
     /// Evicts KV prefix entries for the given tenant and prefix key.
     /// Returns the number of blocks evicted.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei I/O- oder Freigabefehlern.
+    /// # Crash
+    /// Idempotente Eviction; Teilausfall hinterlässt entweder alten oder eviktierten Zustand.
     fn evict(&self, tenant: TenantId, key: &PrefixKey) -> Result<u64, ContextraError>;
 }
+// !SECTION kv-prefix-contracts
 
 #[cfg(test)]
 #[allow(clippy::disallowed_types, clippy::indexing_slicing)]

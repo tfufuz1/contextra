@@ -1,3 +1,14 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: OpenDocument Extractor (ODT, ODP und Flat-ODF .fodt/.fodp) (WP M4).
 // INVARIANTEN: Zero-Panic, Fail-Closed, Zip-Bomb & Budgetierungsschutz, Verschlüsselungserkennung.
@@ -60,7 +71,9 @@ impl DocumentExtractor for OdfExtractor {
 
 fn is_flat_odf(input: &[u8]) -> bool {
     let s = std::str::from_utf8(input).unwrap_or_default().trim_start();
-    s.starts_with("<?xml") || s.starts_with("<office:document") || s.starts_with("<office:document-content")
+    s.starts_with("<?xml")
+        || s.starts_with("<office:document")
+        || s.starts_with("<office:document-content")
 }
 
 fn extract_flat_odf(
@@ -117,10 +130,11 @@ fn extract_zip_odf(
         ctx.budget.charge_decompressed(uncompressed_size)?;
 
         let mut buf = Vec::with_capacity(uncompressed_size.min(1024 * 1024) as usize);
-        file.read_to_end(&mut buf).map_err(|e| IngestError::Corrupt {
-            format: Some(format),
-            detail: format!("I/O-Fehler beim Lesen von {}: {}", name, e),
-        })?;
+        file.read_to_end(&mut buf)
+            .map_err(|e| IngestError::Corrupt {
+                format: Some(format),
+                detail: format!("I/O-Fehler beim Lesen von {}: {}", name, e),
+            })?;
 
         match name.as_str() {
             "mimetype" => mimetype_bytes = Some(buf),
@@ -134,7 +148,8 @@ fn extract_zip_odf(
     // Mimetype validation
     if let Some(ref mime_raw) = mimetype_bytes {
         let mime_str = std::str::from_utf8(mime_raw).unwrap_or_default().trim();
-        if !mime_str.is_empty() && !mime_str.contains("opendocument") && !mime_str.contains("oasis") {
+        if !mime_str.is_empty() && !mime_str.contains("opendocument") && !mime_str.contains("oasis")
+        {
             return Err(IngestError::Corrupt {
                 format: Some(format),
                 detail: format!("Ungültiger ODF mimetype: {}", mime_str),

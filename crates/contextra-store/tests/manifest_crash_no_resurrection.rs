@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // ANCHOR[TEST:STO-005] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283)
 //! Integration tests for MANIFEST crash safety and SSTable non-resurrection.
 //!

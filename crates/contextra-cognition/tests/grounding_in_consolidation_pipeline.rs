@@ -1,3 +1,17 @@
+//! # Integrationstest: Grounding in der Konsolidierungs-Pipeline (`tests/grounding_in_consolidation_pipeline.rs`)
+//!
+//! Validiert die Faktentreue-Prüfung (Grounding Validation) während der generativen Synthese
+//! in der Konsolidierungs-Pipeline sowohl mit Standard- als auch mit Rich-Grounding-Validatoren.
+
+
+// FILE-CONTEXT
+// ZWECK: Integrationstests fuer Grounding-Validierung in der Konsolidierung.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Grounding-Consolidation Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -20,9 +34,9 @@ use contextra_ports::{
     BoxFuture, GroundingAssessment, GroundingValidator, LlmTextGenerator,
     ResponseGroundingValidator,
 };
-use contextra_store::LsmStorage;
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
 use contextra_types::{ContextChunk, DocId, Result};
-use contextra_vector::HnswIndex;
+
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -72,6 +86,8 @@ impl GroundingValidator for TestMockRichValidator {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-GROUNDIN-059]
+// Prüft Testfall `test_grounding_validation_pass_and_fail_modes`.
 #[tokio::test]
 async fn test_grounding_validation_pass_and_fail_modes() {
     let llm = TestMockLlm;
@@ -140,35 +156,24 @@ async fn test_grounding_validation_pass_and_fail_modes() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-GROUNDIN-060]
+// Prüft Testfall `test_consolidation_pipeline_rich_validator_wiring`.
 #[tokio::test]
 async fn test_consolidation_pipeline_rich_validator_wiring() {
     let dir = tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new(4));
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
-    let collection = Arc::new(contextra_engine::collection::Collection::new(
+    let collection = Arc::new(contextra_cognition::collection::Collection::new(
         "test_grounding_pipeline".to_string(),
         storage,
         index,
         graph,
         next_tx,
         4,
-        contextra_engine::Language::English,
+        contextra_text::Language::English,
     ));
 
     collection
@@ -234,3 +239,4 @@ async fn test_consolidation_pipeline_rich_validator_wiring() {
         "Rich GroundingValidator returning PolicyViolation/LowScore must cause synthesis chunk rejection"
     );
 }
+// !SECTION: Grounding-Consolidation Tests

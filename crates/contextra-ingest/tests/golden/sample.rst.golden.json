@@ -1,0 +1,35 @@
+{
+  "source_file": "sample.rst",
+  "detected_format": "Rst",
+  "title": "Haupttitel RST",
+  "canonical_hash": "5e94508e754351d7bde63f91768aa798770123a9e507e79b08c379e87b37191d",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "# Haupttitel RST\n\nEinleitender Text im reStructuredText-Format.\n\n## Unterabschnitt\n\nHier steht weiterer beschreibender Text.",
+      "token_count": 29,
+      "metadata": {
+        "breadcrumb": "# Haupttitel RST",
+        "chunk_id": "df873a7b8ae1ac85eaa40992827b3fce",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "doc_title": "Haupttitel RST",
+        "format": "rst",
+        "heading_level": 1,
+        "locator": {},
+        "merged_breadcrumbs": [
+          "# Haupttitel RST",
+          "# Haupttitel RST > ## Unterabschnitt"
+        ],
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 124,
+          "start": 0
+        },
+        "strategy": "prose"
+      }
+    }
+  ]
+}

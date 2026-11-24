@@ -1,5 +1,14 @@
 //! Averaging-based Personalized PageRank for Hypergraphs (APPRH).
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Adaptiver PageRank mit Hyperkanten-Expansion (APPRH).
+// INVARIANTEN: Deterministische Diffusion, budgetierte Iterationen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+
+// SECTION Mod Core Implementation
 pub mod diffusion;
 pub mod error;
 pub mod gate_monitor;
@@ -20,9 +29,10 @@ pub use shadow::{
 };
 
 use crate::csr::CsrGraph;
+use crate::error::{GraphError, Result as GraphResult};
 use crate::path_rag::{PathGraph, PprParams};
 use ahash::AHashMap;
-use contextra_types::EntityId;
+use crate::types::EntityId;
 
 /// Computes Averaging-based Personalized PageRank for Hypergraphs (APPRH) over a generic [`PathGraph`].
 ///
@@ -31,6 +41,7 @@ use contextra_types::EntityId;
 ///
 /// # Complexity
 /// Time complexity bounded by push budget $O(1 / (\alpha \cdot \epsilon))$, independent of total graph size.
+// ANCHOR[contextra-graph:SRC-APPRH-MOD-001]
 pub fn apprh_local<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -46,17 +57,18 @@ pub fn apprh_local<G: PathGraph>(
 ///
 /// # Errors
 /// Returns [`contextra_types::ContextraError::InvalidInput`] if `hyperedge_decay_factor` is non-finite or outside `(0.0, 1.0]`.
+// ANCHOR[contextra-graph:SRC-APPRH-MOD-002]
 pub fn forward_push_apprh<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
     params: &PprParams,
     hyperedge_decay_factor: f32,
-) -> Result<AHashMap<EntityId, f32>, contextra_types::ContextraError> {
+) -> GraphResult<AHashMap<EntityId, f32>> {
     if !hyperedge_decay_factor.is_finite() // NAN-CHECK-OK
         || hyperedge_decay_factor <= 0.0
         || hyperedge_decay_factor > 1.0
     {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(GraphError::InvalidInput(format!(
             "hyperedge_decay_factor must be in (0.0, 1.0] and finite, got {}",
             hyperedge_decay_factor
         )));
@@ -76,6 +88,7 @@ impl CsrGraph {
     ///
     /// # Invariants
     /// Runs exclusively in shadow mode unless feature-flag activated. Bit-identical determinism.
+    // ANCHOR[contextra-graph:SRC-APPRH-MOD-003]
     pub fn apprh_diffusion(
         &self,
         seeds: &[EntityId],
@@ -85,6 +98,7 @@ impl CsrGraph {
     }
 
     /// Computes shadow comparison between Forward-Push PPR and APPRH on CsrGraph.
+    // ANCHOR[contextra-graph:SRC-APPRH-MOD-004]
     pub fn apprh_shadow_compare(
         &self,
         seeds: &[EntityId],
@@ -100,8 +114,9 @@ impl CsrGraph {
 mod tests {
     use super::*;
     use crate::csr::CsrGraph;
-    use contextra_types::Entity;
+    use crate::types::Entity;
 
+    // ANCHOR[contextra-graph:SRC-APPRH-MOD-005]
     #[tokio::test]
     async fn test_apprh_diffusion_and_shadow_compare_diagnostic_paths() {
         let graph = std::sync::Arc::new(CsrGraph::new());
@@ -142,3 +157,5 @@ mod tests {
         assert!(comparison.top_k_overlap >= 0.0 && comparison.top_k_overlap <= 1.0);
     }
 }
+
+// !SECTION Mod Core Implementation

@@ -1,17 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/contextra-storage/crates/contextra-storage",
-    "crates/contextra-storage/crates/contextra-storage-ports",
-    "crates/contextra-storage/crates/contextra-storage-fs",
-    "crates/contextra-storage/crates/contextra-crypto-ref",
-    "crates/contextra-storage/crates/contextra-keys-file",
-    "crates/contextra-storage/crates/contextra-keys-cohort",
-    "crates/contextra-storage/crates/contextra-storage-bridge",
+    "crates/contextra-ids",
+    "crates/contextra-env",
+    "crates/contextra-durable-fs",
     "crates/contextra-wire",
     "crates/contextra-sys",
     "crates/contextra-simd",
-    "crates/contextra-core",
     "crates/contextra-store",
     "crates/contextra-vector",
     "crates/contextra-db",
@@ -39,23 +34,18 @@ members = [
     "crates/contextra-engine",
     "crates/contextra-cognition",
     "crates/contextra-rank",
-    "crates/contextra-audit-export",
-    "crates/contextra-avv-generator",
-    "crates/contextra-license",
+    "crates/contextra-erasure",
     "crates/contextra-ingest",
-    "crates/contextra-durable-fs",
-    "xtask",
+    "crates/contextra-prompt-guard",
+]
+exclude = [
+    "crates/contextra-vault",
 ]
 # Restored archived crates to default-members:
-# contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama, contextra-core
+# contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama
 default-members = [
-    "crates/contextra-storage/crates/contextra-storage",
-    "crates/contextra-storage/crates/contextra-storage-ports",
-    "crates/contextra-storage/crates/contextra-storage-fs",
-    "crates/contextra-storage/crates/contextra-crypto-ref",
-    "crates/contextra-storage/crates/contextra-keys-file",
-    "crates/contextra-storage/crates/contextra-keys-cohort",
-    "crates/contextra-storage/crates/contextra-storage-bridge",
+    "crates/contextra-ids",
+    "crates/contextra-env",
     "crates/contextra-durable-fs",
     "crates/contextra-wire",
     "crates/contextra-sys",
@@ -82,7 +72,6 @@ default-members = [
     "crates/contextra-agent",
     "crates/contextra-infer-onnx",
     "crates/contextra-infer-ollama",
-    "crates/contextra-core",
 ]
 
 [workspace.package]
@@ -90,9 +79,11 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 rust-version = "1.89"
-publish = false
 
 [workspace.dependencies]
+contextra-ids = { path = "crates/contextra-ids" }
+contextra-env = { path = "crates/contextra-env" }
+contextra-durable-fs = { path = "crates/contextra-durable-fs" }
 # Error handling
 thiserror = "2"
 
@@ -111,18 +102,12 @@ memmap2 = "0.9.11"
 ahash = { version = "0.8", features = ["serde"] }
 itoa = "1"
 parking_lot = "0.12"
-crossbeam-skiplist = "0.1"
 roaring = "0.10"
 regex = "1"
 
 # Crypto & hashing
 blake3 = "1"
 crc32fast = "1.3"
-zeroize = "1"
-chacha20 = "0.9"
-chacha20poly1305 = "0.10"
-hkdf = "0.12"
-sha2 = "0.10"
 
 # Concurrency
 rand = "0.8"
@@ -139,9 +124,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 contextra-wire = { path = "crates/contextra-wire" }
 contextra-sys = { path = "crates/contextra-sys" }
 contextra-simd = { path = "crates/contextra-simd" }
-contextra-core = { path = "crates/contextra-core" }
 contextra-store = { path = "crates/contextra-store" }
-contextra-storage = { path = "crates/contextra-storage/crates/contextra-storage" }
 contextra-vector = { path = "crates/contextra-vector" }
 contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" } # <!-- crate-ref-ignore -->
 contextra-db = { path = "crates/contextra-db" }
@@ -171,9 +154,7 @@ contextra-kvcache = { path = "crates/contextra-kvcache" }
 contextra-engine = { path = "crates/contextra-engine" }
 contextra-cognition = { path = "crates/contextra-cognition" }
 contextra-rank = { path = "crates/contextra-rank" }
-contextra-audit-export = { path = "crates/contextra-audit-export" }
-contextra-avv-generator = { path = "crates/contextra-avv-generator" }
-contextra-license = { path = "crates/contextra-license" }
+contextra-erasure = { path = "crates/contextra-erasure" }
 contextra-ingest = { path = "crates/contextra-ingest" }
 
 # Ingestion dependencies

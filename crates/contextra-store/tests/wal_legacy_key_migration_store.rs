@@ -23,7 +23,7 @@ async fn test_regular_open_rejects_legacy_wal_without_migration() {
         key: b"legacy_key".to_vec(),
         value: b"legacy_val".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 1, &legacy_key, [0u8; 32]).expect("legacy entry");
 
     let mut wal_bytes = Vec::new();
@@ -64,7 +64,7 @@ async fn test_explicit_migration_rekeys_and_clears_pending_status() {
         key: b"k_mig".to_vec(),
         value: b"v_mig".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 42, &legacy_key, [0u8; 32]).expect("legacy entry");
 
     let mut wal_bytes = Vec::new();

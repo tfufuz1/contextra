@@ -10,17 +10,33 @@
     clippy::await_holding_lock,
     clippy::type_complexity
 )]
+//! # Integrationstest: Crash-Recovery und Mandanten-Isolation
+//!
+//! Verifiziert die strikte Trennung von Checkpoints über verschiedene Mandanten-Namespaces hinweg.
 
+use contextra_checkpoint::SnapshotPinner;
 use contextra_checkpoint::{
     CheckpointHardlinkCloner, DefaultHardlinkCloner, PersistentCheckpointStore, PinnedSeqNoOrphan,
     StateCheckpoint,
 };
-use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
+
+/// Minimaler Mock für SnapshotPinner im Testkit-Stil ohne contextra-mvcc Abhängigkeit.
+#[derive(Default)]
+struct MockSnapshotPinner {
+    pinned: Mutex<Vec<u64>>,
+}
+
+impl SnapshotPinner for MockSnapshotPinner {
+    fn pin_seq_no(&self, seq_no: u64) -> Box<dyn std::any::Any + Send + Sync> {
+        self.pinned.lock().push(seq_no);
+        Box::new(())
+    }
+}
 
 /// In-memory mock storage supporting failpoints and versioned key namespaces.
 struct FaultMockStorage {
@@ -393,6 +409,7 @@ async fn test_crash_recovery_dropped_guard_with_newer_tx_skipped_by_open_and_rec
 
 /// 9. Tenant isolation: Checkpoints created under tenant A are never listed by tenant B.
 #[tokio::test]
+// Prüft, dass Checkpoints eines Mandanten für andere Mandanten unsichtbar bleiben.
 async fn test_tenant_isolation_checkpoints_never_visible_across_namespaces() {
     let storage = Arc::new(FaultMockStorage::new());
 
@@ -424,6 +441,7 @@ async fn test_tenant_isolation_checkpoints_never_visible_across_namespaces() {
 
 /// 10. Tenant isolation: get_checkpoint for checkpoint name on another tenant returns None.
 #[tokio::test]
+// Prüft, dass Checkpoints eines Mandanten für andere Mandanten unsichtbar bleiben.
 async fn test_tenant_isolation_get_checkpoint_cross_tenant_returns_none() {
     let storage = Arc::new(FaultMockStorage::new());
 
@@ -459,6 +477,7 @@ async fn test_tenant_isolation_get_checkpoint_cross_tenant_returns_none() {
 
 /// 11. Tenant isolation: restore_checkpoint on tenant A never rolls back or mutates tenant B keys.
 #[tokio::test]
+// Prüft, dass Checkpoints eines Mandanten für andere Mandanten unsichtbar bleiben.
 async fn test_tenant_isolation_restore_checkpoint_never_affects_other_tenant() {
     let storage_a = Arc::new(FaultMockStorage::new());
     let storage_b = Arc::new(FaultMockStorage::new());
@@ -502,6 +521,7 @@ async fn test_tenant_isolation_restore_checkpoint_never_affects_other_tenant() {
 
 /// 12. Tenant isolation: drop_checkpoint on tenant A does not delete checkpoint with same name on tenant B.
 #[tokio::test]
+// Prüft, dass Checkpoints eines Mandanten für andere Mandanten unsichtbar bleiben.
 async fn test_tenant_isolation_drop_checkpoint_same_name_does_not_affect_other_tenant() {
     let storage = Arc::new(FaultMockStorage::new());
 
@@ -543,6 +563,7 @@ async fn test_tenant_isolation_drop_checkpoint_same_name_does_not_affect_other_t
 
 /// 13. Tenant isolation: Orphan recovery for tenant A only recovers orphans belonging to tenant A.
 #[tokio::test]
+// Prüft, dass Checkpoints eines Mandanten für andere Mandanten unsichtbar bleiben.
 async fn test_tenant_isolation_orphan_recovery_isolated_by_namespace() {
     let storage = Arc::new(FaultMockStorage::new());
 
@@ -580,11 +601,11 @@ async fn test_crash_recovery_hardlink_clone_fallback_to_copy_on_fault() {
     let sst_path = source_dir.path().join("000001.sst");
     std::fs::write(&sst_path, b"mock sstable content bytes").unwrap();
 
-    let registry = Arc::new(SnapshotRegistry::new());
+    let pinner = MockSnapshotPinner::default();
     let cloner = DefaultHardlinkCloner::new();
 
     let res = cloner
-        .clone_sstable_hardlinks(1, source_dir.path(), target_dir.path(), &registry)
+        .clone_sstable_hardlinks(1, source_dir.path(), target_dir.path(), &pinner)
         .await;
 
     assert!(res.is_ok());

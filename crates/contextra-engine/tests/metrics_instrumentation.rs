@@ -1,3 +1,9 @@
+//! # Integrationstest: metrics instrumentation
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 use contextra_engine::metrics_names::{
     COMMIT_LATENCY, INSERT_LATENCY, REBUILD_DURATION, SEARCH_LATENCY_TEXT, SEARCH_LATENCY_VECTOR,
 };
@@ -23,6 +29,8 @@ impl MetricsSink for PanickingMetricsSink {
     }
 }
 
+// ANCHOR[contextra-engine:TST26-001]
+/// Testblock zur Überprüfung von `test_insert_emits_commit_latency_metric`.
 #[tokio::test]
 async fn test_insert_emits_commit_latency_metric() -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();
@@ -75,6 +83,8 @@ async fn test_insert_emits_commit_latency_metric() -> contextra_types::Result<()
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST26-002]
+/// Testblock zur Überprüfung von `test_search_emits_signal_latency_metrics_without_pii`.
 #[tokio::test]
 async fn test_search_emits_signal_latency_metrics_without_pii() -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();
@@ -92,7 +102,13 @@ async fn test_search_emits_signal_latency_metrics_without_pii() -> contextra_typ
     let secret_prompt = "TOP_SECRET_PROMPT_DO_NOT_LEAK";
     let vector = vec![0.1, 0.2, 0.3, 0.4];
 
-    collection.insert("doc-secret", &vector, Some(serde_json::json!({"text": secret_prompt}))).await?;
+    collection
+        .insert(
+            "doc-secret",
+            &vector,
+            Some(serde_json::json!({"text": secret_prompt})),
+        )
+        .await?;
 
     let _res = collection
         .query()
@@ -135,6 +151,8 @@ async fn test_search_emits_signal_latency_metrics_without_pii() -> contextra_typ
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST26-003]
+/// Testblock zur Überprüfung von `test_repair_emits_rebuild_duration_metric`.
 #[tokio::test]
 async fn test_repair_emits_rebuild_duration_metric() -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();
@@ -177,6 +195,8 @@ async fn test_repair_emits_rebuild_duration_metric() -> contextra_types::Result<
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST26-004]
+/// Testblock zur Überprüfung von `test_default_noop_metrics_sink_runs_without_errors`.
 #[tokio::test]
 async fn test_default_noop_metrics_sink_runs_without_errors() -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();
@@ -196,6 +216,8 @@ async fn test_default_noop_metrics_sink_runs_without_errors() -> contextra_types
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST26-005]
+/// Testblock zur Überprüfung von `test_panicking_metrics_sink_does_not_fail_commit`.
 #[tokio::test]
 async fn test_panicking_metrics_sink_does_not_fail_commit() -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();

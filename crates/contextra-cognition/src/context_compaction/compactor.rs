@@ -1,16 +1,42 @@
-use contextra_engine::collection::Collection;
-use contextra_engine::ProvenanceRecord;
-use contextra_ports::{
+//! # Kontext-Kompaktor (`context_compaction/compactor.rs`)
+//!
+//! Stellt die zentrale Kompaktierungs-Engine [`ContextCompactor`] bereit.
+//! Sie sortiert und filtert Chunks nach Relevanz, gepinntem Status und Tool-Output-Herkunft
+//! und verdichtet sie ins definierte Token-Budget. Unterstützt zudem die LLM-gestützte
+//! Konsolidierung mit automatischem Backoff-Retry bei Nebenläufigkeitskonflikten (OCC).
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2). Greift auf `Collection` und die Ports `Rng` und `LlmTextGenerator` zu.
+//!
+//! ## Invarianten
+//! - **Zufall (Regel 3):** Nicht-kryptographischer Zufall über `Arc<dyn Rng>` für Backoff-Jitter.
+//! - **OCC-Konflikt-Behandlung:** Optimistic Concurrency Control mit exponentiellem Backoff und Jitter.
+//! - **Priorisierung:** Gepinnte Chunks (`is_pinned`) werden bevorzugt behalten,
+//!   Tool-Outputs zuerst kompaktiert.
+
+// FILE-CONTEXT
+// ZWECK: Chunk-Filterung, Token-Budget-Kompaktierung und OCC-gestuetzte LLM-Konsolidierung.
+// INVARIANTEN: Pinned Chunks prioritaer; Backoff-Jitter via Rng; deterministische Tie-Breaks.
+// STAND: 2026-11-11
+
+use crate::engine_local::collection::Collection;
+use crate::engine_local::ProvenanceRecord;
+use crate::ports_local::{
     ContextSegment, LlmTextGenerator, Rng, SeededRng, StorageEngine, VectorIndex,
 };
-use contextra_types::{ContextChunk, DocId, Result, TenantId, TokenBudget};
+use crate::types_local::{ContextChunk, DocId, Result, TenantId, TokenBudget};
 use std::sync::Arc;
 
 use super::session::ConsolidationSession;
 use super::types::{CompactedContext, CompactionStrategy, StatusToken};
 
+// =========================================================================
+// SECTION: ContextCompactor Definition & Konstruktoren
+// =========================================================================
 /// Context Compaction Engine.
 #[derive(Clone)]
+// ANCHOR[contextra-cognition:COMP-001]
+/// Zentrale Kompaktierungs-Engine.
 pub struct ContextCompactor {
     budget: TokenBudget,
     strategy: CompactionStrategy,
@@ -26,7 +52,11 @@ impl std::fmt::Debug for ContextCompactor {
             .finish()
     }
 }
+// !SECTION: ContextCompactor Definition & Konstruktoren
 
+// =========================================================================
+// SECTION: Chunk-Erzeugung
+// =========================================================================
 fn build_consolidated_chunk_from_summary(
     summary_text: String,
     chunks: &[ContextChunk],
@@ -41,7 +71,10 @@ fn build_consolidated_chunk_from_summary(
         serde_json::Value::Number(chunks.len().into()),
     );
 
-    let prov = ProvenanceRecord::synthesized_from(source_doc_ids);
+    // `ProvenanceRecord` arbeitet mit der Rank-eigenen `DocId`-Kopie. Die Konvertierung
+    // über die Ids-Ebene ist bis zur Ein-Besitzer-Migration (P3) die kleinste korrekte Brücke.
+    let rank_doc_ids: Vec<_> = source_doc_ids.iter().map(|d| d.inner().into()).collect();
+    let prov = ProvenanceRecord::synthesized_from(&rank_doc_ids);
     if let Ok(prov_val) = serde_json::to_value(&prov) {
         combined_metadata.insert("provenance".to_string(), prov_val);
     }
@@ -80,6 +113,8 @@ impl ContextCompactor {
     /// Der übergebene RNG dient ausschließlich für nicht-kryptographische Aufgaben wie Backoff-Jitter,
     /// Permutationen und Clustering. Er DARF NICHT für die Generierung von Schlüsseln, Salzen,
     /// Tokens oder kryptographischem Material verwendet werden.
+    // ANCHOR[contextra-cognition:COMP-002]
+    /// Erstellt einen ContextCompactor mit explizit injiziertem RNG.
     pub fn new_with_rng(
         budget: TokenBudget,
         strategy: CompactionStrategy,
@@ -98,6 +133,8 @@ impl ContextCompactor {
     /// Nutzt `SeededRng::from_entropy()` zur Vermeidung konstanter Seeds im Produktionscode.
     /// Der übergebene oder genutzte RNG ist NICHT kryptographisch und darf nicht für Schlüssel oder Salze genutzt werden.
     #[deprecated(note = "use ContextCompactor::new_with_rng to explicitly inject an Arc<dyn Rng>")]
+    // ANCHOR[contextra-cognition:COMP-003]
+    /// Erstellt einen ContextCompactor mit Standard-RNG (veraltet).
     pub fn new(budget: TokenBudget, strategy: CompactionStrategy) -> Self {
         Self::new_with_rng(budget, strategy, Arc::new(SeededRng::from_entropy()))
     }
@@ -106,15 +143,24 @@ impl ContextCompactor {
     ///
     /// # DOKUMENTATION / HINWEIS
     /// Der übergebene RNG ist NICHT kryptographisch und darf nicht für Schlüssel oder Salze genutzt werden.
+    // ANCHOR[contextra-cognition:COMP-004]
+    /// Setzt den Zufallszahlengenerator für Backoff-Jitter.
     pub fn with_rng(mut self, rng: Arc<dyn Rng>) -> Self {
         self.rng = rng;
         self
     }
 
+// !SECTION: ContextCompactor Definition & Konstruktoren
+
+// =========================================================================
+// SECTION: Kompaktierungs-Ausfuehrung
+// =========================================================================
     /// Kompaktiert eine Liste von Chunks auf das Token-Budget.
     ///
     /// Priorisiert nach Relevanz-Score. Tool-Output-Chunks (erkennbar an Metadata-Key "tool_output")
     /// werden zuerst kompaktiert.
+    // ANCHOR[contextra-cognition:COMP-005]
+    /// Kompaktiert Chunks auf das konfigurierte Token-Budget.
     pub fn compact(&self, chunks: Vec<ContextChunk>) -> CompactedContext {
         let _source_doc_ids: Vec<DocId> = chunks.iter().map(|c| c.doc_id).collect();
         let max_tokens = self.budget.available();
@@ -179,10 +225,17 @@ impl ContextCompactor {
         }
     }
 
+// !SECTION: Kompaktierungs-Ausfuehrung
+
+// =========================================================================
+// SECTION: LLM-Konsolidierung & OCC-Retry
+// =========================================================================
     /// Consolidates multiple context chunks into a single summarized chunk using an external LLM via Ollama.
     ///
     /// Preserves strict provenance tracking in `source_doc_ids`. If the LLM call fails, the error is
     /// returned directly to the caller (no silent fallback to `StatusToken`).
+    // ANCHOR[contextra-cognition:COMP-006]
+    /// Konsolidiert Chunks per LLM zu einem einzigen Zusammenfassungs-Chunk.
     pub async fn consolidate_via_llm(
         &self,
         tenant: TenantId,
@@ -224,6 +277,11 @@ impl ContextCompactor {
         })
     }
 
+// !SECTION: LLM-Konsolidierung & OCC-Retry
+
+// =========================================================================
+// SECTION: Private Hilfsfunktionen
+// =========================================================================
     fn is_pinned(chunk: &ContextChunk) -> bool {
         chunk
             .metadata
@@ -256,6 +314,8 @@ impl ContextCompactor {
     #[deprecated(
         note = "use consolidate_with_retry_with_rng directly with an explicit Rng instance"
     )]
+    // ANCHOR[contextra-cognition:COMP-007]
+    /// Führt Konsolidierung mit automatischem Retry bei OCC-Konflikten aus (veraltet).
     pub async fn consolidate_with_retry<S, V, G>(
         collection: &Collection<S, V>,
         source_doc_ids: &[DocId],
@@ -285,6 +345,8 @@ impl ContextCompactor {
     /// # DOKUMENTATION / HINWEIS
     /// Der übergebene RNG dient ausschließlich für Backoff-Jitter und ist NICHT kryptographisch.
     /// Er DARF NICHT für Schlüssel, Salze oder Sicherheits-Tokens verwendet werden.
+    // ANCHOR[contextra-cognition:COMP-008]
+    /// Führt Konsolidierung mit automatischem Retry und injiziertem RNG aus.
     pub async fn consolidate_with_retry_with_rng<S, V, G>(
         collection: &Collection<S, V>,
         source_doc_ids: &[DocId],
@@ -327,3 +389,4 @@ impl ContextCompactor {
         }
     }
 }
+// !SECTION: Chunk-Erzeugung

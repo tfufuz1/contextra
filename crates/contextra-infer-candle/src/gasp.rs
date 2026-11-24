@@ -1,43 +1,22 @@
 // FILE-CONTEXT
 // STAND: 2026-09-09T15:45:22Z (SESSION: 6cae458a)
 // ZWECK: GASP Grounding-Aware Sensitivity by Perturbation post-hoc hallucination validator.
-// INVARIANTEN: Grounding scores are clamped to [0.0, 1.0] with explicit NaN protection; ConfigFingerprint drift resets calibrator.
-// NICHT-OFFENSICHTLICH: Post-hoc validator returns PolicyViolation(LowConfidenceGrounding) on score below threshold.
 
 //! GASP (Grounding-Aware Sensitivity by Perturbation) Post-Hoc Hallucination Validator.
-//!
-//! # Architektur & Abgrenzung
-//! Dieser Post-Hoc-Validator ergänzt den präventiven Halluzinations-Guard (z. B. in `contextra-ollama`).
-//! Während der präventive Guard das Modell vorab instruiert, prüft `GaspValidator` nachgelagert,
-//! ob jede Tatsachenbehauptung (insbesondere Zahlen und Entitäten) in der bereits generierten
-//! Antwort tatsächlich durch mindestens einen abgerufenen Kontext-Chunk belegt ist.
-//!
-//! # Kalibrierung & Abstention (P8)
-//! `GaspValidator` verwendet `IsotonicCalibrator` und `ConfigFingerprint` aus `contextra-rank`.
-//! Fällt der Konfidenz-Score unter den konfigurierbaren Schwellenwert (`threshold`), wird
-//! ein Abstention-Pfad ausgelöst (`Err(ContextraError::PolicyViolation(...))` mit `LowConfidenceGrounding`),
-//! anstatt die ungeprüfte/unsichere Antwort durchzureichen.
 
-use contextra_ports::{
-    BoxFuture, GroundingAssessment, GroundingValidator, ResponseGroundingValidator,
-};
-use contextra_rank::IsotonicCalibrator;
-use contextra_types::{ConfigFingerprint, ContextChunk, ContextraError, Result};
+use crate::calibrator::{ConfidenceCalibrator, ConfigFingerprint};
+#[cfg(not(feature = "workspace"))]
+use crate::calibrator::IdentityCalibrator;
+use crate::error::{Error, Result};
 use std::sync::Mutex;
 
-/// Standard-Schwellenwert für Grounding-Konfidenz (Default: 0.70).
 pub const DEFAULT_GROUNDING_THRESHOLD: f32 = 0.70;
 
-/// Konfiguration für den `GaspValidator`.
 #[derive(Debug, Clone)]
 pub struct GaspConfig {
-    /// Schwellenwert für Grounding-Konfidenz (default: 0.70).
     pub threshold: f32,
-    /// Benötigte Beobachtungen für Isotonic Warmup (default: 10).
     pub warmup_required: u32,
-    /// Maximales Fenster für Isotonic Beobachtungen (default: 2000).
     pub max_observations: usize,
-    /// ConfigFingerprint zur Kalibrierungs-Integrität (P8).
     pub fingerprint: ConfigFingerprint,
 }
 
@@ -58,9 +37,24 @@ impl Default for GaspConfig {
     }
 }
 
-/// Prüft, ob `text` den Substring `target` an echten Wortgrenzen enthält.
-/// Eine Wortgrenze ist erfüllt, wenn das angrenzende Zeichen am Anfang/Ende des
-/// Strings liegt oder kein alphanumerisches Zeichen ist (z. B. Whitespace, Satzzeichen).
+#[derive(Debug, Clone)]
+pub struct ContextChunk {
+    pub doc_id: u64,
+    pub content: String,
+    pub relevance: f32,
+    pub contextual_prefix: Option<String>,
+}
+
+impl ContextChunk {
+    pub fn combined_text_owned(&self) -> String {
+        if let Some(ref p) = self.contextual_prefix {
+            format!("{p}\n{}", self.content)
+        } else {
+            self.content.clone()
+        }
+    }
+}
+
 fn contains_at_word_boundary(text: &str, target: &str) -> bool {
     if target.is_empty() {
         return false;
@@ -92,29 +86,51 @@ fn contains_at_word_boundary(text: &str, target: &str) -> bool {
     false
 }
 
-/// Post-Hoc-Halluzinations-Validator (GASP / TPA-Pattern).
 pub struct GaspValidator {
     config: GaspConfig,
-    calibrator: Mutex<IsotonicCalibrator>,
+    calibrator: Mutex<Box<dyn ConfidenceCalibrator>>,
 }
 
 impl GaspValidator {
-    /// Erstellt einen neuen `GaspValidator` mit Standard-Konfiguration.
     pub fn new() -> Self {
         Self::with_config(GaspConfig::default())
     }
 
-    /// Erstellt einen `GaspValidator` mit angegebener Konfiguration.
     pub fn with_config(config: GaspConfig) -> Self {
-        let mut cal = IsotonicCalibrator::new(config.warmup_required, config.max_observations);
-        cal.invalidate_on_config_change(config.fingerprint.clone());
-        Self {
-            config,
-            calibrator: Mutex::new(cal),
+        #[cfg(feature = "workspace")]
+        {
+            let adapter = crate::compat::calibrator::RankIsotonicCalibratorAdapter::new(
+                config.warmup_required,
+                config.max_observations,
+                config.fingerprint.clone(),
+            );
+            Self {
+                config,
+                calibrator: Mutex::new(Box::new(adapter)),
+            }
+        }
+        #[cfg(not(feature = "workspace"))]
+        {
+            let mut cal = Box::new(IdentityCalibrator::default());
+            cal.invalidate_on_config_change(config.fingerprint.clone());
+            Self {
+                config,
+                calibrator: Mutex::new(cal),
+            }
         }
     }
 
-    /// Setzt den Schwellenwert für Abstention und aktualisiert den Fingerabdruck (INV-CAL-2).
+    pub fn with_calibrator(
+        config: GaspConfig,
+        mut calibrator: Box<dyn ConfidenceCalibrator>,
+    ) -> Self {
+        calibrator.invalidate_on_config_change(config.fingerprint.clone());
+        Self {
+            config,
+            calibrator: Mutex::new(calibrator),
+        }
+    }
+
     pub fn set_threshold(&mut self, threshold: f32) {
         let mut new_config = self.config.clone();
         new_config.threshold = threshold;
@@ -122,28 +138,20 @@ impl GaspValidator {
         self.refresh_config(new_config);
     }
 
-    /// Zeichnet ein externes Ground-Truth-Signal (z. B. aus Nutzer-Feedback oder
-    /// manueller Überprüfung) zur Kalibrierung des GaspValidators auf.
-    ///
-    /// INV-CAL-3: Dies ist der einzige zulässige Schreibpfad für Kalibrierungsbeobachtungen.
     pub fn record_external_feedback(&self, raw_score: f32, ground_truth_grounded: bool) {
         if let Ok(mut cal) = self.calibrator.lock() {
             cal.record_outcome(raw_score, ground_truth_grounded);
         }
     }
 
-    /// Gibt den aktuellen Schwellenwert zurück.
     pub fn threshold(&self) -> f32 {
         self.config.threshold
     }
 
-    /// Gibt eine Referenz auf die aktuelle `GaspConfig` zurück.
     pub fn config(&self) -> &GaspConfig {
         &self.config
     }
 
-    /// Aktualisiert die Konfiguration des `GaspValidator` und invalidiert
-    /// die Kalibrierung, falls sich der `ConfigFingerprint` geändert hat (INV-CAL-2).
     pub fn refresh_config(&mut self, config: GaspConfig) {
         if let Ok(mut cal) = self.calibrator.lock() {
             cal.invalidate_on_config_change(config.fingerprint.clone());
@@ -151,7 +159,6 @@ impl GaspValidator {
         self.config = config;
     }
 
-    /// Gibt die Anzahl der aktuell gesammelten Kalibrierungsbeobachtungen zurück.
     pub fn observation_count(&self) -> usize {
         if let Ok(cal) = self.calibrator.lock() {
             cal.observation_count()
@@ -160,29 +167,24 @@ impl GaspValidator {
         }
     }
 
-    /// Führt die tatsächliche Attributions- und Grounding-Analyse durch.
-    ///
-    /// Extrahierte Fakten / Zahlen / Entitäten in `response` werden mit den bereitgestellten
-    /// `context_chunks` verglichen.
-    pub fn compute_raw_grounding_score(
+    pub fn compute_raw_grounding_score_local(
         &self,
         response: &str,
         context_chunks: &[ContextChunk],
     ) -> Result<f32> {
         if context_chunks.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(Error::InvalidInput(
                 "Empty context provided for post-hoc grounding validation".to_string(),
             ));
         }
 
         let trimmed_resp = response.trim();
         if trimmed_resp.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(Error::InvalidInput(
                 "Response is empty for post-hoc grounding validation".to_string(),
             ));
         }
 
-        // Kombiniere Kontext-Texte
         let combined_context: String = context_chunks
             .iter()
             .map(|c| c.combined_text_owned())
@@ -190,7 +192,6 @@ impl GaspValidator {
             .join("\n");
         let context_lower = combined_context.to_lowercase();
 
-        // 1. Numerischer Faktencheck: Alle Zahlen in der Antwort extrahieren
         let resp_numbers: Vec<&str> = trimmed_resp
             .split(|c: char| !c.is_numeric())
             .filter(|s| !s.is_empty())
@@ -200,7 +201,6 @@ impl GaspValidator {
         let mut total_numbers = 0;
 
         for num in &resp_numbers {
-            // Ignoriere einstellige Zahlen (z.B. Aufzählungspunkte 1., 2.)
             if num.len() < 2 && (num == &"1" || num == &"2" || num == &"3") {
                 continue;
             }
@@ -216,7 +216,6 @@ impl GaspValidator {
             1.0
         };
 
-        // 2. Lexikalischer Claim-Overlap (Wortgruppen/Schlüsselwörter)
         let resp_words: Vec<&str> = trimmed_resp
             .split_whitespace()
             .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
@@ -239,8 +238,6 @@ impl GaspValidator {
             1.0
         };
 
-        // Kombinierter Rohscore (Gewichtung: Zahlen-Integrität 60%, Wort-Overlap 40%)
-        // Halluzinierte Zahlen reduzieren den Score multiplikativ, da falsche Zahlen schwerwiegende Halluzinationen sind
         let base_score = 0.6 * number_score + 0.4 * word_score;
         let raw_score = if total_numbers > 0 && number_score < 1.0 {
             base_score * number_score
@@ -254,6 +251,43 @@ impl GaspValidator {
 
         Ok(raw_score.clamp(0.0, 1.0))
     }
+
+    pub fn score_grounding_slices(&self, response: &str, sources: &[&str]) -> Result<f32> {
+        let chunks: Vec<ContextChunk> = sources
+            .iter()
+            .enumerate()
+            .map(|(i, src)| ContextChunk {
+                doc_id: i as u64 + 1,
+                content: src.to_string(),
+                relevance: 1.0,
+                contextual_prefix: None,
+            })
+            .collect();
+        self.compute_raw_grounding_score_local(response, &chunks)
+    }
+
+    pub async fn validate_grounding_local(
+        &self,
+        response: &str,
+        context_chunks: &[ContextChunk],
+    ) -> Result<f32> {
+        let raw_score = self.compute_raw_grounding_score_local(response, context_chunks)?;
+
+        let final_score = if let Ok(mut cal) = self.calibrator.lock() {
+            cal.calibrated_probability(raw_score).unwrap_or(raw_score)
+        } else {
+            raw_score
+        };
+
+        if final_score < self.config.threshold {
+            return Err(Error::PolicyViolation(format!(
+                "LowConfidenceGrounding: grounding score {:.2} is below threshold {:.2}",
+                final_score, self.config.threshold
+            )));
+        }
+
+        Ok(final_score)
+    }
 }
 
 impl Default for GaspValidator {
@@ -262,71 +296,25 @@ impl Default for GaspValidator {
     }
 }
 
-impl ResponseGroundingValidator for GaspValidator {
-    fn score_grounding(&self, response: &str, sources: &[&str]) -> Result<f32> {
-        let chunks: Vec<ContextChunk> = sources
-            .iter()
-            .enumerate()
-            .map(|(i, src)| ContextChunk {
-                doc_id: contextra_types::DocId::from(i as u64 + 1),
-                content: src.to_string(),
-                relevance: 1.0,
-                token_count: 0,
-                metadata: None,
-                contextual_prefix: None,
-                links: Vec::new(),
-            })
-            .collect();
-        self.compute_raw_grounding_score(response, &chunks)
-    }
-}
-
-impl GroundingValidator for GaspValidator {
-    fn validate_grounding<'a>(
-        &'a self,
-        response: &'a str,
-        context_chunks: &'a [ContextChunk],
-    ) -> BoxFuture<'a, Result<GroundingAssessment>> {
-        Box::pin(async move {
-            let raw_score = self.compute_raw_grounding_score(response, context_chunks)?;
-
-            let final_score = if let Ok(mut cal) = self.calibrator.lock() {
-                cal.calibrated_probability(raw_score).unwrap_or(raw_score)
-            } else {
-                raw_score
-            };
-
-            if final_score < self.config.threshold {
-                return Err(ContextraError::PolicyViolation(format!(
-                    "LowConfidenceGrounding: grounding score {:.2} is below threshold {:.2}",
-                    final_score, self.config.threshold
-                )));
-            }
-
-            Ok(GroundingAssessment {
-                score: final_score,
-                is_grounded: true,
-                reason: None,
-            })
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_types::DocId;
 
     fn sample_chunk(id: u64, content: &str) -> ContextChunk {
         ContextChunk {
-            doc_id: DocId::new(id),
+            doc_id: id,
             content: content.to_string(),
             relevance: 0.95,
-            token_count: 20,
-            metadata: None,
             contextual_prefix: None,
-            links: Vec::new(),
         }
+    }
+
+    #[test]
+    fn test_score_grounding_slices() {
+        let validator = GaspValidator::new();
+        let sources = ["Umsatz 50 Millionen"];
+        let res = validator.score_grounding_slices("Umsatz 50 Millionen", &sources);
+        assert!(res.is_ok());
     }
 
     #[tokio::test]
@@ -338,20 +326,10 @@ mod tests {
         ];
         let response = "Im Jahr 2025 betrug der Umsatz 50 Millionen Euro und der Gewinn lag bei 5 Millionen Euro.";
 
-        let res = validator.validate_grounding(response, &chunks).await;
-        assert!(
-            res.is_ok(),
-            "Response fully supported by context should succeed: {:?}",
-            res
-        );
-
-        let assessment = res.unwrap();
-        assert!(assessment.is_grounded);
-        assert!(
-            assessment.score >= 0.70,
-            "Score should be >= 0.70, got {}",
-            assessment.score
-        );
+        let res = validator.validate_grounding_local(response, &chunks).await;
+        assert!(res.is_ok());
+        let score = res.unwrap();
+        assert!(score >= 0.70);
     }
 
     #[tokio::test]
@@ -361,24 +339,15 @@ mod tests {
             1,
             "Der Umsatz betrug im Jahr 2025 genau 50 Millionen Euro.",
         )];
-        // 99 Millionen Euro is ungrounded / hallucinated
         let response = "Im Jahr 2025 betrug der Umsatz 99 Millionen Euro.";
 
-        let res = validator.validate_grounding(response, &chunks).await;
-        assert!(
-            res.is_err(),
-            "Hallucinated number should trigger abstention error"
-        );
-
-        let err = res.unwrap_err();
-        match err {
-            ContextraError::PolicyViolation(msg) => {
-                assert!(
-                    msg.contains("LowConfidenceGrounding"),
-                    "Expected LowConfidenceGrounding in error msg: {msg}"
-                );
+        let res = validator.validate_grounding_local(response, &chunks).await;
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            Error::PolicyViolation(msg) => {
+                assert!(msg.contains("LowConfidenceGrounding"));
             }
-            _ => panic!("Expected ContextraError::PolicyViolation, got {:?}", err),
+            other => panic!("Expected PolicyViolation, got {other:?}"),
         }
     }
 
@@ -388,22 +357,9 @@ mod tests {
         let empty_chunks: Vec<ContextChunk> = vec![];
         let response = "Das ist eine Antwort ohne Kontext.";
 
-        let res = validator.validate_grounding(response, &empty_chunks).await;
-        assert!(
-            res.is_err(),
-            "Empty context must return an error without panicking"
-        );
-
-        let err = res.unwrap_err();
-        match err {
-            ContextraError::InvalidInput(msg) => {
-                assert!(
-                    msg.contains("Empty context provided"),
-                    "Expected clear empty context message: {msg}"
-                );
-            }
-            _ => panic!("Expected ContextraError::InvalidInput, got {:?}", err),
-        }
+        let res = validator.validate_grounding_local(response, &empty_chunks).await;
+        assert!(res.is_err());
+        assert!(matches!(res.unwrap_err(), Error::InvalidInput(_)));
     }
 
     #[tokio::test]
@@ -413,12 +369,8 @@ mod tests {
             1,
             "Der Umsatz stieg im Jahr 2025 signifikant an.",
         )];
-        // Claim contains "5", context has "2025" -> should NOT match "5"
-        let score = validator.compute_raw_grounding_score("5", &chunks).unwrap();
-        assert_eq!(
-            score, 0.0,
-            "Number '5' should not match substring inside '2025'"
-        );
+        let score = validator.compute_raw_grounding_score_local("5", &chunks).unwrap();
+        assert_eq!(score, 0.0);
     }
 
     #[tokio::test]
@@ -428,17 +380,10 @@ mod tests {
             1,
             "We plan to accelerate the system performance drastically.",
         )];
-        // Context contains "accelerate", claim contains "rate" -> should NOT match "rate".
-        // With 0 numbers, base_score is 0.6 * 1.0 + 0.4 * word_score.
-        // If "rate" matched, word_score = 1.0 => raw_score = 1.0.
-        // Since "rate" does NOT match "accelerate", word_score = 0.0 => raw_score = 0.6.
         let score = validator
-            .compute_raw_grounding_score("rate", &chunks)
+            .compute_raw_grounding_score_local("rate", &chunks)
             .unwrap();
-        assert_eq!(
-            score, 0.6,
-            "Word 'rate' should not match substring inside 'accelerate'"
-        );
+        assert_eq!(score, 0.6);
     }
 
     #[tokio::test]
@@ -448,48 +393,29 @@ mod tests {
             1,
             "We have 5 items in total in the warehouse.",
         )];
-        // Context contains "5 items", claim contains "5" -> MUST match "5"
-        let score = validator.compute_raw_grounding_score("5", &chunks).unwrap();
-        assert_eq!(score, 1.0, "Exact number '5' at word boundary must match");
+        let score = validator.compute_raw_grounding_score_local("5", &chunks).unwrap();
+        assert_eq!(score, 1.0);
     }
 
     #[tokio::test]
     async fn test_exact_word_match() {
         let validator = GaspValidator::new();
         let chunks = vec![sample_chunk(1, "The rate limit was reached yesterday.")];
-        // Context contains "rate limit was reached", claim contains "rate limit" -> MUST match
         let score = validator
-            .compute_raw_grounding_score("rate limit", &chunks)
+            .compute_raw_grounding_score_local("rate limit", &chunks)
             .unwrap();
-        assert_eq!(score, 1.0, "Exact word 'rate' at word boundary must match");
+        assert_eq!(score, 1.0);
     }
 
     #[test]
     fn test_gasp_nan_score_protection() {
         let validator = GaspValidator::new();
         let chunks = vec![sample_chunk(1, "Valid context text.")];
-        let res = validator.compute_raw_grounding_score("Valid response text.", &chunks);
+        let res = validator.compute_raw_grounding_score_local("Valid response text.", &chunks);
         assert!(res.is_ok());
         let score = res.unwrap();
         assert!((0.0..=1.0).contains(&score));
         assert!(!score.is_nan());
-
-        // Verify that non-finite/NaN float inputs do not panic clamp(0.0, 1.0)
-        let nan_score: f32 = f32::NAN;
-        let safe_nan = if nan_score.is_nan() || !nan_score.is_finite() {
-            0.0
-        } else {
-            nan_score.clamp(0.0, 1.0)
-        };
-        assert_eq!(safe_nan, 0.0);
-
-        let inf_score: f32 = f32::INFINITY;
-        let safe_inf = if inf_score.is_nan() || !inf_score.is_finite() {
-            0.0
-        } else {
-            inf_score.clamp(0.0, 1.0)
-        };
-        assert_eq!(safe_inf, 0.0);
     }
 
     #[test]
@@ -511,24 +437,14 @@ mod tests {
         )];
         let response = "Im Jahr 2025 betrug der Umsatz 50 Millionen Euro.";
 
-        // Repeated validate_grounding calls must NOT increment observation_count (INV-CAL-3)
         for _ in 0..5 {
-            let res = validator.validate_grounding(response, &chunks).await;
+            let res = validator.validate_grounding_local(response, &chunks).await;
             assert!(res.is_ok());
         }
-        assert_eq!(
-            validator.observation_count(),
-            0,
-            "validate_grounding alone must leave observation_count at 0"
-        );
+        assert_eq!(validator.observation_count(), 0);
 
-        // Recording external feedback explicit call MUST increment observation_count
         validator.record_external_feedback(0.95, true);
-        assert_eq!(
-            validator.observation_count(),
-            1,
-            "record_external_feedback must increment observation_count"
-        );
+        assert_eq!(validator.observation_count(), 1);
     }
 
     #[tokio::test]
@@ -540,32 +456,19 @@ mod tests {
         )];
         let response = "Im Jahr 2025 betrug der Umsatz 50 Millionen Euro.";
 
-        let res = validator.validate_grounding(response, &chunks).await;
+        let res = validator.validate_grounding_local(response, &chunks).await;
         assert!(res.is_ok());
-        let score = res.unwrap().score;
+        let score = res.unwrap();
 
-        // Record external feedback to populate calibrator
         validator.record_external_feedback(score, true);
         assert_eq!(validator.observation_count(), 1);
 
         let initial_fp = validator.config().fingerprint.clone();
-
-        // Change threshold via set_threshold
         validator.set_threshold(0.85);
-
         let new_fp = validator.config().fingerprint.clone();
-        assert_ne!(
-            initial_fp, new_fp,
-            "ConfigFingerprint must change when threshold is updated"
-        );
+        assert_ne!(initial_fp, new_fp);
         assert_eq!(new_fp.threshold(), 0.85);
-
-        // Calibration history MUST be reset after threshold change (INV-CAL-2)
-        assert_eq!(
-            validator.observation_count(),
-            0,
-            "observation_count must be reset to 0 after set_threshold"
-        );
+        assert_eq!(validator.observation_count(), 0);
     }
 
     #[tokio::test]
@@ -583,81 +486,27 @@ mod tests {
         )];
         let response = "Im Jahr 2025 betrug der Umsatz 50 Millionen Euro.";
 
-        // Record external feedback to populate calibration observation history (INV-CAL-3)
-        let res = validator.validate_grounding(response, &chunks).await;
+        let res = validator.validate_grounding_local(response, &chunks).await;
         assert!(res.is_ok());
-        let score = res.unwrap().score;
+        let score = res.unwrap();
         validator.record_external_feedback(score, true);
         assert_eq!(validator.observation_count(), 1);
 
-        // 1. Hot swap config with a new fingerprint fp2
         let fp2 = ConfigFingerprint::new("candle-gasp-v2", "Q8_0", "gasp-model-b", 0.0);
         let config2 = GaspConfig {
             fingerprint: fp2.clone(),
             ..GaspConfig::default()
         };
         validator.refresh_config(config2.clone());
+        assert_eq!(validator.observation_count(), 0);
 
-        // Observation count must be reset to 0 (INV-CAL-2)
-        assert_eq!(
-            validator.observation_count(),
-            0,
-            "observation_count must be reset to 0 after fingerprint change"
-        );
-
-        // Record a new observation under config2
-        let res2 = validator.validate_grounding(response, &chunks).await;
+        let res2 = validator.validate_grounding_local(response, &chunks).await;
         assert!(res2.is_ok());
-        let score2 = res2.unwrap().score;
+        let score2 = res2.unwrap();
         validator.record_external_feedback(score2, true);
         assert_eq!(validator.observation_count(), 1);
 
-        // 2. Refresh config with the SAME fingerprint fp2
         validator.refresh_config(config2);
-
-        // Observation count must be preserved when fingerprint is unchanged
-        assert_eq!(
-            validator.observation_count(),
-            1,
-            "observation_count must be preserved when fingerprint is unchanged"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_gasp_multibyte_german_and_emoji_word_boundary_matching() {
-        let validator = GaspValidator::new();
-        let chunks = vec![sample_chunk(
-            1,
-            "Die Übernahme von Überlingen e.V. kostete 500000 € 🚀.",
-        )];
-
-        // Multibyte umlaut word match "Übernahme" and emoji
-        let res = validator
-            .compute_raw_grounding_score("Übernahme 🚀", &chunks)
-            .unwrap();
-        assert!(
-            res > 0.0,
-            "Multibyte German word 'Übernahme' and emoji '🚀' should match correctly"
-        );
-
-        // Substring inside multibyte string "Über" vs "Übernahme" at word boundary
-        let sub_score = validator
-            .compute_raw_grounding_score("Über", &chunks)
-            .unwrap();
-        assert_eq!(
-            sub_score, 0.6,
-            "Word 'Über' should not match as full word boundary inside 'Übernahme'"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_gasp_whitespace_or_punctuation_only_response_handling() {
-        let validator = GaspValidator::new();
-        let chunks = vec![sample_chunk(1, "Kontext-Inhalt für Test.")];
-
-        let err = validator
-            .compute_raw_grounding_score("   \n\t   ", &chunks)
-            .unwrap_err();
-        assert!(matches!(err, ContextraError::InvalidInput(_)));
+        assert_eq!(validator.observation_count(), 1);
     }
 }

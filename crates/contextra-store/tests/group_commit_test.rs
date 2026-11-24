@@ -4,7 +4,8 @@
 
 use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::{ContextraError, TxId};
+use contextra_store::StoreError as ContextraError;
+use contextra_types::TxId;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -129,8 +130,8 @@ async fn test_group_commit_mid_batch_fsync_failure_atomicity() {
         if let Err(err) = commit_res {
             err_count += 1;
             assert!(
-                matches!(err, ContextraError::Storage(_)),
-                "Expected ContextraError::Storage, got: {:?}",
+                matches!(err, contextra_store::StoreError::Storage(_)),
+                "Expected contextra_store::StoreError::Storage, got: {:?}",
                 err
             );
         }

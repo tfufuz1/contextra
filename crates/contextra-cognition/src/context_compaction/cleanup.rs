@@ -1,7 +1,28 @@
-use contextra_engine::transaction::CommitIntent;
-use contextra_ports::StorageEngine;
-use contextra_types::{Result, TxId};
+//! # Bereinigung verwaister Intents (`context_compaction/cleanup.rs`)
+//!
+//! Bereinigt nach Systemabstürzen verwaiste `ConsolidationIntent`-Einträge im Speicher.
+//!
+//! ## Ebene und Einordnung
+//! Teil der Kognitionsschicht (Ebene E2). Verwendet den `StorageEngine`-Port.
+//!
+//! ## Invarianten
+//! - **Transaktionale Sicherheit:** Jedes Entfernen erfolgt über eine reguläre, atomare Speicher-Transaktion.
+//! - **Präfix-Scans:** Sucht unter `consolidation_intent:` und `__tx_intent:`.
+//
+// FILE-CONTEXT
+// ZWECK: Bereinigung verwaister Konsolidierungs-Intents nach Systemabstürzen (Recovery-Phase).
+// INVARIANTEN: Atomare Transaktionen für Löschungen; sequentieller TxId-Fortschritt via AtomicU64.
+// STAND: 2026-11-11
 
+use crate::engine_local::transaction::CommitIntent;
+use crate::ports_local::StorageEngine;
+use crate::types_local::{Result, TxId};
+
+// =========================================================================
+// SECTION: Cleanup-Logik
+// =========================================================================
+
+// ANCHOR[contextra-cognition:CLEAN-001]
 /// Aufgerufen beim Öffnen einer Collection / DB. Findet und entfernt verwaiste
 /// ConsolidationIntents aus dem WAL/Storage.
 ///
@@ -15,6 +36,7 @@ pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
     let mut cleaned = 0usize;
 
     for &prefix in prefixes {
+        // NOTE: Präfix-Scan zur Erkennung noch nicht finalisierter Intent-Einträge.
         let orphaned_keys = storage.scan_prefix(prefix).await?;
 
         for (key, value) in orphaned_keys {
@@ -37,3 +59,4 @@ pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
     }
     Ok(cleaned)
 }
+// !SECTION: Cleanup-Logik

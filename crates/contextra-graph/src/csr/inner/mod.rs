@@ -1,3 +1,17 @@
+//! Kern-Datenstrukturen des inneren CSR-Graphzustands (`GraphInner`).
+//!
+//! # Zweck
+//! Hält Knoten-, Offset- und Kanten-Arrays flach im RAM für optimale CPU-Cache-Ausnutzung.
+
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+
+// SECTION Mod Core Implementation
 pub mod compaction;
 pub mod estimate;
 pub mod reinforcement;
@@ -6,7 +20,7 @@ use arc_swap::ArcSwap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use contextra_types::{DocId, Entity, EntityId, TxId};
+use crate::types::{DocId, Entity, EntityId, TxId};
 
 #[cfg(feature = "edge-reinforcement-learning")]
 use super::types::CsrEdge;
@@ -15,6 +29,7 @@ use super::types::{EdgePayload, InternalIndex, StagedEdgePayload};
 pub use estimate::MemoryEstimate;
 
 #[derive(Clone)]
+// ANCHOR[contextra-graph:SRC-CSR-INNER-MOD-001]
 pub struct GraphInner {
     pub(crate) id_map: HashMap<EntityId, InternalIndex>,
     pub(crate) reverse_map: Vec<EntityId>,
@@ -63,6 +78,7 @@ impl Default for GraphInner {
 }
 
 impl GraphInner {
+    // ANCHOR[contextra-graph:SRC-CSR-INNER-MOD-002]
     pub fn new() -> Self {
         Self {
             id_map: HashMap::new(),
@@ -165,3 +181,5 @@ impl<'a> Drop for InnerWriteGuard<'a> {
         self.arc_swap.store(Arc::new((*self.guard).clone()));
     }
 }
+
+// !SECTION Mod Core Implementation

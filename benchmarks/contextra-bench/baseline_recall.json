@@ -1,4 +1,6 @@
 {
+  "_status": "historical",
+  "_historical_note": "Historischer Lauf (Stand vor Reduktion, E12 / WP-110)",
   "recall_at_5": 0.8387096774193549,
   "recall_at_10": 0.8709677419354839,
   "overall_accuracy": 0.8387096774193549,

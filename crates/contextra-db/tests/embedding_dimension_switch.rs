@@ -1,3 +1,7 @@
+//! # Umschalten von Einbettungsdimensionen
+//!
+//! Testet die Fehlerbehandlung beim Versuch, Kollektionen mit geänderten Dimensionen zu öffnen.
+//!
 // FILE-CONTEXT: Integration test verifying dimension mismatch rejection, no-panic guarantee, absence of phantom nodes, and system recovery. (TS: 2026-09-11)
 
 use contextra_db::{Contextra, ContextraConfig};
@@ -5,6 +9,8 @@ use contextra_types::ContextraError;
 use serde_json::json;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-db:TEST-EMBEDDING_DIMENSION_SWITCH-01-TEST_EMBEDDING_MODEL_SWITCH_REJECTS_DIMENSION_MISMATCH_CLEANLY]
+// Testet die Funktionalität von `test_embedding_model_switch_rejects_dimension_mismatch_cleanly`.
 #[tokio::test]
 async fn test_embedding_model_switch_rejects_dimension_mismatch_cleanly() {
     let dir = tempdir().expect("tempdir creation failed");

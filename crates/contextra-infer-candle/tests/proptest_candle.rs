@@ -3,6 +3,12 @@
 // ZWECK: Property-based tests for contextra-infer-candle components (fingerprinting, GaspValidator, and clients).
 // INVARIANTEN: Property tests must cover arbitrary inputs without panicking or producing illegal confidence/grounding scores.
 
+//! Eigenschaftsbasierte Tests (Proptests) für Fingerprinting, GaspValidator und Eingabegrenzen.
+//!
+//! # Zweck
+//! Stellt mathematische Invarianten wie Schrankentreue der Scores (`[0.0, 1.0]`) und deterministisches Hashing sicher.
+
+// ANCHOR[contextra-infer-candle:PROPTEST-CANDLE-SUITE]
 use contextra_infer_candle::gasp::{GaspConfig, GaspValidator};
 use contextra_infer_candle::model_registry::{compute_fingerprint, CandleQuantization};
 use contextra_types::ContextChunk;

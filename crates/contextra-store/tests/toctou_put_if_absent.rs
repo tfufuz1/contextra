@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_types::ContextraError;

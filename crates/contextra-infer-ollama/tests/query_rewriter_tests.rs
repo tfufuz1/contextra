@@ -1,8 +1,8 @@
+#![cfg(all(feature = "client", feature = "ports-compat"))]
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use contextra_infer_ollama::query_rewriter::{OllamaQueryRewriter, OllamaQueryRewriterConfig};
 use contextra_infer_ollama::OllamaClient;
-use contextra_ports::query_rewriter::QueryRewriter;
 
 #[tokio::test]
 async fn test_empty_and_whitespace_query() {

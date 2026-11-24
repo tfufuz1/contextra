@@ -1,6 +1,13 @@
 //! Lovász extension and subgradient calculations for TL-HFD (Spec §21.1).
 
-use contextra_types::EntityId;
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Topologisches Lovász-High-Order-Diffusionsverfahren.
+// INVARIANTEN: Submodulare Optimierung, schattenmodus-fähig.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+use crate::types::EntityId;
 use std::cmp::Ordering;
 
 /// Truncates hyperedge participants to at most `max_sort_size` top x-value participants plus the min x-value participant.
@@ -10,6 +17,9 @@ use std::cmp::Ordering;
 ///
 /// # Complexity
 /// Time complexity $O(|P| \log |P|)$, where $|P|$ is the number of hyperedge participants.
+// ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-001]
+
+// SECTION Lovasz Core Implementation
 pub fn truncate_participants(
     participants: &[EntityId],
     get_x: impl Fn(EntityId) -> f32,
@@ -51,6 +61,7 @@ pub fn truncate_participants(
 ///
 /// # Complexity
 /// Time complexity $O(|e|)$, where $|e|$ is the number of evaluated participants.
+// ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-002]
 pub fn compute_lovasz_extension(
     participants: &[EntityId],
     get_x: impl Fn(EntityId) -> f32,
@@ -114,6 +125,7 @@ pub fn compute_lovasz_extension(
 mod tests {
     use super::*;
 
+    // ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-003]
     #[test]
     fn test_lovasz_extension_basic() {
         let e1 = EntityId::new(1);
@@ -134,6 +146,7 @@ mod tests {
         assert_eq!(u_min, Some(e3));
     }
 
+    // ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-004]
     #[test]
     fn test_lovasz_extension_equal_x() {
         let e1 = EntityId::new(1);
@@ -148,6 +161,7 @@ mod tests {
         assert_eq!(u_min, None);
     }
 
+    // ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-005]
     #[test]
     fn test_lovasz_tie_breaker() {
         let e1 = EntityId::new(1);
@@ -170,6 +184,7 @@ mod tests {
         assert_eq!(u_min, Some(e3));
     }
 
+    // ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-006]
     #[test]
     fn test_truncation() {
         let p: Vec<EntityId> = (1..=10).map(EntityId::new).collect();
@@ -191,3 +206,5 @@ mod tests {
         );
     }
 }
+
+// !SECTION Lovasz Core Implementation

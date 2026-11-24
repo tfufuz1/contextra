@@ -1,9 +1,14 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#![cfg(feature = "bandit-routing")]
+//! # Determinismus- und Mandantenisolationstests für Sketched-Projection
+//!
+//! Prüft die exakte Wiederholbarkeit der Projektionsmatrizen und die Trennung über TenantIds.
+
 // FILE-CONTEXT
 // ZWECK: Determinismus-Tests für SketchedProjection (§13.2 / P28).
 // STAND: TS:2026-09-26T00:00:00Z
 
 use contextra_adapt::bandit::{BanditImplementation, BanditProfileState, SketchMatrix};
-use contextra_types::TenantId;
 
 #[test]
 fn test_sketched_projection_matrix_determinism_100_runs() {
@@ -100,12 +105,12 @@ fn test_sketched_projection_score_and_update_determinism() {
 
 #[test]
 fn test_sketched_projection_tenant_seed_isolation() {
-    let tenant_a = TenantId::try_new(100).expect("valid tenant_id");
-    let tenant_b = TenantId::try_new(200).expect("valid tenant_id");
+    let tenant_a = 100u64;
+    let tenant_b = 200u64;
     let base_seed = 77777u64;
 
-    let seed_a = SketchMatrix::derive_seed(&tenant_a, base_seed);
-    let seed_b = SketchMatrix::derive_seed(&tenant_b, base_seed);
+    let seed_a = SketchMatrix::derive_seed(tenant_a, base_seed);
+    let seed_b = SketchMatrix::derive_seed(tenant_b, base_seed);
 
     assert_ne!(
         seed_a, seed_b,

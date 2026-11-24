@@ -4,6 +4,7 @@ use thiserror::Error;
 
 /// Fehlertypen der WASM-Ausführungsgrenze.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum SandboxError {
     #[error("WASM-Execution timed out after {timeout_ms}ms")]
     Timeout { timeout_ms: u64 },

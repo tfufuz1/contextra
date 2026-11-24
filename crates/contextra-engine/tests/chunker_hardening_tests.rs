@@ -1,7 +1,15 @@
+//! # Integrationstest: chunker hardening tests
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 use contextra_engine::chunker::{ChunkerConfig, MarkdownChunker};
 use contextra_types::DocId;
 use proptest::prelude::*;
 
+// ANCHOR[contextra-engine:TST06-001]
+/// Testblock zur Überprüfung von `test_tilde_fence_with_ignored_heading`.
 #[test]
 fn test_tilde_fence_with_ignored_heading() {
     let markdown = "~~~rust\n# kein Heading\nfn test() {}\n~~~";
@@ -19,6 +27,8 @@ fn test_tilde_fence_with_ignored_heading() {
     assert_eq!(meta["source_span"]["end"], markdown.len());
 }
 
+// ANCHOR[contextra-engine:TST06-002]
+/// Testblock zur Überprüfung von `test_fence_length_4_nested_backticks`.
 #[test]
 fn test_fence_length_4_nested_backticks() {
     let markdown = "````markdown\n```rust\nfn inner() {}\n```\n````";
@@ -31,6 +41,8 @@ fn test_fence_length_4_nested_backticks() {
     assert_eq!(meta["source_line_end"], 5);
 }
 
+// ANCHOR[contextra-engine:TST06-003]
+/// Testblock zur Überprüfung von `test_setext_headings_h1_and_h2`.
 #[test]
 fn test_setext_headings_h1_and_h2() {
     let markdown = "Setext Heading 1\n================\nParagraph text.\n\nSetext Heading 2\n----------------\nMore text.";
@@ -64,6 +76,8 @@ fn test_setext_headings_h1_and_h2() {
     assert_eq!(m1["source_line_end"], 7);
 }
 
+// ANCHOR[contextra-engine:TST06-004]
+/// Testblock zur Überprüfung von `test_crlf_document_span_accuracy`.
 #[test]
 fn test_crlf_document_span_accuracy() {
     let markdown = "Header 1\r\n========\r\nLine 1\r\nLine 2\r\n\r\nHeader 2\r\n--------\r\nLine 3";
@@ -93,6 +107,8 @@ fn test_crlf_document_span_accuracy() {
     assert!(slice1.contains("Line 3"));
 }
 
+// ANCHOR[contextra-engine:TST06-005]
+/// Testblock zur Überprüfung von `test_extreme_configs_max_tokens_zero_and_usize_max`.
 #[test]
 fn test_extreme_configs_max_tokens_zero_and_usize_max() {
     let zero_config = ChunkerConfig {

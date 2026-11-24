@@ -10,7 +10,16 @@
 //! INTEGRATION: PathRAG liefert ein RRF-Signal neben Vektor- und BM25-Signal.
 //! Resultat von to_rrf_signal() wird in FusionEngine als drittes Signal eingespeist.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Path-RAG und budgetierte K-Path Traversierung.
+// INVARIANTEN: Snapshot-Isolation bei Pfadsuche.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 #[cfg(feature = "k-path-diffusion")]
+
+// SECTION Mod Core Implementation
 pub mod k_path;
 
 #[cfg(feature = "k-path-diffusion")]
@@ -21,14 +30,15 @@ pub use snapshot::SnapshotPathGraph;
 
 pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use ahash::AHashMap;
-use contextra_types::DocId;
-pub use contextra_types::EntityId;
+use crate::types::DocId;
+pub use crate::types::EntityId;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 use std::sync::Arc;
 
 /// Ein gefundener Pfad zwischen zwei Knoten.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-001]
 pub struct GraphPath {
     /// Knoten-Sequenz vom Start zum Ziel.
     pub nodes: Vec<EntityId>,
@@ -42,6 +52,7 @@ pub struct GraphPath {
 
 /// Trait für Graphen die PathRAG konsumieren kann.
 /// Ermöglicht Testbarkeit ohne echten CSR-Graphen.
+// ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-002]
 pub trait PathGraph: Send + Sync {
     fn neighbors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)>;
     fn predecessors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)>;
@@ -67,6 +78,7 @@ pub trait PathGraph: Send + Sync {
 
 /// Configuration parameters for Forward-Push Personalized PageRank (PPR).
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-003]
 pub struct PprParams {
     /// Teleport probability ($\alpha$, default: 0.15).
     pub alpha: f32,
@@ -89,6 +101,7 @@ impl Default for PprParams {
 /// Andersen-Chung-Lang Forward-Push PPR implementation with Hyperedge Expansion (§6.6, H3).
 ///
 /// Runtime is $O(1/(\alpha \cdot \epsilon))$, independent of $|V| + |E|$ (P24).
+// ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-004]
 pub fn forward_push_ppr<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -158,10 +171,12 @@ pub fn forward_push_ppr<G: PathGraph>(
 ///
 /// Pfade mit Konfidenz < 0.10 werden verworfen, um Precision-Kollaps durch
 /// Rauschen bei tiefen Multi-Hop-Traversierungen zu verhindern (arXiv:2506.00610).
+// ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-005]
 pub const DEFAULT_SUFFICIENCY_THRESHOLD: f64 = 0.1;
 
 /// Configuration options for [`PathRAGEngine`].
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-006]
 pub struct PathRAGConfig {
     /// Maximale Suchtiefe (Hop-Limit).
     pub max_hops: usize,
@@ -184,12 +199,14 @@ impl Default for PathRAGConfig {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-007]
 pub struct PathRAGEngine<G: PathGraph> {
     graph: G,
     pub config: PathRAGConfig,
 }
 
 impl<G: PathGraph> PathRAGEngine<G> {
+    // ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-008]
     pub fn new(graph: G, max_hops: usize, sufficiency_threshold: f64) -> Self {
         Self::with_config(
             graph,
@@ -202,18 +219,22 @@ impl<G: PathGraph> PathRAGEngine<G> {
         )
     }
 
+    // ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-009]
     pub fn with_defaults(graph: G) -> Self {
         Self::with_config(graph, PathRAGConfig::default())
     }
 
+    // ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-010]
     pub fn with_config(graph: G, config: PathRAGConfig) -> Self {
         Self { graph, config }
     }
 
+    // ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-011]
     pub fn max_hops(&self) -> usize {
         self.config.max_hops
     }
 
+    // ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-012]
     pub fn sufficiency_threshold(&self) -> f64 {
         self.config.sufficiency_threshold
     }
@@ -263,6 +284,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
     ///
     /// Gibt None zurück wenn kein Pfad innerhalb max_hops existiert
     /// oder Sufficiency-Gate fehlschlägt.
+    // ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-013]
     pub fn find_path(&self, source: EntityId, target: EntityId) -> Option<GraphPath> {
         if source == target {
             return Some(GraphPath {
@@ -394,6 +416,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
     }
 
     /// Findet Pfade von einem Ankerknoten zu allen erreichbaren Knoten innerhalb von max_hops.
+    // ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-014]
     pub fn find_all_paths(&self, source: EntityId) -> Vec<GraphPath> {
         let mut targets = std::collections::HashSet::new();
         let mut queue = std::collections::VecDeque::new();
@@ -423,6 +446,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
 
     /// Sufficiency-Gate: Filtert Pfade unter Konfidenz-Schwelle.
     /// Kritisch für Precision (arXiv:2506.00610).
+    // ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-015]
     pub fn sufficiency_check(&self, path: &GraphPath) -> bool {
         path.confidence >= self.config.sufficiency_threshold
     }
@@ -432,6 +456,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
     ///
     /// NOTE (Type-Punning Assumption): Re-uses `EntityId` numerical value as `DocId`.
     /// See explicit confirmation in `csr.rs:5104` ("querying DocId(10) (which equals EntityId 10)").
+    // ANCHOR[contextra-graph:SRC-PATH-RAG-MOD-016]
     pub fn to_rrf_signal(&self, paths: &[GraphPath]) -> Vec<(DocId, f32)> {
         let mut scored: HashMap<u64, f32> = HashMap::new();
 
@@ -443,16 +468,9 @@ impl<G: PathGraph> PathRAGEngine<G> {
             }
         }
 
-        #[cfg(not(feature = "docid-128"))]
         let mut result: Vec<(DocId, f32)> = scored
             .into_iter()
-            .map(|(id, score)| (DocId(id), score))
-            .collect();
-
-        #[cfg(feature = "docid-128")]
-        let mut result: Vec<(DocId, f32)> = scored
-            .into_iter()
-            .map(|(id, score)| (DocId(id as u128), score))
+            .map(|(id, score)| (DocId::from(id), score))
             .collect();
 
         result.sort_by(|a, b| b.1.total_cmp(&a.1));
@@ -462,3 +480,5 @@ impl<G: PathGraph> PathRAGEngine<G> {
 
 #[cfg(test)]
 mod tests;
+
+// !SECTION Mod Core Implementation

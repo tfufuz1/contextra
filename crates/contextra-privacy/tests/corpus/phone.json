@@ -1,0 +1,30 @@
+{
+  "category": "PHONE",
+  "cases": [
+    {
+      "input": "Mobil: +49 170 1234567 erreichbar",
+      "expected_match": true,
+      "expected_value": "+49 170 1234567"
+    },
+    {
+      "input": "Zentrale 0049 89 20202020 anrufen",
+      "expected_match": true,
+      "expected_value": "0049 89 20202020"
+    },
+    {
+      "input": "Lokal 089/12345678 im Büro",
+      "expected_match": true,
+      "expected_value": "089/12345678"
+    },
+    {
+      "input": "Zu kurz 1234",
+      "expected_match": false,
+      "expected_value": null
+    },
+    {
+      "input": "Buchstaben mit Ziffern ABC123DEF",
+      "expected_match": false,
+      "expected_value": null
+    }
+  ]
+}

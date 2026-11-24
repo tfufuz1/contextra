@@ -73,6 +73,17 @@
 #![warn(missing_docs)]
 #![allow(async_fn_in_trait)]
 
+// =========================================================================
+// SECTION: Module & Core Re-exports
+// =========================================================================
+// ANCHOR[contextra-agent:lib-root]
+
+
+pub mod compat;
+pub mod error;
+pub mod ports;
+pub use error::AgentError;
+
 pub mod audit;
 pub mod budget;
 pub mod clm_scratchpad;
@@ -98,4 +109,6 @@ pub use event_source::{BackgroundEvent, EventSource, PollingDocumentEventSource,
 pub use goal_condition::{parse_legacy_condition_string, GoalCondition};
 pub use graph::{AgentNode, NodeType, StateGraph, WorkflowEdge};
 pub use step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};
-pub use tools::{RetrieveTool, ToolManifest, ToolRegistry};
+pub use tools::{ContextRetriever, RetrieveTool, ToolManifest, ToolRegistry};
+
+// !SECTION

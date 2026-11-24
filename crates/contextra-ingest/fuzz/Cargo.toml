@@ -8,7 +8,8 @@ publish = false
 
 [dependencies]
 libfuzzer-sys = "0.4"
-contextra-ingest = { path = "..", features = ["all-formats"] }
+quick-xml = "0.37"
+contextra-ingest = { path = "..", features = ["all-formats", "fuzz"] }
 
 [[bin]]
 name = "fuzz_detect"

@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: Vertragsdatei für contextra-simd (Eingefrorener Crate-Vertrag Klasse A).
+// INVARIANTEN: Zero-Panic, autarker Baustein ohne interne Pflicht-Dependencies (SPEC §4.3).
+// HOTSPOTS: DistanceMetric, DistanceFn, SimdError, Result
+// STAND: 2026-11-11
 
 //! Vertragsdatei für `contextra-simd` (Eingefrorener Crate-Vertrag Klasse A).
 //!
@@ -8,6 +13,7 @@ pub use crate::error::{Error, Result, SimdError};
 pub use crate::metric::DistanceMetric;
 
 // SECTION CONTRACT-DISTANCE-FN
+// ANCHOR[contextra-simd:CONTRACT-DISTANCE-FN]
 /// Abstrakte Distanzfunktions-Schnittstelle zur dynamischen oder externen Injektion von Berechnungen.
 ///
 /// Ermöglicht es Vektor-Konsumenten (wie `contextra-vector`), beliebige Distanz-Backends

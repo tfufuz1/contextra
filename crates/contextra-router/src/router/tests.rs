@@ -1,3 +1,9 @@
+//! # Tests für router-interne Komponenten
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Tests für router-interne Komponenten.
+
+// ANCHOR[contextra-router:TST-RTR-001]
 // FILE-CONTEXT
 // ZWECK: Unit-Tests für RouterEngine.
 // INVARIANTEN: Instanz-Unabhängigkeit von DecisionIdGeneratoren, Kalibrierungs-Resets.
@@ -14,17 +20,20 @@
 use super::*;
 use contextra_types::TokenBudget;
 
+// ANCHOR[contextra-router:TST-RTR-T01]
+// Test `test_router_engine_instance_decision_id_independence`: Prüft das erwartete Verhalten und Invarianten für tests für router-interne komponenten.
+#[cfg(test)]
 #[tokio::test]
 async fn test_router_engine_instance_decision_id_independence() {
-    let dir = tempfile::tempdir().unwrap();
-    let config = contextra_db::ContextraConfig {
+    let dir = tempfile::tempdir().unwrap(); // #[cfg(test)]
+    let config = crate::tests::tests::ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let db = contextra_db::Contextra::open_with_config(dir.path(), config)
+    let db = crate::tests::tests::Contextra::open_with_config(dir.path(), config)
         .await
-        .unwrap();
-    let collection = db.collection("default").await.unwrap();
+        .unwrap(); // #[cfg(test)]
+    let collection = db.collection("default").await.unwrap(); // #[cfg(test)]
 
     let profile = SlmProfile::new(
         "p1",
@@ -51,15 +60,18 @@ async fn test_router_engine_instance_decision_id_independence() {
     assert_eq!(id2_b.inner(), 1);
 }
 
+// ANCHOR[contextra-router:TST-RTR-T02]
+// Test `test_calibration_stats_initial_state`: Prüft das erwartete Verhalten und Invarianten für tests für router-interne komponenten.
+#[cfg(test)]
 #[tokio::test]
 async fn test_calibration_stats_initial_state(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let config = contextra_db::ContextraConfig {
+    let config = crate::tests::tests::ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let db = contextra_db::Contextra::open_with_config(dir.path(), config).await?;
+    let db = crate::tests::tests::Contextra::open_with_config(dir.path(), config).await?;
     let collection = db.collection("default").await?;
 
     let profile1 = SlmProfile::new(
@@ -90,6 +102,8 @@ async fn test_calibration_stats_initial_state(
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-RTR-T03]
+// Test `test_profile_calibration_state_reset`: Prüft das erwartete Verhalten und Invarianten für tests für router-interne komponenten.
 #[test]
 fn test_profile_calibration_state_reset() {
     let mut state = ProfileCalibrationState::new(0.5);
@@ -102,15 +116,18 @@ fn test_profile_calibration_state_reset() {
     assert_eq!(state.cumulative_confidence, 1.0);
 }
 
+// ANCHOR[contextra-router:TST-RTR-T04]
+// Test `test_reset_calibration_per_profile`: Prüft das erwartete Verhalten und Invarianten für tests für router-interne komponenten.
+#[cfg(test)]
 #[tokio::test]
 async fn test_reset_calibration_per_profile() -> std::result::Result<(), Box<dyn std::error::Error>>
 {
     let dir = tempfile::tempdir()?;
-    let config = contextra_db::ContextraConfig {
+    let config = crate::tests::tests::ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let db = contextra_db::Contextra::open_with_config(dir.path(), config).await?;
+    let db = crate::tests::tests::Contextra::open_with_config(dir.path(), config).await?;
     let collection = db.collection("default").await?;
 
     let profile = SlmProfile::new(
@@ -130,27 +147,41 @@ async fn test_reset_calibration_per_profile() -> std::result::Result<(), Box<dyn
         }
         router.state.store(Arc::new(new_state));
     }
-    assert_eq!(router.calibration_stats().get("p1").map(|s| s.times_selected), Some(5));
+    assert_eq!(
+        router
+            .calibration_stats()
+            .get("p1")
+            .map(|s| s.times_selected),
+        Some(5)
+    );
 
     router.reset_calibration("p1");
-    assert_eq!(router.calibration_stats().get("p1").map(|s| s.times_selected), Some(0));
+    assert_eq!(
+        router
+            .calibration_stats()
+            .get("p1")
+            .map(|s| s.times_selected),
+        Some(0)
+    );
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-RTR-T05]
+// Test `test_pending_bandit_eviction_unit`: Prüft das erwartete Verhalten und Invarianten für tests für router-interne komponenten.
 #[test]
 #[cfg(feature = "bandit-routing")]
 fn test_pending_bandit_eviction_unit() {
-    let dir = tempfile::tempdir().unwrap();
-    let config = contextra_db::ContextraConfig {
+    let dir = tempfile::tempdir().unwrap(); // #[cfg(test)]
+    let config = crate::tests::tests::ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap(); // #[cfg(test)]
     rt.block_on(async {
-        let db = contextra_db::Contextra::open_with_config(dir.path(), config)
+        let db = crate::tests::tests::Contextra::open_with_config(dir.path(), config)
             .await
-            .unwrap();
-        let collection = db.collection("default").await.unwrap();
+            .unwrap(); // #[cfg(test)]
+        let collection = db.collection("default").await.unwrap(); // #[cfg(test)]
 
         let profile = SlmProfile::new(
             "p1",

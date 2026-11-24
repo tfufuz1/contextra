@@ -6,6 +6,7 @@ use contextra_graph::csr::CsrGraph;
 use contextra_ports::graph_index::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, PprAlgorithm, PprConfig, TxId};
 
+// ANCHOR[contextra-graph:TESTS-PPR-STRATEGY-EQUIVALENCE-001]
 #[tokio::test]
 async fn test_ppr_strategy_top_k_equivalence_and_tie_breaking() {
     let graph = CsrGraph::new();

@@ -1,3 +1,16 @@
+//! # Integrationstest: Wartungskonfiguration Defaults (`tests/maintenance_config_defaults.rs`)
+//!
+//! Prüft, dass die Standardwerte von [`MaintenanceConfig`] exakt den Architekturvorgaben entsprechen.
+
+
+// FILE-CONTEXT
+// ZWECK: Verifikation der Standardkonfiguration des Wartungsplaners.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Maintenance Config Defaults Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -13,6 +26,8 @@
 
 use contextra_cognition::maintenance_config::MaintenanceConfig;
 
+// ANCHOR[contextra-cognition:TEST-MAINTENA-077]
+// Prüft Testfall `test_maintenance_config_defaults`.
 #[test]
 fn test_maintenance_config_defaults() {
     let config = MaintenanceConfig::default();
@@ -26,3 +41,4 @@ fn test_maintenance_config_defaults() {
     assert_eq!(config.background_consolidation_enabled, false);
     assert_eq!(config.background_consolidation_episode_threshold, 50);
 }
+// !SECTION: Maintenance Config Defaults Tests

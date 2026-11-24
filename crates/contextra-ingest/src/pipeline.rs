@@ -1,9 +1,21 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: Haupt-Pipeline für Ingestion (Format-Erkennung, Extraktion, Kanonisierung & Chunking) (WP M3).
 // INVARIANTEN: Zero-Panic, Limit-Einhaltung (max_document_bytes, max_text_bytes, max_chunks_per_document).
 // STAND: TS:2026-10-31T00:00:00Z
 
 use crate::chunking::config::ChunkingConfig;
+use crate::chunking::types::{ContextChunk, DocId};
 use crate::chunking::{common::finalize, draft_document};
 use crate::detect::{detect, DetectHints};
 use crate::error::{IngestError, LimitKind};
@@ -12,7 +24,6 @@ use crate::format::FormatId;
 use crate::ir::{DocMeta, ExtractWarning};
 use crate::limits::{ExtractPolicy, IngestLimits};
 use crate::registry::ExtractorRegistry;
-use contextra_types::{ContextChunk, DocId};
 
 /// Ingestion-Anforderung.
 pub struct IngestRequest<'a> {

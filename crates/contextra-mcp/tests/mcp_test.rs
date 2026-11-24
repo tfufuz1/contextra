@@ -1,4 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// =========================================================================
+// SECTION: mcp_test
+// =========================================================================
+// ANCHOR[contextra-mcp:ITEST-MCP-TEST-001]
 
 use contextra::Contextra;
 use contextra_mcp::{
@@ -1274,3 +1278,5 @@ async fn test_slowloris_stdio_attack_simulation() {
     drop(stdin);
     let _ = child.wait().await;
 }
+
+// !SECTION: mcp_test

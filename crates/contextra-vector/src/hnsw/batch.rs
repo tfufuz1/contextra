@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
-use contextra_types::DocId;
+use crate::types::DocId;
 
 use super::arena::{BacklinkTable, HnswArena};
 use super::types::{HnswIndexCore, HnswNode, VectorData};
@@ -78,12 +78,12 @@ pub(super) fn get_neighbor_conns_in_batch(
 }
 
 /// Helper for hybrid resolution of nodes (RAM vs Mmap, plus in-flight batch prepared inserts).
-pub(super) struct SearchContext<'a> {
-    pub(super) nodes: &'a [HnswNode],
-    pub(super) mmap: Option<&'a crate::persistence::MmapIndex>,
-    pub(super) mmap_node_count: usize,
-    pub(super) prior_prepared: &'a [PreparedInsert],
-    pub(super) backlink_map: Option<&'a BacklinkTable>,
-    pub(super) quantizer: Option<Cow<'a, crate::quantize::ScalarQuantizer>>,
-    pub(super) arena: &'a HnswArena,
+pub(crate) struct SearchContext<'a> {
+    pub(crate) nodes: &'a [HnswNode],
+    pub(crate) mmap: Option<&'a crate::persistence::MmapIndex>,
+    pub(crate) mmap_node_count: usize,
+    pub(crate) prior_prepared: &'a [PreparedInsert],
+    pub(crate) backlink_map: Option<&'a BacklinkTable>,
+    pub(crate) quantizer: Option<Cow<'a, crate::quantize::ScalarQuantizer>>,
+    pub(crate) arena: &'a HnswArena,
 }

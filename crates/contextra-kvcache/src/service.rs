@@ -1,19 +1,18 @@
-// FILE-CONTEXT
-// ZWECK: Öffentliche Facade `KvCacheService` und `KvCacheServiceBuilder` für Ring-1/Ring-2 Verdrahtung.
-
-//! Öffentliche Fassade für den KV-Cache-Dienst ([`KvCacheService`]).
+//! # Öffentliche Fassade für den KV-Cache-Dienst (`KvCacheService`)
+//!
+//! ANCHOR[contextra-kvcache:SERV-001]
 //!
 //! Stellt eine einheitliche, mandantenisolierte Schnittstelle bereit mit Unterstützung für:
 //! - Speicherbudgetierung & Eviction-Policy ([`KvReusePolicy`])
 //! - Verschlüsselten Tier-2-Spill ([`KvBridgeStorage`])
-//! - KIVI 2-Bit Quantisierung ([`KiviQuantizeConfig`])
-//! - Scratchpad-Invalidierung & Mandantenlöschung ([`TenantId`])
+//! - KIVI 2-Bit Quantisierung
+//! - Scratchpad-Invalidierung & Mandanten-Bereinigung ([`TenantId`])
 //!
 //! # Beispiel
 //! ```rust
 //! use contextra_kvcache::service::{KvCacheService, KvCacheServiceBuilder};
 //! use contextra_kvcache::radix::KvReusePolicy;
-//! use contextra_types::TenantId;
+//! use contextra_kvcache::types::TenantId;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let tenant = TenantId::try_new(42)?;
@@ -37,22 +36,23 @@
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use contextra_crypto::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
-use contextra_ports::attention::AttentionExporter;
-use contextra_ports::clock::{Clock, SystemClock};
-use contextra_ports::kv_bridge_port::KvBridgeStorage;
-use contextra_types::{ContextraError, Result, TenantId, TxId};
+#[cfg(feature = "kv-encryption")]
+#[cfg(feature = "kv-encryption")]
+use crate::kv_encryption::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
+use contextra_env::{Clock, SystemClock};
+use crate::types::{TenantId, TxId};
 use parking_lot::RwLock;
 
 use crate::attention_score::AttentionScoreSource;
+use crate::error::{KvCacheError, Result};
 use crate::eviction_worker::EvictionWorker;
-#[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+#[cfg(feature = "exp-kivi")]
 use crate::quantize_kivi::{
     compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, KiviQuantizeConfig,
     KiviQuantizedBlock, KvTensorView,
 };
 use crate::radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
-use crate::scratchpad_invalidation::ScratchpadCacheScope;
+use crate::invalidation::ScratchpadCacheScope;
 use crate::segment::KvSegment;
 use crate::store::TenantIsolatedKvStore;
 
@@ -68,26 +68,28 @@ fn block_on_simple<F: std::future::Future>(fut: F) -> F::Output {
     }
 }
 
+// ANCHOR[contextra-kvcache:SERV-002]
 /// Statistiken über die KV-Cache-Nutzung eines Mandanten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct KvCacheStats {
-    /// Total number of active segments stored in RAM for this tenant.
+    /// Gesamtanzahl aktiver Segmente im RAM für diesen Mandanten.
     pub segment_count: usize,
-    /// Total number of radix tree entries stored for this tenant.
+    /// Gesamtanzahl von Einträgen im Prefix-Radix-Baum dieses Mandanten.
     pub radix_entry_count: usize,
 }
 
-/// Facade configuration for [`KvCacheService`].
+// ANCHOR[contextra-kvcache:SERV-003]
+/// Konfiguration für die Fassade [`KvCacheService`].
 #[derive(Clone)]
 pub struct KvCacheConfig {
-    /// Maximum RAM memory budget in bytes (default: 512 MiB).
+    /// Maximales RAM-Speicherbudget in Bytes (Standard: 512 MiB).
     pub memory_budget_bytes: usize,
-    /// Prefix reuse policy (default: `CostBased { min_prefix_len: 4 }`).
+    /// Präfix-Wiederverwendungs-Policy (Standard: `CostBased { min_prefix_len: 4 }`).
     pub reuse_policy: KvReusePolicy,
-    /// Whether Tier-2 spill storage is enabled (default: true if spill storage is attached).
+    /// Gibt an, ob Tier-2 Spill aktiviert ist (Standard: true bei konfiguriertem Spill-Storage).
     pub spill_enabled: bool,
-    /// KIVI 2-bit quantization configuration, if enabled.
-    #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+    /// Optionale KIVI 2-Bit Quantisierungskonfiguration.
+    #[cfg(feature = "exp-kivi")]
     pub kivi_config: Option<KiviQuantizeConfig>,
 }
 
@@ -97,20 +99,23 @@ impl Default for KvCacheConfig {
             memory_budget_bytes: 512 << 20,
             reuse_policy: KvReusePolicy::default(),
             spill_enabled: true,
-            #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+            #[cfg(feature = "exp-kivi")]
             kivi_config: None,
         }
     }
 }
 
+// ANCHOR[contextra-kvcache:SERV-004]
 /// Builder zur Erstellung von [`KvCacheService`].
 pub struct KvCacheServiceBuilder {
     config: KvCacheConfig,
     clock: Option<Arc<dyn Clock>>,
-    spill_storage: Option<Arc<dyn KvBridgeStorage>>,
+    spill_storage: Option<Arc<dyn crate::spill::KvSpillStorage>>,
+    #[cfg(feature = "kv-encryption")]
     cipher: Option<Arc<KvSegmentCipher>>,
     attention_source: Option<Arc<dyn AttentionScoreSource>>,
-    attention_exporter: Option<Arc<dyn AttentionExporter>>,
+    #[cfg(feature = "workspace")]
+    attention_exporter: Option<Arc<dyn crate::compat::adapters::AttentionExporter>>,
 }
 
 impl KvCacheServiceBuilder {
@@ -120,106 +125,135 @@ impl KvCacheServiceBuilder {
             config: KvCacheConfig::default(),
             clock: None,
             spill_storage: None,
+            #[cfg(feature = "kv-encryption")]
             cipher: None,
             attention_source: None,
+            #[cfg(feature = "workspace")]
             attention_exporter: None,
         }
     }
 
-    /// Konfiguriert das Speicherbudget in Bytes.
+    /// Konfiguriert das Speicherbudget in Bytes (mindestens 1 MiB).
     pub fn memory_budget_bytes(mut self, bytes: usize) -> Self {
         self.config.memory_budget_bytes = bytes.max(1 << 20);
         self
     }
 
-    /// Konfiguriert die Prefix-Wiederverwendungs-Policy.
+    /// Konfiguriert die Prefix-Wiederverwendungs-Policy ([`KvReusePolicy`]).
     pub fn reuse_policy(mut self, policy: KvReusePolicy) -> Self {
         self.config.reuse_policy = policy;
         self
     }
 
-    /// Aktiviert oder deaktiviert den Tier-2 Spill.
+    /// Aktiviert oder deaktiviert den Tier-2 Spill auf Sekundärspeicher.
     pub fn spill_enabled(mut self, enabled: bool) -> Self {
         self.config.spill_enabled = enabled;
         self
     }
 
     /// Aktiviert oder deaktiviert die KIVI 2-Bit Quantisierung.
-    #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+    #[cfg(feature = "exp-kivi")]
     pub fn enable_kivi_quantization(mut self, config: Option<KiviQuantizeConfig>) -> Self {
         self.config.kivi_config = config;
         self
     }
 
-    /// Injiziert die Clock-Port-Implementierung.
+    /// Injiziert die Clock-Port-Implementierung zur Einhaltung deterministischer Zeitvorgaben (P28 / Regel 3).
     pub fn clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = Some(clock);
         self
     }
 
-    /// Konfiguriert den Tier-2 Spill-Storage Adapter.
-    pub fn spill_storage(mut self, storage: Arc<dyn KvBridgeStorage>) -> Self {
+    /// Konfiguriert den Tier-2 Spill-Storage Adapter ([`KvSpillStorage`]).
+    pub fn spill_storage(
+        mut self,
+        storage: Arc<dyn crate::spill::KvSpillStorage>,
+    ) -> Self {
         self.spill_storage = Some(storage);
         self
     }
 
+    #[cfg(feature = "kv-encryption")]
     /// Konfiguriert den Segment-Cipher für verschlüsselten Tier-2-Spill.
     pub fn cipher(mut self, cipher: Arc<KvSegmentCipher>) -> Self {
         self.cipher = Some(cipher);
         self
     }
 
-    /// Konfiguriert eine benutzerdefinierte `AttentionScoreSource`.
+    /// Konfiguriert eine benutzerdefinierte [`AttentionScoreSource`].
     pub fn attention_source(mut self, source: Arc<dyn AttentionScoreSource>) -> Self {
         self.attention_source = Some(source);
         self
     }
 
-    /// Konfiguriert einen `AttentionExporter` für den EvictionWorker.
-    pub fn attention_exporter(mut self, exporter: Arc<dyn AttentionExporter>) -> Self {
+    #[cfg(feature = "workspace")]
+    /// Konfiguriert einen [`AttentionExporter`] für den [`EvictionWorker`].
+    pub fn attention_exporter(
+        mut self,
+        exporter: Arc<dyn crate::compat::adapters::AttentionExporter>,
+    ) -> Self {
         self.attention_exporter = Some(exporter);
         self
     }
 
     /// Baut die [`KvCacheService`]-Instanz.
+    ///
+    /// # Ablauf
+    /// 1. Clock und Store initialisieren.
+    /// 2. EvictionWorker spawnen und Attention-Quellen injizieren.
+    /// 3. Tier-2 SpillHandler registrieren, falls konfiguriert.
+    /// 4. Service-Struktur zusammenbauen und zurückgeben.
     pub fn build(self) -> KvCacheService {
         let clock = self.clock.unwrap_or_else(|| Arc::new(SystemClock::new()));
-        let store = Arc::new(TenantIsolatedKvStore::new());
+        let store = Arc::new(TenantIsolatedKvStore::with_clock(Arc::clone(&clock)));
 
+        #[cfg_attr(not(feature = "workspace"), allow(unused_mut))]
         let mut eviction_worker = EvictionWorker::spawn(Arc::clone(&store));
+        #[cfg(feature = "workspace")]
         if let Some(exporter) = self.attention_exporter {
             eviction_worker = eviction_worker.with_attention_exporter(exporter);
         } else if let Some(source) = self.attention_source {
             store.set_attention_source(source);
         }
+        #[cfg(not(feature = "workspace"))]
+        if let Some(source) = self.attention_source {
+            store.set_attention_source(source);
+        }
         let eviction_worker = Arc::new(eviction_worker);
 
         let total_bytes_stored = Arc::new(AtomicUsize::new(0));
+
         let total_bytes_spill = Arc::clone(&total_bytes_stored);
 
         if self.config.spill_enabled {
             if let Some(spill) = &self.spill_storage {
                 let spill_storage = Arc::clone(spill);
+                #[cfg(feature = "kv-encryption")]
                 let cipher = self.cipher.clone();
                 let handler = Arc::new(
                     move |tenant_id: TenantId, segment_id: u64, payload: Vec<u8>| {
                         total_bytes_spill.fetch_sub(payload.len(), Ordering::Relaxed);
                         let spill = Arc::clone(&spill_storage);
+                        #[cfg(feature = "kv-encryption")]
                         let cipher = cipher.clone();
                         let handle = std::thread::spawn(move || {
                             let tx_id = TxId::new(segment_id.max(1));
+                            #[cfg(feature = "kv-encryption")]
                             let encrypted = if let Some(c) = &cipher {
                                 let dummy_fp =
                                     ModelFingerprint::new([0xaa; 32], "spill-model", "f16");
-                                let enc_layer = c.encrypt(tenant_id, dummy_fp, &payload).ok()?;
+                                let enc_layer = c.encrypt(crate::kv_encryption::to_crypto_tenant(tenant_id), dummy_fp, &payload).ok()?;
                                 bincode::serialize(&enc_layer).ok()?
                             } else {
                                 payload
                             };
+                            #[cfg(not(feature = "kv-encryption"))]
+                            let encrypted = payload;
+
                             let key = format!("tenant:{}:seg:{}", tenant_id.inner(), segment_id);
                             let fut = async move {
-                                spill.put(tx_id, key.as_bytes(), &encrypted).await.ok()?;
-                                spill.commit(tx_id).await.ok()?;
+                                spill.put(tx_id.into(), key.as_bytes(), &encrypted).await.ok()?;
+                                spill.commit(tx_id.into()).await.ok()?;
                                 Some(())
                             };
                             block_on_simple(fut)
@@ -236,7 +270,8 @@ impl KvCacheServiceBuilder {
             store,
             eviction_worker,
             clock,
-            spill_storage: self.spill_storage,
+                        spill_storage: self.spill_storage,
+            #[cfg(feature = "kv-encryption")]
             cipher: self.cipher,
             radix_trees: Arc::new(RwLock::new(ahash::AHashMap::new())),
             next_segment_id: AtomicU64::new(1),
@@ -251,13 +286,18 @@ impl Default for KvCacheServiceBuilder {
     }
 }
 
-/// Öffentlicher Mandanten-isolierter KV-Cache-Dienst.
+// ANCHOR[contextra-kvcache:SERV-005]
+/// Öffentlicher mandantenisolierter KV-Cache-Dienst.
+///
+/// Zentrale Facade für Inferenz-Laufzeiten: verbindet Radix-Präfixsuche,
+/// Speicher-LRU, Hintergrundverdrängung und Tier-2 Persistenz.
 pub struct KvCacheService {
     config: KvCacheConfig,
     store: Arc<TenantIsolatedKvStore>,
     eviction_worker: Arc<EvictionWorker>,
     clock: Arc<dyn Clock>,
-    spill_storage: Option<Arc<dyn KvBridgeStorage>>,
+    spill_storage: Option<Arc<dyn crate::spill::KvSpillStorage>>,
+    #[cfg(feature = "kv-encryption")]
     cipher: Option<Arc<KvSegmentCipher>>,
     radix_trees: Arc<RwLock<ahash::AHashMap<TenantId, PrefixRadixTree>>>,
     next_segment_id: AtomicU64,
@@ -268,20 +308,28 @@ impl KvCacheService {
     /// Sucht nach einem übereinstimmenden Prefix oder fügt ein neues KV-Segment ein.
     ///
     /// Fail-closed: `tenant_id` ist Pflichtparameter jeder Operation.
+    ///
+    /// # Ablauf
+    /// 1. Eingaben validieren (Tokens und Daten dürfen nicht leer sein).
+    /// 2. Im Prefix-Radix-Baum des Mandanten nach übereinstimmendem Präfix suchen.
+    /// 3. Falls Treffer: Guard erzeugen und `Some((match, guard))` zurückliefern.
+    /// 4. Falls Miss: Prüfen des Speicherbudgets und ggf. Hintergrund-Eviction anstoßen.
+    /// 5. Segment quantisieren/komprimieren (falls aktiviert), in den Store einfügen und im Radix-Baum registrieren.
     pub fn get_or_insert_prefix(
         &self,
-        tenant_id: TenantId,
+        tenant_id: impl Into<TenantId>,
         tokens: &[u32],
         data: &[u8],
     ) -> Result<Option<(PrefixMatch, KvBlockGuard)>> {
+        let tenant_id = tenant_id.into();
         if tokens.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(KvCacheError::InvalidInput(
                 "Cannot query or insert empty token sequence".to_string(),
             ));
         }
 
         if data.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(KvCacheError::InvalidInput(
                 "Cannot insert empty data segment into KV-cache".to_string(),
             ));
         }
@@ -308,7 +356,7 @@ impl KvCacheService {
         // 2. Check RAM budget limit before insertion
         let seg_len = data.len();
         if seg_len > self.config.memory_budget_bytes {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(KvCacheError::InvalidInput(format!(
                 "Segment size {} bytes exceeds total service memory budget {} bytes",
                 seg_len, self.config.memory_budget_bytes
             )));
@@ -326,12 +374,12 @@ impl KvCacheService {
         // 3. Insert new segment
         let segment_id = self.next_segment_id.fetch_add(1, Ordering::Relaxed);
 
-        #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+        #[cfg(feature = "exp-kivi")]
         let final_bytes = if let Some(kivi_cfg) = self.config.kivi_config {
             if let Ok(tensor_view) = KvTensorView::from_bytes(data) {
                 let block = kivi_quantize(&tensor_view, kivi_cfg)?;
                 bincode::serialize(&block)
-                    .map_err(|e| ContextraError::Serialization(e.to_string()))?
+                    .map_err(|e| KvCacheError::Serialization(e.to_string()))?
             } else {
                 compress_bytes(data)
             }
@@ -339,7 +387,7 @@ impl KvCacheService {
             data.to_vec()
         };
 
-        #[cfg(not(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant")))]
+        #[cfg(not(feature = "exp-kivi"))]
         let final_bytes = data.to_vec();
 
         let segment = KvSegment::new(tenant_id, segment_id, final_bytes);
@@ -357,11 +405,16 @@ impl KvCacheService {
     }
 
     /// Liest ein Segment-Payload aus RAM oder Tier-2 Spill-Storage.
+    ///
+    /// # Ablauf
+    /// 1. Versuch, das Segment direkt aus dem RAM-Store zu lesen und zu dekomprimieren/dequantisieren.
+    /// 2. Falls nicht im RAM: Versuch, das Segment aus dem Tier-2 Spill-Storage abzurufen und zu entschlüsseln.
     pub async fn read_segment(
         &self,
-        tenant_id: TenantId,
+        tenant_id: impl Into<TenantId>,
         segment_id: u64,
     ) -> Result<Option<Vec<u8>>> {
+        let tenant_id = tenant_id.into();
         // 1. Attempt RAM read
         if let Some(bytes) = self.store.get_segment_bytes(tenant_id, segment_id) {
             return self.decompress_or_dequantize(&bytes);
@@ -370,14 +423,20 @@ impl KvCacheService {
         // 2. Attempt Tier-2 Spill Storage read
         if let Some(spill) = &self.spill_storage {
             let key = format!("tenant:{}:seg:{}", tenant_id.inner(), segment_id);
-            if let Some(spill_bytes) = spill.get(key.as_bytes()).await? {
+            if let Ok(Some(spill_bytes)) = spill.get(key.as_bytes()).await {
+                #[cfg(feature = "kv-encryption")]
                 let raw_payload = if let Some(cipher) = &self.cipher {
                     let enc_layer: EncryptedKvLayer = bincode::deserialize(&spill_bytes)
-                        .map_err(|e| ContextraError::Serialization(e.to_string()))?;
-                    cipher.decrypt(&enc_layer)?
+                        .map_err(|e| KvCacheError::Serialization(e.to_string()))?;
+                    cipher
+                        .decrypt(&enc_layer)
+                        .map_err(|e| KvCacheError::CryptoError(e.to_string()))?
                 } else {
                     spill_bytes.to_vec()
                 };
+                #[cfg(not(feature = "kv-encryption"))]
+                let raw_payload = spill_bytes.to_vec();
+
                 return self.decompress_or_dequantize(&raw_payload);
             }
         }
@@ -385,7 +444,7 @@ impl KvCacheService {
         Ok(None)
     }
 
-    /// Spill-over method: persists a segment to Tier-2 spill storage encrypted per tenant.
+    /// Persistiert ein Segment explizit verschlüsselt auf Tier-2 Sekundärspeicher.
     pub async fn spill_segment(
         &self,
         tx_id: TxId,
@@ -398,23 +457,35 @@ impl KvCacheService {
             None => return Ok(()),
         };
 
+        #[cfg(feature = "kv-encryption")]
         let serialized_data = if let Some(cipher) = &self.cipher {
             let dummy_fp = ModelFingerprint::new([0xaa; 32], "spill-model", "f16");
-            let enc_layer = cipher.encrypt(tenant_id, dummy_fp, payload)?;
+            let enc_layer = cipher
+                .encrypt(crate::kv_encryption::to_crypto_tenant(tenant_id), dummy_fp, payload)
+                .map_err(|e| KvCacheError::CryptoError(e.to_string()))?;
             bincode::serialize(&enc_layer)
-                .map_err(|e| ContextraError::Serialization(e.to_string()))?
+                .map_err(|e| KvCacheError::Serialization(e.to_string()))?
         } else {
             payload.to_vec()
         };
+        #[cfg(not(feature = "kv-encryption"))]
+        let serialized_data = payload.to_vec();
 
         let key = format!("tenant:{}:seg:{}", tenant_id.inner(), segment_id);
-        spill.put(tx_id, key.as_bytes(), &serialized_data).await?;
-        spill.commit(tx_id).await?;
+        spill
+            .put(tx_id.into(), key.as_bytes(), &serialized_data)
+            .await
+            .map_err(|e| KvCacheError::Internal(e.to_string()))?;
+        spill
+            .commit(tx_id.into())
+            .await
+            .map_err(|e| KvCacheError::Internal(e.to_string()))?;
         Ok(())
     }
 
+    /// Interne Hilfsfunktion zur Dekomprimierung oder Dequantisierung gelesener Bytes.
     fn decompress_or_dequantize(&self, bytes: &[u8]) -> Result<Option<Vec<u8>>> {
-        #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+        #[cfg(feature = "exp-kivi")]
         {
             if let Ok(decompressed) = decompress_bytes(bytes) {
                 return Ok(Some(decompressed));
@@ -429,7 +500,7 @@ impl KvCacheService {
         Ok(Some(bytes.to_vec()))
     }
 
-    /// Invalidates scratchpad tokens matching scope for the specified tenant.
+    /// Invalidiert Scratchpad-Tokens, die zum angegebenen Scope gehören.
     pub fn invalidate_scratchpad(
         &self,
         tenant_id: TenantId,
@@ -445,8 +516,15 @@ impl KvCacheService {
         Ok(invalidated)
     }
 
-    /// Removes all RAM segments and Radix nodes for the given tenant (Mandantenlöschung).
-    pub fn delete_tenant(&self, tenant_id: TenantId) {
+    /// Entfernt alle RAM-Segmente und Radix-Knoten für einen Mandanten (Mandanten-Bereinigung).
+    ///
+    /// # Ablauf
+    /// 1. Alle Segment-IDs des Mandanten ermitteln und RAM-Zähler korrigieren.
+    /// 2. Segmente aus dem Store löschen (ZeroizeOnDrop).
+    /// 3. Radix-Baum des Mandanten entfernen.
+    /// 4. Assoziierte Tier-2 Spill-Einträge auf dem Sekundärspeicher überschreiben.
+    pub fn delete_tenant(&self, tenant_id: impl Into<TenantId>) {
+        let tenant_id = tenant_id.into();
         // Remove all RAM segments and track deleted byte length
         let segments = self.store.get_segments(tenant_id);
         let mut freed_bytes = 0usize;
@@ -472,8 +550,8 @@ impl KvCacheService {
                 let handle = std::thread::spawn(move || {
                     let fut = async move {
                         let tx_id = TxId::new(segment_id.max(1));
-                        spill_storage.put(tx_id, key.as_bytes(), &[]).await.ok()?;
-                        spill_storage.commit(tx_id).await.ok()
+                        spill_storage.put(tx_id.into(), key.as_bytes(), &[]).await.ok()?;
+                        spill_storage.commit(tx_id.into()).await.ok()
                     };
                     block_on_simple(fut)
                 });
@@ -484,18 +562,19 @@ impl KvCacheService {
         tracing::info!(tenant_id = ?tenant_id, freed_bytes = freed_bytes, "Deleted all KV-cache resources for tenant");
     }
 
-    /// Triggers background non-blocking eviction targeting `target_free_bytes`.
+    /// Löst eine nicht-blockierende Verdrängung im Hintergrund aus.
     pub fn trigger_eviction(&self, target_free_bytes: usize) {
         self.eviction_worker.trigger_eviction(target_free_bytes);
     }
 
-    /// Returns the active clock port reference.
+    /// Liefert eine Referenz auf den injizierten Clock-Port.
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
     }
 
     /// Liefert Nutzungsstatistiken für den angegebenen Mandanten.
-    pub fn stats(&self, tenant_id: TenantId) -> KvCacheStats {
+    pub fn stats(&self, tenant_id: impl Into<TenantId>) -> KvCacheStats {
+        let tenant_id = tenant_id.into();
         let segment_count = self.store.get_tenant_segment_len(tenant_id);
         let trees = self.radix_trees.read();
         let radix_entry_count = trees.get(&tenant_id).map(|t| t.len()).unwrap_or(0);
@@ -511,6 +590,7 @@ impl KvCacheService {
 mod tests {
     use super::*;
 
+    // Prüft Erstellung über KvCacheServiceBuilder und Durchsetzung der Mandantentrennung bei Lookups und Bereinigungen.
     #[test]
     fn test_kv_cache_service_builder_and_isolation() {
         let service = KvCacheServiceBuilder::new()

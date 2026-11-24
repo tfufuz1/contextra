@@ -1,8 +1,16 @@
+//! # Integrationstest: tenant policy required
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig, TenantPolicy};
 use contextra_types::{ContextraError, TenantId};
 use tempfile::tempdir;
 
+// ANCHOR[contextra-engine:TST36-001]
+/// Testblock zur Überprüfung von `test_tenant_policy_optional_allows_non_tenant_collections`.
 #[tokio::test]
 async fn test_tenant_policy_optional_allows_non_tenant_collections() -> contextra_types::Result<()>
 {
@@ -20,6 +28,8 @@ async fn test_tenant_policy_optional_allows_non_tenant_collections() -> contextr
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST36-002]
+/// Testblock zur Überprüfung von `test_tenant_policy_required_denies_non_tenant_collections`.
 #[tokio::test]
 async fn test_tenant_policy_required_denies_non_tenant_collections() -> contextra_types::Result<()>
 {

@@ -1,11 +1,23 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (engine_part2.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
+//! # Tests für Kernfunktionen der RouterEngine (Teil 2)
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Tests für Kernfunktionen der RouterEngine (Teil 2).
+
+// ANCHOR[contextra-router:TST-ENG2-001]
 use super::super::fixtures::*;
 use crate::{RoutingOutcome, SlmProfile};
-use contextra_db::{Contextra, ContextraConfig};
-use contextra_ports::StorageEngine;
+
 use contextra_types::{ContextraError, EntityId, TokenBudget};
 use serde_json::json;
 use std::sync::Arc;
 
+// ANCHOR[contextra-router:TST-ENG2-T01]
+// Test `test_router_engine_try_new_and_try_update_profiles_validation_error`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_router_engine_try_new_and_try_update_profiles_validation_error() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -49,6 +61,8 @@ async fn test_router_engine_try_new_and_try_update_profiles_validation_error() {
     ));
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T02]
+// Test `test_select_profile_from_chunks_empty_chunks_and_unmatched_community`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[test]
 fn test_select_profile_from_chunks_empty_chunks_and_unmatched_community() {
     use crate::router::select_profile_from_chunks;
@@ -105,6 +119,8 @@ fn test_select_profile_from_chunks_empty_chunks_and_unmatched_community() {
     );
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T03]
+// Test `test_route_with_missing_community_or_corrupt_result`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_route_with_missing_community_or_corrupt_result() {
     let dir = tempfile::tempdir().unwrap(); // unwrap
@@ -140,6 +156,8 @@ async fn test_route_with_missing_community_or_corrupt_result() {
     assert!(matches!(res, Err(ContextraError::NotFound(_))));
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T04]
+// Test `test_route_invalid_search_result_skips_chunk`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_route_invalid_search_result_skips_chunk() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
@@ -181,6 +199,8 @@ async fn test_route_invalid_search_result_skips_chunk() -> Result<(), Box<dyn st
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T05]
+// Test `test_parallel_route_conformal_calibration_monotonic_convergence`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_parallel_route_conformal_calibration_monotonic_convergence() {
     let dir = tempfile::tempdir().unwrap();
@@ -262,6 +282,8 @@ async fn test_parallel_route_conformal_calibration_monotonic_convergence() {
     );
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T06]
+// Test `test_router_engine_reset_all_calibration`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_router_engine_reset_all_calibration() {
     let dir = tempfile::tempdir().unwrap();
@@ -304,6 +326,8 @@ async fn test_router_engine_reset_all_calibration() {
     assert_eq!(router.calibration_stats()["p2"].times_selected, 0);
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T07]
+// Test `test_route_non_finite_query_embedding_err`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_route_non_finite_query_embedding_err() {
     let dir = tempfile::tempdir().unwrap();
@@ -330,6 +354,8 @@ async fn test_route_non_finite_query_embedding_err() {
     );
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T08]
+// Test `test_router_engine_persisted_calibration_loading`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_router_engine_persisted_calibration_loading() {
     let dir = tempfile::tempdir().unwrap();
@@ -361,6 +387,8 @@ async fn test_router_engine_persisted_calibration_loading() {
     assert_eq!(count, 0);
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T09]
+// Test `test_route_populates_drift_status_after_sufficient_data`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_route_populates_drift_status_after_sufficient_data(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -392,7 +420,7 @@ async fn test_route_populates_drift_status_after_sufficient_data(
 
     #[cfg(feature = "bandit-routing")]
     {
-        profile.bandit_state = Some(crate::bandit::BanditProfileState::cold_start(4, 0.5));
+        profile.bandit_state = Some(contextra_adapt::BanditProfileState::cold_start(4, 0.5));
     }
 
     let router = create_test_router(collection, vec![profile], None);
@@ -413,8 +441,8 @@ async fn test_route_populates_drift_status_after_sufficient_data(
     assert!(
         matches!(
             status,
-            crate::lyapunov::LyapunovResult::Stable { .. }
-                | crate::lyapunov::LyapunovResult::DriftDetected { .. }
+            contextra_adapt::LyapunovResult::Stable { .. }
+                | contextra_adapt::LyapunovResult::DriftDetected { .. }
         ),
         "Expected Stable or DriftDetected, got {:?}",
         status
@@ -423,6 +451,8 @@ async fn test_route_populates_drift_status_after_sufficient_data(
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T10]
+// Test `test_router_engine_try_new_and_try_update_profiles_error_paths`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_router_engine_try_new_and_try_update_profiles_error_paths(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -456,6 +486,8 @@ async fn test_router_engine_try_new_and_try_update_profiles_error_paths(
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T11]
+// Test `test_router_engine_drift_status_and_baseline_helpers`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_router_engine_drift_status_and_baseline_helpers(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -488,6 +520,8 @@ async fn test_router_engine_drift_status_and_baseline_helpers(
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T12]
+// Test `test_select_profile_cascade_error_branches_and_fallback`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_select_profile_cascade_error_branches_and_fallback(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -580,16 +614,18 @@ async fn test_select_profile_cascade_error_branches_and_fallback(
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T13]
+// Test `test_router_engine_additional_coverage_paths`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_router_engine_additional_coverage_paths() -> contextra_types::Result<()> {
     use contextra_types::{ContextChunk, DocId, TokenBudget};
 
     let dir = tempfile::tempdir()?;
-    let config = contextra_db::ContextraConfig {
+    let config = crate::tests::tests::ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let db = contextra_db::Contextra::open_with_config(dir.path(), config).await?;
+    let db = crate::tests::tests::Contextra::open_with_config(dir.path(), config).await?;
     let collection = db.collection("default").await?;
 
     // 1. Corrupt calibration_store_path
@@ -617,7 +653,10 @@ async fn test_router_engine_additional_coverage_paths() -> contextra_types::Resu
             id,
             (
                 "p1".to_string(),
-                router.clock.monotonic_nanos().saturating_sub(600_000_000_000),
+                router
+                    .clock
+                    .monotonic_nanos()
+                    .saturating_sub(600_000_000_000),
             ),
         );
     }
@@ -666,6 +705,8 @@ async fn test_router_engine_additional_coverage_paths() -> contextra_types::Resu
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-ENG2-T14]
+// Test `test_router_uses_cheapest_profile_during_warmup`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 2).
 #[tokio::test]
 async fn test_router_uses_cheapest_profile_during_warmup() {
     let dir = tempfile::tempdir().unwrap();

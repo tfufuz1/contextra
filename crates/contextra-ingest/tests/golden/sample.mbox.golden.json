@@ -1,0 +1,57 @@
+{
+  "source_file": "sample.mbox",
+  "detected_format": "Mbox",
+  "title": "Erste Nachricht in Mbox",
+  "canonical_hash": "42c7a050f1cecb4c4657b964a51a6ae8320482ee71d507b72571af97a3022534",
+  "chunk_count": 2,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "Erste Nachricht in Mbox | sender@example.com | 2026-11-11T10:00:00Z\n\nFrom: sender@example.com\nTo: receiver@example.com\nDate: 2026-11-11T10:00:00Z\nSubject: Erste Nachricht in Mbox\n\nErste Nachricht Inhalt.",
+      "token_count": 57,
+      "metadata": {
+        "breadcrumb": "Erste Nachricht in Mbox",
+        "chunk_id": "ef67ee9e4a9be22f487850bdb001043b",
+        "chunk_index": 0,
+        "chunk_total": 2,
+        "chunker_version": "ingest-chunk/1",
+        "doc_title": "Erste Nachricht in Mbox",
+        "format": "mbox",
+        "locator": {
+          "message": 1
+        },
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 134,
+          "start": 0
+        },
+        "strategy": "email",
+        "synthesized": true
+      }
+    },
+    {
+      "index": 1,
+      "content": "Zweite Nachricht in Mbox | sender2@example.com | 2026-11-11T10:05:00Z\n\nFrom: sender2@example.com\nTo: receiver@example.com\nDate: 2026-11-11T10:05:00Z\nSubject: Zweite Nachricht in Mbox\n\nZweite Nachricht Inhalt.",
+      "token_count": 58,
+      "metadata": {
+        "breadcrumb": "Zweite Nachricht in Mbox",
+        "chunk_id": "eaf33c3833366dcf678b8ccc9031a449",
+        "chunk_index": 1,
+        "chunk_total": 2,
+        "chunker_version": "ingest-chunk/1",
+        "doc_title": "Erste Nachricht in Mbox",
+        "format": "mbox",
+        "locator": {
+          "message": 2
+        },
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 273,
+          "start": 136
+        },
+        "strategy": "email",
+        "synthesized": true
+      }
+    }
+  ]
+}

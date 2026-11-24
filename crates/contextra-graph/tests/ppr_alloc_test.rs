@@ -55,6 +55,7 @@ fn get_stats() -> (u64, u64) {
 
 use std::sync::Arc;
 
+// ANCHOR[contextra-graph:TESTS-PPR-ALLOC-TEST-001]
 #[tokio::test]
 async fn test_ppr_alloc_reduction_100k_nodes() {
     const NUM_NODES: usize = 100_000;

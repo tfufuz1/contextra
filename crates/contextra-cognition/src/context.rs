@@ -1,9 +1,29 @@
+//! # Kontextfenster- und Token-Budget-Verwaltung (`context.rs`)
+//!
+//! Dieses Modul implementiert die autonome Vorbereitung des Kontextfensters für LLM-Prompts
+//! (RAG = Retrieval-Augmented Generation). Es stellt sicher, dass Dokumente
+//! prioritätsbasiert geladen, nach Relevanz gefiltert und strikt an ein definiertes
+//! Token-Budget angepasst (gekürzt oder trunkiert) werden.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2). Greift auf Basistypen aus `contextra-types` zurück.
+//!
+//! ## Hauptkomponenten
+//! - [`ContextManager`]: Kernstruktur zur Relevanzfilterung und Token-Budget-Kompaktierung.
+//! - [`SpatialFence`]: Optionaler geographischer Filter für regionale Datenbeschränkungen.
+//!
+//! ## Invarianten
+//! - **Budget-Einhaltung:** Das konfigurierte Token-Budget wird niemals überschritten.
+//! - **Deterministisches Tie-Breaking:** Bei identischer Relevanz entscheidet die aufsteigende `DocId`.
+//! - **Heuristische Token-Schätzung:** BPE-Approximation (Byte-Pair-Encoding) ohne externe Tokenizer-Crate.
+
 // FILE-CONTEXT
 // ZWECK: Kontextfenster-Verwaltung und Token-Budgetierung für RAG-Prompts.
 // INVARIANTEN: Strikte Einhaltung des TokenBudgets; Dokument-Truncation bei Budgetüberschreitung.
 // NICHT-OFFENSICHTLICH: Token-Schätzung nutzt CJK/Code-Aware Heuristiken ohne schwere Tokenizer-Crate Dependency.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
+// TODO(baukasten): Context Compaction Strategien (Truncate, Summary, Selective) implementieren (F8/WP-P3) um Spezifikationslücke zu schließen.
 //! Autonomous Context Management (WP-6.3).
 //!
 //! Proactively injects the most relevant context into the LLM working memory
@@ -15,7 +35,7 @@
 // TEST: cargo test -p contextra-db
 // DONE: ContextManager nutzt MarkdownChunker zur Dokument-Zerlegung.
 
-use contextra_types::{ContextChunk, ContextWindow, Result, TokenBudget};
+use crate::types_local::{ContextChunk, ContextWindow, Result, TokenBudget};
 
 /// Manages autonomous context preparation for LLM consumption.
 ///
@@ -23,6 +43,13 @@ use contextra_types::{ContextChunk, ContextWindow, Result, TokenBudget};
 /// 1. Find small, precise chunks (Small Retrieval)
 /// 2. Load parent documents (Big Context)
 /// 3. Trim to token budget (relevance-weighted)
+// ANCHOR[contextra-cognition:CTX-001]
+/// Verwaltet autonome Kontextvorbereitung und Token-Budgetierung für Sprachmodelle.
+// !SECTION: SpatialFence Definition
+
+// =========================================================================
+// SECTION: ContextManager Definition & Verwaltung
+// =========================================================================
 pub struct ContextManager {
     /// Token budget configuration.
     budget: TokenBudget,
@@ -38,6 +65,8 @@ impl Default for ContextManager {
 
 impl ContextManager {
     /// Creates a new ContextManager with the given token budget.
+    // ANCHOR[contextra-cognition:CTX-002]
+    /// Erstellt einen neuen ContextManager mit dem angegebenen TokenBudget.
     pub fn new(budget: TokenBudget) -> Self {
         Self {
             budget,
@@ -46,16 +75,22 @@ impl ContextManager {
     }
 
     /// Creates a ContextManager with default settings.
+    // ANCHOR[contextra-cognition:CTX-003]
+    /// Erstellt einen ContextManager mit Standardeinstellungen.
     pub fn with_defaults() -> Self {
         Self::new(TokenBudget::default())
     }
 
     /// Sets the minimum relevance score for context inclusion.
+    // ANCHOR[contextra-cognition:CTX-004]
+    /// Setzt die Mindestrelevanzschwelle für einzubindende Chunks.
     pub fn set_relevance_threshold(&mut self, threshold: f32) {
         self.relevance_threshold = threshold;
     }
 
     /// Returns the current relevance threshold.
+    // ANCHOR[contextra-cognition:CTX-005]
+    /// Liefert die aktuelle Mindestrelevanzschwelle.
     pub fn relevance_threshold(&self) -> f32 {
         self.relevance_threshold
     }
@@ -64,6 +99,8 @@ impl ContextManager {
     ///
     /// Filters by relevance threshold, sorts by score, and truncates to budget.
     #[allow(clippy::indexing_slicing)]
+    // ANCHOR[contextra-cognition:CTX-006]
+    /// Bereitet das finale ContextWindow aus übergebenen Chunks vor.
     pub fn prepare_context(&self, mut chunks: Vec<ContextChunk>) -> Result<ContextWindow> {
         // Filter by relevance threshold (retaining NaN chunks so total_cmp can order them safely without dropping)
         chunks.retain(|c| c.relevance.is_nan() || c.relevance >= self.relevance_threshold);
@@ -138,6 +175,8 @@ impl ContextManager {
     /// - Interpunktion: 1 Token pro 4 Zeichen
     ///
     /// Kalibriert für ±15% Genauigkeit vs. tiktoken cl100k_base.
+    // ANCHOR[contextra-cognition:CTX-007]
+    /// Schätzt die Token-Anzahl eines Textes heuristisch nach BPE-Regeln.
     pub fn estimate_tokens(text: &str) -> usize {
         if text.is_empty() {
             return 0;
@@ -215,6 +254,11 @@ impl ContextManager {
 ///
 /// Filters context by geographic region metadata field.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-cognition:CTX-008]
+/// Geographische Beschränkung (Spatial Fencing) für regionsspezifische Chunks.
+// =========================================================================
+// SECTION: SpatialFence Definition
+// =========================================================================
 pub struct SpatialFence {
     /// The region identifier to filter by.
     pub region: String,
@@ -224,6 +268,8 @@ pub struct SpatialFence {
 
 impl SpatialFence {
     /// Creates a new spatial fence for the given region.
+    // ANCHOR[contextra-cognition:CTX-009]
+    /// Erstellt eine neue SpatialFence für die angegebene Region.
     pub fn new(region: impl Into<String>) -> Self {
         Self {
             region: region.into(),
@@ -232,6 +278,8 @@ impl SpatialFence {
     }
 
     /// Checks if a chunk's metadata matches this spatial fence.
+    // ANCHOR[contextra-cognition:CTX-010]
+    /// Prüft, ob ein Chunk den regionalen Kriterien entspricht.
     pub fn matches(&self, chunk: &ContextChunk) -> bool {
         if let Some(metadata) = &chunk.metadata {
             if let Some(obj) = metadata.as_object() {
@@ -244,6 +292,11 @@ impl SpatialFence {
     }
 }
 
+// !SECTION: Kontext-Operationen & Budgetierung
+
+// =========================================================================
+// SECTION: ContextManager Unit-Tests
+// =========================================================================
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -254,10 +307,12 @@ impl SpatialFence {
 )]
 mod tests {
     use super::*;
-    use contextra_types::DocId;
+    use crate::types_local::DocId;
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-001]
+    // Prüft Testfall `test_context_manager_respects_token_budget`.
     #[test]
-    fn context_manager_respects_token_budget() {
+    fn test_context_manager_respects_token_budget() {
         let budget = TokenBudget::new(100, 0); // 100 max, 0 reserved => 100 available
         let manager = ContextManager::new(budget);
 
@@ -287,6 +342,8 @@ mod tests {
         assert!(window.total_tokens <= 100);
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-002]
+    // Prüft Testfall `test_context_manager_budget_truncation`.
     #[test]
     fn test_context_manager_budget_truncation() {
         let budget = TokenBudget::new(100, 20);
@@ -329,12 +386,16 @@ mod tests {
         assert_eq!(window.total_tokens, 50);
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-003]
+    // Prüft Testfall `test_token_estimation`.
     #[test]
     fn test_token_estimation() {
         let tokens = ContextManager::estimate_tokens("hello world foo bar");
         assert!(tokens >= 4); // At least 4 words
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-004]
+    // Prüft Testfall `test_prepare_context_equal_scores_deterministic`.
     #[test]
     fn test_prepare_context_equal_scores_deterministic() {
         let budget = TokenBudget::new(10000, 0);
@@ -368,6 +429,8 @@ mod tests {
         }
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-005]
+    // Prüft Testfall `test_prepare_context_nan_relevance_safety`.
     #[test]
     fn test_prepare_context_nan_relevance_safety() {
         let budget = TokenBudget::new(10000, 0);
@@ -402,6 +465,8 @@ mod tests {
         assert_eq!(window.chunks[1].doc_id, DocId::new(5));
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-006]
+    // Prüft Testfall `test_single_document_exceeds_budget`.
     #[test]
     fn test_single_document_exceeds_budget() {
         let budget = TokenBudget::new(20, 10); // 10 available
@@ -430,6 +495,11 @@ mod tests {
     }
 }
 
+// !SECTION: Kontext-Operationen & Budgetierung
+
+// =========================================================================
+// SECTION: ContextManager Unit-Tests
+// =========================================================================
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -440,13 +510,17 @@ mod tests {
 )]
 mod token_tests {
     use super::*;
-    use contextra_types::DocId;
+    use crate::types_local::DocId;
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-007]
+    // Prüft Testfall `test_estimate_tokens_empty`.
     #[test]
     fn test_estimate_tokens_empty() {
         assert_eq!(ContextManager::estimate_tokens(""), 0);
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-008]
+    // Prüft Testfall `test_estimate_tokens_simple_english`.
     #[test]
     fn test_estimate_tokens_simple_english() {
         // "Hello world" → ~2 Tokens
@@ -454,6 +528,8 @@ mod token_tests {
         assert!((2..=4).contains(&t), "expected 2-4, got {t}");
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-009]
+    // Prüft Testfall `test_estimate_tokens_cjk`.
     #[test]
     fn test_estimate_tokens_cjk() {
         // 5 CJK Zeichen → ~5 Tokens
@@ -461,6 +537,8 @@ mod token_tests {
         assert!((4..=7).contains(&t), "expected 4-7, got {t}");
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-010]
+    // Prüft Testfall `test_estimate_tokens_code_block`.
     #[test]
     fn test_estimate_tokens_code_block() {
         let code = "```rust\nfn main() { println!(\"hello\"); }\n```";
@@ -469,20 +547,24 @@ mod token_tests {
         assert!(ContextManager::estimate_tokens(code) > ContextManager::estimate_tokens(plain));
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-011]
+    // Prüft Testfall `test_estimate_tokens_never_zero_for_nonempty`.
     #[test]
     fn test_estimate_tokens_never_zero_for_nonempty() {
         assert!(ContextManager::estimate_tokens("a") >= 1);
         assert!(ContextManager::estimate_tokens("   spaces   ") >= 1);
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-012]
+    // Prüft Testfall `test_context_chunk_try_from_search_result_invalid_id`.
     #[test]
     fn test_context_chunk_try_from_search_result_invalid_id() {
-        let sr = contextra_engine::SearchResult {
+        let sr = crate::engine_local::SearchResult {
             id: "".to_string(),
             score: 0.9,
             metadata: None,
             matched_signals: vec![],
-            provenance: Some(contextra_engine::ProvenanceRecord {
+            provenance: Some(crate::engine_local::ProvenanceRecord {
                 index_type: Some("context".to_string()),
                 ..Default::default()
             }),
@@ -494,16 +576,18 @@ mod token_tests {
         ));
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-013]
+    // Prüft Testfall `test_context_chunk_try_from_search_result_valid_id`.
     #[test]
     fn test_context_chunk_try_from_search_result_valid_id() {
         let valid_key = "doc_123_sample";
         let expected_doc_id = DocId::from_key(valid_key).unwrap(); // unwrap
-        let sr = contextra_engine::SearchResult {
+        let sr = crate::engine_local::SearchResult {
             id: valid_key.to_string(),
             score: 0.85,
             metadata: Some(serde_json::json!({"text": "sample text content"})),
             matched_signals: vec!["vector".into()],
-            provenance: Some(contextra_engine::ProvenanceRecord {
+            provenance: Some(crate::engine_local::ProvenanceRecord {
                 index_type: Some("context".to_string()),
                 ..Default::default()
             }),
@@ -514,6 +598,8 @@ mod token_tests {
         assert_eq!(chunk.relevance, 0.85);
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-014]
+    // Prüft Testfall `test_spatial_fence_matching_and_non_matching`.
     #[test]
     fn test_spatial_fence_matching_and_non_matching() {
         let fence = SpatialFence::new("EU");
@@ -550,6 +636,8 @@ mod token_tests {
         assert!(!fence.matches(&chunk_no_meta));
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-015]
+    // Prüft Testfall `test_context_manager_relevance_threshold_setter_getter`.
     #[test]
     fn test_context_manager_relevance_threshold_setter_getter() {
         let mut mgr = ContextManager::with_defaults();
@@ -558,6 +646,8 @@ mod token_tests {
         assert_eq!(mgr.relevance_threshold(), 0.75);
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-016]
+    // Prüft Testfall `test_context_manager_prepare_context_empty_chunks`.
     #[test]
     fn test_context_manager_prepare_context_empty_chunks() {
         let mgr = ContextManager::with_defaults();
@@ -567,3 +657,4 @@ mod token_tests {
         assert!(!window.truncated);
     }
 }
+// !SECTION: ContextManager Unit-Tests

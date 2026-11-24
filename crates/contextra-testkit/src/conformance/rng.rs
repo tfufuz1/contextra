@@ -1,12 +1,28 @@
+//! # Konformitätsprüfsuite für den `Rng`-Port (`conformance/rng`)
+//!
+//! Dieses Modul testet die vertraglichen Zusicherungen für Pseudozufallszahlengeneratoren
+//! (PRNG) des [`contextra_ports::Rng`]-Ports.
+//!
+//! ## Getestete Verträge
+//! 1. **Nicht-Konstanz:** [`contextra_ports::Rng::next_u64`] darf bei aufeinanderfolgenden
+//!    Ziehungen keine identischen Werte liefern.
+//! 2. **Byte-Befüllung:** [`contextra_ports::Rng::fill_bytes`] muss den Zielpuffer füllen
+//!    (darf nicht unberührt oder rein nullwertig bleiben).
+//! 3. **Intervall-Einhaltung:** [`contextra_ports::Rng::next_unit_f64`] muss strikt
+//!    im halboffenen Intervall `[0.0, 1.0)` liegen.
+
 use super::failure::{ConformanceFailure, ConformanceResult};
 use contextra_ports::Rng;
 
-/// Runs the complete conformance test suite for an [`Rng`] implementation.
+// ANCHOR[contextra-testkit:CONF-RNG-SUITE-001]
+/// Führt die vollständige Konformitätsprüfung für einen [`Rng`]-Port durch.
 ///
-/// # Contract Requirements Tested
-/// 1. `next_u64()` produces changing output values (non-constant).
-/// 2. `fill_bytes()` fills the destination slice completely.
-/// 3. `next_unit_f64()` returns values in the half-open interval $[0.0, 1.0)$.
+/// **Ablauf:**
+/// 1. Zieht 3x `next_u64()` und verifiziert Varianz.
+/// 2. Füllt einen 16-Byte-Puffer und prüft auf Nicht-Null-Inhalt.
+/// 3. Zieht 100x `next_unit_f64()` und prüft die Grenzen `0.0 <= val < 1.0`.
+///
+/// **Rückgabe:** `Ok(())` bei Erfolg, andernfalls `Err(ConformanceFailure)`.
 pub fn run_rng_suite<R: Rng>(rng: &R) -> ConformanceResult {
     let suite = "Rng";
 

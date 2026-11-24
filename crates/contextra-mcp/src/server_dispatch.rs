@@ -1,3 +1,7 @@
+// =========================================================================
+// SECTION: server_dispatch
+// =========================================================================
+// ANCHOR[contextra-mcp:SERVER-DIS-001]
 use crate::protocol::{response_from_error, JsonRpcRequest, JsonRpcResponse};
 use crate::server::McpServer;
 use serde_json::{json, Value};
@@ -7,6 +11,13 @@ impl McpServer {
     /// Gibt `Some(Value)` zurück, falls eine Antwort nach stdout gesendet werden muss,
     /// oder `None`, falls der Client eine Notification war (keine Antwort erforderlich).
     pub async fn handle_value(&self, val: Value) -> Option<Value> {
+        if let Err(depth_err) =
+            crate::protocol::validate_json_depth(&val, crate::protocol::MAX_JSON_DEPTH)
+        {
+            let resp = JsonRpcResponse::err(None, depth_err.code(), depth_err.to_string());
+            return serde_json::to_value(resp).ok();
+        }
+
         if let Some(arr) = val.as_array() {
             if arr.is_empty() {
                 return Some(
@@ -14,6 +25,21 @@ impl McpServer {
                         None,
                         -32600,
                         "Invalid Request: empty batch array",
+                    ))
+                    .unwrap_or_default(),
+                );
+            }
+
+            if arr.len() > crate::protocol::MAX_BATCH_SIZE {
+                return Some(
+                    serde_json::to_value(JsonRpcResponse::err(
+                        None,
+                        -32600,
+                        format!(
+                            "Invalid Request: batch size {} exceeds maximum allowed limit of {}",
+                            arr.len(),
+                            crate::protocol::MAX_BATCH_SIZE
+                        ),
                     ))
                     .unwrap_or_default(),
                 );
@@ -168,15 +194,14 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_forget",
-                            "description": "Delete a document (unverified) or drop an entire collection (with verified DeletionProof export).",
+                            "description": "Delete a document without verification receipt (Alias for contextra_delete).",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "collection": { "type": "string" },
                                     "id":         { "type": "string" },
-                                    "confirm":    { "type": "boolean" }
+                                    "collection": { "type": "string", "default": "default" }
                                 },
-                                "required": ["collection", "confirm"]
+                                "required": ["id"]
                             }
                         },
                         {
@@ -216,7 +241,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_delete",
-                            "description": "Delete a single document without measured deletion proof.",
+                            "description": "Delete a single document.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -241,7 +266,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_drop_collection",
-                            "description": "Delete an entire collection and issue a verified collection-wide cryptographic DeletionProof.",
+                            "description": "Delete an entire collection.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -335,3 +360,5 @@ impl McpServer {
         }
     }
 }
+
+// !SECTION: server_dispatch

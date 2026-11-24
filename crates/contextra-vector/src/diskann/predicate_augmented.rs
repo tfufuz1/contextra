@@ -5,9 +5,10 @@
 //              Deterministische Sortierung (Score absteigend, DocId aufsteigend), Schranke MAX_SEARCH_K.
 
 use super::types::{DiskAnnIndex, SearchCandidate};
-use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
+use crate::error::{Result, VectorError};
+use crate::types::{DistanceMetric, DocId, ScoredDocument};
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashSet};
 
 impl DiskAnnIndex {
     /// Executes a predicate-augmented vector search using ACORN 2-hop neighbor expansion during graph traversal.
@@ -29,22 +30,22 @@ impl DiskAnnIndex {
         filter: &(dyn Fn(DocId) -> bool + Send + Sync),
         gamma: usize,
     ) -> Result<Vec<ScoredDocument>> {
-        if k == 0 || k > contextra_types::MAX_SEARCH_K {
-            return Err(ContextraError::invalid_input(format!(
+        if k == 0 || k > crate::types::MAX_SEARCH_K {
+            return Err(VectorError::invalid_input(format!(
                 "Requested k ({k}) is invalid or exceeds maximum allowed search limit ({})",
-                contextra_types::MAX_SEARCH_K
+                crate::types::MAX_SEARCH_K
             )));
         }
 
         if !query.iter().all(|v| v.is_finite()) {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "Query vector contains non-finite (NaN or Infinity) components".to_string(),
             ));
         }
 
         let header = match *self.inner.header.read() {
             Some(h) => h,
-            None => return Err(ContextraError::Index("Index not loaded".into())),
+            None => return Err(VectorError::Index("Index not loaded".into())),
         };
 
         if header.node_count == 0 {
@@ -56,13 +57,13 @@ impl DiskAnnIndex {
         let tombstones = self.inner.tombstones.read();
 
         let ep = header.entry_point;
-        let mut visited = HashSet::new();
+        let mut visited = std::collections::BTreeSet::new();
 
         let ep_node = self.load_node(ep)?;
         let ep_dist = self.get_dist_to_query(query, ep)?;
 
         if !ep_dist.is_finite() {
-            return Err(ContextraError::Index(
+            return Err(VectorError::Index(
                 "Non-finite distance encountered for entry point in search_predicate_augmented"
                     .into(),
             ));
@@ -148,8 +149,7 @@ impl DiskAnnIndex {
         }
 
         // Deduplicate matching results by DocId, retaining best distance
-        let mut best_matching: std::collections::HashMap<DocId, f32> =
-            std::collections::HashMap::new();
+        let mut best_matching: BTreeMap<DocId, f32> = BTreeMap::new();
         for (doc_id, dist) in matching_results {
             best_matching
                 .entry(doc_id)
@@ -170,7 +170,7 @@ impl DiskAnnIndex {
                     DistanceMetric::DotProduct => -dist,
                     _ => 1.0 / (1.0 + dist),
                 };
-                ScoredDocument::new(doc_id, score)
+                ScoredDocument::from_score(doc_id, score)
             })
             .collect();
 
@@ -190,12 +190,11 @@ impl DiskAnnIndex {
 mod tests {
     use super::*;
     use crate::diskann::config::DiskAnnConfig;
-    use contextra_ports::VectorIndex;
-    use contextra_types::{DistanceMetric, DocId};
+    use crate::types::{DistanceMetric, DocId};
 
     #[tokio::test]
     async fn test_gamma_zero_regression_reduction() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let temp_dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let config = DiskAnnConfig {
             index_path: temp_dir.path().join("gamma_zero.idx"),
             dimension: 4,
@@ -235,7 +234,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_low_selectivity_augmented_improves_recall() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let temp_dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let config = DiskAnnConfig {
             index_path: temp_dir.path().join("low_selectivity.idx"),
             dimension: 4,

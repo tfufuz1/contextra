@@ -1,3 +1,6 @@
+// FILE-CONTEXT
+// ZWECK: Validierung der autarken Baustein-Architektur und Schnittstellen-Integrität für contextra-simd.
+// INVARIANTEN: Deterministische Differential-Konsistenz, Safe API, Fail-Closed Fehlerbehandlung.
 
 use contextra_simd::{
     compute_distance, compute_distance_f32_bytes_trusted, compute_distance_trusted, validate_vector,

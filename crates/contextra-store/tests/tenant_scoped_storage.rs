@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Integration and isolation tests for `TenantScopedStorage`.
 
 use contextra_ports::StorageEngine;

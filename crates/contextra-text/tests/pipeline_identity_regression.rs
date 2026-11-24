@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Regression test for Tokenizer Pipeline Identity (P1), Snapshot Isolation (P4), and Tx Rollback (P5).
 
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
@@ -215,7 +216,7 @@ async fn test_pipeline_identity_point_search_recall() -> Result<()> {
     index.insert(tx, doc_id, sample_text).await?;
     index.commit(tx).await?;
 
-    let tokenizer = GermanMorphTokenizer::new();
+    let tokenizer = GermanMorphTokenizer::try_new().expect("try_new succeeds");
     let tokens = tokenizer.tokenize(sample_text);
 
     assert!(!tokens.is_empty(), "Tokenization must yield tokens");

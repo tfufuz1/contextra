@@ -1,3 +1,6 @@
+//! # Fuzz-Target: Manipulation von Löschbeweisen (`fuzz/deletion_proof_tamper.rs`)
+//!
+//! Prüft, ob mutierte oder manipulierte Löschzertifikate zuverlässig abgewiesen werden.
 #![no_main]
 
 use arbitrary::Arbitrary;

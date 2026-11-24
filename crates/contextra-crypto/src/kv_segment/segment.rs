@@ -1,8 +1,16 @@
+//! # Segment-Repräsentation (`kv_segment/segment.rs`)
+//!
+//! Kapselt ein verschlüsseltes oder geschütztes Datensegment im Speicher.
+//!
+//! ## Invarianten
+//! - Implementiert `ZeroizeOnDrop`, um Puffer im Heap bei Freigabe sicher zu überschreiben.
+//! - `#![forbid(unsafe_code)]` wird strikt eingehalten.
+
 // FILE-CONTEXT
 // ZWECK: KvSegment mit Zeroize-Garantie (ZeroizeOnDrop, nie unverschlüsselt auf Disk).
 // STAND: TS:2026-09-08T00:00:00Z (SESSION: a413a598)
 
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(feature = "kv-encryption")]
@@ -32,6 +40,12 @@ pub struct EncryptedSegmentPayload {
 /// - `encrypted`: Kennzeichen, ob die Tensor-Bytes verschlüsselt vorliegen
 /// - `data`: Rohe Tensor-Bytes oder Ciphertext-Bytes. WIRD gezeroized beim Drop.
 #[derive(Zeroize, ZeroizeOnDrop)]
+// ANCHOR[contextra-crypto:KV-003]
+/// Repräsentiert ein einzelnes Datensegment mit automatischer Speicherbereinigung.
+#[deprecated(
+    since = "0.1.0",
+    note = "KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden."
+)]
 pub struct KvSegment {
     #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten
     pub tenant_id: TenantId,
@@ -305,7 +319,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "kv-encryption")]
-    fn test_kv_segment_shredding_revocation() {
+    fn test_kv_segment_encrypted_roundtrip() {
         let km = crate::crypto::KeyManager::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
         let tenant = TenantId::try_new(101).unwrap();
@@ -318,16 +332,6 @@ mod tests {
         // Roundtrip MUST succeed
         let decrypted = segment.decrypt_data(&cipher).unwrap();
         assert_eq!(decrypted, plaintext);
-
-        // Revoke key in single consolidated KeyRegistry
-        let revoked = cipher.registry().revoke_subkey(segment.segment_id);
-        assert!(revoked, "Subkey revocation must succeed");
-
-        let res = segment.decrypt_data(&cipher);
-        assert!(
-            res.is_err(),
-            "Decryption of segment after KeyRegistry subkey revocation MUST fail"
-        );
     }
 
     #[test]

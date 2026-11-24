@@ -1,3 +1,0 @@
-CMD: cargo tree -p contextra --edges normal --locked
-EXIT_CODE: 0
-DURATION_MS: 1378

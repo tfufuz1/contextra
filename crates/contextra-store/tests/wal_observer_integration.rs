@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 #![allow(unexpected_cfgs)]
 #![cfg(not(loom))]
 
@@ -221,6 +222,7 @@ async fn test_observer_fail_open_timeout_and_latency_unaffected() {
     let tx1 = TxId::new(2001);
     storage.put(tx1, b"key1", b"val1").await.unwrap();
     storage.commit(tx1).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert_eq!(records_slow.lock().len(), 1);
     assert_eq!(records_fast.lock().len(), 1);

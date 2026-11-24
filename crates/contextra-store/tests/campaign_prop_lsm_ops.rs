@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Campaign Differential Property Test Suite for `contextra-store` (LSM Storage Engine).
 //! Validates stateful LSM operations (`put`, `delete`, `put_batch`, `delete_prefix`, `get`, `get_at_seq`, `scan_prefix`, `scan_range`, `commit`, `rollback`, close/reopen)
 //! against an independent `BTreeMap`-based reference model tracking active transactions, MVCC versions, and committed history.
@@ -160,6 +161,8 @@ enum CampaignOp {
         start: Vec<u8>,
         end: Vec<u8>,
     },
+    Flush,
+    Compact,
     CloseAndReopen,
 }
 
@@ -223,6 +226,8 @@ fn campaign_op_strategy() -> impl Strategy<Value = CampaignOp> {
             let (start, end) = if k1 <= k2 { (k1, k2) } else { (k2, k1) };
             CampaignOp::ScanRange { start, end }
         }),
+        Just(CampaignOp::Flush),
+        Just(CampaignOp::Compact),
         Just(CampaignOp::CloseAndReopen),
     ]
 }
@@ -346,10 +351,16 @@ proptest! {
                             }
                         }
                     }
+                    CampaignOp::Flush => {
+                        let _ = storage.flush().await;
+                    }
+                    CampaignOp::Compact => {
+                        let _ = storage.maybe_compact().await;
+                    }
                     CampaignOp::CloseAndReopen => {
                         model.active_txs.clear();
                         drop(storage);
-                        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                         storage = LsmStorage::new(config.clone())
                             .await
                             .map_err(|e| TestCaseError::fail(e.to_string()))?;

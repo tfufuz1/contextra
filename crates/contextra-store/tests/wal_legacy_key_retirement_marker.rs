@@ -18,7 +18,7 @@ async fn test_retirement_marker_created_and_contains_blake3_binding() {
         key: b"test_key".to_vec(),
         value: b"test_val".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 1, &legacy_key, [0u8; 32]).expect("legacy entry");
 
     let mut wal_bytes = Vec::new();
@@ -67,7 +67,7 @@ async fn test_post_migration_legacy_fallback_hard_rejected_when_marker_present()
         key: b"k1".to_vec(),
         value: b"v1".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 10, &legacy_key, [0u8; 32]).expect("entry");
     let mut wal_bytes = Vec::new();
     wal_bytes.extend_from_slice(&WAL_V3_HEADER);
@@ -104,7 +104,7 @@ async fn test_crash_window_before_and_after_marker() {
         key: b"crash_k".to_vec(),
         value: b"crash_v".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 99, &legacy_key, [0u8; 32]).expect("entry");
     let mut wal_bytes = Vec::new();
     wal_bytes.extend_from_slice(&WAL_V3_HEADER);

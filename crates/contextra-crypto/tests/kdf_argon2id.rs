@@ -1,3 +1,8 @@
+//! # Integrationstest: `kdf_argon2id.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `kdf_argon2id`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Tests für Argon2id KDF Header, Parameter-Validierung, Parser-Robustheit und KeyManager Integration.
 // INVARIANTEN: Zero Panics bei Fuzzing/ungültigen Header-Bytes. Determinismus bei gleichen Eingaben. Unveränderte HKDF-Referenzwerte.

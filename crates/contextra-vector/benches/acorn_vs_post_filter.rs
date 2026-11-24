@@ -1,6 +1,11 @@
 // FILE-CONTEXT
-// ZWECK: Criterion Benchmark für ACORN Naive-Reference Search vs. Post-Filtering Baseline.
-// INVARIANTEN: O(n) Reference Benchmark für Recall & Latency Baselines.
+// ZWECK: Criterion-Benchmark für ACORN Naive-Reference Search vs. Post-Filtering Baseline
+// INVARIANTEN: O(n) Reference Benchmark für Recall & Latency Baselines, deterministische Vektoren
+// HOTSPOTS: 25-60
+// STAND: 2026-11-11
+// BEREICH: AGENTS §6, SPEC §11.4 — ACORN gefilterte Suche und Gamma-Kantenbudget
+
+// ANCHOR[contextra-vector:W11-BENCH-008]
 
 use contextra_types::DocId;
 use contextra_vector::acorn::{compute_gamma_edge_budget, FilteredIndex, NaiveReferenceIndex};

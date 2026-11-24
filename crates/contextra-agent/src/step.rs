@@ -10,6 +10,12 @@
 //! Each agent step produces a [`StepResult`] and tools implement the
 //! [`AgentTool`] trait to participate in the orchestration loop.
 
+// =========================================================================
+// SECTION: Step Results & Tool Abstractions
+// =========================================================================
+// ANCHOR[contextra-agent:step-primitives]
+
+
 use crate::context::AgentContext;
 use contextra_ports::BoxFuture;
 use contextra_types::{Result, TxId};
@@ -113,3 +119,5 @@ pub trait AgentTool: Send + Sync {
         2
     }
 }
+
+// !SECTION

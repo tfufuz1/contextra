@@ -1,3 +1,10 @@
+//! Markdown-Parser fuer Fliesstext-Segmentierung.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Eigenständiger Markdown-Blockparser mit exakten Byte-Offsets ohne Fremdabhängigkeiten (WP M3 / SPEC C-11.7).
 // INVARIANTEN: Zero-Panic, UTF-8-sicher, exakte Byte-Spans relativ zur Eingabe, Deterministisch.
@@ -8,6 +15,8 @@ use std::ops::Range;
 
 /// Klassifikation von geparsten Markdown-Blöcken.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-ingest:CHK-0221]
+// enum `ParsedBlockKind` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub enum ParsedBlockKind {
     YamlFrontMatter,
     Heading {
@@ -47,6 +56,8 @@ pub enum ParsedBlockKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-ingest:CHK-0222]
+// struct `ParsedListItem` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub struct ParsedListItem {
     pub depth: u8,
     pub ordered: bool,
@@ -55,6 +66,8 @@ pub struct ParsedListItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-ingest:CHK-0223]
+// struct `ParsedMarkdownBlock` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub struct ParsedMarkdownBlock {
     pub kind: ParsedBlockKind,
     pub text: String,
@@ -70,6 +83,8 @@ struct LineInfo<'a> {
 }
 
 /// Zerlegt einen Markdown-Text in Blöcke mit exakten Byte-Spans.
+// ANCHOR[contextra-ingest:CHK-0224]
+// fn `parse_markdown_blocks` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub fn parse_markdown_blocks(full_text: &str, base_offset: usize) -> Vec<ParsedMarkdownBlock> {
     if full_text.is_empty() {
         return Vec::new();
@@ -83,7 +98,9 @@ pub fn parse_markdown_blocks(full_text: &str, base_offset: usize) -> Vec<ParsedM
     let mut blocks = Vec::new();
     let mut i = 0usize;
 
-    if let Some((front_block, next_idx)) = try_parse_yaml_front_matter(&lines, full_text, base_offset) {
+    if let Some((front_block, next_idx)) =
+        try_parse_yaml_front_matter(&lines, full_text, base_offset)
+    {
         blocks.push(front_block);
         i = next_idx;
     }
@@ -102,7 +119,9 @@ pub fn parse_markdown_blocks(full_text: &str, base_offset: usize) -> Vec<ParsedM
             continue;
         }
 
-        if let Some((code_block, next_idx)) = try_parse_fenced_code(&lines, i, full_text, base_offset) {
+        if let Some((code_block, next_idx)) =
+            try_parse_fenced_code(&lines, i, full_text, base_offset)
+        {
             blocks.push(code_block);
             i = next_idx;
             continue;
@@ -114,7 +133,9 @@ pub fn parse_markdown_blocks(full_text: &str, base_offset: usize) -> Vec<ParsedM
             continue;
         }
 
-        if let Some((setext, next_idx)) = try_parse_setext_heading(&lines, i, full_text, base_offset) {
+        if let Some((setext, next_idx)) =
+            try_parse_setext_heading(&lines, i, full_text, base_offset)
+        {
             blocks.push(setext);
             i = next_idx;
             continue;
@@ -286,7 +307,13 @@ fn try_parse_fenced_code<'a>(
 
         if cur_trim.starts_with(fence_char) {
             let cur_fence_len = cur_trim.chars().take_while(|&c| c == fence_char).count();
-            if cur_fence_len >= fence_len && cur_trim.get(cur_fence_len..).unwrap_or("").trim().is_empty() {
+            if cur_fence_len >= fence_len
+                && cur_trim
+                    .get(cur_fence_len..)
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+            {
                 closed = true;
                 i = i.saturating_add(1);
                 break;
@@ -317,7 +344,11 @@ fn try_parse_fenced_code<'a>(
     ))
 }
 
-fn parse_atx_heading(line: LineInfo<'_>, full_text: &str, base_offset: usize) -> Option<ParsedMarkdownBlock> {
+fn parse_atx_heading(
+    line: LineInfo<'_>,
+    full_text: &str,
+    base_offset: usize,
+) -> Option<ParsedMarkdownBlock> {
     let trimmed = line.content.trim_start();
     let indent = line.content.len().saturating_sub(trimmed.len());
     if indent > 3 || !trimmed.starts_with('#') {
@@ -491,7 +522,10 @@ fn try_parse_note<'a>(
     let slice = full_text.get(first.start..end_byte).unwrap_or("");
     Some((
         ParsedMarkdownBlock {
-            kind: ParsedBlockKind::Note { label, text: note_text },
+            kind: ParsedBlockKind::Note {
+                label,
+                text: note_text,
+            },
             text: slice.to_string(),
             span: (base_offset + first.start)..(base_offset + end_byte),
             locator: Locator::default(),
@@ -519,13 +553,21 @@ fn parse_blockquote<'a>(
     full_text: &'a str,
     base_offset: usize,
 ) -> (ParsedMarkdownBlock, usize) {
-    let first = lines.get(start_idx).copied().unwrap_or(LineInfo { content: "", start: 0, end: 0 });
+    let first = lines.get(start_idx).copied().unwrap_or(LineInfo {
+        content: "",
+        start: 0,
+        end: 0,
+    });
     let mut i = start_idx;
     let mut end_byte = first.end;
     let mut body_lines = Vec::new();
 
     while i < lines.len() {
-        let cur = lines.get(i).copied().unwrap_or(LineInfo { content: "", start: 0, end: 0 });
+        let cur = lines.get(i).copied().unwrap_or(LineInfo {
+            content: "",
+            start: 0,
+            end: 0,
+        });
         let trimmed = cur.content.trim();
         if trimmed.starts_with('>') {
             let inner = trimmed.trim_start_matches('>').trim_start();
@@ -571,13 +613,21 @@ fn parse_list<'a>(
     full_text: &'a str,
     base_offset: usize,
 ) -> (ParsedMarkdownBlock, usize) {
-    let first = lines.get(start_idx).copied().unwrap_or(LineInfo { content: "", start: 0, end: 0 });
+    let first = lines.get(start_idx).copied().unwrap_or(LineInfo {
+        content: "",
+        start: 0,
+        end: 0,
+    });
     let mut items = Vec::new();
     let mut i = start_idx;
     let mut end_byte = first.end;
 
     while i < lines.len() {
-        let cur = lines.get(i).copied().unwrap_or(LineInfo { content: "", start: 0, end: 0 });
+        let cur = lines.get(i).copied().unwrap_or(LineInfo {
+            content: "",
+            start: 0,
+            end: 0,
+        });
         if is_list_item_start(cur.content) {
             let trimmed = cur.content.trim_start();
             let indent = cur.content.len().saturating_sub(trimmed.len());
@@ -585,7 +635,11 @@ fn parse_list<'a>(
             let ordered = trimmed.chars().next().is_some_and(|c| c.is_ascii_digit());
 
             let text = if ordered {
-                trimmed.split_once(". ").map(|x| x.1).unwrap_or("").to_string()
+                trimmed
+                    .split_once(". ")
+                    .map(|x| x.1)
+                    .unwrap_or("")
+                    .to_string()
             } else {
                 trimmed.get(2..).unwrap_or("").to_string()
             };
@@ -633,13 +687,21 @@ fn parse_indented_code<'a>(
     full_text: &'a str,
     base_offset: usize,
 ) -> (ParsedMarkdownBlock, usize) {
-    let first = lines.get(start_idx).copied().unwrap_or(LineInfo { content: "", start: 0, end: 0 });
+    let first = lines.get(start_idx).copied().unwrap_or(LineInfo {
+        content: "",
+        start: 0,
+        end: 0,
+    });
     let mut i = start_idx;
     let mut end_byte = first.end;
     let mut code_lines = Vec::new();
 
     while i < lines.len() {
-        let cur = lines.get(i).copied().unwrap_or(LineInfo { content: "", start: 0, end: 0 });
+        let cur = lines.get(i).copied().unwrap_or(LineInfo {
+            content: "",
+            start: 0,
+            end: 0,
+        });
         if is_indented_code(cur.content) || cur.content.trim().is_empty() {
             code_lines.push(cur.content.to_string());
             end_byte = cur.end;
@@ -669,12 +731,20 @@ fn parse_html_block<'a>(
     full_text: &'a str,
     base_offset: usize,
 ) -> (ParsedMarkdownBlock, usize) {
-    let first = lines.get(start_idx).copied().unwrap_or(LineInfo { content: "", start: 0, end: 0 });
+    let first = lines.get(start_idx).copied().unwrap_or(LineInfo {
+        content: "",
+        start: 0,
+        end: 0,
+    });
     let mut i = start_idx.saturating_add(1);
     let mut end_byte = first.end;
 
     while i < lines.len() {
-        let cur = lines.get(i).copied().unwrap_or(LineInfo { content: "", start: 0, end: 0 });
+        let cur = lines.get(i).copied().unwrap_or(LineInfo {
+            content: "",
+            start: 0,
+            end: 0,
+        });
         if cur.content.trim().is_empty() {
             break;
         }
@@ -702,13 +772,21 @@ fn parse_paragraph<'a>(
     full_text: &'a str,
     base_offset: usize,
 ) -> (ParsedMarkdownBlock, usize) {
-    let first = lines.get(start_idx).copied().unwrap_or(LineInfo { content: "", start: 0, end: 0 });
+    let first = lines.get(start_idx).copied().unwrap_or(LineInfo {
+        content: "",
+        start: 0,
+        end: 0,
+    });
     let mut i = start_idx;
     let mut end_byte = first.end;
     let mut para_lines = Vec::new();
 
     while i < lines.len() {
-        let cur = lines.get(i).copied().unwrap_or(LineInfo { content: "", start: 0, end: 0 });
+        let cur = lines.get(i).copied().unwrap_or(LineInfo {
+            content: "",
+            start: 0,
+            end: 0,
+        });
         let trimmed = cur.content.trim();
 
         if (trimmed.is_empty()
@@ -743,7 +821,13 @@ fn parse_paragraph<'a>(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic, clippy::get_first)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::get_first
+)]
 mod tests {
     use super::*;
 
@@ -753,7 +837,10 @@ mod tests {
         let blocks = parse_markdown_blocks(input, 0);
         assert_eq!(blocks.len(), 2);
         assert_eq!(input.get(blocks[0].span.clone()).unwrap(), "# Title");
-        assert_eq!(input.get(blocks[1].span.clone()).unwrap(), "Paragraph text here.");
+        assert_eq!(
+            input.get(blocks[1].span.clone()).unwrap(),
+            "Paragraph text here."
+        );
     }
 
     #[test]
@@ -761,6 +848,9 @@ mod tests {
         let input = "```rust\n# Not a heading\n```";
         let blocks = parse_markdown_blocks(input, 0);
         assert_eq!(blocks.len(), 1);
-        assert!(matches!(blocks.first().unwrap().kind, ParsedBlockKind::FencedCode { .. }));
+        assert!(matches!(
+            blocks.first().unwrap().kind,
+            ParsedBlockKind::FencedCode { .. }
+        ));
     }
 }

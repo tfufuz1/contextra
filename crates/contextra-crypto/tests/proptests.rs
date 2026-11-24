@@ -1,3 +1,8 @@
+//! # Integrationstest: `proptests.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `proptests`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Property-based testing suite for contextra-crypto using proptest.
 // INVARIANTEN: Roundtrip invariant: decrypt(encrypt(pt)) == pt. Authenticity invariant: 1-bit ciphertext flip must fail decryption.

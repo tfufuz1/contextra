@@ -1,5 +1,18 @@
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+// ANCHOR[contextra-graph:SRC-CSR-INNER-REINFORCEMENT-001]
+//! Hebbsches Verstärkungslernen für Kantengewichte im GraphInner.
+//!
+//! # Zweck
+//! Passt Kantengewichte dynamisch an, wenn Pfade erfolgreich traversiert werden.
+
 #[cfg(feature = "edge-reinforcement-learning")]
-use contextra_types::EntityId;
+use crate::types::EntityId;
 
 #[cfg(feature = "edge-reinforcement-learning")]
 use super::super::types::CsrEdge;
@@ -7,6 +20,8 @@ use super::super::types::CsrEdge;
 use super::GraphInner;
 
 #[cfg(feature = "edge-reinforcement-learning")]
+
+// SECTION Reinforcement Core Implementation
 impl GraphInner {
     pub(crate) fn find_edge_mut_by_entities(
         &mut self,
@@ -150,3 +165,5 @@ impl GraphInner {
         }
     }
 }
+
+// !SECTION Reinforcement Core Implementation

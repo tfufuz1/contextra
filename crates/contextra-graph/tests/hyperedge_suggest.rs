@@ -1,3 +1,8 @@
+//! Tests für Vorschlagsheuristiken neuer Hyperkanten aus Kookkurrenzen.
+//!
+//! # Zweck
+//! Prüft die mathematische Korrektheit der Kookkurrenzzählung und Schwellenwertfilterung.
+
 use contextra_graph::{
     compute_co_occurrence_candidates, validate_candidates_with_llm, GraphMutationError,
     HyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,
@@ -32,6 +37,7 @@ impl LlmTextGenerator for MockTextGenerator {
     }
 }
 
+// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-001]
 #[test]
 fn test_co_occurrence_counting_is_deterministic_on_input_permutation() {
     let doc1 = DocId::from_key("doc-1").unwrap();
@@ -76,6 +82,7 @@ fn test_co_occurrence_counting_is_deterministic_on_input_permutation() {
     assert_eq!(candidates1[1].source_doc_ids, expected_docs_1_3);
 }
 
+// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-002]
 #[test]
 fn test_combinations_below_min_co_occurrence_filtered_out() {
     let doc1 = DocId::from_key("doc-1").unwrap();
@@ -98,6 +105,7 @@ fn test_combinations_below_min_co_occurrence_filtered_out() {
     assert!(filtered_candidates.is_empty());
 }
 
+// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-003]
 #[test]
 fn test_combinations_exceeding_max_relate_participants_discarded_not_truncated() {
     let doc1 = DocId::from_key("doc-huge").unwrap();
@@ -122,6 +130,7 @@ fn test_combinations_exceeding_max_relate_participants_discarded_not_truncated()
     assert_eq!(candidates[0].source_doc_ids, vec![doc2]);
 }
 
+// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-004]
 #[tokio::test]
 async fn test_validate_candidates_exceeding_budget_returns_err() {
     let doc = DocId::from_key("doc-1").unwrap();
@@ -152,6 +161,7 @@ async fn test_validate_candidates_exceeding_budget_returns_err() {
     assert_eq!(generator.calls(), 0); // No LLM calls executed due to budget check
 }
 
+// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-005]
 #[tokio::test]
 async fn test_mock_llm_rejection_results_in_accepted_false_without_error() {
     let doc = DocId::from_key("doc-1").unwrap();

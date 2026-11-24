@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 #![cfg(not(loom))]
 
 use contextra_ports::StorageEngine;

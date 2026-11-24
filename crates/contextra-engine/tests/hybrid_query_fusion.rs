@@ -1,3 +1,9 @@
+//! # Integrationstest: hybrid query fusion
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_ports::{BoxFuture, TextEmbeddingEngine};
@@ -24,6 +30,8 @@ impl TextEmbeddingEngine for FakeEmbedder {
     }
 }
 
+// ANCHOR[contextra-engine:TST19-001]
+/// Testblock zur Überprüfung von `test_hybrid_query_fusion_signals_ranking_and_k_zero_boundary`.
 #[tokio::test]
 async fn test_hybrid_query_fusion_signals_ranking_and_k_zero_boundary(
 ) -> contextra_types::Result<()> {

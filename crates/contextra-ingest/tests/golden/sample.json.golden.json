@@ -1,0 +1,28 @@
+{
+  "source_file": "sample.json",
+  "detected_format": "Json",
+  "title": null,
+  "canonical_hash": "0426391a7287a8d709bf85ee51bb495332e7d72b30e36b25debaacaaa9a17098",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "project: contextra-ingest\n\nversion: 0.1.0\n\nactive: true\n\nsettings.timeout_ms: 5000\n\nsettings.retries: 3\n\ntags[0]: parser\n\ntags[1]: extraction\n\ntags[2]: safe",
+      "token_count": 42,
+      "metadata": {
+        "chunk_id": "5fd2751e89ed933f746884fb149ceeea",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "format": "json",
+        "locator": {},
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 156,
+          "start": 0
+        },
+        "strategy": "structured"
+      }
+    }
+  ]
+}

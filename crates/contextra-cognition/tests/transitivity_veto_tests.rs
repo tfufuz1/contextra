@@ -1,3 +1,17 @@
+//! # Integrationstest: Transitivitäts-Veto (`tests/transitivity_veto_tests.rs`)
+//!
+//! Prüft die Vermeidung fehlerhafter Duplikatverschmelzungen durch transitive
+//! Ähnlichkeitsketten, die Einhaltung der P24-Lokalität und das Überspringen bei Budgetüberschreitung.
+
+
+// FILE-CONTEXT
+// ZWECK: Validierungstests fuer das Dreiecks-Transitivitaets-Veto.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Transitivity Veto Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -10,10 +24,6 @@
     clippy::unreachable
 )]
 
-// FILE-CONTEXT
-// ZWECK: Tests für Transitivity Veto Inspektion, Orchestrierung & Budget-Steuerung.
-// INVARIANTEN: P24-Lokalitätsnachweis; Zero-Panic; Budget-Grenzprüfung.
-// STAND: TS:2026-09-27T00:00:00Z
 
 use contextra_cognition::aggregation_phase::{AggregationConfig, AggregationNode};
 use contextra_cognition::memory_consolidation::{run_consolidation_pass, ConsolidationConfig};
@@ -23,6 +33,8 @@ use contextra_cognition::transitivity_veto::{
 use contextra_types::{DocId, EntityId};
 use std::time::Instant;
 
+// ANCHOR[contextra-cognition:TEST-TRANSITI-089]
+// Prüft Testfall `test_classic_transitivity_veto_case`.
 #[test]
 fn test_classic_transitivity_veto_case() {
     // A ≈ B, B ≈ C, A ≉ C
@@ -73,6 +85,8 @@ fn test_classic_transitivity_veto_case() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TRANSITI-090]
+// Prüft Testfall `test_negative_case_high_similarity_throughout`.
 #[test]
 fn test_negative_case_high_similarity_throughout() {
     // A ≈ B ≈ C with high pairwise similarity across all pairs
@@ -119,6 +133,8 @@ fn test_negative_case_high_similarity_throughout() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TRANSITI-091]
+// Prüft Testfall `test_budget_boundary_exceeded_skips_veto_and_continues`.
 #[test]
 fn test_budget_boundary_exceeded_skips_veto_and_continues() {
     let emb_a = vec![1.0f32, 0.0, 0.0, 0.0];
@@ -159,11 +175,13 @@ fn test_budget_boundary_exceeded_skips_veto_and_continues() {
     let result = run_consolidation_pass(&turns, &config);
     assert_eq!(result.segments_created, 2);
     assert!(
-        !result.duplicates_tombstoned.is_empty(),
+        !result.duplicates_superseded.is_empty(),
         "Consolidation continues normally even when transitivity check budget is exceeded"
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TRANSITI-092]
+// Prüft Testfall `test_p24_locality_bounded_runtime_on_large_graph`.
 #[test]
 fn test_p24_locality_bounded_runtime_on_large_graph() {
     let mut turns = Vec::new();
@@ -205,3 +223,4 @@ fn test_p24_locality_bounded_runtime_on_large_graph() {
         duration
     );
 }
+// !SECTION: Transitivity Veto Tests

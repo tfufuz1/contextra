@@ -1,16 +1,32 @@
+//! # Konformitätsprüfsuite für den `GraphIndex`-Port (`conformance/graph`)
+//!
+//! Dieses Modul testet die vertraglichen Zusicherungen (Contract Invariants)
+//! für Wissensgraphen-Indizes des [`contextra_ports::GraphIndex`]-Ports.
+//!
+//! ## Getestete Verträge
+//! 1. **Kanten-Einfügen & Nachbarschaft:** Kanten mit `add_edge` tauchen in `neighbors` auf.
+//! 2. **Kanten-Entfernen:** Mit `remove_edge` entfernte Kanten verschwinden aus den Nachbarn.
+//! 3. **Mehrstufige Traversierung:** `traverse` findet Knoten über mehrere Hops hinweg (z. B. 2 Hops).
+//! 4. **Selbstkanten (Self-Loops):** Kanten von einem Knoten auf sich selbst führen nicht zu Endlosschleifen.
+
 use super::failure::{ConformanceFailure, ConformanceResult};
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::future::Future;
 
-/// Runs the complete conformance test suite for a [`GraphIndex`] implementation.
+// ANCHOR[contextra-testkit:CONF-GRAPH-SUITE-001]
+/// Führt die vollständige Konformitätsprüfung für eine [`GraphIndex`]-Implementierung durch.
 ///
-/// # Contract Requirements Tested
-/// 1. Edge insertion & neighborhood querying (`add_edge`, `neighbors`).
-/// 2. Edge removal & neighborhood update (`remove_edge`).
-/// 3. Graph traversal (BFS hops with decay weights).
-/// 4. Self-loop edge handling.
-/// 5. Tombstone / removal consistency across traversal and neighbors.
+/// **Parameter:**
+/// - `factory`: Asynchrone Closure, die eine frische Graphindex-Instanz erzeugt.
+///
+/// **Ablauf:**
+/// 1. Test 1: Entitäten anlegen, Kante hinzufügen und Nachbarschaft abfragen.
+/// 2. Test 2: Kante löschen und prüfen, dass sie nicht mehr als Nachbar erscheint.
+/// 3. Test 3: Pfad über zwei Kanten spannen und 2-Hop-Traversierung prüfen.
+/// 4. Test 4: Selbstkante anlegen und Nachbarschaftsfunktion auf Robustheit prüfen.
+///
+/// **Rückgabe:** `Ok(())` bei Vertragskonformität, andernfalls `Err(ConformanceFailure)`.
 pub async fn run_graph_index_suite<F, Fut, G>(factory: F) -> ConformanceResult
 where
     F: Fn() -> Fut,

@@ -1,0 +1,29 @@
+{
+  "source_file": "sample.xml",
+  "detected_format": "Xml",
+  "title": null,
+  "canonical_hash": "f01bd5ef29b7e7fdd8376c1ee0cf9a698bb2a4ece6ecfb90f09575c440b9c039",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "catalog.book.@id: bk101\n\ncatalog.book.author: Gambardella, Matthew\n\ncatalog.book.title: XML Developer's Guide\n\ncatalog.book.price: 44.95",
+      "token_count": 34,
+      "metadata": {
+        "breadcrumb": "catalog.book",
+        "chunk_id": "a74af20994b98548c192e1e6e048ea13",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "format": "xml",
+        "locator": {},
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 136,
+          "start": 0
+        },
+        "strategy": "structured"
+      }
+    }
+  ]
+}

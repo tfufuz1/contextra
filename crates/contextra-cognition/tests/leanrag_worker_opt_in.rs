@@ -1,3 +1,17 @@
+//! # Integrationstest: LeanRAG Worker Opt-in (`tests/leanrag_worker_opt_in.rs`)
+//!
+//! Validiert die optionale Aktivierung der LeanRAG Stage-3-Aggregation
+//! in der `ConsolidationEngine`, Superkanten-Generierung, Fehlerisolation und Budgetprüfungen.
+
+
+// FILE-CONTEXT
+// ZWECK: Tests fuer Worker-Opt-In-Flags und Hintergrund-Aggregationsworker.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: LeanRAG Worker Opt-In Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -14,14 +28,14 @@ use contextra_cognition::aggregation_phase::AggregationConfig;
 use contextra_cognition::consolidation_executor::ConsolidationEngine;
 use contextra_cognition::leanrag_input::build_leanrag_inputs;
 use contextra_cognition::memory_consolidation::{ConsolidationConfig, SynthesisConfig};
-use contextra_engine::collection::Collection;
+use contextra_cognition::collection::Collection;
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
-use contextra_store::LsmStorage;
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
 use contextra_types::{DocId, EntityId};
-use contextra_vector::HnswIndex;
+
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -57,23 +71,13 @@ impl LlmTextGenerator for TestMockLlm {
     }
 }
 
-async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir) {
+async fn create_test_collection() -> (
+    Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>,
+    tempfile::TempDir,
+) {
     let dir = tempdir().expect("tempdir");
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .expect("LsmStorage"),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .expect("HnswIndex"),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new(4));
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
@@ -84,12 +88,12 @@ async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, te
         graph,
         next_tx,
         4,
-        contextra_engine::Language::English,
+        contextra_text::Language::English,
     ));
     (col, dir)
 }
 
-async fn setup_test_graph_data(col: &Collection<LsmStorage, HnswIndex>) {
+async fn setup_test_graph_data(col: &Collection<InMemoryStorageEngine, InMemoryVectorIndex>) {
     col.insert(
         "doc_10",
         &[1.0, 0.0, 0.0, 0.0],
@@ -173,6 +177,8 @@ async fn setup_test_graph_data(col: &Collection<LsmStorage, HnswIndex>) {
 }
 
 /// Test (a): Default Engine (ohne with_leanrag) ruft Stage 3 nicht auf.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-071]
+// Prüft Testfall `test_default_engine_skips_leanrag_stage`.
 #[tokio::test]
 async fn test_default_engine_skips_leanrag_stage() {
     let (col, _dir) = create_test_collection().await;
@@ -211,6 +217,8 @@ async fn test_default_engine_skips_leanrag_stage() {
 }
 
 /// Test (b): Engine mit with_leanrag + LLM führt Stage 3 aus und erzeugt Superkante.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-072]
+// Prüft Testfall `test_opt_in_leanrag_stage_creates_superedge`.
 #[tokio::test]
 async fn test_opt_in_leanrag_stage_creates_superedge() {
     let (col, _dir) = create_test_collection().await;
@@ -268,6 +276,8 @@ async fn test_opt_in_leanrag_stage_creates_superedge() {
 }
 
 /// Test (c): with_leanrag ohne LLM führt keine Stage 3 aus und gibt keinen Fehler zurück.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-073]
+// Prüft Testfall `test_opt_in_leanrag_without_llm_skips_stage`.
 #[tokio::test]
 async fn test_opt_in_leanrag_without_llm_skips_stage() {
     let (col, _dir) = create_test_collection().await;
@@ -308,6 +318,8 @@ async fn test_opt_in_leanrag_without_llm_skips_stage() {
 }
 
 /// Test (d): build_leanrag_inputs ist deterministisch und respektiert max_nodes.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-074]
+// Prüft Testfall `test_build_leanrag_inputs_determinism_and_max_nodes`.
 #[tokio::test]
 async fn test_build_leanrag_inputs_determinism_and_max_nodes() {
     let (col, _dir) = create_test_collection().await;
@@ -341,6 +353,8 @@ async fn test_build_leanrag_inputs_determinism_and_max_nodes() {
 }
 
 /// Test (e): Stage-Fehler (LLM schlägt fehl) -> run_cycle liefert weiterhin Ok.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-075]
+// Prüft Testfall `test_stage_error_does_not_fail_run_cycle`.
 #[tokio::test]
 async fn test_stage_error_does_not_fail_run_cycle() {
     let (col, _dir) = create_test_collection().await;
@@ -381,6 +395,8 @@ async fn test_stage_error_does_not_fail_run_cycle() {
 }
 
 /// Test (f): Speicherbudget 0 MB wird von validate() abgelehnt / Stage übersprungen, kein Panic.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-076]
+// Prüft Testfall `test_invalid_config_or_zero_budget_skipped_gracefully`.
 #[tokio::test]
 async fn test_invalid_config_or_zero_budget_skipped_gracefully() {
     let (col, _dir) = create_test_collection().await;
@@ -420,3 +436,4 @@ async fn test_invalid_config_or_zero_budget_skipped_gracefully() {
         "No superedge should be created when config validation fails"
     );
 }
+// !SECTION: LeanRAG Worker Opt-In Tests

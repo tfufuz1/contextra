@@ -3,7 +3,7 @@
 // ZWECK: Model fingerprinting and CandleQuantization definitions.
 // INVARIANTEN: SHA-256 over weight blob concatenated with quantization string; distinct quant tiers yield distinct fingerprints.
 
-use contextra_types::ContextraError;
+use crate::error::{Error, Result};
 use sha2::{Digest, Sha256};
 use std::fmt;
 use std::fs::File;
@@ -33,33 +33,53 @@ impl fmt::Display for CandleQuantization {
 }
 
 impl FromStr for CandleQuantization {
-    type Err = ContextraError;
+    type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         match s.to_ascii_uppercase().as_str() {
             "Q4KM" | "Q4_K_M" | "Q4" => Ok(Self::Q4KM),
             "Q8_0" | "Q8" => Ok(Self::Q8_0),
             "F16" | "FP16" => Ok(Self::F16),
-            _ => Err(ContextraError::InvalidInput(format!(
+            _ => Err(Error::InvalidInput(format!(
                 "Unsupported Candle quantization grade: {s}. Expected Q4KM, Q8_0, or F16"
             ))),
         }
     }
 }
 
-pub use contextra_types::ModelFingerprint;
+/// Eigener Newtype für Modell-Fingerabdrücke in contextra-infer-candle.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ModelFingerprint {
+    /// SHA-256 Hashwert über die Modellgewichte und Quantisierungsgrad.
+    pub hash: [u8; 32],
+    /// Bezeichner des Modells oder Dateiname.
+    pub model_id: String,
+    /// Quantisierungsstufe als String.
+    pub quantization: String,
+}
+
+impl ModelFingerprint {
+    /// Erstellt einen neuen ModelFingerprint.
+    pub fn new(
+        hash: [u8; 32],
+        model_id: impl Into<String>,
+        quantization: impl Into<String>,
+    ) -> Self {
+        Self {
+            hash,
+            model_id: model_id.into(),
+            quantization: quantization.into(),
+        }
+    }
+}
 
 /// Computes a unique fingerprint for a model file and quantization variant.
-///
-/// Calculates SHA-256 over the weight blob concatenated with the quantization grade string
-/// so that different quantization tiers for the same underlying weights file yield distinct hashes.
 pub fn compute_fingerprint(
     model_path: &Path,
     quantization: &CandleQuantization,
-) -> Result<ModelFingerprint, ContextraError> {
-    // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
+) -> Result<ModelFingerprint> {
     let file = File::open(model_path).map_err(|e| {
-        ContextraError::Io(std::io::Error::new(
+        Error::Io(std::io::Error::new(
             e.kind(),
             format!("Failed to open model file at {}: {e}", model_path.display()),
         ))
@@ -70,11 +90,13 @@ pub fn compute_fingerprint(
     let mut buffer = [0u8; 65536];
 
     loop {
-        let count = reader.read(&mut buffer).map_err(ContextraError::Io)?;
+        let count = reader.read(&mut buffer).map_err(Error::Io)?;
         if count == 0 {
             break;
         }
-        hasher.update(&buffer[..count]);
+        if let Some(slice) = buffer.get(..count) {
+            hasher.update(slice);
+        }
     }
 
     let quant_str = quantization.to_string();
@@ -99,12 +121,30 @@ pub fn compute_fingerprint(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn test_candle_quantization_from_str() {
+        assert_eq!(
+            CandleQuantization::from_str("Q4KM").expect("Q4KM should parse"),
+            CandleQuantization::Q4KM
+        );
+        assert_eq!(
+            CandleQuantization::from_str("Q8_0").expect("Q8_0 should parse"),
+            CandleQuantization::Q8_0
+        );
+        assert_eq!(
+            CandleQuantization::from_str("F16").expect("F16 should parse"),
+            CandleQuantization::F16
+        );
+        assert!(CandleQuantization::from_str("invalid").is_err());
+    }
+
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
     #[test]
-    fn test_compute_fingerprint_differs_by_quantization() -> Result<(), Box<dyn std::error::Error>>
+    fn test_compute_fingerprint_differs_by_quantization() -> std::result::Result<(), Box<dyn std::error::Error>>
     {
         let mut tmp_file = NamedTempFile::new()?;
         tmp_file.write_all(b"mock weight blob data 1234567890")?;
@@ -113,18 +153,9 @@ mod tests {
         let fp_q8 = compute_fingerprint(tmp_file.path(), &CandleQuantization::Q8_0)?;
         let fp_f16 = compute_fingerprint(tmp_file.path(), &CandleQuantization::F16)?;
 
-        assert_ne!(
-            fp_q4.hash, fp_q8.hash,
-            "Q4KM and Q8_0 must produce different hashes"
-        );
-        assert_ne!(
-            fp_q8.hash, fp_f16.hash,
-            "Q8_0 and F16 must produce different hashes"
-        );
-        assert_ne!(
-            fp_q4.hash, fp_f16.hash,
-            "Q4KM and F16 must produce different hashes"
-        );
+        assert_ne!(fp_q4.hash, fp_q8.hash);
+        assert_ne!(fp_q8.hash, fp_f16.hash);
+        assert_ne!(fp_q4.hash, fp_f16.hash);
 
         assert_eq!(fp_q4.quantization, "Q4_K_M");
         assert_eq!(fp_q8.quantization, "Q8_0");
@@ -137,6 +168,6 @@ mod tests {
     fn test_compute_fingerprint_nonexistent_file_returns_err() {
         let path = Path::new("/nonexistent/file/path.gguf");
         let res = compute_fingerprint(path, &CandleQuantization::Q4KM);
-        assert!(res.is_err(), "Expected error for nonexistent file");
+        assert!(res.is_err());
     }
 }

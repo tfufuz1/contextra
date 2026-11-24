@@ -1,12 +1,27 @@
+//! Integrationstest-Suite: `detect_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Inhaltsbasierte Formaterkennungs-Tests für detect (WP M3 / P01).
 // INVARIANTEN: Keine eingecheckten Binärdateien, Zero-Panic, deterministische Fixture-Erzeugung.
 // STAND: TS:2026-10-31T00:00:00Z
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation
+)]
+
 use contextra_ingest::detect::{detect, Confidence, DetectHints};
 use contextra_ingest::format::FormatId;
 
 /// Testet positive Erkennung aller Formate über synthetisch generierte minimale Byte-Fixtures.
+// ANCHOR[contextra-ingest:TST-0353]
+// Testet die Funktionsfaehigkeit von `test_detect_positive_fixtures`.
 #[test]
 fn test_detect_positive_fixtures() {
     let cases: Vec<(&'static str, Vec<u8>, DetectHints<'_>, FormatId)> = vec![
@@ -216,6 +231,8 @@ fn test_detect_positive_fixtures() {
 }
 
 /// Testet Widerspruchsfälle: Content Magic gewinnt vor falscher Dateiendung/MIME.
+// ANCHOR[contextra-ingest:TST-0354]
+// Testet die Funktionsfaehigkeit von `test_detect_contradiction_magic_overrides_hint`.
 #[test]
 fn test_detect_contradiction_magic_overrides_hint() {
     let zip_docx = make_zip_fixture("word/document.xml", b"[Content_Types].xml");
@@ -242,6 +259,8 @@ fn test_detect_contradiction_magic_overrides_hint() {
 }
 
 /// Testet Erkennung ohne Hints (nur aus Content-Bytes).
+// ANCHOR[contextra-ingest:TST-0355]
+// Testet die Funktionsfaehigkeit von `test_detect_content_only_no_hints`.
 #[test]
 fn test_detect_content_only_no_hints() {
     let pdf_bytes = b"%PDF-2.0\n1 0 obj...";
@@ -251,6 +270,8 @@ fn test_detect_content_only_no_hints() {
 }
 
 /// Testet Edge-Cases: Leere Eingabe, 1-Byte Eingabe, abgeschnittener Header.
+// ANCHOR[contextra-ingest:TST-0356]
+// Testet die Funktionsfaehigkeit von `test_detect_edge_cases`.
 #[test]
 fn test_detect_edge_cases() {
     // 1. Leere Eingabe ohne Hints -> Fehler

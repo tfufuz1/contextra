@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: Validierung der RAM-Reduktion durch SQ8 Skalare Quantisierung.
+// INVARIANTEN: Speicherverbrauch von SQ8 Index ist ca. 4x kleiner als f32 Index.
+// HOTSPOTS: 20-60
+// STAND: 2026-11-12
 use contextra_ports::VectorIndex;
 use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};

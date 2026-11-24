@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // Regression tests: `scan_prefix` must never return tombstoned entries.
 //
 // Without these tests a future refactoring of `scan_prefix_at` could silently

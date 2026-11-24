@@ -1,3 +1,32 @@
+//! # Kognitions-Engine (`contextra-cognition`)
+//!
+//! Die Crate `contextra-cognition` bildet die Kognitions- und Konsolidierungsschicht
+//! im Contextra-Workspace (Ebene E2 nach Spezifikation docs/SPEC.md v3).
+//! Sie stellt Hintergrundprozesse für Gedächtniskonsolidierung (Memory Consolidation),
+//! Kontext-Kompaktierung (Context Compaction), semantische Aggregation (LeanRAG / Hyperedge Consolidation)
+//! und Wartungsplanung (Maintenance Scheduling) bereit.
+//!
+//! ## Ring-Zugehörigkeit und Abhängigkeiten
+//! - **Abhängigkeiten (eingehend):** Wird von höheren Orchestrierungsschichten wie `contextra-db` eingebunden.
+//! - **Abhängigkeiten (ausgehend):** Nutzt Basis- und Speicher-Crates:
+//!   - `contextra-types`: Domänentypen, Fehlermodelle, Mandanten-IDs.
+//!   - `contextra-ports`: Abstrakte Port-Schnittstellen (Storage, Clock, Rng, Metrics).
+//!   - `contextra-engine`: Ausführungs- und Storage-Subsysteme.
+//!   - `contextra-store`: Schlüssel-Wert- und LSM-Speicher (Key-Value-Store).
+//!   - `contextra-vector`: Vektorindizes und Embeddings.
+//!   - `contextra-graph`: CSR-Graphdarstellung und Hyperedges.
+//!
+//! ## Kernkomponenten
+//! - [`ContextManager`]: Verwaltet Kontexte, Raumgrenzen (SpatialFence) und Token-Budgets.
+//! - [`ContextCompactor`]: Führt Transaktions- und Dialogkompaktierung durch.
+//! - [`ConsolidationEngine`]: Hintergrund-Worker für Schlafzyklen (Sleep Cycles) und semantische Verschmelzung.
+//! - [`MaintenanceScheduler`]: Steuert periodische Wartungsläufe und Speicherbereinigungen.
+//!
+//! ## Invarianten
+//! - **Kein Unsafe-Code:** `#![forbid(unsafe_code)]` wird strikt auf Crate-Ebene erzwungen.
+//! - **Mandantentrennung:** Strikte Isolierung nach `tenant_id` (VETO-F10).
+//! - **Deterministische Sortierung:** Alle aggregierten und vorverdichteten Strukturen werden deterministisch sortiert.
+
 #![deny(dead_code)]
 // FILE-CONTEXT
 // ZWECK: Contextra Cognition Engine (Layer 3 - Cognition).
@@ -8,24 +37,63 @@
 //                          deterministische Sortierung nach tenant_id und text_digest.
 #![forbid(unsafe_code)]
 
-pub mod aggregation_phase;
-pub mod consolidation_executor;
-pub mod consolidation_locks;
-pub mod context;
-pub mod context_compaction;
-pub mod graph_sink;
-pub mod leanrag_input;
-pub mod maintenance_config;
-pub mod maintenance_scheduler;
-pub mod memory_consolidation;
-pub mod semantic_aggregation_facade;
-pub mod synthesis_phase;
-pub mod transitivity_veto;
+// =========================================================================
+// SECTION: Modul-Deklarationen
+// =========================================================================
+pub mod error;
+pub mod ports;
+pub use error::CognitionError;
 
+// ANCHOR[contextra-cognition:ROOT-001]
+/// Modul für Aggregationsphase (LeanRAG Stage 3).
+pub mod aggregation_phase;
+/// Modul für entkoppelte Eingabe- und Ausgabe-Channels (Baukasten-Integration).
+pub mod channel;
+/// Modul für die Ausführung der Konsolidierung.
+pub mod consolidation_executor;
+/// Modul für Konsolidierungs-Locks und Kaskaden-Invalidierung.
+pub mod consolidation_locks;
+/// Modul für autonome Kontextverwaltung und Token-Budgetierung.
+pub mod context;
+/// Modul für Kontext-Kompaktierung.
+pub mod context_compaction;
+pub mod collection;
+pub mod collection_types;
+pub mod decay;
+mod engine_local;
+mod graph_local;
+/// Modul für Graph-Senken (Super-Hyperkanten).
+pub mod graph_sink;
+/// Modul zur Vorbereitung von LeanRAG-Eingabedaten.
+pub mod leanrag_input;
+/// Modul für Wartungskonfigurationen.
+pub mod maintenance_config;
+/// Modul für periodische Wartungsplanung.
+pub mod maintenance_scheduler;
+/// Modul für Gedächtniskonsolidierung (Structural Pass).
+pub mod memory_consolidation;
+mod ports_local;
+/// Modul für die Fassadenschnittstelle zur semantischen Aggregation.
+pub mod semantic_aggregation_facade;
+/// Modul für generative Wissenssynthese (LLM-Pass).
+pub mod synthesis_phase;
+/// Modul für Transitivitäts-Veto-Prüfungen.
+pub mod transitivity_veto;
+mod types_local;
+
+// !SECTION: Modul-Deklarationen
+
+// =========================================================================
+// SECTION: Oeffentliche Re-Exports
+// =========================================================================
 pub use aggregation_phase::{
     check_compaction_budget, compute_entity_community_hash, run_aggregation_pass,
     AggregationConfig, AggregationEdge, AggregationNode, AggregationPhaseResult, AlphaNode,
     ConsolidationPipelineResult, SuperEdgeDraft, SuperEdgeSink,
+};
+pub use channel::{
+    CognitiveInputChannel, CognitiveOutputSink, DirectCognitiveChannel, InMemoryCognitiveChannel,
+    InMemoryOutputSink,
 };
 #[allow(deprecated)]
 pub use consolidation_executor::{
@@ -53,3 +121,4 @@ pub use memory_consolidation::{
 pub use semantic_aggregation_facade::consolidate_semantic_hyperedges;
 pub use synthesis_phase::run_synthesis_pass;
 pub use transitivity_veto::{filter_candidates_with_transitivity_veto, validate_transitivity_veto};
+// !SECTION: Oeffentliche Re-Exports

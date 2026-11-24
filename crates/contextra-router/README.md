@@ -2,28 +2,50 @@
 
 Lyapunov Drift Control und Multi-Candidate Search Routing Engine.
 
-Normativitätsklasse: **Experimentell `[E]`** (Ring 3, `stable`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **Experimentell `[E]`** (Ebene E2, `stable`; §6.0, `capabilities.fragment.toml`).
 
+`contextra-router` ist ein isolierter Baukasten zur intelligenten Zuweisung von Anfragen an geeignete Small Language Models (SLMs) und Dispatcher-Pfade.
 
-`contextra-router` stellt das SLM-Profil-Routing und den Dispatcher bereit (Ring 3).
+## 1. Baukasten-Profil & Architektur
+- **Ebene:** Ebene 2 (Integration/Applikation)
+- **Status:** 🟢 Modular entkoppelt (WP-RT-1)
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` strikt erzwungen
+- **Kern-Closure:** `contextra-types`, `contextra-ports`, `contextra-adapt`
+- **Optionale Closure:** `contextra-wire`, `tokio`, `shlex` (nur hinter `subprocess-dispatch`)
+- **Keine Aufwärtsabhängigkeiten:** Tests und Benchmarks laufen autark über injizierte Ports ohne Abhängigkeiten zu höheren Ringen oder konkreten Speicherkernen (`contextra-db`, `contextra-vector`, `contextra-graph`, `contextra-text`).
 
-## Zweck
+## 2. Garantien & Verträge
+1. **Umwelt-Injektion (M4):**
+   - Zeit über `contextra_ports::Clock`.
+   - Dateizugriffe (z. B. persistierte Kalibrierungen) über die Naht `CalibrationSource` (`src/seam.rs`).
+   - Pseudo-Zufall über deterministische Seeded RNGs (`SplitMix64`) bzw. `contextra_adapt::Rng`.
+2. **Fail-Closed & Conformal Calibration (M5):**
+   - Fail-closed bei ungültigen Profilen, nicht-finiten Relevanzwerten oder fehlender Community-Zuordnung.
+   - Statistisch abgesicherte Konfidenzintervalle via Conformal Prediction.
+3. **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `panic!`, `unwrap()` oder `expect()` in der Produktionslogik.
 
-Führt Anfragen an kleine Sprachmodelle (SLMs) und Dispatcher-Pfade aus, nutzt re-exportierte Bandit-Komponenten zur Strategie-Auswahl.
+## 3. Öffentliche API
+- **Router Engine:** [`RouterEngine`], [`DefaultRouterEngine`], [`RoutingDecision`], [`ConfidenceMetrics`]
+- **Adoptions-Fassade:** [`RouterEngineBuilder`]
+- **SLM Profiles & Dispatch:** [`SlmProfile`], [`dispatch_to_slm`]
+- **Outcomes & IDs:** [`RoutingOutcome`], [`DecisionId`], [`DecisionIdGenerator`]
+- **Strategien:** [`RoutingStrategy`], [`ArmRegistry`]
+- **Kalibrierungs-Naht:** [`CalibrationSource`], [`NoCalibrationSource`], [`StdFsCalibrationSource`], [`VfsCalibrationSource`]
 
-## Ring-Zugehörigkeit & Status
+## 4. Einbettungsbeispiel
+Ein eigenständiges Minimalbeispiel mit dem Fluent Builder findet sich unter `examples/builder_router.rs`:
 
-- **Ring:** Ring 3 (Anwendungskern / Router)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+```rust
+use contextra_router::{RouterEngineBuilder, SlmProfile};
+use std::sync::Arc;
 
-## Öffentliche API-Übersicht
+let router = RouterEngineBuilder::new()
+    .search_provider(search_provider)
+    .community_resolver(community_resolver)
+    .context_preparer(context_preparer)
+    .add_profile(profile)
+    .build()?;
 
-- **Router Engine:** `RouterEngine`, `DefaultRouterEngine`, `RoutingDecision`
-- **SLM Profiles & Dispatch:** `SlmProfile`, `dispatch_to_slm`
-- **Routing Outcomes:** `RoutingOutcome`, `DecisionId`
-- **Adapt Re-exports:** Re-exports von `contextra_adapt::{bandit, lyapunov, offpolicy}`
-
-## Architektur & Verweise
-
-Details zum SLM-Profil-Routing finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) und `README.md` §8.
+let decision = router.route(&query_vector, "Suchanfrage").await?;
+println!("Ausgewähltes SLM: {}", decision.profile.name);
+```

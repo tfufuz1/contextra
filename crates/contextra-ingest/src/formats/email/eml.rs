@@ -1,3 +1,14 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: EML (RFC 5322 / MIME) Extractor-Implementierung mit mail-parser.
 // INVARIANTEN: Zero-Panic, Fail-Closed, kein unsafe, Einhaltung der Privacy- und Budget-Regeln.
@@ -12,7 +23,7 @@ use crate::ir::{
     BlockKind, Boundary, DocumentIr, ExtractWarning, Locator, MessageHeader, WarningCode,
 };
 use mail_parser::{
-    Addr, Address, HeaderValue, Message, MessagePart, MessageParser, MimeHeaders, PartType,
+    Addr, Address, HeaderValue, Message, MessageParser, MessagePart, MimeHeaders, PartType,
 };
 
 /// Extrahiert eine einzelne EML-Nachricht.

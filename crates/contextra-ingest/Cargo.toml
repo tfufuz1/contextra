@@ -22,7 +22,7 @@ fmt-odf = ["zip-container", "xml"]
 fmt-sheets = ["dep:calamine", "dep:csv", "dep:encoding_rs", "zip-container", "xml"]
 fmt-pdf = ["dep:lopdf"]
 fmt-ole = ["dep:cfb"]
-fmt-email = ["dep:mail-parser"]
+fmt-email = ["dep:mail-parser", "dep:encoding_rs"]
 fmt-structured = ["dep:yaml-rust2", "dep:toml", "xml"]
 zip-container = ["dep:zip"]
 xml = ["dep:quick-xml", "dep:encoding_rs"]
@@ -38,11 +38,13 @@ all-formats = [
     "fmt-email",
     "fmt-structured",
 ]
+fuzz = []
+workspace = ["dep:contextra-types"]
+types-compat = ["workspace"]
 
 [dependencies]
-# Workspace crates
-contextra-types = { workspace = true }
-contextra-engine = { workspace = true }
+# Workspace crates (keine internen Dependencies - Klasse A Baustein)
+contextra-types = { workspace = true, optional = true }
 
 # Always dependencies
 serde = { workspace = true }
@@ -66,8 +68,13 @@ yaml-rust2 = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 proptest = "1.4"
 tempfile = { workspace = true }
 zip = { workspace = true, default-features = false, features = ["deflate", "bzip2", "time"] }
 lopdf = { workspace = true }
 cfb = { workspace = true }
+
+[[bench]]
+name = "bm_ingest"
+harness = false

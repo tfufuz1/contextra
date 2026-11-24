@@ -1,4 +1,8 @@
 #![allow(deprecated)]
+//! # Graph-unterstützte Hybrid-Suche
+//!
+//! Testet die Integration von Graph-Anchor-Signalen in die hybride RRF-Suche.
+//!
 
 use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_ports::GraphIndex;
@@ -6,6 +10,8 @@ use contextra_types::{Edge, Entity, EntityId, TxId};
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-GRAPH_HYBRID_SEARCH-01-TEST_HYBRID_SEARCH_INCLUDES_GRAPH_SIGNAL]
+// Testet die Funktionalität von `test_hybrid_search_includes_graph_signal`.
 #[tokio::test]
 #[allow(deprecated)]
 async fn test_hybrid_search_includes_graph_signal() {
@@ -82,6 +88,8 @@ async fn test_hybrid_search_includes_graph_signal() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-GRAPH_HYBRID_SEARCH-02-TEST_RELATE_UPDATES_GRAPH_INDEX_AND_AFFECTS_HYBRID_SEARCH]
+// Testet die Funktionalität von `test_relate_updates_graph_index_and_affects_hybrid_search`.
 #[tokio::test]
 #[allow(deprecated)]
 async fn test_relate_updates_graph_index_and_affects_hybrid_search() {
@@ -139,6 +147,8 @@ async fn test_relate_updates_graph_index_and_affects_hybrid_search() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-GRAPH_HYBRID_SEARCH-03-TEST_HYBRID_SEARCH_WITH_PPR_STRATEGY]
+// Testet die Funktionalität von `test_hybrid_search_with_ppr_strategy`.
 #[tokio::test]
 #[allow(deprecated)]
 async fn test_hybrid_search_with_ppr_strategy() {
@@ -216,6 +226,8 @@ async fn test_hybrid_search_with_ppr_strategy() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-GRAPH_HYBRID_SEARCH-04-TEST_HYBRID_SEARCH_WITH_PATHRAG_STRATEGY]
+// Testet die Funktionalität von `test_hybrid_search_with_pathrag_strategy`.
 #[tokio::test]
 async fn test_hybrid_search_with_pathrag_strategy() {
     use contextra_db::SearchStrategy;

@@ -1,0 +1,28 @@
+{
+  "source_file": "sample.yaml",
+  "detected_format": "Yaml",
+  "title": null,
+  "canonical_hash": "d7a32adef1ed458f655066ed7f53082ed6f8ddf620a96462e93252926d01a902",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "metadata.title: YAML Beispieldokument\n\nmetadata.created: 2026-11-11\n\ndatabase.host: localhost\n\ndatabase.port: 5432\n\ndatabase.tables[0]: users\n\ndatabase.tables[1]: logs",
+      "token_count": 44,
+      "metadata": {
+        "chunk_id": "5f389101c54780031989a77d18eeb2f2",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "format": "yaml",
+        "locator": {},
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 167,
+          "start": 0
+        },
+        "strategy": "structured"
+      }
+    }
+  ]
+}

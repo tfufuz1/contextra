@@ -1,9 +1,17 @@
+//! # Integrationstest: auto extraction default enabled
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Testet den kompilierte Default-Wert fuer AutoExtractionConfig (enabled: true vs. opt-out).
 
 use contextra_engine::collection::crud::AutoExtractionConfig;
 
+// ANCHOR[contextra-engine:TST01-001]
+/// Testblock zur Überprüfung von `test_auto_extraction_config_default_value`.
 #[test]
 fn test_auto_extraction_config_default_value() {
     let cfg = AutoExtractionConfig::default();

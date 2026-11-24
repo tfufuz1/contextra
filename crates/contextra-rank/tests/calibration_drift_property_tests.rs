@@ -5,8 +5,8 @@ use contextra_rank::calibration::{
 };
 use contextra_rank::drift::{DriftDetector, DriftStatus};
 use proptest::prelude::*;
-
 proptest! {
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_isotonic_pava_monotonicity(
         scores in prop::collection::vec(0.0f32..1.0f32, 10..50),
@@ -37,6 +37,7 @@ proptest! {
         }
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_platt_scaling_range_bounded(
         logit in -100.0f32..100.0f32,
@@ -48,6 +49,7 @@ proptest! {
         prop_assert!((0.0..=1.0).contains(&p), "Platt scaling output must be in [0, 1], got {p}");
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_drift_detector_stationary_no_false_alarms(
         mean in 0.2f32..0.8f32,
@@ -71,6 +73,7 @@ proptest! {
     }
 }
 
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_conformal_coverage_empirical_guarantee_synthetic() {
     let alpha = 0.10_f32;
@@ -111,6 +114,7 @@ fn test_conformal_coverage_empirical_guarantee_synthetic() {
     );
 }
 
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_platt_scaler_fit_properties_range() {
     let obs = vec![

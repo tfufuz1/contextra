@@ -1,3 +1,7 @@
+//! # Checkpoint-Schichtgrenzen-Tests
+//!
+//! Überprüft Schichtgrenzen und Snapshot-Konsistenz bei Checkpoint-Erstellung.
+//!
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_types::TxId;

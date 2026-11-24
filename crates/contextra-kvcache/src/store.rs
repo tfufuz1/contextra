@@ -1,38 +1,64 @@
-// FILE-CONTEXT
-// ZWECK: Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation) mit Prefix-Radix & Guard-Schutz.
-// STAND: TS:2026-09-15T00:00:00Z
+//! # Tenant-isolierter KV-Segment-Store
+//!
+//! ANCHOR[contextra-kvcache:STORE-001]
+//!
+//! Dieses Modul implementiert den mandantentrennenden In-Memory-Speicher [`TenantIsolatedKvStore`]
+//! für KV-Cache-Segmente gemäß den Sicherheitsregeln zur Mandanten-Isolation (`INV-TENANT`).
+//!
+//! ## Architektur & Mandantentrennung
+//! - **Sharding**: Der Store ist in mehrere Shards unterteilt (standardmäßig 32), um
+//!   Lock-Konflikte (Lock Contention) bei parallelem Zugriff über mehrere CPU-Kerne zu minimieren.
+//! - **Kein Cross-Tenant-Leak**: Innerhalb jedes Shards hält eine Hash-Map (`AHashMap<TenantId, TenantState>`)
+//!   völlig getrennte LRU-Caches und Prefix-Radix-Bäume pro Mandant. Ein Mandant kann niemals
+//!   Segmente oder Präfixe eines anderen Mandanten lesen, überschreiben oder invalidieren.
+//! - **Fairness bei der Verdrängung (Eviction)**: Die Verdrängungs-Engine ([`TenantIsolatedKvStore::evict_lru_fair`])
+//!   rotiert über die Shards und Mandanten, sodass inaktive Mandanten nicht durch sehr aktive
+//!   Mandanten ausgehungert (Starvation) werden.
+//! - **Schutz aktiver Referenzen**: Segmente mit aktiven Guards ([`KvBlockGuard`], d. h. `active_refs > 0`)
+//!   werden bei der Verdrängung strikt übersprungen.
+//! - **CacheDirectives & Pinning**: Unterstützt deklarative Direktiven wie `NeverCache`, `Pin`
+//!   (mit max. Budget [`MAX_PINNED_BYTES_PER_TENANT`]) und `ReleaseAfterStep`.
 
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use crate::error::{KvCacheError, Result};
+pub use crate::types::{CacheDirective, StepId};
 use ahash::AHashMap;
-pub use contextra_types::error::{CacheDirective, StepId};
-use contextra_types::{ContextraError, TenantId};
+use crate::types::TenantId;
 use lru::LruCache;
 use parking_lot::RwLock;
 
 use super::attention_score::{
-    rank_for_eviction_weighted_for_tenant, AttentionScoreSource, NullAttentionScoreSource,
+    rank_for_eviction_weighted_for_tenant_nanos, AttentionScoreSource, NullAttentionScoreSource,
 };
 use super::eviction_worker::EvictionWorker;
 use super::radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 use super::segment::KvSegment;
+use contextra_env::{Clock, SystemClock};
 
+// ANCHOR[contextra-kvcache:STORE-002]
 /// Optionaler Callback-Hook für Tier-2-LSM-Spill bei Eviction aus dem In-Memory LRU Cache.
+///
+/// Wird aufgerufen, wenn ein Segment aus dem RAM verdrängt wird, um es auf persistente Medien
+/// (LSM-Tree = Log-Structured Merge-Tree) auszulagern.
 pub type SpillHandler = Arc<dyn Fn(TenantId, u64, Vec<u8>) + Send + Sync>;
 
-/// Maximum allowed total pinned bytes per tenant for un-expiring pinned segments (`Pin { ttl: None }`).
+// ANCHOR[contextra-kvcache:STORE-003]
+/// Maximal erlaubte Gesamtgröße gepinnter Bytes pro Mandant für ungepinnte Segmente ohne Ablaufdatum (`Pin { ttl: None }`).
+///
+/// Verhindert Denial-of-Service (DoS) durch unbegrenztes Festpinnen von Speicher (64 MiB).
 pub const MAX_PINNED_BYTES_PER_TENANT: u64 = 64 << 20; // 64 MiB
 
 #[derive(Debug, Clone)]
 struct SegmentMeta {
     directive: CacheDirective,
-    pinned_at: std::time::Instant,
+    pinned_at_nanos: u64,
 }
 
-/// Kapselt den LRU-Cache und den Prefix-Radix-Baum aller KV-Segmente eines einzelnen Tenants.
-struct TenantState {
+/// Kapselt den LRU-Cache und den Prefix-Radix-Baum aller KV-Segmente eines einzelnen Mandanten.
+pub(crate) struct TenantState {
     tenant_id: TenantId,
     cache: LruCache<u64, KvSegment>,
     radix_tree: PrefixRadixTree,
@@ -53,19 +79,26 @@ impl TenantState {
         }
     }
 
-    /// Insert with explicit cache directive and pin budget checking.
+    /// Fügt ein Segment unter Beachtung der CacheDirective und des Pin-Budgets ein.
+    ///
+    /// # Ablauf
+    /// 1. Prüfen des Pin-Budgets bei unbegrenztem Pin (`MAX_PINNED_BYTES_PER_TENANT`).
+    /// 2. Falls Cache voll ist, LRU-Kandidaten unter Beachtung aktiver Guards verdrängen.
+    /// 3. Falls alle Blöcke geschützt sind, Kapazität temporär vergrößern.
+    /// 4. Segment in den LRU-Cache einfügen und Metadaten aktualisieren.
     fn insert_returning_evicted_with_directive(
         &mut self,
         segment: KvSegment,
         directive: &CacheDirective,
         scores: &dyn AttentionScoreSource,
-    ) -> Result<Option<KvSegment>, ContextraError> {
+        now_monotonic: u64,
+    ) -> Result<Option<KvSegment>> {
         let req_bytes = segment.len() as u64;
 
         if matches!(directive, CacheDirective::Pin { ttl: None })
             && self.pinned_bytes.saturating_add(req_bytes) > MAX_PINNED_BYTES_PER_TENANT
         {
-            return Err(ContextraError::pin_budget_exceeded(format!(
+            return Err(KvCacheError::pin_budget_exceeded(format!(
                 "Tenant {:?} requested {} pinned bytes, exceeding limit of {} bytes (current pinned: {})",
                 self.tenant_id, req_bytes, MAX_PINNED_BYTES_PER_TENANT, self.pinned_bytes
             )));
@@ -75,7 +108,7 @@ impl TenantState {
         let bytes = segment.len();
 
         let evicted = if self.cache.len() >= self.cache.cap().get() {
-            self.pop_lru(scores)
+            self.pop_eviction_candidate(scores, 0.5, now_monotonic)
         } else {
             None
         };
@@ -106,7 +139,7 @@ impl TenantState {
             id,
             SegmentMeta {
                 directive: directive.clone(),
-                pinned_at: std::time::Instant::now(),
+                pinned_at_nanos: now_monotonic,
             },
         );
 
@@ -120,7 +153,7 @@ impl TenantState {
 
     /// O(1) get für Entschlüsselung — benötigt &mut wegen LRU-Update.
     #[cfg(feature = "kv-encryption")]
-    fn get_segment_ref_mut(&mut self, id: u64) -> Option<&KvSegment> {
+    pub(crate) fn get_segment_ref_mut(&mut self, id: u64) -> Option<&KvSegment> {
         self.cache.get(&id)
     }
 
@@ -146,7 +179,7 @@ impl TenantState {
         Some(seg)
     }
 
-    /// Releases transient segments associated with a completed step.
+    /// Gibt transiente Segmente frei, die an einen abgeschlossenen Schritt (`StepId`) gebunden sind.
     fn release_step(&mut self, step_id: StepId) {
         let ids_to_release: Vec<u64> = self
             .segment_meta
@@ -164,17 +197,17 @@ impl TenantState {
         }
     }
 
-    /// Candidate eviction selection incorporating LRU access age and attention scores.
+    /// Wählt Verdrängungskandidaten basierend auf LRU-Zugriffszeit und Attention-Scores aus.
     fn pop_eviction_candidate(
         &mut self,
         scores: &dyn AttentionScoreSource,
         attention_weight: f32,
+        now_monotonic: u64,
     ) -> Option<KvSegment> {
         if self.cache.is_empty() {
             return None;
         }
 
-        let now = std::time::Instant::now();
         let unref_ids: Vec<u64> =
             self.cache
                 .iter()
@@ -185,7 +218,9 @@ impl TenantState {
                             .directive
                         {
                             CacheDirective::Pin { ttl: None } => true,
-                            CacheDirective::Pin { ttl: Some(dur) } => now < meta.pinned_at + *dur,
+                            CacheDirective::Pin { ttl: Some(dur) } => {
+                                now_monotonic < meta.pinned_at_nanos.saturating_add(dur.as_nanos() as u64)
+                            }
                             _ => false,
                         });
                         if !is_pinned {
@@ -207,19 +242,18 @@ impl TenantState {
             return self.remove(unref_ids[0]);
         }
 
-        let base_time = std::time::Instant::now();
-        let candidates: Vec<(u64, std::time::Instant)> = unref_ids
+        let candidates: Vec<(u64, u64)> = unref_ids
             .into_iter()
             .enumerate()
             .map(|(i, id)| {
                 (
                     id,
-                    base_time + std::time::Duration::from_nanos(i as u64 * 1000),
+                    now_monotonic.saturating_add((i as u64) * 1000),
                 )
             })
             .collect();
 
-        let ranked = rank_for_eviction_weighted_for_tenant(
+        let ranked = rank_for_eviction_weighted_for_tenant_nanos(
             self.tenant_id,
             &candidates,
             scores,
@@ -235,16 +269,12 @@ impl TenantState {
 
     /// LRU-Eviction unter Schutz aktiver Referenzen (`active_refs == 0`).
     /// Iteriert von LRU (Least Recently Used) zu MRU.
-    fn pop_lru(&mut self, scores: &dyn AttentionScoreSource) -> Option<KvSegment> {
-        self.pop_eviction_candidate(scores, 0.5)
+    fn pop_lru(&mut self, scores: &dyn AttentionScoreSource, now_monotonic: u64) -> Option<KvSegment> {
+        self.pop_eviction_candidate(scores, 0.5, now_monotonic)
     }
 
     /// Fügt eine Token-Sequenz in den Radix-Baum ein.
-    fn insert_token_sequence(
-        &mut self,
-        tokens: &[u32],
-        block_id: u64,
-    ) -> Result<(), ContextraError> {
+    fn insert_token_sequence(&mut self, tokens: &[u32], block_id: u64) -> Result<()> {
         self.radix_tree.insert(tokens, block_id)
     }
 
@@ -274,10 +304,12 @@ impl TenantState {
     }
 }
 
-/// Cache-Line-Padding verhindert False-Sharing auf 64-Byte-Cache-Lines.
+/// Shard-Container mit 64-Byte Cache-Line-Alignment.
+///
+/// Verhindert False-Sharing zwischen verschiedenen CPU-Kernen.
 #[repr(align(64))]
-struct Shard {
-    lock: RwLock<AHashMap<TenantId, TenantState>>,
+pub(crate) struct Shard {
+    pub(crate) lock: RwLock<AHashMap<TenantId, TenantState>>,
 }
 
 impl Shard {
@@ -288,7 +320,11 @@ impl Shard {
     }
 }
 
-/// Tenant-isolierter KV-Segment-Store.
+// ANCHOR[contextra-kvcache:STORE-004]
+/// Mandantenisolierter KV-Segment-Store im Hauptspeicher.
+///
+/// Bildet den zentralen RAM-Zwischenspeicher für KV-Caches mit Sharding,
+/// LRU-Verdrängung, Aufmerksamkeitsscoring und Transaktions-Rollback-Unterstützung.
 pub struct TenantIsolatedKvStore {
     shards: Box<[Shard]>,
     shard_count: usize,
@@ -297,19 +333,37 @@ pub struct TenantIsolatedKvStore {
     segment_capacity: NonZeroUsize,
     spill_handler: RwLock<Option<SpillHandler>>,
     attention_source: Arc<RwLock<Arc<dyn AttentionScoreSource>>>,
+    clock: Arc<dyn Clock>,
 }
 
 impl TenantIsolatedKvStore {
+    #[cfg_attr(not(feature = "kv-encryption"), allow(dead_code))]
+    pub(crate) fn shard_count(&self) -> usize {
+        self.shard_count
+    }
+
+    #[cfg_attr(not(feature = "kv-encryption"), allow(dead_code))]
+    pub(crate) fn shards(&self) -> &[Shard] {
+        &self.shards
+    }
+
+    /// Standardanzahl paralleler Shards (32).
     pub const DEFAULT_SHARD_COUNT: usize = 32;
+    /// Standardkapazität an Segmenten pro Mandant (256).
     pub const DEFAULT_SEGMENT_CAPACITY_PER_TENANT: usize = 256;
 
-    /// Erstellt einen neuen tenant-isolierten KV-Store.
+    /// Erstellt einen neuen tenant-isolierten KV-Store mit Standard-Sharding.
     pub fn new() -> Self {
         Self::with_shard_count(Self::DEFAULT_SHARD_COUNT)
     }
 
-    /// Erstellt einen Store mit angegebener Shard-Anzahl.
+    /// Erstellt einen Store mit benutzerdefinierter Shard-Anzahl (wird auf Zweierpotenz aufgerundet).
     pub fn with_shard_count(n: usize) -> Self {
+        Self::with_shard_count_and_clock(n, Arc::new(SystemClock::new()))
+    }
+
+    /// Erstellt einen Store mit benutzerdefinierter Shard-Anzahl und injizierter Uhr.
+    pub fn with_shard_count_and_clock(n: usize, clock: Arc<dyn Clock>) -> Self {
         let shard_count = n.next_power_of_two().max(1);
         let shards = (0..shard_count)
             .map(|_| Shard::new())
@@ -330,20 +384,26 @@ impl TenantIsolatedKvStore {
             attention_source: Arc::new(RwLock::new(
                 Arc::new(NullAttentionScoreSource) as Arc<dyn AttentionScoreSource>
             )),
+            clock,
         }
     }
 
-    /// Setzt die konfigurierte Standard-AttentionScoreSource für diesen Store.
+    /// Erstellt einen Store mit injizierter Uhr und Standard-Sharding.
+    pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
+        Self::with_shard_count_and_clock(Self::DEFAULT_SHARD_COUNT, clock)
+    }
+
+    /// Setzt die konfigurierte Standard-[`AttentionScoreSource`] für diesen Store.
     pub fn set_attention_source(&self, source: Arc<dyn AttentionScoreSource>) {
         *self.attention_source.write() = source;
     }
 
-    /// Liefert die konfigurierte Standard-AttentionScoreSource für diesen Store.
+    /// Liefert die konfigurierte Standard-[`AttentionScoreSource`] für diesen Store.
     pub fn attention_source(&self) -> Arc<dyn AttentionScoreSource> {
         self.attention_source.read().clone()
     }
 
-    /// Erstellt einen Store mit konfigurierter Segment-Kapazität pro Tenant.
+    /// Erstellt einen Store mit konfigurierter Segment-Kapazität pro Mandant.
     pub fn with_capacity(segment_capacity_per_tenant: usize) -> Self {
         let mut store = Self::new();
         store.segment_capacity =
@@ -351,36 +411,54 @@ impl TenantIsolatedKvStore {
         store
     }
 
-    /// Registriert einen Spill-Handler für evictierte Segmente.
+    /// Erstellt einen Store mit konfigurierter Segment-Kapazität pro Mandant und injizierter Uhr.
+    pub fn with_capacity_and_clock(segment_capacity_per_tenant: usize, clock: Arc<dyn Clock>) -> Self {
+        let mut store = Self::with_clock(clock);
+        store.segment_capacity =
+            NonZeroUsize::new(segment_capacity_per_tenant.max(1)).unwrap_or(NonZeroUsize::MIN);
+        store
+    }
+
+    /// Registriert einen Spill-Handler für evictierte Segmente (Tier-2 Auslagerung).
     pub fn set_spill_handler(&self, handler: SpillHandler) {
         *self.spill_handler.write() = Some(handler);
     }
 
+    /// Berechnet den Shard-Index deterministisch aus der Mandanten-ID.
     #[inline]
     fn shard_idx(&self, tenant: TenantId) -> usize {
         (tenant.inner() as usize) & (self.shard_count - 1)
     }
 
-    /// Inserts a segment with an explicit declarative cache directive.
+    /// Fügt ein Segment mit einer deklarativen [`CacheDirective`] ein.
+    ///
+    /// # Ablauf
+    /// 1. Bei `CacheDirective::NeverCache` sofort abbrechen (No-Op).
+    /// 2. Shard anhand der Mandanten-ID ermitteln und Schreibsperre anfordern.
+    /// 3. Mandantenspezifischen `TenantState` abrufen oder initialisieren.
+    /// 4. Segment einfügen und eventuell verdrängtes Segment entgegennehmen.
+    /// 5. Falls verdrängt und SpillHandler registriert: ausgelagertes Segment an Handler übergeben.
     pub fn insert_segment_with_directive(
         &self,
-        tenant: TenantId,
+        tenant: impl Into<TenantId>,
         segment: KvSegment,
         directive: CacheDirective,
-    ) -> Result<(), ContextraError> {
-        if matches!(directive, CacheDirective::NeverCache) {
+    ) -> Result<()> {
+
+        let tenant = tenant.into();        if matches!(directive, CacheDirective::NeverCache) {
             return Ok(());
         }
 
         let idx = self.shard_idx(tenant);
         let capacity = self.segment_capacity;
         let scores = self.attention_source();
+        let now = self.clock.monotonic_nanos();
         let evicted = {
             let mut shard = self.shards[idx].lock.write();
             let state = shard
                 .entry(tenant)
                 .or_insert_with(|| TenantState::new(tenant, capacity));
-            state.insert_returning_evicted_with_directive(segment, &directive, scores.as_ref())?
+            state.insert_returning_evicted_with_directive(segment, &directive, scores.as_ref(), now)?
         };
 
         if let Some(ev) = evicted {
@@ -393,17 +471,19 @@ impl TenantIsolatedKvStore {
         Ok(())
     }
 
-    /// Fügt ein Segment für einen bestimmten Tenant ein.
-    pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment) {
-        let _ = self.insert_segment_with_directive(tenant, segment, CacheDirective::Auto);
+    /// Fügt ein Segment für einen bestimmten Mandanten mit Standard-Direktive (`Auto`) ein.
+    pub fn insert_segment(&self, tenant: impl Into<TenantId>, segment: KvSegment) {
+
+        let tenant = tenant.into();        let _ = self.insert_segment_with_directive(tenant, segment, CacheDirective::Auto);
     }
 
-    /// Releases transient cache segments created during a specific step.
-    pub fn release_step(&self, tenant: TenantId, step_id: StepId) {
-        let idx = self.shard_idx(tenant);
+    /// Gibt transiente Segmente frei, die mit einem bestimmten Ausführungsschritt verknüpft sind.
+    pub fn release_step(&self, tenant: impl Into<TenantId>, step_id: impl Into<StepId>) {
+
+        let tenant = tenant.into();        let idx = self.shard_idx(tenant);
         let mut shard = self.shards[idx].lock.write();
         if let Some(state) = shard.get_mut(&tenant) {
-            state.release_step(step_id);
+            state.release_step(step_id.into());
             if state.is_empty() {
                 shard.remove(&tenant);
             }
@@ -413,11 +493,12 @@ impl TenantIsolatedKvStore {
     /// Fügt eine Token-Sequenz und deren assoziierte Block-ID in den Prefix-Radix-Baum ein.
     pub fn insert_token_sequence(
         &self,
-        tenant: TenantId,
+        tenant: impl Into<TenantId>,
         tokens: &[u32],
         block_id: u64,
-    ) -> Result<(), ContextraError> {
-        let idx = self.shard_idx(tenant);
+    ) -> Result<()> {
+
+        let tenant = tenant.into();        let idx = self.shard_idx(tenant);
         let capacity = self.segment_capacity;
         let mut shard = self.shards[idx].lock.write();
         let state = shard
@@ -426,41 +507,45 @@ impl TenantIsolatedKvStore {
         state.insert_token_sequence(tokens, block_id)
     }
 
-    /// Sucht ein Präfix-Match für die angegebenen Tokens unter der gewünschten `KvReusePolicy`.
+    /// Sucht ein Präfix-Match für die angegebenen Tokens unter der gewünschten [`KvReusePolicy`].
     pub fn find_prefix_match(
         &self,
-        tenant: TenantId,
+        tenant: impl Into<TenantId>,
         tokens: &[u32],
         policy: KvReusePolicy,
         worker: Option<Arc<EvictionWorker>>,
     ) -> Option<(PrefixMatch, KvBlockGuard)> {
-        let idx = self.shard_idx(tenant);
+
+        let tenant = tenant.into();        let idx = self.shard_idx(tenant);
         let mut shard = self.shards[idx].lock.write();
         let state = shard.get_mut(&tenant)?;
         state.find_prefix_match(tokens, policy, worker)
     }
 
-    /// Erstellt einen `KvBlockGuard` für einen bestimmten Block.
+    /// Erstellt einen [`KvBlockGuard`] für einen bestimmten Block.
     pub fn acquire_block_guard(
         &self,
-        tenant: TenantId,
+        tenant: impl Into<TenantId>,
         block_id: u64,
         worker: Option<Arc<EvictionWorker>>,
     ) -> Option<KvBlockGuard> {
-        let idx = self.shard_idx(tenant);
+
+        let tenant = tenant.into();        let idx = self.shard_idx(tenant);
         let mut shard = self.shards[idx].lock.write();
         let state = shard.get_mut(&tenant)?;
         state.acquire_guard(block_id, worker)
     }
 
-    /// Bereinigt assoziierte KV-Segmente bei einem transaktionalen Rollback.
-    pub fn on_rollback(&self, tenant: TenantId, chunk_ids: &[u64]) {
-        self.remove_segments_for_rollback(tenant, chunk_ids);
+    /// Bereinigt assoziierte KV-Segmente bei einem transaktionalen Rollback (z. B. nach Abbruch einer Inferenz).
+    pub fn on_rollback(&self, tenant: impl Into<TenantId>, chunk_ids: &[u64]) {
+
+        let tenant = tenant.into();        self.remove_segments_for_rollback(tenant, chunk_ids);
     }
 
-    /// Entfernt Segmente mit den angegebenen `segment_ids` für einen Tenant.
-    pub fn remove_segments_for_rollback(&self, tenant: TenantId, segment_ids: &[u64]) {
-        if segment_ids.is_empty() {
+    /// Entfernt Segmente mit den angegebenen IDs für einen Mandanten.
+    pub fn remove_segments_for_rollback(&self, tenant: impl Into<TenantId>, segment_ids: &[u64]) {
+
+        let tenant = tenant.into();        if segment_ids.is_empty() {
             return;
         }
         let idx = self.shard_idx(tenant);
@@ -494,13 +579,15 @@ impl TenantIsolatedKvStore {
     }
 
     /// Entfernt ein einzelnes Segment.
-    pub fn remove_segment(&self, tenant: TenantId, segment_id: u64) {
-        self.remove_segments_for_rollback(tenant, &[segment_id]);
+    pub fn remove_segment(&self, tenant: impl Into<TenantId>, segment_id: u64) {
+
+        let tenant = tenant.into();        self.remove_segments_for_rollback(tenant, &[segment_id]);
     }
 
-    /// Liefert unverschlüsselte Segment-Bytes für einen Tenant.
-    pub fn get_segment_bytes(&self, tenant: TenantId, segment_id: u64) -> Option<Vec<u8>> {
-        let idx = self.shard_idx(tenant);
+    /// Liefert unverschlüsselte Segment-Bytes für einen Mandanten.
+    pub fn get_segment_bytes(&self, tenant: impl Into<TenantId>, segment_id: u64) -> Option<Vec<u8>> {
+
+        let tenant = tenant.into();        let idx = self.shard_idx(tenant);
         self.shards[idx]
             .lock
             .write()
@@ -508,31 +595,9 @@ impl TenantIsolatedKvStore {
             .get_bytes(segment_id)
     }
 
-    /// Verschlüsselt einen Klartext-Tensor und fügt ein verschlüsseltes Segment ein.
-    #[cfg(feature = "kv-encryption")]
-    pub fn insert_encrypted_segment(
-        &self,
-        cipher: &contextra_crypto::KvSegmentCipher,
-        tenant: TenantId,
-        segment_id: u64,
-        model_fingerprint: contextra_crypto::ModelFingerprint,
-        rope_offset: Option<usize>,
-        plaintext: &[u8],
-    ) -> Result<(), contextra_crypto::CryptoError> {
-        let segment = KvSegment::new_encrypted(
-            cipher,
-            tenant,
-            segment_id,
-            model_fingerprint,
-            rope_offset,
-            plaintext,
-        )?;
-        self.insert_segment(tenant, segment);
-        Ok(())
-    }
-
-    /// Liefert alle gespeicherten Segment-IDs eines Tenants.
-    pub fn get_segments(&self, tenant: TenantId) -> Vec<u64> {
+    /// Liefert alle gespeicherten Segment-IDs eines Mandanten.
+    pub fn get_segments(&self, tenant: impl Into<TenantId>) -> Vec<u64> {
+        let tenant = tenant.into();
         let idx = self.shard_idx(tenant);
         self.shards[idx]
             .lock
@@ -542,28 +607,10 @@ impl TenantIsolatedKvStore {
             .unwrap_or_default()
     }
 
-    /// Liest ein Segment und entschlüsselt es falls nötig.
-    #[cfg(feature = "kv-encryption")]
-    pub fn get_decrypted_segment(
-        &self,
-        cipher: &contextra_crypto::KvSegmentCipher,
-        tenant: TenantId,
-        segment_id: u64,
-    ) -> Result<Option<Vec<u8>>, contextra_crypto::CryptoError> {
-        let idx = self.shard_idx(tenant);
-        let mut shard = self.shards[idx].lock.write();
-        if let Some(state) = shard.get_mut(&tenant) {
-            if let Some(seg) = state.get_segment_ref_mut(segment_id) {
-                let decrypted = seg.decrypt_data(cipher)?;
-                return Ok(Some(decrypted));
-            }
-        }
-        Ok(None)
-    }
-
     /// Gibt die Anzahl der gespeicherten Segmente für einen Mandanten zurück.
-    pub fn get_tenant_segment_len(&self, tenant: TenantId) -> usize {
-        let idx = self.shard_idx(tenant);
+    pub fn get_tenant_segment_len(&self, tenant: impl Into<TenantId>) -> usize {
+
+        let tenant = tenant.into();        let idx = self.shard_idx(tenant);
         self.shards[idx]
             .lock
             .read()
@@ -597,6 +644,10 @@ impl TenantIsolatedKvStore {
     }
 
     /// Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und Guard-Schutz (`active_refs == 0`).
+    ///
+    /// # Ablauf
+    /// 1. Ruft [`Self::attention_source`] ab.
+    /// 2. Delegiert an [`Self::evict_fair`].
     pub fn evict_lru_fair(&self, target_free_bytes: usize) -> usize {
         let source = self.attention_source();
         self.evict_fair(target_free_bytes, source.as_ref())
@@ -615,6 +666,8 @@ impl TenantIsolatedKvStore {
         )
     }
 
+    /// Interne Verdrängungsschleife: Rotiert über Shards und Mandanten, gibt Locks zwischen
+    /// Batches frei und benachrichtigt registrierte SpillHandler.
     fn evict_fair_internal(
         &self,
         target_free_bytes: usize,
@@ -660,8 +713,9 @@ impl TenantIsolatedKvStore {
                                     }
                                     let tenant = tenants[i];
                                     if let Some(state) = shard.get_mut(&tenant) {
+                                        let now = self.clock.monotonic_nanos();
                                         if let Some(evicted) =
-                                            state.pop_eviction_candidate(scores, attention_weight)
+                                            state.pop_eviction_candidate(scores, attention_weight, now)
                                         {
                                             freed += evicted.len();
                                             #[cfg(test)]
@@ -711,13 +765,15 @@ impl TenantIsolatedKvStore {
         freed
     }
 
+    /// Löscht alle Segmente synchron aus dem Speicher und stellt Zeroization sicher (Emergency Wipe).
     pub fn clear_all(&self) {
         let mut all_segments: Vec<KvSegment> = Vec::new();
         let scores = self.attention_source();
+        let now = self.clock.monotonic_nanos();
         for shard in self.shards.iter() {
             let mut s = shard.lock.write();
             for (tenant, mut state) in s.drain() {
-                while let Some(seg) = state.pop_lru(scores.as_ref()) {
+                while let Some(seg) = state.pop_lru(scores.as_ref(), now) {
                     scores.unregister_segment(tenant, seg.segment_id);
                     all_segments.push(seg);
                 }
@@ -734,6 +790,9 @@ impl Default for TenantIsolatedKvStore {
     }
 }
 
+#[cfg(feature = "workspace")]
+pub use crate::compat::scanner::{KvCachePruner, KvCacheScanner};
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -741,6 +800,7 @@ mod tests {
     use std::sync::Arc;
     use std::thread;
 
+    // Prüft, dass Blöcke mit aktivem Guard selbst bei vollem Speicher niemals verdrängt werden.
     #[test]
     fn test_store_guarded_segments_never_force_evicted_on_overflow() {
         let store = TenantIsolatedKvStore::with_capacity(2);
@@ -776,6 +836,7 @@ mod tests {
         drop(guard2);
     }
 
+    // Prüft strikte Mandantentrennung: Keine Lesbarkeit von Segmenten fremder Mandanten.
     #[test]
     fn test_tenant_isolation_no_cross_read() {
         let store = TenantIsolatedKvStore::new();
@@ -802,6 +863,7 @@ mod tests {
         assert_eq!(store.get_tenant_segment_len(tenant_c), 0);
     }
 
+    // Prüft die Fairness der Verdrängung: Inaktive Mandanten werden nicht durch aktive ausgehungert.
     #[test]
     fn test_evict_lru_fair_does_not_starve_inactive_tenant() {
         let store = TenantIsolatedKvStore::new();
@@ -837,6 +899,7 @@ mod tests {
         );
     }
 
+    // Prüft, dass die angeforderte Menge an Bytes korrekt freigegeben wird.
     #[test]
     fn test_evict_lru_fair_respects_target_free_bytes() {
         let store = TenantIsolatedKvStore::new();
@@ -862,6 +925,7 @@ mod tests {
         assert_eq!(store.get_tenant_segment_len(tenant_b), 2);
     }
 
+    // Prüft, dass Verdrängungs-Locks zwischen Batches freigegeben werden, um Lese- starvation zu verhindern.
     #[test]
     fn test_evict_lru_fair_releases_lock_between_batches() {
         let store = Arc::new(TenantIsolatedKvStore::new());
@@ -936,6 +1000,7 @@ mod tests {
         );
     }
 
+    // Prüft, dass die Shard-Rotation einen Bias gegenüber niedrigen Tenant-IDs verhindert.
     #[test]
     fn test_evict_lru_fair_rotation_prevents_low_id_bias() {
         let store = TenantIsolatedKvStore::new();
@@ -973,6 +1038,7 @@ mod tests {
         );
     }
 
+    // Prüft Randfälle wie 0 Bytes freigeben, nicht existierende Segmente und Überschreiben.
     #[test]
     fn test_store_edge_cases() {
         let store = TenantIsolatedKvStore::default();
@@ -995,6 +1061,7 @@ mod tests {
         assert_eq!(store.get_segment_bytes(tenant, 1), Some(vec![4, 5, 6, 7]));
     }
 
+    // Prüft vollständiges Leeren aller Shards und Mandanten (clear_all).
     #[test]
     fn test_store_clear_all_and_fair_lru() {
         let store = TenantIsolatedKvStore::new();
@@ -1019,6 +1086,7 @@ mod tests {
         assert_eq!(store.get_tenant_segment_len(tenant_b), 0);
     }
 
+    // Prüft transaktionales Rollback über die Callback-Methode on_rollback.
     #[test]
     fn test_on_rollback_cleans_up_correctly() {
         let store = TenantIsolatedKvStore::new();
@@ -1040,6 +1108,7 @@ mod tests {
         assert!(store.get_segments(tenant).is_empty());
     }
 
+    // Prüft gezieltes Entfernen gestageder Segmente bei Transaktionsabbruch.
     #[test]
     fn test_remove_segments_for_rollback_cleans_up_correctly() {
         let store = TenantIsolatedKvStore::new();
@@ -1070,6 +1139,7 @@ mod tests {
         assert!(store.get_segments(tenant).is_empty());
     }
 
+    // Prüft, dass ein Rollback mit leerer Liste von IDs ein No-Op ist.
     #[test]
     fn test_remove_segments_noop_on_empty_ids() {
         let store = TenantIsolatedKvStore::new();
@@ -1079,6 +1149,7 @@ mod tests {
         assert_eq!(store.get_tenant_segment_len(tenant), 1);
     }
 
+    // Prüft das Zusammenspiel von Prefix-Radix-Baum und Block-Guard-Schutz gegen Eviction.
     #[test]
     fn test_store_prefix_radix_and_block_guard_protection() {
         let store = TenantIsolatedKvStore::new();

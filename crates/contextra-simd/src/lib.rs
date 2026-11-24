@@ -1,3 +1,7 @@
+// FILE-CONTEXT
+// ZWECK: Layer-0 Ring-0 Unsafe-Insel für SIMD-Distanzkernel und Laufzeit-Dispatch.
+// INVARIANTEN: Safe Public API, zero panic, bytemuck/slice alignments.
+// HOTSPOTS: lib.rs, kernels/, dispatch.rs
 
 //! # Crate `contextra-simd`
 //!
@@ -26,10 +30,12 @@
 #![allow(unused_unsafe)]
 
 // SECTION MODULE-DECLARATIONS
+// ANCHOR[contextra-simd:CORE-MOD-DISPATCH]
 pub mod contract;
 // Dynamische CPU-Erkennung und Funktionszeiger-Auswahl.
 pub mod dispatch;
 pub mod error;
+// ANCHOR[contextra-simd:CORE-MOD-KERNELS]
 // Hardwarespezifische Rechenkerne (Scalar, AVX2, AVX-512, NEON).
 pub mod kernels;
 pub mod metric;
@@ -39,6 +45,7 @@ pub mod compat;
 // !SECTION MODULE-DECLARATIONS
 
 // SECTION RE-EXPORTS
+// ANCHOR[contextra-simd:RE-EXPORTS]
 pub use contract::{DistanceFn, MetricDistanceFn};
 pub use dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
@@ -59,6 +66,7 @@ pub use metric::DistanceMetric;
 // !SECTION RE-EXPORTS
 
 // SECTION PUBLIC-API-FACADE
+// ANCHOR[contextra-simd:CORE-VALIDATE-VEC]
 /// Prüft, ob ein Vektor gültige endliche Zahlen enthält (kein NaN und kein Unendlich).
 ///
 /// NaN (Not a Number) und Unendlich führen in SIMD-Registern und Metriken zu undefinierten
@@ -97,6 +105,7 @@ pub fn validate_vector(vec: &[f32]) -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-simd:CORE-COMPUTE-DIST]
 /// Berechnet die Distanz zwischen zwei Vektoren unter Verwendung der angegebenen Metrik inklusive Validierung.
 ///
 /// Diese Funktion ist der primäre Einstiegspunkt für sichere Berechnungen von ungesicherten Eingaben.
@@ -133,6 +142,7 @@ pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<
     compute_distance_trusted(a, b, metric)
 }
 
+// ANCHOR[contextra-simd:CORE-COMPUTE-DIST-TRUSTED]
 /// Berechnet die Distanz zwischen zwei bereits validierten `f32`-Vektoren ohne erneute NaN-Prüfung.
 ///
 /// Wird intern verwendet, wenn Vektoren bereits bei der Aufnahme in den Speicher validiert wurden,
@@ -158,6 +168,7 @@ pub fn compute_distance_trusted(a: &[f32], b: &[f32], metric: DistanceMetric) ->
     }
 }
 
+// ANCHOR[contextra-simd:CORE-COMPUTE-DIST-BYTES-TRUSTED]
 /// Berechnet die Distanz zwischen einem `f32`-Vektor und einem rohen Byte-Puffer (`&[u8]`), der `f32`-Werte darstellt.
 ///
 /// Dies ist besonders nützlich, wenn Vektoren aus dem Speicher oder Disk-Cache (z. B. LSM-Tree oder Memory-Mapped Files)

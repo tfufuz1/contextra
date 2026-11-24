@@ -1,3 +1,14 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: ExtractorRegistry zur Registrierung und Panik-Isolierung von Format-Extraktoren (WP M3).
 // INVARIANTEN: Zero-Panic, catch_unwind Isolierung, kein HashMap/HashSet (BTreeMap), feature-basierte Defaults.
@@ -35,6 +46,7 @@ impl ExtractorRegistry {
 
     /// Registriert Standard-Extraktoren gemäß den aktivierten Feature-Flags (`fmt-*`).
     pub fn with_defaults() -> Self {
+        #[allow(unused_mut)]
         let mut registry = Self::new_empty();
 
         #[cfg(feature = "fmt-text")]

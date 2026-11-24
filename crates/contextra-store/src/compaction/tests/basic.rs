@@ -1,3 +1,7 @@
+//! # Grundlegende Kompaktierungstests (Ring 1)
+//!
+//! Validiert Standard-Zusammenfuehrungen zweier SSTables.
+
 use super::*;
 
 use crate::sstable::{create_block_cache, SstableBuilder};
@@ -19,7 +23,7 @@ async fn create_test_sstable(
 }
 
 #[test]
-fn prop_compaction_tombstone_masking_latest_operation_wins() {
+fn test_prop_compaction_tombstone_masking_latest_operation_wins() {
     use proptest::prelude::*;
 
     #[derive(Debug, Clone)]
@@ -48,8 +52,8 @@ fn prop_compaction_tombstone_masking_latest_operation_wins() {
                 registry,
                 Arc::clone(&bc),
                 None,
-                Arc::new(contextra_ports::ResourceTracker::new(
-                    contextra_ports::ResourceBudget {
+                Arc::new(crate::budget::ResourceTracker::new(
+                    crate::budget::ResourceBudget {
                         memory_limit: 1024 * 1024,
                     },
                 )),
@@ -141,8 +145,8 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -150,10 +154,15 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
     );
 
     // Create older SSTable with many entries (large file size) but small max_seq (seq=10)
+    let padding_keys: Vec<String> = (0..100).map(|i| format!("pad_{:03}", i)).collect();
     let mut large_entries = Vec::new();
     large_entries.push((b"key-1".as_ref(), b"old_val".as_ref(), 10u64));
-    for _ in 0..100 {
-        large_entries.push((b"pad", b"large_padding_data_to_increase_file_size", 10u64));
+    for k in &padding_keys {
+        large_entries.push((
+            k.as_bytes(),
+            b"large_padding_data_to_increase_file_size".as_ref(),
+            10u64,
+        ));
     }
     let sst_old_large = create_test_sstable(
         tmp.path(),
@@ -217,8 +226,8 @@ async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -277,8 +286,8 @@ async fn test_mvcc_retention_older_versions_below_floor_discarded() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -345,8 +354,8 @@ async fn test_merge_deduplication() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -398,8 +407,8 @@ async fn test_tombstone_gc_stream_advancement_preserves_subsequent_keys() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -458,8 +467,8 @@ async fn test_tombstone_gc() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -502,8 +511,8 @@ async fn test_tombstone_preserved_with_active_snapshot() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -549,8 +558,8 @@ async fn test_maybe_compact_full_cycle() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -618,8 +627,8 @@ async fn test_no_compaction_below_threshold() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -661,8 +670,8 @@ async fn test_compaction_aborts_on_concurrent_modification() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -713,8 +722,8 @@ async fn test_compaction_removes_uuid_sidecar_files() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -797,8 +806,8 @@ async fn test_compaction_swap_restores_shadowing_order_without_restart() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -815,9 +824,10 @@ async fn test_compaction_swap_restores_shadowing_order_without_restart() {
     .await;
 
     // SSTable C (non-input, intermediate seq, larger size so it is in a separate size tier): key "k1" -> "v_inter", seq 15
+    let padding_keys_c: Vec<String> = (0..100).map(|i| format!("pad_c_{:03}", i)).collect();
     let mut entries_c = vec![(b"k1".as_ref(), b"v_inter".as_ref(), 15u64)];
-    for _ in 0..100 {
-        entries_c.push((b"padding_key", b"padding_value_large_file", 15u64));
+    for k in &padding_keys_c {
+        entries_c.push((k.as_bytes(), b"padding_value_large_file".as_ref(), 15u64));
     }
     let sst_c = create_test_sstable(tmp.path(), "sst_c.sst", &entries_c, Arc::clone(&bc)).await;
 
@@ -924,8 +934,8 @@ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -952,7 +962,7 @@ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
 
     let err = result.unwrap_err();
     match err {
-        contextra_types::ContextraError::MemoryBudgetExceeded { used_mb, limit_mb } => {
+        crate::error::StoreError::MemoryBudgetExceeded { used_mb, limit_mb } => {
             assert!(used_mb >= limit_mb);
         }
         other => panic!("Expected MemoryBudgetExceeded, got {:?}", other),
@@ -988,8 +998,8 @@ async fn test_compaction_succeeds_when_peak_memory_within_limit() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -1029,8 +1039,8 @@ async fn test_compaction_backpressure_timeout_exceeded() {
     };
 
     // Exhausted ResourceTracker budget: capacity limit = 0
-    let exhausted_tracker = Arc::new(contextra_ports::ResourceTracker::new(
-        contextra_ports::ResourceBudget { memory_limit: 0 },
+    let exhausted_tracker = Arc::new(crate::budget::ResourceTracker::new(
+        crate::budget::ResourceBudget { memory_limit: 0 },
     ));
 
     let engine = CompactionEngine::new(
@@ -1067,7 +1077,7 @@ async fn test_compaction_backpressure_timeout_exceeded() {
         "Merge should fail with timeout when budget is exhausted"
     );
     match result.unwrap_err() {
-        contextra_types::ContextraError::MemoryBudgetExceeded { .. } => {}
+        crate::error::StoreError::MemoryBudgetExceeded { .. } => {}
         other => panic!("Expected MemoryBudgetExceeded, got {:?}", other),
     }
 }
@@ -1080,8 +1090,8 @@ fn test_generate_sst_path_uniqueness() {
         Arc::new(SnapshotRegistry::new()),
         create_block_cache(1),
         None,
-        Arc::new(contextra_ports::ResourceTracker::new(
-            contextra_ports::ResourceBudget {
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -1092,5 +1102,95 @@ fn test_generate_sst_path_uniqueness() {
     assert_ne!(
         path1, path2,
         "Rapid sequential calls must produce distinct SSTable paths"
+    );
+}
+
+#[tokio::test]
+async fn test_compact_all_and_compact_range_neutral_maintenance() {
+    let tmp = TempDir::new().expect("temp dir");
+    let engine = CompactionEngine::new(
+        CompactionConfig {
+            min_sstables_per_tier: 2,
+            ..Default::default()
+        },
+        Arc::new(SnapshotRegistry::new()),
+        create_block_cache(10),
+        None,
+        Arc::new(crate::budget::ResourceTracker::new(
+            crate::budget::ResourceBudget {
+                memory_limit: 10 * 1024 * 1024,
+            },
+        )),
+        None,
+    );
+
+    // Create 3 SSTables: sst1 with key "a", sst2 with key "b", sst3 with key "c"
+    let p1 = tmp.path().join("sst-test-01.sst");
+    let p2 = tmp.path().join("sst-test-02.sst");
+    let p3 = tmp.path().join("sst-test-03.sst");
+
+    let mut b1 = SstableBuilder::create(&p1).await.expect("create sst1");
+    b1.add(b"a", b"val_a", 1, 1).await.expect("add");
+    b1.finish().await.expect("build sst1");
+
+    let mut b2 = SstableBuilder::create(&p2).await.expect("create sst2");
+    b2.add(b"b", b"val_b", 2, 2).await.expect("add");
+    b2.finish().await.expect("build sst2");
+
+    let mut b3 = SstableBuilder::create(&p3).await.expect("create sst3");
+    b3.add(b"c", b"val_c", 3, 3).await.expect("add");
+    b3.finish().await.expect("build sst3");
+
+    let r1 = Arc::new(
+        SstableReader::open(&p1, create_block_cache(10))
+            .await
+            .expect("open sst1"),
+    );
+    let r2 = Arc::new(
+        SstableReader::open(&p2, create_block_cache(10))
+            .await
+            .expect("open sst2"),
+    );
+    let r3 = Arc::new(
+        SstableReader::open(&p3, create_block_cache(10))
+            .await
+            .expect("open sst3"),
+    );
+
+    let sstables = Arc::new(tokio::sync::RwLock::new(vec![r1, r2, r3]));
+
+    // Compact range [b"a", b"b"] -> should match 2 tables (sst1 and sst2)
+    let compacted_range = engine
+        .compact_range(b"a"..=b"b", &sstables, tmp.path())
+        .await
+        .expect("compact_range");
+    assert!(
+        compacted_range,
+        "compact_range should have merged matching SSTables"
+    );
+
+    let list_after_range = sstables.read().await;
+    assert_eq!(
+        list_after_range.len(),
+        2,
+        "Expected 2 SSTables after compact_range (merged 2 + sst3)"
+    );
+    drop(list_after_range);
+
+    // Compact all -> should merge remaining 2 into 1
+    let compacted_all = engine
+        .compact_all(&sstables, tmp.path())
+        .await
+        .expect("compact_all");
+    assert!(
+        compacted_all,
+        "compact_all should have merged all remaining SSTables"
+    );
+
+    let list_after_all = sstables.read().await;
+    assert_eq!(
+        list_after_all.len(),
+        1,
+        "Expected 1 SSTable after compact_all"
     );
 }

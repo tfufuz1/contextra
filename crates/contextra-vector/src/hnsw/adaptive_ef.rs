@@ -3,7 +3,8 @@
 // INVARIANTEN: Zero-Panic, keine Zufallsquellen/Systemzeit (deterministisch).
 // NICHT-OFFENSICHTLICH: Bricht Suche ab, sobald sich die Top-k-Kandidaten über das Konvergenzfenster stabilisieren.
 
-use contextra_types::{ContextraError, DocId, Result};
+use crate::error::{Result, VectorError};
+use crate::types::DocId;
 
 /// Configuration policy for adaptive ef_search (Ada-ef).
 #[derive(Debug, Clone, PartialEq)]
@@ -30,27 +31,25 @@ impl AdaptiveEfPolicy {
         stability_threshold: f32,
     ) -> Result<Self> {
         if min_ef == 0 {
-            return Err(ContextraError::invalid_input(
-                "min_ef must be greater than 0",
-            ));
+            return Err(VectorError::invalid_input("min_ef must be greater than 0"));
         }
         if max_ef < min_ef {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "max_ef must be greater than or equal to min_ef",
             ));
         }
         if !growth_factor.is_finite() || growth_factor <= 1.0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "growth_factor must be a finite float greater than 1.0",
             ));
         }
         if convergence_window == 0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "convergence_window must be greater than 0",
             ));
         }
         if !stability_threshold.is_finite() || !(0.0..=1.0).contains(&stability_threshold) {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "stability_threshold must be a finite float in range [0.0, 1.0]",
             ));
         }
@@ -66,28 +65,26 @@ impl AdaptiveEfPolicy {
     /// Validates policy invariants.
     pub fn validate(&self) -> Result<()> {
         if self.min_ef == 0 {
-            return Err(ContextraError::invalid_input(
-                "min_ef must be greater than 0",
-            ));
+            return Err(VectorError::invalid_input("min_ef must be greater than 0"));
         }
         if self.max_ef < self.min_ef {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "max_ef must be greater than or equal to min_ef",
             ));
         }
         if !self.growth_factor.is_finite() || self.growth_factor <= 1.0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "growth_factor must be a finite float greater than 1.0",
             ));
         }
         if self.convergence_window == 0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "convergence_window must be greater than 0",
             ));
         }
         if !self.stability_threshold.is_finite() || !(0.0..=1.0).contains(&self.stability_threshold)
         {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "stability_threshold must be a finite float in range [0.0, 1.0]",
             ));
         }
@@ -225,5 +222,89 @@ impl AdaptiveEfStateMachine {
         self.current_ef = next_raw.clamp(self.current_ef + 1, self.policy.max_ef);
 
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_adaptive_ef_state_machine_monotonicity_and_bounds() {
+        let policy = AdaptiveEfPolicy {
+            min_ef: 16,
+            max_ef: 64,
+            growth_factor: 1.5,
+            stability_threshold: 0.9,
+            convergence_window: 2,
+        };
+        assert!(policy.validate().is_ok());
+
+        let mut sm = AdaptiveEfStateMachine::new(policy.clone(), 5);
+        let mut prev_ef = 0;
+        let mut steps = 0;
+
+        while !sm.is_terminated() {
+            let ef = sm.current_ef();
+            steps += 1;
+            assert!(
+                ef >= policy.min_ef,
+                "ef ({ef}) must be >= min_ef ({})",
+                policy.min_ef
+            );
+            assert!(
+                ef <= policy.max_ef,
+                "ef ({ef}) must be <= max_ef ({})",
+                policy.max_ef
+            );
+            if prev_ef > 0 {
+                assert!(
+                    ef > prev_ef,
+                    "ef must monotonically increase: {ef} > {prev_ef}"
+                );
+            }
+            prev_ef = ef;
+
+            // Instabile Ergebnisse provozieren
+            let fake_ids: Vec<DocId> = (0..5).map(|i| DocId::from(i + steps * 10)).collect();
+            if sm.step(&fake_ids) {
+                break;
+            }
+        }
+
+        let stats = sm.stats();
+        assert_eq!(stats.final_ef, policy.max_ef);
+        assert!(!stats.converged);
+    }
+
+    #[test]
+    fn test_adaptive_ef_state_machine_convergence() {
+        let policy = AdaptiveEfPolicy {
+            min_ef: 16,
+            max_ef: 128,
+            growth_factor: 2.0,
+            stability_threshold: 0.8,
+            convergence_window: 2,
+        };
+
+        let mut sm = AdaptiveEfStateMachine::new(policy, 5);
+        let stable_ids: Vec<DocId> = (0..5).map(|i| DocId::from(i as u64)).collect();
+
+        let mut converged = false;
+        while !sm.is_terminated() {
+            let _ef = sm.current_ef();
+            if sm.step(&stable_ids) {
+                converged = sm.stats().converged;
+                break;
+            }
+        }
+
+        assert!(
+            converged,
+            "State machine should converge on identical results"
+        );
+        let stats = sm.stats();
+        assert!(stats.converged);
+        assert_eq!(stats.rounds, 3);
     }
 }

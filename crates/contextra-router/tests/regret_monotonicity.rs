@@ -1,3 +1,19 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Integrationstest für contextra-router (regret_monotonicity.rs).
+// INVARIANTEN: Deterministische Ausführung, Zero-Panic, korrekte Fehlertaxonomie.
+
+#![allow(
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+//! # Integrationstest: Monotonie des kumulativen Regrets beim Bandit-Lernen
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Integrationstest: Monotonie des kumulativen Regrets beim Bandit-Lernen.
+
+// ANCHOR[contextra-router:IT-RMON-001]
 #![cfg(feature = "bandit-routing")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -168,6 +184,8 @@ fn profile_name_to_idx(name: &str) -> Option<usize> {
     name.strip_prefix("profile_")?.parse::<usize>().ok()
 }
 
+// ANCHOR[contextra-router:IT-RMON-T01]
+// Test `regret_grows_sublinearly`: Prüft das erwartete Verhalten und Invarianten für integrationstest: monotonie des kumulativen regrets beim bandit-lernen.
 #[tokio::test]
 async fn regret_grows_sublinearly() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let dim = 4;
@@ -240,6 +258,8 @@ async fn regret_grows_sublinearly() -> std::result::Result<(), Box<dyn std::erro
     Ok(())
 }
 
+// ANCHOR[contextra-router:IT-RMON-T02]
+// Test `router_eventually_prefers_best_arm`: Prüft das erwartete Verhalten und Invarianten für integrationstest: monotonie des kumulativen regrets beim bandit-lernen.
 #[tokio::test]
 async fn router_eventually_prefers_best_arm() -> std::result::Result<(), Box<dyn std::error::Error>>
 {

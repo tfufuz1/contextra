@@ -1,10 +1,16 @@
 #![allow(deprecated)]
+//! # Erkennung verwaister Instanzen
+//!
+//! Überprüft die Registrierung und Bereinigung verwaister Collection-Ressourcen.
+//!
 
 use contextra_checkpoint::{global_orphan_registry, PinnedSeqNoOrphan, StateCheckpoint};
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_types::TxId;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-INSTANCE_ORPHAN_REGISTRY_TEST-01-TEST_MULTI_INSTANCE_ORPHAN_REGISTRY_PHYSICAL_PATH_AND_GC_ISOLATION]
+// Testet die Funktionalität von `test_multi_instance_orphan_registry_physical_path_and_gc_isolation`.
 #[tokio::test]
 async fn test_multi_instance_orphan_registry_physical_path_and_gc_isolation() {
     let tmp1 = TempDir::new().expect("temp dir 1");
@@ -72,6 +78,8 @@ async fn test_multi_instance_orphan_registry_physical_path_and_gc_isolation() {
     assert_eq!(reg2.get_orphaned_checkpoints(), vec![cp_orphan2]);
 }
 
+// ANCHOR[contextra-db:TEST-INSTANCE_ORPHAN_REGISTRY_TEST-02-TEST_CONTEXTRA_OPEN_DOES_NOT_TOUCH_GLOBAL_ORPHAN_REGISTRY]
+// Testet die Funktionalität von `test_contextra_open_does_not_touch_global_orphan_registry`.
 #[tokio::test]
 async fn test_contextra_open_does_not_touch_global_orphan_registry() {
     #[allow(deprecated)]
@@ -117,6 +125,8 @@ async fn test_contextra_open_does_not_touch_global_orphan_registry() {
     }
 }
 
+// ANCHOR[contextra-db:TEST-INSTANCE_ORPHAN_REGISTRY_TEST-03-TEST_CUSTOM_ORPHAN_REGISTRY_PATH_CONFIG]
+// Testet die Funktionalität von `test_custom_orphan_registry_path_config`.
 #[tokio::test]
 async fn test_custom_orphan_registry_path_config() {
     let tmp = TempDir::new().expect("temp dir");

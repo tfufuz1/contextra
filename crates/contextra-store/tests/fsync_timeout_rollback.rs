@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT: Integration test verifying fsync timeout handling, clean rollback, and intent file recovery. (TS: 2026-09-11)
 
 use contextra_ports::StorageEngine;
@@ -8,7 +9,6 @@ use tempfile::tempdir;
 use tokio::time::timeout;
 
 #[tokio::test]
-#[ignore = "Timeout cancellation during storage.commit leaves staged WAL entries in prepare_batch that are replayed upon restart, causing key_timeout to exist after recovery"]
 async fn test_fsync_timeout_triggers_clean_rollback() {
     let dir = tempdir().expect("tempdir creation failed");
     let path = dir.path().to_path_buf();

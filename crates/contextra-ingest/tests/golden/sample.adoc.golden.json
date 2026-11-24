@@ -1,0 +1,36 @@
+{
+  "source_file": "sample.adoc",
+  "detected_format": "AsciiDoc",
+  "title": "AsciiDoc Beispieldokument",
+  "canonical_hash": "4d6c630e773d7bba3e314d42901344fc2641c03a14e9f0dbbc669a9567dd6d82",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "# AsciiDoc Beispieldokument\n\nAutor Name <author@example.com>\n\n## Abschnitt Eins\n\nDies ist der erste Absatz im AsciiDoc-Format.\n\n### Unterabschnitt\n\n- Listenpunkt A\n\n- Listenpunkt B",
+      "token_count": 42,
+      "metadata": {
+        "breadcrumb": "# AsciiDoc Beispieldokument",
+        "chunk_id": "30d9f968a7ccfc34ce29d7244291a21c",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "doc_title": "AsciiDoc Beispieldokument",
+        "format": "asciidoc",
+        "heading_level": 1,
+        "locator": {},
+        "merged_breadcrumbs": [
+          "# AsciiDoc Beispieldokument",
+          "# AsciiDoc Beispieldokument > ## Abschnitt Eins",
+          "# AsciiDoc Beispieldokument > ## Abschnitt Eins > ### Unterabschnitt"
+        ],
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 180,
+          "start": 0
+        },
+        "strategy": "prose"
+      }
+    }
+  ]
+}

@@ -1,3 +1,24 @@
+//! # Wartungs-Planer (`maintenance_scheduler.rs`)
+//!
+//! Koordiniert periodische Hintergrund-Wartungsarbeiten für eine [`Collection`].
+//! Führt zyklische Aufgaben wie Verfall-Bereinigung (Decay Eviction), Kantenverstärkung
+//! (Edge Reinforcement), Graphen-Perkolation und Gedächtniskonsolidierung sequenziell
+//! und fehlertolerant aus (ADR-079).
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2). Integriert Speichertreiber (`StorageEngine`)
+//! und Vektorindizes (`VectorIndex`) über Port-Abstraktionen.
+//!
+//! ## Invarianten
+//! - **Fehlerisolation (P2 Zero-Panic):** Jeder Teilschritt fängt Fehler ab und protokolliert sie,
+//!   ohne den Gesamtprozess oder nachfolgende Schritte abzubrechen.
+//! - **Transaktionsprotokollierung (WAL-Intent):** Vor und nach jedem Wartungs-Tick wird ein
+//!   Statusintent in die Collection persistiert.
+//! - **Uhr-Injektion (Regel 3):** Verwendet ausschließlich injizierte `Clock`-Instanzen
+//!   für Zeitstempel im Intent-Protokoll.
+//! - **Session-Sperre:** Konsolidierung und Perkolationsprüfungen laufen nur, wenn keine aktiven
+//!   Agenten-Sessions vorliegen (`active_sessions == 0`).
+
 // FILE-CONTEXT
 // ZWECK: Zentraler MaintenanceScheduler für koordiniertes, sequenzielles Ausführen aller Background-Maintenance-Prozesse (ADR-079).
 // INVARIANTEN: P2 Zero-Panic-Doctrine (Isolierte Fehlerbehandlung pro Teilschritt).
@@ -8,29 +29,36 @@
 // STAND: TS:2026-08-31T00:00:00Z
 
 use crate::consolidation_executor::{execute_consolidation_pass, ConsolidationLockGuard};
+use crate::engine_local::collection::{Collection, StoredDocument};
+use crate::engine_local::decay_controller::AdaptiveDecayController;
 use crate::maintenance_config::MaintenanceConfig;
 use crate::memory_consolidation::ConsolidationConfig;
-use contextra_engine::collection::{Collection, StoredDocument};
-use contextra_engine::decay_controller::AdaptiveDecayController;
-use contextra_ports::{Clock, StorageEngine, SystemClock, VectorIndex};
-use contextra_types::{ContextraError, DocId, TxId};
+use crate::ports_local::{Clock, StorageEngine, SystemClock, VectorIndex};
+use crate::types_local::{ContextraError, DocId, TxId};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 /// Zentraler Scheduler für die Ausführung der Background-Maintenance-Prozesse (ADR-079).
-pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex> {
+// ANCHOR[contextra-cognition:SCHED-001]
+/// Zentraler Scheduler für koordiniertes Ausführen von Background-Maintenance-Prozessen (ADR-079).
+// =========================================================================
+// SECTION: MaintenanceScheduler Definition & Initialisierung
+// =========================================================================
+pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex> {
     config: MaintenanceConfig,
     collection: Arc<Collection<S, V>>,
     consolidation_config: ConsolidationConfig,
     #[cfg(feature = "edge-reinforcement-learning")]
-    edge_reinforcement_buffer: Option<Arc<contextra_graph::EdgeReinforcementBuffer>>,
+    edge_reinforcement_buffer: Option<Arc<crate::graph_local::EdgeReinforcementBuffer>>,
     active_sessions: Arc<AtomicUsize>,
     clock: Arc<dyn Clock>,
 }
 
 impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<S, V> {
     /// Erstellt eine neue Instanz des `MaintenanceScheduler`.
+    // ANCHOR[contextra-cognition:SCHED-002]
+    /// Erstellt eine neue Instanz des MaintenanceScheduler.
     pub fn new(
         config: MaintenanceConfig,
         collection: Arc<Collection<S, V>>,
@@ -48,6 +76,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
     }
 
     /// Setzt die Uhr für den `MaintenanceScheduler` (Standard: `SystemClock::new()`).
+    // ANCHOR[contextra-cognition:SCHED-003]
+    /// Setzt die Uhr für den Scheduler (Clock-Port Injektion nach Regel 3).
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
         self
@@ -55,24 +85,32 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
 
     /// Setzt den optionalen `EdgeReinforcementBuffer` für F-03.
     #[cfg(feature = "edge-reinforcement-learning")]
+    // ANCHOR[contextra-cognition:SCHED-004]
+    /// Setzt den optionalen Puffer für Kantenverstärkung.
     pub fn with_edge_reinforcement_buffer(
         mut self,
-        buffer: Arc<contextra_graph::EdgeReinforcementBuffer>,
+        buffer: Arc<crate::graph_local::EdgeReinforcementBuffer>,
     ) -> Self {
         self.edge_reinforcement_buffer = Some(buffer);
         self
     }
 
     /// Liefert die Anzahl aktuell aktiver Agenten-Sessions.
+    // ANCHOR[contextra-cognition:SCHED-005]
+    /// Liefert die Anzahl aktuell aktiver Agenten-Sessions.
     pub fn active_agent_sessions(&self) -> usize {
         self.active_sessions.load(Ordering::SeqCst)
     }
 
     /// Erhöht die Anzahl aktiver Agenten-Sessions.
+    // ANCHOR[contextra-cognition:SCHED-006]
+    /// Erhöht die Anzahl aktiver Agenten-Sessions.
     pub fn increment_active_sessions(&self) -> usize {
         self.active_sessions.fetch_add(1, Ordering::SeqCst) + 1
     }
 
+    /// Verringert die Anzahl aktiver Agenten-Sessions.
+    // ANCHOR[contextra-cognition:SCHED-007]
     /// Verringert die Anzahl aktiver Agenten-Sessions.
     pub fn decrement_active_sessions(&self) -> usize {
         self.active_sessions
@@ -81,6 +119,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
     }
 
     /// Startet den MaintenanceScheduler in einem eigenen Tokio-Task.
+    // ANCHOR[contextra-cognition:SCHED-008]
+    /// Startet den Scheduler in einem eigenen Tokio-Hintergrund-Task.
     pub fn start(
         self: Arc<Self>,
         cancel_token: tokio_util::sync::CancellationToken,
@@ -226,10 +266,10 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
                         .await
                         {
                             Ok(res) => {
-                                if !res.duplicates_tombstoned.is_empty() {
+                                if !res.duplicates_superseded.is_empty() {
                                     tracing::info!(
                                         collection = %self.collection.name(),
-                                        tombstoned = res.duplicates_tombstoned.len(),
+                                        superseded = res.duplicates_superseded.len(),
                                         segments = res.segments_created,
                                         "MaintenanceScheduler: Consolidation pass consolidated turn duplicates"
                                     );
@@ -257,6 +297,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
     }
 
     /// Führt einen einzelnen sequenziellen Maintenance-Tick durch (ADR-079).
+    // ANCHOR[contextra-cognition:SCHED-009]
+    /// Führt einen einzelnen sequenziellen Wartungs-Tick aus.
     pub async fn run_tick(&self) {
         tracing::debug!(collection = %self.collection.name(), "MaintenanceScheduler tick started");
 
@@ -288,13 +330,6 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
     }
 }
 
-#[allow(dead_code)]
-async fn write_tick_intent<S: StorageEngine, V: VectorIndex>(
-    collection: &Collection<S, V>,
-) -> Result<TxId, ContextraError> {
-    write_tick_intent_with_clock(collection, &SystemClock::new()).await
-}
-
 async fn write_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     clock: &dyn Clock,
@@ -310,13 +345,6 @@ async fn write_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
         .await?;
     collection.storage().commit(tx).await?;
     Ok(tx)
-}
-
-#[allow(dead_code)]
-async fn complete_tick_intent<S: StorageEngine, V: VectorIndex>(
-    collection: &Collection<S, V>,
-) -> Result<(), ContextraError> {
-    complete_tick_intent_with_clock(collection, &SystemClock::new()).await
 }
 
 async fn complete_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
@@ -345,30 +373,15 @@ async fn complete_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
 )]
 mod tests {
     use super::*;
-    use contextra_graph::CsrGraph;
-    use contextra_store::LsmStorage;
-    use contextra_vector::HnswIndex;
+    use crate::graph_local::CsrGraph;
+    use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
     use std::sync::atomic::AtomicU64;
-    use tempfile::tempdir;
     use tokio::time::sleep;
 
-    async fn create_test_collection() -> Arc<Collection<LsmStorage, HnswIndex>> {
-        let dir = tempdir().unwrap();
-        let storage = Arc::new(
-            LsmStorage::new(contextra_store::LsmConfig {
-                path: dir.path().to_path_buf(),
-                ..Default::default()
-            })
-            .await
-            .unwrap(),
-        );
-        let index = Arc::new(
-            HnswIndex::try_new(contextra_vector::HnswConfig {
-                dimension: 4,
-                ..Default::default()
-            })
-            .unwrap(),
-        );
+    async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>
+    {
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let index = Arc::new(InMemoryVectorIndex::new(4));
         Arc::new(Collection::new(
             "default".to_string(),
             storage,
@@ -376,10 +389,12 @@ mod tests {
             Arc::new(CsrGraph::new()),
             Arc::new(AtomicU64::new(1)),
             4,
-            contextra_engine::Language::English,
+            crate::engine_local::Language::English,
         ))
     }
 
+    // ANCHOR[contextra-cognition:TEST-MAINTENA-017]
+    // Prüft Testfall `test_maintenance_scheduler_tick_writes_wal_intent`.
     #[tokio::test]
     async fn test_maintenance_scheduler_tick_writes_wal_intent() {
         let col = create_test_collection().await;
@@ -413,6 +428,8 @@ mod tests {
         );
     }
 
+    // ANCHOR[contextra-cognition:TEST-MAINTENA-018]
+    // Prüft Testfall `test_maintenance_scheduler_step_isolation_on_error`.
     #[tokio::test]
     async fn test_maintenance_scheduler_step_isolation_on_error() {
         let col = create_test_collection().await;
@@ -441,6 +458,8 @@ mod tests {
         assert_eq!(val["status"], "completed");
     }
 
+    // ANCHOR[contextra-cognition:TEST-MAINTENA-019]
+    // Prüft Testfall `test_maintenance_scheduler_background_task_and_cancellation`.
     #[tokio::test]
     async fn test_maintenance_scheduler_background_task_and_cancellation() {
         let col = create_test_collection().await;
@@ -472,6 +491,8 @@ mod tests {
         );
     }
 
+    // ANCHOR[contextra-cognition:TEST-MAINTENA-020]
+    // Prüft Testfall `test_active_sessions_tracking`.
     #[tokio::test]
     async fn test_active_sessions_tracking() {
         let col = create_test_collection().await;
@@ -504,6 +525,8 @@ mod tests {
         }
     }
 
+    // ANCHOR[contextra-cognition:TEST-MAINTENA-021]
+    // Prüft Testfall `test_maintenance_scheduler_with_custom_clock`.
     #[tokio::test]
     async fn test_maintenance_scheduler_with_custom_clock() {
         let col = create_test_collection().await;
@@ -518,6 +541,7 @@ mod tests {
 
         let fixed_nanos = 1_700_000_000_000_000_000u64;
         let test_clock = Arc::new(TestClock { nanos: fixed_nanos });
+        assert_eq!(test_clock.monotonic_nanos(), fixed_nanos);
 
         let scheduler = Arc::new(
             MaintenanceScheduler::new(config, col.clone(), ConsolidationConfig::default())
@@ -541,3 +565,4 @@ mod tests {
         );
     }
 }
+// !SECTION: Sub-Routinen (Scratchpad, Cache, Graph)

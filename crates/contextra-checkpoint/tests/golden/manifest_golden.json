@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "name": "golden_snapshot_v1",
+    "collection_id": "coll_golden_001",
+    "seq_no": 42000,
+    "tx_id": 1337,
+    "metadata": {
+      "env": "golden_production",
+      "retention_days": 30
+    },
+    "created_at": 1700000000000,
+    "id_width_bits": 64
+  },
+  "components": [
+    "lsm",
+    "vector",
+    "meta"
+  ],
+  "checksum": "a30ea7a57c0a86cd58428eb301908e2cd0875529fa821ef48748beb8f2512d0c"
+}

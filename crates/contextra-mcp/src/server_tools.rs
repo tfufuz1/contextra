@@ -1,8 +1,13 @@
+// =========================================================================
+// SECTION: server_tools
+// =========================================================================
+// ANCHOR[contextra-mcp:SERVER-TOO-001]
 use crate::io::MAX_SEARCH_QUERY_BYTES;
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
-use contextra::chunker::{ChunkerConfig, MarkdownChunker};
+// Chunker types
+use contextra::chunker;
 use contextra_types::{DocId, MAX_SEARCH_K};
 use serde_json::{json, Value};
 
@@ -236,7 +241,9 @@ impl McpServer {
                         ));
                     }
                 };
-                let chunker = MarkdownChunker::new(ChunkerConfig::default());
+                let chunker = contextra::chunker::MarkdownChunker::new(
+                    contextra::chunker::ChunkerConfig::default(),
+                );
                 let doc_id = DocId::from_key(id).map_err(|e| {
                     McpError::invalid_params(format!("Invalid document ID '{}': {}", id, e))
                 })?;
@@ -356,132 +363,12 @@ impl McpServer {
                 }
             }
 
-            "contextra_forget" => {
-                let col_name = match args.get("collection") {
-                    Some(col_val) => {
-                        let s = col_val.as_str().ok_or_else(|| {
-                            McpError::invalid_params(
-                                "Invalid params: 'collection' must be a string",
-                            )
-                        })?;
-                        if s.trim().is_empty() {
-                            return Err(McpError::invalid_params("collection cannot be empty"));
-                        }
-                        validate_collection_name(s)?;
-                        s
-                    }
-                    None => {
-                        return Err(McpError::invalid_params(
-                            "collection fehlt: missing required field 'collection'",
-                        ));
-                    }
-                };
-
-                let confirm = match args.get("confirm") {
-                    Some(Value::Bool(b)) => *b,
-                    _ => false,
-                };
-                if !confirm {
-                    return Err(McpError::invalid_params(
-                        "confirm parameter must be explicitly set to true for contextra_forget",
-                    ));
-                }
-
-                let id_opt = match args.get("id") {
-                    Some(v) if !v.is_null() => {
-                        let s = v.as_str().ok_or_else(|| {
-                            McpError::invalid_params("Invalid params: 'id' must be a string")
-                        })?;
-                        if s.trim().is_empty() {
-                            return Err(McpError::invalid_params("id cannot be empty"));
-                        }
-                        if s.len() > 256 {
-                            return Err(McpError::invalid_params(
-                                "id length exceeds limit: max 256 chars",
-                            ));
-                        }
-                        Some(s)
-                    }
-                    _ => None,
-                };
-
-                // Key preflight check: Fail BEFORE deletion if no key is configured
-                let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
-                    .key
-                    .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
-
-                let tenant_id = self.tenant_id.ok_or_else(|| {
-                    McpError::invalid_params("tenant_id not configured on server")
-                })?;
-
-                if let Some(id) = id_opt {
-                    let col = self.db.collection(col_name).await.map_err(McpError::from)?;
-                    col.delete(id).await.map_err(McpError::from)?;
-
-                    Ok(json!({
-                        "ok": true,
-                        "deleted": true,
-                        "verified": false,
-                        "collection": col_name,
-                        "id": id,
-                        "proof": null,
-                        "reason": "Schichteigene Messung für Einzel-Dokument-Löschung nicht angebunden",
-                        "claim": "LogicalDeletionOnly",
-                        "erasure_measured": false
-                    }))
-                } else {
-                    let proof = self
-                        .db
-                        .drop_collection(col_name, tenant_id, proof_key.trim().as_bytes())
-                        .await
-                        .map_err(McpError::from)?;
-
-                    let proof_json_str = proof
-                        .export_for_audit()
-                        .map_err(|e| McpError::internal_error(e.to_string()))?;
-                    let proof_val: Value = serde_json::from_str(&proof_json_str)
-                        .map_err(|e| McpError::internal_error(e.to_string()))?;
-
-                    let layers = proof_val
-                        .get("covered_layers")
-                        .cloned()
-                        .unwrap_or_else(|| json!(["LsmMemtable", "SsTableAllLevels"]));
-                    let excluded = proof_val
-                        .get("excluded_scopes")
-                        .or_else(|| proof_val.get("excluded"))
-                        .cloned()
-                        .unwrap_or_else(|| json!([]));
-
-                    let mut res = json!({
-                        "ok": true,
-                        "deleted": true,
-                        "verified": true,
-                        "collection": col_name,
-                        "proof": proof_val,
-                        "layers": layers,
-                        "excluded": excluded,
-                        "erasure_measured": true,
-                    });
-
-                    if let Some(claim_val) = proof_val
-                        .get("claim")
-                        .or_else(|| proof_val.get("claim_class"))
-                    {
-                        if let Some(obj) = res.as_object_mut() {
-                            obj.insert("claim".to_string(), claim_val.clone());
-                        }
-                    }
-
-                    Ok(res)
-                }
-            }
+            "contextra_forget" | "contextra_delete" => self.handle_delete(args).await,
 
             "contextra_collections" => {
                 let names = self.db.list_collections().await.map_err(McpError::from)?;
                 Ok(json!({ "collections": names }))
             }
-
-            "contextra_delete" => self.handle_delete(args).await,
             "contextra_create_collection" => self.handle_create_collection(args).await,
             "contextra_drop_collection" => self.handle_drop_collection(args).await,
 
@@ -491,3 +378,5 @@ impl McpServer {
         }
     }
 }
+
+// !SECTION: server_tools

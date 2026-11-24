@@ -1,0 +1,8 @@
+{
+  "source_seq_no": 42000,
+  "linked_files": [
+    "/tmp/ckpt_dst/000001.sst",
+    "/tmp/ckpt_dst/000002.sst"
+  ],
+  "wal_tail_offset": 1024
+}

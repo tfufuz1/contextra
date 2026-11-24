@@ -1,7 +1,22 @@
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-PAGERANK-001]
+//! PageRank-Berechnungsroutinen auf dem inneren CSR-Graphzustand.
+//!
+//! # Zweck
+//! Führt personalisierte PageRank-Analysen für Graph-Traversal-Signale durch.
+
 use super::super::graph_write::CsrGraph;
-use contextra_types::EntityId;
+use crate::types::{EntityId, PprConfig};
 use std::collections::{HashMap, HashSet};
 
+
+// SECTION Pagerank Core Implementation
 impl CsrGraph {
     pub async fn pagerank(
         &self,
@@ -84,20 +99,27 @@ impl CsrGraph {
     }
 
     pub async fn get_deleted_node_indices(&self) -> HashSet<usize> {
-        if self.storage.is_none() {
-            return HashSet::new();
-        }
-        let entity_ids: Vec<(usize, EntityId)> = {
-            let inner = self.inner_read();
-            inner.reverse_map.iter().copied().enumerate().collect()
-        };
-        let mut deleted_indices = HashSet::new();
-        for (idx, entity_id) in entity_ids {
-            if self.is_entity_deleted(entity_id).await {
-                deleted_indices.insert(idx);
+        #[cfg(feature = "ports-compat")]
+        {
+            if self.storage.is_none() {
+                return HashSet::new();
             }
+            let entity_ids: Vec<(usize, EntityId)> = {
+                let inner = self.inner_read();
+                inner.reverse_map.iter().copied().enumerate().collect()
+            };
+            let mut deleted_indices = HashSet::new();
+            for (idx, entity_id) in entity_ids {
+                if self.is_entity_deleted(entity_id).await {
+                    deleted_indices.insert(idx);
+                }
+            }
+            deleted_indices
         }
-        deleted_indices
+        #[cfg(not(feature = "ports-compat"))]
+        {
+            HashSet::new()
+        }
     }
 
     pub async fn deleted_view(&self) -> crate::DeletedView {
@@ -107,7 +129,7 @@ impl CsrGraph {
     pub async fn personalized_page_rank_with_context_async(
         &self,
         seed_nodes: &[EntityId],
-        config: &contextra_types::PprConfig,
+        config: &PprConfig,
         ctx: &mut crate::PprContext,
     ) -> Vec<(EntityId, f32)> {
         let deleted_view = self.deleted_view().await;
@@ -121,3 +143,5 @@ impl CsrGraph {
         crate::ppr::compute_ppr_with_context(&inner, seed_nodes, config, &deleted_view, ctx)
     }
 }
+
+// !SECTION Pagerank Core Implementation

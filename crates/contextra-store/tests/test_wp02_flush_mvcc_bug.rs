@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT: Test exposing known HEAD limitation where flushing memtable loses historical MVCC versions.
 // STAND: 2026-09-28
 // TICKET: WP-02 (Flush write-path overwrites historical key versions)

@@ -1,3 +1,7 @@
+//! # Zugriffsschutz & Guards (Ring 1)
+//!
+//! Verwaltet RAII-Guards fuer Lese- und Schreibtransaktionen.
+
 use crate::memtable::MemTable;
 use std::sync::Arc;
 

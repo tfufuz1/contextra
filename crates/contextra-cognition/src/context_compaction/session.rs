@@ -1,7 +1,28 @@
-use contextra_engine::collection::{Collection, StoredDocumentMeta};
-use contextra_engine::transaction::CommitIntent;
-use contextra_ports::{LlmTextGenerator, StorageEngine, VectorIndex};
-use contextra_types::{ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId};
+//! # Konsolidierungs-Sitzung (`context_compaction/session.rs`)
+//!
+//! Implementiert eine transaktionale OCC-Sitzung ([`ConsolidationSession`])
+//! für die Gedächtniskompaktierung im Schlafzyklus.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2). Koordiniert `Collection`, Speicher-Engine und LLM-Aufrufe.
+//!
+//! ## Invarianten
+//! - **Optimistic Concurrency Control (OCC):** Verhindert verlorene Aktualisierungen (Lost Updates),
+//!   indem sichergestellt wird, dass Quelldokumente während des LLM-Aufrufs nicht verändert wurden.
+//! - **Crash-Resilienz (INV-CONSOLIDATE-1/2):** Schreibt zu Beginn einen `CommitIntent::Consolidation`
+//!   in das Speichersystem, der bei erfolgreichem Abschluss gelöscht wird.
+//! - **Fail-Closed bei Löschfehlern:** Scheitert das Entfernen von Quelldokumenten, schlägt der Commit fehl.
+
+// FILE-CONTEXT
+// ZWECK: Transaktionale OCC-Konsolidierungssitzung mit Crash-Resilienz und Intent-Tracking.
+// INVARIANTEN: INV-CONSOLIDATE-1/2 Intent-Protokollierung; atomare Dokument-Updates; Fail-Closed bei Loeschfehlern.
+// STAND: 2026-11-11
+
+use crate::engine_local::collection::{Collection, StoredDocumentMeta};
+use crate::engine_local::transaction::CommitIntent;
+use crate::error::CognitionError;
+use crate::ports_local::{LlmTextGenerator, StorageEngine, VectorIndex};
+use crate::types_local::{ContextChunk, DocId, Result, TenantId, TokenBudget, TxId};
 use std::sync::Arc;
 
 use super::compactor::ContextCompactor;
@@ -9,11 +30,15 @@ use super::types::CompactionStrategy;
 
 /// Optimistic Concurrency Control (OCC) Consolidation Session for Sleep-Cycle Memory Compaction.
 ///
-/// Prevents lost updates / phantom erasures by verifying that no source documents were modified
+/// Prevents lost updates / phantom modifications by verifying that no source documents were modified
 /// while asynchronous LLM summarization was in progress. Also journals a `CommitIntent::Consolidation`
 /// entry into storage for crash resilience (INV-CONSOLIDATE-1, INV-CONSOLIDATE-2).
-pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex>
-{
+// ANCHOR[contextra-cognition:SESS-001]
+/// Transaktionale OCC-Konsolidierungssitzung.
+// =========================================================================
+// SECTION: ConsolidationSession Struktur
+// =========================================================================
+pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex> {
     /// Reference to the active collection.
     pub collection: &'a Collection<S, V>,
     /// Source document IDs and their transaction IDs captured at read snapshot time.
@@ -29,6 +54,8 @@ pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex = contextra
 impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     /// Starts a consolidation session, snapshotting the version of each source document
     /// and writing a `CommitIntent::Consolidation` intent to storage.
+    // ANCHOR[contextra-cognition:SESS-002]
+    /// Startet eine neue Konsolidierungs-Session und sichert Versionen der Quelldokumente.
     pub async fn start(
         collection: &'a Collection<S, V>,
         source_doc_ids: &[DocId],
@@ -65,22 +92,25 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
 
     /// Validates optimistic concurrency control: checks that every source document
     /// has NOT been mutated since the consolidation session started.
+    // ANCHOR[contextra-cognition:SESS-003]
+    /// Validiert die optimistische Nebenläufigkeitskontrolle.
     pub async fn validate_occ(&self) -> Result<()> {
         for &(doc_id, expected_tx) in &self.source_docs {
             match self.collection.get_doc_tx(doc_id).await? {
                 Some(current_tx) => {
                     if current_tx.inner() > expected_tx.inner() {
-                        return Err(ContextraError::StaleRead(format!(
+                        return Err(CognitionError::StaleRead(format!(
                             "OCC conflict: Document {:?} was mutated during consolidation (snapshot tx={}, current tx={})",
                             doc_id, expected_tx, current_tx
-                        )));
+                        )).into());
                     }
                 }
                 None => {
-                    return Err(ContextraError::StaleRead(format!(
+                    return Err(CognitionError::StaleRead(format!(
                         "OCC conflict: Document {:?} was deleted or missing during consolidation",
                         doc_id
-                    )));
+                    ))
+                    .into());
                 }
             }
         }
@@ -91,6 +121,13 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     /// This is used to retry consolidation after an OCC conflict, allowing the caller to re-summarize
     /// only the documents that have actually changed.
     /// Returns a list of document IDs that were mutated or deleted since the session started.
+    // ANCHOR[contextra-cognition:SESS-004]
+    /// Aktualisiert Versionen nach einem OCC-Konflikt.
+// !SECTION: ConsolidationSession Struktur
+
+// =========================================================================
+// SECTION: OCC-Refresh & Validierung
+// =========================================================================
     pub async fn refresh(&mut self) -> Result<Vec<DocId>> {
         let mut changed_docs = Vec::new();
         let mut new_source_docs = Vec::with_capacity(self.source_docs.len());
@@ -133,6 +170,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     }
 
     /// Cancels / aborts the consolidation session, removing the intent key.
+    // ANCHOR[contextra-cognition:SESS-005]
+    /// Bricht die Session ab und entfernt den Intent-Schlüssel.
     pub async fn abort(self) -> Result<()> {
         let abort_tx = self.collection.allocate_tx()?;
         self.collection
@@ -145,6 +184,13 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
 
     /// Executes the consolidation process using the provided LLM text generator:
     /// validates OCC, reads source document contents, generates summary, and commits.
+    // ANCHOR[contextra-cognition:SESS-006]
+    /// Führt den gesamten Konsolidierungsablauf aus.
+// !SECTION: OCC-Refresh & Validierung
+
+// =========================================================================
+// SECTION: LLM-Ausfuehrung & Finalisierung
+// =========================================================================
     pub async fn execute<G>(&self, generator: &G) -> Result<()>
     where
         G: LlmTextGenerator + ?Sized,
@@ -184,9 +230,10 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
         }
 
         if chunks.is_empty() {
-            return Err(ContextraError::NotFound(
+            return Err(CognitionError::NotFound(
                 "No source documents found for consolidation".to_string(),
-            ));
+            )
+            .into());
         }
 
         // 3. Generate summary via LLM
@@ -217,6 +264,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     }
 
     /// Commits the consolidated document and removes the source documents.
+    // ANCHOR[contextra-cognition:SESS-007]
+    /// Committet das konsolidierte Dokument und löscht Quelldokumente.
     pub async fn commit(
         self,
         target_string_id: &str,
@@ -229,6 +278,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     }
 
     /// Commits the consolidated document and removes the source documents (takes `&self`).
+    // ANCHOR[contextra-cognition:SESS-008]
+    /// Committet das konsolidierte Dokument unter Beibehaltung der Session-Referenz.
     pub async fn commit_ref(
         &self,
         target_string_id: &str,
@@ -275,17 +326,20 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
                             .delete_op(&mut db_tx, &meta.id)
                             .await
                             .map_err(|e| {
-                                ContextraError::Internal(format!(
-                                    "Consolidation commit: failed to delete source doc {:?}: {}",
-                                    src_id, e
+                                contextra_types::ContextraError::from(CognitionError::Internal(
+                                    format!(
+                                        "Consolidation commit: failed to delete source doc {:?}: {}",
+                                        src_id, e
+                                    ),
                                 ))
                             })?;
                     }
                     Err(e) => {
-                        return Err(ContextraError::Serialization(format!(
+                        return Err(CognitionError::Serialization(format!(
                             "Consolidation commit: cannot deserialize meta for source doc {:?}: {}",
                             src_id, e
-                        )));
+                        ))
+                        .into());
                     }
                 },
                 None => {
@@ -307,3 +361,4 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
         Ok(())
     }
 }
+// !SECTION: Private Schluesselgenerierung

@@ -1,3 +1,5 @@
+// FILE-CONTEXT
+// ZWECK: Benchmarks for SIMD distance kernels with comparison to simsimd and scalar autovectorization.
 
 //! # Benchmark-Suite: `simd_bench`
 //!

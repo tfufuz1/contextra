@@ -1,3 +1,9 @@
+//! # Integrationstest: write skew via engine api
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_types::ContextraError;
@@ -6,6 +12,8 @@ use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST41-001]
+/// Testblock zur Überprüfung von `test_write_skew_prevention_via_engine_api`.
 #[tokio::test]
 async fn test_write_skew_prevention_via_engine_api() -> contextra_types::Result<()> {
     let tmp_dir = TempDir::new().expect("Failed to create temporary directory");
@@ -83,6 +91,8 @@ async fn test_write_skew_prevention_via_engine_api() -> contextra_types::Result<
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST41-002]
+/// Testblock zur Überprüfung von `test_engine_storage_supports_ssi_tracking`.
 #[tokio::test]
 async fn test_engine_storage_supports_ssi_tracking() -> contextra_types::Result<()> {
     let tmp_dir = TempDir::new().expect("Failed to create temporary directory");

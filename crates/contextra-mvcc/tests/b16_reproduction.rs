@@ -1,7 +1,15 @@
+// ANCHOR[contextra-mvcc:TEST-B16-ROOT]
+//! # Regressionstests für Befund B-16 (Kapazitätserschöpfung und Coarsening)
+//!
+//! Verifiziert, dass das Erreichen von `DEFAULT_MAX_TRACKED_COMMIT_KEYS` nicht mehr
+//! zu einem Totalausfall führt, sondern ältere Buckets konservativ vergröbert werden,
+//! während 0 % False Negatives garantiert bleiben.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{ReadSet, SequenceLogSsiValidator, SsiValidator, TxId};
 
+// Prüft, dass das Erreichen der maximalen Schlüsselkapazität durch Coarsening gelöst wird und nicht blockiert.
 #[test]
 fn test_b16_reproduction_capacity_total_outage_resolved() {
     let max_keys = 100;
@@ -27,6 +35,7 @@ fn test_b16_reproduction_capacity_total_outage_resolved() {
     );
 }
 
+// Prüft, dass vergröberte Buckets echte Schreibkonflikte weiterhin zuverlässig (ohne False Negatives) abfangen.
 #[test]
 fn test_b16_coarsening_prevents_false_negatives() {
     let max_keys = 10;
@@ -62,17 +71,18 @@ fn test_b16_coarsening_prevents_false_negatives() {
     assert!(validator.validate(tx_ok, &rs_ok).is_ok());
 }
 
+// Prüft, dass langlaufende gepinnte Snapshots, die das Pruning behindern, als Diagnosealarm erkannt werden.
 #[test]
 fn test_long_lived_snapshot_pin_blocker_alarm() {
     use contextra_mvcc::SnapshotRegistry;
-    use contextra_testkit::ManualClock;
+    use contextra_env::{Clock, ManualClock};
     use std::sync::Arc;
     use std::time::Duration;
 
-    let clock = Arc::new(ManualClock::new(400_000_000_000));
+    let clock = Arc::new(ManualClock::new(400_000_000_000, 400_000_000_000));
     let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
 
-    let now_nanos = clock.now_nanos();
+    let now_nanos = clock.now_unix_nanos();
     let past_350s_nanos = now_nanos.saturating_sub(350_000_000_000);
 
     // Register a snapshot guard at 350s ago (> DEFAULT_MAX_PIN_DURATION of 300s)
@@ -101,6 +111,7 @@ fn test_long_lived_snapshot_pin_blocker_alarm() {
     );
 }
 
+// Prüft, dass das Fail-Closed-Verhalten für Lese-Snapshots älter als pruned_through auch nach Coarsening greift.
 #[test]
 fn test_fail_closed_snapshot_pruned_still_enforced_after_coarsening() {
     let validator = SequenceLogSsiValidator::new_with_bounds(10);

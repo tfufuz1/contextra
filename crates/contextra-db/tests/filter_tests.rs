@@ -1,8 +1,14 @@
+//! # Filter- und Prädikat-Tests
+//!
+//! Überprüft Metadaten- und Attributfilter bei Vektor- und Hybridsuchen.
+//!
 #[allow(deprecated)]
 use contextra_db::{filter::FilterOp, Contextra, ContextraConfig, MetadataFilter};
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-FILTER_TESTS-01-SETUP_DB]
+// Testet die Funktionalität von `setup_db`.
 async fn setup_db(dim: usize) -> (Contextra, TempDir) {
     let tmp = TempDir::new().expect("temp dir");
     let config = ContextraConfig {
@@ -15,6 +21,8 @@ async fn setup_db(dim: usize) -> (Contextra, TempDir) {
     (db, tmp)
 }
 
+// ANCHOR[contextra-db:TEST-FILTER_TESTS-02-TEST_POST_FILTER_RETURNS_ONLY_MATCHING]
+// Testet die Funktionalität von `test_post_filter_returns_only_matching`.
 #[allow(deprecated)]
 #[tokio::test]
 async fn test_post_filter_returns_only_matching() {
@@ -48,6 +56,8 @@ async fn test_post_filter_returns_only_matching() {
     }
 }
 
+// ANCHOR[contextra-db:TEST-FILTER_TESTS-03-TEST_PRE_FILTER_WITH_LOW_SELECTIVITY]
+// Testet die Funktionalität von `test_pre_filter_with_low_selectivity`.
 #[allow(deprecated)]
 #[tokio::test]
 async fn test_pre_filter_with_low_selectivity() {
@@ -83,6 +93,8 @@ async fn test_pre_filter_with_low_selectivity() {
         .all(|r| r.metadata.as_ref().unwrap()["topic"] == "special"));
 }
 
+// ANCHOR[contextra-db:TEST-FILTER_TESTS-04-TEST_COMPLEX_LOGICAL_FILTER]
+// Testet die Funktionalität von `test_complex_logical_filter`.
 #[allow(deprecated)]
 #[tokio::test]
 async fn test_complex_logical_filter() {

@@ -1,24 +1,30 @@
+//! # Audit-Kette (`audit_chain.rs`)
+//!
+//! Unveränderliches, kryptographisch verkettetes Audit-Protokoll für sicherheitsrelevante Aktionen.
+//!
+//! ## Invarianten
+//! - Jeder Eintrag enthält den Hash seines Vorgängers (Hash-Chain).
+//! - Rollback-Schutz durch externe Anker-Validierung (Anchor Verification).
+
 // FILE-CONTEXT
-// ZWECK: Cryptographic Blake3 audit hash chain with periodic Ed25519 signatures and encrypted commitments.
+// ZWECK: Cryptographic Blake3 audit hash chain with periodic signatures and encrypted commitments.
 // INVARIANTEN: Audit chain entries strictly exclude personal data. Chain links are linked via Blake3 hashes.
 // NICHT-OFFENSICHTLICH: Commitments are Blake3(salt || attr) where salt is encrypted via key shredding.
 // HOTSPOTS: [AuditChain, AuditChainEntry, compute_record_commitment]
 
 #![forbid(unsafe_code)]
 
-//! Audit-Log als Blake3-Hash-Kette mit periodischer Ed25519-Signatur.
+//! Audit-Log als Blake3-Hash-Kette mit periodischer Signatur.
 //!
-//! DSGVO Art. 17 / Art. 30 Compliance:
+//! Revisions- und Integritätsnachweis:
 //! - Jeder Schreibvorgang erzeugt einen AuditChainEntry ohne Personenbezug.
 //! - Optionale Commitments Blake3(salt || attr), wobei salt unter einem Shredding-Schlüssel
 //!   verschlüsselt gespeichert ist. Nach dem Schreddern des Schlüssels ist das salt unöffenbar,
 //!   womit das Commitment nicht mehr auf Originalattribute zurückführbar ist (Wörterbuchangriff
 //!   unmöglich, da salt unbekannt).
 
-use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
-use crate::kv_shredding::KeyRegistry;
-use contextra_types::{DocId, TxId};
+use contextra_ids::{DocId, TxId};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 
@@ -35,12 +41,14 @@ pub enum DataClass {
     Restricted,
     /// Personenbezogene Daten (im Audit-Log nur pseudonymisiert/entkoppelt).
     Personal,
-    /// Besondere Kategorien personenbezogener Daten (Art. 9 DSGVO).
+    /// Besondere Kategorien personenbezogener Daten mit erhöhtem Schutzbedarf.
     SpecialCategoryPersonal,
 }
 
 /// Einzelner Eintrag in der Audit-Hash-Kette.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-crypto:AUDIT-001]
+/// Einzelner Eintrag in der manipulationssicheren BLAKE3-Audit-Hash-Kette.
 pub struct AuditChainEntry {
     /// Fortlaufender Index in der Audit-Kette (0-basiert).
     pub index: u64,
@@ -101,14 +109,16 @@ impl AuditChainEntry {
     }
 }
 
-/// Periodisch erzeugte Ed25519-Signatur über den aktuellen Kettenkopf.
+/// Periodisch erzeugte Signatur über den aktuellen Kettenkopf.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-crypto:AUDIT-004]
+/// Periodisch erzeugte Signatur über den aktuellen Kettenkopf.
 pub struct AuditChainHeadSignature {
     /// Index des signierten Kettenkopfs.
     pub chain_index: u64,
     /// Blake3-Hash des Kettenkopfs.
     pub head_hash: [u8; 32],
-    /// Ed25519-Signatur (64 Bytes).
+    /// Signatur-Bytes.
     pub signature: Vec<u8>,
 }
 
@@ -119,7 +129,7 @@ pub struct AuditHeadAnchor {
     pub seq_no: u64,
     /// Blake3-Hash des Kettenkopfs an der Position `seq_no`.
     pub head_hash: [u8; 32],
-    /// Optionale Ed25519-Signatur über (seq_no || head_hash).
+    /// Optionale Signatur über (seq_no || head_hash).
     pub head_signature: Option<AuditChainHeadSignature>,
 }
 
@@ -158,27 +168,7 @@ pub struct EncryptedCommitmentSalt {
     pub nonce: [u8; 12],
 }
 
-impl EncryptedCommitmentSalt {
-    /// Verschlüsselt ein Salt-Byte-Array über den `KeyRegistry`-Shredding-Mechanismus.
-    pub fn encrypt(
-        registry: &KeyRegistry,
-        master_key: &KeyManager,
-        group_id: u64,
-        salt: &[u8],
-    ) -> Result<Self> {
-        let (ciphertext, nonce) = registry.encrypt_with_group(master_key, group_id, salt)?;
-        Ok(Self {
-            group_id,
-            ciphertext,
-            nonce,
-        })
-    }
 
-    /// Entschlüsselt das Salt. Schlägt fehl, wenn der Sub-Key für `group_id` geschreddert/widerrufen wurde.
-    pub fn decrypt(&self, registry: &KeyRegistry) -> Result<Vec<u8>> {
-        registry.decrypt_with_group(self.group_id, &self.ciphertext, &self.nonce)
-    }
-}
 
 /// Berechnet das Commitment `Blake3(salt || attr)`.
 pub fn compute_record_commitment(salt: &[u8], attr: &[u8]) -> [u8; 32] {
@@ -190,6 +180,8 @@ pub fn compute_record_commitment(salt: &[u8], attr: &[u8]) -> [u8; 32] {
 
 /// Manipulationssichere Blake3-Hash-Kette für Audit-Einträge.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-crypto:AUDIT-002]
+/// Manipulationssichere Audit-Kette mit BLAKE3-Hash-Verkettung.
 pub struct AuditChain {
     /// Öffentlicher Zugriff auf die Liste der Ketten-Einträge für Prüfungen/Tests.
     pub entries: Vec<AuditChainEntry>,
@@ -270,10 +262,10 @@ impl AuditChain {
         self.head_hash
     }
 
-    /// Periodischer Aufruf: Signiert den aktuellen Kettenkopf mit Ed25519.
-    pub fn sign_head(
+    /// Periodischer Aufruf: Erzeugt eine Kettenkopf-Signatur / Snapshot.
+    pub fn sign_head_with_bytes(
         &self,
-        signing_key: &ed25519_dalek::SigningKey,
+        signature_bytes: Vec<u8>,
     ) -> Result<AuditChainHeadSignature> {
         let last_entry = match self.entries.last() {
             Some(e) => e,
@@ -287,36 +279,11 @@ impl AuditChain {
         let chain_index = last_entry.index;
         let head_hash = self.head_hash;
 
-        let mut payload = Vec::with_capacity(8 + 32);
-        payload.extend_from_slice(&chain_index.to_le_bytes());
-        payload.extend_from_slice(&head_hash);
-
-        use ed25519_dalek::Signer;
-        let sig = signing_key.sign(&payload);
-
         Ok(AuditChainHeadSignature {
             chain_index,
             head_hash,
-            signature: sig.to_bytes().to_vec(),
+            signature: signature_bytes,
         })
-    }
-
-    /// Verifiziert eine periodische Kettenkopf-Signatur gegen den angegebenen VerifyingKey.
-    pub fn verify_head_signature(
-        head_sig: &AuditChainHeadSignature,
-        verifying_key: &ed25519_dalek::VerifyingKey,
-    ) -> Result<bool> {
-        let mut payload = Vec::with_capacity(8 + 32);
-        payload.extend_from_slice(&head_sig.chain_index.to_le_bytes());
-        payload.extend_from_slice(&head_sig.head_hash);
-
-        use ed25519_dalek::Verifier;
-        let sig = match ed25519_dalek::Signature::from_slice(&head_sig.signature) {
-            Ok(s) => s,
-            Err(_) => return Ok(false),
-        };
-
-        Ok(verifying_key.verify(&payload, &sig).is_ok())
     }
 
     /// Verifiziert die vollständige Kette auf Integrität.
@@ -379,7 +346,6 @@ impl AuditChain {
     pub fn verify_chain_with_anchor(
         &self,
         anchor: &AuditHeadAnchor,
-        verifying_key: Option<&ed25519_dalek::VerifyingKey>,
     ) -> Result<bool> {
         // Rollback-Prüfung: Kette muss mindestens bis zum Anker-Index gefüllt sein
         let anchor_idx = anchor.seq_no as usize;
@@ -399,11 +365,6 @@ impl AuditChain {
                 || sig.head_hash.ct_eq(&anchor.head_hash).unwrap_u8() != 1
             {
                 return Ok(false);
-            }
-            if let Some(vk) = verifying_key {
-                if !Self::verify_head_signature(sig, vk)? {
-                    return Ok(false);
-                }
             }
         }
 

@@ -1,5 +1,17 @@
+//! # WAL-Frame-Kodierung (Ring 1)
+//!
+//! Kodiert und dekodiert WAL-Einträge mit Längenfeldern, Sequenznummern, Prüfsummen (CRC32C)
+//! und kryptografischer HMAC-Verkettung (SPEC §3.5, §12.1).
+//!
+//! ## Invarianten
+//! - **INV-WAL-FRAME-1:** Bounded entry length: Jeder Record validiert key_len und val_len strikt gegen Maximallimits.
+//! - **INV-WAL-CRC-1:** Jedes Frame trägt eine CRC32C-Prüfsumme über den Nutzdaten-Payload.
+//! - **INV-WAL-HMAC-1:** Sequenzielle Hash-Kette bindet vorherigen HMAC (`prev_hmac`), Sequenznummer und Operation.
+
 use contextra_crypto::wal_crypto::WalHmac;
-use contextra_types::{ContextraError, Result, TxId};
+use crate::error::{StoreError, StoreResult};
+use contextra_ids::TxId;
+use std::result::Result;
 
 use super::MAX_WAL_ENTRY_SIZE;
 
@@ -66,7 +78,7 @@ pub enum WalVersion {
 /// A batch of prepared WAL entries bound to a specific HMAC chain.
 ///
 /// `PreparedBatch` has a private inner field and cannot be constructed outside `wal.rs`.
-/// It can only be created by calling [`Wal::prepare_batch`].
+/// It can only be created by calling [`crate::wal::Wal::prepare_batch`].
 #[derive(Debug, Clone)]
 pub struct PreparedBatch(pub(crate) Vec<WalEntry>);
 
@@ -123,7 +135,7 @@ impl WalEntry {
         seq_no: u64,
         integrity_key: &[u8],
         prev_hmac: [u8; 32],
-    ) -> Result<Self> {
+    ) -> StoreResult<Self> {
         let checksum = Self::compute_checksum_v3(&op, seq_no, integrity_key, prev_hmac)?;
         Ok(Self {
             op,
@@ -139,7 +151,7 @@ impl WalEntry {
         seq_no: u64,
         integrity_key: &[u8],
         prev_hmac: [u8; 32],
-    ) -> Result<[u8; 32]> {
+    ) -> StoreResult<[u8; 32]> {
         let mut mac = WalHmac::new(integrity_key)?;
 
         // Hash Chaining: binding to the previous entry
@@ -177,7 +189,7 @@ impl WalEntry {
         seq_no: u64,
         integrity_key: &[u8],
         prev_hmac: [u8; 32],
-    ) -> Result<[u8; 32]> {
+    ) -> StoreResult<[u8; 32]> {
         let mut mac = WalHmac::new(integrity_key)?;
 
         mac.update(&prev_hmac);
@@ -205,12 +217,12 @@ impl WalEntry {
         seq_no: u64,
         integrity_key: &[u8],
         prev_hmac: [u8; 32],
-    ) -> Result<[u8; 32]> {
+    ) -> StoreResult<[u8; 32]> {
         Self::compute_checksum_v3(op, seq_no, integrity_key, prev_hmac)
     }
 
     /// Serializes the entry to bytes.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self) -> StoreResult<Vec<u8>> {
         let op_size = match &self.op {
             WalOp::Put { key, value, .. } => 1 + 8 + 4 + key.len() + 4 + value.len(),
             WalOp::Delete { key, .. } => 1 + 8 + 4 + key.len(),
@@ -228,7 +240,7 @@ impl WalEntry {
 
         // 1. Length Prefix
         if total_payload_size > MAX_WAL_ENTRY_SIZE as usize {
-            return Err(ContextraError::Serialization(format!(
+            return Err(StoreError::Serialization(format!(
                 "WAL entry too large: {} bytes (max {})",
                 total_payload_size, MAX_WAL_ENTRY_SIZE
             )));
@@ -429,7 +441,7 @@ impl WalEntry {
     }
 
     /// Deserializes a WAL entry from bytes, verifying CRC32.
-    pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        Self::from_bytes_classified(data).map_err(|e| ContextraError::Serialization(e.to_string()))
+    pub fn from_bytes(data: &[u8]) -> StoreResult<Self> {
+        Self::from_bytes_classified(data).map_err(|e| StoreError::Serialization(e.to_string()))
     }
 }

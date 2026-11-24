@@ -2,11 +2,22 @@
 // ZWECK: End-to-End Facade Wiring Matrix Integration Tests (§20.2 / Regel R1).
 // INVARIANTEN: Greift ausschließlich über die öffentliche Facade (contextra::open, ContextraBuilder) zu.
 
+//! # Integrationstest: `wiring_matrix`
+//!
+//! Prüft die End-to-End-Verdrahtung aller Subsysteme über die Fassade (Spec §20.2 / Regel R1):
+//! - Snapshot-Stabilität über Memtable-Flushes hinweg.
+//! - Verzeichnis-Sperren (`DirLock`): Schutz vor zweifachem Öffnen desselben Pfads.
+//! - Profil-Initialisierung ohne Lizenzbeschränkungen (direkter Durchlauf).
+//! - Weitergabe von Profil-Durability in die LSM-Konfiguration.
+//! - Crash-/Reopen-Persistenz geschriebener Datensätze.
+
+use contextra::performance_profile::DurabilityMode;
 use contextra::performance_profile::PerformanceProfile;
-use contextra::{builder, open, open_with_config, ContextraConfig, ContextraError};
-use contextra_store::lsm::DurabilityMode;
+use contextra::{builder, open, open_with_config, ContextraConfig};
 use tempfile::TempDir;
 
+// ANCHOR[contextra:TEST-WIR-001]
+// Prüft, dass gepinnte MVCC-Snapshots auch nach einem Memtable-Flush auf SSTable konsistent bleiben.
 #[tokio::test]
 async fn flush_preserves_pinned_snapshot() -> Result<(), Box<dyn std::error::Error>> {
     let tmp = TempDir::new()?;
@@ -43,6 +54,8 @@ async fn flush_preserves_pinned_snapshot() -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-WIR-002]
+// Verifiziert, dass der Versuch, denselben Datenbankpfad ein zweites Mal zu öffnen, mit einem Lock-Fehler scheitert.
 #[tokio::test]
 async fn second_open_same_directory_rejected() -> Result<(), Box<dyn std::error::Error>> {
     let tmp = TempDir::new()?;
@@ -58,32 +71,27 @@ async fn second_open_same_directory_rejected() -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-WIR-003]
+// Stellt sicher, dass das Anfordern des Compliance-Profils lizenzfrei erfolgreich initialisiert werden kann (direkter Durchlauf).
 #[tokio::test]
-async fn open_without_gate_never_grants_sovereign() -> Result<(), Box<dyn std::error::Error>> {
+async fn open_compliance_profile_succeeds_without_license() -> Result<(), Box<dyn std::error::Error>>
+{
     let tmp = TempDir::new()?;
 
-    // Requesting Compliance performance profile (which requires Sovereign ring) without attaching a valid signed license gate must fail
-    let res = builder(16)
+    // Nach Entfernen des Lizenz-Gates muss das Compliance-Profil ohne Lizenzschlüssel erfolgreich bauen
+    let db = builder(16)
         .with_storage_path(tmp.path())
         .with_performance_profile(PerformanceProfile::Compliance)
         .build()
-        .await;
+        .await?;
 
-    assert!(
-        res.is_err(),
-        "Compliance/Sovereign feature ring without signed license must be rejected"
-    );
-    if let Err(err) = res {
-        assert!(
-            matches!(err, ContextraError::PolicyViolation(_)),
-            "Expected PolicyViolation error, got: {:?}",
-            err
-        );
-    }
+    assert_eq!(db.len().await?, 0);
 
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-WIR-004]
+// Überprüft, dass die Durability-Einstellung aus dem PerformanceProfile (z. B. BareMetal -> MemoryOnly) die LSM-Engine erreicht.
 #[tokio::test]
 async fn profile_durability_reaches_lsm_config() -> Result<(), Box<dyn std::error::Error>> {
     let tmp = TempDir::new()?;
@@ -105,6 +113,8 @@ async fn profile_durability_reaches_lsm_config() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-WIR-005]
+// Stellt sicher, dass bestätigte Schreibvorgänge das Beenden (Drop/Close) und anschließende Wiedereröffnen überleben.
 #[tokio::test]
 async fn confirmed_commit_survives_drop_reopen() -> Result<(), Box<dyn std::error::Error>> {
     let tmp = TempDir::new()?;

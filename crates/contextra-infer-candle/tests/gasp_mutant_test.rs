@@ -2,6 +2,12 @@
 // STAND: 2026-09-09T12:44:49Z (SESSION: c74a1828)
 // ZWECK: Additional unit tests targeting mutants in GaspValidator and GaspConfig.
 
+//! Mutationstests und Grenzfall-Tests für den `GaspValidator`.
+//!
+//! # Zweck
+//! Prüft Schwellenwert-Grenzbereiche, Wortlängen-Filterung und Zahlenabgleiche gegen Mutanten.
+
+// ANCHOR[contextra-infer-candle:TEST-GASP-MUTANT]
 use contextra_infer_candle::gasp::{GaspConfig, GaspValidator};
 use contextra_ports::GroundingValidator;
 use contextra_types::{ContextChunk, ContextraError, DocId};

@@ -1,3 +1,9 @@
+//! # Integrationstest: tenant wrapper coverage
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Lückenlose Abdeckung aller Collection- und Storage-Operationen unter Mandanten-Isolation (TenantScopedStorage N21).
@@ -12,6 +18,8 @@ use serde_json::json;
 use std::ops::Bound;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST37-001]
+/// Testblock zur Überprüfung von `test_tenant_scoped_storage_full_coverage`.
 #[tokio::test]
 async fn test_tenant_scoped_storage_full_coverage() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create temporary directory");
@@ -222,10 +230,7 @@ async fn test_tenant_scoped_storage_full_coverage() -> contextra_types::Result<(
         "Tenant B doc_b_1 must remain unaffected by Tenant A single document delete"
     );
 
-    let proof_a = db
-        .drop_collection("shared_col", tenant_a, b"secret_proof_key_32bytes_1234567")
-        .await?;
-    assert_eq!(proof_a.tenant_id(), tenant_a);
+    db.drop_collection("shared_col", tenant_a).await?;
 
     // Assert Tenant B collection remains fully intact
     let doc_b1_after_drop = col_b.get("doc_b_1").await?;

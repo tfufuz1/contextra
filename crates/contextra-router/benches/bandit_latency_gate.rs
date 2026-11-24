@@ -1,10 +1,21 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Benchmark / Beispiel für contextra-router (bandit_latency_gate.rs).
+// INVARIANTEN: Deterministische Ausführung, Latenz- und Budgetüberwachung.
+
+//! # Benchmark für die Latenzschranke der Bandit-Entscheidung
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Benchmark für die Latenzschranke der Bandit-Entscheidung.
+
+// ANCHOR[contextra-router:BN-BLAT-001]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 #[cfg(feature = "bandit-routing")]
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 #[cfg(feature = "bandit-routing")]
-use contextra_router::{BanditImplementation, BanditProfileState};
+use contextra_adapt::{BanditImplementation, BanditProfileState};
 
 /// Standard-Dimension für Kontext-Embeddings (nomic-embed-text d=768).
 #[cfg(feature = "bandit-routing")]
@@ -57,6 +68,8 @@ fn bench_bandit_latency_gate(c: &mut Criterion) {
 }
 
 #[cfg(feature = "bandit-routing")]
+// ANCHOR[contextra-router:BN-BLAT-CRIT]
+// Benchmark-Gruppe für Performance- und Regressionsmessungen.
 criterion_group!(benches, bench_bandit_latency_gate);
 #[cfg(feature = "bandit-routing")]
 criterion_main!(benches);

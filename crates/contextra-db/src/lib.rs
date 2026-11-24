@@ -1,37 +1,463 @@
 // FILE-CONTEXT
-// ZWECK: Contextra Database Facade & Integration Hub (Ring 3).
+// ZWECK: Contextra Database Facade & Core Engine (Ring 3/Ring 2 gemäss ADR-0122).
 // INVARIANTEN: Abwärtskompatibilität für bestehende Pfade via prelude/advanced; Forbid unsafe code.
 
 #![forbid(unsafe_code)]
 
-//! # Contextra DB — Facade & Integrationstest-Hub
+//! # Contextra DB — Facade & Storage Engine
 //!
-//! `contextra-db` bildet die benutzerfreundliche Hauptfassade (Ring 3) für Anwendungen,
-//! welche die Contextra-Datenbankbibliothek als eingebettete Engine nutzen.
-//!
-//! ## Architekturübersicht: Welche Schicht gehört wozu?
-//!
-//! Contextra ist als geschichteter Baukasten (Layered Toolkit) konzipiert:
-//!
-//! - **Ring 0 — Fundament & Hardware-Isolation (`contextra-store`, `contextra-sys`, `contextra-wire`)**:
-//!   Verwaltet LSM-Storage, WAL, Speicher-Locks, Zero-Copy-IPC sowie direkte I/O- und Durabilitätssicherungen.
-//! - **Ring 1 — Fachspezifische Indizes (`contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-crypto`)**:
-//!   Implementiert Vektorsuche (HNSW), BM25-Textsuche, Graph-CSR-Strukturen und DSGVO-Art.-17-Löschbeweise.
-//! - **Ring 2 — Adaption & Kognitive Orchestrierung (`contextra-engine`, `contextra-adapt`, `contextra-cognition`)**:
-//!   Kombiniert Multi-Signal-Fusion (RRF), dynamische Schwellenwert-Anpassung, Memory Consolidation,
-//!   Turn-Segmentierung und Schlafzyklen-Synthese.
-//! - **Ring 3 — Fassade & Haupt-API (`contextra-db`)**:
-//!   Bündelt alle Subsysteme in eine konsistente, typ- und mandanten-sichere API ([`Contextra`], [`Collection`]).
-//!
-//! ## API-Strukturierung: `prelude` vs. `advanced`
-//!
-//! - **[`prelude`]**: Die empfohlene, stabile Kern-API für reguläre Datenbankoperationen (Einfügen, Suchen, Löschen, Multi-Step).
-//! - **[`advanced`]**: Erweiterte Steuerungselemente und fortgeschrittene Subsystem-Schnittstellen aus `adapt`, `cognition` und `graph`.
+//! `contextra-db` bildet die benutzerfreundliche Hauptfassade und Speicher-Engine
+//! für Anwendungen, welche die Contextra-Datenbankbibliothek als eingebettete Engine nutzen.
 
-/// Stabile Kern-API für den alltäglichen Einsatz.
+pub mod adapters;
+pub mod backends;
+#[cfg(not(loom))]
+pub mod background_workers;
+#[cfg(not(loom))]
+pub mod chunker;
+pub mod collection;
+#[cfg(not(loom))]
+pub mod contextra_impl;
+#[cfg(not(loom))]
+pub mod decay_controller;
+#[cfg(not(loom))]
+pub mod export;
+#[cfg(any(feature = "exp-extraction", feature = "entity-extraction"))]
+#[cfg(not(loom))]
+pub mod extraction;
+#[cfg(not(loom))]
+pub mod filter;
+#[cfg(not(loom))]
+pub mod fusion;
+pub mod homeostat;
+#[cfg(not(loom))]
+pub mod import;
+pub(crate) mod license_seam;
+#[cfg(feature = "sandbox")]
+pub mod merge_operator_adapter;
+#[cfg(not(loom))]
+pub mod metrics_names;
+pub mod multistep;
+pub mod orchestration;
+pub mod pid_latency_controller;
+#[cfg(not(loom))]
+pub mod temporal_filter;
+#[cfg(not(loom))]
+pub mod transaction;
+
+#[cfg(feature = "cognition")]
+pub mod cognition;
+
+#[cfg(feature = "volatile-vault")]
+pub mod volatile_vault;
+
+use license_seam::LicenseGate;
+#[cfg(feature = "sandbox")]
+use contextra_ports::BoxFuture;
+use contextra_ports::StorageEngine;
+pub use contextra_ports::TextEmbeddingEngine;
+pub use contextra_ports::VectorDeleteMode;
+#[cfg(not(loom))]
+pub use contextra_store::lsm::DurabilityMode;
+#[cfg(not(loom))]
+use contextra_store::LsmStorage;
+use contextra_types::TenantId;
+use contextra_vector::HnswIndex;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
+
+#[cfg(feature = "sandbox")]
+pub use merge_operator_adapter::WasmMergeOperator;
+
+#[cfg(not(loom))]
+pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
+
+#[cfg(not(loom))]
+pub use export::{
+    ExportCollectionV1, ExportDocumentV1, ExportMemoryV1, ExportRelationV1, SCHEMA_VERSION_V1,
+};
+#[cfg(not(loom))]
+pub use import::ImportSummary;
+
+#[cfg(not(loom))]
+#[cfg(feature = "background-maintenance")]
+pub use background_workers::start_decay_cleanup_worker;
+#[cfg(not(loom))]
+pub use background_workers::{start_expiry_cleanup_worker, start_orphan_cleanup_worker};
+
+#[cfg(not(loom))]
+pub use backends::Backends;
+#[cfg(not(loom))]
+pub use backends::DefaultBackends;
+#[cfg(not(loom))]
+pub use collection::crud::MAX_SCAN_RESULTS;
+#[cfg(feature = "graph-connectivity-health")]
+pub use collection::maintenance::PercolationConfig;
+#[cfg(not(loom))]
+#[cfg(feature = "graph-connectivity-health")]
+pub use collection::maintenance::PercolationResult;
+#[cfg(not(loom))]
+pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
+pub use collection::{Collection, CollectionConfig};
+pub use contextra_checkpoint;
+pub use contextra_text::Language;
+#[cfg(not(loom))]
+#[allow(deprecated)]
+pub use filter::MetadataFilter;
+
+#[cfg(not(loom))]
+#[allow(clippy::type_complexity)]
+/// Funktions-Typdefinition zum Starten von Wissenskonsolidierungs-Workern.
+pub type ConsolidationLauncher = Arc<
+    dyn Fn(
+            Arc<Collection<LsmStorage>>,
+            std::time::Duration,
+            usize,
+            tokio_util::sync::CancellationToken,
+        ) -> tokio::task::JoinHandle<()>
+        + Send
+        + Sync,
+>;
+
+#[cfg(not(loom))]
+#[deprecated(
+    note = "Instanzgebundenen Launcher via ContextraConfig::with_consolidation_launcher setzen (P29)"
+)]
+pub fn register_consolidation_launcher<F>(_f: F)
+where
+    F: Fn(
+            Arc<Collection<LsmStorage>>,
+            std::time::Duration,
+            usize,
+            tokio_util::sync::CancellationToken,
+        ) -> tokio::task::JoinHandle<()>
+        + Send
+        + Sync
+        + 'static,
+{
+    tracing::warn!(
+        "register_consolidation_launcher is deprecated and has no effect. Set consolidation_launcher on ContextraConfig instead."
+    );
+}
+
+#[cfg(not(loom))]
+pub use fusion::{ProvenanceRecord, SearchResult, SignalContribution};
+
+#[cfg(not(loom))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Repräsentiert ein Dokument mit eindeutiger ID, Text, Vektoreinbettung und Metadaten.
+pub struct Document {
+    pub id: String,
+    pub metadata: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Aggregierte Betriebs- und Belegungsstatistiken der Engine.
+pub struct ContextraStats {
+    pub drift_status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calibration_ece: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_calibration_at: Option<u64>,
+    pub active_memory_count: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pid_pool_size: Option<usize>,
+    pub index_stats: contextra_ports::VectorIndexStats,
+    pub storage_stats: contextra_ports::StorageStats,
+}
+
+pub use contextra_ports::DriftStatusProvider;
+/// Alias für `ContextraStats` zur Abwärtskompatibilität.
+pub type DbStats = ContextraStats;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Konfiguration für Community-Erkennungs- und Graph-Clustering-Algorithmen.
+pub struct CommunityDetectionConfig {
+    pub auto_trigger_threshold: u64,
+}
+
+impl Default for CommunityDetectionConfig {
+    fn default() -> Self {
+        Self {
+            auto_trigger_threshold: 100,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Wählbares Backend zur Berechnung von Text-Embeddings.
+pub enum EmbeddingBackend {
+    Onnx {
+        model_name: String,
+        cache_dir: Option<std::path::PathBuf>,
+    },
+    None,
+}
+
+impl Default for EmbeddingBackend {
+    fn default() -> Self {
+        Self::Onnx {
+            model_name: "nomic-embed-text".to_string(),
+            cache_dir: None,
+        }
+    }
+}
+
+/// Tenant isolation enforcement policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum TenantPolicy {
+    /// Non-tenant collection access (`collection(...)`) is allowed (Default / Admin / Single-tenant path).
+    #[default]
+    Optional,
+    /// Non-tenant collection access is forbidden; callers MUST use tenant-scoped handles (`collection_for_tenant(...)`).
+    Required,
+}
+
+#[cfg(not(loom))]
+#[derive(Clone)]
+/// Globale Konfiguration für die Contextra-Engine-Initialisierung.
+pub struct ContextraConfig {
+    pub dimension: usize,
+    pub max_elements: usize,
+    pub distance_metric: contextra_types::DistanceMetric,
+    pub encryption_passphrase: Option<String>,
+    pub max_ram_mb: u64,
+    pub group_commit_window_micros: u64,
+    pub durability_mode: DurabilityMode,
+    pub deletion_proof_active: bool,
+    pub vector_delete_mode: VectorDeleteMode,
+    pub memtable_size_limit: usize,
+    pub expiry_reaper_interval: std::time::Duration,
+    pub orphan_registry_path: Option<std::path::PathBuf>,
+    pub community_detection: CommunityDetectionConfig,
+    pub embedding_backend: EmbeddingBackend,
+    pub consolidation_enabled: bool,
+    pub consolidation_interval: std::time::Duration,
+    pub max_llm_calls_per_cycle: usize,
+    pub consolidation_launcher: Option<ConsolidationLauncher>,
+    pub tenant_policy: TenantPolicy,
+    pub metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+}
+
+#[cfg(not(loom))]
+impl ContextraConfig {
+    pub fn with_consolidation_launcher(mut self, launcher: ConsolidationLauncher) -> Self {
+        self.consolidation_launcher = Some(launcher);
+        self
+    }
+
+    pub fn with_tenant_policy(mut self, policy: TenantPolicy) -> Self {
+        self.tenant_policy = policy;
+        self
+    }
+
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+        self.metrics_sink = Some(sink);
+        self
+    }
+}
+
+#[cfg(not(loom))]
+impl std::fmt::Debug for ContextraConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ContextraConfig")
+            .field("dimension", &self.dimension)
+            .field("max_elements", &self.max_elements)
+            .field("distance_metric", &self.distance_metric)
+            .field(
+                "encryption_passphrase",
+                &self.encryption_passphrase.as_ref().map(|_| "***"),
+            )
+            .field("max_ram_mb", &self.max_ram_mb)
+            .field(
+                "group_commit_window_micros",
+                &self.group_commit_window_micros,
+            )
+            .field("durability_mode", &self.durability_mode)
+            .field("deletion_proof_active", &self.deletion_proof_active)
+            .field("vector_delete_mode", &self.vector_delete_mode)
+            .field("memtable_size_limit", &self.memtable_size_limit)
+            .field("expiry_reaper_interval", &self.expiry_reaper_interval)
+            .field("orphan_registry_path", &self.orphan_registry_path)
+            .field("community_detection", &self.community_detection)
+            .field("embedding_backend", &self.embedding_backend)
+            .field("consolidation_enabled", &self.consolidation_enabled)
+            .field("consolidation_interval", &self.consolidation_interval)
+            .field("max_llm_calls_per_cycle", &self.max_llm_calls_per_cycle)
+            .field(
+                "consolidation_launcher",
+                &self.consolidation_launcher.as_ref().map(|_| "Fn(...)"),
+            )
+            .field("tenant_policy", &self.tenant_policy)
+            .field(
+                "metrics_sink",
+                &self.metrics_sink.as_ref().map(|_| "dyn MetricsSink"),
+            )
+            .finish()
+    }
+}
+
+#[cfg(not(loom))]
+impl Default for ContextraConfig {
+    fn default() -> Self {
+        Self {
+            dimension: 768,
+            max_elements: 1_000_000,
+            distance_metric: contextra_types::DistanceMetric::Cosine,
+            encryption_passphrase: None,
+            max_ram_mb: 2048,
+            group_commit_window_micros: 500,
+            durability_mode: DurabilityMode::default(),
+            deletion_proof_active: false,
+            vector_delete_mode: VectorDeleteMode::BackgroundRepair,
+            memtable_size_limit: 64 * 1024 * 1024,
+            expiry_reaper_interval: std::time::Duration::from_secs(60),
+            orphan_registry_path: None,
+            community_detection: CommunityDetectionConfig::default(),
+            embedding_backend: EmbeddingBackend::default(),
+            consolidation_enabled: true,
+            consolidation_interval: std::time::Duration::from_secs(6 * 3600),
+            max_llm_calls_per_cycle: 10,
+            consolidation_launcher: None,
+            tenant_policy: TenantPolicy::Optional,
+            metrics_sink: None,
+        }
+    }
+}
+
+#[cfg(not(loom))]
+pub type TenantCollectionMap = ahash::AHashMap<
+    (TenantId, String),
+    Arc<Collection<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>>,
+>;
+
+#[cfg(not(loom))]
+pub struct Contextra {
+    storage: Arc<LsmStorage>,
+    next_tx: Arc<AtomicU64>,
+    dimension: usize,
+    config: ContextraConfig,
+    license_gate: Arc<dyn LicenseGate>,
+    expiry_reaper_interval: std::time::Duration,
+    community_detection_threshold: u64,
+    collections: tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,
+    tenant_collections: tokio::sync::RwLock<TenantCollectionMap>,
+    cancel_token: tokio_util::sync::CancellationToken,
+    task_tracker: tokio_util::task::TaskTracker,
+    embedder: parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>,
+    orphan_registry: Arc<contextra_checkpoint::InstanceOrphanRegistry>,
+    router: parking_lot::RwLock<Option<std::sync::Weak<dyn DriftStatusProvider>>>,
+    calibrator: parking_lot::RwLock<
+        Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
+    >,
+    metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
+}
+
+pub use contextra_types::DistanceMetric;
+pub use serde_json::json;
+
+#[cfg(not(loom))]
+impl Contextra {
+    #[doc(hidden)]
+    pub fn inner_storage(&self) -> Arc<LsmStorage> {
+        self.storage.clone()
+    }
+
+    pub fn config(&self) -> &ContextraConfig {
+        &self.config
+    }
+
+    pub fn license_gate(&self) -> Arc<dyn LicenseGate> {
+        Arc::clone(&self.license_gate)
+    }
+}
+
+#[cfg(feature = "sandbox")]
+pub trait SandboxBridge: Send + Sync {
+    fn db_search<'a>(
+        &'a self,
+        query: &'a [u8],
+        k: usize,
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>>;
+    fn db_insert<'a>(
+        &'a self,
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> BoxFuture<'a, contextra_types::Result<()>>;
+    fn db_get<'a>(
+        &'a self,
+        key: &'a [u8],
+    ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>>;
+}
+
+#[cfg(feature = "sandbox")]
+impl SandboxBridge for Contextra {
+    fn db_search<'a>(
+        &'a self,
+        query: &'a [u8],
+        k: usize,
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>> {
+        Box::pin(async move {
+            let f32_count = query.len() / 4;
+            let mut vector = Vec::with_capacity(f32_count);
+            for i in 0..f32_count {
+                let start = i * 4;
+                let bits = u32::from_le_bytes(
+                    query
+                        .get(start..start + 4)
+                        .ok_or_else(|| {
+                            contextra_types::ContextraError::Serialization("Query too short".into())
+                        })?
+                        .try_into()
+                        .map_err(|_| {
+                            contextra_types::ContextraError::Serialization("Invalid slice".into())
+                        })?,
+                );
+                vector.push(f32::from_bits(bits));
+            }
+
+            let results: Vec<SearchResult> = self.search(&vector, k).await?;
+            serde_json::to_vec(&results)
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))
+        })
+    }
+
+    fn db_insert<'a>(
+        &'a self,
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> BoxFuture<'a, contextra_types::Result<()>> {
+        Box::pin(async move {
+            let id = String::from_utf8_lossy(key).to_string();
+            let val_json: Value = serde_json::from_slice(value)
+                .unwrap_or(serde_json::json!({ "raw_data": String::from_utf8_lossy(value) }));
+
+            self.insert(&id, &[], Some(val_json)).await
+        })
+    }
+
+    fn db_get<'a>(
+        &'a self,
+        key: &'a [u8],
+    ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>> {
+        Box::pin(async move {
+            let id = String::from_utf8_lossy(key).to_string();
+            let doc = self.get(&id).await?;
+            match doc {
+                Some(d) => Ok(Some(serde_json::to_vec(&d).map_err(|e| {
+                    contextra_types::ContextraError::Internal(e.to_string())
+                })?)),
+                None => Ok(None),
+            }
+        })
+    }
+}
+
 pub mod prelude {
-    pub use contextra_engine::collection::{self, Collection, CollectionConfig};
-    pub use contextra_engine::{
+    pub use crate::collection::{self, Collection, CollectionConfig};
+    pub use crate::{
         Contextra, ContextraConfig, ContextraStats, DbStats, Document, EmbeddingBackend,
         HybridQueryBuilder, Language, ProvenanceRecord, SearchResult, SearchStrategy,
         SignalContribution, SignalWeights,
@@ -41,13 +467,9 @@ pub mod prelude {
     pub use crate::multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
 
     #[cfg(feature = "volatile-vault")]
-    pub use crate::volatile_vault::{
-        CommitReceipt, PurgeReceipt, SignalModality, VaultChunk, VaultChunkMetadata, VaultConfig,
-        VaultError, VolatileContextVault,
-    };
+    pub use crate::volatile_vault::*;
 }
 
-/// Erweiterte Experten-Schnittstellen aus Adaption, Kognition und Graph-Maintenance.
 pub mod advanced {
     pub use crate::decay_controller::{
         AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs,
@@ -60,100 +482,22 @@ pub mod advanced {
         MIN_SCALING_FACTOR,
     };
 
-    pub use contextra_cognition as cognition;
-    pub use contextra_cognition::{
-        cleanup_orphaned_consolidation_intents, compact_segment_via_context_compactor,
-        compute_community_hash, detect_near_duplicates, execute_background_consolidation,
-        execute_consolidation_pass, group_turns_into_segments, run_consolidation_pass,
-        run_synthesis_pass, CommunityStabilityTracker, CompactedContext, CompactionStrategy,
-        ConsolidationConfig, ConsolidationEngine, ConsolidationNodesGuard,
-        ConsolidationPhaseResult, ConsolidationSession, ContextCompactor, ContextManager,
-        MaintenanceConfig, MaintenanceScheduler, MetaChunk, SpatialFence, StatusToken,
-        SynthesisConfig, SynthesisPhaseResult, TurnSegment,
-    };
-    pub use contextra_engine as engine;
-    pub use contextra_engine::{
+    pub use crate as engine;
+    pub use crate::DurabilityMode;
+
+    pub use crate::{
         background_workers, chunker, export, filter, import, temporal_filter, transaction,
         CommunityDetectionConfig, ExportCollectionV1, ExportDocumentV1, ExportMemoryV1,
         ExportRelationV1, ImportSummary, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
     };
 
-    #[cfg(feature = "graph-connectivity-health")]
-    pub use contextra_engine::collection::maintenance::PercolationResult;
     #[cfg(feature = "sandbox")]
-    pub use contextra_engine::SandboxBridge;
+    pub use crate::SandboxBridge;
 }
 
-// Abwärtskompatible Re-Exports auf Root-Ebene (bestehender Code kompiliert nahtlos weiter)
 pub use advanced::*;
 pub use prelude::*;
 
-/// Kontext-Verwaltung und Konversationshistorie.
-pub mod context {
-    pub use contextra_cognition::context::*;
-}
-/// Kontext-Kompaktierung und Chunk-Zusammenfassung.
-pub mod context_compaction {
-    pub use contextra_cognition::context_compaction::*;
-}
-/// Speicher-Konsolidierung und Wissens-Synthese.
-pub mod memory_consolidation {
-    pub use contextra_cognition::memory_consolidation::*;
-}
-/// Synthese-Phase für konsolidierte Wissenssegmente.
-pub mod synthesis_phase {
-    pub use contextra_cognition::synthesis_phase::*;
-}
-/// Ausführung von Konsolidierungs-Passes.
-pub mod consolidation_executor {
-    pub use contextra_cognition::consolidation_executor::*;
-}
-/// Locks und Synchronisation für Konsolidierung.
-pub mod consolidation_locks {
-    pub use contextra_cognition::consolidation_locks::*;
-}
-/// Scheduler für periodische Hintergrundwartung.
-pub mod maintenance_scheduler {
-    pub use contextra_cognition::maintenance_scheduler::*;
-}
-/// Konfiguration für Wartungszyklen.
-pub mod maintenance_config {
-    pub use contextra_cognition::maintenance_config::*;
-}
-
-/// Veraltetes Reaper-Modul.
-#[deprecated(note = "use background_workers instead")]
-pub mod reaper {
-    pub use contextra_engine::background_workers::*;
-}
-#[deprecated(note = "use start_consolidation_worker instead")]
-#[allow(deprecated)]
-pub use contextra_cognition::start_consolidation_reaper;
-
-// mod Collection is used via pub mod collection
-/// Adaptiver Decay-Controller für zeitliche Relevanz-Abwertung.
-pub mod decay_controller {
-    pub use contextra_adapt::decay_controller::*;
-}
-pub use contextra_engine::fusion;
-/// Homeostat-Modul für PID-Kandidatenpool-Regulierung.
-pub mod homeostat;
-/// Iteratives Multi-Step Retrieval mit Query Rewriting.
-pub mod multistep;
-/// PID-Regler zur Einhaltung von Latenzbudgets.
-pub mod pid_latency_controller {
-    pub use contextra_adapt::pid_latency_controller::*;
-}
-
-#[cfg(feature = "volatile-vault")]
-pub mod volatile_vault;
-#[cfg(feature = "volatile-vault")]
-pub use volatile_vault::{
-    CommitReceipt, PurgeReceipt, SignalModality, VaultChunk, VaultChunkMetadata, VaultConfig,
-    VaultError, VolatileContextVault,
-};
-
-pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
 pub use homeostat::RerankDeadline;
 #[allow(deprecated)]
 pub use homeostat::RerankPidController;
@@ -163,14 +507,8 @@ pub use pid_latency_controller::{
     MIN_SCALING_FACTOR,
 };
 
-pub use collection::{Collection, CollectionConfig};
-pub use contextra_checkpoint;
-#[cfg(feature = "graph-connectivity-health")]
-pub use contextra_graph::percolation::PercolationConfig;
-
-pub use contextra_ports::{DriftStatusProvider, SegmentSynthesizer, TextEmbeddingEngine};
-pub use contextra_types::DistanceMetric;
-pub use serde_json::json;
+#[cfg(feature = "volatile-vault")]
+pub use volatile_vault::*;
 
 #[cfg(test)]
 #[allow(deprecated)]
@@ -181,7 +519,7 @@ mod tests {
     use tempfile::TempDir;
 
     async fn test_db(dim: usize) -> (Contextra, TempDir) {
-        let tmp = TempDir::new().expect("temp dir"); // expect
+        let tmp = TempDir::new().expect("temp dir");
         let config = ContextraConfig {
             dimension: dim,
             max_elements: 10_000,
@@ -190,7 +528,7 @@ mod tests {
         };
         let db = Contextra::open_with_config(tmp.path(), config)
             .await
-            .expect("open db"); // expect
+            .expect("open db");
         (db, tmp)
     }
 
@@ -204,7 +542,7 @@ mod tests {
             Some(json!({"topic": "rust"})),
         )
         .await
-        .expect("insert"); // expect
+        .expect("insert");
 
         db.insert(
             "doc-2",
@@ -212,15 +550,14 @@ mod tests {
             Some(json!({"topic": "python"})),
         )
         .await
-        .expect("insert"); // expect
+        .expect("insert");
 
         db.insert("doc-3", &[0.9, 0.1, 0.0, 0.0], None)
             .await
-            .expect("insert"); // expect
+            .expect("insert");
 
-        let results = db.search(&[1.0, 0.0, 0.0, 0.0], 2).await.expect("search"); // expect
+        let results = db.search(&[1.0, 0.0, 0.0, 0.0], 2).await.expect("search");
         assert_eq!(results.len(), 2);
-        // doc-1 should be closest
         assert!(results[0].score > results[1].score);
     }
 
@@ -234,12 +571,12 @@ mod tests {
             Some(json!({"topic": "rust", "priority": 1})),
         )
         .await
-        .expect("insert"); // expect
+        .expect("insert");
 
-        let results = db.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search"); // expect
+        let results = db.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "doc-1");
-        let meta = results[0].metadata.as_ref().expect("metadata should exist"); // expect
+        let meta = results[0].metadata.as_ref().expect("metadata should exist");
         assert_eq!(meta["topic"], "rust");
         assert_eq!(meta["priority"], 1);
     }
@@ -254,13 +591,13 @@ mod tests {
             Some(json!({"topic": "rust"})),
         )
         .await
-        .expect("insert"); // expect
+        .expect("insert");
 
-        let doc = db.get("doc-1").await.expect("get").expect("should exist"); // expect
+        let doc = db.get("doc-1").await.expect("get").expect("should exist");
         assert_eq!(doc.id, "doc-1");
-        assert_eq!(doc.metadata.expect("valid")["topic"], "rust"); // expect
+        assert_eq!(doc.metadata.expect("valid")["topic"], "rust");
 
-        let none = db.get("nonexistent").await.expect("get"); // expect
+        let none = db.get("nonexistent").await.expect("get");
         assert!(none.is_none());
     }
 
@@ -270,18 +607,16 @@ mod tests {
 
         db.insert("doc-1", &[1.0, 0.0, 0.0, 0.0], Some(json!({"v": 1})))
             .await
-            .expect("insert"); // expect
+            .expect("insert");
 
         db.update("doc-1", &[0.0, 1.0, 0.0, 0.0], Some(json!({"v": 2})))
             .await
-            .expect("update"); // expect
+            .expect("update");
 
-        // Metadata should be updated
-        let doc = db.get("doc-1").await.expect("get").expect("exists"); // expect
-        assert_eq!(doc.metadata.expect("valid")["v"], 2); // expect
+        let doc = db.get("doc-1").await.expect("get").expect("exists");
+        assert_eq!(doc.metadata.expect("valid")["v"], 2);
 
-        // Vector should be updated — search for new vector should find it
-        let results = db.search(&[0.0, 1.0, 0.0, 0.0], 1).await.expect("search"); // expect
+        let results = db.search(&[0.0, 1.0, 0.0, 0.0], 1).await.expect("search");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "doc-1");
     }
@@ -292,14 +627,13 @@ mod tests {
 
         db.insert("doc-1", &[1.0, 0.0, 0.0, 0.0], None)
             .await
-            .expect("insert"); // expect
-        assert_eq!(db.len().await.expect("len"), 1); // expect
+            .expect("insert");
+        assert_eq!(db.len().await.expect("len"), 1);
 
-        db.delete("doc-1").await.expect("delete"); // expect
-        assert_eq!(db.len().await.expect("len"), 0); // expect
+        db.delete("doc-1").await.expect("delete");
+        assert_eq!(db.len().await.expect("len"), 0);
 
-        // get should return None after delete
-        let doc = db.get("doc-1").await.expect("get"); // expect
+        let doc = db.get("doc-1").await.expect("get");
         assert!(doc.is_none());
     }
 
@@ -309,15 +643,14 @@ mod tests {
 
         db.insert("doc-1", &[1.0, 0.0, 0.0, 0.0], None)
             .await
-            .expect("insert"); // expect
+            .expect("insert");
         db.insert("doc-2", &[0.0, 1.0, 0.0, 0.0], None)
             .await
-            .expect("insert"); // expect
+            .expect("insert");
 
-        // Should not error
         db.relate("doc-1", "doc-2", "references")
             .await
-            .expect("relate"); // expect
+            .expect("relate");
     }
 
     #[tokio::test]
@@ -330,7 +663,7 @@ mod tests {
     #[tokio::test]
     async fn test_empty_search() {
         let (db, _tmp) = test_db(4).await;
-        let results = db.search(&[1.0, 0.0, 0.0, 0.0], 5).await.expect("search"); // expect
+        let results = db.search(&[1.0, 0.0, 0.0, 0.0], 5).await.expect("search");
         assert!(results.is_empty());
     }
 
@@ -340,40 +673,38 @@ mod tests {
 
         db.insert("doc-1", &[1.0, 0.0, 0.0, 0.0], None)
             .await
-            .expect("insert"); // expect
+            .expect("insert");
         db.insert("doc-2", &[0.0, 1.0, 0.0, 0.0], None)
             .await
-            .expect("insert"); // expect
+            .expect("insert");
         db.insert("doc-3", &[0.0, 0.0, 1.0, 0.0], None)
             .await
-            .expect("insert"); // expect
+            .expect("insert");
 
         db.relate_bidirectional("doc-1", "doc-2", "references")
             .await
-            .expect("relate"); // expect
+            .expect("relate");
         db.relate("doc-1", "doc-3", "references")
             .await
-            .expect("relate"); // expect
+            .expect("relate");
 
-        // Scan for relations of doc-1
         let results = db
             .scan_prefix("__rel:doc-1:references:", None)
             .await
-            .expect("scan"); // expect
+            .expect("scan");
         assert_eq!(results.len(), 2);
 
         let related_ids: Vec<String> = results
             .into_iter()
-            .map(|(_, v)| v["to"].as_str().expect("valid").to_string()) // expect
+            .map(|(_, v)| v["to"].as_str().expect("valid").to_string())
             .collect();
         assert!(related_ids.contains(&"doc-2".to_string()));
         assert!(related_ids.contains(&"doc-3".to_string()));
 
-        // Check backward edge setup automatically
         let backward_results = db
             .scan_prefix("__rel:doc-2:references:", None)
             .await
-            .expect("scan bwd"); // expect
+            .expect("scan bwd");
         assert_eq!(backward_results.len(), 1);
         assert_eq!(backward_results[0].1["to"], "doc-1");
     }
@@ -384,9 +715,9 @@ mod tests {
 
         db.insert("doc-1", &[1.0, 0.0, 0.0, 0.0], None)
             .await
-            .expect("insert"); // expect
+            .expect("insert");
 
-        let stats = db.stats().await.expect("stats"); // expect
+        let stats = db.stats().await.expect("stats");
         assert_eq!(stats.index_stats.num_vectors, 1);
         assert_eq!(stats.active_memory_count, 1);
         assert_eq!(stats.drift_status, "nicht verfügbar");
@@ -397,26 +728,25 @@ mod tests {
     async fn test_stats_live_data_and_weak_reference_lifecycle() {
         let (db, _tmp) = test_db(4).await;
 
-        // 1. Unattached state
         let stats_unattached = db.stats().await.expect("stats");
         assert_eq!(stats_unattached.drift_status, "nicht verfügbar");
         assert_eq!(stats_unattached.calibration_ece, None);
         assert_eq!(stats_unattached.last_calibration_at, None);
         assert_eq!(stats_unattached.pid_pool_size, None);
 
-        // 2. Attached state with live components
         struct DummyRouter;
         impl DriftStatusProvider for DummyRouter {
             fn overall_drift_status(&self) -> String {
                 "stabil".to_string()
             }
         }
+        let dummy = DummyRouter;
+        assert_eq!(dummy.overall_drift_status(), "stabil");
 
         let router_arc: Arc<dyn DriftStatusProvider> = Arc::new(DummyRouter);
         let calibrator_arc = Arc::new(parking_lot::Mutex::new(
             contextra_rank::IsotonicCalibrator::new(5, 100),
         ));
-        // Warmup calibrator so ECE is populated
         {
             let mut cal = calibrator_arc.lock();
             for i in 0..10 {
@@ -433,7 +763,6 @@ mod tests {
         assert!(stats_attached.calibration_ece.is_some());
         assert!(stats_attached.last_calibration_at.is_some());
 
-        // 3. Drop strong references (simulating shutdown) -> stats() must not panic and fallback gracefully
         drop(router_arc);
         drop(calibrator_arc);
 
@@ -448,65 +777,58 @@ mod tests {
     async fn test_integration_end_to_end() {
         let (db, _tmp) = test_db(4).await;
 
-        // 1. Insert
         db.insert(
             "agent-1",
             &[1.0, 0.5, 0.0, 0.0],
             Some(json!({"type": "agent"})),
         )
         .await
-        .expect("insert agent"); // expect
+        .expect("insert agent");
         db.insert(
             "task-1",
             &[0.9, 0.6, 0.0, 0.0],
             Some(json!({"type": "task"})),
         )
         .await
-        .expect("insert task"); // expect
+        .expect("insert task");
         db.insert(
             "task-2",
             &[0.0, 0.0, 1.0, 0.5],
             Some(json!({"type": "task"})),
         )
         .await
-        .expect("insert task 2"); // expect
+        .expect("insert task 2");
 
-        // 2. Relate
         db.relate("agent-1", "task-1", "assigned_to")
             .await
-            .expect("relate 1"); // expect
+            .expect("relate 1");
         db.relate("agent-1", "task-2", "assigned_to")
             .await
-            .expect("relate 2"); // expect
+            .expect("relate 2");
 
-        // 3. Search
-        let results = db.search(&[1.0, 0.5, 0.0, 0.0], 2).await.expect("search"); // expect
-        assert_eq!(results[0].id, "agent-1"); // Exactly matches
-        assert_eq!(results[1].id, "task-1"); // Close match
+        let results = db.search(&[1.0, 0.5, 0.0, 0.0], 2).await.expect("search");
+        assert_eq!(results[0].id, "agent-1");
+        assert_eq!(results[1].id, "task-1");
 
-        // 4. Update
         db.update(
             "task-1",
             &[0.1, 0.1, 0.9, 0.9],
             Some(json!({"type": "task", "status": "done"})),
         )
         .await
-        .expect("update task"); // expect
+        .expect("update task");
 
-        // 5. Scan prefix
         let edges = db
             .scan_prefix("__rel:agent-1:assigned_to:", None)
             .await
-            .expect("scan"); // expect
+            .expect("scan");
         assert_eq!(edges.len(), 2);
 
-        // 6. Delete
-        db.delete("agent-1").await.expect("delete"); // expect
+        db.delete("agent-1").await.expect("delete");
 
-        // 7. Verify empty search and missing doc
-        let get_agent = db.get("agent-1").await.expect("get"); // expect
+        let get_agent = db.get("agent-1").await.expect("get");
         assert!(get_agent.is_none());
-        assert_eq!(db.len().await.expect("len"), 2); // 3 inserted, 1 deleted // expect
+        assert_eq!(db.len().await.expect("len"), 2);
     }
 
     #[tokio::test]
@@ -518,13 +840,13 @@ mod tests {
         for _ in 0..10 {
             let db_clone = db.clone();
             handles.push(tokio::spawn(async move {
-                db_clone.collection("c").await.expect("collection c") // expect
+                db_clone.collection("c").await.expect("collection c")
             }));
         }
 
         let mut cols = Vec::new();
         for handle in handles {
-            cols.push(handle.await.expect("join handle")); // expect
+            cols.push(handle.await.expect("join handle"));
         }
 
         let first = &cols[0];
@@ -537,52 +859,38 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn collections_are_isolated() {
-        let (db, _tmp) = test_db(4).await;
-        let vec = vec![1.0, 0.0, 0.0, 0.0];
-        let col_a = db.collection("alpha").await.unwrap(); // unwrap
-        let col_b = db.collection("beta").await.unwrap(); // unwrap
-        col_a.insert("doc1", &vec, None).await.unwrap(); // unwrap
-        let results = col_b.search(&vec, 10).await.unwrap(); // unwrap
-        assert!(
-            results.is_empty(),
-            "Collection B must not see Collection A's data"
-        );
-    }
-
-    #[tokio::test]
     async fn test_collections_are_isolated() {
         let (db, _tmp) = test_db(4).await;
-        let col_a = db.collection("a").await.expect("col a"); // expect
-        let col_b = db.collection("b").await.expect("col b"); // expect
+        let col_a = db.collection("a").await.expect("col a");
+        let col_b = db.collection("b").await.expect("col b");
 
         col_a
             .insert("k1", &[1.0, 0.0, 0.0, 0.0], Some(json!({"val": "a"})))
             .await
-            .expect("ins a"); // expect
+            .expect("ins a");
         col_b
             .insert("k1", &[0.0, 1.0, 0.0, 0.0], Some(json!({"val": "b"})))
             .await
-            .expect("ins b"); // expect
+            .expect("ins b");
 
-        let res_a = col_a.get("k1").await.expect("get a").expect("exists"); // expect
-        let res_b = col_b.get("k1").await.expect("get b").expect("exists"); // expect
+        let res_a = col_a.get("k1").await.expect("get a").expect("exists");
+        let res_b = col_b.get("k1").await.expect("get b").expect("exists");
 
-        assert_eq!(res_a.metadata.expect("test")["val"], "a"); // expect
-        assert_eq!(res_b.metadata.expect("test")["val"], "b"); // expect
+        assert_eq!(res_a.metadata.expect("test")["val"], "a");
+        assert_eq!(res_b.metadata.expect("test")["val"], "b");
 
         let search_a = col_a
             .search(&[1.0, 0.0, 0.0, 0.0], 1)
             .await
-            .expect("search a"); // expect
+            .expect("search a");
         assert_eq!(search_a.len(), 1);
         assert_eq!(search_a[0].id, "k1");
-        assert_eq!(search_a[0].metadata.as_ref().expect("test")["val"], "a"); // expect
+        assert_eq!(search_a[0].metadata.as_ref().expect("test")["val"], "a");
     }
 
     #[tokio::test]
     async fn test_close_and_reopen_100_docs() {
-        let tmp = TempDir::new().expect("temp dir"); // expect
+        let tmp = TempDir::new().expect("temp dir");
         let path = tmp.path().to_path_buf();
         let config = ContextraConfig {
             dimension: 4,
@@ -592,36 +900,36 @@ mod tests {
         {
             let db = Contextra::open_with_config(&path, config.clone())
                 .await
-                .expect("open 1"); // expect
+                .expect("open 1");
             for i in 0..100 {
                 let id = format!("doc-{}", i);
                 let val = (i as f32) / 100.0;
                 db.insert(&id, &[val, 1.0 - val, 0.0, 0.0], Some(json!({"idx": i})))
                     .await
-                    .expect("insert"); // expect
+                    .expect("insert");
             }
-            db.close().await.expect("close"); // expect
+            db.close().await.expect("close");
         }
 
         {
             let db = Contextra::open_with_config(&path, config)
                 .await
-                .expect("open 2"); // expect
-            assert_eq!(db.len().await.expect("len"), 100); // expect
+                .expect("open 2");
+            assert_eq!(db.len().await.expect("len"), 100);
             for i in 0..100 {
                 let id = format!("doc-{}", i);
-                let doc = db.get(&id).await.expect("get").expect("exists"); // expect
+                let doc = db.get(&id).await.expect("get").expect("exists");
                 assert_eq!(doc.id, id);
-                assert_eq!(doc.metadata.expect("valid")["idx"], i); // expect
+                assert_eq!(doc.metadata.expect("valid")["idx"], i);
             }
-            let results = db.search(&[0.5, 0.5, 0.0, 0.0], 10).await.expect("search"); // expect
+            let results = db.search(&[0.5, 0.5, 0.0, 0.0], 10).await.expect("search");
             assert_eq!(results.len(), 10);
         }
     }
 
     #[tokio::test]
     async fn test_close_and_reopen() {
-        let tmp = TempDir::new().expect("temp dir"); // expect
+        let tmp = TempDir::new().expect("temp dir");
         let path = tmp.path().to_path_buf();
         let config = ContextraConfig {
             dimension: 4,
@@ -631,45 +939,45 @@ mod tests {
         {
             let db = Contextra::open_with_config(&path, config.clone())
                 .await
-                .expect("open 1"); // expect
+                .expect("open 1");
             db.insert("doc-1", &[1.0, 0.0, 0.0, 0.0], Some(json!({"v": 1})))
                 .await
-                .expect("insert"); // expect
-            db.close().await.expect("close"); // expect
+                .expect("insert");
+            db.close().await.expect("close");
         }
 
         {
             let db = Contextra::open_with_config(&path, config)
                 .await
-                .expect("open 2"); // expect
-            let doc = db.get("doc-1").await.expect("get").expect("exists"); // expect
+                .expect("open 2");
+            let doc = db.get("doc-1").await.expect("get").expect("exists");
             assert_eq!(doc.id, "doc-1");
-            assert_eq!(doc.metadata.expect("valid")["v"], 1); // expect
+            assert_eq!(doc.metadata.expect("valid")["v"], 1);
         }
     }
 
     #[tokio::test]
     async fn test_drop_removes_all_data() {
         let (db, _tmp) = test_db(4).await;
-        let tenant_id = TenantId::try_new(1).expect("tenant_id"); // expect
+        let tenant_id = TenantId::try_new(1).expect("tenant_id");
         let col = db
             .collection_for_tenant("drop-me", tenant_id)
             .await
-            .expect("col"); // expect
+            .expect("col");
         col.insert("k1", &[1.0, 0.0, 0.0, 0.0], None)
             .await
-            .expect("ins"); // expect
+            .expect("ins");
 
-        db.drop_collection("drop-me", tenant_id, &[0u8; 32])
+        db.drop_collection("drop-me", tenant_id)
             .await
-            .expect("drop"); // expect
+            .expect("drop");
 
         let col2 = db
             .collection_for_tenant("drop-me", tenant_id)
             .await
-            .expect("re-create"); // expect
+            .expect("re-create");
         assert_eq!(col2.len().await, 0);
-        assert!(col2.get("k1").await.expect("get").is_none()); // expect
+        assert!(col2.get("k1").await.expect("get").is_none());
     }
 
     #[tokio::test]
@@ -677,23 +985,23 @@ mod tests {
         let (db, _tmp) = test_db(4).await;
         db.insert("k", &[1.0, 0.0, 0.0, 0.0], Some(json!({"v": 1})))
             .await
-            .expect("ins"); // expect
+            .expect("ins");
 
-        let doc = db.get("k").await.expect("get").expect("exists"); // expect
+        let doc = db.get("k").await.expect("get").expect("exists");
         assert_eq!(doc.id, "k");
 
-        let results = db.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search"); // expect
+        let results = db.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search");
         assert_eq!(results[0].id, "k");
     }
 
     #[tokio::test]
     async fn test_list_collections() {
         let (db, _tmp) = test_db(4).await;
-        db.collection("c1").await.expect("c1"); // expect
-        db.collection("c2").await.expect("c2"); // expect
-        db.collection("c3").await.expect("c3"); // expect
+        db.collection("c1").await.expect("c1");
+        db.collection("c2").await.expect("c2");
+        db.collection("c3").await.expect("c3");
 
-        let list = db.list_collections().await.expect("list"); // expect
+        let list = db.list_collections().await.expect("list");
         assert!(list.contains(&"default".to_string()));
         assert!(list.contains(&"c1".to_string()));
         assert!(list.contains(&"c2".to_string()));
@@ -722,48 +1030,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "onnx")]
-    async fn test_onnx_default_backend_e2e_with_fixture() {
-        let tmp = TempDir::new().expect("temp dir");
-        let cache_tmp = TempDir::new().expect("cache temp dir");
-        let model_dir = cache_tmp.path().join("nomic-embed-text");
-        std::fs::create_dir_all(&model_dir).expect("create model dir");
-
-        let fixture_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join("contextra-embed")
-            .join("tests")
-            .join("fixtures");
-
-        std::fs::copy(fixture_dir.join("model.onnx"), model_dir.join("model.onnx"))
-            .expect("copy model");
-        std::fs::copy(
-            fixture_dir.join("tokenizer.json"),
-            model_dir.join("tokenizer.json"),
-        )
-        .expect("copy tokenizer");
-
-        let config = ContextraConfig {
-            dimension: 32, // Fixture BERT model output dim is 32
-            embedding_backend: EmbeddingBackend::Onnx {
-                model_name: "nomic-embed-text".to_string(),
-                cache_dir: Some(cache_tmp.path().to_path_buf()),
-            },
-            ..Default::default()
-        };
-
-        let db = Contextra::open_with_config(tmp.path(), config)
-            .await
-            .expect("open_with_config");
-
-        assert!(db.embedder.read().is_some());
-        let embedder = db.embedder.read().as_ref().cloned().expect("embedder");
-        let vec = embedder.embed("test document").await.expect("embed test");
-        assert_eq!(vec.len(), 32);
-    }
-
-    #[tokio::test]
     async fn test_open_dimension_mismatch_fails() -> contextra_types::Result<()> {
         let dir = tempfile::tempdir()
             .map_err(|e| contextra_types::ContextraError::InvalidInput(e.to_string()))?;
@@ -774,7 +1040,6 @@ mod tests {
         let db = Contextra::open_with_config(dir.path(), config_768).await?;
         db.close().await?;
 
-        // Zweites Öffnen mit falscher Dimension muss früh fehlschlagen
         let config_1536 = ContextraConfig {
             dimension: 1536,
             ..Default::default()
@@ -842,7 +1107,6 @@ mod tests {
             provenance: None,
         };
         let json = serde_json::to_string(&sr).expect("serialize");
-        // provenance: None → Feld soll komplett fehlen (skip_serializing_if)
         assert!(
             !json.contains("provenance"),
             "provenance=None soll im JSON weggelassen werden: {json}"

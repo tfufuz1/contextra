@@ -1,0 +1,10 @@
+{
+  "project": "contextra-ingest",
+  "version": "0.1.0",
+  "active": true,
+  "settings": {
+    "timeout_ms": 5000,
+    "retries": 3
+  },
+  "tags": ["parser", "extraction", "safe"]
+}

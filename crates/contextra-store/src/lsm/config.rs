@@ -1,3 +1,7 @@
+//! # LSM-Konfiguration (Ring 1)
+//!
+//! Konfiguriert Schwellenwerte fuer MemTable-Groesse, Flush-Intervalle und WAL-Pfade.
+
 use crate::compaction::CompactionConfig;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -27,48 +31,44 @@ pub enum DurabilityConfigError {
     },
 }
 
-impl From<DurabilityConfigError> for contextra_types::ContextraError {
-    fn from(err: DurabilityConfigError) -> Self {
-        contextra_types::ContextraError::DurabilityConfig(err.to_string())
-    }
-}
+
 
 impl DurabilityMode {
-    pub fn validate_against_features(
+    /// Validates the durability mode against required integrity guarantees and persistence constraints.
+    pub fn validate_durability(
         self,
-        deletion_proof_active: bool,
-        feature_ring: contextra_ports::license::FeatureRing,
+        integrity_chain_required: bool,
+        require_persistence: bool,
     ) -> Result<(), DurabilityConfigError> {
         use DurabilityMode::*;
         match self {
             Full => Ok(()),
-            WalNoHmac if deletion_proof_active => {
+            WalNoHmac if integrity_chain_required => {
                 Err(DurabilityConfigError::IncompatibleCombination {
                     mode: self,
-                    feature: "deletion-proof",
-                    reason: "no HMAC integrity chain to anchor the proof",
+                    feature: "integrity-chain",
+                    reason: "no HMAC integrity chain to anchor the proof or audit trail",
                 })
             }
-            MemoryOnly
-                if deletion_proof_active
-                    || feature_ring == contextra_ports::license::FeatureRing::Sovereign =>
-            {
+            MemoryOnly if integrity_chain_required || require_persistence => {
                 Err(DurabilityConfigError::IncompatibleCombination {
                     mode: self,
-                    feature: "deletion-proof / FeatureRing::Sovereign",
-                    reason: "no persistence layer exists to prove deletion from",
+                    feature: "persistence-required",
+                    reason: "no persistence layer exists to prove integrity or durability from",
                 })
             }
             _ => Ok(()),
         }
     }
+
+
 }
 
 /// LSM storage configuration.
 // SEC-001 — Erweitere LsmConfig um `encryption_passphrase` und AES-256.
 // TEST: cargo test -p contextra-store test_encrypted_db_unreadable_without_key
 // DONE: LsmConfig akzeptiert Passphrase, AES-256 wird für Disk-I/O verwendet.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 /// Configuration for the LSM storage engine.
 pub struct LsmConfig {
@@ -94,6 +94,15 @@ pub struct LsmConfig {
     /// Maximum capacity of committed write keys tracked in SSI validator before pruning or rejecting.
     /// Default is 1,000,000 keys.
     pub ssi_max_tracked_keys: usize,
+    /// Optional Vfs instance for file operations.
+    #[serde(skip)]
+    pub vfs: Option<crate::io_seam::StoreIo>,
+    /// Injected clock port for deterministic execution timing (P28).
+    #[serde(skip, default = "default_clock")]
+    pub clock: std::sync::Arc<dyn contextra_env::Clock>,
+    /// Injected source for cryptographic key and salt material (P28).
+    #[serde(skip, default = "default_key_source")]
+    pub key_source: std::sync::Arc<dyn crate::key_source::KeyMaterialSource>,
 }
 
 impl Default for LsmConfig {
@@ -109,6 +118,38 @@ impl Default for LsmConfig {
             block_cache_shards: 64,
             durability_mode: DurabilityMode::default(),
             ssi_max_tracked_keys: 1_000_000,
+            vfs: None,
+            clock: default_clock(),
+            key_source: default_key_source(),
         }
     }
 }
+
+fn default_clock() -> std::sync::Arc<dyn contextra_env::Clock> {
+    std::sync::Arc::new(contextra_env::SystemClock::new())
+}
+
+fn default_key_source() -> std::sync::Arc<dyn crate::key_source::KeyMaterialSource> {
+    std::sync::Arc::new(crate::key_source::OsKeyMaterialSource)
+}
+
+impl LsmConfig {
+    /// Attaches an injected clock port fluently to `LsmConfig`.
+    pub fn with_clock(mut self, clock: std::sync::Arc<dyn contextra_env::Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// Attaches an injected key material source fluently to `LsmConfig` (for deterministic testing).
+    pub fn with_key_source(
+        mut self,
+        key_source: std::sync::Arc<dyn crate::key_source::KeyMaterialSource>,
+    ) -> Self {
+        self.key_source = key_source;
+        self
+    }
+}
+
+// MIGRATION(S-70): validate_against_features moved to crate::compat::license
+#[cfg(feature = "workspace")]
+pub use crate::compat::license::*;

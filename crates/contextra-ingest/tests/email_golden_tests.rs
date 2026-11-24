@@ -1,3 +1,10 @@
+#![cfg(feature = "fmt-email")]
+//! Integrationstest-Suite: `email_golden_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Golden- und Vertragstests für E-Mail- (EML) und MBOX-Extraktor.
 // INVARIANTEN: Zero-Panic, deterministisch, Fail-Closed bei Limits, Einhaltung der Privacy-Regeln.
@@ -32,6 +39,8 @@ fn make_ctx<'a>(
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0369]
+// Testet die Funktionsfaehigkeit von `test_email_plain_umlauts_utf8_iso8859_qp`.
 #[test]
 fn test_email_plain_umlauts_utf8_iso8859_qp() {
     let raw_eml = b"From: sender@example.com\n\
@@ -76,6 +85,8 @@ Hallo Welt, =C3=9Cberfall und Gr=C3=BC=C3=9Fe!\n";
     assert!(found_paragraph);
 }
 
+// ANCHOR[contextra-ingest:TST-0370]
+// Testet die Funktionsfaehigkeit von `test_email_multipart_alternative_preference`.
 #[test]
 fn test_email_multipart_alternative_preference() {
     let raw_eml = b"From: sender@example.com\n\
@@ -112,6 +123,8 @@ Content-Type: text/html; charset=utf-8\n\
     assert!(plain_found);
 }
 
+// ANCHOR[contextra-ingest:TST-0371]
+// Testet die Funktionsfaehigkeit von `test_email_html_only_script_prompt_injection_discarded`.
 #[test]
 fn test_email_html_only_script_prompt_injection_discarded() {
     let raw_eml = b"From: html@example.com\n\
@@ -139,6 +152,8 @@ Content-Type: text/html; charset=utf-8\n\
     assert!(!canon.text.contains("color: red"));
 }
 
+// ANCHOR[contextra-ingest:TST-0372]
+// Testet die Funktionsfaehigkeit von `test_email_quoted_reply_and_signature_discarded`.
 #[test]
 fn test_email_quoted_reply_and_signature_discarded() {
     let raw_eml = b"From: alice@example.com\n\
@@ -191,6 +206,8 @@ CEO Example Corp\n";
     assert!(!canon.text.contains("CEO Example Corp"));
 }
 
+// ANCHOR[contextra-ingest:TST-0373]
+// Testet die Funktionsfaehigkeit von `test_email_attachments_txt_and_recursive_eml`.
 #[test]
 fn test_email_attachments_txt_and_recursive_eml() {
     let raw_eml = b"From: parent@example.com\n\
@@ -246,6 +263,8 @@ Child email body\n\
     assert!(child_body_found);
 }
 
+// ANCHOR[contextra-ingest:TST-0374]
+// Testet die Funktionsfaehigkeit von `test_email_broken_attachment_handled_gracefully`.
 #[test]
 fn test_email_broken_attachment_handled_gracefully() {
     let raw_eml = b"From: sender@example.com\n\
@@ -283,6 +302,8 @@ BINARY_GARBAGE_DATA_12345\n\
     assert!(warning_found);
 }
 
+// ANCHOR[contextra-ingest:TST-0375]
+// Testet die Funktionsfaehigkeit von `test_email_mbox_three_messages_one_defective`.
 #[test]
 fn test_email_mbox_three_messages_one_defective() {
     let raw_mbox = b"From sender1@example.com Mon Jan  1 10:00:00 2026\n\
@@ -316,6 +337,8 @@ Body of third mail\n";
     assert!(canon.text.contains("Body of third mail"));
 }
 
+// ANCHOR[contextra-ingest:TST-0376]
+// Testet die Funktionsfaehigkeit von `test_email_mbox_from_unescaping`.
 #[test]
 fn test_email_mbox_from_unescaping() {
     let raw_mbox = b"From sender@example.com Mon Jan  1 10:00:00 2026\n\
@@ -339,6 +362,8 @@ Line 3\n";
     assert!(!canon.text.contains(">From line"));
 }
 
+// ANCHOR[contextra-ingest:TST-0377]
+// Testet die Funktionsfaehigkeit von `test_email_keep_personal_metadata_policy`.
 #[test]
 fn test_email_keep_personal_metadata_policy() {
     let raw_eml = b"From: Alice <alice@example.com>\n\
@@ -383,6 +408,8 @@ Mail body content\n";
     assert_eq!(doc2.meta.authors, vec!["Alice <alice@example.com>"]);
 }
 
+// ANCHOR[contextra-ingest:TST-0378]
+// Testet die Funktionsfaehigkeit von `test_email_nesting_depth_bomb`.
 #[test]
 fn test_email_nesting_depth_bomb() {
     let mut bomb = String::from("From: root@example.com\nSubject: Depth Bomb\n");
@@ -401,7 +428,9 @@ fn test_email_nesting_depth_bomb() {
     let budget = contextra_ingest::extractor::ResourceBudget::new(limits.clone());
     let ctx = make_ctx(&limits, &policy, &budget, &reg);
 
-    let err = reg.extract(FormatId::Eml, bomb.as_bytes(), &ctx).unwrap_err();
+    let err = reg
+        .extract(FormatId::Eml, bomb.as_bytes(), &ctx)
+        .unwrap_err();
 
     assert!(matches!(
         err,
@@ -412,6 +441,8 @@ fn test_email_nesting_depth_bomb() {
     ));
 }
 
+// ANCHOR[contextra-ingest:TST-0379]
+// Testet die Funktionsfaehigkeit von `test_email_mbox_max_archive_entries_limit`.
 #[test]
 fn test_email_mbox_max_archive_entries_limit() {
     let mut mbox_data = Vec::new();
@@ -433,9 +464,7 @@ fn test_email_mbox_max_archive_entries_limit() {
     let budget = contextra_ingest::extractor::ResourceBudget::new(limits.clone());
     let ctx = make_ctx(&limits, &policy, &budget, &reg);
 
-    let err = reg
-        .extract(FormatId::Mbox, &mbox_data, &ctx)
-        .unwrap_err();
+    let err = reg.extract(FormatId::Mbox, &mbox_data, &ctx).unwrap_err();
 
     assert!(matches!(
         err,
@@ -446,6 +475,8 @@ fn test_email_mbox_max_archive_entries_limit() {
     ));
 }
 
+// ANCHOR[contextra-ingest:TST-0380]
+// Testet die Funktionsfaehigkeit von `test_email_fuzz_random_bytes_no_panic`.
 #[test]
 fn test_email_fuzz_random_bytes_no_panic() {
     let reg = ExtractorRegistry::with_defaults();

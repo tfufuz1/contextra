@@ -1,0 +1,14 @@
+[
+  {
+    "profile_name": "mock-fast",
+    "jsonrpc": "2.0",
+    "method": "slm_process_context",
+    "payload_hash": "533193a819470cc74eb4ac94c65fae50bb33bed2381c3a59a6b8bc03dc7ebdb0"
+  },
+  {
+    "profile_name": "mock-accurate",
+    "jsonrpc": "2.0",
+    "method": "slm_process_context",
+    "payload_hash": "533193a819470cc74eb4ac94c65fae50bb33bed2381c3a59a6b8bc03dc7ebdb0"
+  }
+]

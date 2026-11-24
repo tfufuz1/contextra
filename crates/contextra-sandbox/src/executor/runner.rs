@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-10-30T00:00:00Z
-// ZWECK: WASM module execution and linker setup
-// INVARIANTEN: #![forbid(unsafe_code)], zero panics, strict error classification
-
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use wasmtime::{Engine, Linker, Module, Store};

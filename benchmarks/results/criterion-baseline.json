@@ -1,4 +1,6 @@
 {
+  "_status": "historical",
+  "_historical_note": "Historischer Lauf (Stand vor Reduktion, E12 / WP-110)",
   "BlockCache_MultiThreaded_HotSet/readers_16_threads": {
     "mean": {
       "confidence_interval": {

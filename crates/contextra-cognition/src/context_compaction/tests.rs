@@ -1,3 +1,8 @@
+//! # Tests für die Kontext-Kompaktierung (`context_compaction/tests.rs`)
+//!
+//! Validiert die Kompaktierungs-Strategien, Token-Budget-Einhaltung,
+//! Tool-Output-Priorisierung, OCC-Konflikterkennung und Intent-Bereinigungslogik.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -6,16 +11,25 @@
     clippy::unreachable
 )]
 
+// FILE-CONTEXT
+// ZWECK: Unit- und Integrationstests fuer context_compaction (Kompaktor, Sessions, StatusToken).
+// INVARIANTEN: Zero-Panic; deterministische Budget- und OCC-Simulationen.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Context-Compaction Tests
+// =========================================================================
 use super::*;
-use contextra_engine::collection::Collection;
-use contextra_engine::transaction::CommitIntent;
-use contextra_engine::ProvenanceRecord;
-use contextra_graph::CsrGraph;
-use contextra_ports::SeededRng;
-use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, StorageStats};
-use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::{ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId};
-use contextra_vector::{HnswConfig, HnswIndex};
+use crate::engine_local::collection::Collection;
+use crate::engine_local::transaction::CommitIntent;
+use crate::engine_local::ProvenanceRecord;
+use crate::graph_local::CsrGraph;
+use crate::ports_local::SeededRng;
+use crate::ports_local::{BoxFuture, LlmTextGenerator, StorageEngine, StorageStats};
+use crate::types_local::{
+    ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId,
+};
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -36,6 +50,8 @@ fn make_chunk(id: u64, content: &str, relevance: f32, is_tool: bool) -> ContextC
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-045]
+// Prüft Testfall `test_compactor_within_budget`.
 #[test]
 fn test_compactor_within_budget() {
     let budget = TokenBudget::new(100, 0);
@@ -56,6 +72,8 @@ fn test_compactor_within_budget() {
     assert_eq!(result.tokens_used, "chunk 1".len() + "chunk 2".len());
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-046]
+// Prüft Testfall `test_compactor_tool_output_compacted_first`.
 #[test]
 fn test_compactor_tool_output_compacted_first() {
     let budget = TokenBudget::new(20, 0);
@@ -82,6 +100,8 @@ fn test_compactor_tool_output_compacted_first() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-047]
+// Prüft Testfall `test_compactor_truncate_strategy`.
 #[test]
 fn test_compactor_truncate_strategy() {
     let budget = TokenBudget::new(10, 0);
@@ -102,6 +122,8 @@ fn test_compactor_truncate_strategy() {
     assert!(result.status_tokens.is_empty());
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-048]
+// Prüft Testfall `test_compactor_summarize_strategy_fallback`.
 #[test]
 fn test_compactor_summarize_strategy_fallback() {
     let budget = TokenBudget::new(10, 0);
@@ -125,6 +147,8 @@ fn test_compactor_summarize_strategy_fallback() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-049]
+// Prüft Testfall `test_compact_with_contextual_prefix_respects_budget`.
 #[test]
 fn test_compact_with_contextual_prefix_respects_budget() {
     let budget = TokenBudget::new(20, 0); // 20 tokens available
@@ -165,6 +189,8 @@ impl LlmTextGenerator for UnreachableLlmGenerator {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-050]
+// Prüft Testfall `test_consolidate_via_llm_error_propagation_on_unreachable_client`.
 #[tokio::test]
 async fn test_consolidate_via_llm_error_propagation_on_unreachable_client() {
     let budget = TokenBudget::new(100, 0);
@@ -191,6 +217,8 @@ async fn test_consolidate_via_llm_error_propagation_on_unreachable_client() {
     assert!(res.is_err());
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-051]
+// Prüft Testfall `test_consolidate_via_llm_provenance_and_empty`.
 #[tokio::test]
 async fn test_consolidate_via_llm_provenance_and_empty() {
     let budget = TokenBudget::new(100, 0);
@@ -219,6 +247,8 @@ impl LlmTextGenerator for MockLlmGenerator {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-052]
+// Prüft Testfall `test_consolidate_via_llm_provenance_3_source_docs`.
 #[tokio::test]
 async fn test_consolidate_via_llm_provenance_3_source_docs() {
     let budget = TokenBudget::new(1000, 0);
@@ -265,6 +295,8 @@ async fn test_consolidate_via_llm_provenance_3_source_docs() {
         .contains_key(&DocId::new(30).0.to_string()));
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-053]
+// Prüft Testfall `test_compact_empty_chunks_returns_empty_compacted_context`.
 #[test]
 fn test_compact_empty_chunks_returns_empty_compacted_context() {
     let budget = TokenBudget::new(100, 0);
@@ -282,7 +314,7 @@ fn test_compact_empty_chunks_returns_empty_compacted_context() {
 
 #[derive(Clone)]
 struct FaultyDeleteStorage {
-    inner: Arc<LsmStorage>,
+    inner: Arc<InMemoryStorageEngine>,
     fail_delete: Arc<AtomicBool>,
 }
 
@@ -384,38 +416,31 @@ impl StorageEngine for FaultyDeleteStorage {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-054]
+// Prüft Testfall `test_consolidation_aborts_on_delete_failure`.
 #[tokio::test]
 async fn test_consolidation_aborts_on_delete_failure(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let tmp = tempfile::tempdir()?;
-    let lsm_config = LsmConfig {
-        path: tmp.path().to_path_buf(),
-        ..Default::default()
-    };
-    let lsm = Arc::new(LsmStorage::new(lsm_config).await?);
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let fail_delete = Arc::new(AtomicBool::new(false));
     let faulty_storage = FaultyDeleteStorage {
-        inner: lsm,
+        inner: storage,
         fail_delete: fail_delete.clone(),
     };
 
     let dim = 4;
-    let hnsw_config = HnswConfig {
-        dimension: dim,
-        ..Default::default()
-    };
-    let hnsw = Arc::new(HnswIndex::try_new(hnsw_config)?);
+    let index = Arc::new(InMemoryVectorIndex::new(dim));
     let graph = Arc::new(CsrGraph::with_storage(Arc::new(faulty_storage.clone())));
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Collection::new(
         "test_col".to_string(),
         Arc::new(faulty_storage),
-        hnsw,
+        index,
         graph,
         next_tx,
         dim,
-        contextra_engine::Language::English,
+        crate::engine_local::Language::English,
     );
 
     // 1. Insert source document
@@ -462,9 +487,11 @@ async fn test_consolidation_aborts_on_delete_failure(
     Ok(())
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-055]
+// Prüft Testfall `test_compactor_jitter_reproducible_and_in_bounds`.
 #[test]
 fn test_compactor_jitter_reproducible_and_in_bounds() {
-    use contextra_ports::{Rng, SeededRng};
+    use crate::ports_local::{Rng, SeededRng};
 
     let rng1 = SeededRng::new(42);
     let rng2 = SeededRng::new(42);
@@ -495,9 +522,11 @@ fn test_compactor_jitter_reproducible_and_in_bounds() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-056]
+// Prüft Testfall `test_compactor_with_rng_builder`.
 #[test]
 fn test_compactor_with_rng_builder() {
-    use contextra_ports::SeededRng;
+    use crate::ports_local::SeededRng;
 
     let budget = TokenBudget::new(100, 0);
     let rng = Arc::new(SeededRng::new(12345));
@@ -506,15 +535,12 @@ fn test_compactor_with_rng_builder() {
     assert_eq!(compactor.compact(vec![]).tokens_used, 0);
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-057]
+// Prüft Testfall `test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_monotonically`.
 #[tokio::test]
 async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_monotonically(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let tmp = tempfile::tempdir()?;
-    let lsm_config = LsmConfig {
-        path: tmp.path().to_path_buf(),
-        ..Default::default()
-    };
-    let lsm = Arc::new(LsmStorage::new(lsm_config).await?);
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let next_tx = Arc::new(AtomicU64::new(10));
 
     let target_doc_id = DocId::new(42);
@@ -526,15 +552,17 @@ async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_mono
     let intent_bytes = serde_json::to_vec(&intent)?;
 
     let setup_tx = TxId::new(1);
-    lsm.put(setup_tx, b"consolidation_intent:1", &intent_bytes)
+    storage
+        .put(setup_tx, b"consolidation_intent:1", &intent_bytes)
         .await?;
-    lsm.commit(setup_tx).await?;
-    lsm.put(setup_tx, b"consolidation_intent:2", &intent_bytes)
+    storage.commit(setup_tx).await?;
+    storage
+        .put(setup_tx, b"consolidation_intent:2", &intent_bytes)
         .await?;
-    lsm.commit(setup_tx).await?;
+    storage.commit(setup_tx).await?;
 
     let prev_counter = next_tx.load(Ordering::SeqCst);
-    let cleaned = cleanup_orphaned_consolidation_intents(lsm.as_ref(), &next_tx).await?;
+    let cleaned = cleanup_orphaned_consolidation_intents(storage.as_ref(), &next_tx).await?;
     assert_eq!(cleaned, 2, "Should clean up exactly 2 orphaned intents");
 
     let post_counter = next_tx.load(Ordering::SeqCst);
@@ -544,29 +572,20 @@ async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_mono
         "next_tx counter must increment monotonically by the number of cleaned intents"
     );
 
-    let remaining1 = lsm.get(b"consolidation_intent:1").await?;
-    let remaining2 = lsm.get(b"consolidation_intent:2").await?;
+    let remaining1 = storage.get(b"consolidation_intent:1").await?;
+    let remaining2 = storage.get(b"consolidation_intent:2").await?;
     assert!(remaining1.is_none());
     assert!(remaining2.is_none());
 
     Ok(())
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-058]
+// Prüft Testfall `test_concurrent_mutation_aborts_consolidation`.
 #[tokio::test]
 async fn test_concurrent_mutation_aborts_consolidation() -> Result<()> {
-    let tmp = tempfile::tempdir().unwrap();
-    let lsm_config = LsmConfig {
-        path: tmp.path().to_path_buf(),
-        ..Default::default()
-    };
-    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
-    let index = Arc::new(
-        HnswIndex::try_new(HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new(4));
     let col = Collection::new(
         "default".to_string(),
         storage,
@@ -574,7 +593,7 @@ async fn test_concurrent_mutation_aborts_consolidation() -> Result<()> {
         Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
-        contextra_engine::Language::English,
+        crate::engine_local::Language::English,
     );
 
     col.insert(
@@ -635,3 +654,4 @@ async fn test_concurrent_mutation_aborts_consolidation() -> Result<()> {
 
     Ok(())
 }
+// !SECTION: Context-Compaction Tests

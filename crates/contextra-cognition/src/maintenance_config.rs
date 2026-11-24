@@ -1,15 +1,30 @@
+//! # Wartungskonfiguration (`maintenance_config.rs`)
+//!
+//! Dieses Modul definiert die Konfigurationsparameter für den [`MaintenanceScheduler`].
+//! Es aggregiert Steuerwerte für Verfall (Decay Controller), Kantenverstärkung (Edge Reinforcement),
+//! Perkolationsgesundheit (Percolation Health), Replikatordynamik und Gedächtniskonsolidierung.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2). Bindet Konfigurationen aus `contextra-engine` und `contextra-graph` ein.
+//!
+//! ## Invarianten
+//! - **Keine Duplikation (P10):** Wiederverwendung bestehender Konfigurationsobjekte (DecayControllerConfig, PercolationConfig).
+//! - **Sichere Defaults:** Konservative Standardwerte für autonome Hintergrund-Ticks.
+
 // FILE-CONTEXT
 // ZWECK: Konfiguration des MaintenanceSchedulers für Background-Maintenance-Layer.
 // INVARIANTEN: P10: Wiederverwendung bestehender Konfigurationsobjekte (DecayControllerConfig, PercolationConfig) ohne Duplikation.
 // STAND: TS:2026-08-31T00:00:00Z
 
-use contextra_engine::decay_controller::DecayControllerConfig;
+use crate::engine_local::decay_controller::DecayControllerConfig;
 
 #[cfg(feature = "graph-connectivity-health")]
-use contextra_graph::percolation::PercolationConfig;
+use crate::graph_local::percolation::PercolationConfig;
 
 #[cfg(not(feature = "graph-connectivity-health"))]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-cognition:CFG-001]
+/// Fallback-Konfiguration für Perkolationsprüfungen.
 pub struct PercolationConfig {
     pub critical_threshold: f32,
     pub rebonding_similarity: f32,
@@ -29,6 +44,11 @@ impl Default for PercolationConfig {
 
 /// Zentrale Konfiguration für den `MaintenanceScheduler` (§10.2).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-cognition:CFG-002]
+/// Zentrale Konfiguration für den MaintenanceScheduler (§10.2).
+// =========================================================================
+// SECTION: MaintenanceConfig Definition
+// =========================================================================
 pub struct MaintenanceConfig {
     /// Intervall zwischen Ticks in Sekunden. Default: 60s.
     pub tick_interval_secs: u64,
@@ -44,7 +64,7 @@ pub struct MaintenanceConfig {
     // --- F-03 Edge Reinforcement ---
     /// Edge-Reinforcement-Konfiguration (η, δ, W_max, ρ, Q, α).
     #[cfg(feature = "edge-reinforcement-learning")]
-    pub edge_reinforcement: contextra_graph::EdgeReinforcementConfig,
+    pub edge_reinforcement: crate::graph_local::EdgeReinforcementConfig,
 
     // --- F-06 Perkolation ---
     /// Ob Perkolations-Gesundheitsprüfungen aktiviert sind. Default: true.
@@ -72,6 +92,11 @@ pub struct MaintenanceConfig {
     pub background_consolidation_episode_threshold: usize,
 }
 
+// !SECTION: MaintenanceConfig Definition
+
+// =========================================================================
+// SECTION: Default-Werte & Builder
+// =========================================================================
 impl Default for MaintenanceConfig {
     fn default() -> Self {
         Self {
@@ -79,7 +104,7 @@ impl Default for MaintenanceConfig {
             decay_enabled: true,
             decay_config: DecayControllerConfig::default(),
             #[cfg(feature = "edge-reinforcement-learning")]
-            edge_reinforcement: contextra_graph::EdgeReinforcementConfig::default(),
+            edge_reinforcement: crate::graph_local::EdgeReinforcementConfig::default(),
             percolation_enabled: true,
             percolation: PercolationConfig::default(),
             replicator_enabled: false,
@@ -90,3 +115,4 @@ impl Default for MaintenanceConfig {
         }
     }
 }
+// !SECTION: Default-Werte & Builder

@@ -1,7 +1,24 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Integrationstest für contextra-router (bandit_latency.rs).
+// INVARIANTEN: Deterministische Ausführung, Zero-Panic, korrekte Fehlertaxonomie.
+
+#![allow(
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+//! # Integrationstest: Latenzbudget für Bandit-Routing-Entscheidungen
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Integrationstest: Latenzbudget für Bandit-Routing-Entscheidungen.
+
+// ANCHOR[contextra-router:IT-BLAT-001]
 #![cfg(feature = "bandit-routing")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_router::{BanditImplementation, BanditProfileState};
+use contextra_adapt::{BanditImplementation, BanditProfileState};
 use std::time::Instant;
 
 const FEATURE_DIM: usize = 768; // nomic-embed-text standard dimension
@@ -12,6 +29,8 @@ const LATENCY_BUDGET_P95_US: u64 = 15_000; // Debug-Modus allowance (unoptimized
 #[cfg(not(debug_assertions))]
 const LATENCY_BUDGET_P95_US: u64 = 1_000; // Release-Modus gate (1.0 ms)
 
+// ANCHOR[contextra-router:IT-BLAT-T01]
+// Test `test_bandit_sherman_morrison_latency_budget`: Prüft das erwartete Verhalten und Invarianten für integrationstest: latenzbudget für bandit-routing-entscheidungen.
 #[test]
 fn test_bandit_sherman_morrison_latency_budget() {
     let cost = 0.2f32;

@@ -1,4 +1,15 @@
-//! Query-Abstraktionen (wie `HybridQuery` und `HybridQueryBuilder`) sowie Signal-Fusionstypen (wie `FusionWeights`, `FusionStrategy`, `GraphTraversalStrategy`, `ContextChunk`, `ContextWindow`, `ScoredEntry`, `RerankResult`). Der Begriff SAOS (Synthesized Agent Operating System) dient als historische Modulbezeichnung.
+//! Query-Abstraktionen (wie `HybridQuery` und `HybridQueryBuilder`) sowie Signal-Fusionstypen.
+//!
+//! # Architektur-Rolle: Typen-Fundament (Hybride Multi-Signal-Suche)
+//!
+//! Contextra synthetisiert Antworten über vier Suchkanäle (Dense Vector, Sparse Text, Graph und Recency).
+//!
+//! Dieses Modul stellt bereit:
+//! - `HybridQuery`: Zentrale Abfragestruktur mit Text, Embedding, Startknoten und Filtern.
+//! - `HybridQueryBuilder`: Ergonomischer Value-Builder zur Konstruktion unveränderlicher Abfragen.
+//! - `FusionWeights`: Auf 1.0 normalisierte Gewichte für Vektor-, Text- und Graph-Signale.
+//! - `FusionStrategy`: Fusionsalgorithmen (RRF = Reciprocal Rank Fusion, Score-Normalisierung).
+//! - `ContextChunk` & `ContextWindow`: Für LLMs aufbereitete Textsegmente inklusive Tokenzählung und Zettelkasten-Links.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
@@ -8,6 +19,7 @@
 // NICHT-OFFENSICHTLICH: metadata signal weight ist in FusionWeights reserviert und liefert via pub fn metadata() 0.0 zurück.
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-021)
 
+#[allow(deprecated)]
 use super::domain::{DocId, EntityId, MemoryType, PprConfig};
 use super::filter::FilterExpr;
 use crate::error::{ContextraError, Result};
@@ -15,6 +27,7 @@ use serde::{Deserialize, Serialize};
 
 /// Strategy used for search result signal fusion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-FUSIONSTRAT]
 pub enum FusionStrategy {
     /// Reciprocal Rank Fusion (default strategy per ADR-003).
     /// Robust against score scale mismatch and partial signal degradation.
@@ -27,6 +40,7 @@ pub enum FusionStrategy {
 
 /// Strategy configuration mapping per retrieval signal (vector, text, graph).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+// ANCHOR[contextra-types:SAOS-SIGNALSTRAT]
 pub struct SignalFusionStrategies {
     /// Strategy used for vector search signal fusion.
     pub vector: FusionStrategy,
@@ -109,6 +123,7 @@ impl<'de> Deserialize<'de> for SignalFusionStrategies {
 
 /// Strategy used for graph retrieval in hybrid search queries.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-GRAPHTRAV]
 pub enum GraphTraversalStrategy {
     /// Multi-hop BFS traversal with hop score decay (default max_hops = 3).
     Hops {
@@ -116,6 +131,7 @@ pub enum GraphTraversalStrategy {
         max_hops: usize,
     },
     /// Personalized PageRank power iteration starting from seed nodes.
+    #[allow(deprecated)]
     PersonalizedPageRank(PprConfig),
     /// PathRAG bidirectional Dijkstra traversal with sufficiency filtering.
     PathRag {
@@ -134,6 +150,7 @@ impl Default for GraphTraversalStrategy {
 
 /// Normalized fusion weights for hybrid search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-WEIGHTS]
 pub struct FusionWeights {
     vector: f32,
     text: f32,
@@ -211,6 +228,7 @@ impl FusionWeights {
 
 /// A chunk of context for LLM budget allocation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-CHUNK]
 pub struct ContextChunk {
     /// Document identifier associated with this chunk.
     pub doc_id: DocId,
@@ -232,8 +250,8 @@ pub struct ContextChunk {
 }
 
 impl ContextChunk {
-    /// Kombinierten Text für BM25-Indizierung und Embedding.
-    /// Entspricht dem etablierten Contextual-BM25-Schema: prefix + "\n\n" + content.
+    /// Kombinierten Text für Text-Indizierung und Embedding.
+    /// Entspricht dem etablierten Contextual-Schema: prefix + "\n\n" + content.
     ///
     /// Allokiert nur wenn `contextual_prefix` gesetzt. Akzeptabel für
     /// Ingestion-Pipeline (1× pro Chunk, kein Hot-Path).
@@ -269,6 +287,7 @@ impl ContextChunk {
 
 /// An aggregated context window constrained by a token budget.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-WINDOW]
 pub struct ContextWindow {
     /// List of included context chunks.
     pub chunks: Vec<ContextChunk>,
@@ -298,10 +317,11 @@ impl std::fmt::Display for ContextWindow {
 /// Im Gegensatz dazu ist `contextra_rank::fusion::types::Signal` eine interne Signal-Repräsentation
 /// der Rank-Engine zur Gewichtsmodulation und Z-Score/RRF-Kalibrierung.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-SIGNAL]
 pub enum Signal {
     /// Dense vector embedding search signal.
     Vector,
-    /// Lexical full-text BM25 search signal.
+    /// Lexical full-text search signal.
     Text,
     /// Graph traversal / PageRank signal.
     Graph,
@@ -322,14 +342,15 @@ impl std::fmt::Display for Signal {
 /// **Semantik**:
 /// - `Fail` (Default): If an individual signal fails due to an underlying internal error
 ///   (e.g., vector index failure or timeout), the search aborts immediately and returns a
-///   structured error ([`ContextraError::SignalFailed`]) explicitly identifying the failing signal.
+///   structured error (`ContextraError`) explicitly identifying the failing signal.
 /// - `Degrade`: If an individual signal fails, the search logs a warning and proceeds with
 ///   fusion across the remaining successful signals. The returned results bear a non-empty
 ///   `degraded_signals` list detailing which signals failed.
 ///
-/// *Note*: An empty but valid result from a signal (e.g. no documents matched BM25 or zero vector)
+/// *Note*: An empty but valid result from a signal (e.g. no documents matched lexical text or zero vector)
 /// is NOT a signal failure and does not trigger this behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-FAILPOLICY]
 pub enum OnSignalFailure {
     /// Abort hybrid search and return an error on signal failure (Default per Spec Teil 6.5 P1).
     #[default]
@@ -340,8 +361,9 @@ pub enum OnSignalFailure {
 
 /// Output of a query rewriter containing text, semantic, and graph anchor reformulations.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-REWRITE]
 pub struct QueryRewriteOutput {
-    /// Textual reformulation intended for BM25 keyword search.
+    /// Textual reformulation intended for lexical keyword search.
     pub text_query: Option<String>,
     /// Semantic reformulation intended for dense vector embedding search.
     pub semantic_query: Option<String>,
@@ -386,6 +408,7 @@ impl QueryRewriteOutput {
 
 /// Evaluated result for hybrid/4-signal search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-SCOREDENTRY]
 pub struct ScoredEntry {
     /// Unique result identifier.
     pub id: String,
@@ -397,6 +420,7 @@ pub struct ScoredEntry {
 
 /// A unified query traversing multiple index signals.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-HYBRIDQUERY]
 pub struct HybridQuery {
     /// Optional full-text query string.
     pub text_query: Option<String>,
@@ -459,12 +483,13 @@ impl HybridQuery {
 /// Builder for HybridQuery to improve DX.
 ///
 /// # Abgrenzung
-/// `contextra_types::HybridQueryBuilder` ist ein speicherfreier, reiner Value-Builder in Ring 0,
+/// `contextra_types::HybridQueryBuilder` ist ein speicherfreier, reiner Value-Builder auf Vertragsebene,
 /// der eine unveränderliche `HybridQuery`-Value-Instanz erzeugt.
 /// Im Gegensatz dazu ist `contextra_engine::collection::query_builder::builder::HybridQueryBuilder`
 /// an eine aktive `Collection`-Instanz mit Storage- und Vektorindex-Handles gebunden und führt
 /// die Abfrage über `.execute()` direkt auf der Datenbank aus.
 #[derive(Default)]
+// ANCHOR[contextra-types:SAOS-BUILDER]
 pub struct HybridQueryBuilder {
     text_query: Option<String>,
     vector_query: Option<Vec<f32>>,

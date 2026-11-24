@@ -2,6 +2,10 @@
 //!
 //! Zweck: Vollständige Matrix-Tests für alle `ScrubRefusal`-Varianten und Readback-Nullenverifikation.
 
+// FILE-CONTEXT
+// STAND: 2026-10-13
+// ZWECK: Integrationstests fuer die Scrubbing Refusal-Matrix und Readback-Nullenverifikation.
+// INVARIANTEN: Zero-Panic, pure safe Rust, fail-closed Refusal-Pfade.
 
 #![allow(deprecated)]
 
@@ -13,6 +17,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-durable-fs:TEST-MATRIX-NORMAL-READBACK]
 /// Prüft das Nullen mit Readback-Verifikation für reguläre Dateien.
 #[test]
 fn test_scrub_matrix_normal_file_scrubbed_with_readback() -> std::io::Result<()> {
@@ -36,6 +41,7 @@ fn test_scrub_matrix_normal_file_scrubbed_with_readback() -> std::io::Result<()>
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-MATRIX-HARDLINK-REFUSED]
 /// Prüft die Verweigerung MultipleHardlinks in der Refusal-Matrix.
 #[test]
 fn test_scrub_matrix_hardlink_refused() -> std::io::Result<()> {
@@ -62,6 +68,7 @@ fn test_scrub_matrix_hardlink_refused() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-MATRIX-READER-REFUSED]
 /// Prüft die Verweigerung ReaderAlive bei aktiven Lesern.
 #[test]
 fn test_scrub_matrix_reader_alive_refused() -> std::io::Result<()> {
@@ -81,6 +88,7 @@ fn test_scrub_matrix_reader_alive_refused() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-MATRIX-NOT-OBSOLETE-REFUSED]
 /// Prüft die Verweigerung NotObsolete bei nicht freigegebenen Dateien.
 #[test]
 fn test_scrub_matrix_not_obsolete_refused() -> std::io::Result<()> {
@@ -100,6 +108,7 @@ fn test_scrub_matrix_not_obsolete_refused() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-MATRIX-POLICY-DISABLED]
 /// Prüft RemovedUnscrubbed bei deaktivierter ScrubPolicy.
 #[test]
 fn test_scrub_matrix_policy_disabled_removed_unscrubbed() -> std::io::Result<()> {
@@ -119,6 +128,7 @@ fn test_scrub_matrix_policy_disabled_removed_unscrubbed() -> std::io::Result<()>
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-MATRIX-READBACK-FAILURE]
 /// Prüft den Fehlerabbruch bei nicht übereinstimmender Readback-Nullenprüfung.
 #[test]
 fn test_scrub_matrix_readback_failure_returns_err() -> std::io::Result<()> {

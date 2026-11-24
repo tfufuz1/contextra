@@ -1,3 +1,4 @@
+//! Eigenschafts- und Vektortests für den regelbasierten Entitäten-Erkenner.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -17,6 +18,8 @@ use contextra_privacy::{EgressVault, PatternRecognizer};
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-001]
+// Prüft: Prüft synthetische IBAN-Testvektoren mit Modulo-97-Validierung.
 fn test_iban_mod_97_valid_and_invalid_synthetic_vectors() {
     let recognizer = PatternRecognizer::new();
 
@@ -40,6 +43,8 @@ fn test_iban_mod_97_valid_and_invalid_synthetic_vectors() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-002]
+// Prüft: Prüft synthetische BIC/SWIFT-Vektoren auf ISO-Konformität.
 fn test_bic_valid_and_invalid_synthetic_vectors() {
     let recognizer = PatternRecognizer::new();
 
@@ -68,6 +73,8 @@ fn test_bic_valid_and_invalid_synthetic_vectors() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-004]
+// Prüft: Prüft deutsche Steuer-ID-Vektoren inklusive Ziffernhäufigkeit und Prüfziffer.
 fn test_steuer_id_valid_and_invalid_synthetic_vectors() {
     let recognizer = PatternRecognizer::new();
 
@@ -94,6 +101,8 @@ fn test_steuer_id_valid_and_invalid_synthetic_vectors() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-003]
+// Prüft: Prüft Kreditkarten-Prüfsummen mittels Luhn-Algorithmus.
 fn test_credit_card_luhn_valid_and_invalid_synthetic_vectors() {
     let recognizer = PatternRecognizer::new();
 
@@ -115,6 +124,8 @@ fn test_credit_card_luhn_valid_and_invalid_synthetic_vectors() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-005]
+// Prüft: Prüft die Erkennung von Postleitzahlen und Ortszusätzen.
 fn test_plz_and_plz_ort_detection() {
     let recognizer = PatternRecognizer::new();
 
@@ -141,6 +152,8 @@ fn test_plz_and_plz_ort_detection() {
 }
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-006]
+// Prüft: Stellt sicher, dass nachfolgende Satzteile nicht versehentlich in Ortsnamen geschluckt werden.
 fn test_plz_ort_does_not_swallow_subsequent_sentence_text() {
     let recognizer = PatternRecognizer::new();
     let text = "Der Hauptsitz ist in 10115 Berlin und die Filiale ist in 80331 München.";
@@ -159,6 +172,8 @@ fn test_plz_ort_does_not_swallow_subsequent_sentence_text() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-007]
+// Prüft: Prüft die Begrenzung überlanger Eingaben auf 64 KiB.
 fn test_overlong_input_handling_and_bounded_error() {
     let small_limit_recognizer = PatternRecognizer::new().with_max_input_length(100);
     assert_eq!(small_limit_recognizer.max_input_length(), 100);
@@ -183,6 +198,8 @@ fn test_overlong_input_handling_and_bounded_error() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-008]
+// Prüft: Prüft den vollständigen Zyklus von Pseudonymisierung und anschließender Rehydrierung.
 fn test_surrogation_to_reidentification_roundtrip() {
     let vault = EgressVault::try_default().expect("vault creates");
     let recognizer = PatternRecognizer::new();
@@ -225,6 +242,8 @@ fn test_surrogation_to_reidentification_roundtrip() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-009]
+// Prüft: Eigenschaftstest: Erkenner gerät bei beliebigen Zufallsstrings niemals in Panik.
 fn test_property_recognizer_never_panics_on_arbitrary_inputs() {
     let recognizer = PatternRecognizer::new();
 
@@ -248,4 +267,132 @@ fn test_property_recognizer_never_panics_on_arbitrary_inputs() {
         let _ = recognizer.recognize(&char_str);
         let _ = recognizer.recognize_bounded(&char_str);
     }
+}
+
+// ============================================================================
+// 9. ReDoS Resilience & INV-PRIVACY-FAILCLOSED-1 Tests
+// ============================================================================
+
+#[test]
+/// SPEC: INV-PRIVACY-FAILCLOSED-1
+fn test_inv_privacy_failclosed_1_limit_and_error_handling() {
+    let recognizer = PatternRecognizer::new().with_max_input_length(256);
+
+    // 1. Text precisely within boundary
+    let valid_text = "test@example.com";
+    let ok_res = recognizer.recognize_bounded(valid_text);
+    assert!(ok_res.is_ok(), "Bounded recognition succeeds within limit");
+    assert_eq!(ok_res.unwrap().len(), 1);
+
+    // 2. Text strictly exceeding limit -> Must return Err(CapacityExceeded) and never silent clean pass
+    let exceeded_text = "a".repeat(257);
+    let err_res = recognizer.recognize_bounded(&exceeded_text);
+    assert!(
+        err_res.is_err(),
+        "Exceeding limit must fail closed with error"
+    );
+
+    // Detailed bounded variant
+    let detailed_err = recognizer.recognize_detailed_bounded(&exceeded_text);
+    assert!(detailed_err.is_err());
+}
+
+#[test]
+#[allow(clippy::disallowed_methods)] // Messung der Ausführungsdauer gegen ReDoS
+fn test_redos_adversarial_patterns_linear_execution_time() {
+    let recognizer = PatternRecognizer::new();
+
+    // Adversarial pattern 1: Long chain of '@' and dots that would cause catastrophic backtracking in flawed regexes
+    let evil_email_1 = format!("{}@{}.com", "a".repeat(10_000), "b.".repeat(500));
+    let start = std::time::Instant::now();
+    let _ = recognizer.recognize(&evil_email_1);
+    let duration = start.elapsed();
+    assert!(
+        duration < std::time::Duration::from_millis(500),
+        "Email scan must complete in linear time, took {:?}",
+        duration
+    );
+
+    // Adversarial pattern 2: Repeated IBAN prefix with incomplete bodies
+    let evil_iban = "DE".repeat(5_000);
+    let start = std::time::Instant::now();
+    let _ = recognizer.recognize(&evil_iban);
+    let duration = start.elapsed();
+    assert!(
+        duration < std::time::Duration::from_millis(500),
+        "IBAN scan must complete in linear time, took {:?}",
+        duration
+    );
+
+    // Adversarial pattern 3: Long sequence of colons and hex digits
+    let evil_ip = "::".repeat(5_000);
+    let start = std::time::Instant::now();
+    let _ = recognizer.recognize(&evil_ip);
+    let duration = start.elapsed();
+    assert!(
+        duration < std::time::Duration::from_millis(500),
+        "IP scan must complete in linear time, took {:?}",
+        duration
+    );
+}
+
+#[test]
+fn test_masking_idempotence_property() {
+    let vault = EgressVault::try_default().expect("vault creates");
+    let recognizer = PatternRecognizer::new();
+
+    let text =
+        "Contact alice@example.com or bob@company.org regarding IBAN DE89370400440532013000.";
+
+    // Pass 1: Sanitize
+    let (sanitized_1, count_1) = vault
+        .sanitize_and_vault(text, &recognizer)
+        .expect("sanitization 1 succeeds");
+    assert!(count_1 >= 2);
+
+    // Pass 2: Re-sanitizing already sanitized text must be idempotent (0 new entities replaced)
+    let (sanitized_2, count_2) = vault
+        .sanitize_and_vault(&sanitized_1, &recognizer)
+        .expect("sanitization 2 succeeds");
+    assert_eq!(
+        count_2, 0,
+        "Already sanitized text must not yield new replacements"
+    );
+    assert_eq!(
+        sanitized_1, sanitized_2,
+        "Sanitized text must remain identical on subsequent passes"
+    );
+}
+
+#[test]
+fn test_detailed_entity_matches_and_rule_ids() {
+    let recognizer = PatternRecognizer::new();
+    let text = "E-Mail: test@example.com, IBAN: DE89370400440532013000, Card: 4532820011223344";
+
+    let matches = recognizer.recognize_detailed(text);
+    assert_eq!(matches.len(), 3);
+
+    let email_match = matches
+        .iter()
+        .find(|m| m.entity_type == "EMAIL")
+        .expect("email found");
+    assert_eq!(email_match.rule_id, "PII-EMAIL-01");
+    assert!(email_match.confidence > 0.9);
+    assert_eq!(&text[email_match.range.clone()], "test@example.com");
+
+    let iban_match = matches
+        .iter()
+        .find(|m| m.entity_type == "IBAN")
+        .expect("iban found");
+    assert_eq!(iban_match.rule_id, "PII-IBAN-MOD97");
+    assert_eq!(iban_match.confidence, 1.0);
+    assert_eq!(&text[iban_match.range.clone()], "DE89370400440532013000");
+
+    let cc_match = matches
+        .iter()
+        .find(|m| m.entity_type == "CREDIT_CARD")
+        .expect("cc found");
+    assert_eq!(cc_match.rule_id, "PII-CC-LUHN");
+    assert!(cc_match.confidence > 0.9);
+    assert_eq!(&text[cc_match.range.clone()], "4532820011223344");
 }

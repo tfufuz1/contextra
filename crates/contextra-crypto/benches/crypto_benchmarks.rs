@@ -1,3 +1,6 @@
+//! # Benchmark-Suite: Kryptographische Kernoperationen (`benches/crypto_benchmarks.rs`)
+//!
+//! Misst Durchsatz und Latenz von AES-256-GCM-SIV, HKDF-Schlüsselableitung und KV-Sharding.
 // FILE-CONTEXT
 // ZWECK: Criterion benchmark suite for contextra-crypto throughput and latency measurement.
 // INVARIANTEN: Measures AES-256-GCM-SIV throughput at 1KB/64KB/1MB/16MB, HKDF derivation, HMAC throughput, and nonce overhead.

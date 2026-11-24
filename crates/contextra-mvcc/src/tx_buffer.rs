@@ -1,66 +1,81 @@
-//! Transactional buffer for staging index operations.
+// ANCHOR[id=tx-buffer-module-root]
+//! # Transaktions-Puffer (`TxBuffer`) für das Staging von Index-Operationen
 //!
-//! Sharded into sub-buffers to reduce lock contention.
-//! Each shard is independently locked, allowing concurrent writers
-//! to different transactions.
+//! LINK crates/contextra-mvcc/src/lib.rs
+//! LINK crates/contextra-mvcc/src/snapshot.rs
+//! LINK crates/contextra-mvcc/src/ssi.rs
 //!
-//! # INVARIANT
-//! To avoid deadlocks, callers must never acquire more than one shard lock simultaneously.
-//! In multi-shard sweeps, `reap_orphans()` acquires all shards sequentially in ascending index
-//! order (index 0 to N-1), acquiring and releasing each shard lock one at a time via `try_write()`.
+//! Der `TxBuffer` puffert Einfüge- und Löschoperationen aktiver Transaktionen vorübergehend
+//! im Hauptspeicher, bis die Transaktion entweder erfolgreich bestätigt (Commit / `drain`)
+//! oder verworfen wird (Rollback / `discard`).
+//!
+//! ## Funktionsweise und Partitionierung (Sharding)
+//! Um Lock-Konflikte (Lock Contention) bei vielen gleichzeitigen Schreibern zu minimieren,
+//! ist der Puffer intern in $N$ voneinander unabhängige Shards unterteilt (Standard: 64).
+//! Jede Transaktions-ID (`TxId`) wird deterministisch per Modulo einem Shard zugeordnet.
+//! Schreiber auf unterschiedliche Transaktionen blockieren sich somit gegenseitig nicht.
+//!
+//! ## Wichtige Invarianten (Deadlock-Freiheit)
+//! - **Niemals zwei Shards gleichzeitig sperren**: Operationen dürfen stets nur die Sperre
+//!   für einen einzelnen Shard halten.
+//! - **Sequentielle Multi-Shard-Durchläufe**: Operationen, die alle Shards durchsuchen müssen
+//!   (z. B. [`TxBuffer::reap_orphans`] oder [`TxBuffer::min_read_snapshot`]), durchlaufen die Shards
+//!   streng sequentiell in aufsteigender Index-Reihenfolge (0 bis $N-1$) und geben jede Sperre frei,
+//!   bevor der nächste Shard gesperrt wird.
+//!
+//! ## Bounded Memory Protection (DoS-Schutz)
+//! Um Speichererschöpfung (OOM) durch bösartige oder fehlerhafte Riesen-Transaktionen zu verhindern,
+//! erzwingt der `TxBuffer` konfigurierte Höchstgrenzen:
+//! - Maximale Anzahl an Operationen pro Transaktion (`max_ops_per_tx`).
+//! - Maximales Byte-Budget pro Transaktion (`max_tx_staged_bytes`).
+//! - Globales Byte-Budget über alle Transaktionen hinweg (`max_total_staged_bytes`).
 
 // FILE-CONTEXT
-// STAND: 2026-09-28T00:00:00Z (SESSION: e459bd5f)
 // ZWECK: Shard-basierter Transaktionsbuffer für das Staging von 2-Phase-Commit Index-Operationen, ReadSet-Limits & Watermark-Tracking.
 // INVARIANTEN: Shard-Isolation per TxId; Niemals zwei Shards gleichzeitig sperren (Deadlock-Prävention); Bounded ReadSet via try_register_read.
 // HOTSPOTS: 110-380
 // NICHT-OFFENSICHTLICH: Orphan Reaper & min_read_snapshot führen getrennte Locks pro Shard 0..N-1 durch; keinesfalls verschachtelt.
-// SIEHE AUCH: crates/contextra-mvcc/src/ssi.rs
 
-// INVARIANT: Sharded Transaction Buffer für lock-freie Concurrency.
-
-use crate::error::{ContextraError, Result};
+use crate::mvcc_error::{MvccError, Result};
 use crate::ssi::ReadSet;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
-use contextra_ports::{Clock, SystemClock};
+use contextra_env::{Clock, SystemClock};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Single canonical constant for overhead calculation per staged entry (32 bytes).
+// SECTION Constants
+// ANCHOR[id=tx-buffer-constants]
+/// Fester Speicher-Overhead pro gepufferter Operation (32 Bytes).
 pub const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32;
 
-/// Default number of shards for the transaction buffer.
+/// Standardanzahl an Partitionen (Shards) im Transaktionspuffer (64 Shards).
 pub const DEFAULT_SHARD_COUNT: usize = 64;
 
-/// Recommended maximum operations per single transaction to guard against memory exhaustion DoS.
-// AI-TAG[SMELL][MINOR] RESOLVED: AGT-CORE-001 — Bounded staging capacity enforced (TS:2026-08-29T12:00:00Z) (SESSION: a3f29c1d)
+/// Empfohlene Maximalanzahl an Operationen pro Einzelschreibtransaktion (10.000 Operationen).
 pub const DEFAULT_MAX_OPS_PER_TX: usize = 10_000;
 
-/// Default maximum number of read keys tracked per transaction's [`ReadSet`].
-///
-/// Prevents unbounded memory growth during large read scans (~100,000 keys * ~100B per key = ~10MB per active transaction).
+/// Standard-Maximalanzahl an getrackten Lese-Schlüsseln pro Transaktion (100.000 Schlüssel).
 pub const DEFAULT_MAX_READ_SET_KEYS: usize = 100_000;
 
-/// Default maximum staged bytes per transaction (16 MiB).
-///
-/// Bounds staging memory per individual transaction while enabling high-throughput bulk operations.
+/// Standard-Maximalgröße für gepufferte Rohdaten pro Einzelschreibtransaktion (16 MiB).
 pub const DEFAULT_MAX_TX_STAGED_BYTES: usize = 16 * 1024 * 1024;
 
-/// Default maximum total staged bytes across all active transactions (256 MiB).
-///
-/// Guards the process memory budget against multi-transaction staging memory exhaustion.
+/// Standard-Maximalgröße für den globalen Puffer über alle Transaktionen hinweg (256 MiB).
 pub const DEFAULT_MAX_TOTAL_STAGED_BYTES: usize = 256 * 1024 * 1024;
+// !SECTION Constants
 
-/// Configuration options for `TxBuffer`.
+// SECTION Configuration
+// ANCHOR[id=tx-buffer-config]
+/// Konfigurationsoptionen für den [`TxBuffer`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxBufferConfig {
-    /// Transaction timeout duration.
+    /// Timeout-Dauer, nach der verwaiste (inaktive) Transaktionen automatisch abgeräumt werden.
     pub tx_timeout: Duration,
-    /// Maximum recommended active transactions.
+    /// Maximale empfohlene Anzahl gleichzeitig aktiver Transaktionen.
     pub max_active_tx: usize,
     /// Maximale Anzahl von Staging-Operationen pro Transaktion.
     /// Verhindert OOM durch einzelne unbegrenzte Transaktionen.
@@ -85,29 +100,32 @@ impl Default for TxBufferConfig {
         }
     }
 }
+// !SECTION Configuration
 
-/// Operation to be executed in an index.
+// SECTION Index Operations
+// ANCHOR[id=index-op-enum]
+/// Eine im Puffer vorgemerkte Operation auf einem Index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum IndexOp<T: Clone> {
-    /// Insert a document with associated data.
+    /// Einfügen eines Dokuments mit Nutzlast (z. B. Einbettungs-Vektoren oder Schlüssel-Werte).
     Insert {
-        /// Document identifier to insert.
+        /// Kennung des Dokuments.
         doc_id: DocId,
-        /// Associated payload or index data.
+        /// Assoziierte Nutzdaten.
         data: T,
     },
-    /// Delete a document.
+    /// Entfernen eines Dokuments aus dem Index.
     Delete {
-        /// Document identifier to delete.
+        /// Kennung des Dokuments.
         doc_id: DocId,
-        /// Optional payload associated with deletion.
+        /// Optionale Zusatzdaten zur Entfernung.
         data: Option<T>,
     },
 }
 
 impl<T: Clone> IndexOp<T> {
-    /// Returns the document ID for this operation.
+    /// Liefert die Kennung des Dokuments (`DocId`), das von dieser Operation betroffen ist.
     pub fn doc_id(&self) -> DocId {
         match self {
             IndexOp::Insert { doc_id, .. } => *doc_id,
@@ -116,9 +134,12 @@ impl<T: Clone> IndexOp<T> {
     }
 }
 
-/// Trait for estimating the byte footprint of a staged payload.
+// ANCHOR[id=staged-op-size-trait]
+/// Trait zur Schätzung des Speicherverbrauchs in Bytes für gepufferte Nutzdaten.
+///
+/// Ermöglicht genaue Buchführung des verbrauchten Hauptspeichers pro Transaktion und global.
 pub trait StagedOpSize {
-    /// Estimates memory footprint in bytes for staging entry overhead accounting.
+    /// Liefert den geschätzten Speicherbedarf der Nutzdaten in Bytes.
     fn staged_bytes(&self) -> usize;
 }
 
@@ -159,7 +180,7 @@ impl StagedOpSize for u8 {
 }
 
 impl<T: Clone + StagedOpSize> IndexOp<T> {
-    /// Estimates total memory footprint in bytes including fixed overhead and payload size.
+    /// Schätzt den gesamten Speicherbedarf der Operation in Bytes (Overhead + Nutzdaten).
     pub fn estimated_bytes(&self) -> usize {
         STAGING_ENTRY_OVERHEAD_BYTES
             + match self {
@@ -169,7 +190,10 @@ impl<T: Clone + StagedOpSize> IndexOp<T> {
             }
     }
 }
+// !SECTION Index Operations
 
+// SECTION Shard Internals
+// ANCHOR[id=tx-shard-struct]
 #[derive(Debug)]
 struct TxShard<T: Clone> {
     ops: AHashMap<TxId, (Vec<IndexOp<T>>, u64)>,
@@ -199,18 +223,16 @@ impl KeyShard {
         }
     }
 }
+// !SECTION Shard Internals
 
-/// Buffers index operations until commit or rollback.
+// SECTION TxBuffer Engine
+// ANCHOR[id=tx-buffer-struct]
+/// Verwaltet gepufferte Transaktionen, deren Staging-Operationen und ReadSets.
 ///
-/// Sharded into sub-buffers to reduce lock contention.
-///
-/// # INVARIANT
-/// Each shard is protected by an independent `parking_lot::RwLock`.
-/// Standard acquisition order: Read-lock for queries, Write-lock for mutations.
-/// To avoid deadlocks, cross-shard operations must never acquire more than
-/// one shard lock simultaneously. Operations that process all shards (like `reap_orphans()` or `min_read_snapshot()`)
-/// MUST iterate over shards sequentially in ascending index order (from shard 0 to N-1)
-/// and release each lock before acquiring the next.
+/// ### Synchronisations- und Sperrstrategie:
+/// Jeder Shard besitzt ein eigenes `parking_lot::RwLock`. Leseoperationen erfordern ein Read-Lock,
+/// Mutationen ein Write-Lock. Es wird niemals mehr als ein Shard-Lock gleichzeitig gehalten.
+/// Multi-Shard-Scans durchlaufen die Shards strikt aufsteigend (0 bis $N-1$).
 pub struct TxBuffer<T: Clone> {
     shards: Vec<RwLock<TxShard<T>>>,
     key_shards: Vec<RwLock<KeyShard>>,
@@ -232,12 +254,13 @@ impl<T: Clone> std::fmt::Debug for TxBuffer<T> {
 }
 
 impl<T: Clone> TxBuffer<T> {
-    /// Creates a new buffer with default 64 shards and 30s timeout using [`SystemClock`].
+    // ANCHOR[id=tx-buffer-constructors]
+    /// Erstellt einen neuen Puffer mit 64 Shards, 30 Sekunden Timeout und [`SystemClock`].
     pub fn new() -> Self {
         Self::new_with_config(DEFAULT_SHARD_COUNT, Duration::from_secs(30))
     }
 
-    /// Creates a new buffer with custom settings using [`SystemClock`].
+    /// Erstellt einen neuen Puffer mit konfigurierter Shard-Anzahl und Transaktions-Timeout.
     pub fn new_with_config(shard_count: usize, tx_timeout: Duration) -> Self {
         let config = TxBufferConfig {
             tx_timeout,
@@ -246,7 +269,7 @@ impl<T: Clone> TxBuffer<T> {
         Self::new_with_config_ext(shard_count, tx_timeout, config)
     }
 
-    /// Creates a new buffer with explicit `TxBufferConfig` using [`SystemClock`].
+    /// Erstellt einen neuen Puffer mit expliziter Konfiguration ([`TxBufferConfig`]).
     pub fn new_with_config_ext(
         shard_count: usize,
         _tx_timeout: Duration,
@@ -255,7 +278,7 @@ impl<T: Clone> TxBuffer<T> {
         Self::new_with_clock_and_config(Arc::new(SystemClock::new()), shard_count, config)
     }
 
-    /// Creates a new buffer with explicit [`Clock`], shard count, and `TxBufferConfig`.
+    /// Erstellt einen Puffer mit benutzerdefinierter [`Clock`], Shard-Anzahl und Konfiguration.
     pub fn new_with_clock_and_config(
         clock: Arc<dyn Clock>,
         shard_count: usize,
@@ -278,22 +301,61 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    /// Attaches a custom [`Clock`] implementation to this buffer.
+    /// Erstellt einen Puffer mit einer Zeitstempel-Closure (State-Passing per `Fn() -> u64`), Shard-Anzahl und Konfiguration.
+    pub fn new_with_time_fn_and_config<F>(
+        time_fn: F,
+        shard_count: usize,
+        config: TxBufferConfig,
+    ) -> Self
+    where
+        F: Fn() -> u64 + Send + Sync + 'static,
+    {
+        struct ClosureClock<F>(F);
+        impl<F: Fn() -> u64 + Send + Sync + 'static> Clock for ClosureClock<F> {
+            fn now_unix_nanos(&self) -> u64 {
+                (self.0)()
+            }
+            fn monotonic_nanos(&self) -> u64 {
+                (self.0)()
+            }
+        }
+        Self::new_with_clock_and_config(Arc::new(ClosureClock(time_fn)), shard_count, config)
+    }
+
+    /// Bindet eine benutzerdefinierte [`Clock`]-Instanz an diesen Puffer an.
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
         self
     }
 
-    /// Returns the active [`Clock`] instance attached to this buffer.
+    /// Bindet eine Zeitstempel-Closure (State-Passing per `Fn() -> u64`) an diesen Puffer an.
+    pub fn with_time_fn<F>(self, time_fn: F) -> Self
+    where
+        F: Fn() -> u64 + Send + Sync + 'static,
+    {
+        struct ClosureClock<F>(F);
+        impl<F: Fn() -> u64 + Send + Sync + 'static> Clock for ClosureClock<F> {
+            fn now_unix_nanos(&self) -> u64 {
+                (self.0)()
+            }
+            fn monotonic_nanos(&self) -> u64 {
+                (self.0)()
+            }
+        }
+        self.with_clock(Arc::new(ClosureClock(time_fn)))
+    }
+
+    /// Liefert eine Referenz auf den aktiven [`Clock`]-Port.
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
     }
 
-    /// Returns the current total staged bytes across all active transactions.
+    /// Liefert den aktuell global über alle Transaktionen verbrauchten Staging-Speicher in Bytes.
     pub fn staged_bytes(&self) -> usize {
         self.global_staged_bytes.load(Ordering::Relaxed)
     }
 
+    // ANCHOR[id=tx-buffer-sharding-indices]
     #[inline]
     fn shard_idx(&self, tx: TxId) -> usize {
         let num_shards = self.shards.len();
@@ -317,7 +379,7 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    /// Checks if the given transaction exists in the buffer.
+    /// Prüft, ob die gegebene Transaktion im Puffer registriert ist.
     pub fn has_tx(&self, tx: TxId) -> bool {
         let idx = self.shard_idx(tx);
         if let Some(shard_lock) = self.shards.get(idx) {
@@ -327,7 +389,13 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    /// Registers a new transaction in the buffer at monotonic timestamp `at_nanos`.
+    // ANCHOR[id=tx-buffer-begin]
+    /// Registriert eine neue Transaktion im Puffer zu einem bestimmten Nanosekunden-Zeitstempel.
+    ///
+    /// ### Ablauf:
+    /// 1. Shard-Index für `tx` per Hash berechnen.
+    /// 2. Shard exklusiv sperren (`write`).
+    /// 3. Neuen Operationsvektor mit Zeitstempel anlegen, ReadSet initialisieren und Byte-Zähler auf 0 setzen.
     pub fn begin_at(&self, tx: TxId, at_nanos: u64) {
         let shard_idx = self.shard_idx(tx);
         if let Some(shard_lock) = self.shards.get(shard_idx) {
@@ -341,13 +409,14 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    /// Registers a new transaction in the buffer using current clock timestamp.
+    /// Registriert eine neue Transaktion mit der aktuellen Uhrzeit.
     pub fn begin(&self, tx: TxId) {
         let now_nanos = self.clock.monotonic_nanos();
         self.begin_at(tx, now_nanos);
     }
 
-    /// Registers a read key and its snapshot sequence number for transaction `tx`.
+    // ANCHOR[id=tx-buffer-read-registration]
+    /// Registriert einen Lesezugriff im ReadSet der Transaktion `tx`.
     pub fn register_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
         let shard_idx = self.shard_idx(tx);
         if let Some(shard_lock) = self.shards.get(shard_idx) {
@@ -360,8 +429,13 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    /// Registers a read key and its snapshot sequence number for transaction `tx`,
-    /// enforcing a maximum key count limit `max_keys` on new key insertions.
+    /// Registriert einen gelesenen Schlüssel für Transaktion `tx` mit Obergrenzen-Prüfung (`max_keys`).
+    ///
+    /// Verhindert unbegrenztes Speicherwachstum bei massiven Lese-Scans.
+    ///
+    /// ### Fehlerfälle:
+    /// Gibt `Err(MvccError::LimitExceeded)` zurück, falls das ReadSet bereits `max_keys` erreicht hat
+    /// und ein bisher unbekannter Schlüssel hinzugefügt werden soll.
     pub fn try_register_read(
         &self,
         tx: TxId,
@@ -373,13 +447,13 @@ impl<T: Clone> TxBuffer<T> {
         let shard_lock = self
             .shards
             .get(shard_idx)
-            .ok_or_else(|| ContextraError::Storage("Shard index out of bounds".to_string()))?;
+            .ok_or_else(|| MvccError::Storage("Shard index out of bounds".to_string()))?;
         let mut shard = shard_lock.write();
         let rs = shard.read_sets.entry(tx).or_default();
 
         let k = key.into();
         if rs.get(&k).is_none() && rs.len() >= max_keys {
-            return Err(ContextraError::limit_exceeded(
+            return Err(MvccError::limit_exceeded(
                 max_keys,
                 format!("Read set size limit exceeded for transaction {tx}"),
             ));
@@ -389,12 +463,16 @@ impl<T: Clone> TxBuffer<T> {
         Ok(())
     }
 
-    /// Alias for [`TxBuffer::register_read`].
+    /// Alias-Funktion für [`TxBuffer::register_read`].
     pub fn record_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
         self.register_read(tx, key, snapshot_seq);
     }
 
-    /// Returns the lowest snapshot sequence number across all read sets of all active transactions in all shards.
+    // ANCHOR[id=tx-buffer-min-read-snapshot]
+    /// Findet die kleinste Snapshot-Sequenznummer über alle aktiven ReadSets aller Shards hinweg.
+    ///
+    /// Dient der Bestimmung des globalen GC-Schwellenwerts (Tombstone-Compaction-Floor).
+    /// Durchläuft alle Shards sequentiell (0 bis $N-1$) unter kurzem Read-Lock.
     pub fn min_read_snapshot(&self) -> Option<u64> {
         let mut overall_min: Option<u64> = None;
         for shard_lock in &self.shards {
@@ -408,7 +486,7 @@ impl<T: Clone> TxBuffer<T> {
         overall_min
     }
 
-    /// Returns a clone of the accumulated [`ReadSet`] for transaction `tx`, if present.
+    /// Liefert eine Kopie des angesammelten [`ReadSet`] für Transaktion `tx`.
     pub fn get_read_set(&self, tx: TxId) -> Option<ReadSet> {
         let shard_idx = self.shard_idx(tx);
         let shard_lock = self.shards.get(shard_idx)?;
@@ -416,12 +494,13 @@ impl<T: Clone> TxBuffer<T> {
         shard.read_sets.get(&tx).cloned()
     }
 
-    /// Alias for [`TxBuffer::get_read_set`].
+    /// Alias-Funktion für [`TxBuffer::get_read_set`].
     pub fn read_set(&self, tx: TxId) -> Option<ReadSet> {
         self.get_read_set(tx)
     }
 
-    /// Stages an operation for the given transaction, checking bounded capacity and byte budget.
+    // ANCHOR[id=tx-buffer-staging]
+    /// Puffert eine Indexoperation für die Transaktion `tx` unter Prüfung aller Speichergrenzen.
     pub fn stage(&self, tx: TxId, op: IndexOp<T>) -> Result<()>
     where
         T: StagedOpSize,
@@ -429,7 +508,15 @@ impl<T: Clone> TxBuffer<T> {
         self.stage_bounded(tx, op)
     }
 
-    /// Stages an operation for the given transaction, enforcing `max_ops_per_tx` and byte limits.
+    /// Puffert eine Operation und erzwingt Obergrenzen für Operationsanzahl und Byte-Budgets.
+    ///
+    /// ### Ablauf:
+    /// 1. Berechne geschätzten Speicherbedarf der Operation in Bytes (`op_bytes`).
+    /// 2. Shard exklusiv sperren.
+    /// 3. Prüfen: Überschreitet `tx` ihr lokales Byte-Budget (`max_tx_staged_bytes`)?
+    /// 4. Prüfen: Wird das globale Byte-Budget (`max_total_staged_bytes`) überschritten?
+    /// 5. Prüfen: Wird die maximale Anzahl an Operationen pro Transaktion (`max_ops_per_tx`) überschritten?
+    /// 6. Operation in den Shard-Puffer einhängen, Zähler aktualisieren und atomaren globalen Speicherstand erhöhen.
     pub fn stage_bounded(&self, tx: TxId, op: IndexOp<T>) -> Result<()>
     where
         T: StagedOpSize,
@@ -439,12 +526,12 @@ impl<T: Clone> TxBuffer<T> {
         let shard_lock = self
             .shards
             .get(shard_idx)
-            .ok_or_else(|| ContextraError::Storage("Shard index out of bounds".to_string()))?;
+            .ok_or_else(|| MvccError::Storage("Shard index out of bounds".to_string()))?;
         let mut shard = shard_lock.write();
 
         let curr_tx_bytes = *shard.staged_bytes.entry(tx).or_insert(0);
         if curr_tx_bytes + op_bytes > self.config.max_tx_staged_bytes {
-            return Err(ContextraError::Storage(format!(
+            return Err(MvccError::Storage(format!(
                 "Transaction {tx} staging budget exceeded: {} + {op_bytes} > {}",
                 curr_tx_bytes, self.config.max_tx_staged_bytes
             )));
@@ -452,7 +539,7 @@ impl<T: Clone> TxBuffer<T> {
 
         let curr_global = self.global_staged_bytes.load(Ordering::Relaxed);
         if curr_global + op_bytes > self.config.max_total_staged_bytes {
-            return Err(ContextraError::Storage(format!(
+            return Err(MvccError::Storage(format!(
                 "Global staging budget exceeded: {curr_global} + {op_bytes} > {}",
                 self.config.max_total_staged_bytes
             )));
@@ -466,7 +553,7 @@ impl<T: Clone> TxBuffer<T> {
             .or_insert_with(|| (Vec::with_capacity(16), now_nanos));
 
         if entry.0.len() >= max_ops {
-            return Err(ContextraError::Transaction(format!(
+            return Err(MvccError::Transaction(format!(
                 "Transaction {} exceeded max staging capacity ({} ops)",
                 tx, max_ops
             )));
@@ -479,7 +566,7 @@ impl<T: Clone> TxBuffer<T> {
         Ok(())
     }
 
-    /// Stages multiple operations for a transaction in a single shard lock acquisition.
+    /// Puffert mehrere Operationen stapelweise mit einer einzigen Sperrung des Shards.
     pub fn stage_many(&self, tx: TxId, ops: impl IntoIterator<Item = IndexOp<T>>) -> Result<()>
     where
         T: StagedOpSize,
@@ -491,12 +578,12 @@ impl<T: Clone> TxBuffer<T> {
         let shard_lock = self
             .shards
             .get(shard_idx)
-            .ok_or_else(|| ContextraError::Storage("Shard index out of bounds".to_string()))?;
+            .ok_or_else(|| MvccError::Storage("Shard index out of bounds".to_string()))?;
         let mut shard = shard_lock.write();
 
         let curr_tx_bytes = *shard.staged_bytes.entry(tx).or_insert(0);
         if curr_tx_bytes + total_op_bytes > self.config.max_tx_staged_bytes {
-            return Err(ContextraError::Storage(format!(
+            return Err(MvccError::Storage(format!(
                 "Transaction {tx} staging budget exceeded: {} + {total_op_bytes} > {}",
                 curr_tx_bytes, self.config.max_tx_staged_bytes
             )));
@@ -504,7 +591,7 @@ impl<T: Clone> TxBuffer<T> {
 
         let curr_global = self.global_staged_bytes.load(Ordering::Relaxed);
         if curr_global + total_op_bytes > self.config.max_total_staged_bytes {
-            return Err(ContextraError::Storage(format!(
+            return Err(MvccError::Storage(format!(
                 "Global staging budget exceeded: {curr_global} + {total_op_bytes} > {}",
                 self.config.max_total_staged_bytes
             )));
@@ -518,7 +605,7 @@ impl<T: Clone> TxBuffer<T> {
             .or_insert_with(|| (Vec::new(), now_nanos));
 
         if entry.0.len() + ops_vec.len() > max_ops {
-            return Err(ContextraError::Transaction(format!(
+            return Err(MvccError::Transaction(format!(
                 "Transaction {} exceeded max staging capacity ({} ops)",
                 tx, max_ops
             )));
@@ -534,14 +621,14 @@ impl<T: Clone> TxBuffer<T> {
         Ok(())
     }
 
-    /// Validates that the transaction has pending operations.
+    /// Prüft, ob für eine registrierte Transaktion tatsächlich anhängige Operationen existieren.
     pub fn validate_pending_ops(&self, tx: TxId) -> Result<()> {
         let shard_idx = self.shard_idx(tx);
         if let Some(shard_lock) = self.shards.get(shard_idx) {
             let shard = shard_lock.read();
             if let Some((ops, _)) = shard.ops.get(&tx) {
                 if ops.is_empty() {
-                    return Err(ContextraError::Transaction(format!(
+                    return Err(MvccError::Transaction(format!(
                         "Transaction {} was registered but has no pending operations",
                         tx
                     )));
@@ -551,7 +638,9 @@ impl<T: Clone> TxBuffer<T> {
         Ok(())
     }
 
-    /// Drains and returns all buffered operations for a transaction.
+    // ANCHOR[id=tx-buffer-drain-discard]
+    /// Entnimmt alle gepufferten Operationen der Transaktion `tx` für den anschließenden Commit
+    /// und gibt den reservierten Speicherplatz frei.
     pub fn drain(&self, tx: TxId) -> Vec<IndexOp<T>> {
         let shard_idx = self.shard_idx(tx);
         if let Some(shard_lock) = self.shards.get(shard_idx) {
@@ -572,7 +661,7 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    /// Discards all buffered operations and tracked read-sets for a transaction.
+    /// Verwirft alle gepufferten Operationen und das ReadSet einer Transaktion (Rollback).
     pub fn discard(&self, tx: TxId) {
         let shard_idx = self.shard_idx(tx);
         if let Some(shard_lock) = self.shards.get(shard_idx) {
@@ -587,28 +676,36 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    /// Returns the total number of pending transactions.
+    /// Liefert die Gesamtzahl aller aktuell gepufferten Transaktionen über alle Shards.
     pub fn len(&self) -> usize {
         self.shards.iter().map(|s| s.read().ops.len()).sum()
     }
 
-    /// Returns true if all shards are empty.
+    /// Gibt `true` zurück, wenn in keinem einzigen Shard gepufferte Transaktionen liegen.
     pub fn is_empty(&self) -> bool {
         self.shards.iter().all(|s| s.read().ops.is_empty())
     }
 
-    /// Cleans up expired transactions relative to monotonic timestamp `now_nanos`.
+    // ANCHOR[id=tx-buffer-orphan-reaping]
+    /// Räumt abgelaufene (verwaiste) Transaktionen bezüglich `now_nanos` über alle Shards ab.
     pub fn reap_orphans_at(&self, now_nanos: u64) -> Vec<TxId> {
         self.reap_orphans_bounded_at(usize::MAX, now_nanos)
     }
 
-    /// Cleans up expired transactions using current clock timestamp.
+    /// Räumt verwaiste Transaktionen unter Verwendung der aktuellen Uhrzeit ab.
     pub fn reap_orphans(&self) -> Vec<TxId> {
         let now_nanos = self.clock.monotonic_nanos();
         self.reap_orphans_at(now_nanos)
     }
 
-    /// Reaps up to `max` expired orphan transactions across shards relative to monotonic timestamp `now_nanos`.
+    /// Räumt maximal `max` verwaiste Transaktionen ab, um Latenzspitzen zu vermeiden.
+    ///
+    /// ### Ablauf:
+    /// 1. Iteriere aufsteigend über die Shards (0 bis $N-1$).
+    /// 2. Versuche Sperre via `try_write()` zu erhalten (nicht blockierend!).
+    /// 3. Entferne alle Transaktionen, deren Alter `tx_timeout` überschreitet.
+    /// 4. Gebe für jede entfernte Transaktion deren ReadSet und Staging-Bytes frei.
+    /// 5. `thread::yield_now()` nach jedem Shard ausführen, um parallelen Schreibern Vorrang zu gewähren.
     pub fn reap_orphans_bounded_at(&self, max: usize, now_nanos: u64) -> Vec<TxId> {
         let mut expired = Vec::new();
         let timeout_nanos = u64::try_from(self.tx_timeout.as_nanos()).unwrap_or(u64::MAX);
@@ -644,13 +741,13 @@ impl<T: Clone> TxBuffer<T> {
         expired
     }
 
-    /// Reaps up to `max` expired orphan transactions across shards using current clock timestamp.
+    /// Räumt bis zu `max` verwaiste Transaktionen bezogen auf die aktuelle Uhrzeit ab.
     pub fn reap_orphans_bounded(&self, max: usize) -> Vec<TxId> {
         let now_nanos = self.clock.monotonic_nanos();
         self.reap_orphans_bounded_at(max, now_nanos)
     }
 
-    /// Returns a clone of the pending operations for a transaction.
+    /// Liefert eine Kopie der gepufferten Operationen einer Transaktion.
     pub fn get_ops(&self, tx: TxId) -> Option<Vec<IndexOp<T>>> {
         let shard_idx = self.shard_idx(tx);
         let shard_lock = self.shards.get(shard_idx)?;
@@ -658,12 +755,14 @@ impl<T: Clone> TxBuffer<T> {
         shard.ops.get(&tx).map(|(ops, _)| ops.clone())
     }
 
-    /// Returns the transaction timeout.
+    /// Liefert die konfigurierte Transaktions-Timeout-Dauer.
     pub fn tx_timeout(&self) -> Duration {
         self.tx_timeout
     }
 }
 
+// SECTION KV Buffer Extension
+// ANCHOR[id=tx-buffer-kv-impl]
 impl TxBuffer<(Vec<u8>, Vec<u8>)> {
     fn track_key_stage(&self, tx: TxId, key: &[u8], is_insert: bool) {
         let idx = self.key_shard_idx(key);
@@ -699,7 +798,9 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         }
     }
 
-    /// Stages a key-value operation and updates atomic key staging map.
+    /// Puffert eine Schlüssel-Wert-Operation und aktualisiert die Key-Staging-Map.
+    ///
+    /// Bei Fehlschlag von `stage()` (z. B. Budget-Überlauf) wird das Key-Tracking atomar zurückgerollt.
     pub fn stage_kv(&self, tx: TxId, op: IndexOp<(Vec<u8>, Vec<u8>)>) -> Result<()> {
         let (key, is_insert) = match &op {
             IndexOp::Insert { data, .. } => (data.0.as_slice(), true),
@@ -729,7 +830,7 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         Ok(())
     }
 
-    /// Drains and returns all buffered operations for a key-value transaction, cleaning up key staging.
+    /// Entnimmt alle gepufferten KV-Operationen einer Transaktion und bereinigt das Key-Staging.
     pub fn drain_kv(&self, tx: TxId) -> Vec<IndexOp<(Vec<u8>, Vec<u8>)>> {
         let ops = self.drain(tx);
         if !ops.is_empty() {
@@ -738,7 +839,7 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         ops
     }
 
-    /// Discards all buffered operations for a key-value transaction, cleaning up key staging.
+    /// Verwirft alle KV-Operationen einer Transaktion und bereinigt das Key-Staging.
     pub fn discard_kv(&self, tx: TxId) {
         if let Some(ops) = self.get_ops(tx) {
             self.untrack_key_ops_kv(tx, &ops);
@@ -746,7 +847,7 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         self.discard(tx);
     }
 
-    /// Checks if `key` is staged for insertion in the specified transaction `tx_id`.
+    /// Prüft, ob ein Schlüssel `key` innerhalb der Transaktion `tx_id` als Einfügung vorgemerkt ist.
     pub fn is_key_staged_for_tx(&self, tx_id: TxId, key: &[u8]) -> bool {
         let shard_idx = self.shard_idx(tx_id);
         if let Some(shard_lock) = self.shards.get(shard_idx) {
@@ -764,7 +865,9 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         false
     }
 
-    /// Atomisch ermittelt den Staging-Status eines Keys über alle uncommitted Transaktionen.
+    /// Ermittelt atomar den Staging-Status eines Schlüssels über alle uncommitted Transaktionen.
+    ///
+    /// Liefert `Some(true)` bei Einfügung, `Some(false)` bei Entfernung oder `None`, falls der Schlüssel nicht gepuffert ist.
     pub fn staged_status(&self, key: &[u8]) -> Option<bool> {
         let idx = self.key_shard_idx(key);
         if let Some(shard_lock) = self.key_shards.get(idx) {
@@ -791,6 +894,7 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         None
     }
 }
+// !SECTION KV Buffer Extension
 
 impl<T: Clone> Default for TxBuffer<T> {
     fn default() -> Self {
@@ -802,9 +906,10 @@ impl<T: Clone> Default for TxBuffer<T> {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_testkit::ManualClock;
+    use contextra_env::ManualClock;
     use proptest::{prop_assert, prop_assert_eq};
 
+    // Prüft das Registrieren und Verfolgen von Lesezugriffen im ReadSet einer Transaktion sowie die Freigabe beim Drain.
     #[test]
     fn test_tx_buffer_read_set_tracking() {
         let buffer = TxBuffer::<String>::new();
@@ -827,6 +932,7 @@ mod tests {
         assert!(buffer.get_read_set(tx).is_none());
     }
 
+    // Prüft, dass die maximale Operationsanzahl pro Transaktion (max_ops_per_tx) strikt durchgesetzt wird.
     #[test]
     fn test_txbuffer_respects_max_ops_limit() {
         let config = TxBufferConfig {
@@ -855,9 +961,10 @@ mod tests {
                 data: "overflow".to_string(),
             },
         );
-        assert!(matches!(result, Err(ContextraError::Transaction(_))));
+        assert!(matches!(result, Err(MvccError::Transaction(_))));
     }
 
+    // Prüft, dass die Standardkonfiguration normale Lastprofile mit hunderten Operationen problemlos zulässt.
     #[test]
     fn test_txbuffer_default_config_allows_normal_workload() {
         let buffer = TxBuffer::<String>::new();
@@ -876,6 +983,7 @@ mod tests {
         assert_eq!(buffer.get_ops(tx).map(|v| v.len()), Some(500));
     }
 
+    // Prüft das stapelweise Puffern (stage_many) und die Konstante DEFAULT_MAX_OPS_PER_TX.
     #[test]
     fn test_tx_buffer_stage_many_and_max_ops_constant() {
         let buffer = TxBuffer::<String>::new();
@@ -900,6 +1008,7 @@ mod tests {
         assert!(buffer.is_empty());
     }
 
+    // Prüft, dass stage_many fehlschlägt, sobald das Gesamtvolumen die definierte Kapazität übersteigt.
     #[test]
     fn test_tx_buffer_stage_many_exceeds_capacity() {
         let config = TxBufferConfig {
@@ -925,30 +1034,36 @@ mod tests {
         ];
 
         let res = buffer.stage_many(tx, ops);
-        assert!(matches!(res, Err(ContextraError::Transaction(_))));
+        assert!(matches!(res, Err(MvccError::Transaction(_))));
     }
 
+    // Prüft die Begrenzung der Anzahl abgeräumter verwaister Transaktionen über reap_orphans_bounded.
     #[test]
     fn test_tx_buffer_reap_orphans_bounded_capping() {
-        let clock = Arc::new(ManualClock::new(1_000_000_000));
+        let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
         let config = TxBufferConfig {
             tx_timeout: Duration::from_millis(5),
             ..Default::default()
         };
-        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone(), 1, config);
+        let buffer = TxBuffer::<String>::new_with_clock_and_config(
+            clock.clone() as Arc<dyn Clock>,
+            1,
+            config,
+        );
 
         buffer.begin(TxId::new(1));
         buffer.begin(TxId::new(2));
         buffer.begin(TxId::new(3));
 
         // Advance clock by 20ms
-        clock.advance(Duration::from_millis(20));
+        clock.advance_nanos(20_000_000);
 
         let reaped = buffer.reap_orphans_bounded(2);
         assert_eq!(reaped.len(), 2);
         assert_eq!(buffer.len(), 1);
     }
 
+    // Prüft das Verwerfen (Rollback) gepufferter Operationen einer Transaktion.
     #[test]
     fn test_tx_buffer_discard() {
         let buffer = TxBuffer::<String>::new_with_config(64, Duration::from_secs(30));
@@ -965,6 +1080,7 @@ mod tests {
         assert!(buffer.is_empty());
     }
 
+    // Prüft nebenläufige Schreibzugriffe auf verschiedene Transaktionen und verifiziert Datenintegrität ohne Datenverlust.
     #[test]
     fn test_concurrent_stage_no_data_loss() {
         let buffer = Arc::new(TxBuffer::<usize>::new_with_config(
@@ -1005,35 +1121,45 @@ mod tests {
         assert!(buffer.is_empty());
     }
 
+    // Prüft das Timeout-basierte Bereinigen verwaister Transaktionen nach Ablauf der Timeout-Frist.
     #[test]
     fn test_tx_buffer_reap_orphans() {
-        let clock = Arc::new(ManualClock::new(1_000_000_000));
+        let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
         let config = TxBufferConfig {
             tx_timeout: Duration::from_millis(10),
             ..Default::default()
         };
-        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone(), 1, config);
+        let buffer = TxBuffer::<String>::new_with_clock_and_config(
+            clock.clone() as Arc<dyn Clock>,
+            1,
+            config,
+        );
         let tx = TxId::new(1);
         buffer.begin(tx);
 
-        clock.advance(Duration::from_millis(20));
+        clock.advance_nanos(20_000_000);
 
         let expired = buffer.reap_orphans();
         assert_eq!(expired, vec![tx]);
         assert!(buffer.is_empty());
     }
 
+    // Prüft das Bereinigen verwaister Transaktionen mit deterministischer Zeiteinspeisung über ManualClock.
     #[test]
     fn test_tx_buffer_reap_orphans_deterministic_time_injection() {
-        let clock = Arc::new(ManualClock::new(20_000_000_000));
+        let clock = Arc::new(ManualClock::new(20_000_000_000, 20_000_000_000));
         let config = TxBufferConfig {
             tx_timeout: Duration::from_secs(10),
             ..Default::default()
         };
-        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone(), 1, config);
+        let buffer = TxBuffer::<String>::new_with_clock_and_config(
+            clock.clone() as Arc<dyn Clock>,
+            1,
+            config,
+        );
         let tx = TxId::new(100);
 
-        let past_nanos = clock.now_nanos().saturating_sub(15_000_000_000);
+        let past_nanos = clock.now_unix_nanos().saturating_sub(15_000_000_000);
 
         // Begin transaction at 15 seconds in the past
         buffer.begin_at(tx, past_nanos);
@@ -1044,8 +1170,9 @@ mod tests {
         assert!(buffer.is_empty());
     }
 
-    #[tokio::test]
-    async fn test_has_tx_concurrent() {
+    #[test]
+    // Prüft die nebenläufige has_tx-Abfrage parallel zu schreibenden Operationen.
+    fn test_has_tx_concurrent() {
         let buffer = Arc::new(TxBuffer::<String>::new());
         let num_tasks = 8;
         let mut handles = Vec::new();
@@ -1053,7 +1180,7 @@ mod tests {
         for i in 0..num_tasks {
             let buffer = buffer.clone();
             let tx = TxId::new(u64::try_from(i).expect("valid u64") + 100);
-            handles.push(tokio::spawn(async move {
+            handles.push(std::thread::spawn(move || {
                 buffer.begin(tx);
                 let _ = buffer.stage(
                     tx,
@@ -1068,7 +1195,7 @@ mod tests {
 
         let mut txs = Vec::new();
         for h in handles {
-            let tx = h.await.expect("task failed"); // #[cfg(test)]
+            let tx = h.join().expect("thread join failed");
             txs.push(tx);
         }
 
@@ -1084,6 +1211,7 @@ mod tests {
         assert!(buffer.is_empty());
     }
 
+    // Prüft die Validierung, ob eine registrierte Transaktion anstehende Operationen besitzt.
     #[test]
     fn test_tx_buffer_validate_pending_ops() {
         let buffer = TxBuffer::<String>::new();
@@ -1107,6 +1235,7 @@ mod tests {
         assert!(buffer.validate_pending_ops(tx).is_ok());
     }
 
+    // Prüft die Semantik von is_key_staged_for_tx für Einfügungen und Entfernungen.
     #[test]
     fn test_is_key_staged_for_tx_semantics() {
         let buffer = TxBuffer::<(Vec<u8>, Vec<u8>)>::new();
@@ -1135,6 +1264,7 @@ mod tests {
         assert!(!buffer.is_key_staged_for_tx(tx2, &key_a));
     }
 
+    // Prüft die Hilfsmethoden von IndexOp wie doc_id() und estimated_bytes().
     #[test]
     fn test_index_op_helpers() {
         let op = IndexOp::Insert {
@@ -1150,6 +1280,7 @@ mod tests {
         assert_eq!(op2.doc_id(), DocId::from(2u64));
     }
 
+    // Prüft die Standardwerte der TxBufferConfig-Struktur.
     #[test]
     fn test_tx_buffer_config() {
         let timeout = Duration::from_secs(100);
@@ -1160,6 +1291,7 @@ mod tests {
         }
     }
 
+    // Prüft, dass eine Konfiguration mit 0 Shards sicherheitshalber auf mindestens 1 Shard korrigiert wird.
     #[test]
     fn test_tx_buffer_zero_shards_defaults_to_one() {
         let buffer = TxBuffer::<u8>::new_with_config(0, Duration::from_secs(1));
@@ -1178,8 +1310,9 @@ mod tests {
     }
 
     proptest::proptest! {
+        // Eigenschaftstest: Verifiziert die strikte Isolation gepufferter Transaktionen über Shards hinweg.
         #[test]
-        fn prop_tx_buffer_isolation(
+        fn test_prop_tx_buffer_isolation(
             tx_ids in proptest::collection::vec(0..u64::MAX, 1..50),
             shard_count in 1..256usize
         ) {
@@ -1211,31 +1344,33 @@ mod tests {
             prop_assert!(buffer.is_empty());
         }
 
+        // Eigenschaftstest: Prüft, dass der Orphan-Reaper alle überalterten Transaktionen vollständig abräumt.
         #[test]
-        fn prop_tx_buffer_reap_is_complete(
+        fn test_prop_tx_buffer_reap_is_complete(
             tx_count in 1..100usize,
             timeout_ms in 1..100u64
         ) {
-            let clock = Arc::new(ManualClock::new(1_000_000_000));
+            let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
             let config = TxBufferConfig {
                 tx_timeout: Duration::from_millis(timeout_ms),
                 ..Default::default()
             };
-            let buffer = TxBuffer::<u8>::new_with_clock_and_config(clock.clone(), 16, config);
+            let buffer = TxBuffer::<u8>::new_with_clock_and_config(clock.clone() as Arc<dyn Clock>, 16, config);
 
             for i in 0..tx_count {
                 buffer.begin(TxId::new(u64::try_from(i).expect("valid u64")));
             }
 
-            clock.advance(Duration::from_millis(timeout_ms * 2));
+            clock.advance_nanos(timeout_ms.saturating_mul(2).saturating_mul(1_000_000));
 
             let reaped = buffer.reap_orphans();
             prop_assert_eq!(reaped.len(), tx_count);
             prop_assert!(buffer.is_empty());
         }
 
+        // Eigenschaftstest: Prüft den Lebenszyklus von Stage, Drain und erneutem Stage für dieselbe Transaktion.
         #[test]
-        fn prop_tx_buffer_stage_drain_stage_lifecycle(
+        fn test_prop_tx_buffer_stage_drain_stage_lifecycle(
             tx_id_raw in 0..u64::MAX,
             first_ops in proptest::collection::vec(0..100u64, 1..20),
             second_ops in proptest::collection::vec(0..100u64, 1..20)
@@ -1282,8 +1417,9 @@ mod tests {
             prop_assert!(buffer.is_empty());
         }
 
+        // Eigenschaftstest: Prüft, dass das Verwerfen einzelner Transaktionen andere aktive Transaktionen unberührt lässt.
         #[test]
-        fn prop_tx_buffer_partial_discard_isolation(
+        fn test_prop_tx_buffer_partial_discard_isolation(
             tx_ids in proptest::collection::vec(0..u64::MAX, 2..40),
             discard_indices in proptest::collection::vec(0..100usize, 1..20)
         ) {

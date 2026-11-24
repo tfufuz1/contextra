@@ -2,13 +2,19 @@
 // ZWECK: Multi-Term Query-Traversierung mit Block-Maximalwert-Pruning und dynamic thresholding.
 // INVARIANTEN: Zero-Panic Doctrine, Safe Optimization (Ergebnisse identisch zu Full-Scan), MVCC & Tombstone Isolation.
 
+//! Block-Max WAND (Weak AND) Algorithmus für performante Multi-Term BM25-Suchen.
+
 use crate::bm25::score_term;
+use crate::error::{Result, TextError};
 use crate::posting_list::{DocIdRaw, Posting, PostingList, BLOCK_SIZE};
-use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, DocId, Result, MAX_SEARCH_K};
-use std::collections::{BinaryHeap, HashMap};
+use crate::storage::PostingStore;
+use crate::types::MAX_SEARCH_K;
+use contextra_ids::DocId;
+use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::Arc;
 
+// ANCHOR[contextra-text:WAND-001]
+/// Interner BM25-Kandidat für die Top-K-Min-Heap-Verwaltung.
 struct Bm25Candidate {
     doc_id: DocId,
     score: f32,
@@ -39,12 +45,16 @@ impl PartialOrd for Bm25Candidate {
     }
 }
 
+// ANCHOR[contextra-text:WAND-002]
+/// Begrenzter Min-Heap zur effizienten Verwaltung der K besten Treffer.
 pub struct BoundedTopK {
     heap: BinaryHeap<Bm25Candidate>,
     capacity: usize,
 }
 
 impl BoundedTopK {
+    // ANCHOR[contextra-text:WAND-003]
+    /// Erzeugt einen neuen `BoundedTopK`-Puffer mit maximaler Kapazität (`MAX_SEARCH_K`).
     pub fn new(capacity: usize) -> Self {
         let capacity = capacity.min(MAX_SEARCH_K);
         Self {
@@ -53,6 +63,8 @@ impl BoundedTopK {
         }
     }
 
+    // ANCHOR[contextra-text:WAND-004]
+    /// Fügt einen neuen Kandidaten ein, wenn er besser als der schlechteste bisherige Treffer ist.
     pub fn push(&mut self, doc_id: DocId, score: f32) {
         if self.capacity == 0 {
             return;
@@ -68,6 +80,8 @@ impl BoundedTopK {
         }
     }
 
+    // ANCHOR[contextra-text:WAND-005]
+    /// Liefert den aktuellen Minimal-Score (Schwelle), den ein Kandidat übertreffen muss.
     pub fn min_threshold(&self) -> f32 {
         if self.heap.len() < self.capacity {
             0.0
@@ -76,6 +90,8 @@ impl BoundedTopK {
         }
     }
 
+    // ANCHOR[contextra-text:WAND-006]
+    /// Konvertiert den Heap in einen nach Relevanz absteigend sortierten Ergebnisvektor.
     pub fn into_sorted_vec(self) -> Vec<(DocId, f32)> {
         self.heap
             .into_sorted_vec()
@@ -91,9 +107,7 @@ struct TermCursor {
     posting_list: Arc<PostingList>,
     df: u32,
     cursor: usize,
-    /// Precomputed global maximum term score upper bound.
     term_max_score: f32,
-    /// Precomputed block maximum term score upper bounds.
     block_max_scores: Vec<f32>,
 }
 
@@ -144,7 +158,6 @@ impl TermCursor {
         if self.cursor >= postings.len() {
             return 0.0;
         }
-        // If current cursor doc_id matches target doc_id, return current block max score
         if let Some(p) = postings.get(self.cursor) {
             if p.doc_id == doc_id {
                 let block_idx = self.cursor / BLOCK_SIZE;
@@ -155,7 +168,6 @@ impl TermCursor {
                     .unwrap_or(self.term_max_score);
             }
         }
-        // Binary search for doc_id block index
         let blocks = self.posting_list.blocks();
         match blocks.binary_search_by_key(&doc_id, |b| b.max_doc_id) {
             Ok(idx) => self
@@ -176,21 +188,19 @@ impl TermCursor {
         }
     }
 
-    /// Advances cursor to the first posting with `doc_id >= target_doc_id`.
     fn advance_to(&mut self, target_doc_id: DocIdRaw) {
         let postings = self.posting_list.as_slice();
         if self.cursor >= postings.len() {
             return;
         }
 
-        // Skip blocks whose max_doc_id is strictly less than target_doc_id
         let blocks = self.posting_list.blocks();
         let mut block_idx = self.cursor / BLOCK_SIZE;
 
         while block_idx < blocks.len()
             && blocks
                 .get(block_idx)
-                .map_or(false, |b| b.max_doc_id < target_doc_id)
+                .is_some_and(|b| b.max_doc_id < target_doc_id)
         {
             block_idx += 1;
         }
@@ -203,7 +213,6 @@ impl TermCursor {
 
         self.cursor = new_cursor_start.max(self.cursor);
 
-        // Binary search within current block / remaining postings
         if let Some(slice) = postings.get(self.cursor..) {
             match slice.binary_search_by_key(&target_doc_id, |p| p.doc_id) {
                 Ok(offset) => self.cursor += offset,
@@ -213,17 +222,20 @@ impl TermCursor {
     }
 }
 
-/// Result from Block-Max WAND search containing top-k items and execution metrics.
+// ANCHOR[contextra-text:WAND-007]
+/// Ergebnis einer Block-Max-WAND-Suche inklusive Top-K-Treffern und Metadaten über evaluierte Dokumente.
 #[derive(Debug)]
 pub struct WandSearchResult {
+    /// Gefundene Trefferdokumente mit Relevanzwert.
     pub results: Vec<(DocId, f32)>,
+    /// Anzahl tatsächlich voll berechneter Dokumente (Pruning-Effektivitätsmetrik).
     pub evaluated_docs_count: usize,
 }
 
-/// Executes Block-Max WAND traversal over resident posting lists.
-// ADR-0015: Block-Max WAND query search signature requires storage, index, and query parameters.
+// ANCHOR[contextra-text:WAND-008]
 #[allow(clippy::too_many_arguments)]
-pub async fn block_max_wand_search<S: StorageEngine>(
+/// Führt eine dynamisch geprunte Block-Max WAND Volltextsuche über den gegebenen Termen aus.
+pub async fn block_max_wand_search<S: PostingStore>(
     storage: &S,
     terms: &[String],
     resident_index: &crate::posting_list::ResidentPostingIndex,
@@ -251,10 +263,9 @@ pub async fn block_max_wand_search<S: StorageEngine>(
     let is_latest = max_seq.is_none() || max_seq == Some(u64::MAX);
     let total_docs_u32 = u32::try_from(total_docs).unwrap_or(u32::MAX).max(1);
 
-    let mut doc_len_cache: HashMap<DocId, Option<u32>> = HashMap::new();
-    let mut tbs_cache: HashMap<Vec<u8>, bool> = HashMap::new();
+    let mut doc_len_cache: BTreeMap<DocId, Option<u32>> = BTreeMap::new();
+    let mut tbs_cache: BTreeMap<Vec<u8>, bool> = BTreeMap::new();
 
-    // Prefetch active tombstones globally at snapshot `seq` in a single prefix scan
     let tbs_global_prefix = tombstone_key_helper(DocId::new(0), "")
         .into_iter()
         .take_while(|&b| b != b'0')
@@ -264,7 +275,6 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         tbs_cache.insert(tbs_key.clone(), true);
     }
 
-    // Retrieve posting lists for all query terms
     let mut cursors: Vec<TermCursor> = Vec::with_capacity(terms.len());
     for term in terms {
         let list = match resident_index.get(term) {
@@ -272,7 +282,6 @@ pub async fn block_max_wand_search<S: StorageEngine>(
             None => {
                 let prefix = prefix_helper(term);
 
-                // Construct batch posting list key by replacing "pl:" with "plb:" and stripping trailing ":"
                 let mut batch_key = Vec::with_capacity(prefix.len() + 1);
                 if let Some(pos) = prefix.windows(3).position(|w| w == b"pl:") {
                     if let Some(prefix_sub) = prefix.get(..pos) {
@@ -312,15 +321,15 @@ pub async fn block_max_wand_search<S: StorageEngine>(
 
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if val_bytes.len() == 4 {
-                                        let doc_id = DocId::new(doc_id_raw);
+                                        let doc_id = DocId::new(doc_id_raw as _);
                                         let tf_bytes = val_bytes.get(..4).ok_or_else(|| {
-                                            ContextraError::Storage(
+                                            TextError::Storage(
                                                 "Invalid val_bytes length".into(),
                                             )
                                         })?;
                                         let tf = u32::from_le_bytes(tf_bytes.try_into().map_err(
                                             |_| {
-                                                ContextraError::Storage(
+                                                TextError::Storage(
                                                     "Invalid posting tf length".into(),
                                                 )
                                             },
@@ -330,7 +339,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                                             Some(dl_bytes) if dl_bytes.len() == 4 => {
                                                 u32::from_le_bytes(
                                                     (&dl_bytes[..]).try_into().map_err(|_| {
-                                                        ContextraError::Storage(
+                                                        TextError::Storage(
                                                             "Invalid doc_len length".into(),
                                                         )
                                                     })?,
@@ -356,13 +365,11 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         };
 
         if !list.is_empty() {
-            // Count active tombstones for `term` at snapshot `seq` from pre-cached global tombstones
             let mut term_tbs_count = 0u32;
             let term_suffix = format!(":{}", term);
             for (tbs_key, _) in &active_tbs_entries {
                 if let Ok(key_str) = std::str::from_utf8(tbs_key) {
                     if key_str.ends_with(&term_suffix) {
-                        // Extract doc_id from tombstone key: {prefix}tbs:{doc_id}:{term}
                         let suffix = tbs_key.get(tbs_global_prefix.len()..).unwrap_or(&[]);
                         if let Some(colon_pos) = suffix.iter().position(|&b| b == b':') {
                             if let Some(doc_bytes) = suffix.get(..colon_pos) {
@@ -415,18 +422,20 @@ pub async fn block_max_wand_search<S: StorageEngine>(
     let mut evaluated_docs_count = 0usize;
 
     loop {
-        // Remove exhausted cursors
         cursors.retain(|c| c.current_doc_id().is_some());
         if cursors.is_empty() {
             break;
         }
 
-        // Sort active cursors by current_doc_id ascending
-        cursors.sort_by_key(|c| c.current_doc_id().unwrap_or(DocIdRaw::MAX));
+        cursors.sort_by(|a, b| {
+            a.current_doc_id()
+                .unwrap_or(DocIdRaw::MAX)
+                .cmp(&b.current_doc_id().unwrap_or(DocIdRaw::MAX))
+                .then_with(|| a.term.cmp(&b.term))
+        });
 
         let threshold = top_k.min_threshold();
 
-        // 1. Pivot selection using conservative global term_max_score
         let mut accum_max_score = 0.0f32;
         let mut pivot_idx = None;
 
@@ -441,7 +450,6 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         let pivot_idx = match pivot_idx {
             Some(idx) => idx,
             None => {
-                // Total upper bound of all terms cannot reach threshold -> done!
                 break;
             }
         };
@@ -457,9 +465,8 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         };
 
         if min_doc_id == pivot_doc_id {
-            let doc_id = DocId::new(pivot_doc_id);
+            let doc_id = DocId::new(pivot_doc_id as _);
 
-            // Check if block max scores at pivot_doc_id still exceed threshold
             let block_max_sum: f32 = cursors
                 .iter()
                 .filter(|c| c.current_doc_id() == Some(pivot_doc_id))
@@ -470,7 +477,6 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 && top_k.heap.len() >= top_k.capacity
                 && block_max_sum <= threshold
             {
-                // Block upper bound cannot beat top_k min_threshold -> advance leading cursors
                 for c in cursors.iter_mut() {
                     if c.current_doc_id() == Some(pivot_doc_id) {
                         c.advance_to(pivot_doc_id + 1);
@@ -479,7 +485,6 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 continue;
             }
 
-            // MVCC snapshot check for historical queries
             if !is_latest {
                 let dl_key = doc_len_key_helper(doc_id.inner().into());
                 let is_active = match doc_len_cache.get(&doc_id) {
@@ -509,7 +514,6 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 }
             }
 
-            // Calculate exact BM25 score across all terms matching pivot_doc_id
             let mut total_score = 0.0f32;
             let mut has_valid_term = false;
 
@@ -559,7 +563,6 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 top_k.push(doc_id, total_score);
             }
         } else {
-            // min_doc_id < pivot_doc_id: Advance leading terms towards pivot_doc_id
             for c in cursors.iter_mut() {
                 if let Some(cur_id) = c.current_doc_id() {
                     if cur_id < pivot_doc_id {
@@ -582,34 +585,35 @@ pub async fn block_max_wand_search<S: StorageEngine>(
 mod tests {
     use super::*;
     use crate::inverted::InvertedIndex;
-    use contextra_ports::BoxFuture;
+    use crate::storage::BoxFuture;
+    use contextra_ids::{TxId, TOMBSTONE_BIT};
     use parking_lot::RwLock;
 
-    type MockStoreMap = RwLock<HashMap<Vec<u8>, Vec<(Vec<u8>, u64)>>>;
+    type MockStoreMap = RwLock<BTreeMap<Vec<u8>, Vec<(Vec<u8>, u64)>>>;
 
     struct MockStorage {
         store: MockStoreMap,
-        staged: RwLock<HashMap<contextra_types::TxId, Vec<Vec<u8>>>>,
+        staged: RwLock<BTreeMap<TxId, Vec<Vec<u8>>>>,
         next_seq: std::sync::atomic::AtomicU64,
     }
 
     impl MockStorage {
         fn new() -> Self {
             Self {
-                store: MockStoreMap::new(HashMap::new()),
-                staged: RwLock::new(HashMap::new()),
+                store: MockStoreMap::new(BTreeMap::new()),
+                staged: RwLock::new(BTreeMap::new()),
                 next_seq: std::sync::atomic::AtomicU64::new(1),
             }
         }
     }
 
-    impl StorageEngine for MockStorage {
+    impl PostingStore for MockStorage {
         fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
         }
         fn put<'a>(
             &'a self,
-            tx_id: contextra_types::TxId,
+            tx_id: TxId,
             key: &'a [u8],
             value: &'a [u8],
         ) -> BoxFuture<'a, Result<()>> {
@@ -632,7 +636,7 @@ mod tests {
         }
         fn delete<'a>(
             &'a self,
-            tx_id: contextra_types::TxId,
+            tx_id: TxId,
             key: &'a [u8],
         ) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move {
@@ -641,11 +645,11 @@ mod tests {
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 let mut w = self.store.write();
                 if let Some(versions) = w.get_mut(key) {
-                    versions.push((Vec::new(), seq | contextra_types::TOMBSTONE_BIT));
+                    versions.push((Vec::new(), seq | TOMBSTONE_BIT));
                 } else {
                     w.insert(
                         key.to_vec(),
-                        vec![(Vec::new(), seq | contextra_types::TOMBSTONE_BIT)],
+                        vec![(Vec::new(), seq | TOMBSTONE_BIT)],
                     );
                 }
                 self.staged
@@ -656,13 +660,13 @@ mod tests {
                 Ok(())
             })
         }
-        fn commit<'a>(&'a self, tx_id: contextra_types::TxId) -> BoxFuture<'a, Result<()>> {
+        fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move {
                 self.staged.write().remove(&tx_id);
                 Ok(())
             })
         }
-        fn rollback<'a>(&'a self, tx_id: contextra_types::TxId) -> BoxFuture<'a, Result<()>> {
+        fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move {
                 let keys = self.staged.write().remove(&tx_id).unwrap_or_default();
                 let mut store = self.store.write();
@@ -679,7 +683,7 @@ mod tests {
         }
         fn rollback_to_tx<'a>(
             &'a self,
-            _tx_id: contextra_types::TxId,
+            _tx_id: TxId,
         ) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move { Ok(()) })
         }
@@ -692,9 +696,9 @@ mod tests {
                 let store = self.store.read();
                 if let Some(versions) = store.get(key) {
                     for (val, v_seq) in versions.iter().rev() {
-                        let raw_seq = v_seq & !contextra_types::TOMBSTONE_BIT;
+                        let raw_seq = v_seq & !TOMBSTONE_BIT;
                         if raw_seq <= seq {
-                            if (v_seq & contextra_types::TOMBSTONE_BIT) != 0 {
+                            if (v_seq & TOMBSTONE_BIT) != 0 {
                                 return Ok(None);
                             }
                             return Ok(Some(bytes::Bytes::from(val.clone())));
@@ -712,34 +716,8 @@ mod tests {
                     .saturating_sub(1))
             })
         }
-        fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<contextra_types::TxId>> {
-            Box::pin(async move { Ok(contextra_types::TxId::new(0)) })
-        }
-        fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move { Ok(()) })
-        }
-        fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_ports::StorageStats>> {
-            Box::pin(async move {
-                Ok(contextra_ports::StorageStats {
-                    num_segments: 0,
-                    total_size_bytes: 0,
-                    memtable_size_bytes: 0,
-                })
-            })
-        }
-        fn pin_checkpoint<'a>(&'a self, _id: u64) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move { Ok(()) })
-        }
-        fn unpin_checkpoint<'a>(&'a self, _id: u64) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move { Ok(()) })
-        }
-        fn scan<'a>(
-            &'a self,
-            _start: std::ops::Bound<&'a [u8]>,
-            _end: std::ops::Bound<&'a [u8]>,
-            _: Option<usize>,
-        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-            Box::pin(async move { Ok(Vec::new()) })
+        fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+            Box::pin(async move { Ok(TxId::new(0)) })
         }
         fn scan_prefix<'a>(
             &'a self,
@@ -758,9 +736,9 @@ mod tests {
                 for (k, versions) in store.iter() {
                     if k.starts_with(prefix) {
                         for (val, v_seq) in versions.iter().rev() {
-                            let raw_seq = v_seq & !contextra_types::TOMBSTONE_BIT;
+                            let raw_seq = v_seq & !TOMBSTONE_BIT;
                             if raw_seq <= seq_no {
-                                if (v_seq & contextra_types::TOMBSTONE_BIT) == 0 {
+                                if (v_seq & TOMBSTONE_BIT) == 0 {
                                     results.push((k.clone(), val.clone()));
                                 }
                                 break;
@@ -773,33 +751,29 @@ mod tests {
         }
     }
 
+    // ANCHOR[contextra-text:TEST-WAND-001]
     #[tokio::test]
     async fn test_block_max_wand_equivalence_and_pruning_performance() -> Result<()> {
         let storage = Arc::new(MockStorage::new());
         let index = InvertedIndex::new(storage.clone(), "wand_test");
-        let tx = contextra_types::TxId::new(1);
+        let tx = TxId::new(1);
 
-        // Index 500 documents:
-        // "common" occurs in all 500 documents.
-        // "rare" occurs in only 5 documents (DocId 100, 200, 300, 400, 500) with high frequency.
-        for i in 1..=500 {
-            let doc_id = DocId::new(i as u64);
+        for i in 1u64..=500u64 {
+            let doc_id = DocId::new(i);
             let text = if i % 100 == 0 {
-                format!("common rare rare rare rare rare doc {}", i)
+                format!("common rare rare rare rare rare doc {i}")
             } else {
-                format!("common doc {}", i)
+                format!("common doc {i}")
             };
             index.upsert_document(tx, doc_id, &text).await?;
         }
         index.commit_stats(tx).await?;
         storage.commit(tx).await?;
 
-        // 1. Equivalence Test: WAND search results vs full scan expectations
         let k = 5;
         let query_results = index.search_bm25("common rare", k, None).await?;
         assert_eq!(query_results.len(), k);
 
-        // The top 5 documents should be doc_ids 100, 200, 300, 400, 500 because they match "rare" 5x
         let top_doc_ids: Vec<u64> = query_results
             .iter()
             .map(|(id, _)| id.inner() as u64)
@@ -810,7 +784,6 @@ mod tests {
         assert!(top_doc_ids.contains(&400));
         assert!(top_doc_ids.contains(&500));
 
-        // 2. Pruning Performance Test: Verify evaluated_docs_count is significantly less than 500
         let n = index.total_docs.load(std::sync::atomic::Ordering::Acquire);
         let avg_len_x1000 = index
             .avg_doc_len_x1000
@@ -833,9 +806,6 @@ mod tests {
         .await?;
 
         assert_eq!(wand_metrics.results, query_results);
-
-        // Without WAND, full scan evaluates all 500 documents.
-        // With Block-Max WAND, dynamic thresholding skips low-scoring blocks of "common".
         assert!(
             wand_metrics.evaluated_docs_count < 500,
             "Block-Max WAND evaluated {} docs, which should be significantly less than total 500",

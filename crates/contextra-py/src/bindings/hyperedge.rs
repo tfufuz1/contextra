@@ -1,9 +1,35 @@
+//! # n-äre Hyperkanten-Bindungen (`hyperedge`)
+//!
+//! Dieses Modul erweitert `PyCollection` um die Fähigkeit, n-äre Relationen (Hyperkanten)
+//! im Wissensgraphen anzulegen.
+//!
+//! ## Ring-Zugehörigkeit
+//! Ring 4 (FFI-Boundary / Bindings).
+//!
+//! ## Was ist eine n-äre Hyperkante?
+//! Eine klassische Graphkante verbindet genau 2 Knoten. Eine n-äre Hyperkante verbindet
+//! 2 bis maximal 64 Knoten gleichzeitig, wobei jeder Teilnehmer (`doc_id`) eine spezifische
+//! Rolle (`role`) in der Beziehung einnimmt (z. B. Prädikat: "Kaufvertrag", Teilnehmer: (Käufer, Verkäufer, Notar, Immobilie)).
+
 use pyo3::prelude::*;
 
 use crate::bindings::collection::PyCollection;
 use crate::bindings::common::*;
 
-/// Validates arguments for creating an n-ary hyperedge.
+// ANCHOR[contextra-py:HYP-001]
+/// Validiert die Eingabeparameter für das Erstellen einer n-ären Hyperkante.
+///
+/// # Parameter
+/// - `predicate`: Der Beziehungsname (z. B. "verhandelt", "gekauft").
+/// - `participants`: Eine Slice von Tupeln bestehend aus `(doc_id, role)`.
+/// - `source_doc_id`: Optionales Referenzdokument, aus dem die Beziehung hervorging.
+///
+/// # Invarianten & Grenzwerte:
+/// - Teilnehmeranzahl: Mindestens 2, maximal 64 Knoten.
+/// - Gültigkeit: Weder Prädikat noch Rollen noch Dokument-IDs dürfen leer sein oder ungültige Zeichen enthalten.
+///
+/// # Fehlerfälle
+/// - `ContextraValueError`, falls die Teilnehmergrenzen verletzt sind oder Strings leer sind.
 pub fn validate_hyperedge_args(
     predicate: &str,
     participants: &[(&str, &str)],
@@ -38,7 +64,22 @@ pub fn validate_hyperedge_args(
 
 #[pymethods]
 impl PyCollection {
-    /// Legt eine n-äre Hyperkante an. `participants` = [(doc_id, role), ...], mindestens 2.
+    // ANCHOR[contextra-py:HYP-002]
+    /// Legt eine n-äre Hyperkante an.
+    ///
+    /// # Parameter
+    /// - `predicate`: Der Name des Prädikats als String.
+    /// - `participants`: Liste von Tupeln `[(doc_id, role), ...]`, mindestens 2 und maximal 64 Teilnehmer.
+    /// - `source_doc_id`: Optionale ID des Ursprungsdokuments.
+    ///
+    /// # Rückgabe
+    /// Die eindeutige ID der erzeugten Hyperkante als 64-Bit Integer (`u64`).
+    ///
+    /// # Ablauf
+    /// 1. Teilnehmer-IDs und Rollen aus Python-Objekten extrahieren und prüfen.
+    /// 2. Argumente via `validate_hyperedge_args` auf Schranken [2, 64] und Gültigkeit prüfen.
+    /// 3. Unter GIL-Release die asynchrone Rust-Methode `inner.relate_n_ary` ausführen.
+    /// 4. Resultierende ID extrahieren und zurückliefern.
     #[pyo3(signature = (predicate, participants, source_doc_id=None))]
     pub fn relate_n_ary<'py>(
         &self,
@@ -91,6 +132,7 @@ impl PyCollection {
 mod tests {
     use super::*;
 
+    // Prüft, dass gültige Hyperedge-Argumente mit und ohne Source-Doc-ID akzeptiert werden.
     #[test]
     fn test_validate_hyperedge_args_success() {
         pyo3::prepare_freethreaded_python();
@@ -99,6 +141,7 @@ mod tests {
         assert!(validate_hyperedge_args("collaborated", &participants, Some("src-doc")).is_ok());
     }
 
+    // Prüft die harten Schranken für Teilnehmeranzahlen: Fehler bei < 2 und > 64, Erfolg bei genau 64.
     #[test]
     fn test_validate_hyperedge_args_participant_count_bounds() {
         pyo3::prepare_freethreaded_python();
@@ -130,6 +173,7 @@ mod tests {
         assert!(validate_hyperedge_args("pred", &max64, None).is_ok());
     }
 
+    // Prüft, dass leere Prädikate, leere Rollen oder leere IDs fehlschlagen.
     #[test]
     fn test_validate_hyperedge_args_invalid_labels_and_ids() {
         pyo3::prepare_freethreaded_python();

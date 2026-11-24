@@ -1,0 +1,28 @@
+# capabilities.fragment.toml — contextra-router
+# Schema v3 (§8.3)
+schema_version = 3
+
+[crate]
+name = "contextra-router"
+group = "llm"
+level = 2
+tier = "stable"
+
+[dependencies]
+allowed_internal = [
+    "contextra-types",
+    "contextra-ports",
+    "contextra-adapt",
+]
+
+[dependencies.feature_closure_allowed]
+subprocess-dispatch = ["contextra-wire"]
+
+[dependencies.dev_allowed]
+test = [
+    "tempfile",
+    "proptest",
+    "criterion",
+    "tracing-subscriber",
+    "tokio",
+]

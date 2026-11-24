@@ -1,148 +1,30 @@
-// FILE-CONTEXT
-// STAND: 2026-09-29 (S-01 / T-04)
-// ZWECK: Kernimplementierung des Manifests zum Lesen, Schreiben, Rollover und Reconstruct aktiver SSTables.
-// INVARIANTEN: Atomare Schreiboperationen via Buffer & Sync; Tail-Truncation Recovery bei unvollständigem Frame am EOF.
-// HOTSPOTS: load, reconstruct_valid_sstables, append_batch
-// FORMATABKÜNDIGUNG (S-01 / T-04): `rank` in `ManifestEntry::Replace` ist abgekündigt. `reconstruct_valid_sstables` nutzt ausschließlich die Manifest-Operationsreihenfolge (`next_rank`). `recovery.rs` verwirft den Wert explizit.
+//! # Manifest-Kernlogik (Ring 1)
+//!
+//! Serialisiert und deserialisiert Manifest-Eintraege fuer Dateiaustausch und Compaction.
+//! Verwaltet Ladevorgänge, Tail-Truncation Recovery und die Re-Exporte der Teilmodule.
 
-use contextra_types::{ContextraError, Result};
-use std::path::{Path, PathBuf};
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use crate::error::{StoreError, StoreResult};
+use std::path::Path;
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use super::entry::ManifestEntry;
 use super::recovery::is_valid_tail_truncation_candidate;
 use super::MAX_MANIFEST_ENTRY_SIZE;
-use crate::util::DirLock;
 
 pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
-pub const CURRENT_MANIFEST_VERSION: u8 = 1;
+pub const CURRENT_MANIFEST_VERSION: u8 = 2;
+#[allow(dead_code)]
+pub const MANIFEST_VERSION_V1: u8 = 1;
+#[allow(dead_code)]
+pub const MANIFEST_VERSION_V2: u8 = 2;
 
-/// Append-only Manifest file handle for recording active SSTable set transitions.
-pub struct Manifest {
-    pub(super) path: PathBuf,
-    pub(super) file: tokio::sync::Mutex<tokio::fs::File>,
-    pub(super) _dir_lock: Option<DirLock>,
-}
-
-impl std::fmt::Debug for Manifest {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Manifest")
-            .field("path", &self.path)
-            .finish()
-    }
-}
+// Submodule für fokussierte Verantwortlichkeiten
+// MIGRATION(S-70): Zerlegt in handle, apply, cleanup
+pub use super::handle::Manifest;
 
 impl Manifest {
-    /// Opens or creates an append-only Manifest file at `path`.
-    pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_dir_lock(path, None).await
-    }
-
-    /// Opens or creates an append-only Manifest file at `path`, attaching `dir_lock`.
-    pub(crate) async fn open_with_dir_lock(
-        path: impl AsRef<Path>,
-        dir_lock: Option<DirLock>,
-    ) -> Result<Self> {
-        let path = path.as_ref().to_path_buf();
-        let (mut file, is_new) = match tokio::fs::OpenOptions::new()
-            .create_new(true)
-            .append(true)
-            .read(true)
-            .open(&path)
-            .await
-        {
-            Ok(file) => (file, true),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                let file = tokio::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .read(true)
-                    .open(&path)
-                    .await
-                    .map_err(|e| {
-                        ContextraError::Storage(format!("Failed to open MANIFEST: {}", e))
-                    })?;
-                (file, false)
-            }
-            Err(e) => {
-                return Err(ContextraError::Storage(format!(
-                    "Failed to create MANIFEST: {}",
-                    e
-                )));
-            }
-        };
-
-        if is_new {
-            let mut header = Vec::with_capacity(5);
-            header.extend_from_slice(MANIFEST_HEADER_MAGIC);
-            header.push(CURRENT_MANIFEST_VERSION);
-            file.write_all(&header).await.map_err(|e| {
-                ContextraError::Storage(format!("Failed to write MANIFEST header: {}", e))
-            })?;
-            file.sync_all().await.map_err(|e| {
-                ContextraError::Storage(format!(
-                    "MANIFEST file fsync failed for {}: {}",
-                    path.display(),
-                    e
-                ))
-            })?;
-            crate::util::fsync_parent_dir(&path).await?;
-        }
-
-        Ok(Self {
-            path,
-            file: tokio::sync::Mutex::new(file),
-            _dir_lock: dir_lock,
-        })
-    }
-
-    /// Appends a new entry to the manifest and performs flush + fsync.
-    pub async fn append(&self, entry: &ManifestEntry) -> Result<()> {
-        self.append_batch(std::slice::from_ref(entry)).await
-    }
-
-    /// Appends multiple entries to the manifest in a single atomic batch with flush + fsync.
-    pub async fn append_batch(&self, entries: &[ManifestEntry]) -> Result<()> {
-        if entries.is_empty() {
-            return Ok(());
-        }
-        let mut batch_bytes = Vec::new();
-        for entry in entries {
-            batch_bytes.extend(entry.to_bytes()?);
-        }
-
-        let mut file = self.file.lock().await;
-        file.write_all(&batch_bytes).await.map_err(|e| {
-            ContextraError::Storage(format!(
-                "MANIFEST write failed for {}: {}",
-                self.path.display(),
-                e
-            ))
-        })?;
-        file.flush().await.map_err(|e| {
-            ContextraError::Storage(format!(
-                "MANIFEST flush failed for {}: {}",
-                self.path.display(),
-                e
-            ))
-        })?;
-        file.sync_all().await.map_err(|e| {
-            ContextraError::Storage(format!(
-                "MANIFEST fsync failed for {}: {}",
-                self.path.display(),
-                e
-            ))
-        })?;
-        Ok(())
-    }
-
     /// Loads all valid manifest entries from `path`.
-    ///
-    /// If the file does not exist, returns an empty vector.
-    /// Tail-truncation (an incomplete frame at EOF caused by interrupted write / power cut) is recovered
-    /// safely by returning valid entries read up to the point of truncation.
-    /// Mid-file corruption or CRC mismatches on complete frames return `Err`.
-    pub async fn load(path: &Path) -> Result<Vec<ManifestEntry>> {
+    pub async fn load(path: &Path) -> StoreResult<Vec<ManifestEntry>> {
         if !tokio::fs::try_exists(path).await.unwrap_or(false) {
             return Ok(Vec::new());
         }
@@ -151,7 +33,7 @@ impl Manifest {
             Ok(f) => f,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(e) => {
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "Failed to open MANIFEST for reading: {}",
                     e
                 )))
@@ -161,7 +43,7 @@ impl Manifest {
         let file_size = file
             .metadata()
             .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?
+            .map_err(|e| StoreError::Storage(e.to_string()))?
             .len();
 
         let mut reader = tokio::io::BufReader::new(&mut file);
@@ -174,7 +56,7 @@ impl Manifest {
                 if &header[0..4] == MANIFEST_HEADER_MAGIC {
                     let version = header[4];
                     if version > CURRENT_MANIFEST_VERSION {
-                        return Err(ContextraError::Storage(format!(
+                        return Err(StoreError::Storage(format!(
                             "Unsupported MANIFEST format version: {}",
                             version
                         )));
@@ -186,7 +68,7 @@ impl Manifest {
                         .seek(tokio::io::SeekFrom::Start(0))
                         .await
                         .map_err(|e| {
-                            ContextraError::Storage(format!("Failed to seek MANIFEST: {}", e))
+                            StoreError::Storage(format!("Failed to seek MANIFEST: {}", e))
                         })?;
                 }
             }
@@ -208,7 +90,7 @@ impl Manifest {
                     break;
                 }
                 Err(e) => {
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "MANIFEST read error at offset {}: {}",
                         pos, e
                     )));
@@ -217,7 +99,7 @@ impl Manifest {
 
             let len = u32::from_le_bytes(len_bytes) as usize;
             if len < 5 || len > MAX_MANIFEST_ENTRY_SIZE as usize {
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "MANIFEST entry length ({}) invalid or exceeds max size ({}) at offset {}",
                     len, MAX_MANIFEST_ENTRY_SIZE, pos
                 )));
@@ -229,7 +111,7 @@ impl Manifest {
             if pos <= file_size {
                 let mut entry_raw = vec![0u8; len];
                 if let Err(e) = reader.read_exact(&mut entry_raw).await {
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "MANIFEST read error at offset {}: {}",
                         entry_pos, e
                     )));
@@ -238,7 +120,7 @@ impl Manifest {
                 match ManifestEntry::from_bytes(&entry_raw) {
                     Ok(entry) => entries.push(entry),
                     Err(e) => {
-                        return Err(ContextraError::Storage(format!(
+                        return Err(StoreError::Storage(format!(
                             "MANIFEST entry corruption at offset {}: {}",
                             entry_pos, e
                         )));
@@ -248,7 +130,7 @@ impl Manifest {
                 let avail = (file_size - (entry_pos + 4)) as usize;
                 let mut partial_raw = vec![0u8; avail];
                 if let Err(e) = reader.read_exact(&mut partial_raw).await {
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "MANIFEST read error for partial payload at offset {}: {}",
                         entry_pos, e
                     )));
@@ -261,7 +143,7 @@ impl Manifest {
                     );
                     break;
                 } else {
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "MANIFEST mid-file corruption at offset {}: invalid frame length {} or corrupt frame structure (possible SSTable resurrection risk)",
                         entry_pos, len
                     )));
@@ -270,113 +152,5 @@ impl Manifest {
         }
 
         Ok(entries)
-    }
-
-    /// Reconstructs the ordered list of currently valid SSTable file names (or path components)
-    /// and their rank (shadowing order: smaller rank = older) from a sequence of manifest entries.
-    pub fn reconstruct_valid_sstables(entries: &[ManifestEntry]) -> Vec<(PathBuf, u64)> {
-        let mut valid_map = std::collections::HashMap::new();
-        // `next_rank` führt eine reine Monotonie-über-die-Add-Historie und ist NICHT identisch mit dem
-        // zur Kompaktierungszeit lokal berechneten `insertion_point` (siehe `lsm/ops/compaction.rs`).
-        // Diese Diskrepanz zwischen den Zähldomänen ist bewusst folgenlos, weil `rank` bei der Recovery
-        // an keiner Stelle für Sortier- oder Sichtbarkeitsentscheidungen konsultiert wird:
-        // `recovery.rs` verwirft den Wert explizit via `.map(|(path, _rank)| path)`. Die Lese-Sichtbarkeit
-        // richtet sich ausschließlich nach `SstableMetadata::max_seq`.
-        let mut next_rank = 0u64;
-
-        for entry in entries {
-            match entry {
-                ManifestEntry::Add { path, .. } => {
-                    let key = path
-                        .file_name()
-                        .map(PathBuf::from)
-                        .unwrap_or_else(|| path.clone());
-                    valid_map.insert(key, next_rank);
-                    next_rank += 1;
-                }
-                ManifestEntry::Remove { path } => {
-                    let key = path
-                        .file_name()
-                        .map(PathBuf::from)
-                        .unwrap_or_else(|| path.clone());
-                    valid_map.remove(&key);
-                }
-                ManifestEntry::RollbackComplete { .. } | ManifestEntry::WalCheckpoint { .. } => {}
-                ManifestEntry::Replace { removed, added, .. } => {
-                    for p in removed {
-                        let key = p
-                            .file_name()
-                            .map(PathBuf::from)
-                            .unwrap_or_else(|| p.clone());
-                        valid_map.remove(&key);
-                    }
-                    let key = added
-                        .file_name()
-                        .map(PathBuf::from)
-                        .unwrap_or_else(|| added.clone());
-                    valid_map.insert(key, next_rank);
-                    next_rank += 1;
-                }
-            }
-        }
-
-        let mut sorted: Vec<(PathBuf, u64)> = valid_map.into_iter().collect();
-        sorted.sort_by_key(|(_, rank)| *rank);
-        sorted
-    }
-
-    /// Reconstructs the set of SSTable file names (or path components) that are proven dead
-    /// (explicitly removed via `Remove` or `Replace.removed`) and are not in the valid set.
-    pub fn reconstruct_dead_sstables(
-        entries: &[ManifestEntry],
-    ) -> std::collections::HashSet<PathBuf> {
-        let valid = Self::reconstruct_valid_sstables(entries);
-        let valid_set: std::collections::HashSet<PathBuf> =
-            valid.into_iter().map(|(p, _)| p).collect();
-        let mut dead_set = std::collections::HashSet::new();
-
-        for entry in entries {
-            match entry {
-                ManifestEntry::Remove { path } => {
-                    let key = path
-                        .file_name()
-                        .map(PathBuf::from)
-                        .unwrap_or_else(|| path.clone());
-                    if !valid_set.contains(&key) {
-                        dead_set.insert(key);
-                    }
-                }
-                ManifestEntry::Replace { removed, .. } => {
-                    for p in removed {
-                        let key = p
-                            .file_name()
-                            .map(PathBuf::from)
-                            .unwrap_or_else(|| p.clone());
-                        if !valid_set.contains(&key) {
-                            dead_set.insert(key);
-                        }
-                    }
-                }
-                ManifestEntry::Add { .. }
-                | ManifestEntry::RollbackComplete { .. }
-                | ManifestEntry::WalCheckpoint { .. } => {}
-            }
-        }
-
-        dead_set
-    }
-
-    /// Extracts the most recent WAL high-water-mark HMAC from a list of manifest entries.
-    pub fn extract_high_water_mark(entries: &[ManifestEntry]) -> Option<[u8; 32]> {
-        for entry in entries.iter().rev() {
-            if let ManifestEntry::WalCheckpoint { hmac } = entry {
-                return Some(*hmac);
-            }
-        }
-        None
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
     }
 }

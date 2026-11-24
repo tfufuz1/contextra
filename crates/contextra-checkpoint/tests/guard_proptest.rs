@@ -10,6 +10,9 @@
     clippy::await_holding_lock
 )]
 #![allow(deprecated)]
+//! # Integrationstest: Eigenschaftsbasierte Tests für Guards
+//!
+//! Generiert zufällige Transaktionsfolgen zur Verifikation der Guard-Invarianten.
 
 use contextra_checkpoint::{CheckpointManifest, CheckpointMeta, PersistentCheckpointStore};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
@@ -158,6 +161,7 @@ prop_compose! {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(20))]
 
+// Testet: prop guard random lifecycle sequences.
     #[test]
     fn prop_guard_random_lifecycle_sequences(steps in proptest::collection::vec(arb_guard_step(), 1..15)) {
         let rt = tokio::runtime::Runtime::new().unwrap();
@@ -197,6 +201,7 @@ proptest! {
         }).unwrap();
     }
 
+// Testet: prop manifest checksum integrity.
     #[test]
     fn prop_manifest_checksum_integrity(
         name in "[a-zA-Z0-9_]{1,50}",
@@ -212,6 +217,7 @@ proptest! {
             tx_id: TxId::new(tx),
             metadata: serde_json::json!({"prop": true}),
             created_at: 1000,
+        id_width_bits: contextra_checkpoint::CURRENT_ID_WIDTH_BITS,
         };
 
         let manifest_res = CheckpointManifest::new(meta, components);

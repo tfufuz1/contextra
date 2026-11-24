@@ -1,5 +1,14 @@
 //! Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Topologisches Lovász-High-Order-Diffusionsverfahren.
+// INVARIANTEN: Submodulare Optimierung, schattenmodus-fähig.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+
+// SECTION Mod Core Implementation
 pub mod diffusion;
 pub mod error;
 pub mod lovasz;
@@ -18,7 +27,7 @@ pub use shadow::{
 use crate::csr::CsrGraph;
 use crate::path_rag::PathGraph;
 use ahash::AHashMap;
-use contextra_types::EntityId;
+use crate::types::EntityId;
 
 /// Computes Thresholded Local Hyper-Flow Diffusion (TL-HFD) over a generic [`PathGraph`].
 ///
@@ -27,6 +36,7 @@ use contextra_types::EntityId;
 ///
 /// # Complexity
 /// Time complexity $O(\text{iterations} \cdot k \cdot |\text{Seeds}| \cdot \text{max\_edge\_size})$.
+// ANCHOR[contextra-graph:SRC-TL-HFD-MOD-001]
 pub fn tl_hfd_local<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -43,6 +53,7 @@ impl CsrGraph {
     ///
     /// # Complexity
     /// Time complexity $O(\text{iterations} \cdot k \cdot |\text{Seeds}| \cdot \text{max\_edge\_size})$.
+    // ANCHOR[contextra-graph:SRC-TL-HFD-MOD-002]
     pub fn thresholded_local_hfd(
         &self,
         seeds: &[EntityId],
@@ -56,8 +67,9 @@ impl CsrGraph {
 mod tests {
     use super::*;
     use crate::csr::CsrGraph;
-    use contextra_types::Entity;
+    use crate::types::Entity;
 
+    // ANCHOR[contextra-graph:SRC-TL-HFD-MOD-003]
     #[tokio::test]
     async fn test_thresholded_local_hfd_diagnostic_path() {
         let graph = std::sync::Arc::new(CsrGraph::new());
@@ -93,3 +105,5 @@ mod tests {
         assert!(scores.contains_key(&e1));
     }
 }
+
+// !SECTION Mod Core Implementation

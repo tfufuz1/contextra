@@ -1,5 +1,10 @@
 //! Proptest-Suite für ScalarQuantizer und compute_distance.
 //! Verifiziert mathematische Invarianten über zufällige Eingaben.
+// FILE-CONTEXT
+// ZWECK: Proptest für SQ8 Quantisierungs- und Dequantisierungs-Fehlerschranken.
+// INVARIANTEN: Rekonstruktionsfehler je Dimension <= (max - min) / 255.0.
+// HOTSPOTS: 20-80
+// STAND: 2026-11-12
 
 use contextra_types::DistanceMetric;
 use contextra_vector::distance::compute_distance;

@@ -1,3 +1,4 @@
+// ANCHOR[contextra-infer-candle:BENCH-KV-BRIDGE]
 //! Benchmark: KV-Cache-Bridge Prefill Savings (§8, §10 Krit. #15, P7).
 //!
 //! Misst: Cache-Miss (voller Prefill) vs. Cache-Hit (entfällt Prefill).

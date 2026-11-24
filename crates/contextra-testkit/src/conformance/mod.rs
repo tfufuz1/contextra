@@ -1,14 +1,22 @@
-//! Conformance test suites for Port traits.
+//! # Konformitätsprüfsuiten für Contextra-Port-Traits (`conformance`)
 //!
-//! Provides reusable contract verification functions for adapter implementations across Contextra.
+//! Dieses Modul stellt wiederverwendbare, vertragliche Prüfsuiten (Contract Verification Suites)
+//! für alle zentralen Adapter-Implementierungen von Contextra-Ports bereit.
 //!
-//! # Overview
-//! Each suite function accepts a factory closure or an instance reference, executes a series of
-//! rigorous contract verification tests, and returns a [`ConformanceResult`]. On failure,
-//! a detailed [`ConformanceFailure`] is returned without panicking in the library itself.
-//! Downstream test runners can convert failures into test panics using [`assert_conformance!`].
+//! ## Ring & Architektur-Einordnung
+//! - **Ring:** Werkzeug / Tooling
+//! - **Regel 1 (SPEC §3.2):** Jeder Adapter muss die semantischen Verträge der Ports vollständig einhalten.
+//! - **Regel 2 (SPEC §3.2):** Die Prüfsuiten panicken selbst nicht, sondern liefern ein typisiertes
+//!   `ConformanceResult`. Erst der Testläufer wandelt Fehlschläge bei Bedarf in Panics um
+//!   (z. B. mit `assert_conformance!`).
 //!
-//! # Usage Example
+//! ## Funktionsweise
+//! Jede Konformitätsfunktion akzeptiert entweder eine Referenz auf einen Adapter oder eine
+//! Factory-Closure (für asynchrone Neuerstellung im sauberen Zustand). Die Suite führt eine
+//! Batterie strenger Tests durch (z. B. Rollback-Isolation, Randfälle, Dimensionen) und sammelt
+//! Fehler deterministisch in `ConformanceFailure`.
+//!
+//! # Anwendungsbeispiel
 //!
 //! ```ignore
 //! #[cfg(test)]
@@ -24,16 +32,54 @@
 //! }
 //! ```
 
+// ANCHOR[contextra-testkit:CONF-MOD-CLOCK-001]
+/// Konformitätssuite für den `Clock`-Port.
 pub mod clock;
+
+// ANCHOR[contextra-testkit:CONF-MOD-FAILURE-001]
+/// Typen zur detaillierten Erfassung von Konformitätsfehlschlägen.
 pub mod failure;
+
+// ANCHOR[contextra-testkit:CONF-MOD-GRAPH-001]
+/// Konformitätssuite für den `GraphIndex`-Port.
 pub mod graph;
+
+// ANCHOR[contextra-testkit:CONF-MOD-MACROS-001]
+/// Hilfsmakros für Konformitätsprüfungen (`assert_conformance!`).
 pub mod macros;
+
+// ANCHOR[contextra-testkit:CONF-MOD-METRICS-001]
+/// Konformitätssuite für den `MetricsSink`-Port.
 pub mod metrics;
+
+// ANCHOR[contextra-testkit:CONF-MOD-RNG-001]
+/// Konformitätssuite für den Zufallszahlen-Port (`Rng`).
 pub mod rng;
+
+// ANCHOR[contextra-testkit:CONF-MOD-STORAGE-001]
+/// Konformitätssuite für den `StorageEngine`-Port.
 pub mod storage;
+
+// ANCHOR[contextra-testkit:CONF-MOD-TEXT-001]
+/// Konformitätssuite für den `TextIndex`-Port.
 pub mod text;
+
+// ANCHOR[contextra-testkit:CONF-MOD-VECTOR-001]
+/// Konformitätssuite für den `VectorIndex`-Port.
 pub mod vector;
 
+/// Konformitätssuite für den `Vfs`-Port.
+pub mod vfs;
+
+// ANCHOR[contextra-testkit:CONF-MOD-KV-001]
+/// Konformitaetssuiten fuer KV-Ports.
+pub mod kv_ports;
+
+// ANCHOR[contextra-testkit:CONF-MOD-ROUTING-001]
+/// Konformitaetssuiten fuer Routing-Ports.
+pub mod routing_ports;
+
+// Re-Exports für bequemen Zugriff
 pub use clock::run_clock_suite;
 pub use failure::{ConformanceFailure, ConformanceResult};
 pub use graph::run_graph_index_suite;
@@ -42,3 +88,16 @@ pub use rng::run_rng_suite;
 pub use storage::run_storage_engine_suite;
 pub use text::run_text_index_suite;
 pub use vector::run_vector_index_suite;
+pub use vfs::run_vfs_suite;
+pub use kv_ports::{
+    assert_attention_exporter_conformance, assert_kv_bridge_storage_conformance,
+    assert_kv_prefix_store_conformance, run_attention_exporter_suite,
+    run_kv_bridge_storage_suite, run_kv_prefix_store_suite,
+};
+pub use routing_ports::{
+    assert_community_resolver_conformance, assert_context_preparer_conformance,
+    assert_drift_status_provider_conformance, assert_egress_policy_conformance,
+    assert_hybrid_search_provider_conformance, run_community_resolver_suite,
+    run_context_preparer_suite, run_drift_status_provider_suite, run_egress_policy_suite,
+    run_hybrid_search_provider_suite,
+};

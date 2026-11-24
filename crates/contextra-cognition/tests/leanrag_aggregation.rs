@@ -1,5 +1,17 @@
-//! Integrationstests für LeanRAG Aggregation Phase (Consolidation Stage 3).
+//! # Integrationstests: LeanRAG Aggregationsphase (`tests/leanrag_aggregation.rs`)
+//!
+//! Validiert GMM-Clusterung, Permutationsinvarianz, Typ-Denoising, LLM-Budgetierung
+//! und Superkanten-Erzeugung in Stage 3.
 
+
+// FILE-CONTEXT
+// ZWECK: Umfassende Tests fuer LeanRAG GMM-Clustering und Aggregation.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: LeanRAG Aggregation Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -40,7 +52,7 @@ impl LlmTextGenerator for MockLlm {
 }
 
 struct MockSink {
-    tombstoned: Vec<HyperEdgeId>,
+    invalidated: Vec<HyperEdgeId>,
     written_super_edges: Vec<SuperEdgeDraft>,
     committed: bool,
     fail_on_write: bool,
@@ -49,7 +61,7 @@ struct MockSink {
 impl MockSink {
     fn new() -> Self {
         Self {
-            tombstoned: Vec::new(),
+            invalidated: Vec::new(),
             written_super_edges: Vec::new(),
             committed: false,
             fail_on_write: false,
@@ -58,11 +70,11 @@ impl MockSink {
 }
 
 impl SuperEdgeSink for MockSink {
-    fn tombstone_edge(&mut self, id: HyperEdgeId) -> Result<()> {
+    fn invalidate_edge(&mut self, id: HyperEdgeId) -> Result<()> {
         if self.fail_on_write {
             return Err(ContextraError::Internal("Sink write failed".into()));
         }
-        self.tombstoned.push(id);
+        self.invalidated.push(id);
         Ok(())
     }
 
@@ -81,6 +93,8 @@ impl SuperEdgeSink for MockSink {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-062]
+// Prüft Testfall `test_gmm_determinism_and_permutation_invariance`.
 #[tokio::test]
 async fn test_gmm_determinism_and_permutation_invariance() {
     // 6 nodes in 2 distinct 2D clusters
@@ -153,6 +167,8 @@ async fn test_gmm_determinism_and_permutation_invariance() {
     assert_eq!(alpha1, alpha2);
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-063]
+// Prüft Testfall `test_clustering_two_distinct_blobs`.
 #[tokio::test]
 async fn test_clustering_two_distinct_blobs() {
     let nodes = vec![
@@ -203,8 +219,10 @@ async fn test_clustering_two_distinct_blobs() {
     assert!(sink.committed);
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-064]
+// Prüft Testfall `test_type_denoising_invalidates_inconsistent_edge`.
 #[tokio::test]
-async fn test_type_denoising_tombstones_inconsistent_edge() {
+async fn test_type_denoising_invalidates_inconsistent_edge() {
     let nodes = vec![
         AggregationNode {
             entity: EntityId::new(1),
@@ -240,7 +258,7 @@ async fn test_type_denoising_tombstones_inconsistent_edge() {
     });
 
     let cfg = AggregationConfig {
-        min_type_compat_score: 0.2, // 1/20 = 0.05 < 0.2 -> tombstone
+        min_type_compat_score: 0.2, // 1/20 = 0.05 < 0.2 -> invalidate
         min_cluster_size: 1,
         stability_cycles_required: 1,
         ..Default::default()
@@ -256,10 +274,12 @@ async fn test_type_denoising_tombstones_inconsistent_edge() {
         .await
         .unwrap();
 
-    assert_eq!(res.raw_edges_tombstoned, 1);
-    assert_eq!(sink.tombstoned, vec![HyperEdgeId::new(10)]);
+    assert_eq!(res.raw_edges_invalidated, 1);
+    assert_eq!(sink.invalidated, vec![HyperEdgeId::new(10)]);
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-065]
+// Prüft Testfall `test_llm_budgeting_and_per_cluster_error_recovery`.
 #[tokio::test]
 async fn test_llm_budgeting_and_per_cluster_error_recovery() {
     let nodes = vec![
@@ -308,6 +328,8 @@ async fn test_llm_budgeting_and_per_cluster_error_recovery() {
     assert_eq!(alphas[0].cluster_id, 1);
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-066]
+// Prüft Testfall `test_memory_budget_exceeded`.
 #[test]
 fn test_memory_budget_exceeded() {
     let cfg = AggregationConfig {
@@ -328,6 +350,8 @@ fn test_memory_budget_exceeded() {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-067]
+// Prüft Testfall `test_super_edge_carries_correct_child_edge_ids`.
 #[tokio::test]
 async fn test_super_edge_carries_correct_child_edge_ids() {
     // 2 clusters
@@ -395,6 +419,8 @@ async fn test_super_edge_carries_correct_child_edge_ids() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-068]
+// Prüft Testfall `test_no_commit_on_sink_error`.
 #[tokio::test]
 async fn test_no_commit_on_sink_error() {
     // Non-finite embedding to trigger immediate error
@@ -417,6 +443,8 @@ async fn test_no_commit_on_sink_error() {
     assert!(!sink.committed, "Sink commit must NOT be called on error");
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-069]
+// Prüft Testfall `test_type_renaming_and_deprecation`.
 #[test]
 fn test_type_renaming_and_deprecation() {
     // Verify SegmentSynthesisResult in synthesis_phase
@@ -433,3 +461,4 @@ fn test_type_renaming_and_deprecation() {
     };
     assert!(root_res.synthesized.is_empty());
 }
+// !SECTION: LeanRAG Aggregation Tests

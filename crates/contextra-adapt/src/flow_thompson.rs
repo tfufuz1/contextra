@@ -1,4 +1,20 @@
-//! Flow-Corrected Thompson Sampling (FC-TS) pro SLM-Profil-Arm (§21.3).
+//! # Flow-Corrected Thompson Sampling (FC-TS) (§21.3)
+//!
+//! Dieses Modul implementiert Flow-Corrected Thompson Sampling (FC-TS) pro SLM-Profil-Arm.
+//! Es kombiniert konfidenzgewichtete Sherman-Morrison-Updates mit Drift-Kompensation,
+//! deterministischer Pseudozufalls-Generierung ([`SplitMix64`]) und Ringpuffern fester Kapazität.
+//!
+//! ## Ring & Architektur
+//! - **Ring:** Ring 0 (Parameteradaption / mathematischer Kern).
+//! - **Status:** Rand `[R]`, Feature `flow-corrected-thompson`.
+//! - **Sicherheitsinvariante (AK-18):** Das periodische Neuberechnen der Drift-Rate über ein
+//!   gleitendes Zeitfenster erfordert ein [`Ring3Token`], um unbefugte Ring-0-Hintergrundmutationen
+//!   zu verhindern.
+//!
+//! ## Mathematische Eigenschaften
+//! - Verhindert Überanpassung an instationäre Umgebungen durch Drift-Kompensation.
+//! - Berechnet konfidenzgewichtete Updates in $O(d^2)$.
+//! - Deterministische Reproduzierbarkeit durch zustandsbehafteten SplitMix64 PRNG (P28).
 //!
 //! Implementiert konfidenzgewichtete Sherman-Morrison-Updates, transportierte Belohnungen
 //! bezüglich geschätzter Drift-Raten, Ringpuffer fester Kapazität und deterministisches Thompson-Sampling.
@@ -9,6 +25,7 @@ use thiserror::Error;
 
 /// Fehlerzustände für Flow-Corrected Thompson Sampling (FC-TS).
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
+// ANCHOR[contextra-adapt:FCTS-ERROR-001]
 pub enum FcTsError {
     /// Dimension des Eingabevektors stimmt nicht mit der konfigurierten Arm-Dimension überein.
     #[error("Embedding dimension mismatch: expected {expected}, actual {actual}")]
@@ -26,25 +43,8 @@ pub enum FcTsError {
     InvalidConfig(String),
 }
 
-impl From<FcTsError> for contextra_types::ContextraError {
-    fn from(err: FcTsError) -> Self {
-        match err {
-            FcTsError::DimensionMismatch { expected, actual } => {
-                contextra_types::ContextraError::InvalidInput(format!(
-                    "Embedding dimension mismatch: expected {expected}, actual {actual}"
-                ))
-            }
-            FcTsError::NonFinite => contextra_types::ContextraError::InvalidInput(
-                "Non-finite numerical value encountered".to_string(),
-            ),
-            FcTsError::InvalidConfig(msg) => contextra_types::ContextraError::InvalidInput(
-                format!("Invalid configuration: {msg}"),
-            ),
-        }
-    }
-}
-
 /// Trait für deterministischen Zufallszahlengenerator im Thompson-Sampling.
+// ANCHOR[contextra-adapt:FCTS-RNG-TRAIT-001]
 pub trait FcTsRng {
     /// Generiert die nächste 64-Bit vorzeichenlose Ganzzahl.
     fn next_u64(&mut self) -> u64;
@@ -68,6 +68,7 @@ pub trait FcTsRng {
 
 /// Deterministische `SplitMix64`-Referenzimplementierung des [`FcTsRng`]-Traits.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-adapt:FCTS-SPLITMIX-001]
 pub struct SplitMix64 {
     state: u64,
 }
@@ -90,7 +91,8 @@ impl FcTsRng for SplitMix64 {
 }
 
 /// Konfigurationsparameter für Flow-Corrected Thompson Sampling (§21.3).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-adapt:FCTS-CONFIG-001]
 pub struct FcTsConfig {
     /// Feature-Dimension $d$.
     pub dim: usize,
@@ -164,6 +166,7 @@ impl FcTsConfig {
 
 /// Privater Zero-Sized Token zur Erzwingung, dass Drift-Update-Aufrufe exklusiv aus Ring-3-Hintergrundtasks stammen (AK-18).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// ANCHOR[contextra-adapt:FCTS-RING3-TOKEN-001]
 pub struct Ring3Token {
     _private: (),
 }
@@ -173,12 +176,14 @@ pub struct Ring3Token {
 /// # Architektur-Hinweis (AK-18)
 /// Darf ausschließlich im Ring-3-Hintergrundtask aufgerufen werden. Ein automatisierter
 /// Architektur-Lint prüft die Einhaltung dieser Regel über den gesamten Workspace.
+// ANCHOR[contextra-adapt:FCTS-RING3-TOKEN-FN-001]
 pub fn ring3_background_task_token() -> Ring3Token {
     Ring3Token { _private: () }
 }
 
 /// Laufzeitzustand eines Arms im Flow-Corrected Thompson Sampling (§21.3).
 #[derive(Clone)]
+// ANCHOR[contextra-adapt:FCTS-BANDIT-001]
 pub struct FlowCorrectedThompsonBandit {
     config: FcTsConfig,
     /// Inverse Kovarianzmatrix $A^{-1}$ ($d \times d$, row-major).
@@ -631,15 +636,16 @@ fn solve_conjugate_gradient(ztz: &[f32], zte: &[f32], d: usize) -> Vec<f32> {
 
 /// Referenzpolitik basierend auf Diagonal-Approximation für Off-Policy-Evaluation (§B.3.2).
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-adapt:FCTS-DIAG-BANDIT-001]
 pub struct DiagonalApproximationBandit {
     /// Propensities P(a | x) pro RetrievalStrategy.
-    pub propensities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+    pub propensities: std::collections::BTreeMap<crate::strategy::RetrievalStrategy, f32>,
 }
 
 impl DiagonalApproximationBandit {
     /// Erstellt eine neue `DiagonalApproximationBandit`-Referenzpolitik mit der gegebenen Propensitätsmap.
     pub fn new(
-        propensities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+        propensities: std::collections::BTreeMap<crate::strategy::RetrievalStrategy, f32>,
     ) -> Self {
         Self { propensities }
     }
@@ -648,7 +654,7 @@ impl DiagonalApproximationBandit {
     ///
     /// ```
     /// use contextra_adapt::flow_thompson::DiagonalApproximationBandit;
-    /// use contextra_types::RetrievalStrategy;
+    /// use contextra_adapt::strategy::RetrievalStrategy;
     ///
     /// let bandit = DiagonalApproximationBandit::from_pairs([
     ///     (RetrievalStrategy::Vector, 0.7),
@@ -657,7 +663,7 @@ impl DiagonalApproximationBandit {
     /// assert_eq!(bandit.propensity(RetrievalStrategy::Vector), 0.7);
     /// ```
     pub fn from_pairs(
-        pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
+        pairs: impl IntoIterator<Item = (crate::strategy::RetrievalStrategy, f32)>,
     ) -> Self {
         Self {
             propensities: pairs.into_iter().collect(),
@@ -665,12 +671,13 @@ impl DiagonalApproximationBandit {
     }
 
     /// Liefert die Propensity P(a | x) für eine gegebene RetrievalStrategy.
-    pub fn propensity(&self, strategy: contextra_types::RetrievalStrategy) -> f32 {
+    pub fn propensity(&self, strategy: crate::strategy::RetrievalStrategy) -> f32 {
         self.propensities.get(&strategy).copied().unwrap_or(0.0)
     }
 }
 
 /// Trait zur Überprüfung der Off-Policy-Kompatibilität zwischen FC-TS und einer Referenzpolitik (§B.3.2).
+// ANCHOR[contextra-adapt:FCTS-OFFPOL-COMPAT-001]
 pub trait OffPolicyCompatibility {
     /// Gibt `Err` zurück, wenn für irgendeinen Arm eine Propensity von 0
     /// unter der Referenz-Policy gemessen wird, während FC-TS diesem Arm
@@ -684,29 +691,25 @@ pub trait OffPolicyCompatibility {
 
 /// Fehlerzustände bei der Off-Policy-Kompatibilitätsprüfung.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
+// ANCHOR[contextra-adapt:FCTS-OFFPOL-ERROR-001]
 pub enum OffPolicyError {
     /// Ein Arm hat Propensity 0 unter der Referenzpolicy, aber eine positive FC-TS-Sampling-Wahrscheinlichkeit.
     #[error("arm {0:?} has zero propensity under reference policy but positive FC-TS sampling probability — IPS weight would diverge")]
-    ZeroPropensityViolation(contextra_types::RetrievalStrategy),
-}
-
-impl From<OffPolicyError> for contextra_types::ContextraError {
-    fn from(err: OffPolicyError) -> Self {
-        contextra_types::ContextraError::InvalidInput(err.to_string())
-    }
+    ZeroPropensityViolation(crate::strategy::RetrievalStrategy),
 }
 
 /// Sampling-Wahrscheinlichkeitsverteilung über FC-TS-Arme/Strategien (§B.3.2).
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-adapt:FCTS-DISTRIBUTION-001]
 pub struct FcTsSamplingDistribution {
     /// Mapping von RetrievalStrategy zu FC-TS-Sampling-Wahrscheinlichkeit P_FCTS(a | x).
-    pub probabilities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+    pub probabilities: std::collections::BTreeMap<crate::strategy::RetrievalStrategy, f32>,
 }
 
 impl FcTsSamplingDistribution {
     /// Erstellt eine neue `FcTsSamplingDistribution`-Instanz mit der gegebenen Wahrscheinlichkeitsmap.
     pub fn new(
-        probabilities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+        probabilities: std::collections::BTreeMap<crate::strategy::RetrievalStrategy, f32>,
     ) -> Self {
         Self { probabilities }
     }
@@ -715,7 +718,7 @@ impl FcTsSamplingDistribution {
     ///
     /// ```
     /// use contextra_adapt::flow_thompson::FcTsSamplingDistribution;
-    /// use contextra_types::RetrievalStrategy;
+    /// use contextra_adapt::strategy::RetrievalStrategy;
     ///
     /// let dist = FcTsSamplingDistribution::from_pairs([
     ///     (RetrievalStrategy::Hybrid, 0.8),
@@ -724,7 +727,7 @@ impl FcTsSamplingDistribution {
     /// assert_eq!(dist.probability(RetrievalStrategy::Hybrid), 0.8);
     /// ```
     pub fn from_pairs(
-        pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
+        pairs: impl IntoIterator<Item = (crate::strategy::RetrievalStrategy, f32)>,
     ) -> Self {
         Self {
             probabilities: pairs.into_iter().collect(),
@@ -732,7 +735,7 @@ impl FcTsSamplingDistribution {
     }
 
     /// Liefert die FC-TS-Sampling-Wahrscheinlichkeit für eine gegebene RetrievalStrategy.
-    pub fn probability(&self, strategy: contextra_types::RetrievalStrategy) -> f32 {
+    pub fn probability(&self, strategy: crate::strategy::RetrievalStrategy) -> f32 {
         self.probabilities.get(&strategy).copied().unwrap_or(0.0)
     }
 }
@@ -756,6 +759,7 @@ impl OffPolicyCompatibility for FcTsSamplingDistribution {
 
 /// Menge von FC-TS-Armen zur Auswahl der optimalen Aktion.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-adapt:FCTS-ARMSET-001]
 pub struct FcTsArmSet {
     /// Liste der Bandit-Arme.
     pub arms: Vec<FlowCorrectedThompsonBandit>,
@@ -825,17 +829,17 @@ impl OffPolicyCompatibility for FcTsArmSet {
         reference_policy: &DiagonalApproximationBandit,
     ) -> Result<(), OffPolicyError> {
         let default_strategies = [
-            contextra_types::RetrievalStrategy::Vector,
-            contextra_types::RetrievalStrategy::Text,
-            contextra_types::RetrievalStrategy::Graph,
-            contextra_types::RetrievalStrategy::Hybrid,
+            crate::strategy::RetrievalStrategy::Vector,
+            crate::strategy::RetrievalStrategy::Text,
+            crate::strategy::RetrievalStrategy::Graph,
+            crate::strategy::RetrievalStrategy::Hybrid,
         ];
 
         for (idx, _arm) in self.arms.iter().enumerate() {
             let strategy = default_strategies
                 .get(idx)
                 .copied()
-                .unwrap_or(contextra_types::RetrievalStrategy::Vector);
+                .unwrap_or(crate::strategy::RetrievalStrategy::Vector);
             let ref_p = reference_policy.propensity(strategy);
             if ref_p <= 0.0 {
                 return Err(OffPolicyError::ZeroPropensityViolation(strategy));
@@ -846,12 +850,14 @@ impl OffPolicyCompatibility for FcTsArmSet {
 }
 
 /// Minimale Anzahl an Shadow-Samples für den Bandit-Default-Flip.
+// ANCHOR[contextra-adapt:FCTS-SHADOW-CONST-001]
 pub const MIN_BANDIT_SHADOW_SAMPLES: u64 = 10_000;
 /// Maximales zulässiges kumulatives Regret für den Bandit-Default-Flip (≤ 0.0).
 pub const MAX_CUMULATIVE_REGRET_THRESHOLD: f64 = 0.0;
 
 /// Aggregierter Shadow-Mode-Bericht für den Bandit-Default-Flip.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-adapt:FCTS-SHADOW-REPORT-001]
 pub struct BanditShadowReport {
     /// Anzahl ausgewerteter Shadow-Mode-Samples.
     pub sample_count: u64,
@@ -864,6 +870,7 @@ pub struct BanditShadowReport {
 }
 
 /// Formales Bandit-Default-Flip-Gate nach analogem Muster wie `DefaultFlipGate` (AP-P15-01).
+// ANCHOR[contextra-adapt:FCTS-GATE-TRAIT-001]
 pub trait BanditDefaultFlipGate {
     /// `true` ⇔ alle drei Bedingungen erfüllt:
     /// 1. `sample_count >= MIN_BANDIT_SHADOW_SAMPLES` (10_000)
@@ -874,6 +881,7 @@ pub trait BanditDefaultFlipGate {
 
 /// Standardimplementierung des [`BanditDefaultFlipGate`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+// ANCHOR[contextra-adapt:FCTS-GATE-DEFAULT-001]
 pub struct DefaultBanditFlipGate;
 
 impl BanditDefaultFlipGate for DefaultBanditFlipGate {

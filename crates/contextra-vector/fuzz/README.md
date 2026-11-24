@@ -1,19 +1,25 @@
-# Fuzzing infrastructure for `contextra-vector`
+# Fuzzing Suite — `contextra-vector`
 
-This directory contains `cargo-fuzz` targets for `contextra-vector`.
+Diese Fuzzing-Ziele sichern die Persistenz- und Parsing-Pfade gegen Crashes, Endlosschleifen und Panics ab.
 
-## Targets
+## Fuzz Targets
 
-- `hnsw_insert_search`: Fuzzes sequences of `HnswIndex` operations (insert, search, delete) with arbitrary dimensions, vector values (including NaN/Inf), and `k` values.
+1. `fuzz_hnsw_persistence`: Fuzzt die HNSW Serialisierung und Deserialisierung via MmapIndex.
+2. `fuzz_mmap_header`: Fuzzt die Header-Validierung über rohe Bytes.
+3. `fuzz_hnsw_header_versions`: Fuzzt alle Versionen, Roundtrip-Serialisierung und Checksummen.
+4. `fuzz_diskann_formats`: Fuzzt DiskANN DANN, DANF, PWAL und TWAL Formate sowie Recovery.
+5. `fuzz_sq8_quantizer`: Fuzzt Training, Quantisierung und Dequantisierung beliebiger Byte-Streams.
+6. `hnsw_insert_search`: Fuzzt Index-Operationen (Insert, Search).
 
-## Running locally
+## Aufruf mit `cargo-fuzz` (sofern Nightly & cargo-fuzz installiert)
 
 ```bash
-cargo fuzz run hnsw_insert_search
+cargo +nightly fuzz run fuzz_hnsw_header_versions -- -max_total_time=30
+cargo +nightly fuzz run fuzz_diskann_formats -- -max_total_time=30
+cargo +nightly fuzz run fuzz_sq8_quantizer -- -max_total_time=30
 ```
 
-To run with a time limit (e.g. 60 seconds):
+## Smoke-Test ohne `cargo-fuzz`
 
-```bash
-cargo fuzz run hnsw_insert_search -- -max_total_time=60
-```
+Wenn `cargo-fuzz` nicht verfügbar ist, kann der Smoke-Runner `./run_smoke.sh` ausgeführt werden.
+Er führt die Targets gegen die hinterlegten Seed-Korpora aus.

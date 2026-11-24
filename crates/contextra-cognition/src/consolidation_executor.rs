@@ -1,3 +1,26 @@
+//! # Konsolidierungs-Ausführer (`consolidation_executor.rs`)
+//!
+//! Koordiniert die Ausführung der Konsolidierungsläufe und wendet Änderungen
+//! (Tombstones, Graph-Invalidierungen, synthetisierte Chunks) auf eine [`Collection`] an.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2). Koordiniert Speicher-, Vektor- und Graphoperationen
+//! über Port- und Crate-Schnittstellen.
+//!
+//! ## Hauptkomponenten
+//! - [`ConsolidationLockGuard`]: RAII-Sperre zur Verhinderung paralleler Konsolidierungsläufe.
+//! - [`ConsolidationEngine`]: Hintergrund-Task zur periodischen Konsolidierung.
+//! - [`execute_consolidation_pass`]: Führt den rein strukturellen Konsolidierungslauf aus.
+//! - [`execute_background_consolidation`]: Führt strukturellen Pass und generative Synthese aus.
+//! - [`execute_leanrag_aggregation_stage`]: Führt die LeanRAG Stage-3-Hyperkantenaggregation aus.
+//!
+//! ## Invarianten
+//! - **Exklusivität:** Pro Collection darf stets nur ein Konsolidierungslauf aktiv sein
+//!   (`consolidation_in_progress`-Flag).
+//! - **Kaskaden-Sicherheit:** Ungültig gewordene Kanten werden geordnet invalidiert.
+//! - **Zero-Panic:** Blockierende CPU-intensive Aufgaben werden in `spawn_blocking` ausgelagert,
+//!   um den Tokio-Worker-Thread nicht zu blockieren.
+
 // FILE-CONTEXT
 // ZWECK: Verbindet Structural Consolidation Pass-Ergebnisse mit der Collection-Mutation-API.
 // INVARIANTEN: Nur Structural Consolidation Pass (rein strukturell) hier. Keine LLM-Calls. Keine direkte Abhängigkeit zu contextra-graph (P1-DAG-Integrität).
@@ -10,6 +33,9 @@ use crate::aggregation_phase::{
     check_compaction_budget, run_aggregation_pass, AggregationConfig, AggregationEdge,
     AggregationNode, AggregationPhaseResult, AlphaNode,
 };
+use crate::engine_local::collection::{Collection, StoredDocument, StoredDocumentMeta};
+use crate::engine_local::decay_controller::AdaptiveDecayController;
+use crate::graph_local::{detect_communities, CommunityDetectionConfig};
 use crate::graph_sink::CsrGraphSuperEdgeSink;
 use crate::leanrag_input::{build_leanrag_inputs, DEFAULT_MAX_LEANRAG_NODES};
 use crate::memory_consolidation::{
@@ -17,20 +43,20 @@ use crate::memory_consolidation::{
     CommunityStabilityTracker, ConsolidationConfig, ConsolidationPhaseResult, SynthesisConfig,
     SynthesisPhaseResult,
 };
-use ahash::{AHashMap, AHashSet};
-use contextra_engine::collection::{Collection, StoredDocument, StoredDocumentMeta};
-use contextra_engine::decay_controller::AdaptiveDecayController;
-use contextra_graph::{detect_communities, CommunityDetectionConfig};
-use contextra_ports::{
+use crate::ports_local::{
     GroundingValidator, LlmTextGenerator, ResponseGroundingValidator, StorageEngine, VectorIndex,
 };
-use contextra_types::{DocId, Result};
+use crate::types_local::{DocId, Result};
+use ahash::{AHashMap, AHashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
+// TODO(baukasten): ConsolidationExecutor von contextra-engine entkoppeln (AD-8/S-63). Invertierung der Abhängigkeit über DocumentSource- und MemoryStore-Traits.
 use std::sync::Arc;
 
 /// RAII Guard zur Koordination des Konsolidierungslaufs.
 /// Stellt sicher, dass das `consolidation_in_progress`-Flag bei Beendigung oder Panic
 /// stets panic-sicher auf `false` zurückgesetzt wird.
+// ANCHOR[contextra-cognition:EXEC-001]
+/// RAII-Guard zur Absicherung gegen parallele Konsolidierungsläufe.
 pub struct ConsolidationLockGuard {
     flag: Arc<AtomicBool>,
 }
@@ -57,7 +83,7 @@ impl Drop for ConsolidationLockGuard {
     }
 }
 
-async fn apply_duplicate_tombstones<S: StorageEngine, V: VectorIndex>(
+async fn apply_duplicate_supersessions<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     duplicates: &[DocId],
 ) {
@@ -67,26 +93,26 @@ async fn apply_duplicate_tombstones<S: StorageEngine, V: VectorIndex>(
             Ok(Some(val)) => match serde_json::from_slice::<StoredDocumentMeta>(&val) {
                 Ok(meta) => meta.id,
                 Err(e) => {
-                    tracing::warn!(doc_id = ?doc_id, error = %e, "Consolidation pass: failed to deserialize StoredDocumentMeta for tombstone");
+                    tracing::warn!(doc_id = ?doc_id, error = %e, "Consolidation pass: failed to deserialize StoredDocumentMeta for supersession");
                     continue;
                 }
             },
             Ok(None) => {
-                tracing::warn!(doc_id = ?doc_id, "Consolidation pass: doc_id key not found for tombstone");
+                tracing::warn!(doc_id = ?doc_id, "Consolidation pass: doc_id key not found for supersession");
                 continue;
             }
             Err(e) => {
-                tracing::warn!(doc_id = ?doc_id, error = %e, "Consolidation pass: failed to lookup doc_id for tombstone");
+                tracing::warn!(doc_id = ?doc_id, error = %e, "Consolidation pass: failed to lookup doc_id for supersession");
                 continue;
             }
         };
 
         match collection.delete(&user_id).await {
             Ok(_) => {
-                tracing::debug!(doc_id = ?doc_id, user_id = %user_id, "Consolidation pass: duplicate tombstoned")
+                tracing::debug!(doc_id = ?doc_id, user_id = %user_id, "Consolidation pass: duplicate superseded")
             }
             Err(e) => {
-                tracing::warn!(doc_id = ?doc_id, user_id = %user_id, error = %e, "Consolidation pass: tombstone failed")
+                tracing::warn!(doc_id = ?doc_id, user_id = %user_id, error = %e, "Consolidation pass: supersession failed")
             }
         }
     }
@@ -95,6 +121,8 @@ async fn apply_duplicate_tombstones<S: StorageEngine, V: VectorIndex>(
 /// Führt den Structural Consolidation Pass aus UND wendet die Ergebnisse an (Tombstones, Graph-Cascade).
 ///
 /// Gibt das `ConsolidationPhaseResult` zurück.
+// ANCHOR[contextra-cognition:EXEC-002]
+/// Führt den Structural Pass aus und wendet Änderungen auf die Collection an.
 pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     turns: &[(DocId, Vec<f32>)],
@@ -103,8 +131,8 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
     if turns.is_empty() {
         return Ok(ConsolidationPhaseResult {
             segments_created: 0,
-            duplicates_tombstoned: Vec::new(),
-            cascade_edge_tombstones_needed: Vec::new(),
+            duplicates_superseded: Vec::new(),
+            cascade_edge_invalidations_needed: Vec::new(),
             cascade_errors: Vec::new(),
         });
     }
@@ -118,8 +146,8 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
             );
             return Ok(ConsolidationPhaseResult {
                 segments_created: 0,
-                duplicates_tombstoned: Vec::new(),
-                cascade_edge_tombstones_needed: Vec::new(),
+                duplicates_superseded: Vec::new(),
+                cascade_edge_invalidations_needed: Vec::new(),
                 cascade_errors: Vec::new(),
             });
         }
@@ -138,12 +166,12 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
                 ))
             })?;
 
-    apply_duplicate_tombstones(collection, &result.duplicates_tombstoned).await;
+    apply_duplicate_supersessions(collection, &result.duplicates_superseded).await;
 
-    if !result.cascade_edge_tombstones_needed.is_empty() {
+    if !result.cascade_edge_invalidations_needed.is_empty() {
         let tx = collection.allocate_tx()?;
         let (_reports, errors) = guard
-            .cascade_invalidate_edges_ordered(&result.cascade_edge_tombstones_needed, tx.inner())
+            .cascade_invalidate_edges_ordered(&result.cascade_edge_invalidations_needed, tx.inner())
             .await;
         result.cascade_errors.extend(errors);
     }
@@ -159,6 +187,8 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
 ///
 /// Adapter, der einen `GroundingValidator` (mit kalibrierter GroundingAssessment- und PolicyViolation-Semantik)
 /// an das `ResponseGroundingValidator`-Trait anpasst.
+// ANCHOR[contextra-cognition:EXEC-003]
+/// Adapter für GroundingValidator auf ResponseGroundingValidator.
 pub struct GroundingValidatorAdapter<'a>(pub &'a dyn GroundingValidator);
 
 impl<'a> ResponseGroundingValidator for GroundingValidatorAdapter<'a> {
@@ -211,6 +241,8 @@ impl<'a> ResponseGroundingValidator for GroundingValidatorAdapter<'a> {
 
 /// Führt die vollständige Hintergrund-Konsolidierung aus.
 /// Abwärtskompatibler Wrapper um [`execute_background_consolidation_with_rich_validator`].
+// ANCHOR[contextra-cognition:EXEC-004]
+/// Führt die vollständige Hintergrund-Konsolidierung aus.
 pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     turns: &[(DocId, Vec<f32>)],
@@ -336,6 +368,8 @@ async fn persist_synthesized_meta_chunks<S: StorageEngine, V: VectorIndex>(
 ///    Synthetisierte MetaChunks werden in die Collection eingefügt.
 ///    WENN `rich_validator` angegeben ist, wird dessen kalibrierte Grounding-/PolicyViolation-Semantik bevorzugt.
 #[allow(clippy::too_many_arguments)]
+// ANCHOR[contextra-cognition:EXEC-005]
+/// Führt Hintergrund-Konsolidierung mit Unterstützung für Rich-Grounding-Validatoren aus.
 pub async fn execute_background_consolidation_with_rich_validator<
     S: StorageEngine,
     V: VectorIndex,
@@ -396,6 +430,13 @@ pub async fn execute_background_consolidation_with_rich_validator<
 
 /// Führt die Stage-3-Aggregation (LeanRAG) aus und wendet Kanten-Tombstones und Super-Hyperkanten
 /// atomar über [`CsrGraphSuperEdgeSink`] an.
+// ANCHOR[contextra-cognition:EXEC-006]
+/// Führt die LeanRAG Stage 3 Aggregation aus.
+// !SECTION: Sleep-Cycle & Workflow-Steuerung
+
+// =========================================================================
+// SECTION: LeanRAG Aggregations-Ausfuehrung
+// =========================================================================
 pub async fn execute_leanrag_aggregation_stage<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     nodes: &[AggregationNode],
@@ -410,8 +451,15 @@ pub async fn execute_leanrag_aggregation_stage<S: StorageEngine, V: VectorIndex>
     run_aggregation_pass(nodes, edges, cfg, llm, tracker, &mut sink).await
 }
 
+// !SECTION: ConsolidationEngine Definition
+
+// =========================================================================
+// SECTION: Sleep-Cycle & Workflow-Steuerung
+// =========================================================================
 /// Deprecated legacy wrapper for `execute_background_consolidation`.
 #[deprecated(note = "use execute_background_consolidation instead")]
+// ANCHOR[contextra-cognition:EXEC-007]
+/// Veralteter Wrapper für execute_background_consolidation.
 pub async fn execute_sleep_cycle<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     turns: &[(DocId, Vec<f32>)],
@@ -433,6 +481,8 @@ pub async fn execute_sleep_cycle<S: StorageEngine, V: VectorIndex>(
 }
 
 /// Starts a background task for periodic consolidation.
+// ANCHOR[contextra-cognition:EXEC-008]
+/// Startet einen Hintergrund-Worker für periodische Konsolidierung.
 pub fn start_consolidation_worker<S: StorageEngine + 'static, V: VectorIndex + 'static>(
     collection: Arc<Collection<S, V>>,
     consolidation_config: ConsolidationConfig,
@@ -453,6 +503,8 @@ pub fn start_consolidation_worker<S: StorageEngine + 'static, V: VectorIndex + '
 /// Deprecated legacy alias for `start_consolidation_worker`.
 #[deprecated(note = "use start_consolidation_worker instead")]
 #[allow(deprecated)]
+// ANCHOR[contextra-cognition:EXEC-009]
+/// Veralteter Alias für start_consolidation_worker.
 pub fn start_consolidation_reaper<S: StorageEngine + 'static, V: VectorIndex + 'static>(
     collection: Arc<Collection<S, V>>,
     consolidation_config: ConsolidationConfig,
@@ -470,7 +522,12 @@ pub fn start_consolidation_reaper<S: StorageEngine + 'static, V: VectorIndex + '
 }
 
 /// Tokio-Background-Task Engine für periodische Speicher-Konsolidierung und Wissenssynthese.
-pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex> {
+// ANCHOR[contextra-cognition:EXEC-010]
+/// Engine für periodische Hintergrund-Konsolidierung und Wissenssynthese.
+// =========================================================================
+// SECTION: ConsolidationEngine Definition
+// =========================================================================
+pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex> {
     collection: Arc<Collection<S, V>>,
     llm: Option<Arc<dyn LlmTextGenerator>>,
     validator: Option<Arc<dyn ResponseGroundingValidator>>,
@@ -709,8 +766,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
                     return Ok((
                         ConsolidationPhaseResult {
                             segments_created: 0,
-                            duplicates_tombstoned: Vec::new(),
-                            cascade_edge_tombstones_needed: Vec::new(),
+                            duplicates_superseded: Vec::new(),
+                            cascade_edge_invalidations_needed: Vec::new(),
                             cascade_errors: Vec::new(),
                         },
                         None,
@@ -724,8 +781,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
             return Ok((
                 ConsolidationPhaseResult {
                     segments_created: 0,
-                    duplicates_tombstoned: Vec::new(),
-                    cascade_edge_tombstones_needed: Vec::new(),
+                    duplicates_superseded: Vec::new(),
+                    cascade_edge_invalidations_needed: Vec::new(),
                     cascade_errors: Vec::new(),
                 },
                 None,
@@ -785,15 +842,13 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
 )]
 mod tests {
     use super::*;
-    use contextra_graph::CsrGraph;
-    use contextra_ports::{BoxFuture, LlmTextGenerator};
-    use contextra_store::LsmStorage;
-    use contextra_vector::HnswIndex;
+    use crate::graph_local::CsrGraph;
+    use crate::ports_local::{BoxFuture, LlmTextGenerator};
+    use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
     use serde_json::json;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
-    use tempfile::tempdir;
 
     struct TestMockLlm {
         should_fail: AtomicBool,
@@ -827,42 +882,29 @@ mod tests {
         }
     }
 
-    async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir)
+    async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>
     {
-        let dir = tempdir().expect("tempdir");
-        let storage = Arc::new(
-            LsmStorage::new(contextra_store::LsmConfig {
-                path: dir.path().to_path_buf(),
-                ..Default::default()
-            })
-            .await
-            .expect("LsmStorage"),
-        );
-        let index = Arc::new(
-            HnswIndex::try_new(contextra_vector::HnswConfig {
-                dimension: 4,
-                ..Default::default()
-            })
-            .expect("HnswIndex"),
-        );
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let index = Arc::new(InMemoryVectorIndex::new(4));
         let graph = Arc::new(CsrGraph::new());
         let next_tx = Arc::new(AtomicU64::new(1));
 
-        let col = Arc::new(Collection::new(
+        Arc::new(Collection::new(
             "default".to_string(),
             storage,
             index,
             graph,
             next_tx,
             4,
-            contextra_engine::Language::English,
-        ));
-        (col, dir)
+            crate::engine_local::Language::English,
+        ))
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONSOLID-040]
+    // Prüft Testfall `test_consolidation_engine_concurrency_no_deadlock`.
     #[tokio::test]
     async fn test_consolidation_engine_concurrency_no_deadlock() {
-        let (col, _dir) = create_test_collection().await;
+        let col = create_test_collection().await;
         let cancel_token = tokio_util::sync::CancellationToken::new();
 
         let engine = Arc::new(ConsolidationEngine::new(
@@ -890,7 +932,8 @@ mod tests {
                     (angle * 2.0).sin(),
                 ];
                 let _ = col_clone.insert(&id, &vec, Some(json!({"fg": true}))).await;
-                let _ = col_clone.query().embedding(&vec).k(5).execute().await;
+                // query() nicht in cognition::Collection verfügbar — Vektornäherung über Index-Direktaufruf
+                let _ = col_clone.index().search(&vec, 5).await;
             }));
         }
 
@@ -907,13 +950,17 @@ mod tests {
         cancel_token.cancel();
         let _ = engine_handle.await;
 
-        // Confirm foreground docs exist
-        assert_eq!(col.len().await, 20);
+        // Confirm foreground docs exist — len() nicht verfügbar, Scan als Ersatz
+        let prefix = col.user_key_prefix();
+        let doc_count = col.storage().scan_prefix(&prefix).await.map(|v| v.len()).unwrap_or(0);
+        assert_eq!(doc_count, 20);
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONSOLID-041]
+    // Prüft Testfall `test_consolidation_engine_fault_injection_resume`.
     #[tokio::test]
     async fn test_consolidation_engine_fault_injection_resume() {
-        let (col, _dir) = create_test_collection().await;
+        let col = create_test_collection().await;
         let cancel_token = tokio_util::sync::CancellationToken::new();
 
         let llm = Arc::new(TestMockLlm::new());
@@ -993,9 +1040,11 @@ mod tests {
         cancel_token.cancel();
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONSOLID-042]
+    // Prüft Testfall `test_execute_consolidation_pass_skips_when_guard_locked`.
     #[tokio::test]
     async fn test_execute_consolidation_pass_skips_when_guard_locked() {
-        let (col, _dir) = create_test_collection().await;
+        let col = create_test_collection().await;
 
         let turn1 = (DocId::new(1), vec![1.0, 0.0, 0.0, 0.0]);
         let turn2 = (DocId::new(2), vec![1.0, 0.0, 0.0, 0.0]);
@@ -1013,12 +1062,14 @@ mod tests {
         assert!(res.is_ok(), "Should return Ok when guard is locked");
         let phase_res = res.unwrap();
         assert_eq!(phase_res.segments_created, 0);
-        assert!(phase_res.duplicates_tombstoned.is_empty());
+        assert!(phase_res.duplicates_superseded.is_empty());
     }
 
+    // ANCHOR[contextra-cognition:TEST-CONSOLID-043]
+    // Prüft Testfall `test_consolidation_nodes_guard_deadlock_regression`.
     #[tokio::test]
     async fn test_consolidation_nodes_guard_deadlock_regression() {
-        let (col, _dir) = create_test_collection().await;
+        let col = create_test_collection().await;
 
         for i in 1..=5 {
             let id = format!("doc_{}", i);
@@ -1074,6 +1125,8 @@ mod tests {
     ///
     /// Wenn dieser Test unter `#[tokio::test]` läuft und spawn_blocking korrekt ist,
     /// darf der blocking Thread nicht den Tokio-Runtime blockieren.
+    // ANCHOR[contextra-cognition:TEST-CONSOLID-044]
+    // Prüft Testfall `test_spawn_blocking_consolidation_does_not_block_runtime`.
     #[tokio::test]
     async fn test_spawn_blocking_consolidation_does_not_block_runtime() {
         use tokio::time::timeout;
@@ -1105,3 +1158,4 @@ mod tests {
         );
     }
 }
+// !SECTION: Hintergrund-Worker & Reaper

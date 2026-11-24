@@ -1,5 +1,11 @@
+//! # Tests fuer Open-Heal im WAL (Ring 1)
+//!
+//! Prueft die automatische Kuerzung und Reparatur beschaedigter WAL-Dateien am Dateiende.
+
 use super::*;
-use contextra_types::TxId;
+use contextra_ids::TxId;
+use crate::error::StoreResult as Result;
+use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;

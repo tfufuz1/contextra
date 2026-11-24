@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-10-30T00:00:00Z
-// ZWECK: WASI preview1 host function registration (§4.18)
-// INVARIANTEN: Zero unsafe code, strict bounds checking, host call limits
-
 pub(crate) mod fd;
 pub(crate) mod sys;
 

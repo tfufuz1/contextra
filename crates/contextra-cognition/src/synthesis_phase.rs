@@ -1,15 +1,33 @@
-//! Generative Synthesis Pass — LLM-basierte, stochastische Wissenssynthese pro konsolidiertem Segment.
-//! Bewusst getrennt vom Structural Consolidation Pass, da hier LLM-API-Abhängigkeiten bestehen, die dort verboten sind.
+//! # Generative Synthesephase (`synthesis_phase.rs`)
 //!
-//! SEGMENT-LEVEL (nicht Turn-Level): Jeder SynthesizedChunk abstrahiert ein ganzes
-//! TurnSegment aus dem Structural Consolidation Pass. Dies entspricht LycheeMemory V2 (arXiv:2608.12990).
+//! Führt die LLM-basierte Wissenssynthese auf Segment-Ebene aus.
+//! Abstrahiert ganze Turn-Segmente zu übergeordneten Wissens-Chunks ([`SynthesizedChunk`]).
+//! Dies ist bewusst vom rein deterministischen strukturellen Konsolidierungslauf getrennt,
+//! da hier stochastische Sprachmodelle über den [`SegmentSynthesizer`]-Port aufgerufen werden.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ebene E2). Nutzt den Port `SegmentSynthesizer` aus `contextra-ports`.
+//!
+//! ## Invarianten
+//! - **Fehlertoleranz:** Ein Einzelfehler bei der LLM-Synthese führt niemals zum Abbruch des gesamten Laufs,
+//!   sondern inkrementiert lediglich `skipped_segments` (Fail-Soft).
+//! - **Provenienzerhalt:** Jeder synthetisierte Chunk speichert exakt die Quell-`DocId`s der Ausgangs-Turns.
+
+// FILE-CONTEXT
+// ZWECK: LLM-basierte Wissenssynthese auf Segment-Ebene zur Erzeugung uebergeordneter Chunks.
+// INVARIANTEN: Fail-Soft bei LLM-Fehlern; vollstaendige Provenienzverfolgung ueber source_doc_ids.
+// STAND: 2026-11-11
 
 use crate::memory_consolidation::TurnSegment;
-use contextra_ports::SegmentSynthesizer;
-use contextra_types::DocId;
+use crate::ports_local::SegmentSynthesizer;
+use crate::types_local::DocId;
 
+// =========================================================================
+// SECTION: Synthese-Datenstrukturen
+// =========================================================================
 /// Ergebnis des Generative Synthesis Pass auf Segment-Ebene.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-cognition:SYNTH-001]
 pub struct SegmentSynthesisResult {
     /// Neu synthetisierte Chunks (einer pro konsolidiertem Segment).
     pub synthesized_chunks: Vec<SynthesizedChunk>,
@@ -18,10 +36,14 @@ pub struct SegmentSynthesisResult {
 }
 
 #[deprecated(note = "use SegmentSynthesisResult")]
+// ANCHOR[contextra-cognition:SYNTH-002]
+/// Veralteter Typalias für SegmentSynthesisResult.
 pub type SynthesisPhaseResult = SegmentSynthesisResult;
 
 /// Ein generativ synthetisierter Wissens-Chunk mit Provenienz.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-cognition:SYNTH-003]
+/// Ein generativ synthetisierter Wissens-Chunk mit Provenienz.
 pub struct SynthesizedChunk {
     /// Der neue, abstrakte Inhalt.
     pub content: String,
@@ -32,7 +54,7 @@ pub struct SynthesizedChunk {
 }
 
 /// Trait-Abstraktion für den LLM-Synthesizer (testbar via Mock).
-pub use contextra_ports::SegmentSynthesizer as TraitSegmentSynthesizer;
+pub use crate::ports_local::SegmentSynthesizer as TraitSegmentSynthesizer;
 
 /// Dies ist der LLM-BASIERTE Generative Synthesis Pass (erzeugt `SynthesizedChunk`s via `SegmentSynthesizer`-Trait). Für den deterministischen Structural Consolidation Pass siehe `memory_consolidation::run_structural_synthesis_pass()`.
 ///
@@ -41,6 +63,13 @@ pub use contextra_ports::SegmentSynthesizer as TraitSegmentSynthesizer;
 /// # Fehlerverhalten
 /// Einzelne Segment-Fehler werden übersprungen (`skipped_segments` inkrementiert),
 /// nie als Err propagiert. Globale Fehler (Trait-Fehler im Setup) propagieren als Err.
+// !SECTION: Synthese-Datenstrukturen
+
+// =========================================================================
+// SECTION: Synthese-Ausfuehrung
+// =========================================================================
+// ANCHOR[contextra-cognition:SYNTH-004]
+/// Führt den generativen Syntheselauf über Turn-Segmente aus.
 pub async fn run_synthesis_pass(
     segments: &[TurnSegment],
     segment_texts: &[Vec<String>], // Texte der Turns pro Segment
@@ -105,8 +134,8 @@ pub async fn run_synthesis_pass(
 )]
 mod tests {
     use super::*;
-    use contextra_ports::BoxFuture;
-    use contextra_types::Result;
+    use crate::ports_local::BoxFuture;
+    use crate::types_local::Result;
     use std::sync::atomic::{AtomicBool, Ordering};
 
     struct MockSynthesizer {
@@ -144,6 +173,8 @@ mod tests {
         }
     }
 
+    // ANCHOR[contextra-cognition:TEST-SYNTHESI-022]
+    // Prüft Testfall `test_synthesis_pass_empty_segments_returns_empty`.
     #[tokio::test]
     async fn test_synthesis_pass_empty_segments_returns_empty() {
         let synthesizer = MockSynthesizer::new("test-model", false);
@@ -153,6 +184,8 @@ mod tests {
         assert_eq!(res.skipped_segments, 0);
     }
 
+    // ANCHOR[contextra-cognition:TEST-SYNTHESI-023]
+    // Prüft Testfall `test_synthesis_pass_too_short_segments_skipped`.
     #[tokio::test]
     async fn test_synthesis_pass_too_short_segments_skipped() {
         let synthesizer = MockSynthesizer::new("test-model", false);
@@ -168,6 +201,8 @@ mod tests {
         assert_eq!(res.skipped_segments, 1);
     }
 
+    // ANCHOR[contextra-cognition:TEST-SYNTHESI-024]
+    // Prüft Testfall `test_synthesis_pass_llm_error_increments_skipped_not_err`.
     #[tokio::test]
     async fn test_synthesis_pass_llm_error_increments_skipped_not_err() {
         let synthesizer = MockSynthesizer::new("test-model", true); // should_fail = true
@@ -187,6 +222,8 @@ mod tests {
         assert_eq!(res.skipped_segments, 1);
     }
 
+    // ANCHOR[contextra-cognition:TEST-SYNTHESI-025]
+    // Prüft Testfall `test_synthesis_pass_synthesized_chunk_has_correct_source_ids`.
     #[tokio::test]
     async fn test_synthesis_pass_synthesized_chunk_has_correct_source_ids() {
         let synthesizer = MockSynthesizer::new("test-model", false);
@@ -210,3 +247,4 @@ mod tests {
         assert_eq!(chunk.model_id, "test-model");
     }
 }
+// !SECTION: Synthese-Ausfuehrung

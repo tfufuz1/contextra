@@ -1,3 +1,14 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: Inhaltsbasierte Formaterkennung anhand Magic Bytes, Strukturmerkmalen und Hints (WP M3 / P01).
 // INVARIANTEN: Zero-Panic, deterministisch, signature-fest, feste Obergrenze (max 64 KiB analysiert).
@@ -40,7 +51,28 @@ struct ContentMatch {
     reason: &'static str,
 }
 
+/// Formaterkennung anhand eines Streams (z. B. Reader ohne bekannte Gesamtlänge).
+///
+/// **Invariante `INV-INGEST-BOUNDED-1`**: Liest strikt niemals mehr als `MAX_DETECT_BYTES` (64 KiB).
+pub fn detect_reader<R: std::io::Read>(
+    reader: R,
+    hints: &DetectHints<'_>,
+) -> Result<Detection, IngestError> {
+    use std::io::Read;
+    let mut buf = Vec::new();
+    let mut limited_reader = reader.take(MAX_DETECT_BYTES as u64);
+    limited_reader
+        .read_to_end(&mut buf)
+        .map_err(|e| IngestError::Corrupt {
+            format: None,
+            detail: format!("Fehler beim Lesen der Erkennungs-Bytes: {e}"),
+        })?;
+    detect(&buf, hints)
+}
+
 /// Formaterkennung anhand von Inhalts-Bytes (max 64 KiB) und Hinweisen.
+///
+/// **Invariante `INV-INGEST-BOUNDED-1`**: Analysiert strikt niemals mehr als `MAX_DETECT_BYTES` (64 KiB).
 pub fn detect(bytes: &[u8], hints: &DetectHints<'_>) -> Result<Detection, IngestError> {
     let analyze_len = bytes.len().min(MAX_DETECT_BYTES);
     let data = match bytes.get(..analyze_len) {
@@ -247,15 +279,13 @@ fn inspect_zip_container(data: &[u8]) -> Option<(FormatId, &'static str)> {
         }
 
         let comp_method = u16::from_le_bytes([byte_at(header, 8), byte_at(header, 9)]);
-        let comp_size = match usize::try_from(u32::from_le_bytes([
+        let comp_size = usize::try_from(u32::from_le_bytes([
             byte_at(header, 18),
             byte_at(header, 19),
             byte_at(header, 20),
             byte_at(header, 21),
-        ])) {
-            Ok(s) => s,
-            Err(_) => 0,
-        };
+        ]))
+        .unwrap_or_default();
 
         let fn_len = usize::from(u16::from_le_bytes([
             byte_at(header, 26),
@@ -381,20 +411,14 @@ fn detect_text_heuristics(data: &[u8]) -> Option<ContentMatch> {
     // 1. UTF-16 LE/BE BOM Dekodierung
     let (text_str, has_bom) = if data.starts_with(&[0xff, 0xfe]) {
         // UTF-16 LE BOM
-        let decoded = decode_utf16_le(match data.get(2..) {
-            Some(s) => s,
-            None => return None,
-        });
+        let decoded = decode_utf16_le(data.get(2..)?);
         if decoded.is_empty() {
             return None;
         }
         (decoded, true)
     } else if data.starts_with(&[0xfe, 0xff]) {
         // UTF-16 BE BOM
-        let decoded = decode_utf16_be(match data.get(2..) {
-            Some(s) => s,
-            None => return None,
-        });
+        let decoded = decode_utf16_be(data.get(2..)?);
         if decoded.is_empty() {
             return None;
         }
@@ -525,7 +549,7 @@ fn decode_utf16_le(bytes: &[u8]) -> String {
     let u16s: Vec<u16> = bytes
         .chunks_exact(2)
         .map(|c| {
-            let b0 = match c.get(0) {
+            let b0 = match c.first() {
                 Some(&b) => b,
                 None => 0,
             };
@@ -543,7 +567,7 @@ fn decode_utf16_be(bytes: &[u8]) -> String {
     let u16s: Vec<u16> = bytes
         .chunks_exact(2)
         .map(|c| {
-            let b0 = match c.get(0) {
+            let b0 = match c.first() {
                 Some(&b) => b,
                 None => 0,
             };
@@ -666,6 +690,7 @@ const ALL_FORMATS: &[FormatId] = &[
 ];
 
 #[cfg(test)]
+#[allow(clippy::panic)]
 mod tests {
     use super::*;
 

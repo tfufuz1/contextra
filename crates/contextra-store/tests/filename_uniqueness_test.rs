@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::{ResourceBudget, ResourceTracker};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};

@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: Regressions-Test für Kapselung und Zustandsschutz des ScalarQuantizers.
+// INVARIANTEN: Quantisierungs-Codebounds bleiben strikt innerhalb [0, 255].
+// HOTSPOTS: 15-40
+// STAND: 2026-11-12
 use contextra_ports::VectorIndex;
 use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};

@@ -1,3 +1,9 @@
+//! # Integrationstest: tx fault injection
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 #![allow(
     clippy::unwrap_used,
@@ -53,6 +59,8 @@ async fn assert_index_doc_count_invariant<S: StorageEngine, V: contextra_ports::
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST38-001]
+/// Testblock zur Überprüfung von `test_tx_fault_after_lsm_write`.
 #[tokio::test]
 async fn test_tx_fault_after_lsm_write() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -103,6 +111,8 @@ async fn test_tx_fault_after_lsm_write() -> contextra_types::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST38-002]
+/// Testblock zur Überprüfung von `test_tx_fault_after_hnsw_insert`.
 #[tokio::test]
 async fn test_tx_fault_after_hnsw_insert() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -146,6 +156,8 @@ async fn test_tx_fault_after_hnsw_insert() -> contextra_types::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST38-003]
+/// Testblock zur Überprüfung von `test_tx_fault_after_text_index_update`.
 #[tokio::test]
 async fn test_tx_fault_after_text_index_update() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -187,6 +199,8 @@ async fn test_tx_fault_after_text_index_update() -> contextra_types::Result<()> 
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST38-004]
+/// Testblock zur Überprüfung von `test_tx_fault_double_failure_in_compensation`.
 #[tokio::test]
 async fn test_tx_fault_double_failure_in_compensation() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -215,6 +229,8 @@ async fn test_tx_fault_double_failure_in_compensation() -> contextra_types::Resu
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST38-005]
+/// Testblock zur Überprüfung von `test_tx_fault_crash_between_intent_log_and_execution`.
 #[tokio::test]
 async fn test_tx_fault_crash_between_intent_log_and_execution() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -275,6 +291,8 @@ async fn test_tx_fault_crash_between_intent_log_and_execution() -> contextra_typ
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST38-006]
+/// Testblock zur Überprüfung von `test_tx_ghost_hit_prevention_after_rollback`.
 #[tokio::test]
 async fn test_tx_ghost_hit_prevention_after_rollback() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");

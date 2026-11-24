@@ -1,4 +1,5 @@
 // =========================================================================
+// ANCHOR[id=sys-mmap-main,epic=sys-mmap,seq=0] Read-Only Memory Mapping Fassade
 // =========================================================================
 // LINK crates/contextra-sys/src/lib.rs
 // NOTE: Read-only memory mapping facade over memmap2 (Ring 0 / E0 / docs/SPEC.md §10.1 / INV-IO-1 / INV-ENCRYPT-REST-2).
@@ -28,6 +29,7 @@ use std::io;
 use crate::error::{Error, Result};
 
 // SECTION Raw Readonly Mapping
+// ANCHOR[id=sys-mmap-raw,epic=sys-mmap,seq=1] mmap_readonly
 
 /// Erstellt eine unveränderliche Nur-Lese-Speicherabbildung (Read-Only Memory Map) für eine geöffnete Datei.
 ///
@@ -45,6 +47,7 @@ pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
 // !SECTION Raw Readonly Mapping
 
 // SECTION Sealed File Abstraction
+// ANCHOR[id=sys-mmap-sealed,epic=sys-mmap,seq=2] Typisierte Versiegelung (Typestate)
 
 /// Typzustands-Marker: Zeigt an, dass eine Datei vollständig versiegelt, unveränderlich
 /// und prüfsummenverifiziert ist (gemäß INV-IO-1 und INV-ENCRYPT-REST-2).
@@ -106,6 +109,7 @@ impl SealedFile<SealedReadOnly> {
 // !SECTION Sealed File Abstraction
 
 // SECTION Sealed Map Abstraction
+// ANCHOR[id=sys-mmap-sealed-map,epic=sys-mmap,seq=3] SealedMap
 
 /// Sichere Nur-Lese-Speicherabbildung für versiegelte, unveränderliche Dateien (INV-IO-1).
 #[derive(Debug)]
@@ -179,6 +183,7 @@ impl AsRef<[u8]> for SealedMap {
 // !SECTION Sealed Map Abstraction
 
 // SECTION Unit Tests
+// ANCHOR[id=sys-mmap-tests,epic=sys-mmap,seq=4] Mmap-Modultests
 #[cfg(test)]
 mod tests {
     use super::*;

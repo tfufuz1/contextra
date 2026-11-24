@@ -6,6 +6,8 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
 
+// ANCHOR[contextra-db:TEST-STRESS-01-TEST_ORCHESTRATOR_STRESS_CONCURRENCY]
+// Testet die Funktionalität von `test_orchestrator_stress_concurrency`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_orchestrator_stress_concurrency() {
     let tmp = TempDir::new().expect("temp dir");

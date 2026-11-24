@@ -1,3 +1,9 @@
+//! # Integrationstest: auto extraction wiring
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Integrationstests fuer die Verdrahtung von AutoExtraction in Collection::insert_text_only.
@@ -60,6 +66,8 @@ impl LlmTextGenerator for MockLlmGenerator {
     }
 }
 
+// ANCHOR[contextra-engine:TST03-001]
+/// Testblock zur Überprüfung von `test_auto_extraction_disabled_no_llm_calls`.
 #[tokio::test]
 async fn test_auto_extraction_disabled_no_llm_calls() {
     let tmp = TempDir::new().expect("temp dir");
@@ -99,6 +107,8 @@ async fn test_auto_extraction_disabled_no_llm_calls() {
     assert!(doc.is_some(), "Document must exist");
 }
 
+// ANCHOR[contextra-engine:TST03-002]
+/// Testblock zur Überprüfung von `test_auto_extraction_enabled_creates_edges`.
 #[tokio::test]
 async fn test_auto_extraction_enabled_creates_edges() {
     let tmp = TempDir::new().expect("temp dir");
@@ -158,6 +168,8 @@ async fn test_auto_extraction_enabled_creates_edges() {
     }
 }
 
+// ANCHOR[contextra-engine:TST03-003]
+/// Testblock zur Überprüfung von `test_auto_extraction_low_confidence_ignored`.
 #[tokio::test]
 async fn test_auto_extraction_low_confidence_ignored() {
     let tmp = TempDir::new().expect("temp dir");
@@ -215,6 +227,8 @@ async fn test_auto_extraction_low_confidence_ignored() {
     }
 }
 
+// ANCHOR[contextra-engine:TST03-004]
+/// Testblock zur Überprüfung von `test_auto_extraction_llm_error_best_effort`.
 #[tokio::test]
 async fn test_auto_extraction_llm_error_best_effort() {
     let tmp = TempDir::new().expect("temp dir");
@@ -253,6 +267,8 @@ async fn test_auto_extraction_llm_error_best_effort() {
     assert!(doc.is_some(), "Document must be stored");
 }
 
+// ANCHOR[contextra-engine:TST03-005]
+/// Testblock zur Überprüfung von `test_auto_extraction_default_config_creates_edges_in_graph_index`.
 #[tokio::test]
 async fn test_auto_extraction_default_config_creates_edges_in_graph_index() {
     let tmp = TempDir::new().expect("temp dir");

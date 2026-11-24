@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Candidate stream for Personalized PageRank (PPR) graph retrieval (DiBud / Spec §21.2 / AK-17).
 //!
 //! # Candidate Ordering & Determinism
@@ -10,14 +11,26 @@
 //!
 //! The performance gain (P24) stems from seed-local forward-push calculation in the underlying PPR engine, rather than incremental batching.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
+// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use contextra_ports::GraphIndex;
-use contextra_types::{DocId, EntityId, PprConfig, Result, MAX_SEARCH_K};
+use crate::error::{GraphError, Result};
+use crate::types::{DocId, EntityId, PprConfig, MAX_SEARCH_K};
 use std::collections::{HashSet, VecDeque};
 
 /// Default batch size for candidate retrieval (Spec §21.2).
+// ANCHOR[contextra-graph:SRC-PPR-STREAM-001]
+
+// SECTION Ppr Stream Core Implementation
 pub const DEFAULT_PPR_STREAM_BATCH_SIZE: usize = 16;
 
 /// On-demand loading async candidate stream for Personalized PageRank search.
+// ANCHOR[contextra-graph:SRC-PPR-STREAM-002]
 pub struct PprCandidateStream<'a, G: GraphIndex + ?Sized> {
     graph: &'a G,
     seeds: Vec<EntityId>,
@@ -30,6 +43,7 @@ pub struct PprCandidateStream<'a, G: GraphIndex + ?Sized> {
 
 impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
     /// Creates a new candidate stream for Personalized PageRank starting from `seeds`.
+    // ANCHOR[contextra-graph:SRC-PPR-STREAM-003]
     pub fn new(graph: &'a G, seeds: impl Into<Vec<EntityId>>, config: PprConfig) -> Self {
         Self {
             graph,
@@ -43,12 +57,14 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
     }
 
     /// Sets a custom batch size (minimum 1).
+    // ANCHOR[contextra-graph:SRC-PPR-STREAM-004]
     pub fn with_batch_size(mut self, n: usize) -> Self {
         self.batch_size = n.max(1);
         self
     }
 
     /// Specifies whether seed entities themselves should be excluded from the yielded candidate stream.
+    // ANCHOR[contextra-graph:SRC-PPR-STREAM-005]
     pub fn with_exclude_seeds(mut self, exclude: bool) -> Self {
         self.exclude_seeds = exclude;
         self
@@ -105,11 +121,13 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
     }
 
     /// Returns the total number of items yielded so far.
+    // ANCHOR[contextra-graph:SRC-PPR-STREAM-006]
     pub fn yielded(&self) -> usize {
         self.yielded
     }
 
     /// Returns whether the candidate stream is exhausted.
+    // ANCHOR[contextra-graph:SRC-PPR-STREAM-007]
     pub fn is_exhausted(&self) -> bool {
         match &self.ranked {
             Some(ranked) => ranked.is_empty(),
@@ -118,6 +136,7 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
     }
 
     /// Returns the maximum depth limit for candidate retrieval (`MAX_SEARCH_K`).
+    // ANCHOR[contextra-graph:SRC-PPR-STREAM-008]
     pub const fn max_depth() -> usize {
         MAX_SEARCH_K
     }
@@ -143,9 +162,11 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
 
         match self.ranked.as_mut() {
             Some(ranked) => Ok(ranked),
-            None => Err(contextra_types::ContextraError::Internal(
+            None => Err(GraphError::Internal(
                 "Failed to initialize PPR stream ranking buffer".to_string(),
             )),
         }
     }
 }
+
+// !SECTION Ppr Stream Core Implementation

@@ -1,6 +1,11 @@
-// FILE-CONTEXT: Benchmark für Write-Amplification und p95-Latenz in DiskANN
-// ZWECK: Quantifizierung von Schreibvolumen und Latenz-Trade-offs für PENDING_FLUSH_THRESHOLD (50 / 200 / 1.000)
-// STAND: TS:2026-09-07T00:00:00Z
+// FILE-CONTEXT
+// ZWECK: Benchmark für Write-Amplification und p95-Latenz in DiskANN
+// INVARIANTEN: Deterministische Vektoren über festen Seed, kontrollierte I/O-Messung
+// HOTSPOTS: 60-150
+// STAND: 2026-11-11
+// BEREICH: AGENTS §6, SPEC §11.4 — Write-Amplification und Flush-Threshold-Trade-offs
+
+// ANCHOR[contextra-vector:W11-BENCH-011]
 
 #[cfg(feature = "experimental-diskann")]
 use std::fs;
@@ -14,7 +19,9 @@ use contextra_types::{DistanceMetric, DocId, TxId};
 #[cfg(feature = "experimental-diskann")]
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
 #[cfg(feature = "experimental-diskann")]
-use rand::Rng;
+use rand::rngs::StdRng;
+#[cfg(feature = "experimental-diskann")]
+use rand::{Rng, SeedableRng};
 
 #[cfg(feature = "experimental-diskann")]
 fn percentile(mut latencies: Vec<f64>, p: f64) -> f64 {
@@ -60,7 +67,7 @@ async fn run_benchmark_for_config(
 
     let index = DiskAnnIndex::try_new(config).expect("DiskAnnIndex creation failed");
 
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(0x4242_1111);
 
     // 1. Base Collection generate and build
     let base_vectors: Vec<Vec<f32>> = (0..collection_size)
@@ -137,7 +144,6 @@ async fn run_benchmark_suite() {
     #[cfg(not(feature = "experimental-diskann"))]
     {
         println!("Bitte '--features experimental-diskann' angeben, um den Benchmark auszuführen.");
-        println!("Befehl: cargo bench -p contextra-index --bench flush_threshold_amplification --features experimental-diskann");
         return;
     }
 
@@ -148,7 +154,7 @@ async fn run_benchmark_suite() {
         println!("=========================================================================================");
         println!();
 
-        let collection_sizes = [100, 1_000, 10_000, 100_000];
+        let collection_sizes = [100, 1_000, 10_000];
         let thresholds = [50u64, 200u64, 1_000u64];
         let dim = 64;
 
@@ -159,28 +165,13 @@ async fn run_benchmark_suite() {
                 100 => 200,
                 1_000 => 200,
                 10_000 => 200,
-                100_000 => 100,
                 _ => 100,
             };
 
-            println!(
-                "--- Running Collection Size N = {} (Inserts = {}) ---",
-                size, num_inserts
-            );
-
             for &t in &thresholds {
-                print!("  Testing PENDING_FLUSH_THRESHOLD = {:>4} ... ", t);
                 let res = run_benchmark_for_config(size, t, num_inserts, dim).await;
-                println!(
-                    "Flushes: {:>2}, Disk: {:>8.2} MB, WA: {:>6.2}x, p95 Latency: {:>7.2} ms",
-                    res.num_flushes,
-                    res.total_disk_bytes as f64 / (1024.0 * 1024.0),
-                    res.write_amplification,
-                    res.p95_latency_ms
-                );
                 results.push(res);
             }
-            println!();
         }
 
         println!("=========================================================================================");

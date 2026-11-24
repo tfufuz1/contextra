@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "exported_at": null,
+  "collections": [
+    {
+      "name": "default",
+      "memories": [
+        {
+          "id": "golden-1",
+          "memory_type": "semantic",
+          "content": "Golden content 1",
+          "embedding": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "embedding_model": null,
+          "created_at": null,
+          "importance_score": 0.0,
+          "metadata": {
+            "text": "Golden content 1",
+            "category": "benchmark"
+          },
+          "links": []
+        },
+        {
+          "id": "golden-2",
+          "memory_type": "episodic",
+          "content": "Golden content 2",
+          "embedding": [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          "embedding_model": null,
+          "created_at": null,
+          "importance_score": 0.0,
+          "metadata": {
+            "text": "Golden content 2",
+            "category": "benchmark"
+          },
+          "links": []
+        }
+      ],
+      "relations": []
+    }
+  ]
+}

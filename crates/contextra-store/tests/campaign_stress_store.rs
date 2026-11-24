@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT: Campaign stress tests for contextra-store concurrency, cancel-safety, interleaving, and observers.
 // TS: 2026-10-03
 

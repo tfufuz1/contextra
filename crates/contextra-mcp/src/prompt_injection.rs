@@ -1,9 +1,6 @@
-// FILE-CONTEXT
-// STAND:       2026-09-10T19:25:24Z (SESSION: ae8c2fb9)
-// ZWECK:       Prompt-Injection-Erkennung & Quarantäne-System für MCP-Server
-// INVARIANTEN: Standardmäßig werden verdächtige Texte redigiert (strict); Audit-Logs in escalate-Mode sind isoliert vom Vektor-Index.
-
 //! # LÜCKENANALYSE & DEFENSE-IN-DEPTH ARCHITEKTUR
+//!
+//! Re-Export der Typen aus `contextra-prompt-guard`.
 //!
 //! ## System-Charakterisierung & Erkennungsgrenzen:
 //! Der Prompt-Injection-Guard bietet eine **signatur-/phrasenbasierte Erkennung bekannter Angriffsmuster**
@@ -44,14 +41,36 @@
 //! (Zero-Trust Tool Isolation, Volatile Memory Encryption, Permission Policies).
 //! Dieser Prompt-Injection-Guard ergänzt die Sandbox als Inhaltsfilter auf Transport- / DTO-Ebene,
 //! **ersetzt sie jedoch ausdrücklich nicht**.
+// =========================================================================
+// SECTION: prompt_injection
+// =========================================================================
+// ANCHOR[contextra-mcp:PROMPT-INJ-001]
+// FILE-CONTEXT
+// STAND:       2026-11-10T10:00:00Z
+// ZWECK:       Prompt-Injection-Erkennung & Quarantäne-System für MCP-Server
+// INVARIANTEN: Re-Export aus contextra-prompt-guard; Standardmäßig werden verdächtige Texte redigiert (strict); Audit-Logs in escalate-Mode sind isoliert vom Vektor-Index.
 
-mod audit;
-mod guard;
-mod policy;
 
-#[cfg(test)]
-mod tests;
+pub use contextra_prompt_guard::{
+    audit::{SecurityAuditLogger, SecurityAuditRecord},
+    clock::{Clock, SystemClock},
+    error::GuardError,
+    guard::{NormalizedPattern, PromptInjectionGuard},
+    policy::{PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER},
+};
 
-pub use audit::{SecurityAuditLogger, SecurityAuditRecord};
-pub use guard::{NormalizedPattern, PromptInjectionGuard};
-pub use policy::{PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER};
+pub mod audit {
+    pub use contextra_prompt_guard::audit::{SecurityAuditLogger, SecurityAuditRecord};
+}
+
+pub mod guard {
+    pub use contextra_prompt_guard::guard::{NormalizedPattern, PromptInjectionGuard};
+}
+
+pub mod policy {
+    pub use contextra_prompt_guard::policy::{
+        PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER,
+    };
+}
+
+// !SECTION: prompt_injection

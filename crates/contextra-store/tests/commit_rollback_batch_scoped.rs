@@ -51,6 +51,7 @@ async fn test_batch_scoped_rollback_preserves_prior_batch() {
     assert_eq!(storage.get(b"k2").await.unwrap(), None);
 
     // Reopen storage to verify recovery / durability of k1
+    let _ = storage.close().await;
     drop(storage);
 
     let config_reopen = LsmConfig {

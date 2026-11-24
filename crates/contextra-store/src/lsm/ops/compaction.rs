@@ -1,8 +1,17 @@
+//! # Kompaktierungsoperationen (Ring 1)
+//!
+//! ZWECK: Integriert Flush und CompactionEngine in den Lebenszyklus des LSM-Speichers.
+//! INVARIANTEN:
+//! - Flush-before-Visible: Manifest-Commit vor Sichtbarkeit neuer SSTables.
+//! - Dekker-Write-Fence: Flush vs. Purge Koordination ueber `FlushPurgeFence`.
+//! - Sperrenreihenfolge: `flush_mutex` -> `commit_mutex` (fuer MemTable/WAL Swap) -> `state.write`.
+
 use super::super::engine::LsmStorage;
 use super::super::{MemTable, SstableBuilder, SstableReader, Wal};
 use crate::compaction::retain_key_versions;
 use bytes::Bytes;
-use contextra_types::{ContextraError, Result, TOMBSTONE_BIT};
+use crate::error::{StoreError as ContextraError, StoreResult as Result};
+use contextra_ids::TOMBSTONE_BIT;
 use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -12,8 +21,21 @@ use std::sync::Arc;
 /// MUST NOT be called while holding `commit_mutex` (will deadlock).
 /// Rotation (WAL swap and MemTable swap) is performed under `commit_mutex` to prevent
 /// concurrent sequence allocation races during rotation.
-pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
+pub(crate) async fn flush(storage: &LsmStorage) -> Result<()> {
     let _flush_lock = storage.flush_mutex.lock().await;
+
+    // Dekker-Write-Fence: Flush vs Purge Koordination
+    if !storage.flush_purge_fence.enter_flush() {
+        tracing::debug!("Flush postponed: exclusive purge operation currently active");
+        return Ok(());
+    }
+    struct FlushFenceGuard<'a>(&'a super::super::fence::FlushPurgeFence);
+    impl<'a> Drop for FlushFenceGuard<'a> {
+        fn drop(&mut self) {
+            self.0.leave_flush();
+        }
+    }
+    let _fence_guard = FlushFenceGuard(&storage.flush_purge_fence);
 
     // ── Phase 0: Schnellcheck (Read-Lock, kein I/O) ──────────────────────
     let has_active_memtable = {
@@ -101,8 +123,12 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             }
         }
 
-        let mut builder =
-            SstableBuilder::create_with_key_manager(&sst_path, storage.key_manager.clone()).await?;
+        let mut builder = SstableBuilder::create_with_vfs(
+            &sst_path,
+            storage.key_manager.clone(),
+            Arc::clone(&storage.compaction_engine.vfs),
+        )
+        .await?;
 
         for (k, mut versions) in key_map {
             versions.sort_by(|a, b| (b.1 & !TOMBSTONE_BIT).cmp(&(a.1 & !TOMBSTONE_BIT)));
@@ -117,10 +143,11 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             .await
             .map_err(|e| ContextraError::Storage(format!("SSTable finish failed: {}", e)))?;
 
-        let reader = SstableReader::open_with_key_manager(
+        let reader = SstableReader::open_with_vfs(
             &sst_path,
             Arc::clone(&storage.block_cache),
             storage.key_manager.clone(),
+            Arc::clone(&storage.compaction_engine.vfs),
         )
         .await
         .map_err(|e| ContextraError::Storage(format!("SSTable open after flush failed: {}", e)))?;
@@ -157,7 +184,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
         // last_committed_tx MUSS vor sstables.push() aktualisiert werden — sonst Race-Fenster für parallele Reader, siehe DECISIONS.md ADR-043.
         let sst_max_tx = reader.metadata().max_tx_id;
-        storage.advance_visibility(contextra_types::TxId::new(sst_max_tx));
+        storage.advance_visibility(contextra_ids::TxId::new(sst_max_tx));
 
         sstables.push(Arc::new(reader));
         sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
@@ -190,13 +217,13 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                         }
                     }
 
-                    if let Err(e) = tokio::fs::remove_file(&wal_path).await {
+                    if let Err(e) = storage.compaction_engine.vfs.remove_file(&wal_path) {
                         tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
                     } else {
                         let uuid_sidecar =
                             std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
-                        if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
-                            if e.kind() != std::io::ErrorKind::NotFound {
+                        if let Err(e) = storage.compaction_engine.vfs.remove_file(&uuid_sidecar) {
+                            if !matches!(e, crate::error::StoreError::NotFound(_)) {
                                 tracing::debug!(
                                     "Could not delete sidecar {:?}: {}",
                                     uuid_sidecar,
@@ -208,7 +235,10 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                     drop(trunc_guard_opt);
                 }
             }
-            crate::util::fsync_parent_dir(&storage.config.path).await?;
+            storage
+                .compaction_engine
+                .vfs
+                .sync_dir(&storage.config.path)?;
         }
 
         let bytes_freed: u64 = to_flush.iter().map(|mt| mt.size() as u64).sum();
@@ -234,7 +264,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
     if let Err(ref e) = phase3_res {
         if sst_path.exists() {
-            if let Err(rm_err) = tokio::fs::remove_file(&sst_path).await {
+            if let Err(rm_err) = storage.compaction_engine.vfs.remove_file(&sst_path) {
                 tracing::warn!(
                     path = ?sst_path,
                     "Failed to remove partial SSTable after flush failure: {rm_err}"

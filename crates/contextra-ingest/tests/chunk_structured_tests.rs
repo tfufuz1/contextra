@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `chunk_structured_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Akzeptanz- und Proptests für StructuredChunker (WP-ING-15).
 // INVARIANTEN: Zero-Panic in Produktion, Test-First, Lints eingehalten.
@@ -17,6 +23,8 @@ use contextra_ingest::format::FormatId;
 use contextra_ingest::ir::{BlockKind, DocumentIr, Locator};
 use proptest::prelude::*;
 
+// ANCHOR[contextra-ingest:TST-0327]
+// Testet die Funktionsfaehigkeit von `test_structured_5000_customers_bundling_and_coverage`.
 #[test]
 fn test_structured_5000_customers_bundling_and_coverage() {
     let mut ir = DocumentIr::new(FormatId::Json);
@@ -65,6 +73,8 @@ fn test_structured_5000_customers_bundling_and_coverage() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0328]
+// Testet die Funktionsfaehigkeit von `test_structured_large_record_windowing`.
 #[test]
 fn test_structured_large_record_windowing() {
     let mut ir = DocumentIr::new(FormatId::Json);
@@ -102,6 +112,8 @@ fn test_structured_large_record_windowing() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0329]
+// Testet die Funktionsfaehigkeit von `test_structured_jsonl_10000_lines`.
 #[test]
 fn test_structured_jsonl_10000_lines() {
     let mut ir = DocumentIr::new(FormatId::Jsonl);
@@ -134,6 +146,8 @@ fn test_structured_jsonl_10000_lines() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0330]
+// Testet die Funktionsfaehigkeit von `test_structured_deep_paths_and_special_characters`.
 #[test]
 fn test_structured_deep_paths_and_special_characters() {
     let mut ir = DocumentIr::new(FormatId::Yaml);
@@ -164,6 +178,8 @@ fn test_structured_deep_paths_and_special_characters() {
 }
 
 proptest! {
+// ANCHOR[contextra-ingest:TST-0331]
+// Testet die Funktionsfaehigkeit von `prop_structured_chunker_determinism_and_monotone_spans`.
     #[test]
     fn prop_structured_chunker_determinism_and_monotone_spans(
         val in ".*"

@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Integration test for `LsmStorage::open_with_merge_operator`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

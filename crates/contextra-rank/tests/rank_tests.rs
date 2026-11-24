@@ -1,3 +1,9 @@
+//! # Integrationstest: Basis-Ranking-Tests für mRRF, RRF, ECE und Drift
+//!
+//! **Crate:** `contextra-rank`
+//!
+//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Comprehensive unit test suite for `contextra-rank` crate modules.
 
@@ -8,8 +14,7 @@ mod tests {
     use contextra_rank::fusion::{
         reciprocal_rank_fusion, BoundedTopK, ProvenanceBuilder, SearchResult,
     };
-    use contextra_types::ConfigFingerprint;
-
+    use contextra_rank::ConfigFingerprint;
     #[test]
     fn test_rrf_k_zero_boundary() {
         let prov = ProvenanceBuilder::new(0.0)
@@ -25,6 +30,7 @@ mod tests {
         assert_eq!(contrib.rrf_contribution, 1.0);
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_rrf_dual_signal_higher_than_single_signal() {
         let set1 = vec![SearchResult {
@@ -60,6 +66,7 @@ mod tests {
         }
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_bounded_top_k() {
         let mut top_k = BoundedTopK::new(2);
@@ -70,6 +77,7 @@ mod tests {
         assert_eq!(sorted, vec![5, 10]);
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_isotonic_calibrator_warmup() {
         let mut cal = IsotonicCalibrator::new(10, 100);
@@ -82,6 +90,7 @@ mod tests {
         assert!(cal.calibrated_probability(0.5).is_some());
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_isotonic_p8_invalidation() {
         let mut cal = IsotonicCalibrator::new(5, 100);
@@ -97,6 +106,7 @@ mod tests {
         assert_eq!(cal.observation_count(), 1);
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_platt_scaler_fit_and_predict() {
         let mut obs = Vec::new();
@@ -111,6 +121,7 @@ mod tests {
         assert!(scaler.predict(-1.0) < 0.3);
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_drift_detector() {
         let mut detector = DriftDetector::new(10, 0.1);
@@ -127,6 +138,7 @@ mod tests {
         assert_eq!(detector.overall_drift_status(), "kritisch");
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_g_function_standalone_properties() {
         use contextra_rank::g;
@@ -148,6 +160,7 @@ mod tests {
         assert_eq!(g(f32::NEG_INFINITY), 0.0);
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_mrrf_determinism_baseline() {
         use contextra_rank::drift::DriftStatus;
@@ -244,6 +257,7 @@ mod tests {
         assert_eq!(standard_fused, mrrf_fused_uncalibrated);
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_mrrf_margin_modulation_relative_weight_effect() {
         use contextra_rank::drift::DriftStatus;

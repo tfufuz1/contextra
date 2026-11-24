@@ -1,5 +1,10 @@
 //! Campaign J-24 Test Suite — contextra-vector
 //! Covers Hypotheses H1 - H10 for Product 3 Vector Index Deep Audit.
+// FILE-CONTEXT
+// ZWECK: Campaign J-24 Test Suite — Vector Index Deep Audit Hypothesen H1 - H10.
+// INVARIANTEN: Deterministische Validierung von Mmap, DiskANN, Quantisierung und Rebuild.
+// HOTSPOTS: 30-150
+// STAND: 2026-11-12
 
 use std::collections::HashSet;
 use std::f32;
@@ -401,10 +406,10 @@ async fn test_h5_ram_vs_mmap_mixed_precision_top_k() {
     }
     ram_index.commit(tx).await.unwrap();
 
-    ram_index.save(&index_path).await.unwrap();
+    ram_index.save(&index_path).unwrap();
 
     let loaded_mmap_index = HnswIndex::try_new(config.clone()).unwrap();
-    loaded_mmap_index.load_mmap(&index_path).await.unwrap();
+    loaded_mmap_index.load_mmap(&index_path).unwrap();
 
     let query = gen_vector(dim, 9999);
 
@@ -477,7 +482,7 @@ async fn test_h6_hnsw_persistence_corruption_and_bounds() {
     }
     index.commit(tx).await.unwrap();
 
-    index.save(&index_path).await.unwrap();
+    index.save(&index_path).unwrap();
 
     // Roundtrip verification
     let valid_mmap = MmapIndex::open(&index_path);

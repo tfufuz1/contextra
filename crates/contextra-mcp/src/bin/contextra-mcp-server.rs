@@ -1,3 +1,7 @@
+// =========================================================================
+// SECTION: contextra-mcp-server
+// =========================================================================
+// ANCHOR[contextra-mcp:CONTEXTRA--001]
 // FILE-CONTEXT
 // STAND:       2026-09-10T19:25:24Z (SESSION: ae8c2fb9)
 // ZWECK:       Binary Entry Point for Contextra MCP Stdio JSON-RPC Server
@@ -86,3 +90,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     server.run_stdio().await?;
     Ok(())
 }
+
+// !SECTION: contextra-mcp-server

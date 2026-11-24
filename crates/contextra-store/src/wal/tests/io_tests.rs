@@ -1,6 +1,10 @@
+//! # Tests fuer WAL-Dateisystem-I/O (Ring 1)
+//!
+//! Ueberprueft Persistenz, Dateigroessen und Verzeichnis-Syncs.
+
 use super::*;
 use crate::wal::{Wal, WAL_V3_HEADER};
-use contextra_types::TxId;
+use contextra_ids::TxId;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;

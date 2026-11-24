@@ -142,3 +142,37 @@ async fn test_retrieve_tool_execution() {
     assert!(res.tokens_consumed >= 10);
     assert_eq!(res.output.get("count").and_then(|v| v.as_u64()), Some(1));
 }
+#[tokio::test]
+async fn test_retrieve_tool_with_custom_retriever() {
+    struct MockRetriever;
+    impl ContextRetriever for MockRetriever {
+        fn scan_prefix<'a>(
+            &'a self,
+            _prefix: &'a str,
+            _limit: Option<usize>,
+        ) -> BoxFuture<'a, Result<Vec<(String, serde_json::Value)>>> {
+            Box::pin(async move {
+                Ok(vec![(
+                    "decoupled:1".to_string(),
+                    json!({"text": "autarkic context"}),
+                )])
+            })
+        }
+    }
+
+    let (ctx, _tmp) = create_test_context().await;
+    let tool = RetrieveTool::with_retriever(Arc::new(MockRetriever));
+    let input = json!({"query": "autarkic"});
+
+    let res = tool
+        .execute(&ctx, input)
+        .await
+        .expect("execute custom retriever");
+    assert_eq!(res.output.get("count").and_then(|v| v.as_u64()), Some(1));
+    let results = res
+        .output
+        .get("results")
+        .and_then(|v| v.as_array())
+        .expect("results array");
+    assert_eq!(results[0]["key"], "decoupled:1");
+}

@@ -7,7 +7,7 @@
 //!
 //! NOTE: `RerankPidController` has been consolidated into `crate::PidController`.
 
-use contextra_ports::{Clock, SystemClock};
+use crate::clock::{Clock, SystemClock};
 use std::time::Duration;
 
 /// P95 Latency-feedback PID Controller for dynamically tuning candidate pool sizes.
@@ -17,7 +17,7 @@ use std::time::Duration;
     since = "0.1.0",
     note = "Consolidated into `crate::PidController`. Use `crate::PidController` directly."
 )]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RerankPidController {
     inner: crate::PidController,
 }

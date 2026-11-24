@@ -8,6 +8,7 @@ use crate::error::SimdError;
 use crate::metric::DistanceMetric;
 
 // SECTION COMPAT-METRIC
+// ANCHOR[contextra-simd:COMPAT-METRIC-FROM-SIMD]
 // Konvertierung von lokalem DistanceMetric in contextra_types::DistanceMetric
 impl From<DistanceMetric> for contextra_types::DistanceMetric {
     #[inline]
@@ -20,6 +21,7 @@ impl From<DistanceMetric> for contextra_types::DistanceMetric {
     }
 }
 
+// ANCHOR[contextra-simd:COMPAT-METRIC-FROM-TYPES]
 // Konvertierung von contextra_types::DistanceMetric in lokales DistanceMetric
 impl From<contextra_types::DistanceMetric> for DistanceMetric {
     #[inline]
@@ -35,6 +37,7 @@ impl From<contextra_types::DistanceMetric> for DistanceMetric {
 // !SECTION COMPAT-METRIC
 
 // SECTION COMPAT-ERROR
+// ANCHOR[contextra-simd:COMPAT-ERROR-FROM-SIMD]
 // Konvertierung von SimdError in contextra_types::ContextraError
 impl From<SimdError> for contextra_types::ContextraError {
     #[inline]

@@ -1,0 +1,9 @@
+= AsciiDoc Beispieldokument
+Autor Name <author@example.com>
+
+== Abschnitt Eins
+Dies ist der erste Absatz im AsciiDoc-Format.
+
+=== Unterabschnitt
+* Listenpunkt A
+* Listenpunkt B
