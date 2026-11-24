@@ -1,4 +1,4 @@
-# SPEC.md — `contextra-storage` (Speicherkern), Revision R9.1
+# SPEC.md — `contextra-storage` (Speicherkern), Revision R9.1 (+ Ökosystem §3.7)
 
 | | |
 |---|---|
@@ -178,8 +178,8 @@ Kommerzielle Pakete können optionale Implementierungen/Services anbieten: HSM-/
 contextra-storage-ports   Traits und Werttypen, keine Logik
         ▲
 contextra-storage         Kern, #![forbid(unsafe_code)], nur std + ports + bewilligte Abhängigkeiten
-        ▲ (nur dev)
-contextra-crypto-ref      Referenz Cipher/Mac/Kdf, In-Memory-KeyProvider, KeyProviderConformance
+        ▲ (Kern: nur dev; produktiv über Composition Root, SD-71)
+contextra-crypto-ref      Standard-/Referenz-Adapter Cipher/Mac/Kdf/Checksum, In-Memory-KeyProvider, KeyProviderConformance
 contextra-keys-file       Referenz-KeyProvider Einzelhost (ab P6)
 contextra-keys-cohort     optional: Cohort-Rewrap-Provider für Millionen Cluster (ab P6)
 ```
@@ -193,7 +193,7 @@ recovery · catalog · store (run, blob, segment, redo) · keys · codec (varint
 env (Fs, Clock, Entropy, Governor, Metrics, Anchor; MemFs, RealFs, FaultFs, Sim) · sync (Ränge, Epoche)
 ```
 
-`std::fs`, `std::time::SystemTime`, `rand` nur in Adaptern (Lint `disallowed_methods`). Kein `mmap` im Lesepfad. Namensraum: `crates/contextra-storage(-ports)`; `contextra-store` (Altstand) bleibt unverändert bis zur Ablösung (§14).
+`std::fs`, `std::time::SystemTime`, `rand` nur in Adaptern (Lint `disallowed_methods`). Kein `mmap` im Lesepfad. Fremdabhängigkeiten: §3.7. Namensraum: `crates/contextra-storage(-ports)`; `contextra-store` (Altstand) bleibt unverändert bis zur Ablösung (§14).
 
 ### 3.2 Ports
 
@@ -237,6 +237,105 @@ Fehlertexte enthalten keine Schlüssel, Nutzerschlüssel, Körper oder Klartextf
 ### 3.6 Lint-Pflicht
 
 Fehler im Kern: `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`, `unreachable`, `indexing_slicing`, `let _ =` auf Rückgaben von `sync_*`, `rename`, `unlink`. `Debug` für ClusterId, Schlüssel, Körper ist redigiert (`Redacted<T>`).
+
+### 3.7 Ökosystem: finale Abhängigkeiten (Crates) und Ausschlüsse
+
+Dieser Abschnitt ist normativ für jede `Cargo.toml` im Bereich `contextra-storage*`, `contextra-crypto-ref`, `contextra-keys-*`. Stand der Prüfung: Snapshot `f68e2c3` von `tfufuz1/contextra`, Toolchain `1.89.0`. Nicht gebaut, nicht getestet: **Versionen sind Untergrenzen** (`^`), der exakte Pin steht in `Cargo.lock`; vor G-0 wird jede Zeile mit `cargo deny check` und `cargo tree -d` bestätigt. Was im Bestands-`Cargo.lock` steht, ist unten als *Lock* angegeben.
+
+**Auswahlkriterien (in dieser Reihenfolge):** (1) `std` reicht ⇒ kein Crate; (2) Crate ist `#![forbid(unsafe_code)]`-kompatibel für den Kern, Fremd-`unsafe` nur in auditierten Crates der RustCrypto-/crossbeam-Familie; (3) kein Laufzeit-Async im Kern; (4) ein Crate je Aufgabe, **eine** Hauptversion im Workspace; (5) keine Abhängigkeit, die persistierte Inhalts-Hashes (`INV-PRIV-1`) oder Formatdetails vorgibt.
+
+#### 3.7.1 Kern `contextra-storage` und `contextra-storage-ports`
+
+| Aufgabe | Entscheidung | Begründung |
+|---|---|---|
+| Fehler | `thiserror ^2` (Workspace-Version) | Kern/Ports stehen auf `1`, Workspace auf `2` (E10-03); zwei Hauptversionen verboten. Fehlertexte bleiben redigiert (§3.5). |
+| Byte-Puffer | `bytes ^1` | Teilen ohne Kopie für Körper/Blöcke. *Lock:* 1.12.1. |
+| Speicherhygiene | `zeroize ^1` (`derive`) | Schlüsselmaterial, `Redacted<T>`. *Lock:* 1.9.0. |
+| Memtable-Index | `crossbeam-skiplist ^0.1`, **nur hinter Trait `MemIndex`** | Lock-freie sortierte Map ohne eigenes `unsafe`. Fehlt im Lock und im Workspace (E10-03). Rückfall hinter demselben Trait: sharded `BTreeMap` unter Rang-Sperre. `loom` kann den Skiplist-Pfad nicht prüfen ⇒ Modelltests laufen gegen die Rückfall-Implementierung, der Skiplist-Pfad wird mit `shuttle`/Stress und `miri` gefahren. |
+| Guard-Fingerabdruck | `siphasher ^1` | nur Guard-Fingerabdrücke (SD-03), nie persistiert. *Lock:* 1.0.4. |
+| Sperren | `std::sync::{Mutex, RwLock, Condvar}` mit eigenem `RankedMutex` (§11.2) | futex-basiert, Rangstack und Poison-Abbildung auf F-8 (`Poisoned`) sind Teil des Vertrags; `parking_lot` bringt kein Poisoning und keinen Rangstack und wird nicht verwendet. |
+| Atomics, Threads, Kanäle | `std` | Spawner-Port statt Runtime. |
+| Serialisierung | **keine** (handgeschriebener `codec`, §5) | Formate sind eingefroren und byte-genau; `serde`/`bincode`/`flatbuffers` dürfen im Kern und in den Ports nicht auftauchen. |
+
+**Im Kern verboten:** `tokio`/`async-std`/`futures`, `rayon`, `parking_lot`, `scc`, `dashmap`, `memmap2`/`mmap` (§7), `serde*`, `bincode`, `blake3` (SD-03), `rand`/`getrandom` (nur Port `Entropy`), jede Krypto-Implementierung, `anyhow`, `tracing` (Observability nur über `Metrics`/`Observer`-Ports).
+
+#### 3.7.2 Krypto-Adapter `contextra-crypto-ref` (Standard-Adapter, nicht nur Referenz)
+
+Der Kern bleibt krypto-frei (Ports). Es braucht aber ein produktives `Cipher`/`Mac`/`Kdf`/`Checksum`: **`contextra-crypto-ref` ist Referenz- und Standard-Adapter** und wird vom Composition Root (`contextra-storage-api`, Feature `default-crypto`) als normale Abhängigkeit eingebunden, nicht vom Kern.
+
+| Aufgabe | Crate | Anmerkung |
+|---|---|---|
+| AEAD | `chacha20poly1305 ^0.10` (`XChaCha20Poly1305`, 24-Byte-Nonce) | §5.2; fehlt heute im Lock. |
+| Ketten-/Auth-MAC | `hmac ^0.12` + `sha2 ^0.10` | HMAC-SHA256, Tag auf 16 B gekürzt (§5.2). *Lock:* 0.12.1 / 0.10.9. |
+| KDF | `hkdf ^0.12` | Rollenableitung außerhalb jedes SealFrame (§12.8 Nr. 24). *Lock:* 0.12.4. |
+| Prüfsumme | **`crc32c ^0.6`** | Die Spec verlangt CRC-32**C**; im Lock steht nur `crc32fast` (CRC-32/IEEE) — **nicht austauschbar**. `crc32fast` darf für Formate nicht verwendet werden. |
+| Constant-time-Vergleich | `subtle ^2` | Tagvergleich (§5.2). *Lock:* 2.6.1. |
+| Zufall | `getrandom ^0.3` (nur im `Entropy`-Adapter) | `rand` entfällt in neuen Crates (siehe 3.7.5). |
+
+**Entfernen:** `blake3` aus `contextra-crypto-ref` (Abhängigkeit der verworfenen `derive_subkey_fast`-Vorstufe, E-68). Kein Selbstbau von AEAD/KDF/MAC (R10 E10-21: `crypto_local`).
+
+#### 3.7.3 Dateisystem-Adapter `contextra-storage-fs` (`RealFs`)
+
+Ziel: `RealFs` ohne `unsafe` im Adapter-Crate, ohne Umweg über `contextra-durable-fs` (R10 §4.1).
+
+| Fs-Port-Operation | Mittel |
+|---|---|
+| `read_at`, `read_ranges`, Schreiben an Offset | `std::os::unix::fs::FileExt` / `std::os::windows::fs::FileExt` |
+| `sync_data`/`sync_all`, `sync_dir` | `std::fs::File` (`sync_data`/`sync_all`; Verzeichnis auf Unix per `File::open` + `sync_all`) |
+| `rename`, `list`, `remove_file`, Metadaten | `std::fs` |
+| `lock` | `std::fs::File::{lock, try_lock}` (seit Rust 1.89 stabil; **per Compile verifizieren**), kein `fs2`/`fs4`/`fd-lock` |
+| `preallocate`, `punch_hole`, `free_space`, macOS `F_FULLFSYNC` | **`rustix ^1`** (`default-features = false`, Features `fs`, `std`) — sichere Wrapper um `fallocate`/`fcntl`/`statvfs`. *Lock:* 1.1.4 (transitiv) |
+| Windows-Sonderfälle | `windows-sys` ausschließlich in `contextra-sys` (bestehendes `unsafe`-Crate), `storage-fs` ruft dessen sichere Funktionen |
+
+Wo `rustix` für eine Plattform keine Operation bietet (z. B. macOS-Vorallokation), ist der Rückfall „mit Nullen füllen und `sync_data`“ erlaubt, aber ausdrücklich als `FsCaps`-Merkmal zu melden, nie still. `libc` direkt: nein (`unsafe`). `memmap2`: nein.
+
+#### 3.7.4 Schlüssel-Provider und obere Löschschicht
+
+| Crate | Zusätzliche Abhängigkeiten | Regel |
+|---|---|---|
+| `contextra-keys-file` | `argon2 ^0.5` (Passphrase → Schlüssel, Pflicht, R10 E10-22), `zeroize`, `getrandom` | Parameter (m, t, p) im Provider-Header; `KeyManager::try_new` ohne Argon2id nicht für neue Daten. *Lock:* argon2 0.5.3. |
+| `contextra-keys-cohort` | wie `keys-file` | Rewrap über Ports-AEAD, keine eigene Krypto. |
+| `contextra-keys-kms` (optional) | je Anbieter-SDK **hinter Feature**, getrennt vom Kern | SDK-Abhängigkeiten (HTTP/TLS) dürfen nie in den Standard-Build des Kerns wandern. |
+| `contextra-erasure` (Orchestrator) | `ed25519-dalek ^2` (`verify_strict` überall), `sha2`, `subtle`, `zeroize`, `serde`+`serde_json` (nur Berichte), `thiserror` | Signaturschlüssel aus 32-Byte-Seed (`SigningKey::from_bytes`), damit **kein `rand`** nötig ist. `aes-gcm-siv` entfällt (R10 §4.2). *Lock:* ed25519-dalek 2.2.0. |
+| `contextra-erase-verify` | nur Ports + `sha2` | Orakel liest ausschließlich über Ports. |
+
+Kanonische Receipt-Bytes (§9.7) werden **von Hand** codiert (wie `codec`), nicht über `serde`/`bincode`; JSON ist nur Anzeigeformat und nie signiert.
+
+#### 3.7.5 Test-, Prüf- und Werkzeug-Ökosystem
+
+| Zweck | Werkzeug | Pflicht ab |
+|---|---|---|
+| Interleavings (kleine Modelle) | `loom ^0.7` (*Lock:* 0.7.2) mit `cfg(loom)` | P1 |
+| Interleavings (größere Modelle, Zufallsplanung) | `shuttle ^0.8` | P1 (fehlt im Lock) |
+| Eigenschafts-/Modelltests | `proptest ^1` (*Lock:* 1.11.0) | P1 |
+| Fuzzing | `cargo-fuzz` + `libfuzzer-sys` + `arbitrary`; echte `fuzz/Cargo.toml` und `fuzz_target!` (E10-06) | G-F |
+| UB-Prüfung | `miri` auf `codec`/Siegel/Skiplist-Wrapper | G-F |
+| Mutationen | `cargo-mutants` | G-F (H-16) |
+| Abdeckung | `cargo-llvm-cov` | G-F (H-15) |
+| Lieferkette | `cargo-deny` (Advisories, Lizenzen, Bans, Quellen) | **sofort** |
+| Testläufer | `cargo-nextest` | P1 |
+| Formale Modelle | TLA+/TLC für M1–M6 (E10-07) | G-F |
+| Temp-Dateien (nur Dev) | `tempfile ^3` | P1 |
+| Benchmarks | `criterion` nur in `contextra-bench` | P3 |
+
+`cargo-geiger` ist **nicht** Pflichtgate (Pflege unsicher); `#![forbid(unsafe_code)]` plus `deny.toml` ersetzt es.
+
+#### 3.7.6 Obere Schichten: Entscheidungen, die den Kern berühren
+
+- **`tokio`:** nur an den Rändern (`contextra`, `contextra-mcp`, `contextra-py`, `contextra-infer-*`, Bench). `contextra-storage-api` ist synchron; Async-Verbraucher nutzen `spawn_blocking`. Die Übergangsausnahmen in `deny.toml` (`TRANSITION E29`, bis 2027-04-30) werden mit dem Ablauf entfernt, nicht verlängert.
+- **`serde`/`bincode`:** `bincode 1.3.3` (Lock) ist nur Altstand; neue Persistenzformate nutzen es nicht. Migration der Konsumenten (`text`, `graph`, `types`, `erasure`) auf handcodierte Formate oder Kern-Segmente; bis dahin Eintrag in `deny.toml` mit Ablaufdatum.
+- **`rand`:** im Lock drei Hauptversionen (0.8, 0.9, 0.10). Ziel: **keine** in neuen Crates (`getrandom` genügt), Altcrates auf eine Version.
+- **`thiserror`:** Lock hat 1.0.69 und 2.0.20 ⇒ auf 2 vereinheitlichen. **`parking_lot`:** 0.11.2 und 0.12.5 ⇒ auf 0.12 (nur oberhalb des Kerns).
+- **`scc`:** nicht im Kern; in `deny.toml` steht ein ignorierter Advisory-Eintrag (`RUSTSEC-2026-0205`). Alle `ignore`-Einträge (auch pyo3, rustls) erhalten Begründung und Ablaufdatum; Inhalt der Advisories ist hier **nicht geprüft**.
+- **Parser-Crates** (`lopdf`, `calamine`, `mail-parser`, `zip =0.6.6`, `cfb`, `html5ever`): liegen außerhalb des Kerns, sind aber Angriffsfläche für gespeicherte Daten. Pflicht: Fuzz-Ziele je Parser, Größen-/Tiefenlimits, Ausführung in `contextra-sandbox` für untrusted Eingaben. Die Pin-Gründe von `zip =0.6.6` sind zu dokumentieren und gegen aktuelle Advisories zu prüfen.
+- **`contextra-durable-fs`:** wird nicht Teil von `RealFs` (3.7.3).
+
+#### 3.7.7 Durchsetzung
+
+1. `deny.toml` bekommt für die Kern-Crates eine Positivliste (`[bans] deny` alles außer den in 3.7.1–3.7.4 genannten Crates, per `wrappers`); der `layering`-Test (§3.1) prüft zusätzlich `cargo metadata`.
+2. `[workspace.dependencies]` führt **jedes** hier genannte Crate genau einmal; Kern-Manifeste verwenden `workspace = true` (behebt E10-03, inkl. `publish`).
+3. CI-Job `deps-gate`: `cargo deny check`, `cargo tree -d` (Duplikate nur mit Eintrag), `cargo tree -p contextra-storage --edges normal` gegen die Positivliste.
+4. Eine neue Abhängigkeit im Kern braucht einen Eintrag im Entscheidungsregister (§19) mit Kriterien 1–5 oben.
 
 ---
 
@@ -1259,7 +1358,7 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 |---|---|
 | SD-01 | Catalog als einzige Wahrheit, ein Edit = ein Durabilitätspunkt |
 | SD-02 | Clusterreine Blöcke, ein Abschnitt je Cluster und Datei, abschnittsrelative Offsets |
-| SD-03 | Bewilligte Abhängigkeiten. Kern: `crossbeam-skiplist` (hinter Trait), `bytes`, `zeroize`, `siphasher` (nur Guard-Fingerabdrücke). `contextra-crypto-ref`: `chacha20poly1305`, `hmac`, `sha2`, `hkdf`, `crc32c`. Dev: `loom`, `shuttle`, `proptest`, `cargo-mutants`. Krypto im Kern nur über Ports (`blake3` und `chacha20poly1305` sind keine Kernabhängigkeiten; sie widersprächen §5.2 und dem Portprinzip) |
+| SD-03 | Bewilligte Abhängigkeiten: normativ **§3.7** (Positivliste je Crate, Ausschlüsse, Werkzeuge). Kern: `thiserror 2`, `bytes`, `zeroize`, `crossbeam-skiplist` (hinter `MemIndex`), `siphasher`; `std::sync` statt `parking_lot`. Krypto im Kern nur über Ports; Standard-Adapter `contextra-crypto-ref`: `chacha20poly1305`, `hmac`, `sha2`, `hkdf`, `crc32c`, `subtle`. `blake3` ist keine Kern- und keine Referenzabhängigkeit |
 | SD-04 | Eine Formatversion je Dateiart, Migration als Werkzeug |
 | SD-05 | Sealed-Cluster umfasst Schlüssel, Kopf, Körper, Index, Filter, Marker, Branch-Metadaten |
 | SD-06 | `purge_deadline` Pflichtparameter |
@@ -1324,6 +1423,12 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 | **SD-65** | **Staging-Spill-Policy, Fenster-Amortisierung des Purge, Sealed-Hygiene-Lane (K-36)** |
 | **SD-66** | **`ClusterLocal`-Admission, Pure-Demotion, FD-Cache, Verzeichnis-Sharding (K-37)** |
 | **SD-67** | **Idempotenz als implizite `Absent`-Guard (K-38)** |
+| SD-68 | Ökosystem-Positivliste §3.7; Kern ohne `tokio`, `parking_lot`, `scc`, `memmap2`, `serde*`, `bincode`, `rand`, `blake3` |
+| SD-69 | Prüfsumme der Formate ist `crc32c` (CRC-32C); `crc32fast` (IEEE) ist für Formate verboten |
+| SD-70 | `RealFs` = `std` + `rustix` (`fs`) hinter `contextra-storage-fs`; kein `contextra-durable-fs`, kein `libc`, kein `mmap` |
+| SD-71 | `contextra-crypto-ref` ist Standard-Adapter (Composition Root, Feature `default-crypto`), nicht nur `dev-dependency` (Berichtigung zu SPEC-R10 §4.1) |
+| SD-72 | Signaturen/Receipts: `ed25519-dalek` mit `verify_strict`, Schlüssel aus Seed; kanonische Receipt-Bytes handcodiert |
+| SD-73 | Eine Hauptversion je Crate im Workspace (`thiserror 2`, `parking_lot 0.12`, höchstens eine `rand`-Linie, Ziel keine); `deny.toml`-Ausnahmen nur mit Begründung und Ablaufdatum |
 
 ---
 
@@ -1425,6 +1530,19 @@ R9.1 ändert kein Dateiformat, keine Gate-Reihenfolge und keinen Phasenplan. All
 | R9.1-09 | `BranchId` (u32) kam aus dem `reserve_ids`-Zähler ohne Überlaufregel; `eraser().branch(…)` stand als unzulässige Signatur in `impl Storage`; §8.4 nannte „maximal 8“ Ebenen neben Default 4 | Überlauf ⇒ `Exhausted`; eigener `impl Eraser`; Default 4, hart 8 (§8.4) |
 | R9.1-10 | Undefinierte Verweise `P-2`, `P-4`, `P-10`; `E-nn` ohne Erklärung | durch `INV-LIM-1` bzw. Klartext ersetzt; `E-nn` in §12.8 als Auditbefund erklärt |
 | R9.1-11 | Keine Rangfolge bei Widerspruch zwischen Invarianten, §12.8 und Fließtext | §15 vor §12.8 vor übrigen Abschnitten (Kopfzeile, §12.8) |
+
+## Anhang B.4 — Ergänzung R9.1 → R9.1+Ö (Ökosystem, §3.7)
+
+Kein Format-, Gate- oder Phasenänderung. Ergänzt wird die bisher fehlende Entscheidung über Fremdabhängigkeiten.
+
+| ID | Befund | Lösung |
+|---|---|---|
+| Ö-01 | SD-03 nannte Crates ohne Auswahlkriterien; `crossbeam-skiplist`, `chacha20poly1305`, `crc32c`, `shuttle` fehlen im Bestands-Lock | §3.7 mit Kriterien, Positivliste, Ausschlüssen |
+| Ö-02 | Spec verlangt CRC32C, Workspace führt nur `crc32fast` (IEEE) | `crc32c` verbindlich (SD-69) |
+| Ö-03 | `contextra-crypto-ref` nur `dev`, produktiv aber nötig | Standard-Adapter (SD-71) |
+| Ö-04 | `RealFs` ohne Plan für Prealloc/Hole-Punch/Dir-Sync/Lock | `std` + `rustix` (SD-70) |
+| Ö-05 | `parking_lot`/`scc`/`rand`/`thiserror` in mehreren Hauptversionen oder mit Advisory-Ausnahmen | §3.7.6, SD-73 |
+| Ö-06 | `blake3` in `crypto-ref` widerspricht E-68/SD-03 | entfernen |
 
 ## Anhang C — Verworfene Vorschläge
 
