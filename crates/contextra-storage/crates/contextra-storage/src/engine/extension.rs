@@ -6,6 +6,13 @@ use contextra_storage_ports::{ClusterId, Error, Stamp};
 
 pub const EXTENSION_BLOCK_MAGIC: &[u8; 8] = b"CTXSEXT1";
 
+/// Manifest pruning contract required before `BlockPruner` may skip blocks (SP-EXT WP-17.6, K-29).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PruneContract {
+    ShadowSafe { reason: &'static str },
+    NotShadowSafe,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtensionBlock {
     pub owner_tag: u32,
@@ -45,12 +52,22 @@ impl ExtensionBlock {
                 place: "extension payload length",
             }
         })?) as usize;
-        if bytes.len() < 20 + payload_len {
+        let expected_len = 20usize
+            .checked_add(payload_len)
+            .ok_or(Error::Corrupt {
+                place: "extension payload length overflow",
+            })?;
+        if bytes.len() < expected_len {
             return Err(Error::Corrupt {
                 place: "extension block payload truncated",
             });
         }
-        let payload = bytes[20..20 + payload_len].to_vec();
+        if bytes.len() > expected_len {
+            return Err(Error::Corrupt {
+                place: "extension block trailing bytes",
+            });
+        }
+        let payload = bytes[20..expected_len].to_vec();
         Ok(Self {
             owner_tag,
             block_index,

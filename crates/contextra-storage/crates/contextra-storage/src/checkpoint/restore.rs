@@ -44,7 +44,9 @@ impl CheckpointRestorer {
 
         // Validate against external anchor
         let anchor_val = anchor.read()?;
-        if manifest.catalog_epoch < anchor_val.catalog_epoch {
+        if manifest.catalog_epoch < anchor_val.catalog_epoch
+            || manifest.erase_epoch < anchor_val.erase_epoch
+        {
             return Err(Error::Rollback);
         }
 

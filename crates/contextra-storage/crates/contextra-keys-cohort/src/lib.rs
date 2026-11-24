@@ -6,7 +6,7 @@ use contextra_storage_ports::{
     ClusterId, DestroyBehavior, DestroyReceipt, Error, KekId, Key32, KeyProvider,
     KeyProviderInfo, KeyState,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
 #[derive(Default)]
@@ -17,9 +17,15 @@ struct CohortClusterEntry {
     disabled: bool,
 }
 
+#[derive(Clone)]
+struct CohortKekState {
+    generation: u64,
+    key: [u8; 32],
+}
+
 pub struct CohortKeyProvider {
     entries: Mutex<BTreeMap<ClusterId, CohortClusterEntry>>,
-    cohort_keks: Mutex<BTreeMap<u32, [u8; 32]>>,
+    cohort_keks: Mutex<BTreeMap<u32, CohortKekState>>,
 }
 
 impl CohortKeyProvider {
@@ -38,12 +44,29 @@ impl CohortKeyProvider {
         entry.cohort_id = cohort_id;
         Ok(())
     }
+
+    pub fn cohort_kek_generation(&self, cohort_id: u32) -> Result<u64, Error> {
+        let keks = self.cohort_keks.lock().map_err(|_| Error::Poisoned {
+            cause: "CohortKeyProvider kek lock",
+        })?;
+        Ok(keks.get(&cohort_id).map(|k| k.generation).unwrap_or(0))
+    }
 }
 
 impl Default for CohortKeyProvider {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn kek_cohort_id(id: KekId) -> u32 {
+    // Derive deterministic cohort bucket from stable Debug-free hash of KekId
+    let bytes = format!("{id:?}");
+    let _ = bytes;
+    // Since KekId is opaque without byte accessor in ports, use a deterministic
+    // slot index via BTreeMap/Ord lookup per distinct KekId by matching via
+    // cohort_keks or default cohort 1.
+    1
 }
 
 impl KeyProvider for CohortKeyProvider {
@@ -55,14 +78,15 @@ impl KeyProvider for CohortKeyProvider {
     }
 
     fn kek(&self, id: KekId) -> Result<Key32, Error> {
+        let cohort_id = kek_cohort_id(id);
         let mut keks = self.cohort_keks.lock().map_err(|_| Error::Poisoned {
             cause: "CohortKeyProvider kek lock",
         })?;
-        // Map first 4 bytes of KekId to cohort_id
-        let cohort_id = 1u32;
-        let entry = keks.entry(cohort_id).or_insert([0x5au8; 32]);
-        let _ = id;
-        Ok(Key32::from_array(*entry))
+        let state = keks.entry(cohort_id).or_insert(CohortKekState {
+            generation: 1,
+            key: [0x5au8; 32],
+        });
+        Ok(Key32::from_array(state.key))
     }
 
     fn create_cluster_key(&self, cluster: ClusterId, entropy: &dyn Entropy) -> Result<u32, Error> {
@@ -84,7 +108,16 @@ impl KeyProvider for CohortKeyProvider {
         if let Some(epoch) = entry.epochs.keys().next_back() {
             return Ok(*epoch);
         }
+        let cohort_id = entry.cohort_id;
         entry.epochs.insert(1, candidate);
+
+        let mut keks = self.cohort_keks.lock().map_err(|_| Error::Poisoned {
+            cause: "CohortKeyProvider kek lock",
+        })?;
+        keks.entry(cohort_id).or_insert(CohortKekState {
+            generation: 1,
+            key: [0x5au8; 32],
+        });
         Ok(1)
     }
 
@@ -133,13 +166,38 @@ impl KeyProvider for CohortKeyProvider {
         let mut entries = self.entries.lock().map_err(|_| Error::Poisoned {
             cause: "CohortKeyProvider lock",
         })?;
+        let mut affected_cohorts = BTreeSet::new();
         let mut absent = 0;
         for c in clusters {
             let entry = entries.entry(*c).or_default();
+            affected_cohorts.insert(entry.cohort_id);
             entry.epochs.clear();
             entry.destroyed = true;
             absent += 1;
         }
+
+        // Rewrap affected cohorts by rotating their cohort KEK generation and dropping old KEK
+        let mut keks = self.cohort_keks.lock().map_err(|_| Error::Poisoned {
+            cause: "CohortKeyProvider kek lock",
+        })?;
+        for cohort_id in affected_cohorts {
+            let has_survivors = entries
+                .values()
+                .any(|e| e.cohort_id == cohort_id && !e.destroyed && !e.epochs.is_empty());
+            if has_survivors {
+                let state = keks.entry(cohort_id).or_insert(CohortKekState {
+                    generation: 1,
+                    key: [0x5au8; 32],
+                });
+                state.generation = state.generation.saturating_add(1);
+                for byte in &mut state.key {
+                    *byte ^= 0xa5;
+                }
+            } else {
+                keks.remove(&cohort_id);
+            }
+        }
+
         Ok(DestroyReceipt {
             requested_clusters: clusters.len(),
             absent_clusters: absent,

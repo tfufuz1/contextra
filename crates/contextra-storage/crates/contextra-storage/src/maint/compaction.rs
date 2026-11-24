@@ -36,7 +36,8 @@ impl Compactor {
 
         let file = fs.create_new(&temp_path, compact_ctx("compact_create_temp"))?;
         if let Err(e) = file
-            .append_prealloc(compacted_bytes, compact_ctx("compact_write_data"))
+            .preallocate(compacted_bytes.len() as u64, compact_ctx("compact_prealloc"))
+            .and_then(|_| file.append_prealloc(compacted_bytes, compact_ctx("compact_write_data")))
             .and_then(|_| file.sync_all(compact_ctx("compact_sync_file")))
         {
             let _ = fs.unlink(&temp_path, compact_ctx("compact_cleanup_temp"));

@@ -26,6 +26,12 @@ pub struct ReadCache {
     current_bytes: usize,
 }
 
+impl Default for ReadCache {
+    fn default() -> Self {
+        Self::new(DEFAULT_CACHE_MAX_BYTES)
+    }
+}
+
 impl ReadCache {
     pub fn new(max_bytes: usize) -> Self {
         Self {
@@ -119,6 +125,18 @@ impl ReadCache {
     pub fn invalidate_cluster(&mut self, cluster: ClusterId) {
         self.entries.retain(|k, v| {
             if k.cluster == cluster {
+                self.current_bytes = self.current_bytes.saturating_sub(v.size_bytes);
+                false
+            } else {
+                true
+            }
+        });
+    }
+
+    /// Invalidates all cached entries for a specific cluster and branch.
+    pub fn invalidate_branch(&mut self, cluster: ClusterId, branch: BranchId) {
+        self.entries.retain(|k, v| {
+            if k.cluster == cluster && k.branch == branch {
                 self.current_bytes = self.current_bytes.saturating_sub(v.size_bytes);
                 false
             } else {

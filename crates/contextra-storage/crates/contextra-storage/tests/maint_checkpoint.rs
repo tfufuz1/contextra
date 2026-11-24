@@ -11,7 +11,7 @@ use contextra_storage::maint::flush::{FlushJob, FlushRunner};
 use contextra_storage::maint::purge::PurgeRunner;
 use contextra_storage::maint::scheduler::{MaintPriority, MaintScheduler};
 use contextra_storage::maint::scrub::Scrubber;
-use contextra_storage_ports::traits::{Anchor, AnchorValue, Fs};
+use contextra_storage_ports::traits::AnchorValue;
 use contextra_storage_ports::{ClusterId, Error, InstanceId, TombId};
 use std::path::{Path, PathBuf};
 
@@ -118,6 +118,8 @@ fn test_checkpoint_create_and_restore_validation() {
 
     let manifest_path = CheckpointCreator::write_manifest(&fs, root, &manifest).unwrap();
     assert_eq!(manifest_path, root.join("manifest.ckpt"));
+    let decoded_manifest = CheckpointCreator::read_manifest(&fs, root).unwrap();
+    assert_eq!(decoded_manifest, manifest);
 
     let anchor = MemAnchor::new(AnchorValue {
         erase_epoch: 10,

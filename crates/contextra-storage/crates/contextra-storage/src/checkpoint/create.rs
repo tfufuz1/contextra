@@ -117,7 +117,13 @@ impl CheckpointManifest {
                 },
             )?) as usize;
             offset += 4;
-            if offset + path_len + 8 + 4 > bytes.len() {
+            let entry_end = offset
+                .checked_add(path_len)
+                .and_then(|n| n.checked_add(12))
+                .ok_or(Error::Corrupt {
+                    place: "file entry length overflow",
+                })?;
+            if entry_end > bytes.len() {
                 return Err(Error::Corrupt {
                     place: "file entry body truncated",
                 });
@@ -144,6 +150,11 @@ impl CheckpointManifest {
                 relative_path: PathBuf::from(path_str),
                 size_bytes,
                 checksum,
+            });
+        }
+        if offset != bytes.len() {
+            return Err(Error::Corrupt {
+                place: "checkpoint manifest trailing bytes",
             });
         }
 
@@ -175,7 +186,8 @@ impl CheckpointCreator {
         let encoded = manifest.encode();
         let file = fs.create_new(&temp_path, ckpt_ctx("ckpt_manifest_create"))?;
         if let Err(e) = file
-            .append_prealloc(&encoded, ckpt_ctx("ckpt_manifest_write"))
+            .preallocate(encoded.len() as u64, ckpt_ctx("ckpt_manifest_prealloc"))
+            .and_then(|_| file.append_prealloc(&encoded, ckpt_ctx("ckpt_manifest_write")))
             .and_then(|_| file.sync_all(ckpt_ctx("ckpt_manifest_sync")))
         {
             let _ = fs.unlink(&temp_path, ckpt_ctx("ckpt_manifest_cleanup"));
@@ -190,5 +202,21 @@ impl CheckpointCreator {
 
         fs.sync_dir(target_dir, ckpt_ctx("ckpt_manifest_dir_sync"))?;
         Ok(final_path)
+    }
+
+    /// Reads and decodes a checkpoint manifest from `target_dir/manifest.ckpt`.
+    pub fn read_manifest(fs: &dyn Fs, target_dir: &Path) -> Result<CheckpointManifest, Error> {
+        let path = target_dir.join("manifest.ckpt");
+        let file = fs.open(&path, ckpt_ctx("ckpt_manifest_open"))?;
+        let size = usize::try_from(file.size()?)
+            .map_err(|_| Error::Limit { limit: "checkpoint manifest size" })?;
+        let mut buf = vec![0u8; size];
+        let read = file.read_at(0, &mut buf, ckpt_ctx("ckpt_manifest_read"))?;
+        if read != size {
+            return Err(Error::Corrupt {
+                place: "checkpoint manifest short read",
+            });
+        }
+        CheckpointManifest::decode(&buf)
     }
 }

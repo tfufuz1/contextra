@@ -19,7 +19,7 @@ use contextra_storage::erase::tickets::{
     CompletionEvidence, EraseLevel, EraseScope, Residual, TicketStage, TicketStatus,
 };
 use contextra_storage_ports::traits::{Anchor, AnchorStrength, AnchorValue, FileRole, Fs, IoCtx};
-use contextra_storage_ports::{ClusterId, Error, Key32, KeyProvider, KeyState, Protection, Ticket};
+use contextra_storage_ports::{ClusterId, Key32, KeyProvider, KeyState, Protection, Ticket};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;

@@ -30,6 +30,12 @@ pub struct IdemRegistry {
     max_entries: usize,
 }
 
+impl Default for IdemRegistry {
+    fn default() -> Self {
+        Self::new(DEFAULT_MAX_IDEM_ENTRIES)
+    }
+}
+
 impl IdemRegistry {
     pub fn new(max_entries: usize) -> Self {
         Self {
@@ -87,7 +93,12 @@ impl IdemRegistry {
         }
 
         if self.entries.len() >= self.max_entries {
-            return Err(Error::IdemCapacity);
+            self.entries.retain(|_, e| {
+                !matches!(e.state, IdemState::Reserved) || now_mono < e.expires_at_mono
+            });
+            if self.entries.len() >= self.max_entries {
+                return Err(Error::IdemCapacity);
+            }
         }
 
         self.entries.insert(
@@ -104,8 +115,17 @@ impl IdemRegistry {
     /// Transitions a reserved token to committed status upon successful durable commit.
     pub fn commit(&mut self, token: IdemToken, stamp: Stamp, durable: bool) -> Result<(), Error> {
         if let Some(entry) = self.entries.get_mut(&token) {
-            entry.state = IdemState::Committed { stamp, durable };
-            Ok(())
+            match entry.state {
+                IdemState::Reserved => {
+                    entry.state = IdemState::Committed { stamp, durable };
+                    Ok(())
+                }
+                IdemState::Committed {
+                    stamp: prev_stamp,
+                    durable: prev_durable,
+                } if prev_stamp == stamp && prev_durable == durable => Ok(()),
+                IdemState::Committed { .. } => Err(Error::Conflict),
+            }
         } else {
             Err(Error::Limit {
                 limit: "unreserved idempotency token commit",

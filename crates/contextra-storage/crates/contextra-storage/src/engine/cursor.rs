@@ -53,12 +53,22 @@ impl ResumeToken {
                 place: "resume token key length",
             }
         })?) as usize;
-        if bytes.len() < 40 + key_len {
+        let expected_len = 40usize
+            .checked_add(key_len)
+            .ok_or(Error::Corrupt {
+                place: "resume token length overflow",
+            })?;
+        if bytes.len() < expected_len {
             return Err(Error::Corrupt {
                 place: "resume token key truncated",
             });
         }
-        let last_key = bytes[40..40 + key_len].to_vec();
+        if bytes.len() > expected_len {
+            return Err(Error::Corrupt {
+                place: "resume token trailing bytes",
+            });
+        }
+        let last_key = bytes[40..expected_len].to_vec();
         Ok(Self {
             cluster,
             branch,
@@ -152,6 +162,20 @@ impl Cursor {
 
     pub fn mark_exhausted(&mut self) {
         self.exhausted = true;
+    }
+
+    /// Evaluates the optional BlockPruner only for ShadowSafe owners on primary branch 0 (SPEC §12.2, K-29).
+    pub fn may_prune_block(
+        &self,
+        pruner: Option<&dyn BlockPruner>,
+        shadow_safe: bool,
+        min_key: &[u8],
+        max_key: &[u8],
+    ) -> bool {
+        if !shadow_safe || self.branch != BranchId(0) {
+            return false;
+        }
+        pruner.is_some_and(|p| p.should_prune(min_key, max_key))
     }
 
     /// Generates a resume token representing the current cursor state.

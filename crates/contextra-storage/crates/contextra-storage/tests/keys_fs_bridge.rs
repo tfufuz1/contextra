@@ -6,7 +6,7 @@ use contextra_storage::env::sim::{SimClock, SimEntropy};
 use contextra_storage_fs::realfs::RealFs;
 use contextra_storage_ports::traits::{Clock, ClockSkew, Entropy, FileRole, Fs, IoCtx};
 use contextra_storage_ports::{ClusterId, Error, KeyProvider, KeyState};
-use std::path::PathBuf;
+use std::io::ErrorKind;
 
 fn test_io_ctx() -> IoCtx {
     IoCtx {
@@ -48,7 +48,11 @@ fn test_sim_clock_and_entropy() {
 
 #[test]
 fn test_file_key_provider_conformance() {
-    let provider = FileKeyProvider::new(PathBuf::from("/tmp/test_keys"));
+    let test_dir =
+        std::env::temp_dir().join(format!("contextra_file_keys_test_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&test_dir);
+
+    let provider = FileKeyProvider::new(test_dir.clone());
     let entropy = SimEntropy::new(123);
     let c = ClusterId::from_wire([0x44; 16]);
 
@@ -61,36 +65,62 @@ fn test_file_key_provider_conformance() {
     let key = provider.cluster_key(c, epoch).unwrap();
     assert!(key.is_some());
 
-    let clusters = provider.list().unwrap();
+    // Reload from disk in a fresh FileKeyProvider instance
+    let reopened = FileKeyProvider::new(test_dir.clone());
+    assert_eq!(reopened.probe(c).unwrap(), KeyState::Present);
+    assert_eq!(
+        reopened.cluster_key(c, epoch).unwrap().unwrap().expose(),
+        key.unwrap().expose()
+    );
+
+    let clusters = reopened.list().unwrap();
     assert_eq!(clusters, vec![c]);
 
-    let receipt = provider.destroy_many(&[c]).unwrap();
+    let receipt = reopened.destroy_many(&[c]).unwrap();
     assert_eq!(receipt.absent_clusters, 1);
-    assert_eq!(provider.probe(c).unwrap(), KeyState::Absent);
-    assert!(provider.cluster_key(c, epoch).unwrap().is_none());
+    assert_eq!(reopened.probe(c).unwrap(), KeyState::Absent);
+    assert!(reopened.cluster_key(c, epoch).unwrap().is_none());
+
+    // After restart following destroy, key file is gone
+    let after_destroy = FileKeyProvider::new(test_dir.clone());
+    assert_eq!(after_destroy.probe(c).unwrap(), KeyState::Absent);
+
+    let _ = std::fs::remove_dir_all(&test_dir);
 }
 
 #[test]
 fn test_cohort_key_provider_conformance() {
     let provider = CohortKeyProvider::new();
     let entropy = SimEntropy::new(456);
-    let c = ClusterId::from_wire([0x77; 16]);
+    let c1 = ClusterId::from_wire([0x77; 16]);
+    let c2 = ClusterId::from_wire([0x78; 16]);
 
-    provider.assign_cohort(c, 10).unwrap();
-    let epoch = provider.create_cluster_key(c, &entropy).unwrap();
+    provider.assign_cohort(c1, 10).unwrap();
+    provider.assign_cohort(c2, 10).unwrap();
+    let epoch = provider.create_cluster_key(c1, &entropy).unwrap();
+    provider.create_cluster_key(c2, &entropy).unwrap();
     assert_eq!(epoch, 1);
+    assert_eq!(provider.cohort_kek_generation(10).unwrap(), 1);
 
-    let key = provider.cluster_key(c, epoch).unwrap();
+    let key = provider.cluster_key(c1, epoch).unwrap();
     assert!(key.is_some());
 
-    provider.destroy_many(&[c]).unwrap();
-    assert_eq!(provider.probe(c).unwrap(), KeyState::Absent);
+    // Destroying c1 rotates cohort 10 KEK generation for survivor c2
+    provider.destroy_many(&[c1]).unwrap();
+    assert_eq!(provider.probe(c1).unwrap(), KeyState::Absent);
+    assert_eq!(provider.probe(c2).unwrap(), KeyState::Present);
+    assert_eq!(provider.cohort_kek_generation(10).unwrap(), 2);
+
+    // Destroying last survivor removes cohort KEK
+    provider.destroy_many(&[c2]).unwrap();
+    assert_eq!(provider.cohort_kek_generation(10).unwrap(), 0);
 }
 
 #[test]
-fn test_realfs_basic_io() {
+fn test_realfs_basic_io_and_locking() {
     let realfs = RealFs::new();
-    let test_dir = std::env::temp_dir().join(format!("contextra_realfs_test_{}", std::process::id()));
+    let test_dir =
+        std::env::temp_dir().join(format!("contextra_realfs_test_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&test_dir);
     std::fs::create_dir_all(&test_dir).unwrap();
 
@@ -98,6 +128,16 @@ fn test_realfs_basic_io() {
     let file = realfs.create_new(&file_path, test_io_ctx()).unwrap();
 
     let data = b"hello durable realfs world";
+    // Appending without preallocation must fail
+    assert!(matches!(
+        file.append_prealloc(data, test_io_ctx()),
+        Err(Error::Io {
+            kind: ErrorKind::InvalidData,
+            ..
+        })
+    ));
+
+    file.preallocate(data.len() as u64, test_io_ctx()).unwrap();
     file.append_prealloc(data, test_io_ctx()).unwrap();
     file.sync_all(test_io_ctx()).unwrap();
     assert_eq!(file.size().unwrap(), data.len() as u64);
@@ -108,8 +148,16 @@ fn test_realfs_basic_io() {
     assert_eq!(&buf, data);
     drop(file);
 
+    // Lock exclusivity check
+    let lock_path = test_dir.join("LOCK");
+    let lock1 = realfs.lock(&lock_path, test_io_ctx()).unwrap();
+    assert!(realfs.lock(&lock_path, test_io_ctx()).is_err());
+    drop(lock1);
+    let lock2 = realfs.lock(&lock_path, test_io_ctx()).unwrap();
+    drop(lock2);
+
     let list = realfs.list(&test_dir).unwrap();
-    assert_eq!(list.len(), 1);
+    assert_eq!(list.len(), 2);
 
     realfs.unlink(&file_path, test_io_ctx()).unwrap();
     let _ = std::fs::remove_dir_all(&test_dir);

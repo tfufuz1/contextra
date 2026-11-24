@@ -7,8 +7,14 @@ use contextra_storage_ports::{
     KeyProviderInfo, KeyState,
 };
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::fs::{self, OpenOptions};
+use std::io::{Read, Write};
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+
+const KEY_FILE_MAGIC: &[u8; 8] = b"CTXSKEY1";
 
 #[derive(Default)]
 struct FileClusterEntry {
@@ -18,16 +24,135 @@ struct FileClusterEntry {
 }
 
 pub struct FileKeyProvider {
-    _base_dir: PathBuf,
+    base_dir: PathBuf,
     entries: Mutex<BTreeMap<ClusterId, FileClusterEntry>>,
     keks: Mutex<BTreeMap<KekId, [u8; 32]>>,
 }
 
+fn cluster_hex(cluster: ClusterId) -> String {
+    let mut out = String::with_capacity(32);
+    for b in cluster.as_bytes() {
+        use std::fmt::Write as _;
+        let _ = write!(&mut out, "{b:02x}");
+    }
+    out
+}
+
+fn parse_cluster_hex(name: &str) -> Option<ClusterId> {
+    let stem = name.strip_suffix(".key")?;
+    if stem.len() != 32 {
+        return None;
+    }
+    let mut raw = [0u8; 16];
+    for (i, byte) in raw.iter_mut().enumerate() {
+        let part = stem.get(i * 2..i * 2 + 2)?;
+        *byte = u8::from_str_radix(part, 16).ok()?;
+    }
+    Some(ClusterId::from_wire(raw))
+}
+
+fn key_file_path(base_dir: &Path, cluster: ClusterId) -> PathBuf {
+    base_dir.join(format!("{}.key", cluster_hex(cluster)))
+}
+
+fn write_cluster_file(
+    base_dir: &Path,
+    cluster: ClusterId,
+    epochs: &BTreeMap<u32, [u8; 32]>,
+) -> Result<(), Error> {
+    fs::create_dir_all(base_dir).map_err(|e| Error::Io {
+        role: "keys",
+        kind: e.kind(),
+    })?;
+    let tmp_path = base_dir.join(format!(".tmp.{}.key", cluster_hex(cluster)));
+    let final_path = key_file_path(base_dir, cluster);
+
+    let mut payload = Vec::with_capacity(12 + epochs.len() * 36);
+    payload.extend_from_slice(KEY_FILE_MAGIC);
+    payload.extend_from_slice(&(epochs.len() as u32).to_be_bytes());
+    for (epoch, key) in epochs {
+        payload.extend_from_slice(&epoch.to_be_bytes());
+        payload.extend_from_slice(key);
+    }
+
+    let mut opts = OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    opts.mode(0o600);
+    let mut f = opts.open(&tmp_path).map_err(|e| Error::Io {
+        role: "keys",
+        kind: e.kind(),
+    })?;
+    f.write_all(&payload).map_err(|e| Error::Io {
+        role: "keys",
+        kind: e.kind(),
+    })?;
+    f.sync_all().map_err(|e| Error::Io {
+        role: "keys",
+        kind: e.kind(),
+    })?;
+    drop(f);
+
+    fs::rename(&tmp_path, &final_path).map_err(|e| Error::Io {
+        role: "keys",
+        kind: e.kind(),
+    })?;
+    if let Ok(dir) = OpenOptions::new().read(true).open(base_dir) {
+        let _ = dir.sync_all();
+    }
+    Ok(())
+}
+
+fn load_existing_entries(base_dir: &Path) -> BTreeMap<ClusterId, FileClusterEntry> {
+    let mut map = BTreeMap::new();
+    let Ok(rd) = fs::read_dir(base_dir) else {
+        return map;
+    };
+    for entry in rd.flatten() {
+        let fname = entry.file_name();
+        let Some(name_str) = fname.to_str() else {
+            continue;
+        };
+        let Some(cluster) = parse_cluster_hex(name_str) else {
+            continue;
+        };
+        let Ok(mut f) = OpenOptions::new().read(true).open(entry.path()) else {
+            continue;
+        };
+        let mut buf = Vec::new();
+        if f.read_to_end(&mut buf).is_err() || buf.len() < 12 || &buf[..8] != KEY_FILE_MAGIC {
+            continue;
+        }
+        let count = u32::from_be_bytes([buf[8], buf[9], buf[10], buf[11]]) as usize;
+        if buf.len() != 12 + count * 36 {
+            continue;
+        }
+        let mut epochs = BTreeMap::new();
+        for i in 0..count {
+            let off = 12 + i * 36;
+            let epoch = u32::from_be_bytes([buf[off], buf[off + 1], buf[off + 2], buf[off + 3]]);
+            let mut key = [0u8; 32];
+            key.copy_from_slice(&buf[off + 4..off + 36]);
+            epochs.insert(epoch, key);
+        }
+        map.insert(
+            cluster,
+            FileClusterEntry {
+                epochs,
+                destroyed: false,
+                disabled: false,
+            },
+        );
+    }
+    map
+}
+
 impl FileKeyProvider {
     pub fn new(base_dir: PathBuf) -> Self {
+        let entries = load_existing_entries(&base_dir);
         Self {
-            _base_dir: base_dir,
-            entries: Mutex::new(BTreeMap::new()),
+            base_dir,
+            entries: Mutex::new(entries),
             keks: Mutex::new(BTreeMap::new()),
         }
     }
@@ -69,6 +194,7 @@ impl KeyProvider for FileKeyProvider {
             return Ok(*epoch);
         }
         cluster_entry.epochs.insert(1, candidate);
+        write_cluster_file(&self.base_dir, cluster, &cluster_entry.epochs)?;
         Ok(1)
     }
 
@@ -122,7 +248,26 @@ impl KeyProvider for FileKeyProvider {
             let entry = entries.entry(*c).or_default();
             entry.epochs.clear();
             entry.destroyed = true;
+            let path = key_file_path(&self.base_dir, *c);
+            match fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => {
+                    return Err(Error::Io {
+                        role: "keys",
+                        kind: e.kind(),
+                    })
+                }
+            }
             absent += 1;
+        }
+        if self.base_dir.exists() {
+            if let Ok(dir) = OpenOptions::new().read(true).open(&self.base_dir) {
+                dir.sync_all().map_err(|e| Error::Io {
+                    role: "keys",
+                    kind: e.kind(),
+                })?;
+            }
         }
         Ok(DestroyReceipt {
             requested_clusters: clusters.len(),

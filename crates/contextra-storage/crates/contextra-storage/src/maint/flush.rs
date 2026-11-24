@@ -39,7 +39,8 @@ impl FlushRunner {
 
         let file = fs.create_new(&temp_path, flush_ctx("flush_create_temp"))?;
         if let Err(e) = file
-            .append_prealloc(&job.raw_data, flush_ctx("flush_write_data"))
+            .preallocate(job.raw_data.len() as u64, flush_ctx("flush_prealloc"))
+            .and_then(|_| file.append_prealloc(&job.raw_data, flush_ctx("flush_write_data")))
             .and_then(|_| file.sync_all(flush_ctx("flush_sync_file")))
         {
             let _ = fs.unlink(&temp_path, flush_ctx("flush_cleanup_temp"));
