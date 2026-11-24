@@ -16,7 +16,7 @@ for conda in ("rust.conda", "rust-std.conda"):
     pkg = [n for n in z.namelist() if n.startswith("pkg-")][0]
     with zstandard.ZstdDecompressor().stream_reader(io.BytesIO(z.read(pkg))) as r:
         with tarfile.open(fileobj=r, mode="r|") as t:
-            t.extractall(prefix)
+            t.extrcontextrall(prefix)
 PY
 rm -rf "$TMP"
 echo "Installiert: $PREFIX/bin/rustc"

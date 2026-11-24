@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 test -f SPEC.md
-test -d crates/acta-storage/tests
+test -d crates/contextra-storage/tests
 
 rows=$(awk '/^## 15\./ { in_section = 1; next } /^## 16\./ { in_section = 0 } in_section { print }' SPEC.md)
 compact=$(grep -oE 'INV-[A-Z]+-[0-9]+([/…][0-9]+)*' <<<"$rows" | sort -u || true)
@@ -32,7 +32,7 @@ while read -r token; do
     fi
 done <<<"$compact"
 
-found=$(grep -rhoE 'INV-[A-Z]+-[0-9]+' crates/acta-storage/tests 2>/dev/null | sort -u || true)
+found=$(grep -rhoE 'INV-[A-Z]+-[0-9]+' crates/contextra-storage/tests 2>/dev/null | sort -u || true)
 missing=0
 for inv in $expected; do
     if ! grep -qx "$inv" <<<"$found"; then

@@ -117,7 +117,7 @@ pub struct AgentStateNode {
     pub response: String,
     /// Optional MVCC snapshot reference (TxId at checkpoint creation).
     pub snapshot_tx_id: Option<TxId>,
-    /// Compactable tool outputs for this step.
+    /// Compcontextrable tool outputs for this step.
     pub tool_outputs: Vec<String>,
     /// Whether this node has already been compacted.
     pub compacted: bool,

@@ -1,12 +1,12 @@
-# CLAUDE.md — Acta
+# CLAUDE.md — Contextra
 
-Du arbeitest als Principal Rust Architect am Projekt Acta. Ziel: ein produktionsreifes, gesetzeskonformes Produkt. Diese Datei ist der Einstieg. Details stehen in den genannten Dateien, nicht hier.
+Du arbeitest als Principal Rust Architect am Projekt Contextra. Ziel: ein produktionsreifes, gesetzeskonformes Produkt. Diese Datei ist der Einstieg. Details stehen in den genannten Dateien, nicht hier.
 
 ## 1. Produkt
 
-- Acta verbindet Unternehmenswissen mit LLMs und Agenten. Zielgruppe: Mittelstand und Großunternehmen in Deutschland und Europa, keine Behörden.
+- Contextra verbindet Unternehmenswissen mit LLMs und Agenten. Zielgruppe: Mittelstand und Großunternehmen in Deutschland und Europa, keine Behörden.
 - Kernqualität ist die **Löschung** personenbezogener Daten aus dem RAG (DSGVO Art. 17). Sie soll nachweisbar, gesetzeskonform und für Kunden unbemerkt im Hintergrund laufen.
-- Der Speicherkern wird neu entwickelt (`acta-storage` ersetzt `acta-store`). Finale Crate-Entscheidungen fallen in dieser Neuentwicklung. Nichts ist final entschieden.
+- Der Speicherkern wird neu entwickelt (`contextra-storage` ersetzt `contextra-store`). Finale Crate-Entscheidungen fallen in dieser Neuentwicklung. Nichts ist final entschieden.
 
 ## 2. Sitzungsstart
 
@@ -28,15 +28,15 @@ Du arbeitest als Principal Rust Architect am Projekt Acta. Ziel: ein produktions
 
 - Die Crates gliedern sich in Gruppen, Ebenen und Tiers. Quelle: `capabilities.toml`. Übersicht: `docs/agent/CRATES.md`.
 - Ring-Matrix in `tests/layering.rs`. Abhängigkeiten nur nach unten. **Achtung:** Diese Datei liegt im Workspace-Root und wird von keinem Crate eingebunden. Sie läuft unter `cargo test` daher nicht.
-- Unsafe-Inseln laut `tests/unsafe_islands.rs`: `acta-simd`, `acta-sys`, `acta-wire`. Dieselbe Datei ist ebenfalls nicht eingebunden.
-- Konsistenz prüfen: `bash tools/ctx.sh gates`. Stand: 7 Workspace-Mitglieder fehlen in `capabilities.toml`, und `acta-vault` steht dort, ist aber nicht Mitglied.
-- `acta-erasure` hat Gruppe `compliance` und Tier `frozen`. Änderungen dort nur mit ausdrücklicher Rückfrage.
+- Unsafe-Inseln laut `tests/unsafe_islands.rs`: `contextra-simd`, `contextra-sys`, `contextra-wire`. Dieselbe Datei ist ebenfalls nicht eingebunden.
+- Konsistenz prüfen: `bash tools/ctx.sh gates`. Stand: 7 Workspace-Mitglieder fehlen in `capabilities.toml`, und `contextra-vault` steht dort, ist aber nicht Mitglied.
+- `contextra-erasure` hat Gruppe `compliance` und Tier `frozen`. Änderungen dort nur mit ausdrücklicher Rückfrage.
 
 ## 5. Bekannte Befunde (gemessen 2026-11-24)
 
 - Der Cargo-Alias `xtask` zeigt auf ein nicht existierendes Paket. Deaktiviert in `.cargo/config.toml`.
 - Die Architektur-Tests in `tests/` laufen nicht (siehe oben). Eine Einbindung ist offen.
-- `acta-ids` (17 Tests) ist grün.
+- `contextra-ids` (17 Tests) ist grün.
 - Ein vollständiger Workspace-Check ist nicht durchgelaufen. Die Zahl der Warnungen ist daher unbekannt.
 
 ## 6. Änderungsregeln

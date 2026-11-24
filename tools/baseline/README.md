@@ -1,6 +1,6 @@
 # Baseline Tooling (`tools/baseline/`)
 
-This directory contains the reproducible baseline execution tool `run_baseline.py` for the Acta Rust workspace (35 workspace members).
+This directory contains the reproducible baseline execution tool `run_baseline.py` for the Contextra Rust workspace (35 workspace members).
 
 ## Overview
 
@@ -22,7 +22,7 @@ python3 tools/baseline/run_baseline.py --self-test
 python3 tools/baseline/run_baseline.py
 
 # Run baseline for a single crate
-python3 tools/baseline/run_baseline.py --crate acta-types
+python3 tools/baseline/run_baseline.py --crate contextra-types
 
 # Custom timeout per crate (default: 1800 seconds / 30 minutes)
 python3 tools/baseline/run_baseline.py --timeout 600
@@ -35,5 +35,5 @@ python3 tools/baseline/run_baseline.py --allow-dirty
 
 - **Path Normalization**: Absolute paths (e.g. `/app/`, `/home/...`) are normalized to relative repository paths across all logs, JSONs, and markdown reports.
 - **Uncut Evidence**: No stdout/stderr log output is truncated. Logs >= 2 MB are compressed with gzip.
-- **Root Cause Attribution**: Groups cascading errors (e.g. `acta-types` clippy warnings breaking downstream crates) by the root cause crate and lint code rather than blaming victim crates.
+- **Root Cause Attribution**: Groups cascading errors (e.g. `contextra-types` clippy warnings breaking downstream crates) by the root cause crate and lint code rather than blaming victim crates.
 - **Standard Library Only**: Built purely using Python 3 standard library tools.

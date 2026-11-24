@@ -4,9 +4,9 @@ generate_migration_edges.py - Generates docs/spec/MIGRATION-EDGES.md inventory v
 
 Rule definition:
 - Scans all workspace crates for dependencies on the 9 Archive Crates:
-  acta-adapt, acta-agent, acta-cognition, acta-core,
-  acta-graph, acta-infer-ollama, acta-infer-onnx,
-  acta-kvcache, acta-router.
+  contextra-adapt, contextra-agent, contextra-cognition, contextra-core,
+  contextra-graph, contextra-infer-ollama, contextra-infer-onnx,
+  contextra-kvcache, contextra-router.
 - Identifies manifest edges (normal, dev, build; optional flag) and source code references
   (number of files in src/ and tests/, top 10 imported symbols).
 - Generates summary table by Dependent and per-archive-crate breakdown table.
@@ -21,38 +21,38 @@ import tomllib
 from collections import Counter
 
 ARCHIVE_CRATES = {
-    'acta-adapt': 'acta_adapt',
-    'acta-agent': 'acta_agent',
-    'acta-cognition': 'acta_cognition',
-    'acta-core': 'acta_core',
-    'acta-graph': 'acta_graph',
-    'acta-infer-ollama': 'acta_infer_ollama',
-    'acta-infer-onnx': 'acta_infer_onnx',
-    'acta-kvcache': 'acta_kvcache',
-    'acta-router': 'acta_router',
+    'contextra-adapt': 'contextra_adapt',
+    'contextra-agent': 'contextra_agent',
+    'contextra-cognition': 'contextra_cognition',
+    'contextra-core': 'contextra_core',
+    'contextra-graph': 'contextra_graph',
+    'contextra-infer-ollama': 'contextra_infer_ollama',
+    'contextra-infer-onnx': 'contextra_infer_onnx',
+    'contextra-kvcache': 'contextra_kvcache',
+    'contextra-router': 'contextra_router',
 }
 
 MASSNAHMEN = {
-    'acta-adapt': '`AdaptiveController` durch feste Startwerte ersetzen: `efSearch = 64`, `exact_scan_max = 20_000`, Overfetch `3 / 6 / 12` (PLAN.md §7, WP 2.2 Schritt 3).',
-    'acta-agent': 'Feature `agent-workflows` entfernen; optionale Kante aus `mcp/Cargo.toml` löschen.',
-    'acta-cognition': 'Kante aus `db/Cargo.toml` löschen; betroffene Module in `db/src/` entfernen oder stubben.',
-    'acta-core': 'Mechanische Ersetzung `use acta_core::` → `use acta_types::` (K-11: ~286 Dateien). Nach `cargo check` Crate und Eintrag in `Cargo.toml` löschen (D-05).',
-    'acta-graph': '`engine/src/collection/crud/links.rs` löschen; graph-bezogene Funktionen (`stage_graph_entity_delete`, `check_and_trigger_community_detection`, `CommunityDetectionConfig`, PPR-Pfade im Hybrid-Planner) entfernen; Modalität als `modalities_unavailable` markieren.',
-    'acta-infer-ollama': 'Feature `ollama` bleibt in Fassade, aber Kante nur noch über Feature-Gate.',
-    'acta-infer-onnx': 'Feature `onnx` bleibt in Fassade, aber Kante nur noch über Feature-Gate.',
-    'acta-kvcache': '`engine/src/kv_cache_integration/` löschen; `Collection::with_kv_store`, `set_kv_store`, `kv_store`, `start_kv_cache_eviction`, `TenantIsolatedKvStore`-Reste entfernen; Layer `KvCache` → `FeatureDisabled`.',
-    'acta-router': 'Feature `router` in Fassade entfernen; `acta-py` anpassen.',
+    'contextra-adapt': '`AdaptiveController` durch feste Startwerte ersetzen: `efSearch = 64`, `exact_scan_max = 20_000`, Overfetch `3 / 6 / 12` (PLAN.md §7, WP 2.2 Schritt 3).',
+    'contextra-agent': 'Feature `agent-workflows` entfernen; optionale Kante aus `mcp/Cargo.toml` löschen.',
+    'contextra-cognition': 'Kante aus `db/Cargo.toml` löschen; betroffene Module in `db/src/` entfernen oder stubben.',
+    'contextra-core': 'Mechanische Ersetzung `use contextra_core::` → `use contextra_types::` (K-11: ~286 Dateien). Nach `cargo check` Crate und Eintrag in `Cargo.toml` löschen (D-05).',
+    'contextra-graph': '`engine/src/collection/crud/links.rs` löschen; graph-bezogene Funktionen (`stage_graph_entity_delete`, `check_and_trigger_community_detection`, `CommunityDetectionConfig`, PPR-Pfade im Hybrid-Planner) entfernen; Modalität als `modalities_unavailable` markieren.',
+    'contextra-infer-ollama': 'Feature `ollama` bleibt in Fassade, aber Kante nur noch über Feature-Gate.',
+    'contextra-infer-onnx': 'Feature `onnx` bleibt in Fassade, aber Kante nur noch über Feature-Gate.',
+    'contextra-kvcache': '`engine/src/kv_cache_integration/` löschen; `Collection::with_kv_store`, `set_kv_store`, `kv_store`, `start_kv_cache_eviction`, `TenantIsolatedKvStore`-Reste entfernen; Layer `KvCache` → `FeatureDisabled`.',
+    'contextra-router': 'Feature `router` in Fassade entfernen; `contextra-py` anpassen.',
 }
 
 def get_target_wp(dep_name, archive_crate):
-    if dep_name == 'acta-engine':
+    if dep_name == 'contextra-engine':
         return 'WP 2.2'
-    elif dep_name in ('acta-bench', 'benchmarks/acta-bench'):
+    elif dep_name in ('contextra-bench', 'benchmarks/contextra-bench'):
         return 'WP 2.1b'
     elif dep_name in ARCHIVE_CRATES and archive_crate in ARCHIVE_CRATES:
         return 'WP 2.1b'
-    elif dep_name in ('acta-py', 'acta-infer-candle', 'acta-privacy', 'acta-sandbox', 'acta-license', 'acta-audit-export', 'acta-avv-generator'):
-        return 'WP 2.3' if dep_name in ('acta-py', 'acta-core') else 'WP 2.4'
+    elif dep_name in ('contextra-py', 'contextra-infer-candle', 'contextra-privacy', 'contextra-sandbox', 'contextra-license', 'contextra-audit-export', 'contextra-avv-generator'):
+        return 'WP 2.3' if dep_name in ('contextra-py', 'contextra-core') else 'WP 2.4'
     else:
         return 'WP 2.3'
 
@@ -228,7 +228,7 @@ def main():
     lines.append("| WP | Kanten-Ziel | Status |")
     lines.append("|---|---|---|")
     lines.append("| WP 2.2 | `engine` entkoppeln | 🔴 offen |")
-    lines.append("| WP 2.3 | `db`, `mcp`, `acta`, `core` entkoppeln | 🔴 offen |")
+    lines.append("| WP 2.3 | `db`, `mcp`, `contextra`, `core` entkoppeln | 🔴 offen |")
     lines.append("| WP 2.4 | Rand-Crates als optional markieren | 🔴 offen |")
     lines.append("| WP 2.1b | `bench` & Archiv-Crates (physisches Entfernen) | 🔴 offen |")
     lines.append("")

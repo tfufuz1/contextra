@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GOLDEN_DIR = REPO_ROOT / "crates" / "acta-storage" / "tests" / "format" / "golden"
+GOLDEN_DIR = REPO_ROOT / "crates" / "contextra-storage" / "tests" / "format" / "golden"
 REFLECTED_POLY = 0x82F63B78
 
 

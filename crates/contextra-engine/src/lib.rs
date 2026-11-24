@@ -58,11 +58,6 @@ pub mod temporal_filter;
 #[cfg(not(loom))]
 pub mod transaction;
 
-#[cfg(feature = "sandbox")]
-pub mod merge_operator_adapter;
-#[cfg(feature = "sandbox")]
-pub use merge_operator_adapter::WasmMergeOperator;
-
 #[cfg(not(loom))]
 pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
 

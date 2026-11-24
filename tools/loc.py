@@ -14,18 +14,18 @@ import os
 import json
 
 CORE_CRATES = [
-    "acta-types",
-    "acta-ports",
-    "acta-mvcc",
-    "acta-crypto",
-    "acta-vector",
-    "acta-text",
-    "acta-store",
-    "acta-checkpoint",
-    "acta-engine",
-    "acta-db",
-    "acta",
-    "acta-mcp",
+    "contextra-types",
+    "contextra-ports",
+    "contextra-mvcc",
+    "contextra-crypto",
+    "contextra-vector",
+    "contextra-text",
+    "contextra-store",
+    "contextra-checkpoint",
+    "contextra-engine",
+    "contextra-db",
+    "contextra",
+    "contextra-mcp",
 ]
 
 def count_loc(filepath):

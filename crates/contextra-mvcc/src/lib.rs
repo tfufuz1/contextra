@@ -77,6 +77,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod contextra_ports;
+pub mod contextra_types;
+
 pub use contextra_types::{
     error::{self, ContextraError, Result},
     tombstone::{SeqBitTombstone, TombstoneSemanticsCheck},

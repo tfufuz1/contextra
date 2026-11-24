@@ -1,9 +1,9 @@
 # Configuration for cargo-mutants scoped to Tier-0/1 crates
 
 examine_globs = [
-    "crates/acta-crypto/src/**/*.rs",
-    "crates/acta-store/src/**/*.rs",
-    "crates/acta-checkpoint/src/**/*.rs",
+    "crates/contextra-crypto/src/**/*.rs",
+    "crates/contextra-store/src/**/*.rs",
+    "crates/contextra-checkpoint/src/**/*.rs",
 ]
 
 exclude_globs = [
@@ -17,7 +17,7 @@ exclude_globs = [
 ]
 
 test_package = [
-    "acta-crypto",
+    "contextra-crypto",
 ]
 
 copy_target = true

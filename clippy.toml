@@ -20,11 +20,11 @@ avoid-breaking-exported-api = false
 # ── P28-Verbotsliste ──────────────────────────────────────────────────────────
 [[disallowed-methods]]
 path = "std::time::Instant::now"
-reason = "P28: Zeit nur über Clock-Port. Verwende acta_ports::clock::Clock."
+reason = "P28: Zeit nur über Clock-Port. Verwende contextra_ports::clock::Clock."
 
 [[disallowed-methods]]
 path = "std::time::SystemTime::now"
-reason = "P28: Zeit nur über Clock-Port. Verwende acta_ports::clock::Clock."
+reason = "P28: Zeit nur über Clock-Port. Verwende contextra_ports::clock::Clock."
 
 [[disallowed-methods]]
 path = "rand::thread_rng"
