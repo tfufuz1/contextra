@@ -1,7 +1,9 @@
 # `contextra-mvcc` — Normative Spezifikation (SPEC v4.0)
 
+> **Revision R12** (Repo-Abgleich, HEAD `60ea034`): Änderungen gemäß `SPEC.md` K-58…K-63 und Anhang B.5. Abschnitte mit Kennzeichnung „R12“ sind normativ.
+
 > **Normativitätsklasse:** Klasse B (Storage-Bundle)
-> **Status:** Stabil (`stable`)
+> **Status:** Übergang (R12, K-40/K-58): `stable` bis G-CUTOVER, danach eingefroren. Kernpfade des neuen Speicherkerns verwenden diese Crate nicht.
 > **Sicherheitsstufe:** `#![forbid(unsafe_code)]`, Zero-Panic
 
 ---
@@ -37,7 +39,7 @@
 ## 3. Storage-Bundle-Kanten & Schnittstellen
 
 Als Klasse-B-Baustein teilt `contextra-mvcc` gemeinsame Speichertypen innerhalb des Storage-Bundles:
-- **`contextra-types`**: `TxId`, `DocId`, `TenantId`, `ContextraError`, `Result`, `TOMBSTONE_BIT`.
+- **`contextra-types`**: `Epoch` (R12, K-59; ersetzt `TxId`), `DocId`, `TenantId`, `ContextraError`, `Result`, `TOMBSTONE_BIT`.
 - **`contextra-ports`**: Übergangs-Anbindung für `Clock` und `MetricsSink`.
 - **State-Passing & Closure-Abstraktion (WP-4)**:
   Alle Komponenten bieten zeitstempelbasierte Signaturen (`*_at(now_nanos)`) und Closure-Konstruktoren (`with_time_fn`), wodurch Port-Imports für Zeiterfassung und Metriken optional entkoppelt sind.
@@ -54,3 +56,9 @@ Als Klasse-B-Baustein teilt `contextra-mvcc` gemeinsame Speichertypen innerhalb 
 | `DEFAULT_MAX_TOTAL_STAGED_BYTES` | 256 MiB | Globales Byte-Budget über alle Transaktionen |
 | `DEFAULT_MAX_TRACKED_COMMIT_KEYS` | 1.000.000 | Maximale Anzahl getrackter Commit-Schlüssel (Coarsening ab 80 %) |
 | `DEFAULT_MAX_PIN_DURATION` | 300 s | Schwellenwert für Warnungen über verwaiste Pins |
+
+## 5. R12-Ergänzungen
+
+- **Keine Kante aus Retrieval-Crates (K-40):** `contextra-vector` entfernt seine optionale Abhängigkeit auf `contextra-mvcc`. Snapshot- und SSI-Logik der Retrieval-Crates läuft über `Epoch`-Sichten des Speicherkerns.
+- **Übernahme in den Speicherkern:** Sequenzlog, Snapshot-Registry und SSI-Validierung werden in `contextra-storage` (Stamp/Epoch-Modell) überführt. Diese Crate liefert dazu nur Referenzverhalten und Differenztests (`INV-MVCC-SSI-1` als Testorakel).
+- **INV-LOCK-ORDER-1** gilt unverändert, bis die Übernahme abgeschlossen ist.

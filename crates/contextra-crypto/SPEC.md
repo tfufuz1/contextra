@@ -1,4 +1,6 @@
-# Spezifikation: `contextra-crypto` (Ring 0 / Klasse A)
+# Spezifikation: `contextra-crypto` (Ring 0 / Level 2 Übergang, R12 K-58)
+
+> **Revision R12** (Repo-Abgleich, HEAD `60ea034`): Änderungen gemäß `SPEC.md` K-58…K-63 und Anhang B.5. Abschnitte mit Kennzeichnung „R12“ sind normativ.
 
 ## 1. Zweck und Baukasten-Profil
 `contextra-crypto` ist die fundamentale, autarke Kryptographie-Bibliothek des Systems Contextra (Ring 0). Sie implementiert standardkonforme kryptographische Primitive und Chiffren:
@@ -7,7 +9,7 @@
 - **WAL-Integrität & Anti-Tamper:** HMAC-SHA256 Integritätsketten, Sequenznummern-Validierung und Anti-Mirroring.
 - **Schlüsselspeicher & Memory-Hygiene:** `Zeroize` und `ZeroizeOnDrop` für flüchtige Schlüsselmaterialien (`SecretKey`, `Secret`, `VolatileEncryptionKey`, `UnitKey`, `Dek`).
 - **Audit-Kette:** Kryptographisch verknüpfte Audit-Log-Einträge mit Salted BLAKE3-Commitments.
-- **KV-Segment-Verschlüsselung:** Neutrale Segment-Chiffre (`KvSegmentCipher`, `EncryptedKvLayer`) zur Speicherung segmentierter Tensoren und Vektoren.
+- **KV-Segment-Verschlüsselung (R12, K-61):** entfällt aus dieser Crate. Segmentverschlüsselung gehört in den Speicherkern (Owner-Klasse `MixedPerClusterKey`). `KvSegmentCipher`, `EncryptedKvLayer` und Feature `kv-encryption` werden vor G-R5 entfernt. `default` verliert `kv-encryption`.
 
 ### Nicht-Ziele
 - Keine Löschbeweise, Schichtenscanner, Zeugen-Aggregation oder DSGVO/GDPR-Fachlogik. Diese Komponenten gehören in `contextra-erasure` (SPEC §6.2) und verbleiben hier nur übergangsweise hinter dem Feature `legacy-erasure` mit `#[deprecated]`-Markierung.
@@ -31,6 +33,9 @@
 
 ---
 
+- **INV-CRYPTO-DESTROY-1 (R12):** Schlüsselvernichtung (`zeroize` plus Entfernen aus dem Schlüsselspeicher) ist die einzige kryptografische Löschoperation. Sie erzeugt ein Receipt `KeysDestroyed` im Speicherkern und ist nicht rückgängig zu machen.
+- **INV-CRYPTO-OWNER-1 (R12):** Jeder Schlüssel ist an genau einen Owner gebunden (Cluster, Person, Partition). Schlüssel mehrerer Löschdomänen werden nicht geteilt (K-60).
+
 ## 3. Fehlermodell
 Alle kryptographischen Fehler werden über den crate-lokalen Fehlertyp `CryptoError` typisiert zurückgegeben:
 - `CryptoError::Aead`: Authentifizierungs- oder Entschlüsselungsfehler.
@@ -38,3 +43,8 @@ Alle kryptographischen Fehler werden über den crate-lokalen Fehlertyp `CryptoEr
 - `CryptoError::IntegrityViolation`: Erkannte Integritätsverletzung oder fehlerhafter MAC-Tag.
 - `CryptoError::WalCorruption`: WAL-Korruptionserkennung mit Byte-Offset.
 - `CryptoError::InvalidLength`: Ungültige Schlüssel- oder Nonce-Länge.
+
+## 5. R12-Feature-Ziel
+
+- `default` nach G-R5: `["std"]`. `legacy-erasure` ist `#[deprecated]` und wird vor G-CUTOVER entfernt. `test-utils` wird nur für `dev-dependencies` genutzt.
+- Keine Kante von `contextra-kvcache` oder Retrieval-Crates auf dieses Crate (K-61, K-58).

@@ -1,6 +1,8 @@
 # SPEC: `contextra-sys` (Baustein-Spezifikation v4.1)
 
-> **Klasse:** A (Vollständig autarker Baustein nach SPEC §5.1, B1–B12)
+> **Revision R12** (Repo-Abgleich, HEAD `60ea034`): Änderungen gemäß `SPEC.md` K-58…K-63 und Anhang B.5. Abschnitte mit Kennzeichnung „R12“ sind normativ.
+
+> **Klasse:** L0 Unsafe-Insel (R12, K-58; zuvor Klasse A nach SPEC §5.1, B1–B12)
 > **Ring:** Ring 0 (Unsafe-Insel)
 > **Status:** Stabil
 > **Geltung:** Verbindliche Verhaltens- und Schnittstellenspezifikation für Systemprimitive in Contextra.
@@ -10,7 +12,7 @@
 ## 1. Zweck und Rolle
 `contextra-sys` stellt systemnahe Betriebssystem-Primitive hinter einer **100 % sicheren Rust-Fassade** bereit:
 1. **Durability-Synchronisation:** Plattformangepasste Datei- und Verzeichnissynchronisation (`fdatasync`, `fsync`, macOS `F_FULLFSYNC`, Windows `FlushFileBuffers`) sowie typsicheres Handle-Poisoning via [`DurableFile`].
-2. **Speicherabbildung (`mmap` / `SealedMap`):** Schreibgeschützte Speicherabbildungen unveränderlicher Dateien mit strenger Längenvalidierung und Signalanomalie-Schutz.
+2. **Speicherabbildung (`mmap` / `SealedMap`):** Schreibgeschützte Speicherabbildungen unveränderlicher Dateien mit strenger Längenvalidierung und Signalanomalie-Schutz. **R12 (K-62):** nur hinter Feature `mmap`; nie im Index- oder Sealed-Pfad des Speicherkerns.
 3. **RAM-Sperrung (`mlock`):** Schutz sensibler Speicherseiten vor Paging/Swapping auf persistenten Speicher inklusive `madvise(MADV_DONTDUMP)`.
 4. **Tresor-Speicherverwaltung (`vault`):** RAII-verwaltete gesperrte Regionen ([`LockedRegions`]), geschützte Allokationen ([`VaultBuffer`]) und volatile Speicherlöschung (`write_volatile` + Compiler-Fence `SeqCst`).
 5. **Prozess-Ressourcenlimits (`posix`):** Abfrage und Erhöhung von Dateideskriptorlimits (`rlimit`) und Deskriptorumleitung (`dup2`).
@@ -26,6 +28,7 @@
 | **INV-SYS-FSYNC-1** | Durability-Fehler dürfen niemals verschluckt oder still wiederholt werden (nur `EINTR` wird wiederholt). Tritt ein Flush-Fehler auf, wird das Handle permanent vergiftet und jeder nachfolgende Flush- oder Schreibversuch schlägt fehl. | `durable_flush_file`, `durable_flush_dir`, `write_all_durable`, `DurableFile` |
 | **INV-SYS-MEMLOCK-1** | Über `VaultBuffer` allozierte Puffer werden mit `mlock` gesperrt, per `MADV_DONTDUMP` vom Core-Dump ausgenommen, beim Drop mit einem nicht wegoptimierbaren Zeroize überschrieben (`write_volatile` + Fence) und erst danach `munlock`/freigegeben. Scheitert `mlock`, schlägt die Allokation fail-closed fehl. | `mlock.rs`, `vault.rs`, `VaultBuffer` |
 | **INV-IO-1** | `mmap` darf nur auf verifizierten, unveränderlichen Dateien ausgeführt werden. Mutationen während bestehender Mappings sind unzulässig. | `SealedFile::new_verified`, `SealedMap` |
+| **INV-SYS-MMAP-GATE-1** (R12) | `memmap2` ist optionale Abhängigkeit hinter Feature `mmap`. Ohne das Feature existiert kein Mapping-Typ. Der Speicherkern (`contextra-storage`) und die Retrieval-Crates binden das Feature nicht ein. | Cargo-Feature-Gate, `scripts/check_forbidden_apis.sh` (Erweiterung R12) |
 | **INV-ENCRYPT-REST-2** | Zero-Copy-`mmap` erfordert volumenlokale Speicherung und verifizierte Integrität. | `mmap_readonly`, `SealedFile` |
 | **INV-HEAP-ZERO-1** | Sensible Puffer werden vor der Freigabe mit flüchtigen Schreibzugriffen (`write_volatile`) und Compiler-Fence genullt, um Compiler-Elimination (Dead-Store Elimination) auszuschließen. | `LockedRegions::zeroize_slice`, `VaultBuffer::drop` |
 | **INV-PLATFORM-1** | Fehlende Plattformunterstützung führt niemals zu stillschweigendem Erfolg. Plattformspezifische Operationen deklarieren deterministisches Verhalten oder typisierte Fehler (`MemLockPolicy::FailClosed`, `Error::Unsupported`). | `mlock.rs`, `acl_win32.rs`, `durability.rs` |
@@ -54,5 +57,5 @@
 | `durable_flush_file` / `DurableFile` | `fdatasync` / `fsync` | `fcntl(F_FULLFSYNC)` / `fsync` | `FlushFileBuffers` | `Error::Unsupported` |
 | `durable_flush_dir` | `open(O_DIRECTORY)` + `fsync` | `open(O_RDONLY)` + `fsync` | Best Effort (`Ok(())`) | `ErrorKind::Unsupported` |
 | `mem_lock` / `VaultBuffer` | `libc::mlock` + `MADV_DONTDUMP` | `libc::mlock` + `MADV_ZERO_WIRED_PAGES` | `VirtualLock` | `MemLockPolicy::FailClosed` |
-| `mmap_readonly` | `memmap2::Mmap` | `memmap2::Mmap` | `memmap2::Mmap` | `memmap2::Mmap` |
+| `mmap_readonly` (nur Feature `mmap`) | `memmap2::Mmap` | `memmap2::Mmap` | `memmap2::Mmap` | `Error::Unsupported` |
 | `ACL / Permissions` | `chmod 0600` + `getuid()` | `chmod 0600` + `getuid()` | DACL via `SetNamedSecurityInfoW` | Best Effort / No-Op |

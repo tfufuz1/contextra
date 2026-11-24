@@ -1,8 +1,10 @@
 # SPEC: `contextra-vector` (HNSW-Vektorindex mit Quantisierung & Filterung)
 
+> **Revision R12** (Repo-Abgleich, HEAD `60ea034`): Änderungen gemäß `SPEC.md` K-58…K-63 und Anhang B.5. Abschnitte mit Kennzeichnung „R12“ sind normativ.
+
 ## 1. Zweck und Architektur-Rolle
-`contextra-vector` ist ein autarker Baustein der **Klasse A** (SPEC v4.0 §4.3, §5.1, §11.4) zur graphbasierten approximativen Nächste-Nachbarn-Suche (Hierarchical Navigable Small World, HNSW) und Quantisierung (SQ8, RaBitQ).
-Der Baustein ist vollständig unabhängig von Transaktions- und Storage-Kernen (`contextra-mvcc`, `contextra-types`, `contextra-ports`).
+`contextra-vector` ist ein autarker Baustein der **Level 2 Triebwerk** (R12, K-58; zuvor Klasse A, SPEC v4.0 §4.3, §5.1, §11.4) zur graphbasierten approximativen Nächste-Nachbarn-Suche (Hierarchical Navigable Small World, HNSW) und Quantisierung (SQ8, RaBitQ).
+**R12:** Der Baustein kennt nur `contextra-types` und `contextra-ports` (Ebenenregel K-58). Keine Kante zu `contextra-mvcc` (K-40) und keine zu `contextra-storage`. Persistenz erfolgt über Partitionen, die `contextra-index-bridge` besitzt (K-48).
 
 Der Kern-Vertrag ist in `src/contract.rs` eingefroren und definiert `Index`, `Maintain`, `Error`, `Result`, `ExternalId`, `Metric`, `ScoredPoint`, `DistanceFn`, `Clock` und `Rng`.
 
@@ -17,6 +19,9 @@ Der Kern-Vertrag ist in `src/contract.rs` eingefroren und definiert `Index`, `Ma
   - *Verifiziert durch:* `tests/hnsw_layer_determinism.rs`, `tests/hnsw_seed_determinism.rs`.
 - **INV-TENANT-IDX-1:** Indizes sind physisch streng isoliert; es gibt keine mandantenübergreifenden Kanten oder Caches.
   - *Verifiziert durch:* Isolationsprüfungen und Namespace-Partitionierung.
+- **INV-VEC-SEP-1 (R12, K-60):** Geteilte Vektorpartitionen enthalten ausschließlich Vektoren aus pseudonymisiertem Text. Klartext-Embeddings von `Personal`-Chunks existieren nur im Cluster-Mikroindex der Person (Modus A) unter deren Clusterschlüssel.
+  - *Verifiziert durch (geplant):* `tests/personal_partition_separation.rs`.
+- **INV-VEC-PARTITION-1 (R12):** Ein Löschauftrag ändert nur Partitionen, deren Mitgliedschaft die Person enthält; die Löschkosten sind durch die Partitionsgröße begrenzt (`H-36`).
 - **INV-SIMD-FINITE-1 / INV-SIMD-ALIGN-1:** Vektoren mit `NaN` oder `±Inf` werden strikt zurückgewiesen.
   - *Verifiziert durch:* `tests/nan_validation_policy.rs`, `tests/simd_numerical_audit.rs`.
 
@@ -40,3 +45,11 @@ Ein primärer Fehlertyp `Error` (`#[derive(thiserror::Error)]`, `#[non_exhaustiv
 - `StateConflict(&'static str)`
 - `Corrupt(&'static str)`
 Sowie `pub type Result<T> = core::result::Result<T, Error>;`.
+
+## 6. R12-Abhängigkeiten und Schnittstellen
+
+- **Abhängigkeiten (Soll):** `contextra-types`, `contextra-ports`. `contextra-mvcc` entfällt (K-40). `contextra-sys` nur über Feature `mmap` (K-62).
+- **`memmap2`:** heute unbedingte Abhängigkeit in 17 Quelldateien. Ziel: optional, nur hinter Feature `mmap`; der Standardpfad ist `mmap`-frei.
+- **`std::fs`:** heute in 7 Dateien. Ziel: Dateizugriffe verlassen den Index vollständig und laufen über die Partition-Sinks der Index-Bridge.
+- **`TxId`:** heute eigene Kopie in `src/types.rs`. Ziel: `contextra_types::Epoch` (K-59).
+- **Konstanten:** `MAX_SEARCH_K = 10_000` bleibt. Partitionslimits für `Personal` werden in der Index-Bridge geführt, nicht hier.

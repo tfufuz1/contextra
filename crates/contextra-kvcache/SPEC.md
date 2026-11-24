@@ -1,6 +1,8 @@
 # SPEC.md: `contextra-kvcache`
 
-**Klasse:** A (Stand-alone Baustein)
+> **Revision R12** (Repo-Abgleich, HEAD `60ea034`): Änderungen gemäß `SPEC.md` K-58…K-63 und Anhang B.5. Abschnitte mit Kennzeichnung „R12“ sind normativ.
+
+**Klasse:** L2 Triebwerk (R12, K-58; zuvor A Stand-alone). Interne Abhängigkeiten nur `contextra-types` und `contextra-ports`.
 **Status:** Welle 3 (Auftrag A abgeschlossen)
 **Standard:** SPEC v4.0 §2, §3, §4, §5, §6
 
@@ -10,7 +12,7 @@
 `contextra-kvcache` ist ein autarker, hochperformanter und verschlüsselter Key-Value Prefix-Cache für LLM-Inferenzzustände (Attention KV-Caches). Er ermöglicht:
 * Prefix-Sharing über Radix-Bäume zur Vermeidung redundanter Prefill-Berechnungen.
 * Mandanten-isolierte Speicherverwaltung (`TenantIsolatedKvStore`).
-* Segment-Level Verschlüsselung über den neutralen `SegmentCipher`-Port.
+* Segment-Verschlüsselung über den Port `SegmentCipher`. **R12 (K-61):** Die eigene Krypto-Implementierung und das Feature `kv-encryption` entfallen; Segmentschlüssel werden vom Owner-Klassen-Vertrag des Speicherkerns verwaltet (`MixedPerClusterKey`).
 * Neutrale Schlüsselzerstörung (`SegmentKey::destroy()`) zur sofortigen Krypto-Invalidierung einzelner Segmente ohne Löschlogik-Kopplung.
 * LRU- und Aufmerksamkeits-basierte Verdrängungsstrategien (`AttentionEvictionPolicy`, `SievePolicy`).
 * Additive KIVI-Quantisierung für 2-Bit/4-Bit KV-Caches (`kivi-quantization`).
@@ -23,6 +25,7 @@
 * **INV-KV-1 (Tenant-Isolation):** Cacheschlüssel und Segmente sind strikt an einen `TenantId` gebunden. Kein mandantenübergreifender Zugriff auf Segmente oder Radix-Knoten.
 * **INV-KV-2 (Krypto-Invalidierung):** Durch Aufruf von `SegmentKey::destroy()` wird das Schlüsselmaterial genullt (`zeroize`). Ein zerstörter Schlüssel kann nicht mehr entschlüsseln (`SegmentKeyDestroyed`).
 * **INV-KV-3 (Zero-Panic):** Kein `unwrap()`, `expect()` oder unkontrolliertes Panicken im Produktionspfad. Fehler werden typisiert über `KvCacheError` zurückgegeben.
+* **INV-KV-5 (R12, Owner-Bindung):** Jeder persistierte Segment-Schlüssel ist an einen Owner (`SegmentOwner`) gebunden. Ein Segment ohne Owner-Zuordnung wird nicht geschrieben.
 * **INV-KV-4 (Entkoppelter Löschkern):** Keine Löschlogik (DSGVO, Art. 17, Sagarecords, Witnesses, Purger) im Produktionskern. Datenhaltende Komponenten bieten nur `insert`, `remove`, `search` und neutrale Wartung (`maintain`, `reclaim`).
 
 ---
@@ -41,7 +44,7 @@
 * `SegmentCipher`: Trait zur Block-/Segmentverschlüsselung:
   * `encrypt_segment(&self, key: &SegmentKey, plaintext: &[u8]) -> Result<Vec<u8>, KvCacheError>`
   * `decrypt_segment(&self, key: &SegmentKey, ciphertext: &[u8]) -> Result<Vec<u8>, KvCacheError>`
-* `PlaintextSegmentCipher`: No-op Implementierung für unverschlüsselte Umgebungen oder Tests.
+* `PlaintextSegmentCipher`: No-op Implementierung für unverschlüsselte Umgebungen oder Tests. **Nur** für Tests und Entwicklungsprofile; produktiver Build verlangt einen Owner-Schlüssel (R12, `INV-KV-5`).
 
 ### 3.3 Kernkomponenten
 * `PrefixRadixTree`: Radix-Baum für Prefix-Caching mit Verzweigungs- und Zusammenführungslogik.
@@ -53,12 +56,10 @@
 ## 4. Feature-Flags
 
 * `default = ["std", "ports-compat"]`
-* `content-addressed-kv-cache`: Aktiviert Hash-basierte Segmentidentifikation.
-* `kv-encryption`: Aktiviert Segment-Verschlüsselung.
-* `kivi-quantization`: Aktiviert KIVI 2-Bit/4-Bit Quantisierungskerne.
+* `kivi-quantization`: Aktiviert KIVI 2-Bit/4-Bit Quantisierungskerne. (Das im Code zusätzlich vorhandene Duplikat `kvcache-kivi-quant` wird entfernt, R12.)
 * `kvcache-attention-eviction`: Aktiviert aufmerksamkeitsgewichtete Verdrängung.
-* `ports-compat` (transitional): Anbindung an `contextra-ports` und `contextra-types`.
-* `crypto-compat` (transitional): Anbindung an `contextra-crypto` für `SegmentCipher`.
+* `ports-compat` (transitional, bis G-CUTOVER): Anbindung an `contextra-ports` und `contextra-types`.
+* **R12 entfernt (K-61):** `content-addressed-kv-cache` (Inhaltsadressierung über Löschdomänen hinweg ist unzulässig, `INV-PRIV-1`), `kv-encryption`, `crypto-compat` (keine Kante zu `contextra-crypto`).
 
 ---
 
@@ -66,4 +67,4 @@
 
 * Concurrency via `tokio::sync::RwLock` / `parking_lot::RwLock`.
 * Keine Blockaden über Async-Grenzen hinweg.
-* In-Memory Caching mit optionalem Überlauf in `KvSpillStorage`.
+* In-Memory Caching. **R12 (K-48, K-60):** Überlauf erfolgt nicht über eine eigene Datei-Schicht (`KvSpillStorage` entfällt), sondern über `SegmentOwner` der Index-Bridge. `KvSpillStorage` bleibt nur bis G-CUTOVER als Trait-Platzhalter.

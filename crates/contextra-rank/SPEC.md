@@ -1,6 +1,8 @@
 # `contextra-rank` — Spezifikation (SPEC v4.0)
 
-> **Klasse:** A (Autarker Rechnerkern) · **Ring:** 0 · **Unsafe:** `#![forbid(unsafe_code)]`
+> **Revision R12** (Repo-Abgleich, HEAD `60ea034`): Änderungen gemäß `SPEC.md` K-58…K-63 und Anhang B.5. Abschnitte mit Kennzeichnung „R12“ sind normativ.
+
+> **Klasse:** L2 Triebwerk (R12, K-58; zuvor A) · **Unsafe:** `#![forbid(unsafe_code)]`
 
 ## 1. Zweck und Verhalten
 `contextra-rank` ist ein reiner Logik-Baustein zur Signal- und Rangfusion (RRF, mRRF), Score-Normalisierung, Kalibrierung (Isotonic via PAVA, Platt-Scaling, Conformal Prediction) sowie Drift-Erkennung und Explainability.
@@ -8,6 +10,7 @@
 ## 2. Invarianten und Verträge
 - **INV-RANK-DETERMINISM-1:** Bei identischen Eingabelisten ist das Fusionsergebnis bitgenau reproduzierbar, unabhängig von Hash-Reihenfolge und Thread-Zahl.
 - **INV-RANK-MONOTONIC-1:** Isotonische Kalibrierung invertiert nie die relative Rangfolge (monoton nicht fallend) und stimmt mit dem Orakel-PAVA überein.
+- **INV-RANK-DETERMINISM-2 (R12):** Im Ausgabepfad wird nie über `ahash`-Maps mit zufälligem Seed iteriert. Ausgaben entstehen aus sortierten Vektoren oder `BTreeMap`. Begründung: `ahash::RandomState` erzeugt pro Prozess eine andere Reihenfolge.
 - **INV-RRF-1 (Gleichstandsauflösung):** Gleichstände werden deterministisch über Score absteigend, gefolgt von stabiler ID-Reihenfolge aufgelöst.
 - **INV-RRF-2 (K_RRF Konstante):** Standard-Glättungsparameter ist `k = 60.0`. Formel: `1.0 / (k + rank)`.
 - **INV-CAL-1 (Isotonische Monotonie):** Nach dem PAVA-Rebuild ist die kalibrierte Wahrscheinlichkeitsfunktion schwach monoton steigend über die sortierten Roh-Scores.
@@ -32,3 +35,7 @@
 ## 5. Concurrency & Durability
 - `contextra-rank` ist rein funktional und zustandslos bzw. thread-safe über `Send + Sync`.
 - Keine Locks über `.await`, keine I/O- oder Persistenzoperationen.
+
+## 6. R12-Hinweis
+
+`rank` bleibt ohne Abhängigkeit auf Speicher oder Persistenz. Abhängigkeiten sind nur `contextra-types` und `contextra-ports` (Ebenenregel K-58); die Kante wird in Phase P0 eingetragen, nicht in dieser Datei.

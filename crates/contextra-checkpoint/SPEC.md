@@ -1,6 +1,8 @@
 # SPEC.md — `contextra-checkpoint`
 
-**Klasse:** B (Storage Bundle)
+> **Revision R12** (Repo-Abgleich, HEAD `60ea034`): Änderungen gemäß `SPEC.md` K-58…K-63 und Anhang B.5. Abschnitte mit Kennzeichnung „R12“ sind normativ.
+
+**Klasse:** L2 Triebwerk / Übergang (R12, K-58, K-63); zuvor Klasse B (Storage Bundle)
 **Normative Architektur:** SPEC v4.0 §5 (Klasse B), Ring 1
 **Verantwortung:** Point-in-Time-Checkpoints, konsistente Snapshot-Exporte, Zwei-Spuren-Backup (Daten getrennt von Schlüsseln), RAII-Guards und deterministisches Orphan-Reaping.
 
@@ -17,7 +19,7 @@
 ## 2. Ports & Schnittstellen
 
 ### 2.1 Konsumierte Ports (`contextra-ports`)
-- `StorageEngine`: Persistieren und Laden von Checkpoint-Manifesten, Pinning/Unpinning von Sequenznummern (`pin_checkpoint`, `unpin_checkpoint`), atomare Commit-/Rollback-Operationen.
+- `StorageEngine` **(Alt-Vertrag, K-63)**: bis G-CUTOVER über `storage-bridge`. Neue Checkpoints basieren auf dem `Receipt`/`Stamp` des Speicherkerns. Persistieren und Laden von Checkpoint-Manifesten, Pinning/Unpinning von Sequenznummern (`pin_checkpoint`, `unpin_checkpoint`), atomare Commit-/Rollback-Operationen.
 - `Vfs`: Dateisystem-Operationen für Hardlink-Klone und Orphan-State-Persistenz ohne ungeprüfte I/O-Fehler.
 - `Clock`: Deterministische Zeitbasis für Metadaten-Zeitstempel (`timestamp_ms`).
 - `IdGen`: Deterministische Identifikator-Generierung.
@@ -36,6 +38,8 @@
 - **INV-CKP-GUARD-RAII-1:** Ein unvollendeter `CheckpointGuard` erzwingt bei Drop die Registrierung in der `InstanceOrphanRegistry`.
 - **INV-CKP-PIN-1:** Ein Checkpoint bleibt gepinnt, bis er explizit freigegeben oder per Reaper bereinigt wird; verhindert vorzeitigen Version-GC.
 - **INV-CKP-DETERMINISM-1:** Zeit und IDs stammen ausschließlich aus injizierten Ports (`Clock`, `IdGen`).
+- **INV-CKP-EPOCH-1 (R12, K-59):** Pins und Wiederherstellungen referenzieren ausschließlich `contextra_types::Epoch`. Keine eigene Versionszahl.
+- **INV-CKP-HARDLINK-1 (R12, Übergang):** Hardlink-Klone sind nur Übergangspfad. Ab G-CUTOVER ersetzt der Storage-Snapshot den Pfad; Klone enthalten nie Schlüsselmaterial (INV-CKP-NO-KEYS-1).
 
 ---
 
@@ -50,6 +54,10 @@
 ## 5. Fehlermodell
 
 Alle Fehler kapseln sich in `contextra_types::error::ContextraError`:
-- `ContextraError::NotFound`: Checkpoint mit dem angegebenen Namen oder TxId existiert nicht.
+- `ContextraError::NotFound`: Checkpoint mit dem angegebenen Namen oder `Epoch` existiert nicht (R12, K-59: `TxId` ersetzt).
 - `ContextraError::InvalidState`: Korrupte Manifeste, unerlaubte Whitespaces oder ungültige Komponenten.
 - `ContextraError::Storage`: Fehler bei I/O- oder StorageEngine-Operationen.
+
+## 6. R12-Hinweis zur Einordnung
+
+Checkpoints sind Sichten auf Stände, keine Löschwerkzeuge. Beim Entfernen einer Person aus einem Checkpoint gilt: Der Checkpoint muss vor Ablauf von `purge_deadline` ebenfalls neu erzeugt oder verworfen werden (Verweis `K-60`, `H-36`). Diese Pflicht liegt bei der Engine (`contextra-engine`), nicht hier.
