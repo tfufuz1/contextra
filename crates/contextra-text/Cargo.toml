@@ -24,6 +24,8 @@ bm25f = []
 docid-128 = []
 
 [dependencies]
+contextra-ports = { workspace = true }
+contextra-types = { workspace = true }
 bytes = { workspace = true }
 itoa = "1.0"
 regex = "1.10"

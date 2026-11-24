@@ -13,6 +13,8 @@ description = "Encryption at Rest and KV-Cache Security utilities for Contextra"
 ring = "0"
 
 [dependencies]
+contextra-ports = { workspace = true }
+contextra-types = { workspace = true }
 thiserror = { workspace = true }
 sha2 = "0.10"
 hmac = "0.12"

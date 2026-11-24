@@ -7,11 +7,13 @@ members = [
     "crates/contextra-engine",
     "crates/contextra-graph",
     "crates/contextra-mvcc",
+    "crates/contextra-ports",
     "crates/contextra-rank",
     "crates/contextra-simd",
     "crates/contextra-storage",
     "crates/contextra-sys",
     "crates/contextra-text",
+    "crates/contextra-types",
     "crates/contextra-vector",
 ]
 
@@ -72,11 +74,13 @@ contextra-crypto = { path = "crates/contextra-crypto" }
 contextra-engine = { path = "crates/contextra-engine" }
 contextra-graph = { path = "crates/contextra-graph" }
 contextra-mvcc = { path = "crates/contextra-mvcc" }
+contextra-ports = { path = "crates/contextra-ports" }
 contextra-rank = { path = "crates/contextra-rank" }
 contextra-simd = { path = "crates/contextra-simd" }
 contextra-storage = { path = "crates/contextra-storage" }
 contextra-sys = { path = "crates/contextra-sys" }
 contextra-text = { path = "crates/contextra-text" }
+contextra-types = { path = "crates/contextra-types" }
 contextra-vector = { path = "crates/contextra-vector" }
 
 # Ingestion dependencies

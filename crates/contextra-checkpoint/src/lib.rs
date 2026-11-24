@@ -32,8 +32,8 @@
 // REVIEW-PASS[1/2] (TS: 2026-09-15T15:09:43Z) (SESSION: 2e382e86) PRÜFER-KONTEXT: FRESH
 // REVIEW-PASS[2/2] (TS: 2026-09-16T16:23:23Z) (SESSION: 8d62c439) PRÜFER-KONTEXT: FRESH
 
-pub mod crate::contextra_ports;
-pub mod crate::contextra_types;
+pub mod contextra_ports;
+pub mod contextra_types;
 
 pub use crate::contextra_types::{ContextraError, Result, TxId, WorkflowState};
 
