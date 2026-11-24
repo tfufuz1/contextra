@@ -61,9 +61,10 @@ impl PurgeRunner {
         let mut unlinked = Vec::new();
         for file_id in dead_files {
             let path = runs_dir.join(format!("{:016x}.run", file_id));
-            if fs.exists(&path)? {
-                fs.unlink(&path, purge_ctx("purge_unlink_dead_run"))?;
-                unlinked.push(path);
+            match fs.unlink(&path, purge_ctx("purge_unlink_dead_run")) {
+                Ok(()) => unlinked.push(path),
+                Err(Error::Io { kind: std::io::ErrorKind::NotFound, .. }) => {}
+                Err(e) => return Err(e),
             }
         }
         if !unlinked.is_empty() {

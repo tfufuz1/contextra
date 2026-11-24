@@ -34,7 +34,7 @@ impl Compactor {
         let temp_path = runs_dir.join(&temp_name);
         let final_path = runs_dir.join(&final_name);
 
-        let file = fs.create(&temp_path, compact_ctx("compact_create_temp"))?;
+        let file = fs.create_new(&temp_path, compact_ctx("compact_create_temp"))?;
         if let Err(e) = file
             .append_prealloc(compacted_bytes, compact_ctx("compact_write_data"))
             .and_then(|_| file.sync_all(compact_ctx("compact_sync_file")))

@@ -37,7 +37,7 @@ impl FlushRunner {
         let temp_path = runs_dir.join(&temp_name);
         let final_path = runs_dir.join(&final_name);
 
-        let file = fs.create(&temp_path, flush_ctx("flush_create_temp"))?;
+        let file = fs.create_new(&temp_path, flush_ctx("flush_create_temp"))?;
         if let Err(e) = file
             .append_prealloc(&job.raw_data, flush_ctx("flush_write_data"))
             .and_then(|_| file.sync_all(flush_ctx("flush_sync_file")))
