@@ -1,0 +1,3601 @@
+{
+ "name": "contextra-infer-ollama",
+ "version": "workspace",
+ "path": "crates/contextra-infer-ollama",
+ "role": "Inferenz Ollama",
+ "features": {
+  "default": [],
+  "client": [
+   "dep:reqwest",
+   "dep:tokio",
+   "dep:futures",
+   "dep:futures-util"
+  ],
+  "http": [
+   "client"
+  ],
+  "workspace": [
+   "dep:contextra-types",
+   "dep:contextra-ports"
+  ],
+  "types-compat": [
+   "workspace"
+  ],
+  "ports-compat": [
+   "workspace"
+  ]
+ },
+ "deps": {
+  "contextra-types": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "contextra-ports": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "parking_lot": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "regex": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "reqwest": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "tokio": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "futures": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "futures-util": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "quick-xml": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "proptest": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "tracing-test": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "criterion": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  }
+ },
+ "crate_doc": [],
+ "files": [
+  {
+   "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+   "module": "client::circuit_breaker",
+   "lines": 193
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/client/config.rs",
+   "module": "client::config",
+   "lines": 64
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/client/core.rs",
+   "module": "client::core",
+   "lines": 1251
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/client/errors.rs",
+   "module": "client::errors",
+   "lines": 38
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+   "module": "client::policy",
+   "lines": 409
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/client/validation.rs",
+   "module": "client::validation",
+   "lines": 62
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/client/wire.rs",
+   "module": "client::wire",
+   "lines": 62
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/client.rs",
+   "module": "client",
+   "lines": 47
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/compat/client.rs",
+   "module": "compat::client",
+   "lines": 19
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/compat/client_tests.rs",
+   "module": "compat::client_tests",
+   "lines": 1739
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/compat/embedding.rs",
+   "module": "compat::embedding",
+   "lines": 290
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/compat/error.rs",
+   "module": "compat::error",
+   "lines": 184
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/compat/mod.rs",
+   "module": "compat",
+   "lines": 17
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/compat/query_rewriter.rs",
+   "module": "compat::query_rewriter",
+   "lines": 56
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/compat/trait_impls.rs",
+   "module": "compat::trait_impls",
+   "lines": 66
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/compat/types.rs",
+   "module": "compat::types",
+   "lines": 48
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+   "module": "context_prefixer",
+   "lines": 461
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/embedding.rs",
+   "module": "embedding",
+   "lines": 155
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/error.rs",
+   "module": "error",
+   "lines": 189
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/importance.rs",
+   "module": "importance",
+   "lines": 685
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "module": "crate",
+   "lines": 43
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/model_info.rs",
+   "module": "model_info",
+   "lines": 339
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+   "module": "query_rewriter",
+   "lines": 302
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/traits.rs",
+   "module": "traits",
+   "lines": 44
+  },
+  {
+   "file": "crates/contextra-infer-ollama/src/xml_escape.rs",
+   "module": "xml_escape",
+   "lines": 19
+  }
+ ],
+ "counts": {
+  "unwrap": 69,
+  "expect": 5,
+  "panic_macro": 5,
+  "todo_unimpl": 0,
+  "index_bracket": 16,
+  "cfg_feature_gates": 63
+ },
+ "grep_pub_decl": 141,
+ "all_pub_decl": 141,
+ "public_items": [
+  {
+   "kind": "enum",
+   "name": "BreakerStatus",
+   "vis": "pub",
+   "module": "client::circuit_breaker",
+   "signature": "pub enum BreakerStatus",
+   "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+   "line": 10,
+   "doc": [
+    "Expliziter Zustand des Circuit-Breakers."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Closed",
+     "shape": "",
+     "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+     "line": 12
+    },
+    {
+     "name": "Open",
+     "shape": "",
+     "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+     "line": 14
+    },
+    {
+     "name": "HalfOpen",
+     "shape": "",
+     "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+     "line": 16
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "CircuitBreaker",
+   "vis": "pub",
+   "module": "client::circuit_breaker",
+   "signature": "pub struct CircuitBreaker",
+   "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+   "line": 29,
+   "doc": [
+    "Thread-safe circuit breaker backed by the `Clock` port."
+   ],
+   "attrs": [
+    "#[derive(Debug)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(failure_threshold: u32, reset_timeout: Duration) -> Self",
+     "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+     "line": 37,
+     "doc": [
+      "Erstellt eine neue Instanz des CircuitBreakers mit konfigurierbarem Schwellwert und Reset-Timeout."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "status",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn status(&self, clock: &dyn LocalClock) -> BreakerStatus",
+     "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+     "line": 50,
+     "doc": [
+      "Liefert den aktuellen Status des Circuit-Breakers unter Auswertung der Zeit."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "check",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn check(&self, clock: &dyn LocalClock) -> Result<(), String>",
+     "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+     "line": 58,
+     "doc": [
+      "Checks if the circuit breaker allows a request.",
+      "Returns `Ok(())` if closed/half-open, or `Err(msg)` if open."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_success",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_success(&self)",
+     "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+     "line": 82,
+     "doc": [
+      "Records a successful request, resetting consecutive failure counts and transitioning to Closed."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_failure",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_failure(&self, clock: &dyn LocalClock)",
+     "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+     "line": 90,
+     "doc": [
+      "Records a failed request (transient/network/5xx)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl CircuitBreaker",
+     "file": "crates/contextra-infer-ollama/src/client/circuit_breaker.rs",
+     "line": 35,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EndpointPolicy",
+   "vis": "pub",
+   "module": "client::config",
+   "signature": "pub struct EndpointPolicy",
+   "file": "crates/contextra-infer-ollama/src/client/config.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [
+    "#[cfg(not(feature = \"client\"))]",
+    "#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "loopback_only",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn loopback_only() -> Self",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 60,
+     "doc": [
+      "Creates a default loopback-only policy."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "check_endpoint",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn check_endpoint(&self, endpoint: &str, audit_sink: &dyn EgressAuditSink) -> Result<()>",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 70,
+     "doc": [
+      "Checks whether the given endpoint URL is permitted under this policy.",
+      "",
+      "Loopback endpoints (`127.0.0.0/8`, `::1`, `localhost`) and permitted Unix sockets",
+      "are allowed by default.",
+      "Non-loopback destinations require `allow_remote = true` AND matching an entry in `allowed_remote_hosts`.",
+      "Every remote usage triggers a call to `audit_sink.audit_egress`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "allow_remote",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 6
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EndpointPolicy",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 58,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_BASE_URL",
+   "vis": "pub",
+   "module": "client::config",
+   "signature": "pub const DEFAULT_BASE_URL: &str = \"\"",
+   "file": "crates/contextra-infer-ollama/src/client/config.rs",
+   "line": 12,
+   "doc": [
+    "Standard Ollama base URL"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_EMBED_MODEL",
+   "vis": "pub",
+   "module": "client::config",
+   "signature": "pub const DEFAULT_EMBED_MODEL: &str = \"\"",
+   "file": "crates/contextra-infer-ollama/src/client/config.rs",
+   "line": 14,
+   "doc": [
+    "Standard embedding model for SME usage (multilingual support for German)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_RETRIES",
+   "vis": "pub",
+   "module": "client::config",
+   "signature": "pub const MAX_RETRIES: u32 = 3",
+   "file": "crates/contextra-infer-ollama/src/client/config.rs",
+   "line": 16,
+   "doc": [
+    "Default maximum retry attempts for transient errors"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_BATCH_SIZE",
+   "vis": "pub",
+   "module": "client::config",
+   "signature": "pub const MAX_BATCH_SIZE: usize = 512",
+   "file": "crates/contextra-infer-ollama/src/client/config.rs",
+   "line": 18,
+   "doc": [
+    "Maximum allowed batch size for batch operations to prevent request timeouts and memory exhaustion."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_TEXT_BYTES",
+   "vis": "pub",
+   "module": "client::config",
+   "signature": "pub const MAX_TEXT_BYTES: usize = 10_000_000",
+   "file": "crates/contextra-infer-ollama/src/client/config.rs",
+   "line": 20,
+   "doc": [
+    "Maximum allowed text length in bytes (10 MB) to prevent OOM or DoS"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_RESPONSE_BYTES",
+   "vis": "pub",
+   "module": "client::config",
+   "signature": "pub const DEFAULT_MAX_RESPONSE_BYTES: usize = 10_000_000",
+   "file": "crates/contextra-infer-ollama/src/client/config.rs",
+   "line": 22,
+   "doc": [
+    "Default maximum response size limit in bytes (10 MB)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "OllamaConfig",
+   "vis": "pub",
+   "module": "client::config",
+   "signature": "pub struct OllamaConfig",
+   "file": "crates/contextra-infer-ollama/src/client/config.rs",
+   "line": 26,
+   "doc": [
+    "Configuration options for the Ollama HTTP client."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "base_url",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 28
+    },
+    {
+     "name": "model",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 30
+    },
+    {
+     "name": "request_timeout",
+     "type": "Duration",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 32
+    },
+    {
+     "name": "connect_timeout",
+     "type": "Duration",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 34
+    },
+    {
+     "name": "read_timeout",
+     "type": "Duration",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 36
+    },
+    {
+     "name": "max_response_bytes",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 38
+    },
+    {
+     "name": "max_retries",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 40
+    },
+    {
+     "name": "policy",
+     "type": "EndpointPolicy",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 42
+    },
+    {
+     "name": "failure_threshold",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 44
+    },
+    {
+     "name": "circuit_reset_timeout",
+     "type": "Duration",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 46
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for OllamaConfig",
+     "file": "crates/contextra-infer-ollama/src/client/config.rs",
+     "line": 49,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "read_response_bytes",
+   "vis": "pub",
+   "module": "client::core",
+   "signature": "pub async fn read_response_bytes(response: reqwest::Response, max_bytes: usize) -> Result<Vec<u8>>",
+   "file": "crates/contextra-infer-ollama/src/client/core.rs",
+   "line": 20,
+   "doc": [
+    "Helper to read HTTP response bytes while strictly enforcing `max_bytes` limit."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "read_response_text",
+   "vis": "pub",
+   "module": "client::core",
+   "signature": "pub async fn read_response_text(response: reqwest::Response, max_bytes: usize) -> Result<String>",
+   "file": "crates/contextra-infer-ollama/src/client/core.rs",
+   "line": 49,
+   "doc": [
+    "Helper to read HTTP response text while strictly enforcing `max_bytes` limit."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "OllamaClient",
+   "vis": "pub",
+   "module": "client::core",
+   "signature": "pub struct OllamaClient",
+   "file": "crates/contextra-infer-ollama/src/client/core.rs",
+   "line": 63,
+   "doc": [
+    "HTTP client for interacting with a local or configured Ollama instance."
+   ],
+   "attrs": [
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(base_url: impl Into<String>) -> Self",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 94,
+     "doc": [
+      "Creates a new `OllamaClient` with the specified base URL and default timeout config.",
+      "",
+      "Note: Intended for local development and testing. For production remote egress,",
+      "consider `try_with_config` with an explicit audit sink."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_config(config: OllamaConfig) -> Self",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 106,
+     "doc": [
+      "Creates a new `OllamaClient` with custom configuration parameters.",
+      "",
+      "Note: Intended for local development and testing. If building the underlying HTTP client fails,",
+      "the error state is saved internally and subsequent requests will fail-closed."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_with_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_with_config( config: OllamaConfig, audit_sink: Arc<dyn EgressAuditSink>, ) -> Result<Self>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 151,
+     "doc": [
+      "Creates a fallible `OllamaClient` with custom configuration parameters and a mandatory audit sink.",
+      "",
+      "Returns an error immediately if building the HTTP client fails."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_rng",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_rng(mut self, rng: Arc<dyn LocalRng>) -> Self",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 189,
+     "doc": [
+      "Sets a custom random number generator for retry jitter computation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock(mut self, clock: Arc<dyn LocalClock>) -> Self",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 195,
+     "doc": [
+      "Sets a custom clock port."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_audit_sink",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_audit_sink(mut self, audit_sink: Arc<dyn EgressAuditSink>) -> Self",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 201,
+     "doc": [
+      "Sets a custom egress audit sink."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_payload_gate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_payload_gate(mut self, payload_gate: Arc<dyn PayloadGate>) -> Self",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 207,
+     "doc": [
+      "Sets a custom payload gate."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_available",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn is_available(&self) -> bool",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 229,
+     "doc": [
+      "Health check verifying Ollama availability via GET /api/tags"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "check_availability",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn check_availability(&self) -> Result<()>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 234,
+     "doc": [
+      "Health check verifying Ollama availability via GET /api/tags"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_defaults",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_defaults() -> Self",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 278,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "base_url",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn base_url(&self) -> &str",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 282,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn config(&self) -> &OllamaConfig",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 286,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "embed_batch",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn embed_batch(&self, model: &str, texts: &[&str]) -> Result<Vec<Vec<f32>>>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 291,
+     "doc": [
+      "Generates vector embeddings for multiple texts. Idempotent retry operation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_embed_batch",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn try_embed_batch(&self, model: &str, texts: &[&str]) -> Result<Vec<Vec<f32>>>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 336,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "list_models",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn list_models(&self) -> Result<Vec<String>>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 400,
+     "doc": [
+      "List available models in Ollama via GET /api/tags"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_model_available",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn is_model_available(&self, model: &str) -> bool",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 442,
+     "doc": [
+      "Verifies if a specific model is available in the Ollama instance."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "generate_text",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn generate_text(&self, model: &str, prompt: &str) -> Result<String>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 460,
+     "doc": [
+      "Idempotent text generation with retries for transient failures."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "generate_text_stream",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn generate_text_stream<F, Fut>( &self, model: &str, prompt: &str, mut on_token: F, ) -> Result<String> where F: FnMut(String) -> Fut + Send, Fut: std::future::Future<Output = bool> + Send,",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 497,
+     "doc": [
+      "Streams text completion token by token via POST /api/chat. Non-idempotent (no automatic retries)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_generate_text",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn try_generate_text(&self, model: &str, prompt: &str) -> Result<String>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 672,
+     "doc": [
+      "Single generate_text attempt via POST /api/chat."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "generate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn generate(&self, model: &str, prompt: &str) -> Result<String>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 746,
+     "doc": [
+      "Generates non-streaming text completion via POST /api/generate with retry logic."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_generate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn try_generate(&self, model: &str, prompt: &str) -> Result<String>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 783,
+     "doc": [
+      "Single generate attempt via POST /api/generate (no retry)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "ensure_model_available",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn ensure_model_available(&self, model: &str) -> Result<()>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 842,
+     "doc": [
+      "Ensures that the specified model exists; returns `OllamaError::ModelNotFound` with helpful instruction if missing."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "embed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn embed(&self, model: &str, text: &str) -> Result<Vec<f32>>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 853,
+     "doc": [
+      "Generates vector embedding with retry logic for transient failures."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_embed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn try_embed(&self, model: &str, text: &str) -> Result<Vec<f32>>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 892,
+     "doc": [
+      "Single embed attempt via POST /api/embeddings (no retry)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "chat_with_rag_streaming",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn chat_with_rag_streaming( &self, model: &str, user_query: &str, context: &str, mut on_token: impl FnMut(String) + Send, ) -> Result<String>",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 951,
+     "doc": [
+      "Streams RAG chat response token by token via POST /api/chat"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_ports_rng",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_ports_rng(mut self, rng: Arc<dyn contextra_ports::Rng>) -> Self",
+     "file": "crates/contextra-infer-ollama/src/compat/client.rs",
+     "line": 9,
+     "doc": [
+      "Sets a custom random number generator from contextra_ports."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "validate_model_available",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn validate_model_available(&self, model: &str) -> Result<()>",
+     "file": "crates/contextra-infer-ollama/src/model_info.rs",
+     "line": 26,
+     "doc": [
+      "Validates that the model exists in Ollama via GET /api/tags before invoking embeddings/chat."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "show_model",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn show_model(&self, model: &str) -> Result<ModelInfo>",
+     "file": "crates/contextra-infer-ollama/src/model_info.rs",
+     "line": 38,
+     "doc": [
+      "Retrieves model info via POST /api/show"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "config",
+     "type": "OllamaConfig",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 64
+    },
+    {
+     "name": "client",
+     "type": "reqwest::Client",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 65
+    },
+    {
+     "name": "client_build_error",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 66
+    },
+    {
+     "name": "rng",
+     "type": "Arc<dyn LocalRng>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 67
+    },
+    {
+     "name": "clock",
+     "type": "Arc<dyn LocalClock>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 68
+    },
+    {
+     "name": "audit_sink",
+     "type": "Arc<dyn EgressAuditSink>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 69
+    },
+    {
+     "name": "payload_gate",
+     "type": "Arc<dyn PayloadGate>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 70
+    },
+    {
+     "name": "circuit_breaker",
+     "type": "Arc<CircuitBreaker>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 71
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for OllamaClient",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 74,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl OllamaClient",
+     "file": "crates/contextra-infer-ollama/src/client/core.rs",
+     "line": 89,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl OllamaClient",
+     "file": "crates/contextra-infer-ollama/src/compat/client.rs",
+     "line": 7,
+     "in_test": false
+    },
+    {
+     "trait": "contextra_ports::LlmTextGenerator",
+     "generics": "",
+     "signature": "impl contextra_ports::LlmTextGenerator for OllamaClient",
+     "file": "crates/contextra-infer-ollama/src/compat/trait_impls.rs",
+     "line": 3,
+     "in_test": false
+    },
+    {
+     "trait": "contextra_ports::LlmTextGeneratorStreaming",
+     "generics": "",
+     "signature": "impl contextra_ports::LlmTextGeneratorStreaming for OllamaClient",
+     "file": "crates/contextra-infer-ollama/src/compat/trait_impls.rs",
+     "line": 16,
+     "in_test": false
+    },
+    {
+     "trait": "contextra_ports::SegmentSynthesizer",
+     "generics": "",
+     "signature": "impl contextra_ports::SegmentSynthesizer for OllamaClient",
+     "file": "crates/contextra-infer-ollama/src/compat/trait_impls.rs",
+     "line": 45,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl OllamaClient",
+     "file": "crates/contextra-infer-ollama/src/model_info.rs",
+     "line": 24,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "is_transient_network_error",
+   "vis": "pub",
+   "module": "client::errors",
+   "signature": "pub fn is_transient_network_error(err: &reqwest::Error) -> bool",
+   "file": "crates/contextra-infer-ollama/src/client/errors.rs",
+   "line": 4,
+   "doc": [
+    "Helper to check if a reqwest error is a transient network error (timeout or connection error)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "classify_reqwest_error",
+   "vis": "pub",
+   "module": "client::errors",
+   "signature": "pub fn classify_reqwest_error(e: reqwest::Error, base_url: &str, context: &str) -> OllamaError",
+   "file": "crates/contextra-infer-ollama/src/client/errors.rs",
+   "line": 9,
+   "doc": [
+    "Classifies a `reqwest::Error` into structured `OllamaError` variants."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "is_transient_error",
+   "vis": "pub",
+   "module": "client::errors",
+   "signature": "pub fn is_transient_error(e: &OllamaError) -> bool",
+   "file": "crates/contextra-infer-ollama/src/client/errors.rs",
+   "line": 22,
+   "doc": [
+    "Helper to classify transient network errors for retry."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "EgressAuditSink",
+   "vis": "pub",
+   "module": "client::policy",
+   "signature": "pub trait EgressAuditSink: Send + Sync + std::fmt::Debug",
+   "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+   "line": 9,
+   "doc": [
+    "Trait for auditing remote egress access attempts."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "audit_egress",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn audit_egress(&self, endpoint: &str, allowed: bool, reason: &str)",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 11,
+     "doc": [
+      "Called when an egress check is performed for a remote (non-loopback) endpoint."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "EgressAuditSink"
+    },
+    {
+     "name": "is_noop",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn is_noop(&self) -> bool",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 14,
+     "doc": [
+      "Returns `true` if this audit sink is a no-op sink (default)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "EgressAuditSink"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "PayloadGate",
+   "vis": "pub",
+   "module": "client::policy",
+   "signature": "pub trait PayloadGate: Send + Sync + std::fmt::Debug",
+   "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+   "line": 20,
+   "doc": [
+    "Trait zur Vorab-Prüfung von Nutzlasten vor dem Versand (z.B. Privacy/Egress-Filter)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "check_payload",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn check_payload(&self, payload: &str) -> Result<()>",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 22,
+     "doc": [
+      "Prüft den Payload-Inhalt vor dem Senden. Gibt `Ok(())` zurück oder bricht fail-closed ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "PayloadGate"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PermissivePayloadGate",
+   "vis": "pub",
+   "module": "client::policy",
+   "signature": "pub struct PermissivePayloadGate",
+   "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+   "line": 27,
+   "doc": [
+    "Standard-Implementierung von `PayloadGate`, die alle Nutzlasten passieren lässt."
+   ],
+   "attrs": [
+    "#[derive(Debug, Default, Clone, Copy)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "PayloadGate",
+     "generics": "",
+     "signature": "impl PayloadGate for PermissivePayloadGate",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 29,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "NoopEgressAuditSink",
+   "vis": "pub",
+   "module": "client::policy",
+   "signature": "pub struct NoopEgressAuditSink",
+   "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+   "line": 37,
+   "doc": [
+    "Default no-op implementation of `EgressAuditSink`."
+   ],
+   "attrs": [
+    "#[derive(Debug, Default, Clone, Copy)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "EgressAuditSink",
+     "generics": "",
+     "signature": "impl EgressAuditSink for NoopEgressAuditSink",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 39,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EndpointPolicy",
+   "vis": "pub",
+   "module": "client::policy",
+   "signature": "pub struct EndpointPolicy",
+   "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+   "line": 49,
+   "doc": [
+    "Endpoint policy governing allowed egress destinations for Ollama requests."
+   ],
+   "attrs": [
+    "#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "allow_remote",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 51
+    },
+    {
+     "name": "allowed_remote_hosts",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 53
+    },
+    {
+     "name": "allowed_unix_sockets",
+     "type": "Vec<PathBuf>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/client/policy.rs",
+     "line": 55
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "xml_escape",
+   "vis": "pub",
+   "module": "client::validation",
+   "signature": "pub fn xml_escape(input: &str) -> String",
+   "file": "crates/contextra-infer-ollama/src/client/validation.rs",
+   "line": 5,
+   "doc": [
+    "Escapes XML special characters in string inputs to prevent tag injection."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "build_rag_prompt",
+   "vis": "pub",
+   "module": "client::validation",
+   "signature": "pub fn build_rag_prompt(system_context: &str, rag_context: &str, user_query: &str) -> String",
+   "file": "crates/contextra-infer-ollama/src/client/validation.rs",
+   "line": 19,
+   "doc": [
+    "Halluzinationsprävention bei lokalen 7B-Modellen ohne Guard:",
+    "Lokale Sprachmodelle neigen ohne explizite Verhaltensanweisungen dazu, bei fehlendem Kontext Fakten frei zu erfinden (Halluzination).",
+    "Der Instruktionsblock wird VOR dem `<context>`-Block platziert, damit das Modell die Regeln zur Kontexttreue, Fallback-Antwort und Quellenangabe vor der Verarbeitung der Dokumentdaten liest.",
+    "",
+    "Constructs a structurally isolated prompt encapsulating system instructions, RAG instructions, RAG context, and user query."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_text_length",
+   "vis": "pub",
+   "module": "client::validation",
+   "signature": "pub fn validate_text_length(text: &str, field_name: &str) -> Result<()>",
+   "file": "crates/contextra-infer-ollama/src/client/validation.rs",
+   "line": 29,
+   "doc": [
+    "Validates that input text length does not exceed `MAX_TEXT_BYTES`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_batch_size",
+   "vis": "pub",
+   "module": "client::validation",
+   "signature": "pub fn validate_batch_size(count: usize) -> Result<()>",
+   "file": "crates/contextra-infer-ollama/src/client/validation.rs",
+   "line": 40,
+   "doc": [
+    "Validates that batch size does not exceed `MAX_BATCH_SIZE`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_model_name",
+   "vis": "pub",
+   "module": "client::validation",
+   "signature": "pub fn validate_model_name(name: &str) -> Result<()>",
+   "file": "crates/contextra-infer-ollama/src/client/validation.rs",
+   "line": 50,
+   "doc": [
+    "Validates that model name does not contain invalid path traversal or whitespace control characters."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "config",
+   "vis": "pub",
+   "module": "client",
+   "signature": "pub mod config",
+   "file": "crates/contextra-infer-ollama/src/client.rs",
+   "line": 10,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "policy",
+   "vis": "pub",
+   "module": "client",
+   "signature": "pub mod policy",
+   "file": "crates/contextra-infer-ollama/src/client.rs",
+   "line": 16,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"client\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "validation",
+   "vis": "pub",
+   "module": "client",
+   "signature": "pub mod validation",
+   "file": "crates/contextra-infer-ollama/src/client.rs",
+   "line": 17,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "client",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod client",
+   "file": "crates/contextra-infer-ollama/src/compat/mod.rs",
+   "line": 6,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"client\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "embedding",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod embedding",
+   "file": "crates/contextra-infer-ollama/src/compat/mod.rs",
+   "line": 8,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"client\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod error",
+   "file": "crates/contextra-infer-ollama/src/compat/mod.rs",
+   "line": 9,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "query_rewriter",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod query_rewriter",
+   "file": "crates/contextra-infer-ollama/src/compat/mod.rs",
+   "line": 11,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"client\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "trait_impls",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod trait_impls",
+   "file": "crates/contextra-infer-ollama/src/compat/mod.rs",
+   "line": 13,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"client\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "types",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod types",
+   "file": "crates/contextra-infer-ollama/src/compat/mod.rs",
+   "line": 14,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ContextPrefixConfig",
+   "vis": "pub",
+   "module": "context_prefixer",
+   "signature": "pub struct ContextPrefixConfig",
+   "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+   "line": 25,
+   "doc": [
+    "Konfiguration für Kontext-Präfix-Generierung."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "model",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 28
+    },
+    {
+     "name": "max_document_chars",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 32
+    },
+    {
+     "name": "max_prefix_tokens",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 35
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for ContextPrefixConfig",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 38,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ContextPrefixEngine",
+   "vis": "pub",
+   "module": "context_prefixer",
+   "signature": "pub struct ContextPrefixEngine",
+   "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+   "line": 59,
+   "doc": [
+    "Generiert LLM-basierte Kontext-Präfixe für Dokument-Chunks.",
+    "",
+    "# Verwendung",
+    "```ignore",
+    "# async fn example() -> Result<(), contextra_infer_ollama::OllamaError> {",
+    "use contextra_infer_ollama::{OllamaClient, ContextPrefixEngine, ContextPrefixConfig};",
+    "let client = OllamaClient::new(\"http://localhost:11434\");",
+    "let engine = ContextPrefixEngine::new(client, ContextPrefixConfig::default());",
+    "let prefix = engine.generate_prefix(\"Volltext des Dokuments...\", \"Chunk-Inhalt...\").await?;",
+    "# Ok(()) }",
+    "```"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn config(&self) -> &ContextPrefixConfig",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 69,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(client: OllamaClient, config: ContextPrefixConfig) -> Self",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 74,
+     "doc": [],
+     "attrs": [
+      "#[cfg(feature = \"client\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(config: ContextPrefixConfig) -> Self",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 79,
+     "doc": [],
+     "attrs": [
+      "#[cfg(not(feature = \"client\"))]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "generate_prefix",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn generate_prefix( &self, full_document: &str, chunk_content: &str, ) -> Result<String>",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 92,
+     "doc": [
+      "Generiert ein Kontext-Präfix für einen einzelnen Chunk.",
+      "",
+      "Der Prompt folgt dem Contextra-Contextual-Chunk-Prefixing-Schema:",
+      "\"Describe this chunk in context of the full document (1-2 sentences).\"",
+      "",
+      "# Fehler",
+      "- `ContextraError::Storage` / `ContextraError::Io` wenn Ollama nicht erreichbar",
+      "- `OllamaError::InvalidInput` wenn document oder chunk leer"
+     ],
+     "attrs": [
+      "#[cfg(feature = \"client\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "generate_prefix_batch",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn generate_prefix_batch( &self, full_document: &str, chunks: &[&str], ) -> Vec<Result<String>>",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 140,
+     "doc": [
+      "Generiert Präfixe für einen Batch von Chunks desselben Dokuments.",
+      "",
+      "Nutzt sequentielle Verarbeitung (Ollama ist single-threaded per default).",
+      "Für Parallel-Verarbeitung: Mehrere ContextPrefixEngine-Instanzen nutzen."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"client\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "config",
+     "type": "ContextPrefixConfig",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 62
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ContextPrefixEngine",
+     "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+     "line": 68,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "ContextPrefixer",
+   "vis": "pub",
+   "module": "context_prefixer",
+   "signature": "pub type ContextPrefixer = ContextPrefixEngine",
+   "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+   "line": 66,
+   "doc": [
+    "Compatibility alias for ContextPrefixEngine."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compute_max_prefix_chars",
+   "vis": "pub",
+   "module": "context_prefixer",
+   "signature": "pub fn compute_max_prefix_chars(max_prefix_tokens: usize) -> usize",
+   "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+   "line": 157,
+   "doc": [],
+   "attrs": [
+    "#[inline]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "truncate_chars",
+   "vis": "pub",
+   "module": "context_prefixer",
+   "signature": "pub fn truncate_chars(s: &str, max_chars: usize) -> String",
+   "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+   "line": 161,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "truncate_prefix",
+   "vis": "pub",
+   "module": "context_prefixer",
+   "signature": "pub fn truncate_prefix(s: &str, max_tokens: usize, max_chars: usize) -> String",
+   "file": "crates/contextra-infer-ollama/src/context_prefixer.rs",
+   "line": 172,
+   "doc": [
+    "Truncates context prefix text while preserving word boundaries up to `max_tokens` (words)",
+    "and hard character limit `max_chars`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "OllamaEmbedder",
+   "vis": "pub",
+   "module": "embedding",
+   "signature": "pub struct OllamaEmbedder",
+   "file": "crates/contextra-infer-ollama/src/embedding.rs",
+   "line": 17,
+   "doc": [
+    "Implementation of `TextEmbeddingEngine` using Ollama's HTTP API."
+   ],
+   "attrs": [
+    "#[derive(Clone, Debug)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(base_url: impl Into<String>, model: impl Into<String>) -> Self",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 26,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_config(config: OllamaConfig) -> Self",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 44,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_defaults",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_defaults() -> Self",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 56,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn config(&self) -> &OllamaConfig",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 60,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "client",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn client(&self) -> &OllamaClient",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 64,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_concurrency",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_concurrency(mut self, concurrency: usize) -> Self",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 68,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_expected_dimension",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_expected_dimension(mut self, dim: usize) -> Self",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 73,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "model",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn model(&self) -> &str",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 78,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "embedding_dimension",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn embedding_dimension(&self) -> usize",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 82,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "EmbeddingProvider",
+     "generics": "",
+     "signature": "impl EmbeddingProvider for OllamaEmbedder",
+     "file": "crates/contextra-infer-ollama/src/compat/embedding.rs",
+     "line": 7,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl OllamaEmbedder",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 25,
+     "in_test": false
+    },
+    {
+     "trait": "Embedder",
+     "generics": "",
+     "signature": "impl Embedder for OllamaEmbedder",
+     "file": "crates/contextra-infer-ollama/src/embedding.rs",
+     "line": 122,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "OllamaError",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum OllamaError",
+   "file": "crates/contextra-infer-ollama/src/error.rs",
+   "line": 8,
+   "doc": [
+    "Fehlerzustände von `contextra-infer-ollama`."
+   ],
+   "attrs": [
+    "#[derive(Debug, Error, Clone, PartialEq)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "InvalidInput",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 11
+    },
+    {
+     "name": "ModelNotFound",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 15
+    },
+    {
+     "name": "Network",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 19
+    },
+    {
+     "name": "Timeout",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 23
+    },
+    {
+     "name": "Server",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 27
+    },
+    {
+     "name": "Deserialization",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 31
+    },
+    {
+     "name": "EgressViolation",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 35
+    },
+    {
+     "name": "CircuitBreakerOpen",
+     "shape": "",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 39
+    },
+    {
+     "name": "Internal",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 43
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "From<contextra_types::ContextraError>",
+     "generics": "",
+     "signature": "impl From<contextra_types::ContextraError> for OllamaError",
+     "file": "crates/contextra-infer-ollama/src/compat/error.rs",
+     "line": 108,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "Result",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub type Result<T> = core::result::Result<T, OllamaError>",
+   "file": "crates/contextra-infer-ollama/src/error.rs",
+   "line": 47,
+   "doc": [
+    "Standard-Result-Typ für `contextra-infer-ollama`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "LocalClock",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub trait LocalClock: Send + Sync",
+   "file": "crates/contextra-infer-ollama/src/error.rs",
+   "line": 50,
+   "doc": [
+    "Lokaler Trait für Zeitgeber (entkoppelt von `contextra-ports::Clock`)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "now",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn now(&self) -> std::time::SystemTime",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 52,
+     "doc": [
+      "Liefert die aktuelle Systemzeit."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "LocalClock"
+    },
+    {
+     "name": "monotonic_nanos",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn monotonic_nanos(&self) -> u64",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 55,
+     "doc": [
+      "Liefert eine monotone Zeit in Nanosekunden."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "LocalClock"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SystemClock",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub struct SystemClock",
+   "file": "crates/contextra-infer-ollama/src/error.rs",
+   "line": 67,
+   "doc": [
+    "Standard-Implementierung von `LocalClock` mit monotonic process epoch baseline."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "crate::error::LocalClock",
+     "generics": "",
+     "signature": "impl crate::error::LocalClock for contextra_ports::SystemClock",
+     "file": "crates/contextra-infer-ollama/src/compat/error.rs",
+     "line": 169,
+     "in_test": false
+    },
+    {
+     "trait": "LocalClock",
+     "generics": "",
+     "signature": "impl LocalClock for contextra_ports::SystemClock",
+     "file": "crates/contextra-infer-ollama/src/compat/types.rs",
+     "line": 33,
+     "in_test": false
+    },
+    {
+     "trait": "LocalClock",
+     "generics": "",
+     "signature": "impl LocalClock for SystemClock",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 70,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "LocalRng",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub trait LocalRng: Send + Sync",
+   "file": "crates/contextra-infer-ollama/src/error.rs",
+   "line": 83,
+   "doc": [
+    "Lokaler Trait für Zufallszahlengeneratoren (entkoppelt von `contextra-ports::Rng`)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "next_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn next_u64(&self) -> u64",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 85,
+     "doc": [
+      "Generiert einen u64-Zufallswert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "LocalRng"
+    },
+    {
+     "name": "next_f64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn next_f64(&self) -> f64",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 88,
+     "doc": [
+      "Generiert eine f64-Fließkommazahl im Bereich [0.0, 1.0)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "LocalRng"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "LocalSeededRng",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub struct LocalSeededRng",
+   "file": "crates/contextra-infer-ollama/src/error.rs",
+   "line": 95,
+   "doc": [
+    "Deterministischer atomarer Zufallsgenerator für Wiederholbarkeit ohne thread_rng."
+   ],
+   "attrs": [
+    "#[derive(Debug)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(seed: u64) -> Self",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 101,
+     "doc": [
+      "Erstellt einen Generator mit dem angegebenen Seed."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl LocalSeededRng",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 99,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for LocalSeededRng",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 112,
+     "in_test": false
+    },
+    {
+     "trait": "LocalRng",
+     "generics": "",
+     "signature": "impl LocalRng for LocalSeededRng",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 118,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "LocalQueryRewriteOutput",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub struct LocalQueryRewriteOutput",
+   "file": "crates/contextra-infer-ollama/src/error.rs",
+   "line": 141,
+   "doc": [
+    "Lokale Datenstruktur für Re-Write-Ausgaben."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( text_query: Option<String>, semantic_query: Option<String>, anchor_entities: Vec<String>, ) -> Self",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 152,
+     "doc": [
+      "Erstellt eine neue Instanz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "text_only",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn text_only(text: impl Into<String>) -> Self",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 165,
+     "doc": [
+      "Erstellt eine rein textuelle Umformulierung."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "text_query",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 143
+    },
+    {
+     "name": "semantic_query",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 145
+    },
+    {
+     "name": "anchor_entities",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 147
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<contextra_types::QueryRewriteOutput>",
+     "generics": "",
+     "signature": "impl From<contextra_types::QueryRewriteOutput> for LocalQueryRewriteOutput",
+     "file": "crates/contextra-infer-ollama/src/compat/error.rs",
+     "line": 151,
+     "in_test": false
+    },
+    {
+     "trait": "From<contextra_types::QueryRewriteOutput>",
+     "generics": "",
+     "signature": "impl From<contextra_types::QueryRewriteOutput> for LocalQueryRewriteOutput",
+     "file": "crates/contextra-infer-ollama/src/compat/types.rs",
+     "line": 15,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl LocalQueryRewriteOutput",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 150,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "LocalImportanceScore",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub struct LocalImportanceScore(pub f32)",
+   "file": "crates/contextra-infer-ollama/src/error.rs",
+   "line": 182,
+   "doc": [
+    "Lokale Bewertung von Wichtigkeit (entkoppelt von `contextra-types::ImportanceScore`).",
+    "",
+    "# Skala",
+    "Der Wert liegt im kontinuierlichen Intervall `[0.0, 1.0]`:",
+    "- `0.0`: Völlig unwichtig / Rauschen / Verwerfbar.",
+    "- `0.5`: Standard-Fallback bei unvollständigem oder unparsebarem LLM-Ergebnis.",
+    "- `1.0`: Höchste Priorität / Essentielle Information / Dauerhaftes Behalten im Kontext."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "as_f32",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_f32(&self) -> f32",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 186,
+     "doc": [
+      "Liefert den Rohwert als f32."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<contextra_types::ImportanceScore>",
+     "generics": "",
+     "signature": "impl From<contextra_types::ImportanceScore> for LocalImportanceScore",
+     "file": "crates/contextra-infer-ollama/src/compat/error.rs",
+     "line": 163,
+     "in_test": false
+    },
+    {
+     "trait": "From<contextra_types::ImportanceScore>",
+     "generics": "",
+     "signature": "impl From<contextra_types::ImportanceScore> for LocalImportanceScore",
+     "file": "crates/contextra-infer-ollama/src/compat/types.rs",
+     "line": 27,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl LocalImportanceScore",
+     "file": "crates/contextra-infer-ollama/src/error.rs",
+     "line": 184,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "ImportanceCalibrator",
+   "vis": "pub",
+   "module": "importance",
+   "signature": "pub trait ImportanceCalibrator: Send + Sync",
+   "file": "crates/contextra-infer-ollama/src/importance.rs",
+   "line": 22,
+   "doc": [
+    "Abstract calibrator trait for post-hoc confidence calibration and outcome recording.",
+    "",
+    "Allows decoupling of `contextra-infer-ollama` from concrete rankers or calibration crates."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "calibrated_probability",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn calibrated_probability(&self, raw_score: f32) -> Option<f32>",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 24,
+     "doc": [
+      "Computes calibrated probability for a raw score in [0.0, 1.0], or returns `None` if warming up."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "ImportanceCalibrator"
+    },
+    {
+     "name": "record_outcome",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn record_outcome(&mut self, raw_score: f32, was_useful: bool)",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 27,
+     "doc": [
+      "Records outcome feedback for a raw score."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "ImportanceCalibrator"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "score_importance_batch",
+   "vis": "pub",
+   "module": "importance",
+   "signature": "pub async fn score_importance_batch( client: &Arc<OllamaClient>, chunks: &[&str], calibrator: Option<&Arc<Mutex<dyn ImportanceCalibrator>>>, max_concurrent: usize, ) -> Vec<ImportanceAssessment>",
+   "file": "crates/contextra-infer-ollama/src/importance.rs",
+   "line": 40,
+   "doc": [
+    "Evaluates importance for multiple text chunks in parallel using tokio::spawn with an optional dynamic calibrator.",
+    "",
+    "Returns a `Vec<ImportanceAssessment>` in the same order as `chunks`.",
+    "Individual chunk errors return `ImportanceAssessment` with `Confidence::Unparseable`",
+    "and default score 0.5 — never propagate a single chunk error to the entire batch.",
+    "",
+    "# Performance",
+    "Spawns one tokio task per chunk up to `max_concurrent` (default: 8).",
+    "Uses `futures::stream::buffer_unordered` to limit concurrency without blocking."
+   ],
+   "attrs": [
+    "#[cfg(feature = \"client\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "Confidence",
+   "vis": "pub",
+   "module": "importance",
+   "signature": "pub enum Confidence",
+   "file": "crates/contextra-infer-ollama/src/importance.rs",
+   "line": 97,
+   "doc": [
+    "Confidence or parse status of an LLM importance rating."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Parsed",
+     "shape": "",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 99
+    },
+    {
+     "name": "Unparseable",
+     "shape": "",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 101
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ImportanceAssessment",
+   "vis": "pub",
+   "module": "importance",
+   "signature": "pub struct ImportanceAssessment",
+   "file": "crates/contextra-infer-ollama/src/importance.rs",
+   "line": 106,
+   "doc": [
+    "Result of an LLM importance evaluation containing the score, parse confidence status, model provenance, and optional calibrated confidence."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(score: LocalImportanceScore, confidence: Confidence) -> Self",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 122,
+     "doc": [
+      "Creates a new `ImportanceAssessment` with default empty model ID and no calibration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_provenance",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_provenance( score: LocalImportanceScore, confidence: Confidence, model_id: impl Into<String>, calibrated_confidence: Option<f32>, ) -> Self",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 132,
+     "doc": [
+      "Creates a new `ImportanceAssessment` with model provenance and optional calibrated confidence."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "value",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn value(&self) -> f32",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 147,
+     "doc": [
+      "Helper returning the raw `f32` importance score value."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_parsed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_parsed(&self) -> bool",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 152,
+     "doc": [
+      "Returns `true` if the score was parsed successfully from the LLM output."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "score",
+     "type": "LocalImportanceScore",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 108
+    },
+    {
+     "name": "confidence",
+     "type": "Confidence",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 110
+    },
+    {
+     "name": "model_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 113
+    },
+    {
+     "name": "calibrated_confidence",
+     "type": "Option<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 117
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ImportanceAssessment",
+     "file": "crates/contextra-infer-ollama/src/importance.rs",
+     "line": 120,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "score_importance",
+   "vis": "pub",
+   "module": "importance",
+   "signature": "pub async fn score_importance( client: &OllamaClient, chunk_text: &str, ) -> Result<ImportanceAssessment>",
+   "file": "crates/contextra-infer-ollama/src/importance.rs",
+   "line": 179,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"client\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "score_importance_with_calibrator",
+   "vis": "pub",
+   "module": "importance",
+   "signature": "pub async fn score_importance_with_calibrator( client: &OllamaClient, chunk_text: &str, calibrator: Option<&Arc<Mutex<dyn ImportanceCalibrator>>>, ) -> Result<ImportanceAssessment>",
+   "file": "crates/contextra-infer-ollama/src/importance.rs",
+   "line": 191,
+   "doc": [
+    "Evaluates importance of a text chunk with an optional shared `ImportanceCalibrator`.",
+    "",
+    "Populates `model_id` provenance from `client.config().model` and enriches",
+    "`calibrated_confidence` when the calibrator has completed warmup."
+   ],
+   "attrs": [
+    "#[cfg(feature = \"client\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "record_importance_outcome",
+   "vis": "pub",
+   "module": "importance",
+   "signature": "pub fn record_importance_outcome( calibrator: &Arc<Mutex<dyn ImportanceCalibrator>>, raw_score: f32, was_useful: bool, )",
+   "file": "crates/contextra-infer-ollama/src/importance.rs",
+   "line": 242,
+   "doc": [
+    "Records outcome feedback for an importance score into an `ImportanceCalibrator`.",
+    "",
+    "Intended for downstream retrieval feedback loops evaluating whether a memory chunk",
+    "assigned a given `raw_score` was actually useful during agent operations."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "parse_importance_score_response",
+   "vis": "pub",
+   "module": "importance",
+   "signature": "pub fn parse_importance_score_response(raw_response: &str) -> ImportanceAssessment",
+   "file": "crates/contextra-infer-ollama/src/importance.rs",
+   "line": 253,
+   "doc": [
+    "Parses an `ImportanceAssessment` from raw LLM output.",
+    "Returns `Confidence::Parsed` on successful float extraction,",
+    "or `Confidence::Unparseable` with default score (0.5) and a warning log if unparseable."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "compat",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod compat",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"workspace\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "client",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod client",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 7,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "compat",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod compat",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 9,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"ports-compat\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "context_prefixer",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod context_prefixer",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 10,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "embedding",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod embedding",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 12,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"client\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 13,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "importance",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod importance",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 14,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "model_info",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod model_info",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 15,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "query_rewriter",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod query_rewriter",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 17,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"client\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "traits",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod traits",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 18,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ModelInfo",
+   "vis": "pub",
+   "module": "model_info",
+   "signature": "pub struct ModelInfo",
+   "file": "crates/contextra-infer-ollama/src/model_info.rs",
+   "line": 17,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "modelfile",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/model_info.rs",
+     "line": 18
+    },
+    {
+     "name": "parameter_size",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/model_info.rs",
+     "line": 19
+    },
+    {
+     "name": "quantization_level",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/model_info.rs",
+     "line": 20
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "known_dimension",
+   "vis": "pub",
+   "module": "model_info",
+   "signature": "pub fn known_dimension(model: &str) -> Option<usize>",
+   "file": "crates/contextra-infer-ollama/src/model_info.rs",
+   "line": 107,
+   "doc": [
+    "Gibt die Embedding-Dimension für bekannte Modelle zurück.",
+    "Gibt `None` zurück wenn das Modell unbekannt ist."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "OllamaQueryRewriterConfig",
+   "vis": "pub",
+   "module": "query_rewriter",
+   "signature": "pub struct OllamaQueryRewriterConfig",
+   "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+   "line": 24,
+   "doc": [
+    "Konfiguration für den `OllamaQueryRewriter`."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "model",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+     "line": 26
+    },
+    {
+     "name": "max_context_results",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+     "line": 28
+    },
+    {
+     "name": "max_snippet_chars",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+     "line": 30
+    },
+    {
+     "name": "max_query_chars",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+     "line": 32
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for OllamaQueryRewriterConfig",
+     "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+     "line": 35,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "OllamaQueryRewriter",
+   "vis": "pub",
+   "module": "query_rewriter",
+   "signature": "pub struct OllamaQueryRewriter",
+   "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+   "line": 47,
+   "doc": [
+    "LLM-basierter Multi-Signal Query Rewriter über Ollama."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "rewrite_structured",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn rewrite_structured<'a>( &'a self, original_query: &'a str, current_results: &'a [ScoredEntry], ) -> BoxFuture<'a, contextra_types::Result<Vec<QueryRewriteOutput>>>",
+     "file": "crates/contextra-infer-ollama/src/compat/query_rewriter.rs",
+     "line": 33,
+     "doc": [
+      "Rewrites a query structured according to contextra-ports QueryRewriter contract."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(client: OllamaClient, config: OllamaQueryRewriterConfig) -> Self",
+     "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+     "line": 56,
+     "doc": [
+      "Erstellt einen neuen `OllamaQueryRewriter` mit dem angegebenen Client und der Konfiguration."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"client\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn config(&self) -> &OllamaQueryRewriterConfig",
+     "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+     "line": 61,
+     "doc": [
+      "Gibt eine Referenz auf die Konfiguration zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "rewrite",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn rewrite( &self, original_query: &str, context_snippets: &[&str], ) -> Result<Vec<LocalQueryRewriteOutput>>",
+     "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+     "line": 67,
+     "doc": [
+      "Rewrites a query using plain text context snippets."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"client\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "QueryRewriter",
+     "generics": "",
+     "signature": "impl QueryRewriter for OllamaQueryRewriter",
+     "file": "crates/contextra-infer-ollama/src/compat/query_rewriter.rs",
+     "line": 7,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl OllamaQueryRewriter",
+     "file": "crates/contextra-infer-ollama/src/compat/query_rewriter.rs",
+     "line": 31,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl OllamaQueryRewriter",
+     "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+     "line": 53,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "truncate_chars",
+   "vis": "pub",
+   "module": "query_rewriter",
+   "signature": "pub fn truncate_chars(s: &str, max_chars: usize) -> &str",
+   "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+   "line": 101,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "build_rewrite_prompt_from_snippets",
+   "vis": "pub",
+   "module": "query_rewriter",
+   "signature": "pub fn build_rewrite_prompt_from_snippets( original_query: &str, snippets: &[&str], max_context_results: usize, max_snippet_chars: usize, ) -> String",
+   "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+   "line": 108,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "parse_rewrite_response",
+   "vis": "pub",
+   "module": "query_rewriter",
+   "signature": "pub fn parse_rewrite_response(response: &str, original_query: &str) -> LocalQueryRewriteOutput",
+   "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+   "line": 149,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "type",
+   "name": "BoxFuture",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>",
+   "file": "crates/contextra-infer-ollama/src/traits.rs",
+   "line": 8,
+   "doc": [
+    "Typalias für gepinnte ge-boxte Futures ohne Fremdtypen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Embedder",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub trait Embedder: Send + Sync",
+   "file": "crates/contextra-infer-ollama/src/traits.rs",
+   "line": 11,
+   "doc": [
+    "Lokaler Trait für Embedding-Provider."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "provider_name",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn provider_name(&self) -> &str",
+     "file": "crates/contextra-infer-ollama/src/traits.rs",
+     "line": 13,
+     "doc": [
+      "Liefert den Namen des Providers."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Embedder"
+    },
+    {
+     "name": "embed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn embed<'a>(&'a self, text: &'a str) -> BoxFuture<'a, Result<Vec<f32>>>",
+     "file": "crates/contextra-infer-ollama/src/traits.rs",
+     "line": 16,
+     "doc": [
+      "Erzeugt ein Embedding für den übergebenen Text."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Embedder"
+    },
+    {
+     "name": "embedding_dim",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn embedding_dim(&self) -> usize",
+     "file": "crates/contextra-infer-ollama/src/traits.rs",
+     "line": 19,
+     "doc": [
+      "Liefert die Embedding-Dimension des konfigurierten Modells."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Embedder"
+    },
+    {
+     "name": "embed_batch",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Vec<f32>>>>",
+     "file": "crates/contextra-infer-ollama/src/traits.rs",
+     "line": 22,
+     "doc": [
+      "Erzeugt Embeddings für einen Batch von Texten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Embedder"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "AsyncEmbedder",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub trait AsyncEmbedder: Send + Sync",
+   "file": "crates/contextra-infer-ollama/src/traits.rs",
+   "line": 26,
+   "doc": [
+    "Lokaler Trait für asynchrone Embedding-Provider."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "model_name",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn model_name(&self) -> &str",
+     "file": "crates/contextra-infer-ollama/src/traits.rs",
+     "line": 28,
+     "doc": [
+      "Liefert den Modellnamen des Providers."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "AsyncEmbedder"
+    },
+    {
+     "name": "embed_async",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn embed_async<'a>(&'a self, text: &'a str) -> BoxFuture<'a, Result<Vec<f32>>>",
+     "file": "crates/contextra-infer-ollama/src/traits.rs",
+     "line": 31,
+     "doc": [
+      "Erzeugt ein Embedding asynchron."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "AsyncEmbedder"
+    },
+    {
+     "name": "embed_batch_async",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn embed_batch_async<'a>( &'a self, texts: &'a [&'a str], ) -> BoxFuture<'a, Result<Vec<Vec<f32>>>>",
+     "file": "crates/contextra-infer-ollama/src/traits.rs",
+     "line": 34,
+     "doc": [
+      "Erzeugt Embeddings für einen Batch asynchron."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "AsyncEmbedder"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "TextGenerator",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub trait TextGenerator: Send + Sync",
+   "file": "crates/contextra-infer-ollama/src/traits.rs",
+   "line": 41,
+   "doc": [
+    "Lokaler Trait für LLM-Textgeneratoren."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "generate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn generate<'a>(&'a self, prompt: &'a str) -> BoxFuture<'a, Result<String>>",
+     "file": "crates/contextra-infer-ollama/src/traits.rs",
+     "line": 43,
+     "doc": [
+      "Generiert Text für den übergebenen Prompt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "TextGenerator"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "xml_escape",
+   "vis": "pub",
+   "module": "xml_escape",
+   "signature": "pub fn xml_escape(input: &str) -> String",
+   "file": "crates/contextra-infer-ollama/src/xml_escape.rs",
+   "line": 2,
+   "doc": [
+    "Escapes XML special characters in string inputs to prevent tag injection."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use circuit_breaker::CircuitBreaker",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/client.rs",
+   "line": 35,
+   "in_test": false,
+   "module": "client"
+  },
+  {
+   "signature": "pub use config::*",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/client.rs",
+   "line": 36,
+   "in_test": false,
+   "module": "client"
+  },
+  {
+   "signature": "pub use core::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/client.rs",
+   "line": 40,
+   "in_test": false,
+   "module": "client"
+  },
+  {
+   "signature": "pub use errors::*",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/client.rs",
+   "line": 42,
+   "in_test": false,
+   "module": "client"
+  },
+  {
+   "signature": "pub use policy::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/client.rs",
+   "line": 44,
+   "in_test": false,
+   "module": "client"
+  },
+  {
+   "signature": "pub use validation::*",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/client.rs",
+   "line": 47,
+   "in_test": false,
+   "module": "client"
+  },
+  {
+   "signature": "pub use client::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 20,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use client::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 22,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use context_prefixer::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 28,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use embedding::OllamaEmbedder",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 30,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use error::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 31,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use importance::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 35,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use importance::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 39,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use model_info::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 40,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use query_rewriter::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 42,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use traits::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-ollama/src/lib.rs",
+   "line": 43,
+   "in_test": false,
+   "module": "crate"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra-mcp"
+ ]
+}

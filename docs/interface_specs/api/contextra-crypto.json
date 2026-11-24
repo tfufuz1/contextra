@@ -1,0 +1,5205 @@
+{
+ "name": "contextra-crypto",
+ "version": "workspace",
+ "path": "crates/contextra-crypto",
+ "role": "Krypto Legacy (Passphrase, AES-GCM-SIV)",
+ "features": {
+  "default": [
+   "kv-encryption"
+  ],
+  "workspace": [
+   "dep:contextra-types",
+   "dep:contextra-ports"
+  ],
+  "types-compat": [
+   "workspace"
+  ],
+  "ports-compat": [
+   "workspace"
+  ],
+  "test-utils": [],
+  "kv-encryption": [],
+  "cloud-egress-guard": []
+ },
+ "deps": {
+  "thiserror": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "sha2": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "hmac": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "aes-gcm-siv": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "argon2": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "hkdf": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "subtle": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "blake3": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "bincode": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-ids": {
+   "kind": "normal",
+   "source": "path",
+   "optional": false
+  },
+  "contextra-env": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "contextra-types": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "contextra-ports": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "rand": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "zeroize": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "parking_lot": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "ahash": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "lru": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "regex": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-crypto": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "tempfile": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "tokio": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "proptest": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "criterion": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "loom": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "# Kryptographie-Kern für Contextra (Ring 0)",
+  "",
+  "Dieses Modul bildet die kryptographische Basis des gesamten Contextra-Systems.",
+  "Als Ring-0-Komponente (Kern) stellt es grundlegende Sicherheitsprimitive bereit,",
+  "ohne selbst von höheren Schichten abzuhängen.",
+  "",
+  "## Ring-Zugehörigkeit und Einbindung",
+  "- **Ring:** Ring 0 (Kern / Foundation)",
+  "- **Abhängigkeiten (ausgehend):** `contextra-ids`, `contextra-env`",
+  "- **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`,",
+  "`contextra-infer-candle`, `contextra-kvcache`, `contextra-mcp`, `contextra-privacy`,",
+  "`contextra-store`, `contextra-vector`.",
+  "",
+  "## Hauptaufgaben",
+  "1. **AEAD-Blockverschlüsselung:** Authentifizierte Verschlüsselung via AES-256-GCM-SIV",
+  "mit deterministischer Nonce-Generierung zur Verhinderung von Nonce-Wiederverwendung.",
+  "2. **Schlüsselableitung (KDF):** Schlüsselhierarchie via HKDF (HMAC-SHA256) und",
+  "Argon2id für sichere Passphrasen-Verarbeitung.",
+  "3. **WAL-Integrität:** Kryptographische Integritätsketten mittels HMAC-SHA256 für",
+  "das Write-Ahead-Log (WAL).",
+  "4. **KV-Segment-Verschlüsselung:** Feingranulare Mandanten- und Segment-Isolierung.",
+  "",
+  "## Invarianten",
+  "- `#![forbid(unsafe_code)]`: Es gibt ausnahmslos keinen Unsafe-Code in dieser Crate.",
+  "- **Zeroize-on-Drop:** Sämtliche geheimen Schlüsselmaterialien werden bei der Freigabe",
+  "deterministisch im Speicher mit Nullen überschrieben.",
+  "- **I/O- und Lock-Freiheit in `src/crypto`:** Reine Kryptographie-Routinen führen keine",
+  "Dateisystem- oder Netzwerk-I/O durch."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-crypto/src/aead.rs",
+   "module": "aead",
+   "lines": 207
+  },
+  {
+   "file": "crates/contextra-crypto/src/anti_tamper.rs",
+   "module": "anti_tamper",
+   "lines": 210
+  },
+  {
+   "file": "crates/contextra-crypto/src/audit_chain.rs",
+   "module": "audit_chain",
+   "lines": 374
+  },
+  {
+   "file": "crates/contextra-crypto/src/compat/error.rs",
+   "module": "compat::error",
+   "lines": 165
+  },
+  {
+   "file": "crates/contextra-crypto/src/compat/mod.rs",
+   "module": "compat",
+   "lines": 7
+  },
+  {
+   "file": "crates/contextra-crypto/src/compat/model_fingerprint.rs",
+   "module": "compat::model_fingerprint",
+   "lines": 44
+  },
+  {
+   "file": "crates/contextra-crypto/src/contract.rs",
+   "module": "contract",
+   "lines": 154
+  },
+  {
+   "file": "crates/contextra-crypto/src/crypto.rs",
+   "module": "crypto",
+   "lines": 1041
+  },
+  {
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "module": "dek",
+   "lines": 170
+  },
+  {
+   "file": "crates/contextra-crypto/src/error.rs",
+   "module": "error",
+   "lines": 96
+  },
+  {
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "module": "kdf",
+   "lines": 319
+  },
+  {
+   "file": "crates/contextra-crypto/src/kv_cipher.rs",
+   "module": "kv_cipher",
+   "lines": 365
+  },
+  {
+   "file": "crates/contextra-crypto/src/kv_segment/delete_mode.rs",
+   "module": "kv_segment::delete_mode",
+   "lines": 55
+  },
+  {
+   "file": "crates/contextra-crypto/src/kv_segment/eviction_worker.rs",
+   "module": "kv_segment::eviction_worker",
+   "lines": 220
+  },
+  {
+   "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+   "module": "kv_segment::manager",
+   "lines": 141
+  },
+  {
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "module": "kv_segment",
+   "lines": 11
+  },
+  {
+   "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+   "module": "kv_segment::segment",
+   "lines": 356
+  },
+  {
+   "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+   "module": "kv_segment::store",
+   "lines": 859
+  },
+  {
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "module": "crate",
+   "lines": 94
+  },
+  {
+   "file": "crates/contextra-crypto/src/secret.rs",
+   "module": "secret",
+   "lines": 162
+  },
+  {
+   "file": "crates/contextra-crypto/src/wal_completeness.rs",
+   "module": "wal_completeness",
+   "lines": 77
+  },
+  {
+   "file": "crates/contextra-crypto/src/wal_crypto.rs",
+   "module": "wal_crypto",
+   "lines": 1163
+  }
+ ],
+ "counts": {
+  "unwrap": 0,
+  "expect": 0,
+  "panic_macro": 0,
+  "todo_unimpl": 0,
+  "index_bracket": 25,
+  "cfg_feature_gates": 29,
+  "deprecated_attr": 5
+ },
+ "grep_pub_decl": 218,
+ "all_pub_decl": 218,
+ "public_items": [
+  {
+   "kind": "const",
+   "name": "REC_AAD",
+   "vis": "pub",
+   "module": "aead",
+   "signature": "pub const REC_AAD: &[u8] = b\"\"",
+   "file": "crates/contextra-crypto/src/aead.rs",
+   "line": 15,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "seal_record_with_nonce",
+   "vis": "pub",
+   "module": "aead",
+   "signature": "pub fn seal_record_with_nonce( dek: &Dek, doc: [u8",
+   "file": "crates/contextra-crypto/src/aead.rs",
+   "line": 24,
+   "doc": [
+    "Seals a plaintext record into an envelope using an explicit, caller-provided 12-byte nonce.",
+    "Binds `doc` and `key_bytes` into the Associated Data (AAD) preventing replay/reordering across documents."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "seal_record_with_rng",
+   "vis": "pub",
+   "module": "aead",
+   "signature": "pub fn seal_record_with_rng<R: RngCore>( dek: &Dek, doc: [u8",
+   "file": "crates/contextra-crypto/src/aead.rs",
+   "line": 56,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "seal_record",
+   "vis": "pub",
+   "module": "aead",
+   "signature": "pub fn seal_record(dek: &Dek, doc: [u8",
+   "file": "crates/contextra-crypto/src/aead.rs",
+   "line": 70,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "open_record",
+   "vis": "pub",
+   "module": "aead",
+   "signature": "pub fn open_record(dek: &Dek, key_bytes: &[u8], env: &[u8]) -> Result<Zeroizing<Vec<u8>>>",
+   "file": "crates/contextra-crypto/src/aead.rs",
+   "line": 81,
+   "doc": [
+    "Opens an encrypted record envelope, verifying the associated data and authentication tag.",
+    "Fails with a uniform `CryptoError::Aead` on any authentication or corruption issue without leaking oracle details."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "VolatileEncryptionKey",
+   "vis": "pub",
+   "module": "anti_tamper",
+   "signature": "pub struct VolatileEncryptionKey",
+   "file": "crates/contextra-crypto/src/anti_tamper.rs",
+   "line": 30,
+   "doc": [],
+   "attrs": [
+    "#[derive(Zeroize)]",
+    "#[zeroize(drop)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(raw: [u8",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 36,
+     "doc": [
+      "Creates a new volatile key from a raw 32-byte array."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "emergency_wipe",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn emergency_wipe(&mut self)",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 44,
+     "doc": [
+      "Emergency Trigger: Explicitly wipes the key from memory.",
+      "This is to be hooked into hardware sensors (e.g. crash/voltage)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_bytes(&self) -> &[u8]",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 49,
+     "doc": [
+      "Accessor for cryptographic operations."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inspect_key_bytes_for_test",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn inspect_key_bytes_for_test(&self) -> &[u8",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 55,
+     "doc": [
+      "Test-only method to inspect key bytes."
+     ],
+     "attrs": [
+      "#[cfg(any(test, feature = \"test-utils\"))]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl VolatileEncryptionKey",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 34,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for VolatileEncryptionKey",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 60,
+     "in_test": false
+    },
+    {
+     "trait": "PartialEq",
+     "generics": "",
+     "signature": "impl PartialEq for VolatileEncryptionKey",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 68,
+     "in_test": false
+    },
+    {
+     "trait": "Eq",
+     "generics": "",
+     "signature": "impl Eq for VolatileEncryptionKey",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 77,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "constant_time_compare",
+   "vis": "pub",
+   "module": "anti_tamper",
+   "signature": "pub fn constant_time_compare(a: &[u8], b: &[u8]) -> bool",
+   "file": "crates/contextra-crypto/src/anti_tamper.rs",
+   "line": 87,
+   "doc": [
+    "Konstantzeit-Verifikation zweier Byte-Slices (`INV-CRYPTO-CONSTANT-TIME-1`).",
+    "",
+    "Verhindert Timing-Orakel bei MAC-, Tag- und Prüfsummen-Validierungen."
+   ],
+   "attrs": [
+    "#[inline]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "verify_tag_constant_time",
+   "vis": "pub",
+   "module": "anti_tamper",
+   "signature": "pub fn verify_tag_constant_time(expected: &[u8], actual: &[u8]) -> Result<()>",
+   "file": "crates/contextra-crypto/src/anti_tamper.rs",
+   "line": 97,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Blake3Chain",
+   "vis": "pub",
+   "module": "anti_tamper",
+   "signature": "pub struct Blake3Chain",
+   "file": "crates/contextra-crypto/src/anti_tamper.rs",
+   "line": 111,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(genesis: [u8",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 118,
+     "doc": [
+      "Initialisiert eine neue BLAKE3-Kette mit einem Seed/Genesis-Hash."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "extend",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn extend(&mut self, context: &[u8], data: &[u8]) -> [u8",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 126,
+     "doc": [
+      "Aktualisiert den Zustand der Kette mit einem neuen Block und Kontext in AAD-Disziplin."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "current_hash",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn current_hash(&self) -> &[u8",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 142,
+     "doc": [
+      "Gibt den aktuellen Ketten-Hash zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "step_count",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn step_count(&self) -> u64",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 147,
+     "doc": [
+      "Gibt die bisherige Anzahl an Kettengliedern zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "verify_current_hash",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn verify_current_hash(&self, expected: &[u8",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 152,
+     "doc": [
+      "Verifiziert in konstanter Zeit, ob der aktuelle Hash mit einem erwarteten Wert übereinstimmt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Blake3Chain",
+     "file": "crates/contextra-crypto/src/anti_tamper.rs",
+     "line": 116,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "DataClass",
+   "vis": "pub",
+   "module": "audit_chain",
+   "signature": "pub enum DataClass",
+   "file": "crates/contextra-crypto/src/audit_chain.rs",
+   "line": 33,
+   "doc": [
+    "Datenklassifikation für Audit-Einträge (keine Freitext-Strings)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Public",
+     "shape": "",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 35
+    },
+    {
+     "name": "Internal",
+     "shape": "",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 37
+    },
+    {
+     "name": "Confidential",
+     "shape": "",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 39
+    },
+    {
+     "name": "Restricted",
+     "shape": "",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 41
+    },
+    {
+     "name": "Personal",
+     "shape": "",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 43
+    },
+    {
+     "name": "SpecialCategoryPersonal",
+     "shape": "",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 45
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "AuditChainEntry",
+   "vis": "pub",
+   "module": "audit_chain",
+   "signature": "pub struct AuditChainEntry",
+   "file": "crates/contextra-crypto/src/audit_chain.rs",
+   "line": 52,
+   "doc": [
+    "Einzelner Eintrag in der manipulationssicheren BLAKE3-Audit-Hash-Kette."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "compute_hash",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn compute_hash( index: u64, schema_id: &str, rules_hash: &[u8",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 76,
+     "doc": [
+      "Berechnet den Blake3-Hash für die Felder eines Audit-Ketten-Eintrags."
+     ],
+     "attrs": [
+      "#[allow(clippy::too_many_arguments)]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "index",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 54
+    },
+    {
+     "name": "schema_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 56
+    },
+    {
+     "name": "rules_hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 58
+    },
+    {
+     "name": "data_class",
+     "type": "DataClass",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 60
+    },
+    {
+     "name": "doc_id",
+     "type": "DocId",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 62
+    },
+    {
+     "name": "tx_id",
+     "type": "TxId",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 64
+    },
+    {
+     "name": "prev_hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 66
+    },
+    {
+     "name": "commitment",
+     "type": "Option<[u8; 32]>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 68
+    },
+    {
+     "name": "entry_hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 70
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl AuditChainEntry",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 73,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "AuditChainHeadSignature",
+   "vis": "pub",
+   "module": "audit_chain",
+   "signature": "pub struct AuditChainHeadSignature",
+   "file": "crates/contextra-crypto/src/audit_chain.rs",
+   "line": 116,
+   "doc": [
+    "Periodisch erzeugte Signatur über den aktuellen Kettenkopf."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "chain_index",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 118
+    },
+    {
+     "name": "head_hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 120
+    },
+    {
+     "name": "signature",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 122
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "AuditHeadAnchor",
+   "vis": "pub",
+   "module": "audit_chain",
+   "signature": "pub struct AuditHeadAnchor",
+   "file": "crates/contextra-crypto/src/audit_chain.rs",
+   "line": 127,
+   "doc": [
+    "Externer Kopf-Anker zur Rollback-Erkennung für die Audit-Hash-Kette."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(seq_no: u64, head_hash: [u8",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 138,
+     "doc": [
+      "Erstellt einen neuen nicht signierten `AuditHeadAnchor`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_signature",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_signature( seq_no: u64, head_hash: [u8",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 147,
+     "doc": [
+      "Erstellt einen neuen signierten `AuditHeadAnchor`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "seq_no",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 129
+    },
+    {
+     "name": "head_hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 131
+    },
+    {
+     "name": "head_signature",
+     "type": "Option<AuditChainHeadSignature>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 133
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl AuditHeadAnchor",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 136,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EncryptedCommitmentSalt",
+   "vis": "pub",
+   "module": "audit_chain",
+   "signature": "pub struct EncryptedCommitmentSalt",
+   "file": "crates/contextra-crypto/src/audit_chain.rs",
+   "line": 162,
+   "doc": [
+    "Verschlüsselter Salt-Wert für ein Record-Commitment."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "group_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 164
+    },
+    {
+     "name": "ciphertext",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 166
+    },
+    {
+     "name": "nonce",
+     "type": "[u8; 12]",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 168
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compute_record_commitment",
+   "vis": "pub",
+   "module": "audit_chain",
+   "signature": "pub fn compute_record_commitment(salt: &[u8], attr: &[u8]) -> [u8",
+   "file": "crates/contextra-crypto/src/audit_chain.rs",
+   "line": 174,
+   "doc": [
+    "Berechnet das Commitment `Blake3(salt || attr)`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "AuditChain",
+   "vis": "pub",
+   "module": "audit_chain",
+   "signature": "pub struct AuditChain",
+   "file": "crates/contextra-crypto/src/audit_chain.rs",
+   "line": 185,
+   "doc": [
+    "Manipulationssichere Audit-Kette mit BLAKE3-Hash-Verkettung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 193,
+     "doc": [
+      "Erzeugt eine neue, leere Audit-Kette."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "append",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn append( &mut self, schema_id: impl Into<String>, rules_hash: [u8",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 202,
+     "doc": [
+      "Fügt einen neuen Eintrag zur Audit-Kette hinzu und aktualisiert den Kettenkopf-Hash."
+     ],
+     "attrs": [
+      "#[allow(clippy::too_many_arguments)]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 246,
+     "doc": [
+      "Liefert die Anzahl der Einträge in der Kette."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 251,
+     "doc": [
+      "Prüft, ob die Kette leer ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "entries",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn entries(&self) -> &[AuditChainEntry]",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 256,
+     "doc": [
+      "Gibt eine Referenz auf alle Einträge der Kette zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "head_hash",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn head_hash(&self) -> [u8",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 261,
+     "doc": [
+      "Liefert den aktuellen Kettenkopf-Hash."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "sign_head_with_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn sign_head_with_bytes( &self, signature_bytes: Vec<u8>, ) -> Result<AuditChainHeadSignature>",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 266,
+     "doc": [
+      "Periodischer Aufruf: Erzeugt eine Kettenkopf-Signatur / Snapshot."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "verify_chain",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn verify_chain(&self) -> Result<bool>",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 298,
+     "doc": [
+      "Verifiziert die vollständige Kette auf Integrität.",
+      "",
+      "# Warnhinweis / Security Warning",
+      "Diese Methode prüft lediglich die **interne kryptographische Hash-Verkettung**",
+      "der vorliegenden Kette. Sie bietet **keinen Schutz gegen Rollback-Angriffe**",
+      "(Replay alter Backup-Zustände), da ein Angreifer eine früher signierte oder valide",
+      "Teilkette vorlegen kann. Für echten Rollback-Schutz (SEC-01/K1) muss",
+      "[`AuditChain::verify_chain_with_anchor`] mit einem externen `AuditHeadAnchor`",
+      "verwendet werden."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "verify_chain_with_anchor",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn verify_chain_with_anchor( &self, anchor: &AuditHeadAnchor, ) -> Result<bool>",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 346,
+     "doc": [
+      "Verifiziert die Kette gegen einen externen Kopf-Anker ([`AuditHeadAnchor`]).",
+      "",
+      "Schlägt fehl (`Ok(false)`), wenn:",
+      "1. Die Kette kürzer ist als vom Anker gefordert (`len() < anchor.seq_no + 1`).",
+      "2. Der Hash an der Ankerposition `anchor.seq_no` nicht konstant-zeitlich mit `anchor.head_hash` übereinstimmt.",
+      "3. Eine optionale Anker-Signatur nicht gegen den bereitgestellten `verifying_key` verifiziert werden kann.",
+      "4. Die interne Hash-Ketten-Struktur bis zum Ankerpunkt ungültig ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "entries",
+     "type": "Vec<AuditChainEntry>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 187
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl AuditChain",
+     "file": "crates/contextra-crypto/src/audit_chain.rs",
+     "line": 191,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod error",
+   "file": "crates/contextra-crypto/src/compat/mod.rs",
+   "line": 6,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "model_fingerprint",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod model_fingerprint",
+   "file": "crates/contextra-crypto/src/compat/mod.rs",
+   "line": 7,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "CryptoEntropy",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub trait CryptoEntropy: Send + Sync",
+   "file": "crates/contextra-crypto/src/contract.rs",
+   "line": 18,
+   "doc": [
+    "Trait zur Bereitstellung kryptographischer Entropie (Zufallsbytes).",
+    "",
+    "Ermöglicht die Injektion deterministischer Test-Zufallsquellen oder sicherer CSPRNGs."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "fill_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn fill_bytes(&mut self, dest: &mut [u8])",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 20,
+     "doc": [
+      "Füllt den übergebenen Puffer mit pseudozufälligen Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CryptoEntropy"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "DeterministicEntropy",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub struct DeterministicEntropy",
+   "file": "crates/contextra-crypto/src/contract.rs",
+   "line": 25,
+   "doc": [
+    "Standard-Implementierung von [`CryptoEntropy`] basierend auf einem deterministischen Generator."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(seed: u64) -> Self",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 31,
+     "doc": [
+      "Erzeugt eine neue deterministische Entropiequelle mit festem Startwert (Seed)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl DeterministicEntropy",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 29,
+     "in_test": false
+    },
+    {
+     "trait": "CryptoEntropy",
+     "generics": "",
+     "signature": "impl CryptoEntropy for DeterministicEntropy",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 38,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "KmsContract",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub trait KmsContract: Send + Sync",
+   "file": "crates/contextra-crypto/src/contract.rs",
+   "line": 52,
+   "doc": [
+    "Schnittstelle für Key Management Services (KMS) zur sicheren Schlüsselableitung und Hüllkurven-Verschlüsselung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "get_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn get_key(&self) -> Result<Zeroizing<Vec<u8>>>",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 54,
+     "doc": [
+      "Liefert den aktiven Datenverschlüsselungsschlüssel (DEK), genullt bei Freigabe."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsContract"
+    },
+    {
+     "name": "active_key_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn active_key_id(&self) -> &str",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 57,
+     "doc": [
+      "Liefert die Kennung (ID) des aktiven Schlüssels."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsContract"
+    },
+    {
+     "name": "derive_data_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn derive_data_key(&self, key_id: &[u8]) -> Result<Zeroizing<Vec<u8>>>",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 60,
+     "doc": [
+      "Leitet einen abgeleiteten Schlüssel anhand einer `key_id` ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsContract"
+    },
+    {
+     "name": "wrap_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn wrap_key(&self, key_id: &[u8], plaintext: &[u8]) -> Result<Vec<u8>>",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 63,
+     "doc": [
+      "Wickelt (verschlüsselt) Daten mit dem angegebenen Schlüssel ein."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsContract"
+    },
+    {
+     "name": "unwrap_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn unwrap_key(&self, key_id: &[u8], wrapped: &[u8]) -> Result<Zeroizing<Vec<u8>>>",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 66,
+     "doc": [
+      "Entpackt (entschlüsselt) Daten mit dem angegebenen Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsContract"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "InMemoryKms",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub struct InMemoryKms",
+   "file": "crates/contextra-crypto/src/contract.rs",
+   "line": 70,
+   "doc": [
+    "I/O-freie In-Memory Referenzimplementierung von [`KmsContract`]."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(active_id: impl Into<String>, master_key: [u8",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 77,
+     "doc": [
+      "Erzeugt eine neue `InMemoryKms`-Instanz mit einem 32-Byte Master-Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl InMemoryKms",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 75,
+     "in_test": false
+    },
+    {
+     "trait": "KmsContract",
+     "generics": "",
+     "signature": "impl KmsContract for InMemoryKms",
+     "file": "crates/contextra-crypto/src/contract.rs",
+     "line": 85,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KeyManager",
+   "vis": "pub",
+   "module": "crypto",
+   "signature": "pub struct KeyManager",
+   "file": "crates/contextra-crypto/src/crypto.rs",
+   "line": 65,
+   "doc": [
+    "Zentraler kryptographischer Schlüsselmanager für symmetrische Verschlüsselung.",
+    "",
+    "Hält den Master-Key im RAM, leitet per HKDF-Expand datei- und mandantenspezifische",
+    "Teilschlüssel ab und kapselt symmetrische AEAD-Ver- und Entschlüsselung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "try_new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 88,
+     "doc": [
+      "Creates a new KeyManager by deriving a key from a passphrase using HKDF-SHA256.",
+      "",
+      "# WARNHINWEIS",
+      "Diese Funktion nutzt HKDF-SHA256 und setzt voraus, dass `passphrase` hochentropisches",
+      "Schlüsselmaterial darstellt. Für menschliche Passphrasen MUSS [`KeyManager::try_new_with_kdf`]",
+      "mit Argon2id verwendet werden."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_new_with_kdf",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new_with_kdf(passphrase: &str, header: &KdfHeader) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 130,
+     "doc": [
+      "Creates a new KeyManager using Argon2id password-based key derivation.",
+      "",
+      "Nutzt Argon2id mit den im [`KdfHeader`] definierten Kostenparametern und Salt,",
+      "um eine sichere Schlüsselableitung für menschliche Passphrasen zu garantieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_new_random_salt",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new_random_salt(passphrase: &str) -> Result<(Self, [u8",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 151,
+     "doc": [
+      "Creates a new KeyManager with a cryptographically secure random salt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "derive_file_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn derive_file_key(&self, file_id: &[u8]) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 160,
+     "doc": [
+      "Derives a sub-key for a specific file or logical stream.",
+      "This prevents nonce-reuse when multiple files use the same master key."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "derive_segment_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn derive_segment_key(&self, info: &str) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 206,
+     "doc": [
+      "Derives a sub-key specifically for a KV-cache segment based on a versioned info string."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "derive_kv_key_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn derive_kv_key_bytes( &self, tenant_id: contextra_ids::TenantId, fingerprint: &[u8",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 261,
+     "doc": [
+      "Derives a sub-key for KV-cache segment encryption using raw 32-byte model fingerprint."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "derive_kv_key_scoped_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn derive_kv_key_scoped_bytes( &self, scoped_fingerprint: contextra_ids::TenantScoped<&[u8",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 275,
+     "doc": [
+      "Derives a sub-key for KV-cache segment encryption with strict compile-time tenant scope enforcement",
+      "using raw 32-byte model fingerprint."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "cipher_for_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn cipher_for_bytes( &self, tenant_id: contextra_ids::TenantId, fingerprint: &[u8",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 287,
+     "doc": [
+      "Derives a tenant-isolated `KeyManager` instance for a specific `TenantId` with raw 32-byte fingerprint."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "cipher_for_scoped_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn cipher_for_scoped_bytes<T>( &self, scoped_key: contextra_ids::TenantScoped<T>, expected_tenant_id: &contextra_ids::TenantId, fingerprint: &[u8",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 297,
+     "doc": [
+      "Derives a tenant-isolated `KeyManager` instance enforcing compile-time `TenantScoped` verification",
+      "with raw 32-byte fingerprint."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "derive_kv_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn derive_kv_key( &self, tenant_id: contextra_ids::TenantId, model_fingerprint: &crate::kv_cipher::ModelFingerprint, ) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 312,
+     "doc": [
+      "All KV-cache segments encrypted before v2 are cryptographically unreadable under v2 keys",
+      "and will fail at the `format_version` check in `KvSegmentCipher::decrypt()` with",
+      "`CryptoError::KvFormatVersionMismatch` — never with a silent garbage-data result."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "derive_kv_key_scoped",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn derive_kv_key_scoped( &self, scoped_fingerprint: contextra_ids::TenantScoped<&crate::kv_cipher::ModelFingerprint>, expected_tenant_id: &contextra_ids::TenantId, ) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 347,
+     "doc": [
+      "Derives a sub-key for KV-cache segment encryption with strict compile-time tenant scope enforcement.",
+      "",
+      "Unpacks `scoped_fingerprint` only if the inner bound `TenantId` matches `expected_tenant_id`.",
+      "Returns [`CryptoError::InvalidInput`] if a tenant scope violation occurs."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "cipher_for",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn cipher_for(&self, tenant_id: contextra_ids::TenantId) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 359,
+     "doc": [
+      "Derives a tenant-isolated `KeyManager` instance for a specific `TenantId`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "cipher_for_scoped",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn cipher_for_scoped<T>( &self, scoped_key: contextra_ids::TenantScoped<T>, expected_tenant_id: &contextra_ids::TenantId, ) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 370,
+     "doc": [
+      "Derives a tenant-isolated `KeyManager` instance enforcing compile-time `TenantScoped` verification.",
+      "Unpacks `scoped_key` only if the bound `TenantId` matches `expected_tenant_id`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "integrity_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn integrity_key(&self) -> Result<[u8",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 382,
+     "doc": [
+      "Derives an integrity key for HMAC-SHA256."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "encrypt_auto_nonce",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn encrypt_auto_nonce(&self, data: &[u8]) -> Result<(Vec<u8>, [u8",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 406,
+     "doc": [
+      "Encrypts a block of data with a deterministically generated 12-byte nonce.",
+      "Returns the ciphertext and the full 12-byte nonce used."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "decrypt_auto_nonce",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn decrypt_auto_nonce(&self, ciphertext: &[u8], nonce_bytes: &[u8",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 437,
+     "doc": [
+      "Decrypts a block of data using a full 12-byte nonce."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "emergency_wipe",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn emergency_wipe(&mut self)",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 446,
+     "doc": [
+      "Emergency Trigger: Explicitly wipes the key from memory and clears cipher cache."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "export_dek",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn export_dek(&self) -> Zeroizing<Vec<u8>>",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 453,
+     "doc": [
+      "Exports the 32-byte raw Data Encryption Key (DEK) wrapped in [`Zeroizing<Vec<u8>>`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inspect_key_bytes_for_test",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn inspect_key_bytes_for_test(&self) -> &[u8",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 459,
+     "doc": [
+      "Provides access to the key bytes ONLY during testing."
+     ],
+     "attrs": [
+      "#[cfg(any(test, feature = \"test-utils\"))]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for KeyManager",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 72,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KeyManager",
+     "file": "crates/contextra-crypto/src/crypto.rs",
+     "line": 81,
+     "in_test": false
+    },
+    {
+     "trait": "KvCipher",
+     "generics": "",
+     "signature": "impl KvCipher for KeyManager",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 101,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "UnitKey",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub struct UnitKey(pub SecretKey<32>)",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 20,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(bytes: [u8",
+     "file": "crates/contextra-crypto/src/dek.rs",
+     "line": 23,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "expose_secret",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn expose_secret(&self) -> &[u8",
+     "file": "crates/contextra-crypto/src/dek.rs",
+     "line": 27,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl UnitKey",
+     "file": "crates/contextra-crypto/src/dek.rs",
+     "line": 22,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Dek",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub struct Dek(pub SecretKey<32>)",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 35,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(bytes: [u8",
+     "file": "crates/contextra-crypto/src/dek.rs",
+     "line": 38,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "expose_secret",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn expose_secret(&self) -> &[u8",
+     "file": "crates/contextra-crypto/src/dek.rs",
+     "line": 42,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Dek",
+     "file": "crates/contextra-crypto/src/dek.rs",
+     "line": 37,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "Salt",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub type Salt = [u8",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 47,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "type",
+   "name": "DocTag",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub type DocTag = [u8",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 48,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "AncestorSalts",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub struct AncestorSalts",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 51,
+   "doc": [],
+   "attrs": [
+    "#[derive(Zeroize, ZeroizeOnDrop)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "t",
+     "type": "Salt",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/dek.rs",
+     "line": 52
+    },
+    {
+     "name": "c",
+     "type": "Salt",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/dek.rs",
+     "line": 53
+    },
+    {
+     "name": "s",
+     "type": "Option<Salt>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/dek.rs",
+     "line": 54
+    },
+    {
+     "name": "d",
+     "type": "Salt",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/dek.rs",
+     "line": 55
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEK_LABEL",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub const DEK_LABEL: &[u8] = b\"\"",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 58,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEK_SALT_LABEL",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub const DEK_SALT_LABEL: &[u8] = b\"\"",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 59,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "WRAP_AAD",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub const WRAP_AAD: &[u8] = b\"\"",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 60,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "derive_dek",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 68,
+   "doc": [
+    "Derives a DEK using AncestorSalts and DocTag."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "wrap_dek",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub fn wrap_dek(kek: &UnitKey, dek: &Dek, nonce: [u8",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 93,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "unwrap_dek",
+   "vis": "pub",
+   "module": "dek",
+   "signature": "pub fn unwrap_dek(kek: &UnitKey, wrapped: &[u8]) -> Result<Dek>",
+   "file": "crates/contextra-crypto/src/dek.rs",
+   "line": 111,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "type",
+   "name": "Result",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub type Result<T> = std::result::Result<T, CryptoError>",
+   "file": "crates/contextra-crypto/src/error.rs",
+   "line": 17,
+   "doc": [
+    "Result type alias for cryptographic operations in `contextra-crypto`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "CryptoError",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum CryptoError",
+   "file": "crates/contextra-crypto/src/error.rs",
+   "line": 27,
+   "doc": [],
+   "attrs": [
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "wal_corruption",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 84,
+     "doc": [
+      "Helper to construct a `WalCorruption` error."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "storage",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn storage(reason: impl Into<String>) -> Self",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 92,
+     "doc": [
+      "Helper to construct a `Storage` error."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "KeyDerivation",
+     "shape": "(String)",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 29
+    },
+    {
+     "name": "Encryption",
+     "shape": "(String)",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 32
+    },
+    {
+     "name": "Decryption",
+     "shape": "(String)",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 35
+    },
+    {
+     "name": "Aead",
+     "shape": "(String)",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 38
+    },
+    {
+     "name": "InvalidLength",
+     "shape": "(String)",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 41
+    },
+    {
+     "name": "IntegrityViolation",
+     "shape": "",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 44
+    },
+    {
+     "name": "InvalidInput",
+     "shape": "(String)",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 47
+    },
+    {
+     "name": "Crypto",
+     "shape": "(String)",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 50
+    },
+    {
+     "name": "KvFormatVersionMismatch",
+     "shape": "{",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 53
+    },
+    {
+     "name": "WalCorruption",
+     "shape": "{",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 61
+    },
+    {
+     "name": "WalTruncationDetected",
+     "shape": "",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 70
+    },
+    {
+     "name": "KeyRevoked",
+     "shape": "(String)",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 73
+    },
+    {
+     "name": "Storage",
+     "shape": "(String)",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 76
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "From<ContextraError>",
+     "generics": "",
+     "signature": "impl From<ContextraError> for CryptoError",
+     "file": "crates/contextra-crypto/src/compat/error.rs",
+     "line": 22,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl CryptoError",
+     "file": "crates/contextra-crypto/src/error.rs",
+     "line": 82,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "KDF_HEADER_MAGIC",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub const KDF_HEADER_MAGIC: &[u8",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 24,
+   "doc": [
+    "Magischer Header-Marker \"MFKD\" (Contextra Key Derivation)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "KDF_HEADER_VERSION_1",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub const KDF_HEADER_VERSION_1: u8 = 1",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 27,
+   "doc": [
+    "Aktuelle KDF Header Version"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "KDF_ID_ARGON2ID",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub const KDF_ID_ARGON2ID: u8 = 1",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 30,
+   "doc": [
+    "Identifikator für Argon2id"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MIN_SALT_LEN",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub const MIN_SALT_LEN: usize = 16",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 33,
+   "doc": [
+    "Min. empfohlener Salt-Umfang (16 Bytes)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MIN_M_COST_KIB",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub const MIN_M_COST_KIB: u32 = 19456",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 36,
+   "doc": [
+    "OWASP Mindestanforderungen für Argon2id"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MIN_T_COST",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub const MIN_T_COST: u32 = 2",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 38,
+   "doc": [
+    "Minimale Anzahl an Iterationen (Zeitkosten) für Argon2id gemäß OWASP."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MIN_P_COST",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub const MIN_P_COST: u32 = 1",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 40,
+   "doc": [
+    "Minimaler Parallelitätsgrad für Argon2id gemäß OWASP."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_M_COST_KIB",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub const DEFAULT_M_COST_KIB: u32 = 65536",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 43,
+   "doc": [
+    "OWASP Standardempfehlungen für Argon2id"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_T_COST",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub const DEFAULT_T_COST: u32 = 3",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 45,
+   "doc": [
+    "Standard-Zeitkosten (Iterationen) für Argon2id."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_P_COST",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub const DEFAULT_P_COST: u32 = 1",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 47,
+   "doc": [
+    "Standard-Parallelitätsgrad für Argon2id."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "KdfParams",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub struct KdfParams",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 51,
+   "doc": [
+    "Konfiguration der Argon2id KDF-Kostenparameter."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(m_cost_kib: u32, t_cost: u32, p_cost: u32) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 69,
+     "doc": [
+      "Erstellt neue `KdfParams` mit Validierung der Untergrenzen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_for_test",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_for_test(m_cost_kib: u32, t_cost: u32, p_cost: u32) -> Self",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 94,
+     "doc": [
+      "Erstellt `KdfParams` mit kleineren Kostenparametern ausschließlich für Testzwecke."
+     ],
+     "attrs": [
+      "#[cfg(any(test, feature = \"test-utils\"))]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "m_cost_kib",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 52
+    },
+    {
+     "name": "t_cost",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 53
+    },
+    {
+     "name": "p_cost",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 54
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for KdfParams",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 57,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KdfParams",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 67,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KdfHeader",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub struct KdfHeader",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 123,
+   "doc": [
+    "Versionierter KDF-Metadaten-Header zur deterministischen Reproduktion von Schlüsseln.",
+    "",
+    "Speichert die Argon2id-Kostenparameter (m_cost, t_cost, p_cost) und den Salt,",
+    "um verschlüsselte Datenbankdateien auch nach Server-Neustarts mit identischen",
+    "Parametern entsperren zu können.",
+    "",
+    "### Binär-Layout (Big-Endian):",
+    "| Offset | Länge | Feld | Beschreibung |",
+    "|---|---|---|---|",
+    "| 0..4 | 4B | Magic | \"MFKD\" (Contextra Key Derivation) |",
+    "| 4 | 1B | Version | Versionsnummer (aktuell 1) |",
+    "| 5 | 1B | KDF-ID | 1 = Argon2id |",
+    "| 6..10 | 4B | m_cost_kib | Speicherkosten in KiB (>= 19456) |",
+    "| 10..14 | 4B | t_cost | Iterationen / Zeitkosten (>= 2) |",
+    "| 14..18 | 4B | p_cost | Parallelitätsgrad (>= 1) |",
+    "| 18..22 | 4B | salt_len | Länge des Salts in Bytes |",
+    "| 22.. | variable | Salt | Kryptographischer Salt (>= 16B) |"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "generate_default",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn generate_default() -> Result<Self>",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 132,
+     "doc": [
+      "Erstellt einen neuen `KdfHeader` v1 mit zufälligem 32-Byte-Salt und OWASP-Standardparametern."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(params: KdfParams, salt: Vec<u8>) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 144,
+     "doc": [
+      "Erstellt einen `KdfHeader` v1 mit vorgegebenen Parametern und Salt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "to_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn to_bytes(&self) -> Vec<u8>",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 170,
+     "doc": [
+      "Serialisiert den `KdfHeader` in Binärform.",
+      "",
+      "Layout:",
+      "`magic (4B \"MFKD\") | version (1B = 1) | kdf_id (1B = 1 Argon2id) | m_cost_kib (4B BE) | t_cost (4B BE) | p_cost (4B BE) | salt_len (4B BE) | salt (salt_len B)`"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_bytes(bytes: &[u8]) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 186,
+     "doc": [
+      "Parst einen `KdfHeader` aus Binärdaten.",
+      "",
+      "Panic-Freiheit (total function) bei beliebigen Byte-Eingaben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "version",
+     "type": "u8",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 124
+    },
+    {
+     "name": "kdf_id",
+     "type": "u8",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 125
+    },
+    {
+     "name": "params",
+     "type": "KdfParams",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 126
+    },
+    {
+     "name": "salt",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 127
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KdfHeader",
+     "file": "crates/contextra-crypto/src/kdf.rs",
+     "line": 130,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DerivedKey",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub struct DerivedKey(pub [u8",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 274,
+   "doc": [
+    "Wrapper für abgeleitetes 256-Bit Schlüsselmaterial, das bei Drop automatisch aus dem Speicher gelöscht wird."
+   ],
+   "attrs": [
+    "#[derive(ZeroizeOnDrop)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "derive_key_argon2id",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub fn derive_key_argon2id(passphrase: &str, header: &KdfHeader) -> Result<DerivedKey>",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 285,
+   "doc": [
+    "Leitet einen kryptographisch starken Schlüssel mittels Argon2id aus einer Passphrase ab.",
+    "",
+    "# Ablauf der Argon2id-Schlüsselableitung:",
+    "1. Passphrase und Salt auf Mindestlänge prüfen.",
+    "2. Kostenparameter gegen OWASP-Mindestgrenzen validieren.",
+    "3. Argon2id-Instanz initialisieren und 32-Byte-Schlüssel ableiten.",
+    "4. Temporäre Puffer löschen und Ergebnis im geschützten KeyManager kapseln."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "hkdf_expand",
+   "vis": "pub",
+   "module": "kdf",
+   "signature": "pub fn hkdf_expand(prk: &[u8], info: &[u8], out: &mut [u8]) -> Result<()>",
+   "file": "crates/contextra-crypto/src/kdf.rs",
+   "line": 311,
+   "doc": [
+    "HKDF-SHA256 expand."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ModelFingerprint",
+   "vis": "pub",
+   "module": "kv_cipher",
+   "signature": "pub struct ModelFingerprint",
+   "file": "crates/contextra-crypto/src/kv_cipher.rs",
+   "line": 43,
+   "doc": [
+    "Uniquely identifies a model weight file and its quantization tier."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( hash: [u8",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 54,
+     "doc": [
+      "Creates a new `ModelFingerprint`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 45
+    },
+    {
+     "name": "model_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 47
+    },
+    {
+     "name": "quantization",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 49
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ModelFingerprint",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 52,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "CURRENT_KV_FORMAT_VERSION",
+   "vis": "pub",
+   "module": "kv_cipher",
+   "signature": "pub const CURRENT_KV_FORMAT_VERSION: u8 = 2",
+   "file": "crates/contextra-crypto/src/kv_cipher.rs",
+   "line": 69,
+   "doc": [
+    "Current serialized format version for [`EncryptedKvLayer`].",
+    "Increment when the serialized layout changes in a breaking way."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EncryptedKvLayer",
+   "vis": "pub",
+   "module": "kv_cipher",
+   "signature": "pub struct EncryptedKvLayer",
+   "file": "crates/contextra-crypto/src/kv_cipher.rs",
+   "line": 77,
+   "doc": [
+    "Container for an encrypted KV-cache segment layer.",
+    "",
+    "Plaintext data and nonce are zeroized on drop. Public metadata (`tenant_id`, `model_fingerprint`, `format_version`)",
+    "is explicitly skipped during zeroization (`#[zeroize(skip)]`)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Zeroize)]",
+    "#[zeroize(drop)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "format_version",
+     "type": "u8",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 80
+    },
+    {
+     "name": "ciphertext",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 82
+    },
+    {
+     "name": "nonce",
+     "type": "[u8; 12]",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 84
+    },
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 87
+    },
+    {
+     "name": "model_fingerprint",
+     "type": "ModelFingerprint",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 90
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "KvCipher",
+   "vis": "pub",
+   "module": "kv_cipher",
+   "signature": "pub trait KvCipher: Send + Sync",
+   "file": "crates/contextra-crypto/src/kv_cipher.rs",
+   "line": 94,
+   "doc": [
+    "Abstract cipher trait for KV block encryption and seal/open operations."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "seal",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>>",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 96,
+     "doc": [
+      "Encrypts (seals) plaintext byte payload into authenticated ciphertext bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KvCipher"
+    },
+    {
+     "name": "open",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn open(&self, ciphertext: &[u8]) -> Result<Vec<u8>>",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 98,
+     "doc": [
+      "Decrypts (opens) authenticated ciphertext bytes back to plaintext byte payload."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KvCipher"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "KvSegmentCipher",
+   "vis": "pub",
+   "module": "kv_cipher",
+   "signature": "pub struct KvSegmentCipher",
+   "file": "crates/contextra-crypto/src/kv_cipher.rs",
+   "line": 132,
+   "doc": [
+    "Chiffre für segmentweise verschlüsselte KV-Einträge."
+   ],
+   "attrs": [
+    "#[cfg(feature = \"kv-encryption\")]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(key_manager: KeyManager) -> Self",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 139,
+     "doc": [
+      "Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "encrypt",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn encrypt( &self, tenant_id: TenantId, model_fingerprint: ModelFingerprint, plaintext: &[u8], ) -> Result<EncryptedKvLayer>",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 149,
+     "doc": [
+      "Encrypts KV-cache plaintext payload for a given `(tenant_id, model_fingerprint)` pair.",
+      "",
+      "Derives an isolated sub-key via HKDF-SHA256 through `KeyManager::derive_kv_key()`",
+      "to cryptographically enforce tenant isolation and model quantization boundaries."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "decrypt",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn decrypt(&self, encrypted: &EncryptedKvLayer) -> Result<Vec<u8>>",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 175,
+     "doc": [
+      "Decrypts an `EncryptedKvLayer` back to its original plaintext.",
+      "",
+      "Checks that `encrypted.format_version == CURRENT_KV_FORMAT_VERSION`.",
+      "Derives the exact sub-key for `(encrypted.tenant_id, encrypted.model_fingerprint)`.",
+      "Fails with a format version error or authentication error if the layer or key",
+      "was tampered with."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "encrypt_with_version",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn encrypt_with_version( &self, tenant_id: TenantId, _segment_id: u64, _version: u8, model_fingerprint: ModelFingerprint, plaintext: &[u8], ) -> Result<EncryptedKvLayer>",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 190,
+     "doc": [
+      "Encrypts KV-cache plaintext payload for a given tenant, segment, and model fingerprint."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "decrypt_with_version",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn decrypt_with_version( &self, encrypted: &EncryptedKvLayer, _segment_id: u64, _version: u8, ) -> Result<Vec<u8>>",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 202,
+     "doc": [
+      "Decrypts an `EncryptedKvLayer` for a given segment and version."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvSegmentCipher",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 137,
+     "in_test": false
+    },
+    {
+     "trait": "KvCipher",
+     "generics": "",
+     "signature": "impl KvCipher for KvSegmentCipher",
+     "file": "crates/contextra-crypto/src/kv_cipher.rs",
+     "line": 213,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "KvDeleteMode",
+   "vis": "pub",
+   "module": "kv_segment::delete_mode",
+   "signature": "pub enum KvDeleteMode",
+   "file": "crates/contextra-crypto/src/kv_segment/delete_mode.rs",
+   "line": 22,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "TombstoneOnly",
+     "shape": "",
+     "file": "crates/contextra-crypto/src/kv_segment/delete_mode.rs",
+     "line": 23
+    },
+    {
+     "name": "CryptoShred",
+     "shape": "",
+     "file": "crates/contextra-crypto/src/kv_segment/delete_mode.rs",
+     "line": 24
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for KvDeleteMode",
+     "file": "crates/contextra-crypto/src/kv_segment/delete_mode.rs",
+     "line": 27,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EvictionWorker",
+   "vis": "pub",
+   "module": "kv_segment::eviction_worker",
+   "signature": "pub struct EvictionWorker",
+   "file": "crates/contextra-crypto/src/kv_segment/eviction_worker.rs",
+   "line": 40,
+   "doc": [
+    "Hintergrund-Worker für die Speicherfreigabe nach dem Least-Recently-Used-Prinzip (LRU)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "spawn",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn spawn(store: Arc<TenantIsolatedKvStore>) -> Self",
+     "file": "crates/contextra-crypto/src/kv_segment/eviction_worker.rs",
+     "line": 47,
+     "doc": [
+      "Spawnt den Eviction-Worker auf einem dedizierten OS-Thread."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "trigger_eviction",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn trigger_eviction(&self, target_free_bytes: usize)",
+     "file": "crates/contextra-crypto/src/kv_segment/eviction_worker.rs",
+     "line": 78,
+     "doc": [
+      "Nicht-blockierender Trigger vom Hot-Path aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "shutdown",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn shutdown(&self)",
+     "file": "crates/contextra-crypto/src/kv_segment/eviction_worker.rs",
+     "line": 86,
+     "doc": [
+      "Beendet den Worker-Thread geordnet."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EvictionWorker",
+     "file": "crates/contextra-crypto/src/kv_segment/eviction_worker.rs",
+     "line": 45,
+     "in_test": false
+    },
+    {
+     "trait": "Drop",
+     "generics": "",
+     "signature": "impl Drop for EvictionWorker",
+     "file": "crates/contextra-crypto/src/kv_segment/eviction_worker.rs",
+     "line": 94,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "emergency_wipe",
+   "vis": "pub",
+   "module": "kv_segment::eviction_worker",
+   "signature": "pub fn emergency_wipe(store: &TenantIsolatedKvStore)",
+   "file": "crates/contextra-crypto/src/kv_segment/eviction_worker.rs",
+   "line": 103,
+   "doc": [
+    "SEPARATER Pfad für Notfall-Bereinigung (z.B. Prozess-Shutdown, expliziter",
+    "Sicherheits-Trigger). Synchron, blockierend, vor Rückkehr abgeschlossen --",
+    "bewusst ANDERS als der reguläre Worker-Pfad."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "KvSegmentConfig",
+   "vis": "pub",
+   "module": "kv_segment::manager",
+   "signature": "pub struct KvSegmentConfig",
+   "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+   "line": 19,
+   "doc": [
+    "Configuration for KV segment storage behavior."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "delete_mode",
+     "type": "KvDeleteMode",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 21
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "KvSegmentPayload",
+   "vis": "pub",
+   "module": "kv_segment::manager",
+   "signature": "pub struct KvSegmentPayload",
+   "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+   "line": 26,
+   "doc": [
+    "Representation of a written KV segment (encrypted or raw payload with group_id and nonce)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "group_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 28
+    },
+    {
+     "name": "payload",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 30
+    },
+    {
+     "name": "nonce",
+     "type": "Option<[u8; 12]>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 32
+    },
+    {
+     "name": "is_encrypted",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 34
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "KvSegmentManager",
+   "vis": "pub",
+   "module": "kv_segment::manager",
+   "signature": "pub struct KvSegmentManager",
+   "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+   "line": 43,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( config: KvSegmentConfig, master_key: Option<Arc<KeyManager>>, ) -> Self",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 50,
+     "doc": [
+      "Creates a new manager with specified config and master key."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "delete_mode",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn delete_mode(&self) -> KvDeleteMode",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 61,
+     "doc": [
+      "Returns the current delete mode."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "write_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn write_segment( &self, group_id: u64, plaintext: &[u8], ) -> Result<KvSegmentPayload, CryptoError>",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 66,
+     "doc": [
+      "Writes a KV segment payload according to the configured mode."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "read_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn read_segment(&self, segment: &KvSegmentPayload) -> Result<Vec<u8>, CryptoError>",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 99,
+     "doc": [
+      "Reads/decrypts a KV segment payload."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "delete_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn delete_segment(&self, _group_id: u64) -> Result<bool, CryptoError>",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 137,
+     "doc": [
+      "Deletes a KV segment."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvSegmentManager",
+     "file": "crates/contextra-crypto/src/kv_segment/manager.rs",
+     "line": 48,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "delete_mode",
+   "vis": "pub",
+   "module": "kv_segment",
+   "signature": "pub mod delete_mode",
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "line": 1,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "eviction_worker",
+   "vis": "pub",
+   "module": "kv_segment",
+   "signature": "pub mod eviction_worker",
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "line": 2,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "manager",
+   "vis": "pub",
+   "module": "kv_segment",
+   "signature": "pub mod manager",
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "line": 3,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "segment",
+   "vis": "pub",
+   "module": "kv_segment",
+   "signature": "pub mod segment",
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "line": 4,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "store",
+   "vis": "pub",
+   "module": "kv_segment",
+   "signature": "pub mod store",
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "CURRENT_KV_KEY_DERIVATION_VERSION",
+   "vis": "pub",
+   "module": "kv_segment::segment",
+   "signature": "pub const CURRENT_KV_KEY_DERIVATION_VERSION: u8 = 1",
+   "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+   "line": 21,
+   "doc": [
+    "Aktuelle Version der KV-Segment-Schlüsselableitung.",
+    "Erhöhe diesen Wert, wenn sich der HKDF-Info-String oder der Salt-Aufbau ändert."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EncryptedSegmentPayload",
+   "vis": "pub",
+   "module": "kv_segment::segment",
+   "signature": "pub struct EncryptedSegmentPayload",
+   "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+   "line": 26,
+   "doc": [
+    "Encrypted layer representation stored inside a KvSegment when encryption is active."
+   ],
+   "attrs": [
+    "#[cfg(feature = \"kv-encryption\")]",
+    "#[derive(Zeroize, ZeroizeOnDrop)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "layer",
+     "type": "EncryptedKvLayer",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 28
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "KvSegment",
+   "vis": "pub",
+   "module": "kv_segment::segment",
+   "signature": "pub struct KvSegment",
+   "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+   "line": 49,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(tenant_id: TenantId, segment_id: u64, data: Vec<u8>) -> Self",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 74,
+     "doc": [
+      "Erstellt ein neues Klartext-KV-Cache-Segment (Default / Zero-Config, P12-konform)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_metadata",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_metadata( tenant_id: TenantId, segment_id: u64, data: Vec<u8>, #[cfg(feature = \"\")] model_fingerprint: Option<ModelFingerprint>, rope_offset: Option<usize>, ) -> Self",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 90,
+     "doc": [
+      "Erstellt ein neues Klartext-KV-Cache-Segment mit optionalen Metadaten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_encrypted",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_encrypted( cipher: &KvSegmentCipher, tenant_id: TenantId, segment_id: u64, model_fingerprint: ModelFingerprint, rope_offset: Option<usize>, plaintext: &[u8], ) -> Result<Self, crate::CryptoError>",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 113,
+     "doc": [
+      "Erstellt ein verschlüsseltes KV-Cache-Segment aus einem Klartext-Tensor."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"kv-encryption\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "decrypt_data",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn decrypt_data(&self, cipher: &KvSegmentCipher) -> Result<Vec<u8>, crate::CryptoError>",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 147,
+     "doc": [
+      "Entschlüsselt die Daten des Segments, falls es verschlüsselt ist.",
+      "Gibt bei Klartext-Segmenten direkt einen Klon der `data`-Bytes zurück."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"kv-encryption\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "to_spill_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn to_spill_bytes(&self) -> Vec<u8>",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 178,
+     "doc": [
+      "Serialisiert das Segment bzw. dessen verschlüsselte Layer für Tier-2-LSM-Spill."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_bytes(&self) -> &[u8]",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 189,
+     "doc": [
+      "Read-Only-Zugriff. Kein Klartext-Export nach außen ohne expliziten Call."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 194,
+     "doc": [
+      "Länge der Tensor-Bytes in Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 199,
+     "doc": [
+      "Prüft ob das Segment leer ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 51
+    },
+    {
+     "name": "segment_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 53
+    },
+    {
+     "name": "key_derivation_version",
+     "type": "u8",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 58
+    },
+    {
+     "name": "encrypted",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 60
+    },
+    {
+     "name": "model_fingerprint",
+     "type": "Option<ModelFingerprint>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 63
+    },
+    {
+     "name": "rope_offset",
+     "type": "Option<usize>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 65
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvSegment",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 72,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for KvSegment",
+     "file": "crates/contextra-crypto/src/kv_segment/segment.rs",
+     "line": 204,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "SpillHandler",
+   "vis": "pub",
+   "module": "kv_segment::store",
+   "signature": "pub type SpillHandler = Arc<dyn Fn(TenantId, u64, Vec<u8>) + Send + Sync>",
+   "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+   "line": 26,
+   "doc": [
+    "Optionaler Callback-Hook für Tier-2-LSM-Spill bei Eviction aus dem In-Memory LRU Cache."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "TenantIsolatedKvStore",
+   "vis": "pub",
+   "module": "kv_segment::store",
+   "signature": "pub struct TenantIsolatedKvStore",
+   "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+   "line": 121,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "DEFAULT_SHARD_COUNT",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const DEFAULT_SHARD_COUNT: usize = 32",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 136,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "DEFAULT_SEGMENT_CAPACITY_PER_TENANT",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const DEFAULT_SEGMENT_CAPACITY_PER_TENANT: usize = 256",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 137,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 140,
+     "doc": [
+      "Erstellt einen neuen tenant-isolierten KV-Store mit Standard-Shard-Anzahl (32)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_shard_count",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_shard_count(n: usize) -> Self",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 146,
+     "doc": [
+      "Erstellt einen Store mit angegebener Shard-Anzahl.",
+      "Die Shard-Anzahl wird automatisch auf die nächste Zweierpotenz aufgerundet."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_capacity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_capacity(segment_capacity_per_tenant: usize) -> Self",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 168,
+     "doc": [
+      "Erstellt einen Store mit konfigurierter Segment-Kapazität pro Tenant."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_spill_handler",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_spill_handler(&self, handler: SpillHandler)",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 176,
+     "doc": [
+      "Registriert einen Spill-Handler für evictierte Segmente."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment)",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 187,
+     "doc": [
+      "Fügt ein Segment für einen bestimmten Tenant ein."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "on_rollback",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn on_rollback(&self, tenant: TenantId, chunk_ids: &[u64])",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 210,
+     "doc": [
+      "Bereinigt assoziierte KV-Segmente bei einem transaktionalen Rollback.",
+      "",
+      "Delegiert direkt an `remove_segments_for_rollback`, um verwaiste KV-Segmente",
+      "(Karteileichen/Memory-Leaks) nach fehlgeschlagenen Multi-Index-Commits zu verhindern."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "remove_segments_for_rollback",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn remove_segments_for_rollback(&self, tenant: TenantId, segment_ids: &[u64])",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 219,
+     "doc": [
+      "Entfernt alle Segmente mit den angegebenen `segment_ids` für den gegebenen Tenant.",
+      "",
+      "Muss bei transaktionalem Rollback aufgerufen werden, wenn ein `DbTransaction::commit()`",
+      "fehlschlägt und `compensate_*()` ausgeführt wird, um verwaiste KV-Segmente zu",
+      "vermeiden (Memory-Leak-Prävention)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "remove_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn remove_segment(&self, tenant: TenantId, segment_id: u64)",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 247,
+     "doc": [
+      "Entfernt ein einzelnes Segment. Convenience-Wrapper um `remove_segments_for_rollback`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_segment_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_segment_bytes(&self, tenant: TenantId, segment_id: u64) -> Option<Vec<u8>>",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 252,
+     "doc": [
+      "Liefert unverschlüsselte Segment-Bytes für einen Tenant (Klartext-Modus)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert_encrypted_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert_encrypted_segment( &self, cipher: &crate::KvSegmentCipher, tenant: TenantId, segment_id: u64, model_fingerprint: crate::ModelFingerprint, rope_offset: Option<usize>, plaintext: &[u8], ) -> Result<(), crate::CryptoError>",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 263,
+     "doc": [
+      "Verschlüsselt einen Klartext-Tensor und fügt ein verschlüsseltes Segment ein."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"kv-encryption\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_segments",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_segments(&self, tenant: TenantId) -> Vec<u64>",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 286,
+     "doc": [
+      "INV-TENANT-Analogon für KV-Bridge: Ein Tenant kann niemals Segmente",
+      "eines anderen Tenants lesen. Strukturell erzwungen durch getrennte Maps."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_decrypted_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_decrypted_segment( &self, cipher: &crate::KvSegmentCipher, tenant: TenantId, segment_id: u64, ) -> Result<Option<Vec<u8>>, crate::CryptoError>",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 298,
+     "doc": [
+      "Liest ein bestimmtes Segment eines Mandanten und entschlüsselt es falls nötig."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"kv-encryption\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_tenant_segment_len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_tenant_segment_len(&self, tenant: TenantId) -> usize",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 316,
+     "doc": [
+      "Gibt die Anzahl der gespeicherten Segmente für einen bestimmten Tenant zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "evict_lru_fair",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn evict_lru_fair(&self, target_free_bytes: usize) -> usize",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 395,
+     "doc": [
+      "Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness via Round-Robin über alle aktiven Tenants.",
+      "",
+      "Im Gegensatz zu `evict_lru_global()` verhindert diese Methode, dass sehr aktive",
+      "Tenants inaktive Tenants vollständig verdrängen (Prevent Cross-Tenant Starvation)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "evict_lru_fair_with_hook",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn evict_lru_fair_with_hook<F>(&self, target_free_bytes: usize, mut hook: F) -> usize where F: FnMut(),",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 407,
+     "doc": [],
+     "attrs": [
+      "#[cfg(test)]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clear_all",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clear_all(&self)",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 510,
+     "doc": [
+      "Leert alle Segmente aus allen Shards vollständig und löscht deren Speicher via Zeroize."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TenantIsolatedKvStore",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 135,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for TenantIsolatedKvStore",
+     "file": "crates/contextra-crypto/src/kv_segment/store.rs",
+     "line": 525,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "aead",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod aead",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 43,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "anti_tamper",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod anti_tamper",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 44,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "audit_chain",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod audit_chain",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 45,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "contract",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod contract",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 46,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "compat",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod compat",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 48,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"workspace\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "crypto",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod crypto",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 49,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "dek",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod dek",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 50,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 51,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "kdf",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod kdf",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 52,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "kv_cipher",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod kv_cipher",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 53,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "kv_segment",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod kv_segment",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 54,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "secret",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod secret",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 55,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "wal_completeness",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod wal_completeness",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 56,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "wal_crypto",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod wal_crypto",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 57,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SecretKey",
+   "vis": "pub",
+   "module": "secret",
+   "signature": "pub struct SecretKey<const N: usize>",
+   "file": "crates/contextra-crypto/src/secret.rs",
+   "line": 14,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(bytes: [u8",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 20,
+     "doc": [
+      "Creates a new secret key wrapping raw bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "expose_secret",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn expose_secret(&self) -> &[u8",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 26,
+     "doc": [
+      "Exposes a reference to the secret bytes."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 32,
+     "doc": [
+      "Exposes a reference to the secret bytes (compatibility alias)."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<const N: usize>",
+     "signature": "impl<const N: usize> SecretKey<N>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 18,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "<const N: usize>",
+     "signature": "impl<const N: usize> std::fmt::Debug for SecretKey<N>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 37,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Display",
+     "generics": "<const N: usize>",
+     "signature": "impl<const N: usize> std::fmt::Display for SecretKey<N>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 43,
+     "in_test": false
+    },
+    {
+     "trait": "ConstantTimeEq",
+     "generics": "<const N: usize>",
+     "signature": "impl<const N: usize> ConstantTimeEq for SecretKey<N>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 49,
+     "in_test": false
+    },
+    {
+     "trait": "PartialEq",
+     "generics": "<const N: usize>",
+     "signature": "impl<const N: usize> PartialEq for SecretKey<N>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 55,
+     "in_test": false
+    },
+    {
+     "trait": "Eq",
+     "generics": "<const N: usize>",
+     "signature": "impl<const N: usize> Eq for SecretKey<N>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 61,
+     "in_test": false
+    },
+    {
+     "trait": "serde::Serialize",
+     "generics": "<const N: usize>",
+     "signature": "impl<const N: usize> serde::Serialize for SecretKey<N>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 108,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Secret",
+   "vis": "pub",
+   "module": "secret",
+   "signature": "pub struct Secret<T: Zeroize>",
+   "file": "crates/contextra-crypto/src/secret.rs",
+   "line": 69,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(inner: T) -> Self",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 75,
+     "doc": [
+      "Creates a new `Secret` wrapping sensitive data."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "expose_secret",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn expose_secret(&self) -> &T",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 81,
+     "doc": [
+      "Exposes a reference to the inner secret."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "expose_secret_mut",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn expose_secret_mut(&mut self) -> &mut T",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 87,
+     "doc": [
+      "Exposes a mutable reference to the inner secret."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<T: Zeroize>",
+     "signature": "impl<T: Zeroize> Secret<T>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 73,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "<T: Zeroize>",
+     "signature": "impl<T: Zeroize> std::fmt::Debug for Secret<T>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 92,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Display",
+     "generics": "<T: Zeroize>",
+     "signature": "impl<T: Zeroize> std::fmt::Display for Secret<T>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 98,
+     "in_test": false
+    },
+    {
+     "trait": "serde::Serialize",
+     "generics": "<T: Zeroize>",
+     "signature": "impl<T: Zeroize> serde::Serialize for Secret<T>",
+     "file": "crates/contextra-crypto/src/secret.rs",
+     "line": 118,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "verify_wal_chain_completeness",
+   "vis": "pub",
+   "module": "wal_completeness",
+   "signature": "pub fn verify_wal_chain_completeness( wal_tail_hmac: &[u8",
+   "file": "crates/contextra-crypto/src/wal_completeness.rs",
+   "line": 43,
+   "doc": [
+    "Verifiziert, dass der WAL-Tail nicht abgeschnitten wurde, indem der",
+    "letzte bekannte WAL-HMAC mit der im Checkpoint-Manifest persistierten",
+    "High-Water-Mark verglichen wird.",
+    "",
+    "# Semantik & Bedrohungsmodell",
+    "- Die Verifikation prüft die exakte Byteweise Gleichheit (`subtle::ConstantTimeEq`) zwischen dem",
+    "Ende der WAL-HMAC-Kette (`wal_tail_hmac`) und der im Checkpoint-Manifest aufgezeichneten High-Water-Mark.",
+    "- Ein fehlgeschlagener Vergleich zeigt an, dass nach dem letzten Checkpoint geschriebene WAL-Einträge",
+    "durch Truncation, Dateisystem-Fehler oder bösartige Rollback-Versuche verloren gegangen oder verfälscht wurden.",
+    "- **Grenzen:** Diese Funktion ist ein reiner Prädikatsvergleich (Tail == HighWaterMark). Ein Angreifer mit",
+    "Schreibzugriff auf WAL *und* Checkpoint-Manifest kann beide konsistent zurücksetzen.",
+    "Der Schutz gegen synchrone Manifest/WAL-Rollbacks wird durch den Audit-Chain-Anker (siehe ADR-042 / Spec §15.6) hergestellt.",
+    "",
+    "# Fehler",
+    "`CryptoError::WalTruncationDetected` wenn `wal_tail_hmac != manifest_high_water_mark`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "KmsProvider",
+   "vis": "pub",
+   "module": "wal_crypto",
+   "signature": "pub trait KmsProvider: Send + Sync",
+   "file": "crates/contextra-crypto/src/wal_crypto.rs",
+   "line": 32,
+   "doc": [
+    "Key Management Strategy interface for data key derivation, key wrapping/unwrapping, and key rotation."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "get_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn get_key(&self) -> Result<Zeroizing<Vec<u8>>>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 34,
+     "doc": [
+      "Retrieves the Data Encryption Key (DEK) zeroized on drop."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsProvider"
+    },
+    {
+     "name": "active_key_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn active_key_id(&self) -> &str",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 37,
+     "doc": [
+      "Returns the active key identifier or version alias."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsProvider"
+    },
+    {
+     "name": "derive_data_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn derive_data_key(&self, key_id: &[u8]) -> Result<Zeroizing<Vec<u8>>>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 40,
+     "doc": [
+      "Derives a raw data key bound to the specified `key_id`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsProvider"
+    },
+    {
+     "name": "wrap_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn wrap_key(&self, key_id: &[u8], plaintext: &[u8]) -> Result<Vec<u8>>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 43,
+     "doc": [
+      "Wraps (encrypts) plaintext data or a raw key using the key bound to `key_id`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsProvider"
+    },
+    {
+     "name": "unwrap_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn unwrap_key(&self, key_id: &[u8], wrapped: &[u8]) -> Result<Zeroizing<Vec<u8>>>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 46,
+     "doc": [
+      "Unwraps (decrypts) wrapped ciphertext data or key using the key bound to `key_id`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsProvider"
+    },
+    {
+     "name": "rotate_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn rotate_key(&mut self) -> Result<String>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 49,
+     "doc": [
+      "Rotates the active master key or key version and returns the new active key ID."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KmsProvider"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "LocalKeyManagerKms",
+   "vis": "pub",
+   "module": "wal_crypto",
+   "signature": "pub struct LocalKeyManagerKms",
+   "file": "crates/contextra-crypto/src/wal_crypto.rs",
+   "line": 55,
+   "doc": [
+    "Standard local implementation of [`KmsProvider`] wrapping [`KeyManager`].",
+    "",
+    "Provides thread-safe, zeroized key derivation, wrapping, unwrapping, and rotation."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(key_manager: KeyManager, key_id: impl Into<String>) -> Self",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 63,
+     "doc": [
+      "Creates a new `LocalKeyManagerKms` wrapping an existing `KeyManager`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "key_manager",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn key_manager(&self) -> &KeyManager",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 72,
+     "doc": [
+      "Accesses the underlying `KeyManager`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl LocalKeyManagerKms",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 61,
+     "in_test": false
+    },
+    {
+     "trait": "KmsProvider",
+     "generics": "",
+     "signature": "impl KmsProvider for LocalKeyManagerKms",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 77,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "CloudEgressGuard",
+   "vis": "pub",
+   "module": "wal_crypto",
+   "signature": "pub struct CloudEgressGuard",
+   "file": "crates/contextra-crypto/src/wal_crypto.rs",
+   "line": 146,
+   "doc": [
+    "Egress guard for inspecting and sanitizing encrypted payload blocks prior to cloud egress."
+   ],
+   "attrs": [
+    "#[cfg(feature = \"cloud-egress-guard\")]",
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 160,
+     "doc": [
+      "Creates a new `CloudEgressGuard` with a default maximum payload limit of 10 MB."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_max_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_max_bytes(max_egress_bytes: usize) -> Self",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 167,
+     "doc": [
+      "Creates a custom `CloudEgressGuard` with a specified maximum payload size."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "validate_egress_payload",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn validate_egress_payload(&self, payload: &[u8]) -> Result<()>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 172,
+     "doc": [
+      "Validates that an egress payload meets size and structural integrity bounds."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for CloudEgressGuard",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 151,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl CloudEgressGuard",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 158,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EncryptedWal",
+   "vis": "pub",
+   "module": "wal_crypto",
+   "signature": "pub struct EncryptedWal",
+   "file": "crates/contextra-crypto/src/wal_crypto.rs",
+   "line": 203,
+   "doc": [
+    "Encrypted WAL chunk provider that handles transparent encryption/decryption of WAL payloads via KMS.",
+    "",
+    "# Invariants",
+    "- Delegates encryption and key management to a [`KmsProvider`].",
+    "- Prepends a unique 12-byte random nonce to every encrypted chunk output.",
+    "",
+    "# Usage",
+    "Use when writing or reading encrypted WAL logs at rest. Call `encrypt_chunk` to wrap",
+    "plain payload bytes into an encrypted chunk with prepended nonce, and `decrypt_chunk`",
+    "to recover the original payload.",
+    "",
+    "# Errors",
+    "Emits `CryptoError::Crypto` if encryption/decryption fails, key derivation fails,",
+    "or if chunk length is less than 12 bytes during decryption."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(key_manager: KeyManager, file_id: &[u8]) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 216,
+     "doc": [
+      "Creates a new EncryptedWal with per-file key derivation via LocalKeyManagerKms to prevent nonce-reuse.",
+      "`file_id` (e.g., filename) is used to derive a unique sub-key for this stream."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_kms",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_kms(kms: Arc<dyn KmsProvider>) -> Self",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 235,
+     "doc": [
+      "Creates a new EncryptedWal using an arbitrary KmsProvider."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "kms",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn kms(&self) -> &Arc<dyn KmsProvider>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 240,
+     "doc": [
+      "Returns a reference to the inner KMS provider."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "encrypt_chunk",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn encrypt_chunk(&self, payload: &[u8]) -> Result<Vec<u8>>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 246,
+     "doc": [
+      "Wraps the internal WAL chunk in AES-256-GCM-SIV stream.",
+      "Prepends the 12-byte nonce to the encrypted ciphertext."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "decrypt_chunk",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn decrypt_chunk(&self, data: &[u8]) -> Result<Vec<u8>>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 258,
+     "doc": [
+      "Decrypts the WAL chunk by extracting the prepended 12-byte nonce from the data."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EncryptedWal",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 213,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "WalHmac",
+   "vis": "pub",
+   "module": "wal_crypto",
+   "signature": "pub struct WalHmac",
+   "file": "crates/contextra-crypto/src/wal_crypto.rs",
+   "line": 291,
+   "doc": [
+    "Stateful wrapper around HMAC-SHA256 initialized with WAL domain separation.",
+    "",
+    "# Invariants",
+    "- Initialized with `b\"contextra-wal-v1\"` domain separation string as the first updated block,",
+    "preventing cross-context HMAC collisions if the integrity key is reused elsewhere.",
+    "",
+    "# Usage",
+    "Use to compute deterministic 32-byte HMAC-SHA256 checksums over WAL entry fields and",
+    "previous chain links during WAL appends or verification.",
+    "",
+    "# Errors",
+    "Emits `CryptoError::Crypto` if key initialization fails."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(integrity_key: &[u8]) -> Result<Self>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 296,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "update",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn update(&mut self, data: &[u8])",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 313,
+     "doc": [
+      "Führt neue Daten in die laufende HMAC-Berechnung ein."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "finalize",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn finalize(self) -> [u8",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 318,
+     "doc": [
+      "Schließt die HMAC-Berechnung ab und liefert den 32-Byte-Digest."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl WalHmac",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 295,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "WalEntrySnapshot",
+   "vis": "pub",
+   "module": "wal_crypto",
+   "signature": "pub struct WalEntrySnapshot",
+   "file": "crates/contextra-crypto/src/wal_crypto.rs",
+   "line": 333,
+   "doc": [
+    "Immutable snapshot of a WAL entry used for cryptographic integrity verification.",
+    "",
+    "# Invariants",
+    "- Captures entry fields (`seq_no`, `op_type`, `key`, `value`, `checksum`, `prev_hmac`)",
+    "required to recompute the entry's HMAC-SHA256 checksum and verify hash-chain continuity.",
+    "",
+    "# Usage",
+    "Passed to `IntegrityVerifier::verify_and_update()` during WAL replay or recovery."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Zeroize)]",
+    "#[zeroize(drop)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "tx_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 334
+    },
+    {
+     "name": "seq_no",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 335
+    },
+    {
+     "name": "op_type",
+     "type": "u8",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 336
+    },
+    {
+     "name": "key",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 337
+    },
+    {
+     "name": "value",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 338
+    },
+    {
+     "name": "checksum",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 339
+    },
+    {
+     "name": "prev_hmac",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 340
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "IntegrityVerifier",
+   "vis": "pub",
+   "module": "wal_crypto",
+   "signature": "pub struct IntegrityVerifier",
+   "file": "crates/contextra-crypto/src/wal_crypto.rs",
+   "line": 361,
+   "doc": [
+    "Stateful verifier for WAL HMAC-SHA256 hash chains.",
+    "",
+    "# Invariants",
+    "- Maintains running `last_hmac` state across entries to enforce sequential hash-chain continuity.",
+    "- Performs constant-time comparison (`subtle::ConstantTimeEq`) of checksums and `prev_hmac`",
+    "to prevent timing side-channel attacks.",
+    "- Zeroizes key material on drop to prevent secret key leakage from memory.",
+    "- Any HMAC discrepancy or broken chain link immediately halts verification.",
+    "",
+    "# Usage",
+    "Instantiate with the WAL's integrity key at the start of replay and call `verify_and_update()`",
+    "sequentially for each deserialized WAL entry.",
+    "",
+    "# Errors",
+    "Emits `CryptoError::WalCorruption` immediately if `checksum` or `prev_hmac` does not match,",
+    "or `CryptoError::Crypto` if HMAC initialization fails."
+   ],
+   "attrs": [
+    "#[derive(Zeroize)]",
+    "#[zeroize(drop)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(integrity_key: &[u8]) -> Self",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 368,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_last_hmac",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_last_hmac(&mut self, hmac: [u8",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 382,
+     "doc": [
+      "Übernimmt einen bereits bekannten `last_hmac`-Kettenzustand, z. B. beim",
+      "Wechsel von einem Normal- auf einen Legacy-Key-Verifier MITTEN in einem",
+      "Batch, damit die HMAC-Chain-Kontinuität über den Verifier-Wechsel hinweg",
+      "gewahrt bleibt (verhindert einen Split-Brain-Zustand, bei dem ein frisch",
+      "initialisierter Verifier fälschlich `prev_hmac == [0u8;32]` als gültigen",
+      "Kettenanfang akzeptiert, obwohl bereits vorherige Einträge verifiziert wurden)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "last_hmac_snapshot",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn last_hmac_snapshot(&self) -> [u8",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 387,
+     "doc": [
+      "Gibt den aktuellen `last_hmac`-Kettenzustand zurück (für Verifier-Handoff)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_last_seq_no",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_last_seq_no(&mut self, seq_no: Option<u64>)",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 392,
+     "doc": [
+      "Übernimmt eine bereits bekannte `last_seq_no` für den Verifier-Handoff."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "last_seq_no_snapshot",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn last_seq_no_snapshot(&self) -> Option<u64>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 397,
+     "doc": [
+      "Gibt die aktuell bekannte `last_seq_no` zurück (für Verifier-Handoff)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "verify_and_update_v3",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn verify_and_update_v3(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 402,
+     "doc": [
+      "Verifies a V3 entry (with tx_id and length prefixes) and updates the chain state."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "verify_and_update_v2",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn verify_and_update_v2(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 491,
+     "doc": [
+      "Verifiziert und aktualisiert die HMAC-Kette im V2-Format (Rückwärtskompatibilität)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "skip_hmac_verify_legacy",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn skip_hmac_verify_legacy(&mut self, entry: &WalEntrySnapshot)",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 560,
+     "doc": [
+      "Updates the chain state for legacy V1 entries without HMAC verification."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "verify_and_update",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn verify_and_update(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()>",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 566,
+     "doc": [
+      "Default verification delegating to V3 verification."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl IntegrityVerifier",
+     "file": "crates/contextra-crypto/src/wal_crypto.rs",
+     "line": 367,
+     "in_test": false
+    }
+   ]
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use delete_mode::KvDeleteMode",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "line": 7,
+   "in_test": false,
+   "module": "kv_segment"
+  },
+  {
+   "signature": "pub use eviction_worker::",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "line": 8,
+   "in_test": false,
+   "module": "kv_segment"
+  },
+  {
+   "signature": "pub use manager::",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "line": 9,
+   "in_test": false,
+   "module": "kv_segment"
+  },
+  {
+   "signature": "pub use segment::",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "line": 10,
+   "in_test": false,
+   "module": "kv_segment"
+  },
+  {
+   "signature": "pub use store::TenantIsolatedKvStore",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/kv_segment/mod.rs",
+   "line": 11,
+   "in_test": false,
+   "module": "kv_segment"
+  },
+  {
+   "signature": "pub use aead::*",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 63,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use contract::*",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 64,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use dek::",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 65,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use kdf::hkdf_expand",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 66,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use secret::SecretKey",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 67,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use audit_chain::",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 69,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use crypto::KeyManager as CryptoKey",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 73,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use crypto::KeyManager",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 74,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use error::",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 75,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use kdf::",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 76,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use kv_cipher::KvSegmentCipher",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 78,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use kv_cipher::",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 79,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use kv_segment::",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 80,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use wal_completeness::verify_wal_chain_completeness",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 88,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use wal_crypto::CloudEgressGuard",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 90,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use wal_crypto::",
+   "vis": "pub",
+   "file": "crates/contextra-crypto/src/lib.rs",
+   "line": 91,
+   "in_test": false,
+   "module": "crate"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra-crypto",
+  "contextra-crypto-fuzz",
+  "contextra-infer-candle",
+  "contextra-kvcache",
+  "contextra-mcp",
+  "contextra-store"
+ ]
+}

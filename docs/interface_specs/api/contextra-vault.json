@@ -1,0 +1,948 @@
+{
+ "name": "contextra-vault",
+ "version": "0.1.0",
+ "path": "crates/contextra-vault",
+ "role": "RAM-Staging (excluded)",
+ "features": {
+  "default": [],
+  "workspace": [
+   "dep:contextra-types"
+  ]
+ },
+ "deps": {
+  "contextra-sys": {
+   "kind": "normal",
+   "source": "path",
+   "optional": false
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "zeroize": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "contextra-types": {
+   "kind": "normal",
+   "source": "path",
+   "optional": true
+  },
+  "tempfile": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "# contextra-vault",
+  "",
+  "Ephemerer, speichergesicherter Chunk- und Kontext-Tresor (Ebene 1, Kern-Closure `{contextra-sys}`).",
+  "",
+  "Dieses Crate implementiert einen flüchtigen Zwischenspeicher für sensible flüchtige",
+  "In-Memory-Daten, basierend auf `contextra-sys::vault::LockedRegions`."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-vault/src/compat/mod.rs",
+   "module": "compat",
+   "lines": 61
+  },
+  {
+   "file": "crates/contextra-vault/src/error.rs",
+   "module": "error",
+   "lines": 20
+  },
+  {
+   "file": "crates/contextra-vault/src/lib.rs",
+   "module": "crate",
+   "lines": 20
+  },
+  {
+   "file": "crates/contextra-vault/src/vault.rs",
+   "module": "vault",
+   "lines": 428
+  }
+ ],
+ "counts": {
+  "unwrap": 0,
+  "expect": 0,
+  "panic_macro": 0,
+  "todo_unimpl": 0,
+  "index_bracket": 0,
+  "cfg_feature_gates": 1
+ },
+ "grep_pub_decl": 33,
+ "all_pub_decl": 33,
+ "public_items": [
+  {
+   "kind": "enum",
+   "name": "VaultError",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum VaultError",
+   "file": "crates/contextra-vault/src/error.rs",
+   "line": 6,
+   "doc": [
+    "Fehlerzustände des flüchtigen Speicher-Puffers."
+   ],
+   "attrs": [
+    "#[derive(Debug, thiserror::Error)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "CapacityExceeded",
+     "shape": "{",
+     "file": "crates/contextra-vault/src/error.rs",
+     "line": 9
+    },
+    {
+     "name": "AlreadyConsumed",
+     "shape": "",
+     "file": "crates/contextra-vault/src/error.rs",
+     "line": 19
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error",
+   "file": "crates/contextra-vault/src/lib.rs",
+   "line": 10,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "vault",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod vault",
+   "file": "crates/contextra-vault/src/lib.rs",
+   "line": 11,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "compat",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod compat",
+   "file": "crates/contextra-vault/src/lib.rs",
+   "line": 14,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"workspace\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "VaultDocId",
+   "vis": "pub",
+   "module": "vault",
+   "signature": "pub struct VaultDocId(pub u64)",
+   "file": "crates/contextra-vault/src/vault.rs",
+   "line": 32,
+   "doc": [
+    "Eindeutige ID eines Dokuments/Chunks im Vault (Kern-Typ)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 36,
+     "doc": [
+      "Erzeugt eine neue VaultDocId."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(self) -> u64",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 41,
+     "doc": [
+      "Gibt den inneren numerischen Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<DocId>",
+     "generics": "",
+     "signature": "impl From<DocId> for VaultDocId",
+     "file": "crates/contextra-vault/src/compat/mod.rs",
+     "line": 19,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl VaultDocId",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 34,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "VaultTxId",
+   "vis": "pub",
+   "module": "vault",
+   "signature": "pub struct VaultTxId(pub u64)",
+   "file": "crates/contextra-vault/src/vault.rs",
+   "line": 48,
+   "doc": [
+    "Transaktions- und Sequenz-ID (Kern-Typ)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 52,
+     "doc": [
+      "Erzeugt eine neue VaultTxId."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(self) -> u64",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 57,
+     "doc": [
+      "Gibt den inneren numerischen Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<TxId>",
+     "generics": "",
+     "signature": "impl From<TxId> for VaultTxId",
+     "file": "crates/contextra-vault/src/compat/mod.rs",
+     "line": 33,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl VaultTxId",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 50,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "VaultTenantId",
+   "vis": "pub",
+   "module": "vault",
+   "signature": "pub struct VaultTenantId(pub u64)",
+   "file": "crates/contextra-vault/src/vault.rs",
+   "line": 64,
+   "doc": [
+    "Mandanten-Kennung (Kern-Typ)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 68,
+     "doc": [
+      "Erzeugt eine neue VaultTenantId."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(self) -> u64",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 73,
+     "doc": [
+      "Gibt den inneren numerischen Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<TenantId>",
+     "generics": "",
+     "signature": "impl From<TenantId> for VaultTenantId",
+     "file": "crates/contextra-vault/src/compat/mod.rs",
+     "line": 47,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl VaultTenantId",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 66,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "SignalModality",
+   "vis": "pub",
+   "module": "vault",
+   "signature": "pub enum SignalModality",
+   "file": "crates/contextra-vault/src/vault.rs",
+   "line": 80,
+   "doc": [
+    "Modalität eines Vault-Chunks — bestimmt den Verarbeitungskontext beim späteren Commit."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "AudioTranscript",
+     "shape": "",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 82
+    },
+    {
+     "name": "VisualCapture",
+     "shape": "",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 84
+    },
+    {
+     "name": "TextInput",
+     "shape": "",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 86
+    },
+    {
+     "name": "StructuredData",
+     "shape": "",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 88
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "VaultChunk",
+   "vis": "pub",
+   "module": "vault",
+   "signature": "pub struct VaultChunk",
+   "file": "crates/contextra-vault/src/vault.rs",
+   "line": 95,
+   "doc": [
+    "Ein einzelner Datenblock (Chunk) im `VolatileContextVault`.",
+    "",
+    "Sämtliche Inhalte werden beim Drop via [`ZeroizeOnDrop`] kryptographisch überschrieben."
+   ],
+   "attrs": [
+    "#[derive(ZeroizeOnDrop)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( id: VaultDocId, content: Vec<u8>, modality: SignalModality, captured_tx: VaultTxId, ) -> Self",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 120,
+     "doc": [
+      "Erzeugt einen neuen sensitiven Chunk.",
+      "",
+      "# Parameter",
+      "- `id`: Eindeutige Dokumenten-ID.",
+      "- `content`: Rohe Nutzdaten (z. B. Text- oder Binärdaten).",
+      "- `modality`: Art der Eingabedaten.",
+      "- `captured_tx`: Transaktions-Sequenznummer zum Zeitpunkt der Aufnahme."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_label",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_label(mut self, label: impl Into<String>) -> Self",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 136,
+     "doc": [
+      "Weist dem Chunk eine beschreibende Bezeichnung (Label) zu."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "size_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn size_bytes(&self) -> usize",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 142,
+     "doc": [
+      "Gibt die Größe des Chunk-Inhalts in Bytes zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "type": "VaultDocId",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 98
+    },
+    {
+     "name": "content",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 100
+    },
+    {
+     "name": "modality",
+     "type": "SignalModality",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 103
+    },
+    {
+     "name": "captured_tx",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 106
+    },
+    {
+     "name": "label",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 109
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl VaultChunk",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 112,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "VaultConfig",
+   "vis": "pub",
+   "module": "vault",
+   "signature": "pub struct VaultConfig",
+   "file": "crates/contextra-vault/src/vault.rs",
+   "line": 149,
+   "doc": [
+    "Konfiguration für den `VolatileContextVault`."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "max_capacity_bytes",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 152
+    },
+    {
+     "name": "attempt_mlock",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 154
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for VaultConfig",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 157,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "VolatileDrainReceipt",
+   "vis": "pub",
+   "module": "vault",
+   "signature": "pub struct VolatileDrainReceipt",
+   "file": "crates/contextra-vault/src/vault.rs",
+   "line": 169,
+   "doc": [
+    "Quittung nach erfolgreicher flüchtiger Speicherbereinigung via [`VolatileContextVault::purge_memory()`]."
+   ],
+   "attrs": [
+    "#[derive(Debug)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "chunks_purged",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 171
+    },
+    {
+     "name": "bytes_zeroed",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 173
+    },
+    {
+     "name": "purged_at",
+     "type": "Instant",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 175
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "CommitReceipt",
+   "vis": "pub",
+   "module": "vault",
+   "signature": "pub struct CommitReceipt",
+   "file": "crates/contextra-vault/src/vault.rs",
+   "line": 182,
+   "doc": [
+    "Quittung nach Übergabe der Chunks an die persistente Datenbank via [`VolatileContextVault::commit()`]."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "chunks_committed",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 184
+    },
+    {
+     "name": "bytes_committed",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 186
+    },
+    {
+     "name": "tenant_id",
+     "type": "VaultTenantId",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 188
+    },
+    {
+     "name": "tx_id",
+     "type": "VaultTxId",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 190
+    },
+    {
+     "name": "metadata_reference",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 192
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "VolatileContextVault",
+   "vis": "pub",
+   "module": "vault",
+   "signature": "pub struct VolatileContextVault",
+   "file": "crates/contextra-vault/src/vault.rs",
+   "line": 205,
+   "doc": [
+    "Ephemerer RAM-Puffer für sensitive Kontexte im Safe-Modus.",
+    "",
+    "# INVARIANTEN",
+    "- **INV-VAULT-1:** `purge()` zeroized alle Chunk-Inhalte via `ZeroizeOnDrop` vor",
+    "der Deallokation. `std::mem::forget` auf den Vault hebelt diese Invariante aus.",
+    "- **INV-VAULT-2:** `ingest()` schreibt NIE in Storage, Log-Writer oder",
+    "irgendeinen Vektorindex. Einziger Schreibpfad auf dauerhafte Ablage:",
+    "expliziter Aufruf von `commit()`.",
+    "- **INV-VAULT-3:** Kapazitätsüberschreitung führt zu `VaultError::CapacityExceeded`.",
+    "Kein stiller Fallback auf Disk-Speicher."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "open",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn open(config: VaultConfig) -> Self",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 221,
+     "doc": [
+      "Öffnet einen neuen leeren Vault im RAM.",
+      "",
+      "Führt keinerlei Datei-I/O oder Festplattenzugriffe aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "ingest",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn ingest(&mut self, chunk: VaultChunk) -> Result<(), VaultError>",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 248,
+     "doc": [
+      "Nimmt einen sensitiven Chunk in den RAM-Puffer auf.",
+      "",
+      "# Ablauf von `ingest`:",
+      "1. Status prüfen: Wurde der Vault bereits konsumiert? Falls ja: `Err(AlreadyConsumed)`.",
+      "2. Kapazität prüfen: Überschreitet `current_bytes + new_bytes` das Limit? Falls ja: `Err(CapacityExceeded)`.",
+      "3. Memory-Locking: `mlock`-Aufruf versuchen, um Swap-Auslagerung auf SSD zu verhindern.",
+      "4. Chunk im flüchtigen RAM-Vektor speichern und Byte-Zähler inkrementieren.",
+      "",
+      "# Invariante INV-VAULT-2:",
+      "Schreibt niemals auf Festplatte oder in ein persistentes Log."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "purge_memory",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn purge_memory(mut self) -> VolatileDrainReceipt",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 288,
+     "doc": [
+      "Verwirft alle Chunks sofort und überschreibt deren Heap-Inhalte kryptographisch mit Nullen.",
+      "",
+      "# Ablauf von `purge`:",
+      "1. Alle Chunk-Inhalte im Heap explizit via [`Zeroize::zeroize()`] mit Nullen überschreiben.",
+      "2. Erst nach dem Nullsetzen: Betriebssystem-Locks via `unlock_all()` freigeben (`munlock`).",
+      "3. Chunk-Liste leeren, Vault als konsumiert markieren und [`VolatileDrainReceipt`] ausstellen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "purge",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn purge(self) -> VolatileDrainReceipt",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 316,
+     "doc": [
+      "Neutralisierte Speicherleeren-Methode (Alias für [`Self::purge_memory`])."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "current_size_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn current_size_bytes(&self) -> usize",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 321,
+     "doc": [
+      "Gibt die Summe der aktuell im flüchtigen RAM liegenden Nutzdaten in Bytes zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 326,
+     "doc": [
+      "Gibt die Anzahl der aktuell gepufferten Chunks zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 331,
+     "doc": [
+      "Prüft, ob der Vault leer ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_memory_locked",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_memory_locked(&self) -> bool",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 339,
+     "doc": [
+      "Gibt an, ob alle Chunk-Inhalte im RAM gegen Swap gesichert sind (`mlock`).",
+      "",
+      "Liefert `false`, falls `attempt_mlock` deaktiviert war oder das Betriebssystem",
+      "das Sperren verweigerte."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "commit",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn commit( mut self, tenant_id: VaultTenantId, tx_id: VaultTxId, metadata_reference: Option<impl Into<String>>, ) -> Result<(Vec<VaultChunk>, CommitReceipt), VaultError>",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 350,
+     "doc": [
+      "Transferiert alle Chunks zur dauerhaften Speicherung und stellt ein [`CommitReceipt`] aus.",
+      "",
+      "# Ablauf von `commit`:",
+      "1. Status prüfen: Falls bereits konsumiert, `Err(AlreadyConsumed)`.",
+      "2. Chunks aus dem Puffer entnehmen (`std::mem::take`).",
+      "3. Speicher-Locks lösen (`munlock`).",
+      "4. Quittung mit Mandanten-ID, Transaktions-ID und Prüfreferenz erzeugen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "preview_metadata",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn preview_metadata(&self) -> Vec<VaultChunkMetadata>",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 381,
+     "doc": [
+      "Gibt eine Vorschau der Metadaten zurück, ohne sensible Inhalte zu exponieren.",
+      "",
+      "Verhindert versehentliches Ausleiten oder Protokollieren von Geheimnissen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl VolatileContextVault",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 217,
+     "in_test": false
+    },
+    {
+     "trait": "Drop",
+     "generics": "",
+     "signature": "impl Drop for VolatileContextVault",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 409,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "VaultChunkMetadata",
+   "vis": "pub",
+   "module": "vault",
+   "signature": "pub struct VaultChunkMetadata",
+   "file": "crates/contextra-vault/src/vault.rs",
+   "line": 396,
+   "doc": [
+    "Metadaten-Ansicht eines Chunks ohne sensiblen Nutzdateninhalt."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "VaultDocId",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 398
+    },
+    {
+     "name": "modality",
+     "type": "SignalModality",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 400
+    },
+    {
+     "name": "size_bytes",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 402
+    },
+    {
+     "name": "label",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-vault/src/vault.rs",
+     "line": 404
+    }
+   ],
+   "variants": []
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use error::VaultError",
+   "vis": "pub",
+   "file": "crates/contextra-vault/src/lib.rs",
+   "line": 16,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use vault::",
+   "vis": "pub",
+   "file": "crates/contextra-vault/src/lib.rs",
+   "line": 17,
+   "in_test": false,
+   "module": "crate"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra-db"
+ ]
+}

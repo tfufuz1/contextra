@@ -1,0 +1,2161 @@
+{
+ "name": "contextra-py",
+ "version": "workspace",
+ "path": "crates/contextra-py",
+ "role": "Python-Bindings",
+ "features": {
+  "default": [],
+  "pyo3": [
+   "dep:pyo3",
+   "dep:numpy",
+   "dep:pythonize"
+  ],
+  "docid-128": [
+   "contextra-types/docid-128"
+  ],
+  "test-hooks": []
+ },
+ "deps": {
+  "contextra-types": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-wire": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tokio": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "parking_lot": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "flatbuffers": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "pyo3": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "numpy": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "pythonize": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "tempfile": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "# Contextra Python Bindings (`contextra-py`)",
+  "",
+  "Dieses Crate stellt die offizielle Python-Brücke (FFI = Foreign Function Interface)",
+  "für die eingebettete 4-Signal Hybrid-Search Vektordatenbank **Contextra** bereit.",
+  "Es verbindet das Python-Ökosystem via PyO3 mit der Fassade (`contextra`).",
+  "",
+  "## Ring-Zugehörigkeit & Architektur",
+  "",
+  "- **Ring / Klasse:** Ring 4 (Ränder / FFI-Bindings).",
+  "- **Abhängigkeiten (eingehend):** Keine Workspace-Crates hängen von `contextra-py` ab.",
+  "Die Nutzung erfolgt ausschließlich durch Python-Clients / User-Space.",
+  "- **Abhängigkeiten (ausgehend):** `contextra-types`, `contextra`, `contextra-wire`",
+  "sowie optionale PyO3-Dependencies (`pyo3`, `numpy`, `pythonize`).",
+  "",
+  "## Wichtige Invarianten für Entwickler",
+  "",
+  "1. **Keine Panics über FFI-Grenzen (ADR-N04):** Rust-Panics dürfen unter keinen Umständen",
+  "in den Python-Interpreter durchschlagen (dies würde den gesamten Prozess crashen).",
+  "Alle Aufrufe werden über `run_blocking_ffi` abgesichert und in strukturierte Python-Exceptions",
+  "konvertiert.",
+  "2. **GIL-Release (Global Interpreter Lock):** Während I/O-lastiger oder rechenintensiver",
+  "Rust-Aufrufe (`block_on`) wird der Python GIL via `py.allow_threads` freigegeben, damit",
+  "andere Python-Threads nicht blockiert werden.",
+  "3. **Sub-Interpreter-Isolation (PEP 684):** Die Tokio-Runtime (`PyRuntimeState`) wird",
+  "pro Python-Modulinstanz verwaltet, um globale Zustände zu vermeiden.",
+  "4. **Zero-Copy Vektor-Umschlag:** Input-Vektoren werden über `numpy::PyReadonlyArray1<f32>`",
+  "als `&[f32]` ohne Kopie direkt an die Speicher-/Indexschichten übergeben."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-py/src/bindings/collection.rs",
+   "module": "bindings::collection",
+   "lines": 128
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "module": "bindings::common",
+   "lines": 488
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/crud_macros.rs",
+   "module": "bindings::crud_macros",
+   "lines": 494
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/db.rs",
+   "module": "bindings::db",
+   "lines": 236
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/db_stats.rs",
+   "module": "bindings::db_stats",
+   "lines": 64
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/document.rs",
+   "module": "bindings::document",
+   "lines": 35
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/functions.rs",
+   "module": "bindings::functions",
+   "lines": 135
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/hyperedge.rs",
+   "module": "bindings::hyperedge",
+   "lines": 197
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "module": "bindings",
+   "lines": 49
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/runtime_state.rs",
+   "module": "bindings::runtime_state",
+   "lines": 116
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/search_result.rs",
+   "module": "bindings::search_result",
+   "lines": 38
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/storage_stats.rs",
+   "module": "bindings::storage_stats",
+   "lines": 43
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/tests.rs",
+   "module": "bindings::tests",
+   "lines": 1026
+  },
+  {
+   "file": "crates/contextra-py/src/bindings/vector_index_stats.rs",
+   "module": "bindings::vector_index_stats",
+   "lines": 43
+  },
+  {
+   "file": "crates/contextra-py/src/kv_links.rs",
+   "module": "kv_links",
+   "lines": 296
+  },
+  {
+   "file": "crates/contextra-py/src/lib.rs",
+   "module": "crate",
+   "lines": 141
+  }
+ ],
+ "counts": {
+  "unwrap": 0,
+  "expect": 0,
+  "panic_macro": 0,
+  "todo_unimpl": 0,
+  "index_bracket": 0,
+  "deprecated_attr": 1,
+  "cfg_feature_gates": 9
+ },
+ "grep_pub_decl": 89,
+ "all_pub_decl": 75,
+ "public_items": [
+  {
+   "kind": "struct",
+   "name": "PyCollection",
+   "vis": "pub",
+   "module": "bindings::collection",
+   "signature": "pub struct PyCollection",
+   "file": "crates/contextra-py/src/bindings/collection.rs",
+   "line": 44,
+   "doc": [
+    "Kapselt eine benannte Contextra-Dokumentensammlung für Python.",
+    "",
+    "# Felder",
+    "- `inner`: Thread-sicherer Zeiger auf die interne `ContextraCollection`.",
+    "- `runtime`: Asynchrone Tokio-Laufzeitumgebung.",
+    "- `poisoned`: Globales Vergiftungsflag bei Panics."
+   ],
+   "attrs": [
+    "#[pyclass(name = \"Collection\")]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( inner: Arc<ContextraCollection>, runtime: Arc<Runtime>, poisoned: Arc<AtomicBool>, ) -> Self",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 52,
+     "doc": [
+      "Erzeugt eine neue `PyCollection`-Instanz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_poisoned",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_poisoned(&self) -> bool",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 73,
+     "doc": [
+      "Gibt `True` zurück, wenn die Collection aufgrund eines vorherigen Rust-Panics vergiftet wurde.",
+      "",
+      "# Invariante (Fail-Closed)",
+      "Sobald `is_poisoned` wahr ist, schlagen alle nachfolgenden Datenzugriffe sofort fehl."
+     ],
+     "attrs": [
+      "#[getter]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "_trigger_panic_for_test",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn _trigger_panic_for_test(&self, py: Python<'_>, message: Option<String>) -> PyResult<()>",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 84,
+     "doc": [
+      "Interner Testhook zur Verifikation von FFI-Panic-Isolation und Engine-Poisoning.",
+      "",
+      "# Panics",
+      "Bewusstes Auslösen eines Panics zum Testen der Barriere. Wird durch `run_blocking_ffi`",
+      "abgefangen und in ein `PyErr` gewandelt."
+     ],
+     "attrs": [
+      "#[pyo3(signature = (message=None))]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "stats",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn stats(&self, py: Python<'_>) -> PyResult<PyVectorIndexStats>",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 94,
+     "doc": [
+      "Liefert detaillierte Statistiken über den HNSW-Vektorindex dieser Collection.",
+      "",
+      "# Ablauf",
+      "1. Asynchron `inner.stats()` unter GIL-Release ausführen.",
+      "2. Rust-Statistiken in `PyVectorIndexStats` überführen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self, py: Python<'_>) -> PyResult<usize>",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 109,
+     "doc": [
+      "Gibt die Gesamtzahl der Dokumente in dieser Collection zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self, py: Python<'_>) -> PyResult<bool>",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 116,
+     "doc": [
+      "Prüft, ob die Collection leer ist (`True` falls keine Dokumente enthalten sind)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "relate_n_ary",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn relate_n_ary<'py>( &self, py: Python<'py>, predicate: &str, participants: Vec<(Bound<'py, PyAny>, String)>, source_doc_id: Option<Bound<'py, PyAny>>, ) -> PyResult<u64>",
+     "file": "crates/contextra-py/src/bindings/hyperedge.rs",
+     "line": 84,
+     "doc": [
+      "Legt eine n-äre Hyperkante an.",
+      "",
+      "# Parameter",
+      "- `predicate`: Der Name des Prädikats als String.",
+      "- `participants`: Liste von Tupeln `[(doc_id, role), ...]`, mindestens 2 und maximal 64 Teilnehmer.",
+      "- `source_doc_id`: Optionale ID des Ursprungsdokuments.",
+      "",
+      "# Rückgabe",
+      "Die eindeutige ID der erzeugten Hyperkante als 64-Bit Integer (`u64`).",
+      "",
+      "# Ablauf",
+      "1. Teilnehmer-IDs und Rollen aus Python-Objekten extrahieren und prüfen.",
+      "2. Argumente via `validate_hyperedge_args` auf Schranken [2, 64] und Gültigkeit prüfen.",
+      "3. Unter GIL-Release die asynchrone Rust-Methode `inner.relate_n_ary` ausführen.",
+      "4. Resultierende ID extrahieren und zurückliefern."
+     ],
+     "attrs": [
+      "#[pyo3(signature = (predicate, participants, source_doc_id=None))]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "put_kv",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn put_kv<'py>( &self, py: Python<'py>, id: &Bound<'py, PyAny>, value: &Bound<'py, PyDict>, ) -> PyResult<()>",
+     "file": "crates/contextra-py/src/kv_links.rs",
+     "line": 91,
+     "doc": [
+      "Speichert ein reines Key-Value-Paar direkt im Speicher ab, ohne Vektor- oder Volltextindizes zu verändern.",
+      "",
+      "# Parameter",
+      "- `py`: Das Python GIL-Token.",
+      "- `id`: Der Primärschlüssel als String oder Int (wird validiert).",
+      "- `value`: Ein Python-Dictionary mit den Nutzdaten (wird in JSON serialisiert).",
+      "",
+      "# Ablauf",
+      "1. Schlüssel validieren (`validate_id_obj`).",
+      "2. Python-Dictionary in JSON konvertieren (`dict_to_json`).",
+      "3. GIL freigeben und Tokio `block_on` auf `inner.put_kv` ausführen.",
+      "4. Rust-Fehler in Python-Exceptions übersetzen (`contextra_err`).",
+      "",
+      "# Fehlerfälle",
+      "- `PyValueError` bei ungültigem Schlüsseltyp.",
+      "- `ContextraIOError` / `ContextraError` bei I/O- oder Speicherfehlern."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "put_kv_if_absent",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn put_kv_if_absent<'py>( &self, py: Python<'py>, id: &Bound<'py, PyAny>, value: &Bound<'py, PyDict>, ) -> PyResult<()>",
+     "file": "crates/contextra-py/src/kv_links.rs",
+     "line": 120,
+     "doc": [
+      "Speichert ein Key-Value-Paar nur dann, wenn der Schlüssel noch nicht im Storage existiert.",
+      "",
+      "# Zweck",
+      "Verhindert versehentliches Überschreiben existierender Einträge (Conditional Put).",
+      "",
+      "# Ablauf",
+      "1. Schlüssel validieren (`validate_id_obj`).",
+      "2. Wert als JSON vorbereiten.",
+      "3. Asynchron `inner.put_kv_if_absent` unter GIL-Release ausführen.",
+      "",
+      "# Fehlerfälle",
+      "- `PyValueError` bei ungültigem Schlüssel.",
+      "- `ContextraIOError` bei I/O-Fehlern."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_kv",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_kv<'py>( &self, py: Python<'py>, id: &Bound<'py, PyAny>, ) -> PyResult<Option<PyObject>>",
+     "file": "crates/contextra-py/src/kv_links.rs",
+     "line": 146,
+     "doc": [
+      "Liest ein Key-Value-Paar direkt anhand des Schlüssels aus dem Speicher.",
+      "",
+      "# Rückgabe",
+      "- `Some(dict)` falls der Eintrag existiert (als Python-Dictionary deserialisiert).",
+      "- `None` falls kein Eintrag zu diesem Schlüssel vorhanden ist.",
+      "",
+      "# Ablauf",
+      "1. Schlüssel prüfen (`validate_id_obj`).",
+      "2. `inner.get_kv` blockierend unter GIL-Release ausführen.",
+      "3. Gefundenes JSON-Objekt zurück in ein Python-Objekt transformieren (`json_to_py`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "relate_bidirectional",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn relate_bidirectional<'py>( &self, py: Python<'py>, from: &Bound<'py, PyAny>, to: &Bound<'py, PyAny>, label: &str, ) -> PyResult<()>",
+     "file": "crates/contextra-py/src/kv_links.rs",
+     "line": 174,
+     "doc": [
+      "Erstellt atomar eine ungerichtete bzw. beidseitige Relation zwischen zwei Dokumenten.",
+      "",
+      "# Parameter",
+      "- `from`: ID des Ursprungsdokuments.",
+      "- `to`: ID des Zieldokuments.",
+      "- `label`: Beschriftung/Klassifikation der Beziehung.",
+      "",
+      "# Ablauf",
+      "1. Beide IDs sowie das Label validieren (`validate_label`).",
+      "2. Asynchron `inner.relate_bidirectional` unter GIL-Release aufrufen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "link_memories",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn link_memories<'py>( &self, py: Python<'py>, from: &Bound<'py, PyAny>, to: &Bound<'py, PyAny>, relation: &str, ) -> PyResult<()>",
+     "file": "crates/contextra-py/src/kv_links.rs",
+     "line": 207,
+     "doc": [
+      "Verknüpft zwei Memory-Knoten mit einer typisierten Zettelkasten-Relation (A-MEM).",
+      "",
+      "# Parameter",
+      "- `from`: ID des Ausgangsdokuments.",
+      "- `to`: ID des Zieldokuments.",
+      "- `relation`: Einer der Werte: \"elaborates\", \"contradicts\", \"supersedes\", \"references\".",
+      "",
+      "# Ablauf",
+      "1. IDs und Relations-String parsen (`parse_link_relation`).",
+      "2. In interne `DocId`s auflösen (`DocId::from_key`).",
+      "3. Link via `inner.link_memories` atomar persistieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_links",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_links<'py>( &self, py: Python<'py>, id: &Bound<'py, PyAny>, ) -> PyResult<Vec<PyObject>>",
+     "file": "crates/contextra-py/src/kv_links.rs",
+     "line": 236,
+     "doc": [
+      "Ruft alle ausgehenden Memory-Links für ein bestimmtes Dokument ab.",
+      "",
+      "# Rückgabe",
+      "Eine Python-Liste von Dictionaries mit den Schlüsseln `target`, `relation` und `created_at_tx`.",
+      "",
+      "# Ablauf",
+      "1. ID validieren und in `DocId` konvertieren.",
+      "2. `inner.get_links` unter GIL-Release abfragen.",
+      "3. Rust-Linkstrukturen in Python-Dictionaries überführen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "inner",
+     "type": "Arc<ContextraCollection>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 45
+    },
+    {
+     "name": "runtime",
+     "type": "Arc<Runtime>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 46
+    },
+    {
+     "name": "poisoned",
+     "type": "Arc<AtomicBool>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 47
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PyCollection",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 50,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PyCollection",
+     "file": "crates/contextra-py/src/bindings/collection.rs",
+     "line": 66,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PyCollection",
+     "file": "crates/contextra-py/src/bindings/hyperedge.rs",
+     "line": 66,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PyCollection",
+     "file": "crates/contextra-py/src/kv_links.rs",
+     "line": 73,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "MIN_WORKER_THREADS",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub const MIN_WORKER_THREADS: usize = 1",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 43,
+   "doc": [
+    "Minimale Anzahl an Worker-Threads für die Tokio-Laufzeitumgebung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_WORKER_THREADS",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub const MAX_WORKER_THREADS: usize = 256",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 45,
+   "doc": [
+    "Maximale Anzahl an Worker-Threads für die Tokio-Laufzeitumgebung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_ID_LENGTH",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub const MAX_ID_LENGTH: usize = 1024",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 48,
+   "doc": [
+    "Maximale Länge für Dokumenten-IDs (1024 Zeichen bzw. Bytes)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_COLLECTION_NAME_LENGTH",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub const MAX_COLLECTION_NAME_LENGTH: usize = 64",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 50,
+   "doc": [
+    "Maximale Länge für Collection-Namen (64 Zeichen)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_LABEL_LENGTH",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub const MAX_LABEL_LENGTH: usize = 256",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 52,
+   "doc": [
+    "Maximale Länge für Relations-Labels (256 Zeichen)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_BATCH_SIZE",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub const MAX_BATCH_SIZE: usize = 10_000",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 54,
+   "doc": [
+    "Maximale Batch-Größe für Massenoperationen (10.000 Einträge)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "dict_to_json",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn dict_to_json(d: &pyo3::Bound<'_, pyo3::types::PyDict>) -> PyResult<serde_json::Value>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 66,
+   "doc": [
+    "Konvertiert ein Python-Dictionary (`PyDict`) in einen `serde_json::Value`.",
+    "",
+    "# Zweck",
+    "Wandelt dynamische Metadaten aus Python in das interne JSON-Format von Contextra um.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `PyValueError`, falls das Dictionary nicht JSON-serialisierbare Objekte enthält."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "opt_dict_to_json",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn opt_dict_to_json( metadata: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>, ) -> PyResult<Option<serde_json::Value>>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 76,
+   "doc": [
+    "Konvertiert ein optionales Python-Dictionary in ein optionales `serde_json::Value`.",
+    "",
+    "# Rückgabe",
+    "- `Ok(Some(Value))` wenn ein Dictionary übergeben wurde.",
+    "- `Ok(None)` wenn `None` übergeben wurde."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_label",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn validate_label(label: &str) -> PyResult<()>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 90,
+   "doc": [
+    "Validiert, dass ein Beziehungs-Label nicht leer ist, keine Null-Bytes enthält und die Maximallänge nicht überschreitet.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `ContextraValueError` bei ungültigem Label."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_id",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn validate_id(id: &str) -> PyResult<()>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 116,
+   "doc": [
+    "Validiert, dass eine Dokumenten-ID nicht leer ist, keine Null-Bytes enthält und maximal 1024 Zeichen lang ist.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `ContextraValueError` bei ungültiger ID."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_collection_name",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn validate_collection_name(name: &str) -> PyResult<()>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 142,
+   "doc": [
+    "Validiert, dass ein Collection-Name nicht leer ist, keine Null-Bytes enthält und maximal 64 Zeichen lang ist.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `ContextraValueError` bei ungültigem Namen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_db_path",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn validate_db_path(path: &str) -> PyResult<()>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 168,
+   "doc": [
+    "Validiert, dass ein Datenbank-Dateipfad nicht leer ist und keine Null-Bytes enthält.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `ContextraValueError` bei fehlerhaftem Pfadstring."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_query_text",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn validate_query_text(text: &str) -> PyResult<()>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 187,
+   "doc": [
+    "Validiert, dass ein Volltext-Suchquery nicht leer ist und keine Null-Bytes enthält.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `ContextraValueError` bei ungültigem Suchtext."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_batch_size",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn validate_batch_size(size: usize) -> PyResult<()>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 213,
+   "doc": [
+    "Prüft, dass eine Batch-Größe größer 0 ist und das Limit von 10.000 Elementen nicht überschreitet.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `ContextraValueError` bei leerer Batch oder Überschreitung des Limits."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_vector",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn validate_vector(vector: &[f32]) -> PyResult<()>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 231,
+   "doc": [
+    "Validiert, dass ein Vektor nicht leer ist und weder `NaN` noch unendliche Werte (`+/-Inf`) enthält.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `ContextraValueError` bei leeren oder unendlichen Gleitkommazahlen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_id_obj",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn validate_id_obj(id_obj: &pyo3::Bound<'_, pyo3::types::PyAny>) -> PyResult<String>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 253,
+   "doc": [
+    "Validiert und extrahiert ein Dokument-ID-Objekt aus Python (erlaubt String oder nicht-negativen Integer).",
+    "",
+    "# Ablauf",
+    "1. Prüft, ob das Objekt ein String ist -> Validierung via `validate_id`.",
+    "2. Prüft, ob das Objekt ein Integer ist -> Sicherstellung, dass `>= 0` und `< u64::MAX`.",
+    "3. Gibt die ID als String zurück.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `ContextraValueError`, falls der Typ weder String noch Integer ist oder Schranken verletzt werden."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "check_subinterpreter_guard",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn check_subinterpreter_guard(py: Python<'_>) -> PyResult<()>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 290,
+   "doc": [
+    "Prüft explizit, ob das Crate innerhalb eines CPython Sub-Interpreters geladen wird.",
+    "",
+    "# Zweck",
+    "Verhindert fehlerhafte Ausführung in isolierten Sub-Interpretern (Interpreter-ID != 0),",
+    "wenn keine vollständige Threadpool-Isolation garantiert werden kann.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `PyImportError`, falls `interpreter_id != 0`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_blocking_ffi",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn run_blocking_ffi<F, R>(py: Python<'_>, poisoned: &AtomicBool, f: F) -> PyResult<R> where F: FnOnce() -> PyResult<R> + Send, R: Send,",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 334,
+   "doc": [
+    "Führt einen blockierenden Aufruf sicher über die FFI-Grenze hinweg aus (mit Panic-Catch und Poisoning).",
+    "",
+    "# Zweck & Invariante (ADR-N04 / APM-PY-A):",
+    "Verhindert, dass unkontrollierte Rust-Panics in den Python-Prozess durchschlagen.",
+    "",
+    "# Ablauf in Schritten:",
+    "1. **Poisoning-Prüfung:** Prüft das atomare `poisoned`-Flag. Falls zuvor ein Panic aufgetreten ist,",
+    "wird sofort mit `PyRuntimeError` abgebrochen (Fail-Closed).",
+    "2. **GIL-Release & Panic Catch:** Gibt mit `py.allow_threads` den Python-GIL frei und führt die",
+    "Closure `f` gekapselt in `std::panic::catch_unwind` aus.",
+    "3. **Ergebnis-Auswertung:**",
+    "- Bei Erfolg: Rückgabe des Werts.",
+    "- Bei Panic: Setzt `poisoned = true` via `SeqCst`, extrahiert die Paniknachricht und",
+    "liefert eine saubere `PyRuntimeError`-Exception an Python zurück.",
+    "",
+    "# Nebenläufigkeit",
+    "Durch `py.allow_threads` können andere Python-Threads parallel weiterlaufen, während",
+    "Rust auf Dateisystem-I/O oder Vektorberechnungen wartet."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "json_to_py",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn json_to_py(py: Python<'_>, val: &serde_json::Value) -> PyResult<PyObject>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 374,
+   "doc": [
+    "Konvertiert einen `serde_json::Value` zurück in ein natives Python-Objekt (`PyObject`).",
+    "",
+    "# Fehlerfälle",
+    "Liefert `PyRuntimeError`, falls die Konvertierung scheitert."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "doc_to_py",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn doc_to_py(py: Python<'_>, d: contextra::Document) -> PyResult<PyDocument>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 386,
+   "doc": [
+    "Konvertiert ein `contextra::Document` in ein `PyDocument`.",
+    "",
+    "# Ablauf",
+    "1. Metadaten-JSON (falls vorhanden) in ein natives Python-Dictionary überführen.",
+    "2. In eine `PyDocument`-Instanz kapseln."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "results_to_py",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn results_to_py( py: Python<'_>, results: Vec<contextra::SearchResult>, ) -> PyResult<Vec<PySearchResult>>",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 403,
+   "doc": [
+    "Konvertiert einen Vektor von internen `contextra::SearchResult` in Python-taugliche `PySearchResult`.",
+    "",
+    "# Ablauf",
+    "1. Allokiert einen Vektor mit passender Kapazität.",
+    "2. Iteriert über die Treffer, wandelt Metadaten in Python-Objekte um und erzeugt `PySearchResult`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "contextra_err",
+   "vis": "pub",
+   "module": "bindings::common",
+   "signature": "pub fn contextra_err(e: contextra_types::ContextraError) -> PyErr",
+   "file": "crates/contextra-py/src/bindings/common.rs",
+   "line": 436,
+   "doc": [
+    "Übersetzt ein typisiertes Rust `ContextraError` in eine strukturierte Python-Exception (`PyErr`).",
+    "",
+    "# Ablauf",
+    "1. Wandelt `ContextraError` in ein Data Transfer Object (`ContextraErrorDto`) um.",
+    "2. Mappt die Fehlerkategorie (`kind`) auf die entsprechende Python-Exception-Klasse:",
+    "- `\"NotFound\"` -> `NotFoundError`",
+    "- `\"Conflict\"`, `\"Transaction\"` -> `IntegrityError`",
+    "- `\"TenantMismatch\"`, `\"NamespaceViolation\"` -> `TenantError`",
+    "- `\"Storage\"`, `\"Io\"`, `\"WalCorruption\"` -> `ContextraIOError`",
+    "- `\"Index\"`, `\"Text\"` -> `ContextraIndexError`",
+    "- `\"Crypto\"` -> `ContextraCryptoError`",
+    "- `\"InvalidInput\"` -> `ContextraValueError`",
+    "3. Hängt Attribute (`kind`, `message`, `details`) an das Python-Fehlerobjekt für strukturierte Inspektion an."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PyContextra",
+   "vis": "pub",
+   "module": "bindings::db",
+   "signature": "pub struct PyContextra",
+   "file": "crates/contextra-py/src/bindings/db.rs",
+   "line": 46,
+   "doc": [
+    "Zentrales Python-Handle für eine geöffnete Contextra-Datenbankinstanz (`Db`).",
+    "",
+    "# Felder",
+    "- `inner`: Thread-sichere Referenz auf den Rust-Datenbankkern (`Contextra`).",
+    "- `runtime`: Asynchrone Tokio-Multi-Thread-Laufzeitumgebung.",
+    "- `worker_threads`: Konfigurierte Thread-Anzahl im Tokio-Pool.",
+    "- `poisoned`: Vergiftungsindikator zur Verhinderung von Folgeaufrufen nach Panics."
+   ],
+   "attrs": [
+    "#[pyclass(name = \"Db\")]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( inner: Arc<Contextra>, runtime: Arc<Runtime>, worker_threads: usize, poisoned: Arc<AtomicBool>, ) -> Self",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 55,
+     "doc": [
+      "Konstruiert ein neues `PyContextra`-Handle."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "worker_threads",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn worker_threads(&self) -> usize",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 75,
+     "doc": [
+      "Gibt die konfigurierte Anzahl an Tokio-Worker-Threads für diese Instanz zurück."
+     ],
+     "attrs": [
+      "#[getter]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_poisoned",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_poisoned(&self) -> bool",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 82,
+     "doc": [
+      "Gibt `True` zurück, wenn die Datenbankinstanz nach einem vorangegangenen Rust-Panic vergiftet ist."
+     ],
+     "attrs": [
+      "#[getter]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "_trigger_panic_for_test",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn _trigger_panic_for_test(&self, py: Python<'_>, message: Option<String>) -> PyResult<()>",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 92,
+     "doc": [
+      "Interner Testhook zur Verifikation der FFI-Panik-Isolation.",
+      "",
+      "# Panics",
+      "Test-Panic wird ausgelöst und durch `run_blocking_ffi` kontrolliert in `PyErr` gewandelt."
+     ],
+     "attrs": [
+      "#[pyo3(signature = (message=None))]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "collection",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn collection(&self, name: &str, py: Python<'_>) -> PyResult<PyCollection>",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 134,
+     "doc": [
+      "Öffnet oder erstellt eine spezifische Collection (Namespace) innerhalb der Datenbank.",
+      "",
+      "# Parameter",
+      "- `name`: Name der Collection (maximal 64 Zeichen).",
+      "",
+      "# Rückgabe",
+      "Eine neue `PyCollection`-Instanz, die auf diesen Namespace zeigt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "list_collections",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn list_collections(&self, py: Python<'_>) -> PyResult<Vec<String>>",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 151,
+     "doc": [
+      "Liefert eine Liste der Namen aller vorhandenen Collections in der Datenbank."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "drop_collection",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn drop_collection(&self, name: &str, py: Python<'_>) -> PyResult<()>",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 164,
+     "doc": [
+      "Löscht eine Collection und entfernt alle darin enthaltenen Daten unwiderruflich aus dem Storage.",
+      "",
+      "# Parameter",
+      "- `name`: Name der zu entfernenden Collection."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "flush",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn flush(&self, py: Python<'_>) -> PyResult<()>",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 181,
+     "doc": [
+      "Schreibt alle im Speicher gepufferten Daten (MemTable/WAL) persistent auf die Festplatte (`fsync`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "stats",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn stats(&self, py: Python<'_>) -> PyResult<PyDbStats>",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 190,
+     "doc": [
+      "Ruft kombinierte Statistiken für Vektorindex, LSM-Tree, Kalibrierung und Drift ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self, py: Python<'_>) -> PyResult<usize>",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 217,
+     "doc": [
+      "Gibt die Anzahl der Dokumente in der Standard-Collection zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self, py: Python<'_>) -> PyResult<bool>",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 226,
+     "doc": [
+      "Prüft, ob die Standard-Collection leer ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "inner",
+     "type": "Arc<Contextra>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 47
+    },
+    {
+     "name": "runtime",
+     "type": "Arc<Runtime>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 48
+    },
+    {
+     "name": "worker_threads",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 49
+    },
+    {
+     "name": "poisoned",
+     "type": "Arc<AtomicBool>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 50
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PyContextra",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 53,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PyContextra",
+     "file": "crates/contextra-py/src/bindings/db.rs",
+     "line": 71,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "PyDbStats",
+   "vis": "pub",
+   "module": "bindings::db_stats",
+   "signature": "pub struct PyDbStats",
+   "file": "crates/contextra-py/src/bindings/db_stats.rs",
+   "line": 32,
+   "doc": [
+    "Ganzheitliche Datenbank- und Systembeobachtungs-Statistiken (`DbStats`).",
+    "",
+    "# Felder",
+    "- `drift_status`: Zustand der Vektor-Driftanalyse (\"stabil\", \"warnung\", \"kritisch\", \"unbekannt\").",
+    "- `calibration_ece`: Erwarteter Kalibrierungsfehler (ECE = Expected Calibration Error, 0.0 bis 1.0).",
+    "- `last_calibration_at`: UNIX-Zeitstempel der letzten Kalibrierungsmodell-Berechnung.",
+    "- `active_memory_count`: Anzahl aktiver Dokumente/Memories in der Default-Collection.",
+    "- `pid_pool_size`: Aktuelle Kandidaten-Pool-Größe des PID-Reglers.",
+    "- `index_stats`: Detaillierte Statistiken über den HNSW-Vektorindex.",
+    "- `storage_stats`: Detaillierte Kennzahlen des LSM-Speichers (MemTable, SSTables, WAL)."
+   ],
+   "attrs": [
+    "#[pyclass(get_all, name = \"DbStats\")]",
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "drift_status",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db_stats.rs",
+     "line": 34
+    },
+    {
+     "name": "calibration_ece",
+     "type": "Option<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db_stats.rs",
+     "line": 36
+    },
+    {
+     "name": "last_calibration_at",
+     "type": "Option<u64>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db_stats.rs",
+     "line": 38
+    },
+    {
+     "name": "active_memory_count",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db_stats.rs",
+     "line": 40
+    },
+    {
+     "name": "pid_pool_size",
+     "type": "Option<usize>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db_stats.rs",
+     "line": 42
+    },
+    {
+     "name": "index_stats",
+     "type": "PyVectorIndexStats",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db_stats.rs",
+     "line": 44
+    },
+    {
+     "name": "storage_stats",
+     "type": "PyStorageStats",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/db_stats.rs",
+     "line": 46
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PyDbStats",
+     "file": "crates/contextra-py/src/bindings/db_stats.rs",
+     "line": 50,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "PyDocument",
+   "vis": "pub",
+   "module": "bindings::document",
+   "signature": "pub struct PyDocument",
+   "file": "crates/contextra-py/src/bindings/document.rs",
+   "line": 22,
+   "doc": [
+    "Ein aus Contextra abgerufener Datensatz (Dokument).",
+    "",
+    "# Felder",
+    "- `id`: Der Primärschlüssel des Dokuments als String.",
+    "- `metadata`: Assoziierte Metadaten des Dokuments (z.B. Python-Dict mit Freitextfeldern)."
+   ],
+   "attrs": [
+    "#[pyclass(get_all)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/document.rs",
+     "line": 24
+    },
+    {
+     "name": "metadata",
+     "type": "Option<PyObject>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/document.rs",
+     "line": 26
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PyDocument",
+     "file": "crates/contextra-py/src/bindings/document.rs",
+     "line": 30,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "open",
+   "vis": "pub",
+   "module": "bindings::functions",
+   "signature": "pub fn open( py: Python<'_>, path: &str, dimension: usize, max_elements: Option<usize>, encryption_passphrase: Option<String>, distance_metric: Option<String>, ) -> PyResult<PyContextra>",
+   "file": "crates/contextra-py/src/bindings/functions.rs",
+   "line": 46,
+   "doc": [
+    "Öffnet oder erstellt eine Contextra-Datenbank am angegebenen Dateipfad.",
+    "",
+    "# Parameter",
+    "- `path`: Dateipfad zum Datenbankverzeichnis (wird validiert, keine Null-Bytes).",
+    "- `dimension`: Vektordimension (Standard: 768, passend für Standardmodelle wie `nomic-embed-text`; Schranke [1, 10000]).",
+    "- `max_elements`: Optionale Obergrenze für Elemente im HNSW-Index (> 0).",
+    "- `encryption_passphrase`: Optionale Passphrase zur transparenten Verschlüsselung der Datenbank.",
+    "- `distance_metric`: Distanzmetrik für Vektoren (\"cosine\", \"euclidean\"/\"l2\", \"dot\"/\"dotproduct\").",
+    "",
+    "# Ablauf in Schritten:",
+    "1. Pfad und Vektordimension prüfen (`validate_db_path`, Bounds-Check).",
+    "2. Tokio-Runtime für den aktuellen Interpreter abrufen (`get_runtime`).",
+    "3. Datenbank-Konfiguration (`ContextraConfig`) mit Dimension, Passphrase und Metrik befüllen.",
+    "4. Atomares Vergiftungsflag (`poisoned`) initialisieren.",
+    "5. Asynchron `Contextra::open_with_config` unter GIL-Release und Panic-Schutz aufrufen.",
+    "6. `PyContextra`-Handle erzeugen und an Python zurückgeben.",
+    "",
+    "# Fehlerfälle",
+    "- `PyValueError` bei ungültigem Pfad, Dimension außerhalb [1, 10000] oder unbekannter Metrik.",
+    "- `ContextraIOError` / `ContextraError` bei Dateisystem- oder Speicherfehlern."
+   ],
+   "attrs": [
+    "#[pyfunction]",
+    "#[pyo3(signature = (path, dimension=768, max_elements=None, encryption_passphrase=None, distance_metric=None))]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "_trigger_panic_for_test",
+   "vis": "pub",
+   "module": "bindings::functions",
+   "signature": "pub fn _trigger_panic_for_test(py: Python<'_>, message: Option<String>) -> PyResult<()>",
+   "file": "crates/contextra-py/src/bindings/functions.rs",
+   "line": 132,
+   "doc": [
+    "Python-Funktion zum Testen der Panik-Isolation (nur bei Feature `test-hooks`).",
+    "",
+    "# Zweck",
+    "Wird von der Python-Testsuite aufgerufen, um zu verifizieren, dass ein Rust-Panic",
+    "sauber als `PyRuntimeError` im Python-Interpreter ankommt."
+   ],
+   "attrs": [
+    "#[doc(hidden)]",
+    "#[cfg(feature = \"test-hooks\")]",
+    "#[pyfunction]",
+    "#[pyo3(signature = (message=None))]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_hyperedge_args",
+   "vis": "pub",
+   "module": "bindings::hyperedge",
+   "signature": "pub fn validate_hyperedge_args( predicate: &str, participants: &[(&str, &str)], source_doc_id: Option<&str>, ) -> PyResult<()>",
+   "file": "crates/contextra-py/src/bindings/hyperedge.rs",
+   "line": 33,
+   "doc": [
+    "Validiert die Eingabeparameter für das Erstellen einer n-ären Hyperkante.",
+    "",
+    "# Parameter",
+    "- `predicate`: Der Beziehungsname (z. B. \"verhandelt\", \"gekauft\").",
+    "- `participants`: Eine Slice von Tupeln bestehend aus `(doc_id, role)`.",
+    "- `source_doc_id`: Optionales Referenzdokument, aus dem die Beziehung hervorging.",
+    "",
+    "# Invarianten & Grenzwerte:",
+    "- Teilnehmeranzahl: Mindestens 2, maximal 64 Knoten.",
+    "- Gültigkeit: Weder Prädikat noch Rollen noch Dokument-IDs dürfen leer sein oder ungültige Zeichen enthalten.",
+    "",
+    "# Fehlerfälle",
+    "- `ContextraValueError`, falls die Teilnehmergrenzen verletzt sind oder Strings leer sind."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "crud_macros",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod crud_macros",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 22,
+   "doc": [],
+   "attrs": [
+    "#[macro_use]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "collection",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod collection",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 24,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "common",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod common",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 25,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "db",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod db",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 26,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "db_stats",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod db_stats",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 27,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "document",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod document",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 28,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "functions",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod functions",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 29,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "hyperedge",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod hyperedge",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 30,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "runtime_state",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod runtime_state",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 31,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "search_result",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod search_result",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 32,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "storage_stats",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod storage_stats",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 33,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "vector_index_stats",
+   "vis": "pub",
+   "module": "bindings",
+   "signature": "pub mod vector_index_stats",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 38,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "parse_worker_threads_env",
+   "vis": "pub",
+   "module": "bindings::runtime_state",
+   "signature": "pub fn parse_worker_threads_env() -> usize",
+   "file": "crates/contextra-py/src/bindings/runtime_state.rs",
+   "line": 35,
+   "doc": [
+    "Liest und begrenzt die Umgebungsvariable `CONTEXTRA_WORKER_THREADS` auf den Bereich `[MIN_WORKER_THREADS, MAX_WORKER_THREADS]`.",
+    "",
+    "# Zweck",
+    "Bestimmt die Anzahl der Hintergrund-Worker-Threads für die Tokio-Laufzeitumgebung.",
+    "",
+    "# Ablauf",
+    "1. Standardwert ermitteln: Halbe Anzahl verfügbarer CPU-Kerne (`available_parallelism`),",
+    "mindestens jedoch auf `[MIN_WORKER_THREADS, MAX_WORKER_THREADS]` begrenzt (z. B. 2 bis 32).",
+    "2. Liest die Umgebungsvariable `CONTEXTRA_WORKER_THREADS`.",
+    "3. Parst den String zu `usize` und klemmt den Wert in die Schranken `MIN_WORKER_THREADS..=MAX_WORKER_THREADS`.",
+    "4. Liefert bei Fehlern oder fehlendem Eintrag den berechneten Standardwert zurück.",
+    "",
+    "# Garantien",
+    "Stellt sicher, dass die Tokio-Runtime niemals mit 0 Threads initialisiert wird (Fail-Safe)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PyRuntimeState",
+   "vis": "pub",
+   "module": "bindings::runtime_state",
+   "signature": "pub struct PyRuntimeState",
+   "file": "crates/contextra-py/src/bindings/runtime_state.rs",
+   "line": 57,
+   "doc": [
+    "Kapselt die Tokio-Laufzeitumgebung und die Thread-Konfiguration pro Python-Modul.",
+    "",
+    "# Felder",
+    "- `runtime`: Referenzgezählter Handle (`Arc<Runtime>`) auf den Tokio-Multi-Thread-Pool.",
+    "- `worker_threads`: Anzahl konfigurierter Worker-Threads in diesem Pool."
+   ],
+   "attrs": [
+    "#[pyclass(name = \"RuntimeState\")]",
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "runtime",
+     "type": "Arc<Runtime>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/runtime_state.rs",
+     "line": 58
+    },
+    {
+     "name": "worker_threads",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/runtime_state.rs",
+     "line": 59
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "get_runtime",
+   "vis": "pub",
+   "module": "bindings::runtime_state",
+   "signature": "pub fn get_runtime(py: Python<'_>) -> PyResult<Arc<Runtime>>",
+   "file": "crates/contextra-py/src/bindings/runtime_state.rs",
+   "line": 77,
+   "doc": [
+    "Ruft die Tokio-Runtime für den aktuellen Python-Interpreter ab oder initialisiert sie bei Bedarf.",
+    "",
+    "# Zweck",
+    "Stellt sicher, dass asynchrone Rust-Operationen in Python synchron ausgeführt werden können.",
+    "",
+    "# Ablauf in Schritten:",
+    "1. Sucht nach dem bereits geladenen Modul `contextra._contextra` oder `_contextra`.",
+    "2. Prüft, ob das Modulattribut `_runtime_state` bereits existiert und extrahiert den Handle.",
+    "3. Falls noch nicht vorhanden: Ermittelt Worker-Threads via `parse_worker_threads_env()`.",
+    "4. Erzeugt eine neue Multi-Thread-Tokio-Runtime mit dem Thread-Präfix `contextra-py-worker`.",
+    "5. Bindet die neue Runtime an das Modulattribut `_runtime_state` via `setattr`.",
+    "",
+    "# Fehlerfälle",
+    "- `PyRuntimeError` bei Scheitern des Runtime-Builds oder beim Setzen des Modulattributs."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PySearchResult",
+   "vis": "pub",
+   "module": "bindings::search_result",
+   "signature": "pub struct PySearchResult",
+   "file": "crates/contextra-py/src/bindings/search_result.rs",
+   "line": 23,
+   "doc": [
+    "Ein einzelnes Suchergebnis aus einer Vektor- oder Hybrid-Suche.",
+    "",
+    "# Felder",
+    "- `id`: Der Primärschlüssel des gefundenen Dokuments.",
+    "- `score`: Der berechnete Ähnlichkeitswert (höherer Wert bedeutet höhere Relevanz/Ähnlichkeit).",
+    "- `metadata`: Assoziierte Metadaten des Treffers (falls bei der Suche angefordert)."
+   ],
+   "attrs": [
+    "#[pyclass(get_all)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/search_result.rs",
+     "line": 25
+    },
+    {
+     "name": "score",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/search_result.rs",
+     "line": 27
+    },
+    {
+     "name": "metadata",
+     "type": "Option<PyObject>",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/search_result.rs",
+     "line": 29
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PySearchResult",
+     "file": "crates/contextra-py/src/bindings/search_result.rs",
+     "line": 33,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "PyStorageStats",
+   "vis": "pub",
+   "module": "bindings::storage_stats",
+   "signature": "pub struct PyStorageStats",
+   "file": "crates/contextra-py/src/bindings/storage_stats.rs",
+   "line": 25,
+   "doc": [
+    "Statistiken der persistenten LSM-Speicherengine (`StorageStats`).",
+    "",
+    "# Felder",
+    "- `num_segments`: Anzahl der auf der Festplatte persistierten SSTable-Segmente.",
+    "- `total_size_bytes`: Gesamter belegter Festplattenplatz aller SSTable-Dateien in Bytes.",
+    "- `memtable_size_bytes`: Aktuelle Belegung der In-Memory-MemTables im Arbeitsspeicher in Bytes."
+   ],
+   "attrs": [
+    "#[pyclass(get_all, name = \"StorageStats\")]",
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "num_segments",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/storage_stats.rs",
+     "line": 27
+    },
+    {
+     "name": "total_size_bytes",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/storage_stats.rs",
+     "line": 29
+    },
+    {
+     "name": "memtable_size_bytes",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/storage_stats.rs",
+     "line": 31
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PyStorageStats",
+     "file": "crates/contextra-py/src/bindings/storage_stats.rs",
+     "line": 35,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "PyVectorIndexStats",
+   "vis": "pub",
+   "module": "bindings::vector_index_stats",
+   "signature": "pub struct PyVectorIndexStats",
+   "file": "crates/contextra-py/src/bindings/vector_index_stats.rs",
+   "line": 25,
+   "doc": [
+    "Statistiken über den HNSW-Vektorindex (`VectorIndexStats`).",
+    "",
+    "# Felder",
+    "- `num_vectors`: Anzahl der aktuell aktiven (nicht als gelöscht markierten) Vektoren im Index.",
+    "- `memory_usage_bytes`: Geschätzter Arbeitsspeicherverbrauch des Vektorgraphen in Bytes.",
+    "- `num_layers`: Anzahl der Schichten (Layer) im hierarchischen HNSW-Graph."
+   ],
+   "attrs": [
+    "#[pyclass(get_all, name = \"VectorIndexStats\")]",
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "num_vectors",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/vector_index_stats.rs",
+     "line": 27
+    },
+    {
+     "name": "memory_usage_bytes",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/vector_index_stats.rs",
+     "line": 29
+    },
+    {
+     "name": "num_layers",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-py/src/bindings/vector_index_stats.rs",
+     "line": 31
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PyVectorIndexStats",
+     "file": "crates/contextra-py/src/bindings/vector_index_stats.rs",
+     "line": 35,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "parse_link_relation",
+   "vis": "pub",
+   "module": "kv_links",
+   "signature": "pub fn parse_link_relation(s: &str) -> PyResult<LinkRelation>",
+   "file": "crates/contextra-py/src/kv_links.rs",
+   "line": 45,
+   "doc": [
+    "Parst einen String ohne Allokation und unabhängig von Groß-/Kleinschreibung in eine `LinkRelation`.",
+    "",
+    "# Zweck",
+    "Konvertiert nutzerdefinierte Relationsbezeichnungen aus Python in das typsichere",
+    "Rust-Enum `LinkRelation` aus `contextra_types`.",
+    "",
+    "# Unterstützte Relationen:",
+    "- `\"elaborates\"`: Vertieft, erklärt oder ergänzt den Zielknoten.",
+    "- `\"contradicts\"`: Widerspricht der Aussage des Zielknotens.",
+    "- `\"supersedes\"`: Löst den Zielknoten ab (neuere Version / Korrektur).",
+    "- `\"references\"`: Zitiert oder verweist auf den Zielknoten.",
+    "",
+    "# Fehlerfälle",
+    "Gibt einen `PyValueError` zurück, falls der übergebene String keinem der vier",
+    "definierten Beziehungstypen entspricht."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "bindings",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod bindings",
+   "file": "crates/contextra-py/src/lib.rs",
+   "line": 46,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"pyo3\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "kv_links",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod kv_links",
+   "file": "crates/contextra-py/src/lib.rs",
+   "line": 48,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"pyo3\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "VERSION",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub const VERSION: &str = \"\"",
+   "file": "crates/contextra-py/src/lib.rs",
+   "line": 141,
+   "doc": [
+    "Fallback / Library-Information wenn `contextra-py` ohne `pyo3`-Feature gebaut wird."
+   ],
+   "attrs": [
+    "#[cfg(not(feature = \"pyo3\"))]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use collection::PyCollection",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 40,
+   "in_test": false,
+   "module": "bindings"
+  },
+  {
+   "signature": "pub use common::*",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 41,
+   "in_test": false,
+   "module": "bindings"
+  },
+  {
+   "signature": "pub use db::PyContextra",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 42,
+   "in_test": false,
+   "module": "bindings"
+  },
+  {
+   "signature": "pub use db_stats::PyDbStats",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 43,
+   "in_test": false,
+   "module": "bindings"
+  },
+  {
+   "signature": "pub use document::PyDocument",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 44,
+   "in_test": false,
+   "module": "bindings"
+  },
+  {
+   "signature": "pub use functions::*",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 45,
+   "in_test": false,
+   "module": "bindings"
+  },
+  {
+   "signature": "pub use runtime_state::*",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 46,
+   "in_test": false,
+   "module": "bindings"
+  },
+  {
+   "signature": "pub use search_result::PySearchResult",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 47,
+   "in_test": false,
+   "module": "bindings"
+  },
+  {
+   "signature": "pub use storage_stats::PyStorageStats",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 48,
+   "in_test": false,
+   "module": "bindings"
+  },
+  {
+   "signature": "pub use vector_index_stats::PyVectorIndexStats",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/bindings/mod.rs",
+   "line": 49,
+   "in_test": false,
+   "module": "bindings"
+  },
+  {
+   "signature": "pub use bindings::*",
+   "vis": "pub",
+   "file": "crates/contextra-py/src/lib.rs",
+   "line": 51,
+   "in_test": false,
+   "module": "crate"
+  }
+ ],
+ "macros": [
+  {
+   "name": "contextra_crud_methods",
+   "file": "crates/contextra-py/src/bindings/crud_macros.rs",
+   "line": 39,
+   "exported": true,
+   "doc": [
+    "Generiert synchrone Python-CRUD-, Such- und Scan-Methoden für den angegebenen Struct-Typ.",
+    "",
+    "# Implementierte Methoden",
+    "- `insert(id, vector, metadata=None)`: Dokument mit Vektor einfügen.",
+    "- `get(id)`: Dokument nach ID abrufen.",
+    "- `update(id, vector, metadata=None)`: Dokument aktualisieren.",
+    "- `upsert(id, vector, metadata=None)`: Dokument einfügen oder aktualisieren.",
+    "- `delete(id)`: Dokument löschen.",
+    "- `search(vector, k)`: K-NN-Vektorsuche über den HNSW-Index.",
+    "- `search_fb(vector, k)`: Vektorsuche mit FlatBuffers-Rückgabe (`PyBytes`).",
+    "- `hybrid_search(text, vector, k, ...)`: Kombinierte Suche (BM25 + Vektor + Graph).",
+    "- `hybrid_search_fb(...)`: Hybridsuche mit FlatBuffers-Rückgabe.",
+    "- `relate(from, to, label)`: Bidirektionale Graph-Kante erstellen.",
+    "- `scan_prefix(prefix=\"\", limit=None)`: Präfix-Scan über Schlüssel.",
+    "- `scan(start=None, end=None, limit=None)`: Bounded/Unbounded Range-Scan über Schlüssel."
+   ],
+   "in_test": false
+  },
+  {
+   "name": "contextra_batch_methods",
+   "file": "crates/contextra-py/src/bindings/crud_macros.rs",
+   "line": 427,
+   "exported": true,
+   "doc": [
+    "Generiert synchrone Python-Massenoperationen (`insert_many`, `upsert_many`) für Batch-Transaktionen.",
+    "",
+    "# Implementierte Methoden",
+    "- `insert_many(docs)`: Fügt eine Liste von `(id, vector, metadata)` atomar ein.",
+    "- `upsert_many(docs)`: Führt Upserts für eine Liste atomar durch.",
+    "",
+    "# Validierung",
+    "Prüft `validate_batch_size` (<= 10.000) sowie Vektor- und ID-Schranken jedes Eintrags."
+   ],
+   "in_test": false
+  }
+ ],
+ "used_by": []
+}

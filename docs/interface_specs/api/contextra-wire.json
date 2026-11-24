@@ -1,0 +1,4463 @@
+{
+ "name": "contextra-wire",
+ "version": "workspace",
+ "path": "crates/contextra-wire",
+ "role": "Wire-Protokoll",
+ "features": {
+  "default": [
+   "std"
+  ],
+  "std": [],
+  "serde": [],
+  "tracing": [
+   "dep:tracing"
+  ],
+  "inspect": []
+ },
+ "deps": {
+  "flatbuffers": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "bytes": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": true
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "criterion": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "proptest": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "# Crate `contextra-wire`",
+  "",
+  "**Ring & Klasse:** Ring 0 (Unsafe-Insel 3 von 3), Klasse A.",
+  "",
+  "## Zweck",
+  "`contextra-wire` stellt performante Zero-Copy-Serialisierungs- und Deserialisierungs-Primitiven",
+  "für die Interprozesskommunikation (IPC = Inter-Process Communication) bereit. Es kapselt:",
+  "1. Generierten FlatBuffers-Code (`contextra_generated`), der direkt auf Byte-Puffern operiert.",
+  "2. Gehärtete Verifikationsfunktionen (`verification`), die Puffer vor dem Zugriff strikt validieren.",
+  "3. Zero-Copy-Adapter (`adapter`), wie den referenzgezählten `WireBuffer`.",
+  "4. Einen robusten, angriffssicheren JSON-RPC-2.0-Parser (`jsonrpc`) ohne Panics.",
+  "5. Einen einheitlichen Fehlertyp `Error` (`Result<T>`) gemäß SPEC v4.0 B4.",
+  "",
+  "## Einbindung und Abhängigkeiten",
+  "- **Abhängigkeiten (normal):** `bytes`, `flatbuffers`, `serde`, `serde_json`, `thiserror`.",
+  "- **Wird eingebunden von:** `contextra-mcp`, `contextra-py`, `contextra-router`, `contextra-core`.",
+  "- **Ring-0-Restriktionen:** Gemäß Regel 3 dürfen Zeit, Zufall und IDs nicht direkt",
+  "erzeugt werden; I/O erfolgt über übergebene Puffer.",
+  "",
+  "## Sicherheitsinvariante & Zero-Panic-Garantie",
+  "Die Crate erzwingt `#![deny(clippy::unwrap_used)]`, `#![deny(clippy::expect_used)]` und",
+  "`#![deny(clippy::panic)]`. Fehler werden konsequent über `Result` gemeldet (Fail-Closed)."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-wire/src/adapter.rs",
+   "module": "adapter",
+   "lines": 222
+  },
+  {
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "module": "contextra_generated",
+   "lines": 1818
+  },
+  {
+   "file": "crates/contextra-wire/src/generated.rs",
+   "module": "generated",
+   "lines": 38
+  },
+  {
+   "file": "crates/contextra-wire/src/jsonrpc.rs",
+   "module": "jsonrpc",
+   "lines": 738
+  },
+  {
+   "file": "crates/contextra-wire/src/lib.rs",
+   "module": "crate",
+   "lines": 76
+  },
+  {
+   "file": "crates/contextra-wire/src/verification.rs",
+   "module": "verification",
+   "lines": 342
+  }
+ ],
+ "counts": {
+  "unwrap": 16,
+  "expect": 9,
+  "panic_macro": 3,
+  "todo_unimpl": 0,
+  "index_bracket": 2,
+  "unsafe_tokens": 45
+ },
+ "grep_pub_decl": 200,
+ "all_pub_decl": 200,
+ "public_items": [
+  {
+   "kind": "struct",
+   "name": "Unverified",
+   "vis": "pub",
+   "module": "adapter",
+   "signature": "pub struct Unverified",
+   "file": "crates/contextra-wire/src/adapter.rs",
+   "line": 30,
+   "doc": [
+    "Typzustands-Marker: Unverifizierter Puffer.",
+    "",
+    "Rohpuffer, dessen FlatBuffers-Offsets, VTables und Bounds noch nicht validiert wurden.",
+    "Aus diesem Zustand kann nicht direkt auf Root-Tabellen zugegriffen werden."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Verified",
+   "vis": "pub",
+   "module": "adapter",
+   "signature": "pub struct Verified<T>",
+   "file": "crates/contextra-wire/src/adapter.rs",
+   "line": 37,
+   "doc": [
+    "Typzustands-Marker: Verifizierter Puffer für FlatBuffers-Wurzeltabelle `T`.",
+    "",
+    "Garantiert durch vorangegangene Verifikation gegen `FlatBufferConfig`, dass alle Offsets,",
+    "VTables, Vektoren und Bounds des Typs `T` innerhalb des Puffers liegen (`INV-WIRE-BOUNDS-1`)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "VerifiableRoot",
+   "vis": "pub",
+   "module": "adapter",
+   "signature": "pub trait VerifiableRoot",
+   "file": "crates/contextra-wire/src/adapter.rs",
+   "line": 42,
+   "doc": [
+    "Helper trait providing higher-ranked follow and verification for root FlatBuffers tables."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "Table",
+     "kind": "type",
+     "vis": "pub",
+     "signature": "type Table<'a>: flatbuffers::Follow<'a> + flatbuffers::Verifiable + 'a",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 44,
+     "doc": [
+      "Associated inner table type with lifetime `'a`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "VerifiableRoot"
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl VerifiableRoot for crate::generated::contextra_generated::contextra::ipc::VectorIndexUpdate<'_>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 60,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "WireBuffer",
+   "vis": "pub",
+   "module": "adapter",
+   "signature": "pub struct WireBuffer<State = Unverified>",
+   "file": "crates/contextra-wire/src/adapter.rs",
+   "line": 93,
+   "doc": [
+    "Zero-Copy Byte-Puffer-Wrapper für FlatBuffers-Nachrichten mit Typzustand.",
+    "",
+    "Kapselt eine Instanz von `bytes::Bytes`, um ein sicheres, referenzgezähltes Weiterreichen",
+    "von Binärdaten ohne Speicherallokation oder Kopiervorgänge zu ermöglichen.",
+    "",
+    "# Invarianten",
+    "- `INV-WIRE-BOUNDS-1`: Typzustand `Unverified` -> `Verified<T>`. Wurzelzugriff existiert nur auf `Verified<T>`.",
+    "- Keine Zeiger-Transmutes (`transmute`) oder Lebenszeit-Manipulationen (`lifetime transmutations`).",
+    "- Threadsicher durch interne atomare Referenzzählung (`Arc`-äquivalent in `Bytes`)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(data: Bytes) -> Self",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 113,
+     "doc": [
+      "Erzeugt einen neuen `WireBuffer` im Zustand `Unverified`, der das übergebene `Bytes`-Objekt umhüllt.",
+      "",
+      "# Ablauf",
+      "1. Übernahme des `Bytes`-Objekts (Besitzübertragung ohne Kopiervorgang).",
+      "2. Rückgabe der initialisierten `WireBuffer`-Struktur im Zustand `Unverified`.",
+      "",
+      "# Parameter",
+      "- `data`: Das zu verpackende `Bytes`-Objekt.",
+      "",
+      "# Nebenwirkungen",
+      "Keine. Keine I/O, keine Allokation."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "verify",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn verify<T>( self, config: &FlatBufferConfig, ) -> Result<WireBuffer<Verified<T>>, FlatBufferError> where T: VerifiableRoot,",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 131,
+     "doc": [
+      "Verifiziert den Puffer gegen das angegebene FlatBuffers-Root-Schema `T` und die Schutzgrenzen `config`.",
+      "",
+      "# Ablauf (`INV-WIRE-BOUNDS-1`)",
+      "1. Übergabe des Rohdaten-Slices an `verification::verify_flatbuffer::<T::Table>`.",
+      "2. Bei Erfolg: Rückgabe eines typisierten `WireBuffer<Verified<T>>` mit gespeicherter Verifikationskonfiguration.",
+      "3. Bei Fehlschlag: Rückgabe von `FlatBufferError`.",
+      "",
+      "# Fehler",
+      "Liefert `FlatBufferError::EmptyBuffer`, `FlatBufferError::BufferTooLarge` oder",
+      "`FlatBufferError::VerificationFailed`, falls Grenzen oder Offsets verletzt sind."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "root",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn root<'a>( &'a self, ) -> Result<<T::Table<'a> as flatbuffers::Follow<'a>>::Inner, FlatBufferError>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 157,
+     "doc": [
+      "Liefert die verifizierte FlatBuffers-Wurzel für diesen Puffer unter Verwendung der bei der Verifikation geprüften Grenzwerte.",
+      "",
+      "# Garantien (`INV-WIRE-BOUNDS-1`)",
+      "Durch den Typzustand `Verified<T>` ist sichergestellt, dass die Pufferstruktur,",
+      "Offsets und Tabellengrenzen vorab vollständig geprüft wurden.",
+      "",
+      "# Fehler",
+      "Liefert `FlatBufferError`, falls eine Re-Validierung wider Erwarten scheitert."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "root_with_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn root_with_config<'a>( &'a self, config: &FlatBufferConfig, ) -> Result<<T::Table<'a> as flatbuffers::Follow<'a>>::Inner, FlatBufferError>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 168,
+     "doc": [
+      "Liefert die verifizierte FlatBuffers-Wurzel für diesen Puffer unter Verwendung der angegebenen Schutzgrenzen.",
+      "",
+      "# Garantien (`INV-WIRE-BOUNDS-1`)",
+      "Sicherer, geprüfter Zugriff ohne ungeschützte Zeigerarithmetik."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_slice",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_slice(&self) -> &[u8]",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 187,
+     "doc": [
+      "Gibt eine unveränderliche Slice-Referenz auf die zugrundeliegenden Rohdaten zurück.",
+      "",
+      "# Ablauf",
+      "1. Zugriff auf den internen Byte-Puffer.",
+      "2. Rückgabe als Byte-Slice `&[u8]`.",
+      "",
+      "# Garantien",
+      "Der Slice bleibt gültig, solange der `WireBuffer` existiert."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "into_inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn into_inner(self) -> Bytes",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 198,
+     "doc": [
+      "Konsumiert den Wrapper und gibt das zugrundeliegende `Bytes`-Objekt frei.",
+      "",
+      "# Ablauf",
+      "1. Entpacken des internen `data`-Felds.",
+      "2. Rückgabe des ursprünglichen `Bytes`-Objekts."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 204,
+     "doc": [
+      "Gibt die Länge des Puffers in Bytes zurück."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 210,
+     "doc": [
+      "Gibt an, ob der Puffer leer ist."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl WireBuffer<Unverified>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 99,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<T: VerifiableRoot>",
+     "signature": "impl<T: VerifiableRoot> WireBuffer<Verified<T>>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 147,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<State>",
+     "signature": "impl<State> WireBuffer<State>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 176,
+     "in_test": false
+    },
+    {
+     "trait": "AsRef<[u8]>",
+     "generics": "<State>",
+     "signature": "impl<State> AsRef<[u8]> for WireBuffer<State>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 217,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "contextra",
+   "vis": "pub",
+   "module": "contextra_generated",
+   "signature": "pub mod contextra",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 29,
+   "doc": [],
+   "attrs": [
+    "#[allow(unused_imports, dead_code)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "ipc",
+   "vis": "pub",
+   "module": "contextra_generated::contextra",
+   "signature": "pub mod ipc",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 37,
+   "doc": [],
+   "attrs": [
+    "#[allow(unused_imports, dead_code)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "EmbeddingOffset",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub enum EmbeddingOffset",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 47,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `EmbeddingOffset` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Embedding",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct Embedding<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 51,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `Embedding` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "VT_DATA",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_DATA: flatbuffers::VOffsetT = 4",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 69,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_DATA` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_QUANTIZED_U8",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_QUANTIZED_U8: flatbuffers::VOffsetT = 6",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 72,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_QUANTIZED_U8` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_METRIC",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_METRIC: flatbuffers::VOffsetT = 8",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 75,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_METRIC` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "init_from_table",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 81,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `init_from_table` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "create",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>( _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>, args: &'args EmbeddingArgs<'args>, ) -> flatbuffers::WIPOffset<Embedding<'bldr>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 87,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `create` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "data",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn data(&self) -> Option<flatbuffers::Vector<'a, f32>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 105,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `data` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "quantized_u8",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn quantized_u8(&self) -> Option<flatbuffers::Vector<'a, u8>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 121,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `quantized_u8` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "metric",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn metric(&self) -> i8",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 137,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `metric` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "_tab",
+     "type": "flatbuffers::Table<'a>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 52
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "VerifiableRoot",
+     "generics": "",
+     "signature": "impl VerifiableRoot for crate::generated::contextra_generated::contextra::ipc::Embedding<'_>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 48,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Follow<'a>",
+     "generics": "<'a>",
+     "signature": "impl<'a> flatbuffers::Follow<'a> for Embedding<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 55,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> Embedding<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 66,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Verifiable",
+     "generics": "",
+     "signature": "impl flatbuffers::Verifiable for Embedding<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 146,
+     "in_test": false
+    },
+    {
+     "trait": "core::fmt::Debug",
+     "generics": "",
+     "signature": "impl core::fmt::Debug for Embedding<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 240,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EmbeddingArgs",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct EmbeddingArgs<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 171,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `EmbeddingArgs` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "metric",
+     "type": "i8",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 174
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "<'a>",
+     "signature": "impl<'a> Default for EmbeddingArgs<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 176,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EmbeddingBuilder",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct EmbeddingBuilder<'a: 'b, 'b>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 189,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `EmbeddingBuilder` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "add_data",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_data(&mut self, data: flatbuffers::WIPOffset<flatbuffers::Vector<'b, f32>>)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 197,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_data` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_quantized_u8",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_quantized_u8( &mut self, quantized_u8: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>, )",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 204,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_quantized_u8` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_metric",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_metric(&mut self, metric: i8)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 216,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_metric` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, ) -> EmbeddingBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 222,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `new` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "finish",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn finish(self) -> flatbuffers::WIPOffset<Embedding<'a>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 234,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `finish` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a: 'b, 'b>",
+     "signature": "impl<'a: 'b, 'b> EmbeddingBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 193,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "ScoredDocumentOffset",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub enum ScoredDocumentOffset",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 251,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `ScoredDocumentOffset` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ScoredDocument",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct ScoredDocument<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 255,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `ScoredDocument` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "VT_ID",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_ID: flatbuffers::VOffsetT = 4",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 273,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_ID` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_SCORE",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_SCORE: flatbuffers::VOffsetT = 6",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 276,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_SCORE` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_METADATA",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_METADATA: flatbuffers::VOffsetT = 8",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 279,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_METADATA` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_EMBEDDING",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_EMBEDDING: flatbuffers::VOffsetT = 10",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 282,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_EMBEDDING` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "init_from_table",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 288,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `init_from_table` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "create",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>( _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>, args: &'args ScoredDocumentArgs<'args>, ) -> flatbuffers::WIPOffset<ScoredDocument<'bldr>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 294,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `create` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn id(&self) -> Option<&'a str>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 315,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn score(&self) -> f32",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 328,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `score` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "metadata",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn metadata(&self) -> Option<&'a str>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 342,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `metadata` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "embedding",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn embedding(&self) -> Option<Embedding<'a>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 357,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `embedding` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "_tab",
+     "type": "flatbuffers::Table<'a>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 256
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "VerifiableRoot",
+     "generics": "",
+     "signature": "impl VerifiableRoot for crate::generated::contextra_generated::contextra::ipc::ScoredDocument<'_>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 52,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Follow<'a>",
+     "generics": "<'a>",
+     "signature": "impl<'a> flatbuffers::Follow<'a> for ScoredDocument<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 259,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> ScoredDocument<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 270,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Verifiable",
+     "generics": "",
+     "signature": "impl flatbuffers::Verifiable for ScoredDocument<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 371,
+     "in_test": false
+    },
+    {
+     "trait": "core::fmt::Debug",
+     "generics": "",
+     "signature": "impl core::fmt::Debug for ScoredDocument<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 476,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ScoredDocumentArgs",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct ScoredDocumentArgs<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 397,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `ScoredDocumentArgs` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "Option<flatbuffers::WIPOffset<&'a str>>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 398
+    },
+    {
+     "name": "score",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 399
+    },
+    {
+     "name": "metadata",
+     "type": "Option<flatbuffers::WIPOffset<&'a str>>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 400
+    },
+    {
+     "name": "embedding",
+     "type": "Option<flatbuffers::WIPOffset<Embedding<'a>>>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 401
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "<'a>",
+     "signature": "impl<'a> Default for ScoredDocumentArgs<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 403,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ScoredDocumentBuilder",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct ScoredDocumentBuilder<'a: 'b, 'b>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 417,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `ScoredDocumentBuilder` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "add_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_id(&mut self, id: flatbuffers::WIPOffset<&'b str>)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 425,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_score(&mut self, score: f32)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 432,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_score` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_metadata",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_metadata(&mut self, metadata: flatbuffers::WIPOffset<&'b str>)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 439,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_metadata` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_embedding",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_embedding(&mut self, embedding: flatbuffers::WIPOffset<Embedding<'b>>)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 448,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_embedding` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, ) -> ScoredDocumentBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 458,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `new` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "finish",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn finish(self) -> flatbuffers::WIPOffset<ScoredDocument<'a>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 470,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `finish` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a: 'b, 'b>",
+     "signature": "impl<'a: 'b, 'b> ScoredDocumentBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 421,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "SearchResponseOffset",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub enum SearchResponseOffset",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 488,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `SearchResponseOffset` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SearchResponse",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct SearchResponse<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 492,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `SearchResponse` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "VT_RESULTS",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_RESULTS: flatbuffers::VOffsetT = 4",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 510,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_RESULTS` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_TOTAL_HITS",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_TOTAL_HITS: flatbuffers::VOffsetT = 6",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 513,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_TOTAL_HITS` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_PROCESSING_TIME_MS",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_PROCESSING_TIME_MS: flatbuffers::VOffsetT = 8",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 516,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_PROCESSING_TIME_MS` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "init_from_table",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 522,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `init_from_table` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "create",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>( _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>, args: &'args SearchResponseArgs<'args>, ) -> flatbuffers::WIPOffset<SearchResponse<'bldr>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 528,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `create` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "results",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn results( &self, ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ScoredDocument<'a>>>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 544,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `results` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "total_hits",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn total_hits(&self) -> u32",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 561,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `total_hits` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "processing_time_ms",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn processing_time_ms(&self) -> f32",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 575,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `processing_time_ms` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "_tab",
+     "type": "flatbuffers::Table<'a>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 493
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "VerifiableRoot",
+     "generics": "",
+     "signature": "impl VerifiableRoot for crate::generated::contextra_generated::contextra::ipc::SearchResponse<'_>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 56,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Follow<'a>",
+     "generics": "<'a>",
+     "signature": "impl<'a> flatbuffers::Follow<'a> for SearchResponse<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 496,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> SearchResponse<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 507,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Verifiable",
+     "generics": "",
+     "signature": "impl flatbuffers::Verifiable for SearchResponse<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 588,
+     "in_test": false
+    },
+    {
+     "trait": "core::fmt::Debug",
+     "generics": "",
+     "signature": "impl core::fmt::Debug for SearchResponse<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 686,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SearchResponseArgs",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct SearchResponseArgs<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 607,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `SearchResponseArgs` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "results",
+     "type": "Option<",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 608
+    },
+    {
+     "name": "total_hits",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 613
+    },
+    {
+     "name": "processing_time_ms",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 614
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "<'a>",
+     "signature": "impl<'a> Default for SearchResponseArgs<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 616,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SearchResponseBuilder",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct SearchResponseBuilder<'a: 'b, 'b>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 629,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `SearchResponseBuilder` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "add_results",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_results( &mut self, results: flatbuffers::WIPOffset< flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<ScoredDocument<'b>>>, >, )",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 637,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_results` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_total_hits",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_total_hits(&mut self, total_hits: u32)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 651,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_total_hits` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_processing_time_ms",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_processing_time_ms(&mut self, processing_time_ms: f32)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 658,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_processing_time_ms` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, ) -> SearchResponseBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 668,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `new` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "finish",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn finish(self) -> flatbuffers::WIPOffset<SearchResponse<'a>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 680,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `finish` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a: 'b, 'b>",
+     "signature": "impl<'a: 'b, 'b> SearchResponseBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 633,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "VectorIndexUpdateOffset",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub enum VectorIndexUpdateOffset",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 697,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `VectorIndexUpdateOffset` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "VectorIndexUpdate",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct VectorIndexUpdate<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 701,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `VectorIndexUpdate` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "VT_ID",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_ID: flatbuffers::VOffsetT = 4",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 719,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_ID` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_EMBEDDING",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_EMBEDDING: flatbuffers::VOffsetT = 6",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 722,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_EMBEDDING` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_METADATA",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_METADATA: flatbuffers::VOffsetT = 8",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 725,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_METADATA` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "init_from_table",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 731,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `init_from_table` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "create",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>( _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>, args: &'args VectorIndexUpdateArgs<'args>, ) -> flatbuffers::WIPOffset<VectorIndexUpdate<'bldr>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 737,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `create` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn id(&self) -> Option<&'a str>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 757,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "embedding",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn embedding(&self) -> Option<Embedding<'a>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 770,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `embedding` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "metadata",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn metadata(&self) -> Option<&'a str>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 785,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `metadata` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "_tab",
+     "type": "flatbuffers::Table<'a>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 702
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "flatbuffers::Follow<'a>",
+     "generics": "<'a>",
+     "signature": "impl<'a> flatbuffers::Follow<'a> for VectorIndexUpdate<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 705,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> VectorIndexUpdate<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 716,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Verifiable",
+     "generics": "",
+     "signature": "impl flatbuffers::Verifiable for VectorIndexUpdate<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 799,
+     "in_test": false
+    },
+    {
+     "trait": "core::fmt::Debug",
+     "generics": "",
+     "signature": "impl core::fmt::Debug for VectorIndexUpdate<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 894,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "VectorIndexUpdateArgs",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct VectorIndexUpdateArgs<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 824,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `VectorIndexUpdateArgs` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "Option<flatbuffers::WIPOffset<&'a str>>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 825
+    },
+    {
+     "name": "embedding",
+     "type": "Option<flatbuffers::WIPOffset<Embedding<'a>>>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 826
+    },
+    {
+     "name": "metadata",
+     "type": "Option<flatbuffers::WIPOffset<&'a str>>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 827
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "<'a>",
+     "signature": "impl<'a> Default for VectorIndexUpdateArgs<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 829,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "VectorIndexUpdateBuilder",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct VectorIndexUpdateBuilder<'a: 'b, 'b>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 842,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `VectorIndexUpdateBuilder` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "add_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_id(&mut self, id: flatbuffers::WIPOffset<&'b str>)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 850,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_embedding",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_embedding(&mut self, embedding: flatbuffers::WIPOffset<Embedding<'b>>)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 857,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_embedding` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_metadata",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_metadata(&mut self, metadata: flatbuffers::WIPOffset<&'b str>)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 867,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_metadata` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, ) -> VectorIndexUpdateBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 876,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `new` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "finish",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn finish(self) -> flatbuffers::WIPOffset<VectorIndexUpdate<'a>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 888,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `finish` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a: 'b, 'b>",
+     "signature": "impl<'a: 'b, 'b> VectorIndexUpdateBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 846,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "RoleIdOffset",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub enum RoleIdOffset",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 905,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `RoleIdOffset` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "RoleId",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct RoleId<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 909,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `RoleId` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "VT_ID",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_ID: flatbuffers::VOffsetT = 4",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 927,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_ID` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "init_from_table",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 933,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `init_from_table` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "create",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>( _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>, args: &'args RoleIdArgs, ) -> flatbuffers::WIPOffset<RoleId<'bldr>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 939,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `create` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn id(&self) -> u32",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 951,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "_tab",
+     "type": "flatbuffers::Table<'a>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 910
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "VerifiableRoot",
+     "generics": "",
+     "signature": "impl VerifiableRoot for crate::generated::contextra_generated::contextra::ipc::RoleId<'_>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 66,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Follow<'a>",
+     "generics": "<'a>",
+     "signature": "impl<'a> flatbuffers::Follow<'a> for RoleId<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 913,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> RoleId<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 924,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Verifiable",
+     "generics": "",
+     "signature": "impl flatbuffers::Verifiable for RoleId<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 960,
+     "in_test": false
+    },
+    {
+     "trait": "core::fmt::Debug",
+     "generics": "",
+     "signature": "impl core::fmt::Debug for RoleId<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1017,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RoleIdArgs",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct RoleIdArgs",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 975,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `RoleIdArgs` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 976
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "<'a>",
+     "signature": "impl<'a> Default for RoleIdArgs",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 978,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RoleIdBuilder",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct RoleIdBuilder<'a: 'b, 'b>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 987,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `RoleIdBuilder` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "add_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_id(&mut self, id: u32)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 995,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> RoleIdBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1001,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `new` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "finish",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn finish(self) -> flatbuffers::WIPOffset<RoleId<'a>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1011,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `finish` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a: 'b, 'b>",
+     "signature": "impl<'a: 'b, 'b> RoleIdBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 991,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "HyperEdgeIdOffset",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub enum HyperEdgeIdOffset",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1026,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `HyperEdgeIdOffset` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "HyperEdgeId",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct HyperEdgeId<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1030,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `HyperEdgeId` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "VT_ID",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_ID: flatbuffers::VOffsetT = 4",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1048,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_ID` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "init_from_table",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1054,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `init_from_table` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "create",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>( _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>, args: &'args HyperEdgeIdArgs, ) -> flatbuffers::WIPOffset<HyperEdgeId<'bldr>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1060,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `create` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn id(&self) -> u64",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1072,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "_tab",
+     "type": "flatbuffers::Table<'a>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1031
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "VerifiableRoot",
+     "generics": "",
+     "signature": "impl VerifiableRoot for crate::generated::contextra_generated::contextra::ipc::HyperEdgeId<'_>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 70,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Follow<'a>",
+     "generics": "<'a>",
+     "signature": "impl<'a> flatbuffers::Follow<'a> for HyperEdgeId<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1034,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> HyperEdgeId<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1045,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Verifiable",
+     "generics": "",
+     "signature": "impl flatbuffers::Verifiable for HyperEdgeId<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1081,
+     "in_test": false
+    },
+    {
+     "trait": "core::fmt::Debug",
+     "generics": "",
+     "signature": "impl core::fmt::Debug for HyperEdgeId<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1140,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "HyperEdgeIdArgs",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct HyperEdgeIdArgs",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1096,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `HyperEdgeIdArgs` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1097
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "<'a>",
+     "signature": "impl<'a> Default for HyperEdgeIdArgs",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1099,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "HyperEdgeIdBuilder",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct HyperEdgeIdBuilder<'a: 'b, 'b>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1108,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `HyperEdgeIdBuilder` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "add_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_id(&mut self, id: u64)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1116,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, ) -> HyperEdgeIdBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1122,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `new` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "finish",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn finish(self) -> flatbuffers::WIPOffset<HyperEdgeId<'a>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1134,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `finish` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a: 'b, 'b>",
+     "signature": "impl<'a: 'b, 'b> HyperEdgeIdBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1112,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "RoleBindingOffset",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub enum RoleBindingOffset",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1149,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `RoleBindingOffset` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "RoleBinding",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct RoleBinding<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1153,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `RoleBinding` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "VT_ROLE",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_ROLE: flatbuffers::VOffsetT = 4",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1171,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_ROLE` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_ENTITY",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_ENTITY: flatbuffers::VOffsetT = 6",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1174,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_ENTITY` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "init_from_table",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1180,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `init_from_table` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "create",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>( _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>, args: &'args RoleBindingArgs, ) -> flatbuffers::WIPOffset<RoleBinding<'bldr>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1186,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `create` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "role",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn role(&self) -> u32",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1199,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `role` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "entity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn entity(&self) -> u64",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1209,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `entity` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "_tab",
+     "type": "flatbuffers::Table<'a>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1154
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "VerifiableRoot",
+     "generics": "",
+     "signature": "impl VerifiableRoot for crate::generated::contextra_generated::contextra::ipc::RoleBinding<'_>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 74,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Follow<'a>",
+     "generics": "<'a>",
+     "signature": "impl<'a> flatbuffers::Follow<'a> for RoleBinding<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1157,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> RoleBinding<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1168,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Verifiable",
+     "generics": "",
+     "signature": "impl flatbuffers::Verifiable for RoleBinding<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1222,
+     "in_test": false
+    },
+    {
+     "trait": "core::fmt::Debug",
+     "generics": "",
+     "signature": "impl core::fmt::Debug for RoleBinding<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1290,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RoleBindingArgs",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct RoleBindingArgs",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1238,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `RoleBindingArgs` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "role",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1239
+    },
+    {
+     "name": "entity",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1240
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "<'a>",
+     "signature": "impl<'a> Default for RoleBindingArgs",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1242,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RoleBindingBuilder",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct RoleBindingBuilder<'a: 'b, 'b>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1251,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `RoleBindingBuilder` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "add_role",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_role(&mut self, role: u32)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1259,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_role` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_entity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_entity(&mut self, entity: u64)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1265,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_entity` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, ) -> RoleBindingBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1272,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `new` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "finish",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn finish(self) -> flatbuffers::WIPOffset<RoleBinding<'a>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1284,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `finish` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a: 'b, 'b>",
+     "signature": "impl<'a: 'b, 'b> RoleBindingBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1255,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "HyperEdgeOffset",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub enum HyperEdgeOffset",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1300,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `HyperEdgeOffset` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "HyperEdge",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct HyperEdge<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1304,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `HyperEdge` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "VT_ID",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_ID: flatbuffers::VOffsetT = 4",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1322,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_ID` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_PREDICATE",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_PREDICATE: flatbuffers::VOffsetT = 6",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1325,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_PREDICATE` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_PARTICIPANTS",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_PARTICIPANTS: flatbuffers::VOffsetT = 8",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1328,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_PARTICIPANTS` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_WEIGHT",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_WEIGHT: flatbuffers::VOffsetT = 10",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1331,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_WEIGHT` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_TX_VALID_FROM",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_TX_VALID_FROM: flatbuffers::VOffsetT = 12",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1334,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_TX_VALID_FROM` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_TX_VALID_TO",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_TX_VALID_TO: flatbuffers::VOffsetT = 14",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1337,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_TX_VALID_TO` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_BUSINESS_VALID_FROM",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_BUSINESS_VALID_FROM: flatbuffers::VOffsetT = 16",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1340,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_BUSINESS_VALID_FROM` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_BUSINESS_VALID_TO",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_BUSINESS_VALID_TO: flatbuffers::VOffsetT = 18",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1343,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_BUSINESS_VALID_TO` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_SOURCE_DOC_ID",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_SOURCE_DOC_ID: flatbuffers::VOffsetT = 20",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1346,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_SOURCE_DOC_ID` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "VT_CHILD_EDGE_IDS",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const VT_CHILD_EDGE_IDS: flatbuffers::VOffsetT = 22",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1349,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `VT_CHILD_EDGE_IDS` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "init_from_table",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1355,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `init_from_table` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "create",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>( _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>, args: &'args HyperEdgeArgs<'args>, ) -> flatbuffers::WIPOffset<HyperEdge<'bldr>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1361,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `create` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn id(&self) -> u64",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1386,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "predicate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn predicate(&self) -> u8",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1396,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `predicate` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "participants",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn participants( &self, ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<RoleBinding<'a>>>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1410,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `participants` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "weight",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn weight(&self) -> f32",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1427,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `weight` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "tx_valid_from",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn tx_valid_from(&self) -> u64",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1441,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `tx_valid_from` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "tx_valid_to",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn tx_valid_to(&self) -> u64",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1455,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `tx_valid_to` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "business_valid_from",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn business_valid_from(&self) -> i64",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1469,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `business_valid_from` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "business_valid_to",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn business_valid_to(&self) -> i64",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1483,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `business_valid_to` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "source_doc_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn source_doc_id(&self) -> u64",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1497,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `source_doc_id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "child_edge_ids",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn child_edge_ids(&self) -> Option<flatbuffers::Vector<'a, u64>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1511,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `child_edge_ids` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "_tab",
+     "type": "flatbuffers::Table<'a>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1305
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "VerifiableRoot",
+     "generics": "",
+     "signature": "impl VerifiableRoot for crate::generated::contextra_generated::contextra::ipc::HyperEdge<'_>",
+     "file": "crates/contextra-wire/src/adapter.rs",
+     "line": 78,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Follow<'a>",
+     "generics": "<'a>",
+     "signature": "impl<'a> flatbuffers::Follow<'a> for HyperEdge<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1308,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> HyperEdge<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1319,
+     "in_test": false
+    },
+    {
+     "trait": "flatbuffers::Verifiable",
+     "generics": "",
+     "signature": "impl flatbuffers::Verifiable for HyperEdge<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1526,
+     "in_test": false
+    },
+    {
+     "trait": "core::fmt::Debug",
+     "generics": "",
+     "signature": "impl core::fmt::Debug for HyperEdge<'_>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1702,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "HyperEdgeArgs",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct HyperEdgeArgs<'a>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1556,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `HyperEdgeArgs` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1557
+    },
+    {
+     "name": "predicate",
+     "type": "u8",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1558
+    },
+    {
+     "name": "participants",
+     "type": "Option<",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1559
+    },
+    {
+     "name": "weight",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1564
+    },
+    {
+     "name": "tx_valid_from",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1565
+    },
+    {
+     "name": "tx_valid_to",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1566
+    },
+    {
+     "name": "business_valid_from",
+     "type": "i64",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1567
+    },
+    {
+     "name": "business_valid_to",
+     "type": "i64",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1568
+    },
+    {
+     "name": "source_doc_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1569
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "<'a>",
+     "signature": "impl<'a> Default for HyperEdgeArgs<'a>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1572,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "HyperEdgeBuilder",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub struct HyperEdgeBuilder<'a: 'b, 'b>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1592,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `HyperEdgeBuilder` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "add_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_id(&mut self, id: u64)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1600,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_predicate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_predicate(&mut self, predicate: u8)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1606,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_predicate` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_participants",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_participants( &mut self, participants: flatbuffers::WIPOffset< flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<RoleBinding<'b>>>, >, )",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1613,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_participants` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_weight",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_weight(&mut self, weight: f32)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1627,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_weight` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_tx_valid_from",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_tx_valid_from(&mut self, tx_valid_from: u64)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1634,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_tx_valid_from` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_tx_valid_to",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_tx_valid_to(&mut self, tx_valid_to: u64)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1641,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_tx_valid_to` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_business_valid_from",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_business_valid_from(&mut self, business_valid_from: i64)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1648,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_business_valid_from` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_business_valid_to",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_business_valid_to(&mut self, business_valid_to: i64)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1658,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_business_valid_to` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_source_doc_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_source_doc_id(&mut self, source_doc_id: u64)",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1665,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_source_doc_id` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_child_edge_ids",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_child_edge_ids( &mut self, child_edge_ids: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u64>>, )",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1672,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `add_child_edge_ids` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, ) -> HyperEdgeBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1684,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `new` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "finish",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn finish(self) -> flatbuffers::WIPOffset<HyperEdge<'a>>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1696,
+     "doc": [
+      "Öffentliches FlatBuffers-Item `finish` für IPC-Nachrichten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a: 'b, 'b>",
+     "signature": "impl<'a: 'b, 'b> HyperEdgeBuilder<'a, 'b>",
+     "file": "crates/contextra-wire/src/contextra_generated.rs",
+     "line": 1596,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "root_as_search_response",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub fn root_as_search_response( buf: &[u8], ) -> Result<SearchResponse, flatbuffers::InvalidFlatbuffer>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1727,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `root_as_search_response` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "size_prefixed_root_as_search_response",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub fn size_prefixed_root_as_search_response( buf: &[u8], ) -> Result<SearchResponse, flatbuffers::InvalidFlatbuffer>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1741,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `size_prefixed_root_as_search_response` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "root_as_search_response_with_opts",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub fn root_as_search_response_with_opts<'b, 'o>( opts: &'o flatbuffers::VerifierOptions, buf: &'b [u8], ) -> Result<SearchResponse<'b>, flatbuffers::InvalidFlatbuffer>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1755,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `root_as_search_response_with_opts` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "size_prefixed_root_as_search_response_with_opts",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub fn size_prefixed_root_as_search_response_with_opts<'b, 'o>( opts: &'o flatbuffers::VerifierOptions, buf: &'b [u8], ) -> Result<SearchResponse<'b>, flatbuffers::InvalidFlatbuffer>",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1770,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `size_prefixed_root_as_search_response_with_opts` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "root_as_search_response_unchecked",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub unsafe fn root_as_search_response_unchecked(buf: &[u8]) -> SearchResponse",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1783,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `root_as_search_response_unchecked` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "size_prefixed_root_as_search_response_unchecked",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub unsafe fn size_prefixed_root_as_search_response_unchecked( buf: &[u8], ) -> SearchResponse",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1793,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `size_prefixed_root_as_search_response_unchecked` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "finish_search_response_buffer",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub fn finish_search_response_buffer<'a, 'b>( fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, root: flatbuffers::WIPOffset<SearchResponse<'a>>, )",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1801,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `finish_search_response_buffer` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "finish_size_prefixed_search_response_buffer",
+   "vis": "pub",
+   "module": "contextra_generated::contextra::ipc",
+   "signature": "pub fn finish_size_prefixed_search_response_buffer<'a, 'b>( fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, root: flatbuffers::WIPOffset<SearchResponse<'a>>, )",
+   "file": "crates/contextra-wire/src/contextra_generated.rs",
+   "line": 1811,
+   "doc": [
+    "Öffentliches FlatBuffers-Item `finish_size_prefixed_search_response_buffer` für IPC-Nachrichten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "contextra_generated",
+   "vis": "pub",
+   "module": "generated",
+   "signature": "pub mod contextra_generated",
+   "file": "crates/contextra-wire/src/generated.rs",
+   "line": 38,
+   "doc": [],
+   "attrs": [
+    "#[path = \"contextra_generated.rs\"]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "JsonRpcConfig",
+   "vis": "pub",
+   "module": "jsonrpc",
+   "signature": "pub struct JsonRpcConfig",
+   "file": "crates/contextra-wire/src/jsonrpc.rs",
+   "line": 33,
+   "doc": [
+    "Configurable limits and security parameters for JSON-RPC message processing.",
+    "",
+    "Konfigurierbare Obergrenzen und Sicherheitsparameter für die JSON-RPC-Verarbeitung."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "max_message_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 36
+    },
+    {
+     "name": "max_depth",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 39
+    },
+    {
+     "name": "max_batch_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 42
+    },
+    {
+     "name": "reject_duplicate_keys",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 45
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for JsonRpcConfig",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 48,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "JsonRpcPayload",
+   "vis": "pub",
+   "module": "jsonrpc",
+   "signature": "pub enum JsonRpcPayload",
+   "file": "crates/contextra-wire/src/jsonrpc.rs",
+   "line": 67,
+   "doc": [
+    "Parsed JSON-RPC payload representing either a single request or a batch of requests.",
+    "",
+    "Geparste JSON-RPC-Payload: Repräsentiert entweder eine Einzelanfrage oder einen Batch von Anfragen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]",
+    "#[serde(untagged)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Single",
+     "shape": "(JsonRpcRequest)",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 70
+    },
+    {
+     "name": "Batch",
+     "shape": "(Vec<JsonRpcRequest>)",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 73
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "JsonRpcRequest",
+   "vis": "pub",
+   "module": "jsonrpc",
+   "signature": "pub struct JsonRpcRequest",
+   "file": "crates/contextra-wire/src/jsonrpc.rs",
+   "line": 82,
+   "doc": [
+    "Incoming JSON-RPC 2.0 message (Request or Notification).",
+    "",
+    "Eingehende JSON-RPC 2.0-Nachricht (Anfrage oder Benachrichtigung).",
+    "Handelt es sich um eine Benachrichtigung (Notification), ist das Feld `id` auf `None` gesetzt."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "validate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn validate(&self) -> Result<(), JsonRpcError>",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 106,
+     "doc": [
+      "Validates that the request complies with the JSON-RPC 2.0 specification (fail-closed).",
+      "",
+      "# Ablauf",
+      "1. Prüfen, ob `jsonrpc` exakt `\"2.0\"` entspricht. Falls nicht -> `InvalidRequest`.",
+      "2. Prüfen, ob `method` nach Entfernung von führenden/nachfolgenden Leerzeichen nicht leer ist. Falls leer -> `InvalidRequest`.",
+      "3. Liefert `Ok(())` bei Konformität."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "jsonrpc",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 85
+    },
+    {
+     "name": "id",
+     "type": "Option<Value>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 88
+    },
+    {
+     "name": "method",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 91
+    },
+    {
+     "name": "params",
+     "type": "Value",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 95
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl JsonRpcRequest",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 98,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "JsonRpcResponse",
+   "vis": "pub",
+   "module": "jsonrpc",
+   "signature": "pub struct JsonRpcResponse",
+   "file": "crates/contextra-wire/src/jsonrpc.rs",
+   "line": 127,
+   "doc": [
+    "Outgoing JSON-RPC 2.0 response.",
+    "",
+    "Ausgehende JSON-RPC 2.0-Antwort (Erfolg oder Fehler)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "ok",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn ok(id: Option<Value>, result: Value) -> Self",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 236,
+     "doc": [
+      "Constructs a successful JSON-RPC response.",
+      "",
+      "Konstruiert eine erfolgreiche JSON-RPC 2.0-Antwort mit Ergebnisdaten.",
+      "",
+      "# Parameter",
+      "- `id`: ID der beantworteten Anfrage.",
+      "- `result`: Rückgabedaten als JSON-Wert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "err",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn err(id: Option<Value>, code: i32, message: impl Into<String>) -> Self",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 254,
+     "doc": [
+      "Constructs an error JSON-RPC response.",
+      "",
+      "Konstruiert eine JSON-RPC 2.0-Fehlerantwort.",
+      "",
+      "# Parameter",
+      "- `id`: ID der Anfrage (oder `None`, falls unbekannt).",
+      "- `code`: Numerischer JSON-RPC Fehlercode.",
+      "- `message`: Fehlerbeschreibung."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "jsonrpc",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 130
+    },
+    {
+     "name": "id",
+     "type": "Option<Value>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 133
+    },
+    {
+     "name": "result",
+     "type": "Option<Value>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 137
+    },
+    {
+     "name": "error",
+     "type": "Option<JsonRpcError>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 141
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl JsonRpcResponse",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 227,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "JsonRpcError",
+   "vis": "pub",
+   "module": "jsonrpc",
+   "signature": "pub struct JsonRpcError",
+   "file": "crates/contextra-wire/src/jsonrpc.rs",
+   "line": 149,
+   "doc": [
+    "JSON-RPC 2.0 Error object.",
+    "",
+    "Standardisiertes JSON-RPC 2.0 Fehlerobjekt."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "parse_error",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn parse_error(message: impl Into<String>) -> Self",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 174,
+     "doc": [
+      "Parse error (-32700): Invalid JSON received by server.",
+      "Erzeugt einen Parse error (-32700): Ungültiges JSON empfangen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "invalid_request",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn invalid_request(message: impl Into<String>) -> Self",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 185,
+     "doc": [
+      "Invalid Request (-32600): JSON sent is not a valid Request object.",
+      "Erzeugt einen Invalid Request (-32600): Gesendetes JSON ist keine gültige Anfrage."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "method_not_found",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn method_not_found(message: impl Into<String>) -> Self",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 196,
+     "doc": [
+      "Method not found (-32601): The method does not exist / is not available.",
+      "Erzeugt einen Method not found (-32601): Methode existiert nicht oder ist nicht verfügbar."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "invalid_params",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn invalid_params(message: impl Into<String>) -> Self",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 207,
+     "doc": [
+      "Invalid params (-32602): Invalid method parameter(s).",
+      "Erzeugt einen Invalid params (-32602): Ungültige Methodenparameter übergeben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "internal_error",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn internal_error(message: impl Into<String>) -> Self",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 218,
+     "doc": [
+      "Internal error (-32603): Internal JSON-RPC error.",
+      "Erzeugt einen Internal error (-32603): Interner JSON-RPC Serverfehler."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "code",
+     "type": "i32",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 152
+    },
+    {
+     "name": "message",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 155
+    },
+    {
+     "name": "data",
+     "type": "Option<Value>",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 159
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Display",
+     "generics": "",
+     "signature": "impl std::fmt::Display for JsonRpcError",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 162,
+     "in_test": false
+    },
+    {
+     "trait": "std::error::Error",
+     "generics": "",
+     "signature": "impl std::error::Error for JsonRpcError",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 168,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl JsonRpcError",
+     "file": "crates/contextra-wire/src/jsonrpc.rs",
+     "line": 170,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "parse_jsonrpc_payload",
+   "vis": "pub",
+   "module": "jsonrpc",
+   "signature": "pub fn parse_jsonrpc_payload(raw: &[u8]) -> Result<JsonRpcPayload, JsonRpcError>",
+   "file": "crates/contextra-wire/src/jsonrpc.rs",
+   "line": 272,
+   "doc": [
+    "Parses raw bytes into a `JsonRpcPayload` using default configuration limits.",
+    "",
+    "Parst rohe Bytes in ein `JsonRpcPayload` unter Verwendung der Standard-Konfiguration."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "parse_jsonrpc_payload_with_config",
+   "vis": "pub",
+   "module": "jsonrpc",
+   "signature": "pub fn parse_jsonrpc_payload_with_config( raw: &[u8], config: &JsonRpcConfig, ) -> Result<JsonRpcPayload, JsonRpcError>",
+   "file": "crates/contextra-wire/src/jsonrpc.rs",
+   "line": 294,
+   "doc": [
+    "Parses raw bytes into a `JsonRpcPayload` with strict security and size validation.",
+    "",
+    "Parst rohe Bytes in ein `JsonRpcPayload` mit strikter Sicherheits- und Größenvalidierung.",
+    "",
+    "# Ablauf von `parse_jsonrpc_payload_with_config`:",
+    "1. Puffergröße gegen `config.max_message_size` prüfen.",
+    "2. UTF-8-Konformität sicherstellen.",
+    "3. Vorvalidierung der Struktur via `validate_json_structure_and_limits` (Schachtelungstiefe und Duplikate).",
+    "4. Deserialisierung in generischen `serde_json::Value`.",
+    "5. Verzweigung nach Wurzelelement:",
+    "- `Value::Array`: Batch-Verarbeitung. Prüfen auf Nicht-Leerheit und `max_batch_size`. Jedes Element validieren.",
+    "- `Value::Object`: Einzelanfrage parsen und validieren.",
+    "- Primitive Werte: Ablehnung mit `InvalidRequest`.",
+    "",
+    "# Fehlerfälle",
+    "Liefert `JsonRpcError::parse_error` bei Größen-, UTF-8- oder Syntaxfehlern,",
+    "oder `JsonRpcError::invalid_request` bei Schemaverletzungen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "generated",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod generated",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 40,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "adapter",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod adapter",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 44,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "jsonrpc",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod jsonrpc",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 45,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "verification",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod verification",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 46,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "Error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub enum Error",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 61,
+   "doc": [
+    "Zentraler, typisierter Fehlertyp für `contextra-wire` gemäß SPEC v4.0 (B4).",
+    "",
+    "Fasst FlatBuffers-Verifikationsfehler und JSON-RPC-Protokollfehler zusammen."
+   ],
+   "attrs": [
+    "#[derive(Debug, thiserror::Error)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "FlatBuffer",
+     "shape": "(#[from] FlatBufferError)",
+     "file": "crates/contextra-wire/src/lib.rs",
+     "line": 64
+    },
+    {
+     "name": "JsonRpc",
+     "shape": "(#[from] JsonRpcError)",
+     "file": "crates/contextra-wire/src/lib.rs",
+     "line": 68
+    },
+    {
+     "name": "InvalidInput",
+     "shape": "(&'static str)",
+     "file": "crates/contextra-wire/src/lib.rs",
+     "line": 72
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "Result",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub type Result<T> = core::result::Result<T, Error>",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 76,
+   "doc": [
+    "Standard-Result-Typ für `contextra-wire`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "FlatBufferError",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub enum FlatBufferError",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 34,
+   "doc": [
+    "Error type for FlatBuffers verification failures.",
+    "",
+    "Signalisiert Verletzungen der Spezifikation oder Sicherheitsgrenzen beim Einlesen von Byte-Puffern."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "EmptyBuffer",
+     "shape": "",
+     "file": "crates/contextra-wire/src/verification.rs",
+     "line": 37
+    },
+    {
+     "name": "BufferTooLarge",
+     "shape": "{ size: usize, max_size: usize }",
+     "file": "crates/contextra-wire/src/verification.rs",
+     "line": 40
+    },
+    {
+     "name": "VerificationFailed",
+     "shape": "(String)",
+     "file": "crates/contextra-wire/src/verification.rs",
+     "line": 43
+    },
+    {
+     "name": "IdentifierMismatch",
+     "shape": "",
+     "file": "crates/contextra-wire/src/verification.rs",
+     "line": 46
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "fmt::Display",
+     "generics": "",
+     "signature": "impl fmt::Display for FlatBufferError",
+     "file": "crates/contextra-wire/src/verification.rs",
+     "line": 49,
+     "in_test": false
+    },
+    {
+     "trait": "std::error::Error",
+     "generics": "",
+     "signature": "impl std::error::Error for FlatBufferError",
+     "file": "crates/contextra-wire/src/verification.rs",
+     "line": 65,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "FlatBufferConfig",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub struct FlatBufferConfig",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 73,
+   "doc": [
+    "Configuration parameters for FlatBuffers verification.",
+    "",
+    "Definiert Schutzgrenzen gegen Denial-of-Service-Angriffe (DoS) durch übergroße oder",
+    "tief geschachtelte Strukturen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "max_message_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/verification.rs",
+     "line": 76
+    },
+    {
+     "name": "max_depth",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/verification.rs",
+     "line": 79
+    },
+    {
+     "name": "max_tables",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-wire/src/verification.rs",
+     "line": 82
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for FlatBufferConfig",
+     "file": "crates/contextra-wire/src/verification.rs",
+     "line": 85,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "verify_flatbuffer",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub fn verify_flatbuffer<'a, T>( buf: &'a [u8], config: &FlatBufferConfig, ) -> Result<T::Inner, FlatBufferError> where T: flatbuffers::Follow<'a> + flatbuffers::Verifiable + 'a,",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 111,
+   "doc": [
+    "Generic verified root accessor for any FlatBuffers root table `T`.",
+    "",
+    "# Ablauf von `verify_flatbuffer`:",
+    "1. Puffer prüfen: Ist der Puffer leer, wird sofort `Err(FlatBufferError::EmptyBuffer)` zurückgegeben.",
+    "2. Längenprüfung: Überschreitet `buf.len()` das Limit `config.max_message_size`, wird mit `Err(FlatBufferError::BufferTooLarge)` abgelehnt.",
+    "3. Verifier konfigurieren: Erstellen der `VerifierOptions` mit Limits für Tiefe, Tabellenanzahl und scheinbare Größe.",
+    "4. Strukturprüfung via `flatbuffers::root_with_opts::<T>`: Prüft Offsets, VTables und Feldausrichtung im Byte-Array.",
+    "5. Bei erfolgreicher Verifikation Rückgabe des typsicheren Wurzel-Objekts, sonst Umwandlung in `FlatBufferError::VerificationFailed`.",
+    "",
+    "# Fehlerfälle",
+    "- Liefert `FlatBufferError::EmptyBuffer` bei leerem Slice.",
+    "- Liefert `FlatBufferError::BufferTooLarge`, wenn die Maximallänge überschritten ist.",
+    "- Liefert `FlatBufferError::VerificationFailed`, wenn Offsets außerhalb des Puffers liegen oder Daten korrupt sind."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "verify_and_parse_search_response",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub fn verify_and_parse_search_response<'a>( buf: &'a [u8], config: &FlatBufferConfig, ) -> Result<SearchResponse<'a>, FlatBufferError>",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 146,
+   "doc": [
+    "Verifies and parses a `SearchResponse` root table from bytes.",
+    "",
+    "# Ablauf von `verify_and_parse_search_response`:",
+    "1. Übergibt Puffer und Konfiguration an `verify_flatbuffer::<SearchResponse<'a>>`.",
+    "2. Validiert Header, Result-Vektor und Dokumente.",
+    "3. Gibt bei Erfolg die verifizierte `SearchResponse` zurück."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "verify_and_parse_embedding",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub fn verify_and_parse_embedding<'a>( buf: &'a [u8], config: &FlatBufferConfig, ) -> Result<Embedding<'a>, FlatBufferError>",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 160,
+   "doc": [
+    "Verifies and parses an `Embedding` root table from bytes.",
+    "",
+    "# Ablauf von `verify_and_parse_embedding`:",
+    "1. Validiert Puffergrenzen und Tabellenstruktur für `Embedding`.",
+    "2. Stellt sicher, dass Vektor-Floats bzw. quantisierte Bytes im Pufferbereich liegen.",
+    "3. Gibt das verifizierte `Embedding` zurück."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "verify_and_parse_scored_document",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub fn verify_and_parse_scored_document<'a>( buf: &'a [u8], config: &FlatBufferConfig, ) -> Result<ScoredDocument<'a>, FlatBufferError>",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 174,
+   "doc": [
+    "Verifies and parses a `ScoredDocument` root table from bytes.",
+    "",
+    "# Ablauf von `verify_and_parse_scored_document`:",
+    "1. Validiert Puffergrenzen und Tabellenstruktur für `ScoredDocument`.",
+    "2. Verifiziert Dokument-ID, Score, Metadaten-String und optionales Embedding.",
+    "3. Gibt das verifizierte `ScoredDocument` zurück."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "verify_and_parse_vector_index_update",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub fn verify_and_parse_vector_index_update<'a>( buf: &'a [u8], config: &FlatBufferConfig, ) -> Result<VectorIndexUpdate<'a>, FlatBufferError>",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 188,
+   "doc": [
+    "Verifies and parses a `VectorIndexUpdate` root table from bytes.",
+    "",
+    "# Ablauf von `verify_and_parse_vector_index_update`:",
+    "1. Validiert Puffergrenzen und Tabellenstruktur für `VectorIndexUpdate`.",
+    "2. Verifiziert Dokument-ID, Operationstyp und Vektordaten.",
+    "3. Gibt das verifizierte `VectorIndexUpdate` zurück."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "verify_and_parse_role_id",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub fn verify_and_parse_role_id<'a>( buf: &'a [u8], config: &FlatBufferConfig, ) -> Result<RoleId<'a>, FlatBufferError>",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 202,
+   "doc": [
+    "Verifies and parses a `RoleId` root table from bytes.",
+    "",
+    "# Ablauf von `verify_and_parse_role_id`:",
+    "1. Validiert Puffergrenzen und Tabellenstruktur für `RoleId`.",
+    "2. Verifiziert die u32-Rollenidentifikation.",
+    "3. Gibt das verifizierte `RoleId` zurück."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "verify_and_parse_hyper_edge_id",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub fn verify_and_parse_hyper_edge_id<'a>( buf: &'a [u8], config: &FlatBufferConfig, ) -> Result<HyperEdgeId<'a>, FlatBufferError>",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 216,
+   "doc": [
+    "Verifies and parses a `HyperEdgeId` root table from bytes.",
+    "",
+    "# Ablauf von `verify_and_parse_hyper_edge_id`:",
+    "1. Validiert Puffergrenzen und Tabellenstruktur für `HyperEdgeId`.",
+    "2. Verifiziert die u64-Hyperkanten-ID.",
+    "3. Gibt das verifizierte `HyperEdgeId` zurück."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "verify_and_parse_role_binding",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub fn verify_and_parse_role_binding<'a>( buf: &'a [u8], config: &FlatBufferConfig, ) -> Result<RoleBinding<'a>, FlatBufferError>",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 230,
+   "doc": [
+    "Verifies and parses a `RoleBinding` root table from bytes.",
+    "",
+    "# Ablauf von `verify_and_parse_role_binding`:",
+    "1. Validiert Puffergrenzen und Tabellenstruktur für `RoleBinding`.",
+    "2. Verifiziert Rollen-ID und zugeordnete Knoten-IDs.",
+    "3. Gibt das verifizierte `RoleBinding` zurück."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "verify_and_parse_hyper_edge",
+   "vis": "pub",
+   "module": "verification",
+   "signature": "pub fn verify_and_parse_hyper_edge<'a>( buf: &'a [u8], config: &FlatBufferConfig, ) -> Result<HyperEdge<'a>, FlatBufferError>",
+   "file": "crates/contextra-wire/src/verification.rs",
+   "line": 244,
+   "doc": [
+    "Verifies and parses a `HyperEdge` root table from bytes.",
+    "",
+    "# Ablauf von `verify_and_parse_hyper_edge`:",
+    "1. Validiert Puffergrenzen und Tabellenstruktur für `HyperEdge`.",
+    "2. Verifiziert Hyperkanten-ID, Attribute und Rollenbindungen.",
+    "3. Gibt die verifizierte `HyperEdge` zurück."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use adapter::*",
+   "vis": "pub",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 49,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use generated::contextra_generated",
+   "vis": "pub",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 50,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use generated::contextra_generated::contextra::ipc::*",
+   "vis": "pub",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 51,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use jsonrpc::*",
+   "vis": "pub",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 52,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use verification::*",
+   "vis": "pub",
+   "file": "crates/contextra-wire/src/lib.rs",
+   "line": 53,
+   "in_test": false,
+   "module": "crate"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra-mcp",
+  "contextra-py",
+  "contextra-router",
+  "contextra-wire-fuzz"
+ ]
+}

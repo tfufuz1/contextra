@@ -1,0 +1,6510 @@
+{
+ "name": "contextra-types",
+ "version": "workspace",
+ "path": "crates/contextra-types",
+ "role": "Gemeinsame Typen",
+ "features": {
+  "default": [],
+  "docid-128": [
+   "contextra-ids/docid-128"
+  ],
+  "auto-extraction-opt-out": []
+ },
+ "deps": {
+  "contextra-ids": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "bincode": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "ahash": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "blake3": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "sha2": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "bytes": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "proptest": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "criterion": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "`Contextra` Types — Kanonische Domänenmodelle, Identifikatoren, Budgets, Filter und Fehlertypen.",
+  "",
+  "# Architektur-Rolle: Gruppe contracts (Ebene 2, Typen-Fundament)",
+  "",
+  "Dieses Crate definiert das fundamentale Typfundament für das gesamte Contextra-System.",
+  "Gemäß der Baukasten-Architektur (reiner Rechenkern):",
+  "- Keine asynchronen Laufzeiten (kein `tokio`).",
+  "- Keine direkten I/O- oder Dateisystemabhängigkeiten.",
+  "- Kein `unsafe` (`#![forbid(unsafe_code)]`).",
+  "- Vollständig deterministische Datenstrukturen und fehlerresistente DTO-Konvertierungen.",
+  "",
+  "# Einbindung im Workspace",
+  "",
+  "`contextra-types` ist das zentrale Vertrags- und Typenpaket.",
+  "",
+  "**Abhängigkeiten (ausgehend):**",
+  "- Reines Rust mit Basis-Bibliotheken: `serde`, `serde_json`, `bincode`, `ahash`, `blake3`, `sha2`, `bytes`, `thiserror`.",
+  "- Interne Abhängigkeiten: `contextra-ids`.",
+  "",
+  "**Einbindung im Workspace (eingehend):**",
+  "- Siehe `capabilities.toml` (Gruppe `contracts`, Ebene 2); dient als typisiertes Fundament",
+  "für Speicher-, Abfrage- und Integrationsbausteine im Gesamtsystem."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-types/src/erasure.rs",
+   "module": "erasure",
+   "lines": 617
+  },
+  {
+   "file": "crates/contextra-types/src/error.rs",
+   "module": "error",
+   "lines": 1177
+  },
+  {
+   "file": "crates/contextra-types/src/error_dto.rs",
+   "module": "error_dto",
+   "lines": 599
+  },
+  {
+   "file": "crates/contextra-types/src/ids.rs",
+   "module": "ids",
+   "lines": 69
+  },
+  {
+   "file": "crates/contextra-types/src/lib.rs",
+   "module": "crate",
+   "lines": 76
+  },
+  {
+   "file": "crates/contextra-types/src/model_fingerprint.rs",
+   "module": "model_fingerprint",
+   "lines": 79
+  },
+  {
+   "file": "crates/contextra-types/src/refs.rs",
+   "module": "refs",
+   "lines": 5
+  },
+  {
+   "file": "crates/contextra-types/src/retrieval_strategy.rs",
+   "module": "retrieval_strategy",
+   "lines": 101
+  },
+  {
+   "file": "crates/contextra-types/src/schema.rs",
+   "module": "schema",
+   "lines": 129
+  },
+  {
+   "file": "crates/contextra-types/src/tenant_scope.rs",
+   "module": "tenant_scope",
+   "lines": 3
+  },
+  {
+   "file": "crates/contextra-types/src/tombstone.rs",
+   "module": "tombstone",
+   "lines": 159
+  },
+  {
+   "file": "crates/contextra-types/src/types/budget.rs",
+   "module": "types::budget",
+   "lines": 709
+  },
+  {
+   "file": "crates/contextra-types/src/types/domain/document.rs",
+   "module": "types::domain::document",
+   "lines": 247
+  },
+  {
+   "file": "crates/contextra-types/src/types/domain/ids.rs",
+   "module": "types::domain::ids",
+   "lines": 3
+  },
+  {
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "module": "types::domain::misc",
+   "lines": 624
+  },
+  {
+   "file": "crates/contextra-types/src/types/domain/mod.rs",
+   "module": "types::domain",
+   "lines": 43
+  },
+  {
+   "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+   "module": "types::domain::tests::doc_tests",
+   "lines": 293
+  },
+  {
+   "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+   "module": "types::domain::tests::ids_tests",
+   "lines": 473
+  },
+  {
+   "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+   "module": "types::domain::tests::misc_tests",
+   "lines": 265
+  },
+  {
+   "file": "crates/contextra-types/src/types/domain/tests/mod.rs",
+   "module": "types::domain::tests",
+   "lines": 6
+  },
+  {
+   "file": "crates/contextra-types/src/types/filter.rs",
+   "module": "types::filter",
+   "lines": 427
+  },
+  {
+   "file": "crates/contextra-types/src/types/importance.rs",
+   "module": "types::importance",
+   "lines": 329
+  },
+  {
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "module": "types::saos",
+   "lines": 942
+  },
+  {
+   "file": "crates/contextra-types/src/types.rs",
+   "module": "types",
+   "lines": 37
+  },
+  {
+   "file": "crates/contextra-types/src/witness.rs",
+   "module": "witness",
+   "lines": 98
+  }
+ ],
+ "counts": {
+  "unwrap": 62,
+  "expect": 22,
+  "panic_macro": 1,
+  "todo_unimpl": 0,
+  "index_bracket": 12,
+  "deprecated_attr": 44,
+  "cfg_feature_gates": 1
+ },
+ "grep_pub_decl": 230,
+ "all_pub_decl": 230,
+ "public_items": [
+  {
+   "kind": "enum",
+   "name": "EraseTarget",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum EraseTarget",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 21,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Document",
+     "shape": "{",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 23
+    },
+    {
+     "name": "Subject",
+     "shape": "{",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 32
+    },
+    {
+     "name": "Collection",
+     "shape": "{",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 39
+    },
+    {
+     "name": "Tenant",
+     "shape": "{",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 46
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "Timing",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum Timing",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 58,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Now",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 60
+    },
+    {
+     "name": "Batched",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 62
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "EraseMode",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum EraseMode",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 71,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Erase",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 73
+    },
+    {
+     "name": "Restrict",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 75
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "RetentionCode",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum RetentionCode",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 84,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "NoObligation",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 86
+    },
+    {
+     "name": "ObligationExpired",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 88
+    },
+    {
+     "name": "ObligationActive",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 90
+    },
+    {
+     "name": "LegalClaimsPending",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 92
+    },
+    {
+     "name": "DataSubjectRequestedRestriction",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 94
+    },
+    {
+     "name": "OperatorOverride",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 96
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RetentionAttestation",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub struct RetentionAttestation",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 105,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "code",
+     "type": "RetentionCode",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 107
+    },
+    {
+     "name": "attested_by",
+     "type": "OperatorRef",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 109
+    },
+    {
+     "name": "attested_at",
+     "type": "Timestamp",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 111
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EraseRequest",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub struct EraseRequest",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 120,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "target",
+     "type": "EraseTarget",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 122
+    },
+    {
+     "name": "timing",
+     "type": "Timing",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 124
+    },
+    {
+     "name": "retention",
+     "type": "RetentionAttestation",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 126
+    },
+    {
+     "name": "mode",
+     "type": "EraseMode",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 128
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EraseReceipt",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub struct EraseReceipt",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 137,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "ErasureId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 139
+    },
+    {
+     "name": "status",
+     "type": "ErasureStatus",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 141
+    },
+    {
+     "name": "gated_at",
+     "type": "Timestamp",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 143
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "LayerId",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub struct LayerId(pub [u8",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 152,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(bytes: [u8",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 156,
+     "doc": [
+      "Erzeugt eine neue `LayerId`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 161,
+     "doc": [
+      "Liefert die rohen Bytes der Schicht-ID."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl LayerId",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 154,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for LayerId",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 166,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "PendingReason",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum PendingReason",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 182,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Io",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 184
+    },
+    {
+     "name": "SlaExceeded",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 186
+    },
+    {
+     "name": "LayerFailed",
+     "shape": "(LayerId)",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 188
+    },
+    {
+     "name": "WitnessMissing",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 190
+    },
+    {
+     "name": "DiskReserve",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 192
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "RefusalReason",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum RefusalReason",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 201,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "RetentionObligation",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 203
+    },
+    {
+     "name": "InvalidParameters",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 205
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "Phase",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum Phase",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 214,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Intent",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 216
+    },
+    {
+     "name": "Gate",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 218
+    },
+    {
+     "name": "KeyDestroy",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 220
+    },
+    {
+     "name": "Purge",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 222
+    },
+    {
+     "name": "Verify",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 224
+    },
+    {
+     "name": "Replace",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 226
+    },
+    {
+     "name": "Supersede",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 228
+    },
+    {
+     "name": "Restrict",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 230
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "ErasureStatus",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum ErasureStatus",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 239,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Requested",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 241
+    },
+    {
+     "name": "Gated",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 243
+    },
+    {
+     "name": "KeyDestroyed",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 245
+    },
+    {
+     "name": "Purging",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 247
+    },
+    {
+     "name": "Verifying",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 249
+    },
+    {
+     "name": "Completed",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 251
+    },
+    {
+     "name": "Restricted",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 253
+    },
+    {
+     "name": "Lifted",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 255
+    },
+    {
+     "name": "Pending",
+     "shape": "{",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 257
+    },
+    {
+     "name": "Refused",
+     "shape": "(RefusalReason)",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 264
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "KeyCoverage",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum KeyCoverage",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 273,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Full",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 275
+    },
+    {
+     "name": "Unlinked",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 277
+    },
+    {
+     "name": "None",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 279
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "GateVariant",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum GateVariant",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 288,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Erased",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 290
+    },
+    {
+     "name": "Restricted",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 292
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "MeasureClass",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum MeasureClass",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 301,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Mk1",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 303
+    },
+    {
+     "name": "Mk2",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 305
+    },
+    {
+     "name": "Mk3",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 307
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "ScanMethod",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum ScanMethod",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 316,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "class",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn class(&self) -> MeasureClass",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 327,
+     "doc": [
+      "Liefert die zugehörige Messklasse (`MeasureClass`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Mk1",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 318
+    },
+    {
+     "name": "Mk2",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 320
+    },
+    {
+     "name": "Mk3",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 322
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ScanMethod",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 325,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "RiskCondition",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum RiskCondition",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 342,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Always",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 344
+    },
+    {
+     "name": "CowOrJournaling",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 346
+    },
+    {
+     "name": "UntilPurgeComplete",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 348
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "ResidualRisk",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub enum ResidualRisk",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 357,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn id(&self) -> &'static str",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 392,
+     "doc": [
+      "Feste Identifikator-Zeichenkette nach SPEC Anhang D."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "condition",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn condition(&self) -> RiskCondition",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 413,
+     "doc": [
+      "Statische Bedingung für Audit- und Verifikationswerkzeuge (AR-4)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "FlashRemanence",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 359
+    },
+    {
+     "name": "FsJournalOrCow",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 361
+    },
+    {
+     "name": "WrappedKeyRemanence",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 363
+    },
+    {
+     "name": "FreedBlockRemanence",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 365
+    },
+    {
+     "name": "OldKeyslotRemanence",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 367
+    },
+    {
+     "name": "ProcessMemory",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 369
+    },
+    {
+     "name": "IndexTopologyInference",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 371
+    },
+    {
+     "name": "TextIndexUntilPurge",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 373
+    },
+    {
+     "name": "ReplicaWindow",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 375
+    },
+    {
+     "name": "ExternalCopies",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 377
+    },
+    {
+     "name": "ExternalProcessors",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 379
+    },
+    {
+     "name": "PseudonymCommitment",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 381
+    },
+    {
+     "name": "PurgeScalesWithDb",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 383
+    },
+    {
+     "name": "PurgeDeferred",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 385
+    },
+    {
+     "name": "KeyCompromise",
+     "shape": "",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 387
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ResidualRisk",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 390,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Unarmed",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub struct Unarmed",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 431,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Armed",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub struct Armed(())",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 438,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ControlEvidence",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub struct ControlEvidence(())",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 446,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "observed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn observed() -> Self",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 451,
+     "doc": [
+      "Bezeugt das Auffinden des Kontrollmusters (nur in autorisierten Modulen aufgerufen)."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ControlEvidence",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 448,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Residue",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub struct Residue",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 462,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "matches",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 464
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "fmt::Display",
+     "generics": "",
+     "signature": "impl fmt::Display for Residue",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 467,
+     "in_test": false
+    },
+    {
+     "trait": "std::error::Error",
+     "generics": "",
+     "signature": "impl std::error::Error for Residue",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 477,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Scanner",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub struct Scanner<S>",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 485,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(layer: LayerId, class: MeasureClass, method_id: u16) -> Self",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 496,
+     "doc": [
+      "Erzeugt einen neuen unbewaffneten Scanner."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "arm",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn arm(self, _ev: ControlEvidence) -> Scanner<Armed>",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 508,
+     "doc": [
+      "Einzige Brücke nach Armed; erfordert Positivkontrollbeleg (TY-10)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record(&mut self, files: u64, bytes: u64)",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 522,
+     "doc": [
+      "Zeichnet geprüfte Dateien und Bytes auf."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "finish",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn finish( self, matches: u64, duration: Duration, hash: [u8",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 530,
+     "doc": [
+      "Schließt die Messung ab.",
+      "matches != 0 => Err(Residue).",
+      "LayerWitness wird ausschließlich bei matches == 0 ausgegeben (TY-10, I-19, D-72)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Scanner<Unarmed>",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 494,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Scanner<Armed>",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 520,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "LayerWitness",
+   "vis": "pub",
+   "module": "erasure",
+   "signature": "pub struct LayerWitness",
+   "file": "crates/contextra-types/src/erasure.rs",
+   "line": 559,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "layer",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn layer(&self) -> LayerId",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 572,
+     "doc": [
+      "Liefert die Schicht-ID."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "class",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn class(&self) -> MeasureClass",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 578,
+     "doc": [
+      "Liefert die Messklasse (MK1-MK3)."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "method_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn method_id(&self) -> u16",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 584,
+     "doc": [
+      "Liefert die Methoden-ID."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "files",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn files(&self) -> u64",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 590,
+     "doc": [
+      "Liefert die Anzahl geprüfter Dateien."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn bytes(&self) -> u64",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 596,
+     "doc": [
+      "Liefert die Anzahl geprüfter Bytes."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "duration",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn duration(&self) -> Duration",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 602,
+     "doc": [
+      "Liefert die Scandauer."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "hash",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn hash(&self) -> &[u8",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 608,
+     "doc": [
+      "Liefert den kryptografischen Hash des Prüflaufs."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "matches",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn matches(&self) -> u64",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 614,
+     "doc": [
+      "matches() ist per Konstruktion immer 0 (I-19)."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl LayerWitness",
+     "file": "crates/contextra-types/src/erasure.rs",
+     "line": 569,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "HnswDeletionError",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum HnswDeletionError",
+   "file": "crates/contextra-types/src/error.rs",
+   "line": 38,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "NodeNotFound",
+     "shape": "(DocId)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 41
+    },
+    {
+     "name": "DisconnectedComponent",
+     "shape": "(DocId)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 45
+    },
+    {
+     "name": "VerificationFailed",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 49
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "StepId",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub struct StepId(pub u64)",
+   "file": "crates/contextra-types/src/error.rs",
+   "line": 61,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 65,
+     "doc": [
+      "Creates a new `StepId` wrapping a `u64`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u64",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 70,
+     "doc": [
+      "Returns the inner raw `u64` value."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl StepId",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 63,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Display",
+     "generics": "",
+     "signature": "impl std::fmt::Display for StepId",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 75,
+     "in_test": false
+    },
+    {
+     "trait": "From<u64>",
+     "generics": "",
+     "signature": "impl From<u64> for StepId",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 81,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "CacheDirective",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum CacheDirective",
+   "file": "crates/contextra-types/src/error.rs",
+   "line": 90,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Pin",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 92
+    },
+    {
+     "name": "NeverCache",
+     "shape": "",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 97
+    },
+    {
+     "name": "Auto",
+     "shape": "",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 99
+    },
+    {
+     "name": "ReleaseAfterStep",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 101
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for CacheDirective",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 107,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "Result",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub type Result<T> = std::result::Result<T, ContextraError>",
+   "file": "crates/contextra-types/src/error.rs",
+   "line": 115,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "ContextraError",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum ContextraError",
+   "file": "crates/contextra-types/src/error.rs",
+   "line": 129,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "limit_exceeded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn limit_exceeded(limit: usize, context: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 392,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "model_load",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn model_load(path: impl Into<String>, reason: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 401,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "snapshot_unsupported_for_signal",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn snapshot_unsupported_for_signal(strategy: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 410,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "orphaned_vector_reference",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn orphaned_vector_reference( doc_id: impl Into<String>, index_id: impl Into<String>, ) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 416,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "capability_unsupported",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn capability_unsupported( capability: impl Into<String>, reason: impl Into<String>, ) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 428,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "invalid_input",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn invalid_input(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 439,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "wal_corruption",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 445,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "checksum_mismatch",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn checksum_mismatch(path: impl Into<String>, block_id: u64) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 454,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "kv_quantization",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn kv_quantization(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 463,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "durability_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn durability_config(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 469,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "pin_budget_exceeded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 475,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "cross_device_link",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn cross_device_link( source_path: impl Into<String>, target_path: impl Into<String>, ) -> Self",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 481,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "wal_truncation_detected",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn wal_truncation_detected(expected_hmac: [u8",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 493,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_occ_conflict",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_occ_conflict(&self) -> bool",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 502,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Internal",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 133
+    },
+    {
+     "name": "InvalidInput",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 137
+    },
+    {
+     "name": "NotFound",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 141
+    },
+    {
+     "name": "PolicyViolation",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 145
+    },
+    {
+     "name": "Storage",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 150
+    },
+    {
+     "name": "Io",
+     "shape": "(#[from] std::io::Error)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 154
+    },
+    {
+     "name": "WalCorruption",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 159
+    },
+    {
+     "name": "ChecksumMismatch",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 169
+    },
+    {
+     "name": "Transaction",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 179
+    },
+    {
+     "name": "TransactionTimeout",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 183
+    },
+    {
+     "name": "Conflict",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 192
+    },
+    {
+     "name": "InvalidSequenceNumber",
+     "shape": "(u64)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 196
+    },
+    {
+     "name": "Index",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 201
+    },
+    {
+     "name": "EmbeddingDimensionMismatch",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 205
+    },
+    {
+     "name": "HnswConnectivityDegraded",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 218
+    },
+    {
+     "name": "Text",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 225
+    },
+    {
+     "name": "MemoryBudgetExceeded",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 230
+    },
+    {
+     "name": "Sandbox",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 239
+    },
+    {
+     "name": "MemoryLimitExceeded",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 243
+    },
+    {
+     "name": "SandboxTimeout",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 247
+    },
+    {
+     "name": "Timeout",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 251
+    },
+    {
+     "name": "Serialization",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 261
+    },
+    {
+     "name": "Json",
+     "shape": "(#[from] serde_json::Error)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 265
+    },
+    {
+     "name": "Crypto",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 269
+    },
+    {
+     "name": "CheckpointNotFound",
+     "shape": "",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 273
+    },
+    {
+     "name": "Cluster",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 277
+    },
+    {
+     "name": "ParseError",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 281
+    },
+    {
+     "name": "Bincode",
+     "shape": "(#[from] bincode::Error)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 285
+    },
+    {
+     "name": "CapabilityUnsupported",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 289
+    },
+    {
+     "name": "SnapshotUnsupportedForSignal",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 298
+    },
+    {
+     "name": "StaleRead",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 302
+    },
+    {
+     "name": "LimitExceeded",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 306
+    },
+    {
+     "name": "ModelLoad",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 316
+    },
+    {
+     "name": "OrphanedVectorReference",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 328
+    },
+    {
+     "name": "CommitTimeout",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 337
+    },
+    {
+     "name": "KvDeleteModeConfig",
+     "shape": "(&'static str)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 344
+    },
+    {
+     "name": "KvQuantization",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 348
+    },
+    {
+     "name": "DurabilityConfig",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 352
+    },
+    {
+     "name": "Plugin",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 356
+    },
+    {
+     "name": "PinBudgetExceeded",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 360
+    },
+    {
+     "name": "GraphRepairFailed",
+     "shape": "(#[from] HnswDeletionError)",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 368
+    },
+    {
+     "name": "WalTruncationDetected",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 372
+    },
+    {
+     "name": "CrossDeviceLink",
+     "shape": "{",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 381
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ContextraError",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 389,
+     "in_test": false
+    },
+    {
+     "trait": "From<std::array::TryFromSliceError>",
+     "generics": "",
+     "signature": "impl From<std::array::TryFromSliceError> for ContextraError",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 507,
+     "in_test": false
+    },
+    {
+     "trait": "From<contextra_ids::IdError>",
+     "generics": "",
+     "signature": "impl From<contextra_ids::IdError> for ContextraError",
+     "file": "crates/contextra-types/src/error.rs",
+     "line": 514,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ContextraErrorDto",
+   "vis": "pub",
+   "module": "error_dto",
+   "signature": "pub struct ContextraErrorDto",
+   "file": "crates/contextra-types/src/error_dto.rs",
+   "line": 32,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(kind: impl Into<String>, message: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 44,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_details",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_details( kind: impl Into<String>, message: impl Into<String>, details: serde_json::Value, ) -> Self",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 54,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "kind",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 34
+    },
+    {
+     "name": "message",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 36
+    },
+    {
+     "name": "details",
+     "type": "Option<serde_json::Value>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 38
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ContextraErrorDto",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 41,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Display",
+     "generics": "",
+     "signature": "impl std::fmt::Display for ContextraErrorDto",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 67,
+     "in_test": false
+    },
+    {
+     "trait": "std::error::Error",
+     "generics": "",
+     "signature": "impl std::error::Error for ContextraErrorDto",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 73,
+     "in_test": false
+    },
+    {
+     "trait": "From<ContextraError>",
+     "generics": "",
+     "signature": "impl From<ContextraError> for ContextraErrorDto",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 75,
+     "in_test": false
+    },
+    {
+     "trait": "From<String>",
+     "generics": "",
+     "signature": "impl From<String> for ContextraErrorDto",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 81,
+     "in_test": false
+    },
+    {
+     "trait": "From<&str>",
+     "generics": "",
+     "signature": "impl From<&str> for ContextraErrorDto",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 91,
+     "in_test": false
+    },
+    {
+     "trait": "From<&ContextraError>",
+     "generics": "",
+     "signature": "impl From<&ContextraError> for ContextraErrorDto",
+     "file": "crates/contextra-types/src/error_dto.rs",
+     "line": 106,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ErasureId",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct ErasureId(pub [u8",
+   "file": "crates/contextra-types/src/ids.rs",
+   "line": 16,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(bytes: [u8",
+     "file": "crates/contextra-types/src/ids.rs",
+     "line": 20,
+     "doc": [
+      "Erzeugt eine `ErasureId` aus rohen 16 Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-types/src/ids.rs",
+     "line": 25,
+     "doc": [
+      "Liefert die 16 Bytes als Slice."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ErasureId",
+     "file": "crates/contextra-types/src/ids.rs",
+     "line": 18,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for ErasureId",
+     "file": "crates/contextra-types/src/ids.rs",
+     "line": 30,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "GateId",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct GateId(pub [u8",
+   "file": "crates/contextra-types/src/ids.rs",
+   "line": 47,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(bytes: [u8",
+     "file": "crates/contextra-types/src/ids.rs",
+     "line": 51,
+     "doc": [
+      "Erzeugt eine `GateId` aus rohen 16 Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-types/src/ids.rs",
+     "line": 56,
+     "doc": [
+      "Liefert die 16 Bytes als Slice."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl GateId",
+     "file": "crates/contextra-types/src/ids.rs",
+     "line": 49,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for GateId",
+     "file": "crates/contextra-types/src/ids.rs",
+     "line": 61,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 31,
+   "doc": [
+    "Fehlertypen und Fehler-Hierarchie für Contextra."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error_dto",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error_dto",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 34,
+   "doc": [
+    "Serialisierbare Data-Transfer-Objects (DTO) für fehlerresistente Schnittstellenübertragung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "model_fingerprint",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod model_fingerprint",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 37,
+   "doc": [
+    "Kryptografische Modell-Fingerabdrücke zur Validierung von Embedding- und Inferenz-Konfigurationen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "retrieval_strategy",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod retrieval_strategy",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 40,
+   "doc": [
+    "Retrieval-Strategien und Routing-Optionen für die hybride Suche."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "schema",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod schema",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 43,
+   "doc": [
+    "Manifest-Schemaversionen und Dokument-ID-Breitenkonfigurationen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "tenant_scope",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod tenant_scope",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 46,
+   "doc": [
+    "Mandantenspezifische Wrapper-Typen zur Durchsetzung strikter Mandantenisolation."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "tombstone",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod tombstone",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 49,
+   "doc": [
+    "Bitmaskenbasierte Tombstones (Löschmarker) für Multi-Version-Concurrency-Control (MVCC)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "types",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod types",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 52,
+   "doc": [
+    "Zentrale Domänentypen, Filter, Budgets, Scoring-Funktionen und SAOS-Suchstrukturen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "erasure",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod erasure",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 55,
+   "doc": [
+    "Audit-Trails, Zeugnisse (Witnesses) und Saga-Transaktionsaufzeichnungen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "ids",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod ids",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 56,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "refs",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod refs",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 57,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "witness",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod witness",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 58,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ModelFingerprint",
+   "vis": "pub",
+   "module": "model_fingerprint",
+   "signature": "pub struct ModelFingerprint",
+   "file": "crates/contextra-types/src/model_fingerprint.rs",
+   "line": 33,
+   "doc": [
+    "Identifiziert eine Modelldatei und deren Quantisierungsstufe eindeutig."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( hash: [u8",
+     "file": "crates/contextra-types/src/model_fingerprint.rs",
+     "line": 48,
+     "doc": [
+      "Creates a new `ModelFingerprint`.",
+      "",
+      "# Ablauf",
+      "Übernimmt Hash, Modellbezeichner und Quantisierungsstring ohne Nebenwirkungen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/model_fingerprint.rs",
+     "line": 35
+    },
+    {
+     "name": "model_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/model_fingerprint.rs",
+     "line": 37
+    },
+    {
+     "name": "quantization",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/model_fingerprint.rs",
+     "line": 39
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ModelFingerprint",
+     "file": "crates/contextra-types/src/model_fingerprint.rs",
+     "line": 42,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "RetrievalStrategy",
+   "vis": "pub",
+   "module": "retrieval_strategy",
+   "signature": "pub enum RetrievalStrategy",
+   "file": "crates/contextra-types/src/retrieval_strategy.rs",
+   "line": 22,
+   "doc": [
+    "Semantische Retrieval-Strategie für Signal-Fusion (§8/§9)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Vector",
+     "shape": "",
+     "file": "crates/contextra-types/src/retrieval_strategy.rs",
+     "line": 24
+    },
+    {
+     "name": "Text",
+     "shape": "",
+     "file": "crates/contextra-types/src/retrieval_strategy.rs",
+     "line": 26
+    },
+    {
+     "name": "Graph",
+     "shape": "",
+     "file": "crates/contextra-types/src/retrieval_strategy.rs",
+     "line": 28
+    },
+    {
+     "name": "Hybrid",
+     "shape": "",
+     "file": "crates/contextra-types/src/retrieval_strategy.rs",
+     "line": 30
+    },
+    {
+     "name": "Global",
+     "shape": "{",
+     "file": "crates/contextra-types/src/retrieval_strategy.rs",
+     "line": 33
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "fmt::Display",
+     "generics": "",
+     "signature": "impl fmt::Display for RetrievalStrategy",
+     "file": "crates/contextra-types/src/retrieval_strategy.rs",
+     "line": 41,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "DocIdWidth",
+   "vis": "pub",
+   "module": "schema",
+   "signature": "pub enum DocIdWidth",
+   "file": "crates/contextra-types/src/schema.rs",
+   "line": 19,
+   "doc": [
+    "Gibt die von einer Schemaversion erwartete oder erzeugte Bitbreite einer `DocId` an."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "current",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn current() -> Self",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 32,
+     "doc": [
+      "Returns the active compile-time `DocIdWidth`.",
+      "",
+      "# Ablauf",
+      "Prüft zur Compile-Zeit via `cfg!(feature = \"docid-128\")`, welche Breite gewählt ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "bytes_len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn bytes_len(self) -> usize",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 42,
+     "doc": [
+      "Returns the size in bytes of a single `DocId` value under this width."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Bit64",
+     "shape": "= 64",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 21
+    },
+    {
+     "name": "Bit128",
+     "shape": "= 128",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 23
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl DocIdWidth",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 26,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "ManifestSchemaVersion",
+   "vis": "pub",
+   "module": "schema",
+   "signature": "pub enum ManifestSchemaVersion",
+   "file": "crates/contextra-types/src/schema.rs",
+   "line": 58,
+   "doc": [
+    "Schema-Versionskennung für SSTable- und WAL-Manifeste."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "doc_id_width",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn doc_id_width(self) -> DocIdWidth",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 69,
+     "doc": [
+      "Returns the corresponding `DocIdWidth` for this schema version."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u8",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_u8(self) -> u8",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 78,
+     "doc": [
+      "Returns the numeric version byte."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_u8",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_u8(version_byte: u8) -> Result<Self>",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 87,
+     "doc": [
+      "Parses a version from a numeric byte indicator.",
+      "",
+      "# Fehler",
+      "Liefert `ContextraError::Serialization`, falls das übergebene Byte keiner bekannten Version entspricht."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_compatible_with_current_build",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_compatible_with_current_build(self) -> bool",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 99,
+     "doc": [
+      "Returns `true` if this schema version is compatible with the compile-time DocId feature flags."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "V1",
+     "shape": "= 1",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 61
+    },
+    {
+     "name": "V2",
+     "shape": "= 2",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 63
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ManifestSchemaVersion",
+     "file": "crates/contextra-types/src/schema.rs",
+     "line": 66,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "TombstoneSemanticsCheck",
+   "vis": "pub",
+   "module": "tombstone",
+   "signature": "pub trait TombstoneSemanticsCheck",
+   "file": "crates/contextra-types/src/tombstone.rs",
+   "line": 38,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "is_tombstone",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn is_tombstone(seq: u64, flags: u8) -> bool",
+     "file": "crates/contextra-types/src/tombstone.rs",
+     "line": 40,
+     "doc": [
+      "Returns `true` if the sequence number or flags indicate a soft-deleted tombstone."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "TombstoneSemanticsCheck"
+    },
+    {
+     "name": "make_tombstone",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn make_tombstone(seq: u64) -> Vec<u8>",
+     "file": "crates/contextra-types/src/tombstone.rs",
+     "line": 43,
+     "doc": [
+      "Encodes a sequence number as an 8-byte little-endian tombstone payload with `TOMBSTONE_BIT` set."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "TombstoneSemanticsCheck"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SeqBitTombstone",
+   "vis": "pub",
+   "module": "tombstone",
+   "signature": "pub struct SeqBitTombstone",
+   "file": "crates/contextra-types/src/tombstone.rs",
+   "line": 53,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "TombstoneSemanticsCheck",
+     "generics": "",
+     "signature": "impl TombstoneSemanticsCheck for SeqBitTombstone",
+     "file": "crates/contextra-types/src/tombstone.rs",
+     "line": 55,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "BudgetStrategy",
+   "vis": "pub",
+   "module": "types::budget",
+   "signature": "pub enum BudgetStrategy",
+   "file": "crates/contextra-types/src/types/budget.rs",
+   "line": 39,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Conservative",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 41
+    },
+    {
+     "name": "Aggressive",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 43
+    },
+    {
+     "name": "Exact",
+     "shape": "(usize)",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 45
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "TokenBudget",
+   "vis": "pub",
+   "module": "types::budget",
+   "signature": "pub struct TokenBudget",
+   "file": "crates/contextra-types/src/types/budget.rs",
+   "line": 51,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(max_tokens: usize, reserve_tokens: usize) -> Self",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 139,
+     "doc": [
+      "Creates a new token budget with an exact max limit and reserve tokens."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "for_model",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn for_model(model: &str) -> Self",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 154,
+     "doc": [
+      "Erstellt ein Budget für gängige Modelle.",
+      "",
+      "# Maintenance Note",
+      "Model name patterns use string matching. Explicit model family patterns",
+      "(e.g. `claude-4`, `claude-opus-4`, `claude-sonnet-4`, `gpt-4o-mini`) must be updated",
+      "whenever new model releases or naming conventions ship."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_reserved",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_reserved(mut self, system_tokens: usize, answer_tokens: usize) -> Self",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 180,
+     "doc": [
+      "Reserviert Token für System-Prompt und Antwort."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_strategy",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_strategy(mut self, strategy: BudgetStrategy) -> Self",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 186,
+     "doc": [
+      "Sets the budget strategy."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "effective_limit",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn effective_limit(&self) -> usize",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 192,
+     "doc": [
+      "Calculates the effective token limit based on strategy."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "available",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn available(&self) -> usize",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 201,
+     "doc": [
+      "Returns tokens still available after subtracting reserved and consumed tokens."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "consume",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn consume(&self, tokens: usize)",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 208,
+     "doc": [
+      "Records `tokens` as consumed, reducing future availability."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reserve",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reserve(&self, amount: usize) -> Result<Reservation<'_>>",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 224,
+     "doc": [
+      "Reserviert `amount` Tokens atomar. Schlägt fehl, wenn das verfügbare Budget",
+      "(limit - reserved - consumed) unterschritten würde."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_reserve",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_reserve(&self, tokens: usize) -> Result<()>",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 262,
+     "doc": [
+      "Tries to reserve `tokens` from the available budget before step execution.",
+      "",
+      "Returns `Err(ContextraError::Internal(...))` if available budget is 0 or less than `tokens`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "refund",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn refund(&self, tokens: usize)",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 275,
+     "doc": [
+      "Refunds `tokens` back to the available budget if execution fails or consumes less than estimated."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "consumed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn consumed(&self) -> usize",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 290,
+     "doc": [
+      "Returns total tokens consumed so far."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "limit",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 53
+    },
+    {
+     "name": "strategy",
+     "type": "BudgetStrategy",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 55
+    },
+    {
+     "name": "reserved",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 57
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Clone",
+     "generics": "",
+     "signature": "impl Clone for TokenBudget",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 62,
+     "in_test": false
+    },
+    {
+     "trait": "PartialEq",
+     "generics": "",
+     "signature": "impl PartialEq for TokenBudget",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 73,
+     "in_test": false
+    },
+    {
+     "trait": "Serialize",
+     "generics": "",
+     "signature": "impl Serialize for TokenBudget",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 82,
+     "in_test": false
+    },
+    {
+     "trait": "Deserialize<'de>",
+     "generics": "<'de>",
+     "signature": "impl<'de> Deserialize<'de> for TokenBudget",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 105,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TokenBudget",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 137,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for TokenBudget",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 327,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Reservation",
+   "vis": "pub",
+   "module": "types::budget",
+   "signature": "pub struct Reservation<'a>",
+   "file": "crates/contextra-types/src/types/budget.rs",
+   "line": 131,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "settle",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn settle(self)",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 301,
+     "doc": [
+      "Bestätigt den Verbrauch endgültig. Nach `settle()` erfolgt bei Drop KEINE Rückerstattung mehr.",
+      "",
+      "# Compile-time Duplicate Call Prevention",
+      "`settle(self)` consumes `self` by value. A second `settle()` call on the same reservation instance",
+      "is compile-time impossible due to Rust ownership transfer semantics."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> Reservation<'a>",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 295,
+     "in_test": false
+    },
+    {
+     "trait": "Drop",
+     "generics": "<'a>",
+     "signature": "impl<'a> Drop for Reservation<'a>",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 306,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ResourceBudget",
+   "vis": "pub",
+   "module": "types::budget",
+   "signature": "pub struct ResourceBudget",
+   "file": "crates/contextra-types/src/types/budget.rs",
+   "line": 341,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "memory_limit",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 343
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for ResourceBudget",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 346,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ResourceTracker",
+   "vis": "pub",
+   "module": "types::budget",
+   "signature": "pub struct ResourceTracker",
+   "file": "crates/contextra-types/src/types/budget.rs",
+   "line": 357,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(budget: ResourceBudget) -> Self",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 372,
+     "doc": [
+      "Creates a new ResourceTracker with the given budget."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "consume_memory",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn consume_memory(&self, bytes: u64) -> Result<()>",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 384,
+     "doc": [
+      "Attempts to consume `bytes` of memory from the tracked budget.",
+      "",
+      "# Errors",
+      "Returns `Err(ContextraError::MemoryBudgetExceeded)` if consuming `bytes`",
+      "exceeds the configured memory limit."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "release_memory",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn release_memory(&self, bytes: u64)",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 413,
+     "doc": [
+      "Releases memory from the budget. Uses saturating subtraction to prevent",
+      "atomic underflow (wrapping to `u64::MAX`) which would permanently block",
+      "all future allocations. (FIND-COR-002)"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "memory_used",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn memory_used(&self) -> u64",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 437,
+     "doc": [
+      "Returns current memory usage in bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "budget",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn budget(&self) -> &ResourceBudget",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 442,
+     "doc": [
+      "Returns a reference to the configured resource budget."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "has_memory_capacity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn has_memory_capacity(&self) -> bool",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 447,
+     "doc": [
+      "Returns true if memory usage is below 95% of the limit."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for ResourceTracker",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 364,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ResourceTracker",
+     "file": "crates/contextra-types/src/types/budget.rs",
+     "line": 370,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "DistanceMetric",
+   "vis": "pub",
+   "module": "types::domain::document",
+   "signature": "pub enum DistanceMetric",
+   "file": "crates/contextra-types/src/types/domain/document.rs",
+   "line": 20,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "compute",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn compute(&self, a: &[f32], b: &[f32]) -> Result<f32>",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 32,
+     "doc": [
+      "Computes the distance between two f32 vectors using this metric."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "compute_u8",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn compute_u8(&self, a: &[u8], b: &[u8]) -> Result<u32>",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 114,
+     "doc": [],
+     "attrs": [
+      "#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Cosine",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 23
+    },
+    {
+     "name": "Euclidean",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 25
+    },
+    {
+     "name": "DotProduct",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 27
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl DistanceMetric",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 30,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Embedding",
+   "vis": "pub",
+   "module": "types::domain::document",
+   "signature": "pub struct Embedding",
+   "file": "crates/contextra-types/src/types/domain/document.rs",
+   "line": 174,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(data: Vec<f32>) -> Self",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 181,
+     "doc": [
+      "Creates a new vector embedding from `f32` slice or vector."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "dim",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn dim(&self) -> usize",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 187,
+     "doc": [
+      "Returns the dimension (length) of the embedding vector."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_slice",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_slice(&self) -> &[f32]",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 193,
+     "doc": [
+      "Returns the vector data as an `f32` slice."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "l2_norm",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn l2_norm(&self) -> f32",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 198,
+     "doc": [
+      "Computes the Euclidean L2 norm of the vector."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "normalize",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn normalize(&self) -> Self",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 207,
+     "doc": [
+      "Returns an L2-unit-normalized clone of this embedding.",
+      "",
+      "Guarded against zero and subnormal/near-zero vector norms (`norm < 1e-12`).",
+      "Vectors with `norm < 1e-12` are returned unchanged to avoid division by subnormals",
+      "resulting in `Inf` or `NaN`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "data",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 176
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Embedding",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 179,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ScoredDocument",
+   "vis": "pub",
+   "module": "types::domain::document",
+   "signature": "pub struct ScoredDocument",
+   "file": "crates/contextra-types/src/types/domain/document.rs",
+   "line": 221,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(doc_id: DocId, score: f32) -> Self",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 230,
+     "doc": [
+      "Creates a new `ScoredDocument` with document ID and score."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "doc_id",
+     "type": "DocId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 223
+    },
+    {
+     "name": "score",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 225
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ScoredDocument",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 228,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RerankResult",
+   "vis": "pub",
+   "module": "types::domain::document",
+   "signature": "pub struct RerankResult",
+   "file": "crates/contextra-types/src/types/domain/document.rs",
+   "line": 238,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "index",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 240
+    },
+    {
+     "name": "original_index",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 242
+    },
+    {
+     "name": "score",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 244
+    },
+    {
+     "name": "calibrated_score",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/document.rs",
+     "line": 246
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "serialize",
+   "vis": "pub",
+   "module": "types::domain::misc::hex",
+   "signature": "pub fn serialize<S>(bytes: &[u8",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 20,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "deserialize",
+   "vis": "pub",
+   "module": "types::domain::misc::hex",
+   "signature": "pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 34,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "WorkflowState",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub struct WorkflowState",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 61,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "tx",
+     "type": "TxId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 63
+    },
+    {
+     "name": "graph_hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 66
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "EXPIRY_METADATA_KEY",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub const EXPIRY_METADATA_KEY: &str = \"\"",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 84,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_SEARCH_K",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub const MAX_SEARCH_K: usize = 1_000",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 98,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "LinkRelation",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub enum LinkRelation",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 103,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Elaborates",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 105
+    },
+    {
+     "name": "Contradicts",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 107
+    },
+    {
+     "name": "Supersedes",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 109
+    },
+    {
+     "name": "References",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 111
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "MemoryLink",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub struct MemoryLink",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 117,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "target",
+     "type": "DocId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 119
+    },
+    {
+     "name": "relation",
+     "type": "LinkRelation",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 121
+    },
+    {
+     "name": "created_at_tx",
+     "type": "TxId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 123
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Entity",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub struct Entity",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 129,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(id: EntityId, name: impl Into<String>, entity_type: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 143,
+     "doc": [
+      "Creates a new `Entity` with id, name, and type."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new( id: EntityId, name: impl Into<String>, entity_type: impl Into<String>, ) -> Result<Self>",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 156,
+     "doc": [
+      "Creates a new `Entity`, validating that `name` and `entity_type` are non-empty.",
+      "",
+      "# Errors",
+      "Returns `ContextraError::InvalidInput` if `name` or `entity_type` is empty or whitespace-only."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "type": "EntityId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 131
+    },
+    {
+     "name": "name",
+     "type": "Arc<str>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 133
+    },
+    {
+     "name": "entity_type",
+     "type": "Arc<str>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 135
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Entity",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 141,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Edge",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub struct Edge",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 192,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(from: EntityId, to: EntityId, label: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 220,
+     "doc": [
+      "Creates a new `Edge` between source and target entities with a label."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_source_doc_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_source_doc_id(mut self, doc_id: DocId) -> Self",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 235,
+     "doc": [
+      "Sets the optional source document ID from which this edge was derived for provenance tracking."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new( from: EntityId, to: EntityId, label: impl Into<String>, weight: f32, ) -> Result<Self>",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 244,
+     "doc": [
+      "Creates a new `Edge`, validating non-empty label and finite non-negative weight.",
+      "",
+      "# Errors",
+      "Returns `ContextraError::InvalidInput` if `label` is empty or `weight` is NaN/infinite/negative."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_weight",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_weight(mut self, weight: f32) -> Self",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 275,
+     "doc": [
+      "Sets a custom weight on the edge."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_tx_validity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_tx_validity(mut self, from: Option<TxId>, to: Option<TxId>) -> Self",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 281,
+     "doc": [
+      "Sets transaction validity window (system time / MVCC) on the edge."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_business_validity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_business_validity(mut self, from: Option<i64>, to: Option<i64>) -> Self",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 288,
+     "doc": [
+      "Sets business validity window (business time in Unix ms) on the edge."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_validity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_validity(self, from: Option<TxId>, to: Option<TxId>) -> Self",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 295,
+     "doc": [
+      "Sets transaction validity window on the edge (alias for `with_tx_validity` for backward compatibility)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "from",
+     "type": "EntityId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 194
+    },
+    {
+     "name": "to",
+     "type": "EntityId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 196
+    },
+    {
+     "name": "label",
+     "type": "Arc<str>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 198
+    },
+    {
+     "name": "weight",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 200
+    },
+    {
+     "name": "tx_valid_from",
+     "type": "Option<TxId>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 203
+    },
+    {
+     "name": "tx_valid_to",
+     "type": "Option<TxId>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 206
+    },
+    {
+     "name": "business_valid_from",
+     "type": "Option<i64>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 209
+    },
+    {
+     "name": "business_valid_to",
+     "type": "Option<i64>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 212
+    },
+    {
+     "name": "source_doc_id",
+     "type": "Option<DocId>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 215
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Edge",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 218,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "MemoryType",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub enum MemoryType",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 315,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "default_decay",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn default_decay(&self) -> crate::types::importance::DecayFunction",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 344,
+     "doc": [
+      "Gibt den Standard-Decay-Typ für diesen Gedächtnistyp zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "default_ttl_tx",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn default_ttl_tx(&self) -> Option<u64>",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 361,
+     "doc": [
+      "Gibt die empfohlene TTL (in Transaktionen) für Session-scoped Working Memory zurück.",
+      "None bedeutet kein automatisches Ablaufen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_metadata_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_metadata_key(&self) -> &'static str",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 369,
+     "doc": [
+      "Gibt den kanonischen Metadaten-Key zurück (für JSON-Serialisierung)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Episodic",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 320
+    },
+    {
+     "name": "Semantic",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 327
+    },
+    {
+     "name": "Procedural",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 333
+    },
+    {
+     "name": "Working",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 339
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl MemoryType",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 342,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "TlHfdParams",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub struct TlHfdParams",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 389,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "sigma",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 392
+    },
+    {
+     "name": "delta",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 395
+    },
+    {
+     "name": "gamma",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 398
+    },
+    {
+     "name": "max_iterations",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 401
+    },
+    {
+     "name": "max_top_k_expansion",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 404
+    },
+    {
+     "name": "max_hyperedge_sort_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 407
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for TlHfdParams",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 430,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "PprAlgorithm",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub enum PprAlgorithm",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 455,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Auto",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 458
+    },
+    {
+     "name": "DensePowerIteration",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 460
+    },
+    {
+     "name": "ForwardPush",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 462
+    },
+    {
+     "name": "ShadowMode",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 464
+    },
+    {
+     "name": "TlHfd",
+     "shape": "(TlHfdParams)",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 467
+    },
+    {
+     "name": "ShadowModeTlHfd",
+     "shape": "(TlHfdParams)",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 470
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "PprConfig",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub struct PprConfig",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 484,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "damping_factor",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 486
+    },
+    {
+     "name": "max_iterations",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 488
+    },
+    {
+     "name": "convergence_epsilon",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 490
+    },
+    {
+     "name": "algorithm",
+     "type": "PprAlgorithm",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 493
+    },
+    {
+     "name": "warn_on_non_convergence",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 499
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for PprConfig",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 507,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ConfigFingerprint",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub struct ConfigFingerprint",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 529,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( model_id: impl Into<String>, quantization: impl Into<String>, prompt_template: &str, temperature: f32, ) -> Self",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 549,
+     "doc": [
+      "Erstellt einen neuen `ConfigFingerprint`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_threshold",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_threshold(mut self, threshold: f32) -> Self",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 570,
+     "doc": [
+      "Setzt die Schwellenwert-Komponente (Threshold) für diesen Fingerabdruck (Builder Pattern)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "threshold",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn threshold(&self) -> f32",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 577,
+     "doc": [
+      "Extrahiert Schwellenwert/Threshold als f32 (verlustfrei da via to_bits gespeichert)."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "temperature",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn temperature(&self) -> f32",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 583,
+     "doc": [
+      "Extrahiert Temperatur als f32 (verlustfrei da via to_bits gespeichert)."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "model_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 531
+    },
+    {
+     "name": "quantization",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 534
+    },
+    {
+     "name": "prompt_template_hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 537
+    },
+    {
+     "name": "temperature_bits",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 540
+    },
+    {
+     "name": "threshold_bits",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 544
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ConfigFingerprint",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 547,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for ConfigFingerprint",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 588,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "AutoExtractionMode",
+   "vis": "pub",
+   "module": "types::domain::misc",
+   "signature": "pub enum AutoExtractionMode",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 598,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "is_enabled",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_enabled(self) -> bool",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 608,
+     "doc": [
+      "Returns `true` if auto extraction mode is enabled."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Enabled",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 600
+    },
+    {
+     "name": "Disabled",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 602
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl AutoExtractionMode",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 605,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for AutoExtractionMode",
+     "file": "crates/contextra-types/src/types/domain/misc.rs",
+     "line": 613,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "FilterExpr",
+   "vis": "pub",
+   "module": "types::filter",
+   "signature": "pub enum FilterExpr",
+   "file": "crates/contextra-types/src/types/filter.rs",
+   "line": 26,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "evaluate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn evaluate(&self, metadata: &serde_json::Value) -> bool",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 116,
+     "doc": [
+      "Evaluates the filter expression against a JSON metadata object."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Eq",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 28
+    },
+    {
+     "name": "Ne",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 35
+    },
+    {
+     "name": "Gt",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 42
+    },
+    {
+     "name": "Gte",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 49
+    },
+    {
+     "name": "Lt",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 56
+    },
+    {
+     "name": "Lte",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 63
+    },
+    {
+     "name": "In",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 70
+    },
+    {
+     "name": "NotIn",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 77
+    },
+    {
+     "name": "Exists",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 84
+    },
+    {
+     "name": "And",
+     "shape": "(Box<FilterExpr>, Box<FilterExpr>)",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 91
+    },
+    {
+     "name": "Or",
+     "shape": "(Box<FilterExpr>, Box<FilterExpr>)",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 93
+    },
+    {
+     "name": "Not",
+     "shape": "(Box<FilterExpr>)",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 95
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl FilterExpr",
+     "file": "crates/contextra-types/src/types/filter.rs",
+     "line": 114,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ImportanceScore",
+   "vis": "pub",
+   "module": "types::importance",
+   "signature": "pub struct ImportanceScore(f32)",
+   "file": "crates/contextra-types/src/types/importance.rs",
+   "line": 37,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(raw: f32) -> Self",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 44,
+     "doc": [
+      "Creates a new `ImportanceScore` clamped strictly within `[0.0, 1.0]`.",
+      "",
+      "# Zero-Panic Guarantee",
+      "NaN inputs return `ImportanceScore(0.0)`. Positive/negative infinity are clamped safely."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "value",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn value(&self) -> f32",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 53,
+     "doc": [
+      "Returns the raw `f32` importance score value."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ImportanceScore",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 39,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for ImportanceScore",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 58,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "DecayFunction",
+   "vis": "pub",
+   "module": "types::importance",
+   "signature": "pub enum DecayFunction",
+   "file": "crates/contextra-types/src/types/importance.rs",
+   "line": 68,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "decay_factor",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn decay_factor(&self, created_at_tx: TxId, now_tx: TxId) -> f32",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 102,
+     "doc": [
+      "Pure non-failing decay factor calculation.",
+      "",
+      "Returns a factor in `[0.0, 1.0]`.",
+      "",
+      "# Invarianten & Edge Cases",
+      "- If `now_tx < created_at_tx` (e.g., due to snapshot reads or TxId rewind), returns `1.0`.",
+      "- Never panics under any combination of TxId values or zero division.",
+      "",
+      "# Bi-Temporal Note",
+      "For `Exponential` and `StepFloor`, decay is measured in TxId distance (mutation events),",
+      "NOT wall-clock time. In systems with high background activity, TxIds advance rapidly",
+      "causing premature decay. Use `WallClockExponential` for time-based decay."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "decay_factor_wallclock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn decay_factor_wallclock( &self, created_at_epoch_secs: u64, now_epoch_secs: u64, created_at_tx: TxId, now_tx: TxId, ) -> f32",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 155,
+     "doc": [
+      "Wall-clock based decay factor calculation.",
+      "",
+      "Returns a factor in `[0.0, 1.0]` based on elapsed wall-clock seconds.",
+      "For non-WallClockExponential variants, delegates to the TxId-based decay_factor.",
+      "",
+      "# Arguments",
+      "* `created_at_epoch_secs` - Unix timestamp (seconds) when the memory was created.",
+      "* `now_epoch_secs` - Current Unix timestamp (seconds).",
+      "* `created_at_tx` - TxId at creation time (used for TxId-based variants).",
+      "* `now_tx` - Current TxId (used for TxId-based variants)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "None",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 71
+    },
+    {
+     "name": "Exponential",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 73
+    },
+    {
+     "name": "StepFloor",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 78
+    },
+    {
+     "name": "WallClockExponential",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 83
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl DecayFunction",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 89,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "MemoryImportance",
+   "vis": "pub",
+   "module": "types::importance",
+   "signature": "pub struct MemoryImportance",
+   "file": "crates/contextra-types/src/types/importance.rs",
+   "line": 186,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(base_score: ImportanceScore, decay: DecayFunction, created_at_tx: TxId) -> Self",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 197,
+     "doc": [
+      "Creates a new `MemoryImportance` configuration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "effective_score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn effective_score(&self, now_tx: TxId) -> f32",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 209,
+     "doc": [
+      "Computes the effective importance score: `base_score * decay_factor`.",
+      "",
+      "# Zero-Panic Guarantee",
+      "Always returns a valid `f32` in `[0.0, 1.0]`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "base_score",
+     "type": "ImportanceScore",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 188
+    },
+    {
+     "name": "decay",
+     "type": "DecayFunction",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 190
+    },
+    {
+     "name": "created_at_tx",
+     "type": "TxId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 192
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl MemoryImportance",
+     "file": "crates/contextra-types/src/types/importance.rs",
+     "line": 195,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "FusionStrategy",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub enum FusionStrategy",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 31,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Rrf",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 35
+    },
+    {
+     "name": "ScoreNormalized",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 38
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SignalFusionStrategies",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub struct SignalFusionStrategies",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 44,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "uniform",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn uniform(strategy: FusionStrategy) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 75,
+     "doc": [
+      "Creates a uniform configuration where all signals use the specified strategy."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "strategy_for_signal",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn strategy_for_signal(&self, signal_name: &str) -> FusionStrategy",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 80,
+     "doc": [
+      "Returns the fusion strategy configured for a specific signal name (\"vector\", \"text\", \"graph\")."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "vector",
+     "type": "FusionStrategy",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 46
+    },
+    {
+     "name": "text",
+     "type": "FusionStrategy",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 48
+    },
+    {
+     "name": "graph",
+     "type": "FusionStrategy",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 50
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for SignalFusionStrategies",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 53,
+     "in_test": false
+    },
+    {
+     "trait": "From<FusionStrategy>",
+     "generics": "",
+     "signature": "impl From<FusionStrategy> for SignalFusionStrategies",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 63,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SignalFusionStrategies",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 73,
+     "in_test": false
+    },
+    {
+     "trait": "Deserialize<'de>",
+     "generics": "<'de>",
+     "signature": "impl<'de> Deserialize<'de> for SignalFusionStrategies",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 90,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "GraphTraversalStrategy",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub enum GraphTraversalStrategy",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 127,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Hops",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 129
+    },
+    {
+     "name": "PersonalizedPageRank",
+     "shape": "(PprConfig)",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 135
+    },
+    {
+     "name": "PathRag",
+     "shape": "{",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 137
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for GraphTraversalStrategy",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 145,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "FusionWeights",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub struct FusionWeights",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 154,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(vector: f32, text: f32, graph: f32) -> Result<Self>",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 175,
+     "doc": [
+      "Creates 3-signal fusion weights (vector, text, graph) summing to 1.0."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "vector",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn vector(&self) -> f32",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 208,
+     "doc": [
+      "Returns the vector signal weight component."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "text",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn text(&self) -> f32",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 213,
+     "doc": [
+      "Returns the text signal weight component."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "graph",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn graph(&self) -> f32",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 218,
+     "doc": [
+      "Returns the graph signal weight component."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "metadata",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn metadata(&self) -> f32",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 224,
+     "doc": [
+      "Returns the metadata signal weight component.",
+      "Reserved for future metadata-signal fusion; currently always 0.0. Do not expose a public constructor parameter for this until the fusion logic is implemented (see TRACKING-ISSUE #144)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for FusionWeights",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 162,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl FusionWeights",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 173,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ContextChunk",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub struct ContextChunk",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 232,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "combined_text_owned",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn combined_text_owned(&self) -> String",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 258,
+     "doc": [
+      "Kombinierten Text für Text-Indizierung und Embedding.",
+      "Entspricht dem etablierten Contextual-Schema: prefix + \"\\n\\n\" + content.",
+      "",
+      "Allokiert nur wenn `contextual_prefix` gesetzt. Akzeptabel für",
+      "Ingestion-Pipeline (1× pro Chunk, kein Hot-Path)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "combined_token_count",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn combined_token_count(&self) -> usize",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 273,
+     "doc": [
+      "Kombinierter Token-Count (Heuristik: chars/4 ≈ Tokens).",
+      "Verwendet für Budget-Management in `contextra-db/src/context.rs`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "has_context_prefix",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn has_context_prefix(&self) -> bool",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 281,
+     "doc": [
+      "Gibt true zurück wenn contextual_prefix gesetzt und nicht leer."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "doc_id",
+     "type": "DocId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 234
+    },
+    {
+     "name": "content",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 236
+    },
+    {
+     "name": "relevance",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 238
+    },
+    {
+     "name": "token_count",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 240
+    },
+    {
+     "name": "metadata",
+     "type": "Option<serde_json::Value>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 242
+    },
+    {
+     "name": "contextual_prefix",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 246
+    },
+    {
+     "name": "links",
+     "type": "Vec<crate::types::domain::MemoryLink>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 249
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ContextChunk",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 252,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ContextWindow",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub struct ContextWindow",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 291,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "chunks",
+     "type": "Vec<ContextChunk>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 293
+    },
+    {
+     "name": "total_tokens",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 295
+    },
+    {
+     "name": "truncated",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 297
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Display",
+     "generics": "",
+     "signature": "impl std::fmt::Display for ContextWindow",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 300,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "Signal",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub enum Signal",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 321,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Vector",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 323
+    },
+    {
+     "name": "Text",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 325
+    },
+    {
+     "name": "Graph",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 327
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Display",
+     "generics": "",
+     "signature": "impl std::fmt::Display for Signal",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 330,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "OnSignalFailure",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub enum OnSignalFailure",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 354,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Fail",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 357
+    },
+    {
+     "name": "Degrade",
+     "shape": "",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 359
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "QueryRewriteOutput",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub struct QueryRewriteOutput",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 365,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( text_query: Option<String>, semantic_query: Option<String>, anchor_entities: Vec<String>, ) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 377,
+     "doc": [
+      "Creates a new `QueryRewriteOutput` with text, semantic, and anchor entity reformulations."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "text_only",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn text_only(text: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 390,
+     "doc": [
+      "Creates a simple text-only `QueryRewriteOutput`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 399,
+     "doc": [
+      "Returns `true` if all reformulation components are empty or None."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "text_query",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 367
+    },
+    {
+     "name": "semantic_query",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 369
+    },
+    {
+     "name": "anchor_entities",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 372
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl QueryRewriteOutput",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 375,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ScoredEntry",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub struct ScoredEntry",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 412,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 414
+    },
+    {
+     "name": "final_score",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 416
+    },
+    {
+     "name": "metadata",
+     "type": "Option<serde_json::Value>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 418
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "HybridQuery",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub struct HybridQuery",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 424,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "builder",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn builder() -> HybridQueryBuilder",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 478,
+     "doc": [
+      "Creates a new `HybridQueryBuilder`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "text_query",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 426
+    },
+    {
+     "name": "vector_query",
+     "type": "Option<Vec<f32>>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 428
+    },
+    {
+     "name": "graph_start_node",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 430
+    },
+    {
+     "name": "graph_strategy",
+     "type": "GraphTraversalStrategy",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 433
+    },
+    {
+     "name": "fusion_weights",
+     "type": "FusionWeights",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 435
+    },
+    {
+     "name": "fusion_strategy",
+     "type": "SignalFusionStrategies",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 438
+    },
+    {
+     "name": "filter",
+     "type": "Option<FilterExpr>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 440
+    },
+    {
+     "name": "same_community_as",
+     "type": "Option<EntityId>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 442
+    },
+    {
+     "name": "memory_type_filter",
+     "type": "Option<Vec<MemoryType>>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 446
+    },
+    {
+     "name": "include_superseded",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 449
+    },
+    {
+     "name": "include_provenance",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 452
+    },
+    {
+     "name": "rerank_pool_multiplier",
+     "type": "Option<usize>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 457
+    },
+    {
+     "name": "rerank_pool_max",
+     "type": "Option<usize>",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 461
+    },
+    {
+     "name": "has_reranker",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 465
+    },
+    {
+     "name": "on_signal_failure",
+     "type": "OnSignalFailure",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 468
+    },
+    {
+     "name": "k",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 470
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl HybridQuery",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 476,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "QueryOptions",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub type QueryOptions = HybridQuery",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 474,
+   "doc": [
+    "Alias for [`HybridQuery`] representing query options for hybrid retrieval operations (Spec Teil 6.5)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "HybridQueryBuilder",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub struct HybridQueryBuilder",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 493,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 516,
+     "doc": [
+      "Creates a new `HybridQueryBuilder` with empty default options."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_text_query",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_text_query(mut self, q: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 521,
+     "doc": [
+      "Sets the full-text search query string."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_vector_query",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_vector_query(mut self, v: Vec<f32>) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 527,
+     "doc": [
+      "Sets the vector query embedding."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_graph_start_node",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_graph_start_node(mut self, start: impl Into<String>) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 533,
+     "doc": [
+      "Sets the graph start node for graph traversal search."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_graph_strategy",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_graph_strategy(mut self, strategy: GraphTraversalStrategy) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 539,
+     "doc": [
+      "Sets the graph traversal strategy (Hops or PersonalizedPageRank)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_fusion_weights",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_fusion_weights(mut self, weights: FusionWeights) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 545,
+     "doc": [
+      "Sets custom signal fusion weights."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_fusion_strategy",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_fusion_strategy(mut self, strategy: impl Into<SignalFusionStrategies>) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 551,
+     "doc": [
+      "Sets search fusion strategy per signal or globally (`FusionStrategy` or `SignalFusionStrategies`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_filter",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_filter(mut self, filter: FilterExpr) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 557,
+     "doc": [
+      "Sets a metadata expression filter on the query."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_same_community_as",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_same_community_as(mut self, entity_id: EntityId) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 563,
+     "doc": [
+      "Sets the community context entity filter/boost."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_memory_type_filter",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_memory_type_filter(mut self, types: Vec<MemoryType>) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 569,
+     "doc": [
+      "Sets the memory_type pre-RRF filter."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_include_superseded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_include_superseded(mut self, include: bool) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 575,
+     "doc": [
+      "Sets whether to include superseded memory chunks (ADR-038)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_include_provenance",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_include_provenance(mut self, include: bool) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 581,
+     "doc": [
+      "Sets whether to calculate and attach ProvenanceRecord to output results."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_rerank_pool_multiplier",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_rerank_pool_multiplier(mut self, multiplier: usize) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 587,
+     "doc": [
+      "Sets the candidate pool multiplier for pre-reranking retrieval."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_rerank_pool_max",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_rerank_pool_max(mut self, max: usize) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 593,
+     "doc": [
+      "Sets the upper bound cap for pre-reranking candidate pool expansion."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_on_signal_failure",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_on_signal_failure(mut self, policy: OnSignalFailure) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 599,
+     "doc": [
+      "Sets the signal failure policy ([`OnSignalFailure`]) for the query (Spec Teil 6.5)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_k",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_k(mut self, k: usize) -> Self",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 605,
+     "doc": [
+      "Sets the top-K limit for the query."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "build",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn build(self) -> Result<HybridQuery>",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 614,
+     "doc": [
+      "Builds the `HybridQuery` instance.",
+      "",
+      "# Errors",
+      "Returns `Err` if query parameters or fusion weights fail validation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl HybridQueryBuilder",
+     "file": "crates/contextra-types/src/types/saos.rs",
+     "line": 514,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "QueryOptionsBuilder",
+   "vis": "pub",
+   "module": "types::saos",
+   "signature": "pub type QueryOptionsBuilder = HybridQueryBuilder",
+   "file": "crates/contextra-types/src/types/saos.rs",
+   "line": 512,
+   "doc": [
+    "Alias for [`HybridQueryBuilder`] representing a query options builder for hybrid retrieval operations (Spec Teil 6.5)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "budget",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub mod budget",
+   "file": "crates/contextra-types/src/types.rs",
+   "line": 15,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "domain",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub mod domain",
+   "file": "crates/contextra-types/src/types.rs",
+   "line": 19,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "filter",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub mod filter",
+   "file": "crates/contextra-types/src/types.rs",
+   "line": 23,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "importance",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub mod importance",
+   "file": "crates/contextra-types/src/types.rs",
+   "line": 27,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "saos",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub mod saos",
+   "file": "crates/contextra-types/src/types.rs",
+   "line": 31,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "ScanMethod",
+   "vis": "pub",
+   "module": "witness",
+   "signature": "pub enum ScanMethod",
+   "file": "crates/contextra-types/src/witness.rs",
+   "line": 44,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Structural",
+     "shape": "",
+     "file": "crates/contextra-types/src/witness.rs",
+     "line": 46
+    },
+    {
+     "name": "NotMeasured",
+     "shape": "(String)",
+     "file": "crates/contextra-types/src/witness.rs",
+     "line": 48
+    },
+    {
+     "name": "FeatureDisabled",
+     "shape": "",
+     "file": "crates/contextra-types/src/witness.rs",
+     "line": 50
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RequestContext",
+   "vis": "pub",
+   "module": "witness",
+   "signature": "pub struct RequestContext",
+   "file": "crates/contextra-types/src/witness.rs",
+   "line": 57,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(tenant_id: crate::TenantId, tx_id: crate::TxId) -> Self",
+     "file": "crates/contextra-types/src/witness.rs",
+     "line": 71,
+     "doc": [
+      "Creates a new `RequestContext`.",
+      "",
+      "# Parameter",
+      "- `tenant_id`: Mandantenidentifikator.",
+      "- `tx_id`: Zugeordnete Transaktions-ID."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "tenant_id",
+     "type": "crate::TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/witness.rs",
+     "line": 59
+    },
+    {
+     "name": "tx_id",
+     "type": "crate::TxId",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/witness.rs",
+     "line": 61
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl RequestContext",
+     "file": "crates/contextra-types/src/witness.rs",
+     "line": 64,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SagaRecord",
+   "vis": "pub",
+   "module": "witness",
+   "signature": "pub struct SagaRecord",
+   "file": "crates/contextra-types/src/witness.rs",
+   "line": 84,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(deleted_keys_hash: [u8",
+     "file": "crates/contextra-types/src/witness.rs",
+     "line": 95,
+     "doc": [
+      "Creates a new `SagaRecord`.",
+      "",
+      "# Parameter",
+      "- `deleted_keys_hash`: BLAKE3-Hash der zu löschenden Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "deleted_keys_hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-types/src/witness.rs",
+     "line": 86
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SagaRecord",
+     "file": "crates/contextra-types/src/witness.rs",
+     "line": 89,
+     "in_test": false
+    }
+   ]
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use contextra_ids::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/ids.rs",
+   "line": 7,
+   "in_test": false,
+   "module": "ids"
+  },
+  {
+   "signature": "pub use erasure::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 61,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use ids::",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 63,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use refs::",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 64,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use error::",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 67,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use error_dto::ContextraErrorDto",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 68,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use model_fingerprint::ModelFingerprint",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 69,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use retrieval_strategy::RetrievalStrategy",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 70,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use schema::",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 71,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use tenant_scope::",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 72,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use tombstone::",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 73,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use types::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 74,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use witness::",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/lib.rs",
+   "line": 76,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use contextra_ids::",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/refs.rs",
+   "line": 3,
+   "in_test": false,
+   "module": "refs"
+  },
+  {
+   "signature": "pub use contextra_ids::",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/tenant_scope.rs",
+   "line": 3,
+   "in_test": false,
+   "module": "tenant_scope"
+  },
+  {
+   "signature": "pub use contextra_ids::",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/types/domain/ids.rs",
+   "line": 3,
+   "in_test": false,
+   "module": "types::domain::ids"
+  },
+  {
+   "signature": "pub use contextra_ids::TOMBSTONE_BIT",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/types/domain/misc.rs",
+   "line": 80,
+   "in_test": false,
+   "module": "types::domain::misc"
+  },
+  {
+   "signature": "pub use document::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/types/domain/mod.rs",
+   "line": 38,
+   "in_test": false,
+   "module": "types::domain"
+  },
+  {
+   "signature": "pub use ids::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/types/domain/mod.rs",
+   "line": 39,
+   "in_test": false,
+   "module": "types::domain"
+  },
+  {
+   "signature": "pub use misc::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/types/domain/mod.rs",
+   "line": 40,
+   "in_test": false,
+   "module": "types::domain"
+  },
+  {
+   "signature": "pub use budget::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/types.rs",
+   "line": 33,
+   "in_test": false,
+   "module": "types"
+  },
+  {
+   "signature": "pub use domain::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/types.rs",
+   "line": 34,
+   "in_test": false,
+   "module": "types"
+  },
+  {
+   "signature": "pub use filter::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/types.rs",
+   "line": 35,
+   "in_test": false,
+   "module": "types"
+  },
+  {
+   "signature": "pub use importance::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/types.rs",
+   "line": 36,
+   "in_test": false,
+   "module": "types"
+  },
+  {
+   "signature": "pub use saos::*",
+   "vis": "pub",
+   "file": "crates/contextra-types/src/types.rs",
+   "line": 37,
+   "in_test": false,
+   "module": "types"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra",
+  "contextra-adapt",
+  "contextra-agent",
+  "contextra-bench",
+  "contextra-checkpoint",
+  "contextra-cognition",
+  "contextra-crypto",
+  "contextra-crypto-fuzz",
+  "contextra-db",
+  "contextra-engine",
+  "contextra-graph",
+  "contextra-graph-fuzz",
+  "contextra-infer-candle",
+  "contextra-infer-ollama",
+  "contextra-infer-onnx",
+  "contextra-ingest",
+  "contextra-kvcache",
+  "contextra-mcp",
+  "contextra-mvcc",
+  "contextra-ports",
+  "contextra-py",
+  "contextra-rank",
+  "contextra-router",
+  "contextra-simd",
+  "contextra-store",
+  "contextra-store-fuzz",
+  "contextra-testkit",
+  "contextra-text",
+  "contextra-vault",
+  "contextra-vector",
+  "contextra-vector-fuzz"
+ ]
+}

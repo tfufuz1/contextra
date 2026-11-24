@@ -1,0 +1,2544 @@
+{
+ "name": "contextra-bench",
+ "version": "workspace",
+ "path": "benchmarks/contextra-bench",
+ "role": "Benchmarks",
+ "features": {
+  "datasets": [],
+  "default": [],
+  "external-benchmarks": []
+ },
+ "deps": {
+  "contextra-store": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-vector": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-text": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-db": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tokio": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tempfile": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tracing-subscriber": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "anyhow": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "hdrhistogram": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "rand": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-rank": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-types": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-sys": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "criterion": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "libc": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "redb": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "sled": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [],
+ "files": [
+  {
+   "file": "benchmarks/contextra-bench/src/adapters.rs",
+   "module": "adapters",
+   "lines": 168
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+   "module": "ann_benchmarks",
+   "lines": 284
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+   "module": "beir_eval",
+   "lines": 378
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/bin/compare_baseline.rs",
+   "module": "bin:compare_baseline",
+   "lines": 92
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+   "module": "bin:scale_100k",
+   "lines": 296
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/compare.rs",
+   "module": "compare",
+   "lines": 437
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/lib.rs",
+   "module": "crate",
+   "lines": 13
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/main.rs",
+   "module": "crate",
+   "lines": 1505
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/matrix.rs",
+   "module": "matrix",
+   "lines": 204
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/metrics.rs",
+   "module": "metrics",
+   "lines": 347
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+   "module": "path_rag_sweep",
+   "lines": 361
+  },
+  {
+   "file": "benchmarks/contextra-bench/src/regression_gate.rs",
+   "module": "regression_gate",
+   "lines": 224
+  }
+ ],
+ "counts": {
+  "unwrap": 0,
+  "expect": 0,
+  "panic_macro": 0,
+  "todo_unimpl": 0,
+  "index_bracket": 48,
+  "cfg_feature_gates": 7
+ },
+ "grep_pub_decl": 71,
+ "all_pub_decl": 71,
+ "public_items": [
+  {
+   "kind": "struct",
+   "name": "BenchmarkDocument",
+   "vis": "pub",
+   "module": "adapters",
+   "signature": "pub struct BenchmarkDocument",
+   "file": "benchmarks/contextra-bench/src/adapters.rs",
+   "line": 14,
+   "doc": [
+    "Abstraktes Dokument für den Engine-Vergleich"
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 15
+    },
+    {
+     "name": "title",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 16
+    },
+    {
+     "name": "body",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 17
+    },
+    {
+     "name": "vector",
+     "type": "Option<Vec<f32>>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 18
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EngineHit",
+   "vis": "pub",
+   "module": "adapters",
+   "signature": "pub struct EngineHit",
+   "file": "benchmarks/contextra-bench/src/adapters.rs",
+   "line": 23,
+   "doc": [
+    "Einheitliche Treffer-Struktur externer Engines"
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "doc_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 24
+    },
+    {
+     "name": "score",
+     "type": "f32",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 25
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "QueryLatencyStats",
+   "vis": "pub",
+   "module": "adapters",
+   "signature": "pub struct QueryLatencyStats",
+   "file": "benchmarks/contextra-bench/src/adapters.rs",
+   "line": 30,
+   "doc": [
+    "Ausführungs-Statistik eines Query-Laufs"
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "elapsed",
+     "type": "Duration",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 31
+    },
+    {
+     "name": "hits_returned",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 32
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "FullTextEngineAdapter",
+   "vis": "pub",
+   "module": "adapters",
+   "signature": "pub trait FullTextEngineAdapter: Send + Sync",
+   "file": "benchmarks/contextra-bench/src/adapters.rs",
+   "line": 36,
+   "doc": [
+    "Generischer Trait für externe oder interne Volltext-Such-Engines (z. B. Tantivy)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "Error",
+     "kind": "type",
+     "vis": "pub",
+     "signature": "type Error: std::fmt::Display",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 38,
+     "doc": [
+      "Fehler-Typ der Engine"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "FullTextEngineAdapter"
+    },
+    {
+     "name": "name",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn name(&self) -> &'static str",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 41,
+     "doc": [
+      "Name der Engine (z. B. \"tantivy\", \"contextra-text\")"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "FullTextEngineAdapter"
+    },
+    {
+     "name": "index_batch",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn index_batch(&mut self, docs: &[BenchmarkDocument]) -> Result<Duration, Self::Error>",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 44,
+     "doc": [
+      "Indiziert einen Batch von Textdokumenten"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "FullTextEngineAdapter"
+    },
+    {
+     "name": "search",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn search(&self, query: &str, top_k: usize) -> Result<Vec<EngineHit>, Self::Error>",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 47,
+     "doc": [
+      "Führt eine Volltext-/BM25-Suche aus"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "FullTextEngineAdapter"
+    },
+    {
+     "name": "commit",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn commit(&mut self) -> Result<(), Self::Error>",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 50,
+     "doc": [
+      "Erzwingt einen Flush / Commit auf die Platte"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "FullTextEngineAdapter"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "VectorEngineAdapter",
+   "vis": "pub",
+   "module": "adapters",
+   "signature": "pub trait VectorEngineAdapter: Send + Sync",
+   "file": "benchmarks/contextra-bench/src/adapters.rs",
+   "line": 54,
+   "doc": [
+    "Generischer Trait für externe oder interne Vektor-Engines (z. B. LanceDB)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "Error",
+     "kind": "type",
+     "vis": "pub",
+     "signature": "type Error: std::fmt::Display",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 56,
+     "doc": [
+      "Fehler-Typ der Engine"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "VectorEngineAdapter"
+    },
+    {
+     "name": "name",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn name(&self) -> &'static str",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 59,
+     "doc": [
+      "Name der Engine (z. B. \"lancedb\", \"contextra-vector\")"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "VectorEngineAdapter"
+    },
+    {
+     "name": "dimension",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn dimension(&self) -> usize",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 62,
+     "doc": [
+      "Dimension der Vektoren"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "VectorEngineAdapter"
+    },
+    {
+     "name": "insert_vectors",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn insert_vectors(&mut self, docs: &[BenchmarkDocument]) -> Result<Duration, Self::Error>",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 65,
+     "doc": [
+      "Fügt Vektoren mit Dokument-IDs ein"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "VectorEngineAdapter"
+    },
+    {
+     "name": "search_knn",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn search_knn(&self, query_vector: &[f32], top_k: usize) -> Result<Vec<EngineHit>, Self::Error>",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 68,
+     "doc": [
+      "Führt k-NN Ähnlichkeitssuche aus"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "VectorEngineAdapter"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "TantivyAdapterSketch",
+   "vis": "pub",
+   "module": "adapters",
+   "signature": "pub struct TantivyAdapterSketch",
+   "file": "benchmarks/contextra-bench/src/adapters.rs",
+   "line": 73,
+   "doc": [
+    "Skizze eines Tantivy-Adapters (Vorbereitung für spätere Feature-Gated Implementierung)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(index_path: impl Into<String>) -> Self",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 79,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "index_path",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 74
+    },
+    {
+     "name": "is_initialized",
+     "type": "bool",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 75
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TantivyAdapterSketch",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 78,
+     "in_test": false
+    },
+    {
+     "trait": "FullTextEngineAdapter",
+     "generics": "",
+     "signature": "impl FullTextEngineAdapter for TantivyAdapterSketch",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 87,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "LanceDbAdapterSketch",
+   "vis": "pub",
+   "module": "adapters",
+   "signature": "pub struct LanceDbAdapterSketch",
+   "file": "benchmarks/contextra-bench/src/adapters.rs",
+   "line": 112,
+   "doc": [
+    "Skizze eines LanceDB-Adapters (Vorbereitung für spätere Feature-Gated Implementierung)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(uri: impl Into<String>, table_name: impl Into<String>, dimension: usize) -> Self",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 119,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "uri",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 113
+    },
+    {
+     "name": "table_name",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 114
+    },
+    {
+     "name": "dimension",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 115
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl LanceDbAdapterSketch",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 118,
+     "in_test": false
+    },
+    {
+     "trait": "VectorEngineAdapter",
+     "generics": "",
+     "signature": "impl VectorEngineAdapter for LanceDbAdapterSketch",
+     "file": "benchmarks/contextra-bench/src/adapters.rs",
+     "line": 128,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "AnnBenchResult",
+   "vis": "pub",
+   "module": "ann_benchmarks",
+   "signature": "pub struct AnnBenchResult",
+   "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+   "line": 19,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "dataset_name",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+     "line": 20
+    },
+    {
+     "name": "n_vectors",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+     "line": 21
+    },
+    {
+     "name": "dimension",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+     "line": 22
+    },
+    {
+     "name": "k",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+     "line": 23
+    },
+    {
+     "name": "qps_at_recall_90",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+     "line": 25
+    },
+    {
+     "name": "qps_at_recall_95",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+     "line": 26
+    },
+    {
+     "name": "qps_at_recall_99",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+     "line": 27
+    },
+    {
+     "name": "max_recall_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+     "line": 29
+    },
+    {
+     "name": "p50_latency_ms",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+     "line": 30
+    },
+    {
+     "name": "p99_latency_ms",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+     "line": 31
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "generate_synthetic_vectors",
+   "vis": "pub",
+   "module": "ann_benchmarks",
+   "signature": "pub fn generate_synthetic_vectors(n: usize, dim: usize, seed: u64) -> Vec<Vec<f32>>",
+   "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+   "line": 35,
+   "doc": [
+    "Synthetische Vektoren (SIFT-ähnlich, uniform-random in [0..127]^dim für CI ohne HDF5)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compute_ground_truth",
+   "vis": "pub",
+   "module": "ann_benchmarks",
+   "signature": "pub fn compute_ground_truth( base: &[Vec<f32>], queries: &[Vec<f32>], k: usize, metric: DistanceMetric, ) -> Vec<Vec<usize>>",
+   "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+   "line": 80,
+   "doc": [
+    "Misst Ground-Truth Nearest Neighbors via Brute-Force"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "recall_at_k",
+   "vis": "pub",
+   "module": "ann_benchmarks",
+   "signature": "pub fn recall_at_k(retrieved: &[u64], ground_truth: &[usize], k: usize) -> f64",
+   "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+   "line": 112,
+   "doc": [
+    "Berechnet Recall@k: |retrieved ∩ ground_truth| / k"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_ann_benchmark",
+   "vis": "pub",
+   "module": "ann_benchmarks",
+   "signature": "pub async fn run_ann_benchmark( base_vectors: Vec<Vec<f32>>, query_vectors: Vec<Vec<f32>>, ground_truth: Vec<Vec<usize>>, dataset_name: &str, m: usize, ef_construction: usize, ef_search_values: &[usize], ) -> Result<AnnBenchResult>",
+   "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+   "line": 136,
+   "doc": [
+    "Führt ANN-Benchmark durch: variiert ef_search, misst QPS vs Recall Trade-off"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_ann_benchmark_synthetic_ci",
+   "vis": "pub",
+   "module": "ann_benchmarks",
+   "signature": "pub async fn run_ann_benchmark_synthetic_ci() -> Result<AnnBenchResult>",
+   "file": "benchmarks/contextra-bench/src/ann_benchmarks.rs",
+   "line": 249,
+   "doc": [
+    "Schnelle CI-Version: 1k Vektoren, D=128 (läuft in <10s)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "BeirDocument",
+   "vis": "pub",
+   "module": "beir_eval",
+   "signature": "pub struct BeirDocument",
+   "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+   "line": 17,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 18
+    },
+    {
+     "name": "title",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 19
+    },
+    {
+     "name": "text",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 20
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "BeirQuery",
+   "vis": "pub",
+   "module": "beir_eval",
+   "signature": "pub struct BeirQuery",
+   "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+   "line": 24,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 25
+    },
+    {
+     "name": "query",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 26
+    },
+    {
+     "name": "relevant_docs",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 27
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "BeirMetrics",
+   "vis": "pub",
+   "module": "beir_eval",
+   "signature": "pub struct BeirMetrics",
+   "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+   "line": 31,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "dataset_name",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 32
+    },
+    {
+     "name": "num_docs",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 33
+    },
+    {
+     "name": "num_queries",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 34
+    },
+    {
+     "name": "ndcg_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 35
+    },
+    {
+     "name": "recall_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 36
+    },
+    {
+     "name": "map_at_100",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 37
+    },
+    {
+     "name": "latency_p50_ms",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 38
+    },
+    {
+     "name": "latency_p99_ms",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+     "line": 39
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "load_beir_corpus",
+   "vis": "pub",
+   "module": "beir_eval",
+   "signature": "pub fn load_beir_corpus(path: &Path) -> Result<Vec<BeirDocument>>",
+   "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+   "line": 43,
+   "doc": [
+    "Lädt BEIR-Corpus aus JSONL-Datei"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "load_beir_queries",
+   "vis": "pub",
+   "module": "beir_eval",
+   "signature": "pub fn load_beir_queries(queries_path: &Path, qrels_path: &Path) -> Result<Vec<BeirQuery>>",
+   "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+   "line": 81,
+   "doc": [
+    "Lädt BEIR-Queries + QRels aus JSONL / TSV-Dateien"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "ndcg_at_k",
+   "vis": "pub",
+   "module": "beir_eval",
+   "signature": "pub fn ndcg_at_k(ranked: &[String], relevant: &HashSet<String>, k: usize) -> f64",
+   "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+   "line": 185,
+   "doc": [
+    "Berechnet NDCG@k aus Ranked Result List und Relevance Set (strikt log2-Standard)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "map_at_k",
+   "vis": "pub",
+   "module": "beir_eval",
+   "signature": "pub fn map_at_k(ranked: &[String], relevant: &HashSet<String>, k: usize) -> f64",
+   "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+   "line": 214,
+   "doc": [
+    "Berechnet MAP@k"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "recall_at_k",
+   "vis": "pub",
+   "module": "beir_eval",
+   "signature": "pub fn recall_at_k(ranked: &[String], relevant: &HashSet<String>, k: usize) -> f64",
+   "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+   "line": 239,
+   "doc": [
+    "Berechnet Recall@k"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_beir_eval",
+   "vis": "pub",
+   "module": "beir_eval",
+   "signature": "pub async fn run_beir_eval( db_path: &Path, corpus: &[BeirDocument], queries: &[BeirQuery], dataset_name: &str, use_hybrid: bool, ) -> Result<BeirMetrics>",
+   "file": "benchmarks/contextra-bench/src/beir_eval.rs",
+   "line": 261,
+   "doc": [
+    "Führt vollständige BEIR-Evaluation auf einer Contextra-Collection durch"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "IntervalResult",
+   "vis": "pub",
+   "module": "bin:scale_100k",
+   "signature": "pub struct IntervalResult",
+   "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+   "line": 13,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "docs_inserted",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 14
+    },
+    {
+     "name": "insert_rate_docs_per_sec",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 15
+    },
+    {
+     "name": "search_p50_ns",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 16
+    },
+    {
+     "name": "search_p95_ns",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 17
+    },
+    {
+     "name": "search_p99_ns",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 18
+    },
+    {
+     "name": "rss_bytes",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 19
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ScaleBenchmarkOutput",
+   "vis": "pub",
+   "module": "bin:scale_100k",
+   "signature": "pub struct ScaleBenchmarkOutput",
+   "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+   "line": 23,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "disclaimer",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 24
+    },
+    {
+     "name": "total_docs_requested",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 25
+    },
+    {
+     "name": "step_size",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 26
+    },
+    {
+     "name": "dimension",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 27
+    },
+    {
+     "name": "seed",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 28
+    },
+    {
+     "name": "aborted_at_docs",
+     "type": "Option<u64>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 29
+    },
+    {
+     "name": "error",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 30
+    },
+    {
+     "name": "intervals",
+     "type": "Vec<IntervalResult>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/bin/scale_100k.rs",
+     "line": 31
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "LongMemEvalMetricsSummary",
+   "vis": "pub",
+   "module": "compare",
+   "signature": "pub struct LongMemEvalMetricsSummary",
+   "file": "benchmarks/contextra-bench/src/compare.rs",
+   "line": 11,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "overall_accuracy",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 12
+    },
+    {
+     "name": "total_cases",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 13
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "LocomoMetricsSummary",
+   "vis": "pub",
+   "module": "compare",
+   "signature": "pub struct LocomoMetricsSummary",
+   "file": "benchmarks/contextra-bench/src/compare.rs",
+   "line": 17,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "overall_recall_at_5",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 18
+    },
+    {
+     "name": "overall_mrr",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 19
+    },
+    {
+     "name": "total_eval_cases",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 20
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "CombinedMetrics",
+   "vis": "pub",
+   "module": "compare",
+   "signature": "pub struct CombinedMetrics",
+   "file": "benchmarks/contextra-bench/src/compare.rs",
+   "line": 24,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "long_mem_eval",
+     "type": "Option<LongMemEvalMetricsSummary>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 26
+    },
+    {
+     "name": "locomo",
+     "type": "Option<LocomoMetricsSummary>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 28
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "MetricComparisonResult",
+   "vis": "pub",
+   "module": "compare",
+   "signature": "pub struct MetricComparisonResult",
+   "file": "benchmarks/contextra-bench/src/compare.rs",
+   "line": 32,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "has_regression",
+     "type": "bool",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 33
+    },
+    {
+     "name": "errors",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 34
+    },
+    {
+     "name": "info_hints",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 35
+    },
+    {
+     "name": "pass_messages",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/compare.rs",
+     "line": 36
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compare_metrics",
+   "vis": "pub",
+   "module": "compare",
+   "signature": "pub fn compare_metrics( current: &CombinedMetrics, baseline: &CombinedMetrics, threshold: f64, ) -> MetricComparisonResult",
+   "file": "benchmarks/contextra-bench/src/compare.rs",
+   "line": 41,
+   "doc": [
+    "Compares current evaluation metrics against baseline metrics using relative tolerance threshold.",
+    "`threshold` is a relative fraction (e.g. 0.05 = 5%)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compare_metrics_files",
+   "vis": "pub",
+   "module": "compare",
+   "signature": "pub fn compare_metrics_files( current_path: &Path, baseline_path: &Path, threshold: f64, ) -> Result<MetricComparisonResult, String>",
+   "file": "benchmarks/contextra-bench/src/compare.rs",
+   "line": 195,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "adapters",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod adapters",
+   "file": "benchmarks/contextra-bench/src/lib.rs",
+   "line": 3,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "ann_benchmarks",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod ann_benchmarks",
+   "file": "benchmarks/contextra-bench/src/lib.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"external-benchmarks\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "beir_eval",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod beir_eval",
+   "file": "benchmarks/contextra-bench/src/lib.rs",
+   "line": 7,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"external-benchmarks\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "compare",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod compare",
+   "file": "benchmarks/contextra-bench/src/lib.rs",
+   "line": 8,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "matrix",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod matrix",
+   "file": "benchmarks/contextra-bench/src/lib.rs",
+   "line": 9,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "metrics",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod metrics",
+   "file": "benchmarks/contextra-bench/src/lib.rs",
+   "line": 10,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "path_rag_sweep",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod path_rag_sweep",
+   "file": "benchmarks/contextra-bench/src/lib.rs",
+   "line": 12,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"datasets\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "regression_gate",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod regression_gate",
+   "file": "benchmarks/contextra-bench/src/lib.rs",
+   "line": 13,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "GroundTruthQuery",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct GroundTruthQuery",
+   "file": "benchmarks/contextra-bench/src/main.rs",
+   "line": 24,
+   "doc": [
+    "Represents a benchmark query with ground truth relevant document IDs."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "query_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 25
+    },
+    {
+     "name": "query_text",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 26
+    },
+    {
+     "name": "query_embedding",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 27
+    },
+    {
+     "name": "relevant_doc_ids",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 28
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SyntheticDocument",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct SyntheticDocument",
+   "file": "benchmarks/contextra-bench/src/main.rs",
+   "line": 33,
+   "doc": [
+    "Raw document chunk item in the synthetic corpus."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 34
+    },
+    {
+     "name": "title",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 35
+    },
+    {
+     "name": "raw_content",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 36
+    },
+    {
+     "name": "context_prefix",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 37
+    },
+    {
+     "name": "embedding",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 38
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "BenchmarkMetrics",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct BenchmarkMetrics",
+   "file": "benchmarks/contextra-bench/src/main.rs",
+   "line": 43,
+   "doc": [
+    "Metrics recorded for a specific evaluation configuration."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "total_queries",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 44
+    },
+    {
+     "name": "recall_at_1",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 45
+    },
+    {
+     "name": "recall_at_3",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 46
+    },
+    {
+     "name": "recall_at_5",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 47
+    },
+    {
+     "name": "mrr",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 48
+    },
+    {
+     "name": "error_rate_at_1",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 49
+    },
+    {
+     "name": "error_rate_at_5",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 50
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ScenarioComparison",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct ScenarioComparison",
+   "file": "benchmarks/contextra-bench/src/main.rs",
+   "line": 55,
+   "doc": [
+    "Detailed benchmark results comparing baseline vs feature."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "scenario_name",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 56
+    },
+    {
+     "name": "baseline_metrics",
+     "type": "BenchmarkMetrics",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 57
+    },
+    {
+     "name": "feature_metrics",
+     "type": "BenchmarkMetrics",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 58
+    },
+    {
+     "name": "recall_at_1_delta_pct",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 59
+    },
+    {
+     "name": "recall_at_5_delta_pct",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 60
+    },
+    {
+     "name": "error_rate_reduction_pct",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 61
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "BenchmarkReport",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct BenchmarkReport",
+   "file": "benchmarks/contextra-bench/src/main.rs",
+   "line": 66,
+   "doc": [
+    "Complete benchmark report."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "timestamp",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 67
+    },
+    {
+     "name": "corpus_size_docs",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 68
+    },
+    {
+     "name": "total_test_queries",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 69
+    },
+    {
+     "name": "scenario_a_context_prefix",
+     "type": "ScenarioComparison",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 70
+    },
+    {
+     "name": "scenario_b_reranking",
+     "type": "ScenarioComparison",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/main.rs",
+     "line": 71
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "EvaluatedStrategy",
+   "vis": "pub",
+   "module": "matrix",
+   "signature": "pub enum EvaluatedStrategy",
+   "file": "benchmarks/contextra-bench/src/matrix.rs",
+   "line": 27,
+   "doc": [
+    "Getestete Retrieval-Strategie in der Vergleichsmatrix"
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]",
+    "#[serde(rename_all = \"snake_case\")]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "name",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn name(&self) -> &'static str",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 37,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "VectorOnly",
+     "shape": "",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 28
+    },
+    {
+     "name": "Bm25Only",
+     "shape": "",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 29
+    },
+    {
+     "name": "RrfVectorText",
+     "shape": "",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 30
+    },
+    {
+     "name": "RrfVectorTextGraph",
+     "shape": "",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 31
+    },
+    {
+     "name": "WeightedRrf",
+     "shape": "",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 32
+    },
+    {
+     "name": "ScoreNormalizedLinear",
+     "shape": "",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 33
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EvaluatedStrategy",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 36,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "StrategyMatrixRow",
+   "vis": "pub",
+   "module": "matrix",
+   "signature": "pub struct StrategyMatrixRow",
+   "file": "benchmarks/contextra-bench/src/matrix.rs",
+   "line": 51,
+   "doc": [
+    "Ergebnis für eine einzelne Strategie in der Matrix"
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "strategy",
+     "type": "EvaluatedStrategy",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 52
+    },
+    {
+     "name": "name",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 53
+    },
+    {
+     "name": "metrics",
+     "type": "Option<AggregateMetrics>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 54
+    },
+    {
+     "name": "status",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 55
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ComparisonMatrixReport",
+   "vis": "pub",
+   "module": "matrix",
+   "signature": "pub struct ComparisonMatrixReport",
+   "file": "benchmarks/contextra-bench/src/matrix.rs",
+   "line": 60,
+   "doc": [
+    "Gesamte Vergleichsmatrix über alle Evaluierungsmodi"
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "date",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 61
+    },
+    {
+     "name": "dataset_name",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 62
+    },
+    {
+     "name": "total_queries",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 63
+    },
+    {
+     "name": "total_documents",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 64
+    },
+    {
+     "name": "rows",
+     "type": "Vec<StrategyMatrixRow>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/matrix.rs",
+     "line": 65
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "to_rank_items",
+   "vis": "pub",
+   "module": "matrix",
+   "signature": "pub fn to_rank_items(results: &[RankedResult]) -> Vec<ScoredItem>",
+   "file": "benchmarks/contextra-bench/src/matrix.rs",
+   "line": 69,
+   "doc": [
+    "Konvertiert interne `RankedResult` in `contextra_rank::ScoredItem`"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "from_rank_items",
+   "vis": "pub",
+   "module": "matrix",
+   "signature": "pub fn from_rank_items(items: &[ScoredItem]) -> Vec<RankedResult>",
+   "file": "benchmarks/contextra-bench/src/matrix.rs",
+   "line": 77,
+   "doc": [
+    "Konvertiert `contextra_rank::ScoredItem` zurück in `RankedResult`"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "to_search_results",
+   "vis": "pub",
+   "module": "matrix",
+   "signature": "pub fn to_search_results(results: &[RankedResult]) -> Vec<SearchResult>",
+   "file": "benchmarks/contextra-bench/src/matrix.rs",
+   "line": 88,
+   "doc": [
+    "Konvertiert interne `RankedResult` in `contextra_rank::SearchResult`"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "fuse_via_rank_rrf",
+   "vis": "pub",
+   "module": "matrix",
+   "signature": "pub fn fuse_via_rank_rrf( lists: &[Vec<ScoredItem>], k: usize, ) -> Result<Vec<ScoredItem>, contextra_rank::RankError>",
+   "file": "benchmarks/contextra-bench/src/matrix.rs",
+   "line": 102,
+   "doc": [
+    "Führt RRF-Fusion über die öffentliche `contextra_rank::rrf_fuse` API aus"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "fuse_via_rank_weighted_rrf",
+   "vis": "pub",
+   "module": "matrix",
+   "signature": "pub fn fuse_via_rank_weighted_rrf( signal_sets: Vec<(String, Vec<SearchResult>, f32)>, max_results: usize, ) -> Vec<SearchResult>",
+   "file": "benchmarks/contextra-bench/src/matrix.rs",
+   "line": 110,
+   "doc": [
+    "Führt gewichtete RRF-Fusion über die öffentliche `contextra_rank::weighted_reciprocal_rank_fusion` API aus"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "fuse_via_rank_score_normalized",
+   "vis": "pub",
+   "module": "matrix",
+   "signature": "pub fn fuse_via_rank_score_normalized( signal_sets: Vec<(String, Vec<SearchResult>, f32)>, max_results: usize, ) -> Vec<SearchResult>",
+   "file": "benchmarks/contextra-bench/src/matrix.rs",
+   "line": 118,
+   "doc": [
+    "Führt normalisierte Linearkombination über `contextra_rank::score_normalized_fusion_with_options` aus"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "RelevanceGrade",
+   "vis": "pub",
+   "module": "metrics",
+   "signature": "pub struct RelevanceGrade(pub f64)",
+   "file": "benchmarks/contextra-bench/src/metrics.rs",
+   "line": 20,
+   "doc": [
+    "Relevanzurteil für ein Dokument"
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "RankedResult",
+   "vis": "pub",
+   "module": "metrics",
+   "signature": "pub struct RankedResult",
+   "file": "benchmarks/contextra-bench/src/metrics.rs",
+   "line": 24,
+   "doc": [
+    "Ein einzelnes abgerufenes Dokument mit Rang"
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "doc_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 25
+    },
+    {
+     "name": "score",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 26
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "QueryEvaluation",
+   "vis": "pub",
+   "module": "metrics",
+   "signature": "pub struct QueryEvaluation",
+   "file": "benchmarks/contextra-bench/src/metrics.rs",
+   "line": 31,
+   "doc": [
+    "Evaluierungsbericht für eine einzelne Abfrage"
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "query_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 32
+    },
+    {
+     "name": "recall_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 33
+    },
+    {
+     "name": "ndcg_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 34
+    },
+    {
+     "name": "mrr_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 35
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "AggregateMetrics",
+   "vis": "pub",
+   "module": "metrics",
+   "signature": "pub struct AggregateMetrics",
+   "file": "benchmarks/contextra-bench/src/metrics.rs",
+   "line": 40,
+   "doc": [
+    "Aggregierte Gesamtmetriken"
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "total_queries",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 41
+    },
+    {
+     "name": "recall_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 42
+    },
+    {
+     "name": "ndcg_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 43
+    },
+    {
+     "name": "mrr_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 44
+    },
+    {
+     "name": "latency_p50_us",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 45
+    },
+    {
+     "name": "latency_p95_us",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 46
+    },
+    {
+     "name": "latency_p99_us",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 47
+    },
+    {
+     "name": "peak_rss_bytes",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 48
+    },
+    {
+     "name": "index_build_duration_ms",
+     "type": "u64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/metrics.rs",
+     "line": 49
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "calculate_recall_at_k",
+   "vis": "pub",
+   "module": "metrics",
+   "signature": "pub fn calculate_recall_at_k( retrieved: &[RankedResult], ground_truth: &HashMap<String, f64>, k: usize, relevance_threshold: f64, ) -> f64",
+   "file": "benchmarks/contextra-bench/src/metrics.rs",
+   "line": 56,
+   "doc": [
+    "Berechnet Recall@k",
+    "",
+    "Recall@k = |relevante Dokumente in Top-k| / |alle relevanten Dokumente|",
+    "Wenn es keine relevanten Dokumente gibt, wird 0.0 zurückgegeben."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "calculate_mrr_at_k",
+   "vis": "pub",
+   "module": "metrics",
+   "signature": "pub fn calculate_mrr_at_k( retrieved: &[RankedResult], ground_truth: &HashMap<String, f64>, k: usize, relevance_threshold: f64, ) -> f64",
+   "file": "benchmarks/contextra-bench/src/metrics.rs",
+   "line": 92,
+   "doc": [
+    "Berechnet Mean Reciprocal Rank (MRR@k) für eine Abfrage",
+    "",
+    "MRR@k = 1 / erster relevanter Rang (1-basiert) innerhalb von Top-k.",
+    "Falls kein relevantes Dokument in Top-k ist: 0.0."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "calculate_ndcg_at_k",
+   "vis": "pub",
+   "module": "metrics",
+   "signature": "pub fn calculate_ndcg_at_k( retrieved: &[RankedResult], ground_truth: &HashMap<String, f64>, k: usize, ) -> f64",
+   "file": "benchmarks/contextra-bench/src/metrics.rs",
+   "line": 112,
+   "doc": [
+    "Berechnet Normalized Discounted Cumulative Gain (nDCG@k)",
+    "",
+    "DCG@k = \\sum_{i=1}^k \\frac{2^{rel_i} - 1}{\\log_2(i + 1)}",
+    "nDCG@k = DCG@k / IDCG@k"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "calculate_latency_percentiles",
+   "vis": "pub",
+   "module": "metrics",
+   "signature": "pub fn calculate_latency_percentiles(mut latencies: Vec<Duration>) -> (u64, u64, u64)",
+   "file": "benchmarks/contextra-bench/src/metrics.rs",
+   "line": 153,
+   "doc": [
+    "Berechnet Perzentile p50, p95, p99 einer Latenzreihe in Mikrosekunden"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "read_process_rss_bytes",
+   "vis": "pub",
+   "module": "metrics",
+   "signature": "pub fn read_process_rss_bytes() -> u64",
+   "file": "benchmarks/contextra-bench/src/metrics.rs",
+   "line": 178,
+   "doc": [
+    "Liest den aktuellen VmRSS (Resident Set Size) in Bytes aus /proc/self/status (Linux)"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PathRagSweepMetric",
+   "vis": "pub",
+   "module": "path_rag_sweep",
+   "signature": "pub struct PathRagSweepMetric",
+   "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+   "line": 23,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "threshold",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+     "line": 24
+    },
+    {
+     "name": "recall_at_5",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+     "line": 25
+    },
+    {
+     "name": "recall_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+     "line": 26
+    },
+    {
+     "name": "precision_at_5",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+     "line": 27
+    },
+    {
+     "name": "precision_at_10",
+     "type": "f64",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+     "line": 28
+    },
+    {
+     "name": "total_queries",
+     "type": "usize",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+     "line": 29
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PathRagSweepReport",
+   "vis": "pub",
+   "module": "path_rag_sweep",
+   "signature": "pub struct PathRagSweepReport",
+   "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+   "line": 33,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "timestamp",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+     "line": 34
+    },
+    {
+     "name": "long_mem_eval_sweep",
+     "type": "Vec<PathRagSweepMetric>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+     "line": 35
+    },
+    {
+     "name": "locomo_sweep",
+     "type": "Vec<PathRagSweepMetric>",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+     "line": 36
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_pathrag_sweep_long_mem_eval",
+   "vis": "pub",
+   "module": "path_rag_sweep",
+   "signature": "pub async fn run_pathrag_sweep_long_mem_eval( thresholds: &[f64], ) -> Result<Vec<PathRagSweepMetric>>",
+   "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+   "line": 39,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_pathrag_sweep_locomo",
+   "vis": "pub",
+   "module": "path_rag_sweep",
+   "signature": "pub async fn run_pathrag_sweep_locomo( locomo_dataset_path: &Path, thresholds: &[f64], ) -> Result<Vec<PathRagSweepMetric>>",
+   "file": "benchmarks/contextra-bench/src/path_rag_sweep.rs",
+   "line": 198,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_TOLERANCE_THRESHOLD",
+   "vis": "pub",
+   "module": "regression_gate",
+   "signature": "pub const DEFAULT_TOLERANCE_THRESHOLD: f64 = 0.05",
+   "file": "benchmarks/contextra-bench/src/regression_gate.rs",
+   "line": 15,
+   "doc": [
+    "Standard tolerance threshold justification:",
+    "Empirical evaluation over multiple runs on synthetic and LongMemEval benchmark cases shows a run-to-run",
+    "retrieval variance of ~1.5% to 2.5% due to hybrid score tie-breaking and vector float rounding.",
+    "A relative tolerance threshold of 5.0% (0.05) provides a statistically robust gate that flags true quality",
+    "degradation while avoiding false-positive CI failures caused by sample noise."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "RegressionGateResult",
+   "vis": "pub",
+   "module": "regression_gate",
+   "signature": "pub struct RegressionGateResult",
+   "file": "benchmarks/contextra-bench/src/regression_gate.rs",
+   "line": 18,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "passed",
+     "type": "bool",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/regression_gate.rs",
+     "line": 19
+    },
+    {
+     "name": "updated",
+     "type": "bool",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/regression_gate.rs",
+     "line": 20
+    },
+    {
+     "name": "message",
+     "type": "String",
+     "vis": "pub",
+     "file": "benchmarks/contextra-bench/src/regression_gate.rs",
+     "line": 21
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_regression_gate",
+   "vis": "pub",
+   "module": "regression_gate",
+   "signature": "pub fn run_regression_gate( results_path: &Path, baseline_path: &Path, threshold: f64, update_baseline: bool, ) -> Result<RegressionGateResult, String>",
+   "file": "benchmarks/contextra-bench/src/regression_gate.rs",
+   "line": 26,
+   "doc": [
+    "Evaluates current metrics file against baseline file using specified tolerance threshold.",
+    "If `update_baseline` is true or if baseline does not exist, writes/updates baseline file."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  }
+ ],
+ "reexports": [],
+ "macros": [],
+ "used_by": []
+}

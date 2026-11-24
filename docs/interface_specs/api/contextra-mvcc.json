@@ -1,0 +1,3649 @@
+{
+ "name": "contextra-mvcc",
+ "version": "workspace",
+ "path": "crates/contextra-mvcc",
+ "role": "MVCC-Hilfen",
+ "features": {
+  "default": [],
+  "workspace": [
+   "dep:contextra-types",
+   "dep:contextra-ports"
+  ],
+  "types-compat": [
+   "workspace"
+  ],
+  "ports-compat": [
+   "workspace"
+  ],
+  "docid-128": [
+   "contextra-ids/docid-128"
+  ]
+ },
+ "deps": {
+  "contextra-ids": {
+   "kind": "normal",
+   "source": "path",
+   "optional": false
+  },
+  "contextra-env": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "contextra-types": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "contextra-ports": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "parking_lot": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "ahash": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "bytes": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "proptest": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "criterion": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "tokio": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "bincode": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "loom": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "# `Contextra` MVCC — Multi-Version Concurrency Control, Sequence Log, Transaction Staging und SSI-Validierung.",
+  "",
+  "Multi-Version Concurrency Control (MVCC, Mehrversions-Nebenläufigkeitssteuerung) ermöglicht es",
+  "Lese- und Schreiboperationen gleichzeitig ohne gegenseitiges Blockieren auszuführen.",
+  "Leser sehen konsistente Snapshots (Schnappschüsse) zu einem logischen Zeitpunkt,",
+  "während Schreiber isoliert neue Versionen im Staging-Puffer vorbereiten.",
+  "",
+  "## Architektur-Rolle (Ring 0 / Ebene E1a — Kernkomponente)",
+  "",
+  "`contextra-mvcc` gehört zur innersten Systemschicht (Ring 0 / Ebene E1a). Es bietet fundamentale",
+  "Isolationsgarantien für relationale und vektorielle Indexstrukturen und besitzt keinerlei",
+  "Kenntnisse über Festplatten-Layouts oder Netzwerkprotokolle.",
+  "",
+  "### Wer nutzt diese Crate? (Eingehende Abhängigkeiten)",
+  "- `contextra-store`: Nutzt MVCC-Sequenzen für WAL-Synchronisation und Compaction-GC-Pruning.",
+  "- `contextra-engine`: Koordiniert Transaktionen, ReadSets und SSI-Validierung vor Commits.",
+  "- `contextra-vector`: Führt snapshot-isolierte Vektorsuchen (`_at`) durch.",
+  "- `contextra-checkpoint`: Schützt Snapshot-Zustände bei Backup-Erstellung.",
+  "",
+  "### Wovon hängt diese Crate ab? (Ausgehende Abhängigkeiten)",
+  "- `contextra-ids`: Kanonische ID-Typen wie `TxId`, `DocId`, `TenantId`, `TOMBSTONE_BIT`.",
+  "- `contextra-env`: Abstrakte Schnittstellen wie `Clock`, `SystemClock`, `MetricsSink`.",
+  "- Bibliotheken dritter Parteien: `parking_lot` (effiziente Mutexe/RwLocks), `ahash` (schnelle Hashing-Algorithmen).",
+  "",
+  "### Kernkomponenten",
+  "- [`SequenceLog`]: Monotone Versionsverfolgung von Dokument-Änderungen für Snapshot-Suchen.",
+  "- [`SnapshotRegistry`] / [`SnapshotGuard`]: RAII-geschützte Schnappschüsse, die minimale aktive Sequenzen garantieren.",
+  "- [`TxBuffer`]: Nach Transaktions-ID partitionierter Staging-Puffer für atomare 2-Phase-Commit-Vorbereitungen.",
+  "- [`ReadSet`] / [`SsiValidator`] / [`SequenceLogSsiValidator`]: Serializable Snapshot Isolation (SSI)",
+  "zur Erkennung von Write-Skew-Anomalien und Phantom-Reads bei Transaktionen.",
+  "",
+  "## Sperrenordnung & Invarianten (INV-LOCK-ORDER-1)",
+  "",
+  "Um Verklemmungen (Deadlocks) bei nebenläufigem Zugriff deterministisch auszuschließen,",
+  "gilt für `contextra-mvcc` und die darüberliegende Engine eine strikte, totale Sperrenhierarchie:",
+  "",
+  "1. **Document / Key Lock**: Externe Zeilen- bzw. Dokumentsperre (z. B. striped Shard-Locks).",
+  "2. **TxBuffer Shards**: Partitionierte Staging-Shards (`shards[0..N-1]`). Es wird **niemals**",
+  "mehr als ein Shard-Lock gleichzeitig erworben. Operationen, die alle Shards durchlaufen",
+  "(z. B. `reap_orphans`, `min_read_snapshot`), sperren streng sequentiell Shard für Shard",
+  "in aufsteigender Index-Reihenfolge (0 bis $N-1$) unter kurzem Lock und verschachteln niemals Locks.",
+  "3. **SnapshotRegistry**: Zentraler Mutex für die aktive Snapshot-Map. Sperre wird nur für",
+  "minimale O(1)-Operationen gehalten (Eintrag einfügen/entfernen, atomares Minimum aktualisieren)",
+  "und ruft keinen externen Code auf.",
+  "4. **SequenceLog / SSI (CommittedWrites)**: Feingranularer `parking_lot::RwLock` zur Verfolgung",
+  "bestätigter Schreibvorgänge und Phantom-Präfixe.",
+  "",
+  "**Regel (INV-LOCK-ORDER-1):** Kein Sperr-Guard wird über `.await`-Punkte hinweg gehalten",
+  "(`contextra-mvcc` ist vollkommen synchron und frei von Async-Runtimes wie Tokio).",
+  "",
+  "## Anwendungsbeispiel (Doctest)",
+  "",
+  "```rust",
+  "use std::sync::Arc;",
+  "use contextra_mvcc::{SnapshotRegistry, TxBuffer, ReadSet, SequenceLogSsiValidator, SsiValidator, IndexOp};",
+  "use contextra_mvcc::types::{TxId, DocId};",
+  "",
+  "let registry = Arc::new(SnapshotRegistry::new());",
+  "let ssi = SequenceLogSsiValidator::new();",
+  "let buffer = TxBuffer::<String>::new();",
+  "",
+  "let tx = TxId::new(1);",
+  "let guard = registry.register(100);",
+  "",
+  "let mut read_set = ReadSet::new();",
+  "read_set.record_read(b\"account:42\", 100);",
+  "",
+  "buffer.begin(tx);",
+  "buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(1u64), data: \"value\".into() }).unwrap();",
+  "",
+  "// Validierung vor Commit gegen Anti-Dependencies",
+  "assert!(ssi.validate(tx, &read_set).is_ok());",
+  "drop(guard);",
+  "```"
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-mvcc/src/compat/error.rs",
+   "module": "compat::error",
+   "lines": 70
+  },
+  {
+   "file": "crates/contextra-mvcc/src/compat/mod.rs",
+   "module": "compat",
+   "lines": 12
+  },
+  {
+   "file": "crates/contextra-mvcc/src/contract.rs",
+   "module": "contract",
+   "lines": 11
+  },
+  {
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "module": "crate",
+   "lines": 112
+  },
+  {
+   "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+   "module": "mvcc_error",
+   "lines": 64
+  },
+  {
+   "file": "crates/contextra-mvcc/src/seq_log.rs",
+   "module": "seq_log",
+   "lines": 858
+  },
+  {
+   "file": "crates/contextra-mvcc/src/snapshot.rs",
+   "module": "snapshot",
+   "lines": 965
+  },
+  {
+   "file": "crates/contextra-mvcc/src/ssi.rs",
+   "module": "ssi",
+   "lines": 1237
+  },
+  {
+   "file": "crates/contextra-mvcc/src/tombstone.rs",
+   "module": "tombstone",
+   "lines": 55
+  },
+  {
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "module": "tx_buffer",
+   "lines": 1474
+  }
+ ],
+ "counts": {
+  "unwrap": 0,
+  "expect": 0,
+  "panic_macro": 0,
+  "todo_unimpl": 0,
+  "index_bracket": 0,
+  "cfg_feature_gates": 2
+ },
+ "grep_pub_decl": 172,
+ "all_pub_decl": 172,
+ "public_items": [
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod error",
+   "file": "crates/contextra-mvcc/src/compat/mod.rs",
+   "line": 8,
+   "doc": [
+    "Brücke zur Konvertierung lokaler `MvccError`-Fehler in `contextra_types::ContextraError`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "types",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod types",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 85,
+   "doc": [
+    "Kanonische Typen und Identifikatoren für MVCC aus `contextra-ids`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "compat",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod compat",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 91,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"workspace\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "mvcc_error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod mvcc_error",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 100,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "seq_log",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod seq_log",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 101,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "snapshot",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod snapshot",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 102,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "ssi",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod ssi",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 103,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "tombstone",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod tombstone",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 104,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "tx_buffer",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod tx_buffer",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 105,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "MvccError",
+   "vis": "pub",
+   "module": "mvcc_error",
+   "signature": "pub enum MvccError",
+   "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+   "line": 18,
+   "doc": [
+    "Lokaler Fehlertyp für Multi-Version Concurrency Control und Transaktionsverwaltung."
+   ],
+   "attrs": [
+    "#[non_exhaustive]",
+    "#[derive(Debug, Error, PartialEq, Eq, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "limit_exceeded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn limit_exceeded(limit: usize, context: impl Into<String>) -> Self",
+     "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+     "line": 53,
+     "doc": [
+      "Hilfskonstruktor zur Erzeugung eines [`MvccError::LimitExceeded`]."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Conflict",
+     "shape": "(String)",
+     "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+     "line": 21
+    },
+    {
+     "name": "LimitExceeded",
+     "shape": "{",
+     "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+     "line": 25
+    },
+    {
+     "name": "Transaction",
+     "shape": "(String)",
+     "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+     "line": 34
+    },
+    {
+     "name": "Storage",
+     "shape": "(String)",
+     "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+     "line": 38
+    },
+    {
+     "name": "InvalidInput",
+     "shape": "(String)",
+     "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+     "line": 42
+    },
+    {
+     "name": "Internal",
+     "shape": "(String)",
+     "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+     "line": 46
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl MvccError",
+     "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+     "line": 49,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "Result",
+   "vis": "pub",
+   "module": "mvcc_error",
+   "signature": "pub type Result<T, E = MvccError> = std::result::Result<T, E>",
+   "file": "crates/contextra-mvcc/src/mvcc_error.rs",
+   "line": 63,
+   "doc": [
+    "Lokaler Result-Typ für MVCC-Operationen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_PIN_DURATION",
+   "vis": "pub",
+   "module": "seq_log",
+   "signature": "pub const DEFAULT_MAX_PIN_DURATION: Duration = Duration::from_secs(300)",
+   "file": "crates/contextra-mvcc/src/seq_log.rs",
+   "line": 38,
+   "doc": [
+    "Standard-Lebensdauer für Snapshot-Pins (5 Minuten), bevor Diagnose-Warnungen für",
+    "blockierende oder verwaiste Pins ausgelöst werden."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SeqLogEntry",
+   "vis": "pub",
+   "module": "seq_log",
+   "signature": "pub struct SeqLogEntry",
+   "file": "crates/contextra-mvcc/src/seq_log.rs",
+   "line": 58,
+   "doc": [
+    "Ein versionierter Protokolleintrag für die Snapshot-Isolation (`_at`-Familie).",
+    "",
+    "Jeder Eintrag repräsentiert die Lebensspanne einer Dokumentversion:",
+    "von der Einfügesequenznummer `insert_seq` bis zur Löschsequenznummer `delete_seq`.",
+    "",
+    "### Speicherverbrauch",
+    "Jeder Eintrag belegt 24 Bytes:",
+    "- 8 Bytes für `DocId` (Dokument-Kennung)",
+    "- 8 Bytes für `insert_seq` (Sequenznummer der Erstellung)",
+    "- 8 Bytes für `delete_seq: Option<u64>` (Sequenznummer der Entfernung/Deletion)",
+    "",
+    "Einträge, deren `delete_seq` unterhalb der minimal aktiven Sequenznummer",
+    "(`min_active_seqno`) aller aktiven Leser liegt, können via [`SequenceLog::compact`]",
+    "gefahrlos aus dem Speicher gelöscht (geprunt) werden."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "is_visible",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_visible(&self, as_of: u64) -> bool",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 89,
+     "doc": [
+      "Prüft in O(1), ob dieser Protokolleintrag zu einem bestimmten Snapshot-Stand `as_of` sichtbar ist.",
+      "",
+      "### Formale Sichtbarkeitsinvariante (INV-INDEX-SNAPSHOT-1):",
+      "Eine Version `(key, seq)` ist für Snapshot `s` mit Lese-Sequenz `as_of` genau dann sichtbar, wenn:",
+      "`seq <= as_of && (delete_seq.is_none() || delete_seq > as_of)`.",
+      "",
+      "Dies gilt universell für reguläre Datensätze, Updates (neue Version erzeugt `insert_seq` und schließt Vorgänger)",
+      "sowie Tombstones (Tombstone markiert `delete_seq` und maskiert ältere Versionen aus).",
+      "",
+      "### Ablauf der Sichtbarkeitsprüfung:",
+      "1. Maskiere eventuell gesetzte Tombstone-Bits (höchstwertiges Bit) auf allen Sequenznummern aus.",
+      "2. Prüfe, ob der Eintrag vor oder genau zum Snapshot-Zeitpunkt eingefügt wurde (`insert_seq <= as_of`).",
+      "3. Prüfe, ob das Dokument ungelöscht ist (`delete_seq == None`) oder erst nach dem Snapshot",
+      "gelöscht wurde (`delete_seq > as_of`).",
+      "",
+      "Ist Bedingung 2 und 3 erfüllt, war das Dokument zum Zeitpunkt `as_of` aktiv und sichtbar.",
+      "",
+      "### Komplexität",
+      "$O(1)$ allokationsfrei und schleifenfrei; benötigt maximal zwei 64-Bit-Ganzzahlvergleiche."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "doc_id",
+     "type": "DocId",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 60
+    },
+    {
+     "name": "insert_seq",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 62
+    },
+    {
+     "name": "delete_seq",
+     "type": "Option<u64>",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 64
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SeqLogEntry",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 67,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "SeqLogChange",
+   "vis": "pub",
+   "module": "seq_log",
+   "signature": "pub enum SeqLogChange",
+   "file": "crates/contextra-mvcc/src/seq_log.rs",
+   "line": 104,
+   "doc": [
+    "Repräsentiert eine historische Änderung (Einfügen oder Löschen) im Sequenz-Log für Delta-Replays.",
+    "",
+    "Wird von Abfragen wie [`SequenceLog::changes_since`] erzeugt, um Indizes",
+    "inkrementell auf den neuesten Stand nachzuziehen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "seq",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn seq(&self) -> u64",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 123,
+     "doc": [
+      "Liefert die logische Sequenznummer dieser Änderung."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "doc_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn doc_id(&self) -> DocId",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 130,
+     "doc": [
+      "Liefert die Kennung des betroffenen Dokuments."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Insert",
+     "shape": "{",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 106
+    },
+    {
+     "name": "Delete",
+     "shape": "{",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 113
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SeqLogChange",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 121,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SequenceLog",
+   "vis": "pub",
+   "module": "seq_log",
+   "signature": "pub struct SequenceLog",
+   "file": "crates/contextra-mvcc/src/seq_log.rs",
+   "line": 151,
+   "doc": [
+    "Verwaltet das chronologische Sequenz-Protokoll und Sichtbarkeitsfilter für Indexstrukturen.",
+    "",
+    "### Funktionsweise:",
+    "`SequenceLog` speichert alle Einfüge- und Löschvorgänge chronologisch in einem Vektor (`entries`).",
+    "Zudem merkt es sich aktive Snapshot-Pins (`pinned_snapshots`), um zu verhindern, dass alte",
+    "Datenbereiche in Indizes vorzeitig freigegeben (geprunt) werden, solange noch Leser darauf zugreifen.",
+    "",
+    "### Port-Nutzung:",
+    "Verwendet [`Clock`] zur Erfassung von Zeitstempeln für gepinnte Snapshots, um verwaiste Pins",
+    "diagnostizieren und automatisch bereinigen zu können."
+   ],
+   "attrs": [
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 188,
+     "doc": [
+      "Erstellt ein neues, leeres `SequenceLog` mit der Standard-Systemuhr [`SystemClock`]",
+      "und einer maximalen Pin-Dauer von 5 Minuten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock(clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 194,
+     "doc": [
+      "Erstellt ein neues, leeres `SequenceLog` mit einer benutzerdefinierten Implementierung",
+      "des [`Clock`]-Ports (z. B. `ManualClock` in deterministischen Tests)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_time_fn",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_time_fn<F>(time_fn: F) -> Self where F: Fn() -> u64 + Send + Sync + 'static,",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 206,
+     "doc": [
+      "Erstellt ein `SequenceLog` mit einer anpassbaren Zeitstempel-Closure (State-Passing per `Fn() -> u64`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clock(&self) -> &Arc<dyn Clock>",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 223,
+     "doc": [
+      "Gibt eine Referenz auf den aktiven [`Clock`]-Port zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_clock(&mut self, clock: Arc<dyn Clock>)",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 228,
+     "doc": [
+      "Ersetzt die aktive [`Clock`]-Instanz für dieses Log."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_max_pin_duration",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_max_pin_duration(mut self, duration: Duration) -> Self",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 233,
+     "doc": [
+      "Konfiguriert die maximale Pin-Dauer als Fluent-Builder und gibt `self` zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_max_pin_duration",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_max_pin_duration(&mut self, duration: Duration)",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 239,
+     "doc": [
+      "Setzt die maximale Pin-Dauer für Diagnosezwecke."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "max_pin_duration",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn max_pin_duration(&self) -> Duration",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 244,
+     "doc": [
+      "Liefert die aktuell konfigurierte Maximaldauer für Pins."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "pin_snapshot",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn pin_snapshot(&mut self, seq_no: u64)",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 255,
+     "doc": [
+      "Pinnt eine historische Sequenznummer, um zu verhindern, dass die Hintergrund-Bereinigung",
+      "(Rebuild/Compaction) gelöschte Knoten entfernt, die für diesen Stand noch sichtbar sein müssen.",
+      "",
+      "### Ablauf:",
+      "1. Aktuellen Zeitstempel in Nanosekunden über die konfigurierte [`Clock`] abfragen.",
+      "2. Sequenznummer und Zeitstempel in `pinned_snapshots` registrieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "pin_snapshot_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn pin_snapshot_at(&mut self, seq_no: u64, at_nanos: u64)",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 261,
+     "doc": [
+      "Pinnt eine Sequenznummer zu einem expliziten Nanosekunden-Zeitstempel (für deterministische Tests)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "unpin_snapshot",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn unpin_snapshot(&mut self, seq_no: u64)",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 275,
+     "doc": [
+      "Gibt einen gepinnten Snapshot wieder frei.",
+      "",
+      "### Ablauf:",
+      "1. Tombstone-Bit der Sequenznummer ausmaskieren.",
+      "2. Den letzten Zeitstempel vom Stack dieses Eintrags entfernen (LIFO).",
+      "3. Ist die Liste der Zeitstempel für diese Sequenznummer leer, den Eintrag vollständig aus der Map löschen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "expired_pins_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn expired_pins_at(&self, now_nanos: u64) -> Vec<u64>",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 292,
+     "doc": [
+      "Findet alle gepinnten Sequenznummern, deren Haltezeit `max_pin_duration` überschreitet,",
+      "bezogen auf den übergebenen Monotonie-Zeitstempel `now_nanos`.",
+      "",
+      "Rückgabe ist aufsteigend sortiert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "expired_pins",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn expired_pins(&self) -> Vec<u64>",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 308,
+     "doc": [
+      "Liefert alle abgelaufenen Snapshot-Pins bezogen auf die aktuelle Systemuhr."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reap_expired_pins_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reap_expired_pins_at(&mut self, now_nanos: u64) -> Vec<u64>",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 318,
+     "doc": [
+      "Bereinigt (entpinnt) alle Pins, die die Maximaldauer bezüglich `now_nanos` überschritten haben.",
+      "",
+      "### Ablauf:",
+      "1. Abgelaufene Pins via [`SequenceLog::expired_pins_at`] ermitteln.",
+      "2. Für jeden abgelaufenen Pin [`SequenceLog::unpin_snapshot`] aufrufen.",
+      "3. Liste der entfernten Sequenznummern zurückgeben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reap_expired_pins",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reap_expired_pins(&mut self) -> Vec<u64>",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 327,
+     "doc": [
+      "Bereinigt alle abgelaufenen Snapshot-Pins bezogen auf die aktuelle Uhrzeit."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "min_retention_seq_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn min_retention_seq_at(&self, now_nanos: u64) -> Option<u64>",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 337,
+     "doc": [
+      "Berechnet die kleinste aktuell gepinnte Sequenznummer für Aufbewahrungs- und Pruning-Zwecke.",
+      "",
+      "Gibt `None` zurück, falls aktuell kein einziger Snapshot gepinnt ist.",
+      "Falls ein aktiver Pin die konfigurierte Maximaldauer überschreitet, wird eine Tracing-Warnung ausgegeben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "min_retention_seq",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn min_retention_seq(&self) -> Option<u64>",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 360,
+     "doc": [
+      "Berechnet die kleinste aktuell gepinnte Sequenznummer bezogen auf die aktuelle Systemuhr."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "deletion_seq",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn deletion_seq(&self, doc_id: DocId) -> Option<u64>",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 365,
+     "doc": [
+      "Liefert die Lösch-Sequenznummer des Dokuments, falls es aktuell als gelöscht verzeichnet ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_insert",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_insert(&mut self, doc_id: DocId, seq: u64)",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 378,
+     "doc": [
+      "Zeichnet eine Einfügeoperation für ein Dokument zu einer Sequenznummer auf.",
+      "",
+      "### Ablauf:",
+      "1. Tombstone-Bit der Sequenznummer ausmaskieren.",
+      "2. Falls für `doc_id` bereits eine ungelöschte Version existiert, diese mit `delete_seq = Some(seq)`",
+      "abschließen (Überschreiben = implizites Ersetzen).",
+      "3. Vorherige Löschmarkierung aus der Schnellsuch-Map `deletions` entfernen.",
+      "4. Neuen Eintrag [`SeqLogEntry`] mit `insert_seq = seq` und `delete_seq = None` anfügen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_delete",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_delete(&mut self, doc_id: DocId, seq: u64)",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 401,
+     "doc": [
+      "Zeichnet eine Löschoperation für ein Dokument zu einer Sequenznummer auf.",
+      "",
+      "### Ablauf:",
+      "1. Tombstone-Bit der Sequenznummer ausmaskieren.",
+      "2. Den letzten noch aktiven Eintrag des Dokuments suchen und dessen `delete_seq` auf `seq` setzen.",
+      "3. Dokument und Lösch-Sequenznummer in `deletions` aufnehmen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_visible",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_visible(&self, doc_id: DocId, seq_no: u64) -> bool",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 418,
+     "doc": [
+      "Prüft, ob ein Dokument zu einer bestimmten Sequenznummer `seq_no` im Index sichtbar ist.",
+      "",
+      "Ein Dokument ist sichtbar, wenn es vor oder bei `seq_no` eingefügt wurde und nicht",
+      "vor oder bei `seq_no` gelöscht wurde."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "compact",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn compact(&mut self, min_active_seqno: u64)",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 450,
+     "doc": [
+      "Verdichtet (kompaktiert) das Sequenz-Log und entfernt historische Versionen,",
+      "deren Entfernung strikt kleiner als `min_active_seqno` ist.",
+      "",
+      "### Invariante:",
+      "Versionen mit `delete_seq >= min_active_seqno` MÜSSEN im Speicher verbleiben, da",
+      "aktive Leser mit einem älteren Snapshot diese Versionen noch sehen können müssen.",
+      "",
+      "### Ablauf:",
+      "1. `min_active_seqno` maskieren und `compacted_below`-Wasserstand anpassen.",
+      "2. `entries` filtern: Nur Einträge behalten, die noch ungelöscht sind ODER deren",
+      "`delete_seq >= min_active_seqno` ist.",
+      "3. Map `deletions` bereinigen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 469,
+     "doc": [
+      "Gibt die Anzahl der aktuell im Log vorgehaltenen Einträge zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 474,
+     "doc": [
+      "Gibt `true` zurück, wenn das Sequenz-Log keine Einträge enthält."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "changes_since",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn changes_since(&self, snapshot_seq: u64) -> Vec<SeqLogChange>",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 484,
+     "doc": [
+      "Liefert alle Änderungen (Einfügungen und Entfernungen), die strikt nach `snapshot_seq`",
+      "stattgefunden haben, aufsteigend sortiert nach Sequenznummer.",
+      "",
+      "Wird verwendet, um einen veralteten Index-Zustand per Delta-Replay schnell",
+      "auf einen neueren Stand zu aktualisieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for SequenceLog",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 166,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for SequenceLog",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 178,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SequenceLog",
+     "file": "crates/contextra-mvcc/src/seq_log.rs",
+     "line": 184,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SnapshotRegistryConfig",
+   "vis": "pub",
+   "module": "snapshot",
+   "signature": "pub struct SnapshotRegistryConfig",
+   "file": "crates/contextra-mvcc/src/snapshot.rs",
+   "line": 46,
+   "doc": [
+    "Konfigurationsoptionen für die [`SnapshotRegistry`]."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "max_active_snapshots",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 48
+    },
+    {
+     "name": "max_snapshot_age",
+     "type": "Duration",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 50
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for SnapshotRegistryConfig",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 53,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SnapshotRegistry",
+   "vis": "pub",
+   "module": "snapshot",
+   "signature": "pub struct SnapshotRegistry",
+   "file": "crates/contextra-mvcc/src/snapshot.rs",
+   "line": 84,
+   "doc": [
+    "Zentrale Registrierung für aktive Lese-Snapshots im System.",
+    "",
+    "### Synchronisationsstrategie:",
+    "- `active`: Ein sortierter `BTreeMap`, geschützt durch einen `parking_lot::Mutex`.",
+    "Schlüssel ist die Snapshot-Sequenznummer; Wert ist eine Liste von Metadaten",
+    "aller Guards, die diesen Snapshot halten (Referenzzählung).",
+    "- `min_active_seqno`: Atomarer 64-Bit-Ganzzahlwert für lock-freies Auslesen durch Hintergrund-Threads.",
+    "- `clock`: Zeitport zur Erfassung der Haltedauer aktiver Snapshots.",
+    "- `config`: Konfigurierte Kapazitäts- und Altersgrenzen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 109,
+     "doc": [
+      "Erstellt eine neue, leere Snapshot-Registry mit Standard-[`SystemClock`] und Standardkonfiguration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock(clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 114,
+     "doc": [
+      "Erstellt eine neue Snapshot-Registry mit benutzerdefiniertem [`Clock`]-Port (für Tests)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock_and_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock_and_config(clock: Arc<dyn Clock>, config: SnapshotRegistryConfig) -> Self",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 119,
+     "doc": [
+      "Erstellt eine neue Snapshot-Registry mit benutzerdefiniertem [`Clock`]-Port und Konfiguration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_time_fn",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_time_fn<F>(time_fn: F) -> Self where F: Fn() -> u64 + Send + Sync + 'static,",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 129,
+     "doc": [
+      "Erstellt eine neue Snapshot-Registry mit einer Zeitstempel-Closure (State-Passing per `Fn() -> u64`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clock(&self) -> &Arc<dyn Clock>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 146,
+     "doc": [
+      "Liefert eine Referenz auf den aktiven Zeitport ([`Clock`])."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn config(&self) -> SnapshotRegistryConfig",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 151,
+     "doc": [
+      "Liefert die aktuelle Konfiguration der Registry."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_config(&mut self, config: SnapshotRegistryConfig)",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 156,
+     "doc": [
+      "Setzt eine neue Konfiguration für die Registry."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "oldest_active_snapshot",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn oldest_active_snapshot(&self) -> Option<u64>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 164,
+     "doc": [
+      "Liefert die Untergrenze für Garbage Collection (älteste aktive Snapshot-Sequenz).",
+      "Entspricht dem Vertrag für Store-Kompaktierung und ist äquivalent zu `min_read_snapshot()`."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_register",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_register(self: &Arc<Self>, seq_no: u64) -> Result<SnapshotGuard>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 173,
+     "doc": [
+      "Versucht, einen Lese-Snapshot zu registrieren.",
+      "",
+      "Im Gegensatz zu `register` schlägt diese Methode fail-closed mit `MvccError::LimitExceeded` fehl,",
+      "wenn die konfigurierte Maximalanzahl aktiver Snapshots (`max_active_snapshots`) erreicht ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_register_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_register_at(self: &Arc<Self>, seq_no: u64, at_nanos: u64) -> Result<SnapshotGuard>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 179,
+     "doc": [
+      "Versucht, einen Lese-Snapshot zu einem expliziten Nanosekunden-Zeitstempel zu registrieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_register_for_tenant",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_register_for_tenant( self: &Arc<Self>, tenant: TenantId, seq_no: u64, ) -> Result<SnapshotGuard>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 184,
+     "doc": [
+      "Versucht, einen Lese-Snapshot für einen bestimmten Mandanten zu registrieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_register_for_tenant_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_register_for_tenant_at( self: &Arc<Self>, tenant: Option<TenantId>, seq_no: u64, at_nanos: u64, ) -> Result<SnapshotGuard>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 194,
+     "doc": [
+      "Versucht, einen Lese-Snapshot für einen Mandanten zu einem expliziten Zeitstempel zu registrieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "register",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn register(self: &Arc<Self>, seq_no: u64) -> SnapshotGuard",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 236,
+     "doc": [
+      "Registriert einen Lese-Snapshot und liefert einen RAII-Guard ([`SnapshotGuard`]) zurück.",
+      "",
+      "Sobald der Guard den Gültigkeitsbereich verlässt (Drop), wird der Snapshot",
+      "automatisch deregistriert.",
+      "",
+      "### Ablauf:",
+      "1. Zeitstempel über die Systemuhr erfassen.",
+      "2. Delegieren an [`SnapshotRegistry::register_at`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "register_for_tenant",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn register_for_tenant(self: &Arc<Self>, tenant: TenantId, seq_no: u64) -> SnapshotGuard",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 242,
+     "doc": [
+      "Registriert einen Lese-Snapshot für einen bestimmten Mandanten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "register_for_tenant_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn register_for_tenant_at( self: &Arc<Self>, tenant: TenantId, seq_no: u64, at_nanos: u64, ) -> SnapshotGuard",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 248,
+     "doc": [
+      "Registriert einen Lese-Snapshot für einen bestimmten Mandanten mit explizitem Zeitstempel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "register_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn register_at(self: &Arc<Self>, seq_no: u64, at_nanos: u64) -> SnapshotGuard",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 270,
+     "doc": [
+      "Registriert einen Lese-Snapshot mit explizitem Zeitstempel ohne Mandantenzuordnung."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "min_active_seqno",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn min_active_seqno(&self) -> u64",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 289,
+     "doc": [
+      "Liefert die kleinste Sequenznummer aller derzeit aktiven Snapshots (`u64::MAX`, falls keine aktiv)."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "min_read_snapshot",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn min_read_snapshot(&self) -> Option<u64>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 295,
+     "doc": [
+      "Liefert die kleinste Snapshot-Sequenznummer als `Option<u64>` (ohne Sentinel)."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "min_for_compaction",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn min_for_compaction(&self, current_seq: u64) -> u64",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 306,
+     "doc": [
+      "Berechnet die minimale Sequenznummer für die Kompaktierung (GC-Grenze) ohne Sentinel."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "revoke_covering",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn revoke_covering( &self, tenant: TenantId, range: std::ops::Range<u64>, gated_seq: u64, ) -> usize",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 312,
+     "doc": [
+      "Widerruft Snapshots im Bereich für einen Mandanten (Tenant-Isolation)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "pin",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn pin(&self, seq_no: u64)",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 346,
+     "doc": [
+      "Dauerhaftes Pinnen einer Sequenznummer (z. B. für SAOS Checkpoints oder Backups),",
+      "ohne einen RAII-Guard zu halten.",
+      "",
+      "Muss manuell über [`SnapshotRegistry::unpin`] wieder freigegeben werden."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "pin_for_tenant",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn pin_for_tenant(&self, tenant: TenantId, seq_no: u64)",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 352,
+     "doc": [
+      "Pinnt eine Sequenznummer für einen Mandanten bezogen auf die aktuelle Systemuhr."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "pin_for_tenant_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn pin_for_tenant_at(&self, tenant: TenantId, seq_no: u64, at_nanos: u64)",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 358,
+     "doc": [
+      "Pinnt eine Sequenznummer für einen Mandanten zu einem expliziten Zeitstempel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "pin_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn pin_at(&self, seq_no: u64, at_nanos: u64)",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 369,
+     "doc": [
+      "Pinnt eine Sequenznummer zu einem expliziten Zeitstempel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "unpin",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn unpin(&self, seq_no: u64)",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 380,
+     "doc": [
+      "Hebt einen dauerhaften Pin auf und bereinigt den minimal aktiven Wasserstand."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "longest_active_pin_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn longest_active_pin_at(&self, now_nanos: u64) -> Option<(u64, Duration)>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 440,
+     "doc": [
+      "Findet den am längsten aktiven Snapshot bezüglich des Nanosekunden-Zeitstempels `now_nanos`.",
+      "",
+      "Liefert `Some((seq_no, duration))` oder `None`, falls aktuell keine Snapshots aktiv sind.",
+      "Dient der Diagnose von \"hängenden\" Lese-Transaktionen, die die Garbage Collection blockieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "longest_active_pin",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn longest_active_pin(&self) -> Option<(u64, Duration)>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 461,
+     "doc": [
+      "Findet den am längsten aktiven Snapshot bezogen auf die aktuelle Systemuhr."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reap_expired_pins_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reap_expired_pins_at(&self, max_pin_duration: Duration, now_nanos: u64) -> Vec<u64>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 473,
+     "doc": [
+      "Bereinigt und entfernt alle aktiven Snapshot-Pins, die älter als `max_pin_duration` sind.",
+      "",
+      "### Ablauf:",
+      "1. Berechne Schwellenwert in Nanosekunden.",
+      "2. Iteriere über alle aktiven Snapshots und entferne überalterte Zeitstempel.",
+      "3. Entferne leere Einträge vollständig aus der Map.",
+      "4. Aktualisiere `min_active_seqno` atomar.",
+      "5. Gib die sortierte, deduplizierte Liste aller entfernten Sequenznummern zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reap_expired_pins",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reap_expired_pins(&self, max_pin_duration: Duration) -> Vec<u64>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 504,
+     "doc": [
+      "Bereinigt alle überalterten Snapshot-Pins bezogen auf die aktuelle Uhrzeit."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for SnapshotRegistry",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 91,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for SnapshotRegistry",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 100,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SnapshotRegistry",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 106,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SnapshotGuard",
+   "vis": "pub",
+   "module": "snapshot",
+   "signature": "pub struct SnapshotGuard",
+   "file": "crates/contextra-mvcc/src/snapshot.rs",
+   "line": 527,
+   "doc": [
+    "RAII-Guard (Resource Acquisition Is Initialization) für einen aktiven Lese-Snapshot.",
+    "",
+    "Hält einen Snapshot in der [`SnapshotRegistry`] gepinnt, solange die Instanz existiert.",
+    "Beim Verlassen des Gültigkeitsbereichs (`Drop`) wird der Snapshot automatisch deregistriert."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "seq_no",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn seq_no(&self) -> u64",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 536,
+     "doc": [
+      "Liefert die Sequenznummer, die durch diesen Guard geschützt wird."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "tenant",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn tenant(&self) -> Option<TenantId>",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 541,
+     "doc": [
+      "Liefert den zugeordneten Mandanten, falls angegeben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SnapshotGuard",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 534,
+     "in_test": false
+    },
+    {
+     "trait": "Drop",
+     "generics": "",
+     "signature": "impl Drop for SnapshotGuard",
+     "file": "crates/contextra-mvcc/src/snapshot.rs",
+     "line": 546,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_TRACKED_COMMIT_KEYS",
+   "vis": "pub",
+   "module": "ssi",
+   "signature": "pub const DEFAULT_MAX_TRACKED_COMMIT_KEYS: usize = 1_000_000",
+   "file": "crates/contextra-mvcc/src/ssi.rs",
+   "line": 51,
+   "doc": [
+    "Standard-Höchstgrenze für im Speicher gehaltene bestätigte Schreib-Schlüssel (1.000.000 Schlüssel)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ReadSet",
+   "vis": "pub",
+   "module": "ssi",
+   "signature": "pub struct ReadSet",
+   "file": "crates/contextra-mvcc/src/ssi.rs",
+   "line": 67,
+   "doc": [
+    "Protokolliert gelesene Einzelschlüssel, Präfixe und deren jeweilige Snapshot-Sequenznummer für SSI.",
+    "",
+    "### Speicher- und Risikoanalyse:",
+    "Der Speicherbedarf pro Transaktion wächst linear $O(R + P)$ mit der Anzahl der gelesenen Schlüssel $R$",
+    "und Präfixe $P$. Bei massiven Lese-Transaktionen muss die Obergrenze über",
+    "[`crate::tx_buffer::TxBuffer::try_register_read`] überwacht werden, um Speichererschöpfung zu verhindern.",
+    "",
+    "### Phantom-Schutz:",
+    "Normale Einzelschlüssel-Leser registrieren Keys via [`ReadSet::record_read`]. Bereichsscans (Range Scans)",
+    "müssen [`ReadSet::record_prefix`] aufrufen, um neu eingefügte Phantome zu erkennen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Default, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 78,
+     "doc": [
+      "Erstellt ein neues, leeres [`ReadSet`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_read",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_read(&mut self, key: impl Into<Vec<u8>>, snapshot_seq: u64)",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 94,
+     "doc": [
+      "Zeichnet einen Lesezugriff auf `key` zu einer bestimmten Snapshot-Sequenznummer `snapshot_seq` auf.",
+      "",
+      "### Ablauf:",
+      "1. Maskiere das Tombstone-Bit der Sequenznummer aus.",
+      "2. Falls der Schlüssel in dieser Transaktion bereits gelesen wurde, wird die früheste",
+      "(kleinste) Sequenznummer beibehalten, um strikte Isolationsgrenzen zu garantieren.",
+      "3. Aktualisiere `min_snapshot_seq` mit dem Minimum."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_prefix",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_prefix(&mut self, prefix: impl Into<Vec<u8>>, snapshot_seq: u64)",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 117,
+     "doc": [
+      "Zeichnet einen Bereichsscan-Präfix zu `snapshot_seq` auf, um Phantom-Reads zu erkennen.",
+      "",
+      "Wenn nach diesem Lesezugriff eine andere Transaktion einen neuen Schlüssel committet,",
+      "der mit diesem Präfix beginnt, schlägt die spätere SSI-Validierung fehl."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "register_read",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn register_read(&mut self, key: impl Into<Vec<u8>>, snapshot_seq: u64)",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 136,
+     "doc": [
+      "Alias-Funktion für [`ReadSet::record_read`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get(&self, key: &[u8]) -> Option<u64>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 141,
+     "doc": [
+      "Liefert die registrierte Snapshot-Sequenznummer für einen Schlüssel, falls vorhanden."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 146,
+     "doc": [
+      "Liefert `true`, falls weder Einzelschlüssel noch Präfixe im ReadSet enthalten sind."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 151,
+     "doc": [
+      "Liefert die Gesamtzahl aller getrackten Schlüssel und Präfixe."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clear",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clear(&mut self)",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 156,
+     "doc": [
+      "Leert das ReadSet vollständig und setzt die kleinste Sequenznummer zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "min_snapshot_seq",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn min_snapshot_seq(&self) -> Option<u64>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 163,
+     "doc": [
+      "Liefert die kleinste Snapshot-Sequenznummer aller gelesenen Schlüssel und Präfixe."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "iter",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn iter(&self) -> impl Iterator<Item = (&Vec<u8>, &u64)>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 168,
+     "doc": [
+      "Liefert einen Iterator über alle gelesenen Schlüssel und deren Snapshot-Sequenzen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "prefixes_iter",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn prefixes_iter(&self) -> impl Iterator<Item = (&Vec<u8>, &u64)>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 173,
+     "doc": [
+      "Liefert einen Iterator über alle Bereichs-Präfixe und deren Snapshot-Sequenzen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "keys_map",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn keys_map(&self) -> &AHashMap<Vec<u8>, u64>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 178,
+     "doc": [
+      "Liefert die interne Schlüssel-Map als Referenz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "prefixes_map",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn prefixes_map(&self) -> &AHashMap<Vec<u8>, u64>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 183,
+     "doc": [
+      "Liefert die interne Präfix-Map als Referenz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ReadSet",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 76,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "SsiValidator",
+   "vis": "pub",
+   "module": "ssi",
+   "signature": "pub trait SsiValidator",
+   "file": "crates/contextra-mvcc/src/ssi.rs",
+   "line": 195,
+   "doc": [
+    "Schnittstelle (Trait) für die Validierung von Transaktionen unter Serializable Snapshot Isolation (SSI).",
+    "",
+    "Prüft vor dem Festschreiben (Commit) einer Transaktion, ob nebenläufige Transaktionen",
+    "Schlüssel oder Präfixe verändert haben, die im [`ReadSet`] dieser Transaktion enthalten sind."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "validate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 207,
+     "doc": [
+      "Validiert das [`ReadSet`] der Transaktion `tx_id`.",
+      "",
+      "### Fehlerfälle:",
+      "Gibt `Err(MvccError::Conflict(...))` zurück, falls:",
+      "- Ein Schlüssel im ReadSet nach dem Lese-Snapshot von einer anderen Transaktion committet wurde (Write-Skew).",
+      "- Ein neuer Schlüssel committet wurde, der auf einen gelesenen Bereichsscan-Präfix zutrifft (Phantom-Read).",
+      "- Der Snapshot-Wasserstand der Transaktion älter ist als die bereits bereinigte Historie (`pruned_through`).",
+      "",
+      "### Nebenläufigkeits-Invariante:",
+      "Aufrufer koordinieren Validierung und Commit-Registrierung (z. B. via Commit-Gate-Lock),",
+      "um atomare, konfliktfreie Zustandsübergänge sicherzustellen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "SsiValidator"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PruningBlockerInfo",
+   "vis": "pub",
+   "module": "ssi",
+   "signature": "pub struct PruningBlockerInfo",
+   "file": "crates/contextra-mvcc/src/ssi.rs",
+   "line": 228,
+   "doc": [
+    "Diagnoseinformationen über aktive Snapshots oder Sequenznummern, die das Pruning im Validator blockieren.",
+    "",
+    "Wird erzeugt, wenn der Speicher für Commit-Schlüssel zu mehr als 80 % gefüllt ist,",
+    "um im Tracing und Monitoring exakt zu erkennen, welcher langlaufende Leser das Aufräumen blockiert."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "min_unpruned_seq",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 230
+    },
+    {
+     "name": "pruned_through_seq",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 232
+    },
+    {
+     "name": "tracked_commit_keys",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 234
+    },
+    {
+     "name": "total_seq_buckets",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 236
+    },
+    {
+     "name": "coarsened_seq_buckets",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 238
+    },
+    {
+     "name": "max_tracked_keys",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 240
+    },
+    {
+     "name": "longest_active_snapshot_seq",
+     "type": "Option<u64>",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 242
+    },
+    {
+     "name": "longest_pin_duration",
+     "type": "Option<Duration>",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 244
+    },
+    {
+     "name": "is_pin_expired",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 246
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SequenceLogSsiValidator",
+   "vis": "pub",
+   "module": "ssi",
+   "signature": "pub struct SequenceLogSsiValidator",
+   "file": "crates/contextra-mvcc/src/ssi.rs",
+   "line": 528,
+   "doc": [
+    "Referenz-Implementierung von [`SsiValidator`] auf Basis von [`SequenceLog`] und In-Memory-Commit-Tracking.",
+    "",
+    "Arbeitet vollständig ohne Festplatten-I/O im Arbeitsspeicher und bietet deterministische",
+    "Konflikterkennung für Transaktionen.",
+    "",
+    "### Deterministische Invariante (INV-MVCC-SSI-1):",
+    "Die Konfliktauflösung basiert rein auf den Sequenznummern der Lese- und Schreiboperationen.",
+    "Gleiche Eingabereihenfolgen führen stets zu exakt identischen Validierungsergebnissen."
+   ],
+   "attrs": [
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 563,
+     "doc": [
+      "Erstellt einen neuen [`SequenceLogSsiValidator`] mit Standard-Obergrenze (1.000.000 Schlüssel)",
+      "und Standard-[`SystemClock`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_bounds",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_bounds(max_tracked_keys: usize) -> Self",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 568,
+     "doc": [
+      "Erstellt einen neuen Validator mit benutzerdefinierter Kapazitätsgrenze für Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_clock_and_bounds",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_clock_and_bounds(clock: Arc<dyn Clock>, max_tracked_keys: usize) -> Self",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 573,
+     "doc": [
+      "Erstellt einen neuen Validator mit benutzerdefiniertem [`Clock`]-Port und Kapazitätsgrenze."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_time_fn_and_bounds",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_time_fn_and_bounds<F>(time_fn: F, max_tracked_keys: usize) -> Self where F: Fn() -> u64 + Send + Sync + 'static,",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 587,
+     "doc": [
+      "Erstellt einen neuen Validator mit einer Zeitstempel-Closure (State-Passing per `Fn() -> u64`) und Kapazitätsgrenze."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 604,
+     "doc": [
+      "Bindet eine benutzerdefinierte Implementierung des [`Clock`]-Ports an den Validator."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_time_fn",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_time_fn<F>(self, time_fn: F) -> Self where F: Fn() -> u64 + Send + Sync + 'static,",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 610,
+     "doc": [
+      "Bindet eine Zeitstempel-Closure (State-Passing per `Fn() -> u64`) an den Validator."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_clock(&mut self, clock: Arc<dyn Clock>)",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 627,
+     "doc": [
+      "Ersetzt die aktive [`Clock`]-Instanz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clock(&self) -> &Arc<dyn Clock>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 632,
+     "doc": [
+      "Liefert eine Referenz auf den aktiven [`Clock`]-Port."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_sequence_log",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_sequence_log(seq_log: Arc<RwLock<SequenceLog>>) -> Self",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 637,
+     "doc": [
+      "Erstellt einen Validator, der an ein bestehendes [`SequenceLog`] angebunden ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_snapshot_registry",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_snapshot_registry(mut self, registry: Arc<SnapshotRegistry>) -> Self",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 651,
+     "doc": [
+      "Verknüpft eine [`SnapshotRegistry`] zur Überwachung aktiver Snapshot-Pins."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_snapshot_registry",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_snapshot_registry(&mut self, registry: Arc<SnapshotRegistry>)",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 657,
+     "doc": [
+      "Setzt die verknüpfte [`SnapshotRegistry`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_metrics_sink",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_metrics_sink( mut self, sink: Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>, ) -> Self",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 662,
+     "doc": [
+      "Bindet einen Metrik-Empfänger ([`MetricsSink`]) für Monitoring an."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_metrics_sink",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_metrics_sink(&mut self, sink: Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>)",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 671,
+     "doc": [
+      "Aktualisiert den Metrik-Empfänger."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_max_pin_duration",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_max_pin_duration(mut self, duration: Duration) -> Self",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 676,
+     "doc": [
+      "Konfiguriert die maximale Pin-Dauer für Diagnosealarme."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "prune_through",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn prune_through(&self, bound_seq: u64) -> usize",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 693,
+     "doc": [
+      "Bereinigt (prunt) bestätigte Schreib-Einträge mit `commit_seq <= bound_seq`.",
+      "",
+      "Aktualisiert den atomaren `pruned_through`-Wasserstand.",
+      "",
+      "### Fail-Closed-Sicherheit & Sentinel-Schutz:",
+      "Sobald ein Stand `bound_seq` bereinigt wurde, schlägt jede Transaktion, die einen Snapshot",
+      "mit `snapshot_seq < bound_seq` nutzt, sofort fehl, um unerkannte Write-Skews zu verhindern.",
+      "",
+      "Sentinel-Werte (`u64::MAX`), Sequenzen mit gesetztem Tombstone-Bit oder Werte",
+      "`>= i64::MAX as u64` sind als Prune-Bound unzulässig und werden ignoriert (liefern 0),",
+      "um eine unbeabsichtigte Vorzeit-Invalidierung aller Transaktionen zu verhindern."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "prune_through_checked",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn prune_through_checked(&self, bound: Option<u64>) -> Result<usize>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 711,
+     "doc": [
+      "Bereinigt bestätigte Schreib-Einträge bis zu einem optionalen Grenzwert mit expliziter Fehlerbehandlung.",
+      "",
+      "### Fehlerfälle:",
+      "Liefert `Err(MvccError::Internal(...))`, wenn der Sentinel-Wert `u64::MAX`",
+      "oder das `TOMBSTONE_BIT` gesetzt ist. `None` führt kein Pruning aus und liefert `Ok(0)`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "forget_from",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn forget_from(&self, first_seq: u64) -> usize",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 736,
+     "doc": [
+      "Entfernt alle Commit-Registrierungen mit `commit_seq >= first_seq` (z. B. nach Transaktionsabbruch)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "pruned_through",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn pruned_through(&self) -> u64",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 743,
+     "doc": [
+      "Liefert den aktuellen `pruned_through`-Wasserstand."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "tracked_commit_keys",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn tracked_commit_keys(&self) -> usize",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 748,
+     "doc": [
+      "Liefert die Anzahl aktuell gehaltener Commit-Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "max_tracked_keys",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn max_tracked_keys(&self) -> usize",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 753,
+     "doc": [
+      "Liefert die konfigurierte Obergrenze für Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "diagnose_pruning_blocker",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn diagnose_pruning_blocker(&self) -> Option<PruningBlockerInfo>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 820,
+     "doc": [
+      "Diagnostiziert, welcher unbereinigte Stand oder aktiver Snapshot das Pruning im Validator blockiert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "diagnose_pruning_blocker_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn diagnose_pruning_blocker_at(&self, now_nanos: u64) -> Option<PruningBlockerInfo>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 825,
+     "doc": [
+      "Diagnostiziert Blockaden bezüglich eines expliziten Zeitstempels `now_nanos`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_commit_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_commit_key(&self, key: &[u8], commit_seq: u64)",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 873,
+     "doc": [
+      "Zeichnet einen committeten Schlüssel zu einer Sequenznummer auf.",
+      "",
+      "### Ablauf:",
+      "1. Tombstone-Bit der Commit-Sequenznummer ausmaskieren.",
+      "2. Schlüssel im Schreibregister unter Mutex eintragen.",
+      "3. Kapazitätsprüfung durchführen: Liegt der Füllstand über 80 %, werden ältere Buckets",
+      "automatisch zu Präfixen vergröbert (Coarsening)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_commit_keys",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_commit_keys<'a>( &self, keys: impl IntoIterator<Item = &'a [u8]>, commit_seq: u64, )",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 881,
+     "doc": [
+      "Zeichnet eine Menge committeter Schlüssel stapelweise (Batch) zu einer Commit-Sequenznummer auf."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "validate_and_record",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn validate_and_record<'a>( &self, tx_id: TxId, read_set: &ReadSet, write_keys: impl IntoIterator<Item = &'a [u8]>, commit_seq: u64, ) -> Result<()>",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 1085,
+     "doc": [
+      "Atomically validates `read_set` and records `write_keys` at `commit_seq` under a single write lock.",
+      "Führt die Validierung und das Eintragen der Commit-Schlüssel atomar unter demselben Schreib-Lock aus.",
+      "",
+      "Verhindert Race Conditions zwischen der Validierung eines ReadSets und dem Hinzufügen",
+      "neuer Commits durch parallele Worker.",
+      "",
+      "### Ablauf:",
+      "1. Schreib-Sperre auf `committed_writes` anfordern.",
+      "2. `pruned_through`-Wasserstand abfragen.",
+      "3. Validierung gegen committed writes und range reads durchführen.",
+      "4. Bei Erfolg: Alle Schlüssel mit `commit_seq` eintragen und Kapazität prüfen.",
+      "5. Bei Konflikt: Sofortigen Abbruch mit `Err(MvccError::Conflict)` zurückgeben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for SequenceLogSsiValidator",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 539,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for SequenceLogSsiValidator",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 553,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SequenceLogSsiValidator",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 559,
+     "in_test": false
+    },
+    {
+     "trait": "SsiValidator",
+     "generics": "",
+     "signature": "impl SsiValidator for SequenceLogSsiValidator",
+     "file": "crates/contextra-mvcc/src/ssi.rs",
+     "line": 1104,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "TombstoneSemanticsCheck",
+   "vis": "pub",
+   "module": "tombstone",
+   "signature": "pub trait TombstoneSemanticsCheck",
+   "file": "crates/contextra-mvcc/src/tombstone.rs",
+   "line": 23,
+   "doc": [
+    "Trait zur Bestimmung und Erzeugung von Tombstones in Sequenzprotokollen und Indizes.",
+    "",
+    "NOTE: In Contextra wird das höchstwertige Bit (`TOMBSTONE_BIT` = 1 << 63) als",
+    "Indikator für gelöschte Versionen verwendet. Zusätzlich können Low-Level-Flags",
+    "(z. B. Bit 0x01) signalisieren, dass ein Key-Value-Record ein Tombstone ist."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "is_tombstone",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn is_tombstone(seq: u64, flags: u8) -> bool",
+     "file": "crates/contextra-mvcc/src/tombstone.rs",
+     "line": 25,
+     "doc": [
+      "Gibt `true` zurück, falls die Sequenznummer oder die Flags eine gelöschte Version (Tombstone) anzeigen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "TombstoneSemanticsCheck"
+    },
+    {
+     "name": "make_tombstone",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn make_tombstone(seq: u64) -> Vec<u8>",
+     "file": "crates/contextra-mvcc/src/tombstone.rs",
+     "line": 28,
+     "doc": [
+      "Kodiert eine logische Sequenznummer als 8-Byte Little-Endian Bytevektor mit gesetztem `TOMBSTONE_BIT`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "TombstoneSemanticsCheck"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SeqBitTombstone",
+   "vis": "pub",
+   "module": "tombstone",
+   "signature": "pub struct SeqBitTombstone",
+   "file": "crates/contextra-mvcc/src/tombstone.rs",
+   "line": 38,
+   "doc": [
+    "Standard-Referenzimplementierung für [`TombstoneSemanticsCheck`].",
+    "",
+    "Nutzt bitweise ODER-Verknüpfung mit [`TOMBSTONE_BIT`] sowie Flag-Prüfung auf Bit 0."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "TombstoneSemanticsCheck",
+     "generics": "",
+     "signature": "impl TombstoneSemanticsCheck for SeqBitTombstone",
+     "file": "crates/contextra-mvcc/src/tombstone.rs",
+     "line": 40,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "STAGING_ENTRY_OVERHEAD_BYTES",
+   "vis": "pub",
+   "module": "tx_buffer",
+   "signature": "pub const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32",
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "line": 53,
+   "doc": [
+    "Fester Speicher-Overhead pro gepufferter Operation (32 Bytes)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_SHARD_COUNT",
+   "vis": "pub",
+   "module": "tx_buffer",
+   "signature": "pub const DEFAULT_SHARD_COUNT: usize = 64",
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "line": 56,
+   "doc": [
+    "Standardanzahl an Partitionen (Shards) im Transaktionspuffer (64 Shards)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_OPS_PER_TX",
+   "vis": "pub",
+   "module": "tx_buffer",
+   "signature": "pub const DEFAULT_MAX_OPS_PER_TX: usize = 10_000",
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "line": 59,
+   "doc": [
+    "Empfohlene Maximalanzahl an Operationen pro Einzelschreibtransaktion (10.000 Operationen)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_READ_SET_KEYS",
+   "vis": "pub",
+   "module": "tx_buffer",
+   "signature": "pub const DEFAULT_MAX_READ_SET_KEYS: usize = 100_000",
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "line": 62,
+   "doc": [
+    "Standard-Maximalanzahl an getrackten Lese-Schlüsseln pro Transaktion (100.000 Schlüssel)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_TX_STAGED_BYTES",
+   "vis": "pub",
+   "module": "tx_buffer",
+   "signature": "pub const DEFAULT_MAX_TX_STAGED_BYTES: usize = 16 * 1024 * 1024",
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "line": 65,
+   "doc": [
+    "Standard-Maximalgröße für gepufferte Rohdaten pro Einzelschreibtransaktion (16 MiB)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_TOTAL_STAGED_BYTES",
+   "vis": "pub",
+   "module": "tx_buffer",
+   "signature": "pub const DEFAULT_MAX_TOTAL_STAGED_BYTES: usize = 256 * 1024 * 1024",
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "line": 68,
+   "doc": [
+    "Standard-Maximalgröße für den globalen Puffer über alle Transaktionen hinweg (256 MiB)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "TxBufferConfig",
+   "vis": "pub",
+   "module": "tx_buffer",
+   "signature": "pub struct TxBufferConfig",
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "line": 75,
+   "doc": [
+    "Konfigurationsoptionen für den [`TxBuffer`]."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "tx_timeout",
+     "type": "Duration",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 77
+    },
+    {
+     "name": "max_active_tx",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 79
+    },
+    {
+     "name": "max_ops_per_tx",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 83
+    },
+    {
+     "name": "max_tx_staged_bytes",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 86
+    },
+    {
+     "name": "max_total_staged_bytes",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 89
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for TxBufferConfig",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 92,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "IndexOp",
+   "vis": "pub",
+   "module": "tx_buffer",
+   "signature": "pub enum IndexOp<T: Clone>",
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "line": 110,
+   "doc": [
+    "Eine im Puffer vorgemerkte Operation auf einem Index."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "doc_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn doc_id(&self) -> DocId",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 129,
+     "doc": [
+      "Liefert die Kennung des Dokuments (`DocId`), das von dieser Operation betroffen ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "estimated_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn estimated_bytes(&self) -> usize",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 184,
+     "doc": [
+      "Schätzt den gesamten Speicherbedarf der Operation in Bytes (Overhead + Nutzdaten)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Insert",
+     "shape": "{",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 112
+    },
+    {
+     "name": "Delete",
+     "shape": "{",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 119
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<T: Clone>",
+     "signature": "impl<T: Clone> IndexOp<T>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 127,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<T: Clone + StagedOpSize>",
+     "signature": "impl<T: Clone + StagedOpSize> IndexOp<T>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 182,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "StagedOpSize",
+   "vis": "pub",
+   "module": "tx_buffer",
+   "signature": "pub trait StagedOpSize",
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "line": 141,
+   "doc": [
+    "Trait zur Schätzung des Speicherverbrauchs in Bytes für gepufferte Nutzdaten.",
+    "",
+    "Ermöglicht genaue Buchführung des verbrauchten Hauptspeichers pro Transaktion und global."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "staged_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn staged_bytes(&self) -> usize",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 143,
+     "doc": [
+      "Liefert den geschätzten Speicherbedarf der Nutzdaten in Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "StagedOpSize"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "TxBuffer",
+   "vis": "pub",
+   "module": "tx_buffer",
+   "signature": "pub struct TxBuffer<T: Clone>",
+   "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+   "line": 236,
+   "doc": [
+    "Verwaltet gepufferte Transaktionen, deren Staging-Operationen und ReadSets.",
+    "",
+    "### Synchronisations- und Sperrstrategie:",
+    "Jeder Shard besitzt ein eigenes `parking_lot::RwLock`. Leseoperationen erfordern ein Read-Lock,",
+    "Mutationen ein Write-Lock. Es wird niemals mehr als ein Shard-Lock gleichzeitig gehalten.",
+    "Multi-Shard-Scans durchlaufen die Shards strikt aufsteigend (0 bis $N-1$)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 259,
+     "doc": [
+      "Erstellt einen neuen Puffer mit 64 Shards, 30 Sekunden Timeout und [`SystemClock`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_config(shard_count: usize, tx_timeout: Duration) -> Self",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 264,
+     "doc": [
+      "Erstellt einen neuen Puffer mit konfigurierter Shard-Anzahl und Transaktions-Timeout."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_config_ext",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_config_ext( shard_count: usize, _tx_timeout: Duration, config: TxBufferConfig, ) -> Self",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 273,
+     "doc": [
+      "Erstellt einen neuen Puffer mit expliziter Konfiguration ([`TxBufferConfig`])."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_clock_and_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_clock_and_config( clock: Arc<dyn Clock>, shard_count: usize, config: TxBufferConfig, ) -> Self",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 282,
+     "doc": [
+      "Erstellt einen Puffer mit benutzerdefinierter [`Clock`], Shard-Anzahl und Konfiguration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_time_fn_and_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_time_fn_and_config<F>( time_fn: F, shard_count: usize, config: TxBufferConfig, ) -> Self where F: Fn() -> u64 + Send + Sync + 'static,",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 305,
+     "doc": [
+      "Erstellt einen Puffer mit einer Zeitstempel-Closure (State-Passing per `Fn() -> u64`), Shard-Anzahl und Konfiguration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 326,
+     "doc": [
+      "Bindet eine benutzerdefinierte [`Clock`]-Instanz an diesen Puffer an."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_time_fn",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_time_fn<F>(self, time_fn: F) -> Self where F: Fn() -> u64 + Send + Sync + 'static,",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 332,
+     "doc": [
+      "Bindet eine Zeitstempel-Closure (State-Passing per `Fn() -> u64`) an diesen Puffer an."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clock(&self) -> &Arc<dyn Clock>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 349,
+     "doc": [
+      "Liefert eine Referenz auf den aktiven [`Clock`]-Port."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "staged_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn staged_bytes(&self) -> usize",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 354,
+     "doc": [
+      "Liefert den aktuell global über alle Transaktionen verbrauchten Staging-Speicher in Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "has_tx",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn has_tx(&self, tx: TxId) -> bool",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 383,
+     "doc": [
+      "Prüft, ob die gegebene Transaktion im Puffer registriert ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "begin_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn begin_at(&self, tx: TxId, at_nanos: u64)",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 399,
+     "doc": [
+      "Registriert eine neue Transaktion im Puffer zu einem bestimmten Nanosekunden-Zeitstempel.",
+      "",
+      "### Ablauf:",
+      "1. Shard-Index für `tx` per Hash berechnen.",
+      "2. Shard exklusiv sperren (`write`).",
+      "3. Neuen Operationsvektor mit Zeitstempel anlegen, ReadSet initialisieren und Byte-Zähler auf 0 setzen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "begin",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn begin(&self, tx: TxId)",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 413,
+     "doc": [
+      "Registriert eine neue Transaktion mit der aktuellen Uhrzeit."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "register_read",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn register_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64)",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 420,
+     "doc": [
+      "Registriert einen Lesezugriff im ReadSet der Transaktion `tx`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_register_read",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_register_read( &self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64, max_keys: usize, ) -> Result<()>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 439,
+     "doc": [
+      "Registriert einen gelesenen Schlüssel für Transaktion `tx` mit Obergrenzen-Prüfung (`max_keys`).",
+      "",
+      "Verhindert unbegrenztes Speicherwachstum bei massiven Lese-Scans.",
+      "",
+      "### Fehlerfälle:",
+      "Gibt `Err(MvccError::LimitExceeded)` zurück, falls das ReadSet bereits `max_keys` erreicht hat",
+      "und ein bisher unbekannter Schlüssel hinzugefügt werden soll."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_read",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64)",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 467,
+     "doc": [
+      "Alias-Funktion für [`TxBuffer::register_read`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "min_read_snapshot",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn min_read_snapshot(&self) -> Option<u64>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 476,
+     "doc": [
+      "Findet die kleinste Snapshot-Sequenznummer über alle aktiven ReadSets aller Shards hinweg.",
+      "",
+      "Dient der Bestimmung des globalen GC-Schwellenwerts (Tombstone-Compaction-Floor).",
+      "Durchläuft alle Shards sequentiell (0 bis $N-1$) unter kurzem Read-Lock."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_read_set",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_read_set(&self, tx: TxId) -> Option<ReadSet>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 490,
+     "doc": [
+      "Liefert eine Kopie des angesammelten [`ReadSet`] für Transaktion `tx`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "read_set",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn read_set(&self, tx: TxId) -> Option<ReadSet>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 498,
+     "doc": [
+      "Alias-Funktion für [`TxBuffer::get_read_set`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "stage",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn stage(&self, tx: TxId, op: IndexOp<T>) -> Result<()> where T: StagedOpSize,",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 504,
+     "doc": [
+      "Puffert eine Indexoperation für die Transaktion `tx` unter Prüfung aller Speichergrenzen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "stage_bounded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn stage_bounded(&self, tx: TxId, op: IndexOp<T>) -> Result<()> where T: StagedOpSize,",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 520,
+     "doc": [
+      "Puffert eine Operation und erzwingt Obergrenzen für Operationsanzahl und Byte-Budgets.",
+      "",
+      "### Ablauf:",
+      "1. Berechne geschätzten Speicherbedarf der Operation in Bytes (`op_bytes`).",
+      "2. Shard exklusiv sperren.",
+      "3. Prüfen: Überschreitet `tx` ihr lokales Byte-Budget (`max_tx_staged_bytes`)?",
+      "4. Prüfen: Wird das globale Byte-Budget (`max_total_staged_bytes`) überschritten?",
+      "5. Prüfen: Wird die maximale Anzahl an Operationen pro Transaktion (`max_ops_per_tx`) überschritten?",
+      "6. Operation in den Shard-Puffer einhängen, Zähler aktualisieren und atomaren globalen Speicherstand erhöhen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "stage_many",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn stage_many(&self, tx: TxId, ops: impl IntoIterator<Item = IndexOp<T>>) -> Result<()> where T: StagedOpSize,",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 570,
+     "doc": [
+      "Puffert mehrere Operationen stapelweise mit einer einzigen Sperrung des Shards."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "validate_pending_ops",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn validate_pending_ops(&self, tx: TxId) -> Result<()>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 625,
+     "doc": [
+      "Prüft, ob für eine registrierte Transaktion tatsächlich anhängige Operationen existieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "drain",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn drain(&self, tx: TxId) -> Vec<IndexOp<T>>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 644,
+     "doc": [
+      "Entnimmt alle gepufferten Operationen der Transaktion `tx` für den anschließenden Commit",
+      "und gibt den reservierten Speicherplatz frei."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "discard",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn discard(&self, tx: TxId)",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 665,
+     "doc": [
+      "Verwirft alle gepufferten Operationen und das ReadSet einer Transaktion (Rollback)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 680,
+     "doc": [
+      "Liefert die Gesamtzahl aller aktuell gepufferten Transaktionen über alle Shards."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 685,
+     "doc": [
+      "Gibt `true` zurück, wenn in keinem einzigen Shard gepufferte Transaktionen liegen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reap_orphans_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reap_orphans_at(&self, now_nanos: u64) -> Vec<TxId>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 691,
+     "doc": [
+      "Räumt abgelaufene (verwaiste) Transaktionen bezüglich `now_nanos` über alle Shards ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reap_orphans",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reap_orphans(&self) -> Vec<TxId>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 696,
+     "doc": [
+      "Räumt verwaiste Transaktionen unter Verwendung der aktuellen Uhrzeit ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reap_orphans_bounded_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reap_orphans_bounded_at(&self, max: usize, now_nanos: u64) -> Vec<TxId>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 709,
+     "doc": [
+      "Räumt maximal `max` verwaiste Transaktionen ab, um Latenzspitzen zu vermeiden.",
+      "",
+      "### Ablauf:",
+      "1. Iteriere aufsteigend über die Shards (0 bis $N-1$).",
+      "2. Versuche Sperre via `try_write()` zu erhalten (nicht blockierend!).",
+      "3. Entferne alle Transaktionen, deren Alter `tx_timeout` überschreitet.",
+      "4. Gebe für jede entfernte Transaktion deren ReadSet und Staging-Bytes frei.",
+      "5. `thread::yield_now()` nach jedem Shard ausführen, um parallelen Schreibern Vorrang zu gewähren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reap_orphans_bounded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reap_orphans_bounded(&self, max: usize) -> Vec<TxId>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 745,
+     "doc": [
+      "Räumt bis zu `max` verwaiste Transaktionen bezogen auf die aktuelle Uhrzeit ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_ops",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_ops(&self, tx: TxId) -> Option<Vec<IndexOp<T>>>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 751,
+     "doc": [
+      "Liefert eine Kopie der gepufferten Operationen einer Transaktion."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "tx_timeout",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn tx_timeout(&self) -> Duration",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 759,
+     "doc": [
+      "Liefert die konfigurierte Transaktions-Timeout-Dauer."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "stage_kv",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn stage_kv(&self, tx: TxId, op: IndexOp<(Vec<u8>, Vec<u8>)>) -> Result<()>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 804,
+     "doc": [
+      "Puffert eine Schlüssel-Wert-Operation und aktualisiert die Key-Staging-Map.",
+      "",
+      "Bei Fehlschlag von `stage()` (z. B. Budget-Überlauf) wird das Key-Tracking atomar zurückgerollt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "drain_kv",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn drain_kv(&self, tx: TxId) -> Vec<IndexOp<(Vec<u8>, Vec<u8>)>>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 834,
+     "doc": [
+      "Entnimmt alle gepufferten KV-Operationen einer Transaktion und bereinigt das Key-Staging."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "discard_kv",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn discard_kv(&self, tx: TxId)",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 843,
+     "doc": [
+      "Verwirft alle KV-Operationen einer Transaktion und bereinigt das Key-Staging."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_key_staged_for_tx",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_key_staged_for_tx(&self, tx_id: TxId, key: &[u8]) -> bool",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 851,
+     "doc": [
+      "Prüft, ob ein Schlüssel `key` innerhalb der Transaktion `tx_id` als Einfügung vorgemerkt ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "staged_status",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn staged_status(&self, key: &[u8]) -> Option<bool>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 871,
+     "doc": [
+      "Ermittelt atomar den Staging-Status eines Schlüssels über alle uncommitted Transaktionen.",
+      "",
+      "Liefert `Some(true)` bei Einfügung, `Some(false)` bei Entfernung oder `None`, falls der Schlüssel nicht gepuffert ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "<T: Clone>",
+     "signature": "impl<T: Clone> std::fmt::Debug for TxBuffer<T>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 245,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<T: Clone>",
+     "signature": "impl<T: Clone> TxBuffer<T>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 256,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TxBuffer<(Vec<u8>, Vec<u8>)>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 766,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "<T: Clone>",
+     "signature": "impl<T: Clone> Default for TxBuffer<T>",
+     "file": "crates/contextra-mvcc/src/tx_buffer.rs",
+     "line": 899,
+     "in_test": false
+    }
+   ]
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use contextra_types::error as workspace_error",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/compat/mod.rs",
+   "line": 10,
+   "in_test": false,
+   "module": "compat"
+  },
+  {
+   "signature": "pub use contextra_types::error::ContextraError",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/compat/mod.rs",
+   "line": 11,
+   "in_test": false,
+   "module": "compat"
+  },
+  {
+   "signature": "pub use contextra_types::error::Result",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/compat/mod.rs",
+   "line": 12,
+   "in_test": false,
+   "module": "compat"
+  },
+  {
+   "signature": "pub use contextra_env::",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/contract.rs",
+   "line": 11,
+   "in_test": false,
+   "module": "contract"
+  },
+  {
+   "signature": "pub use crate::mvcc_error::",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 81,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use contextra_ids::",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 82,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use contextra_ids::",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 86,
+   "in_test": false,
+   "module": "types"
+  },
+  {
+   "signature": "pub use crate::compat::",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 94,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use crate::mvcc_error::Result",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 96,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use seq_log::",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 107,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use snapshot::",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 108,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use ssi::",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 109,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use tombstone::",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 110,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use tx_buffer::",
+   "vis": "pub",
+   "file": "crates/contextra-mvcc/src/lib.rs",
+   "line": 111,
+   "in_test": false,
+   "module": "crate"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra-db",
+  "contextra-store",
+  "contextra-vector",
+  "contextra-vector-fuzz"
+ ]
+}

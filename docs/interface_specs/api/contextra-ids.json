@@ -1,0 +1,1664 @@
+{
+ "name": "contextra-ids",
+ "version": "0.1.0",
+ "path": "crates/contextra-ids",
+ "role": "Identifikatoren",
+ "features": {
+  "default": [
+   "std"
+  ],
+  "std": [
+   "blake3/std",
+   "serde/std"
+  ],
+  "docid-128": []
+ },
+ "deps": {
+  "blake3": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "bincode": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "hex": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "Canonical identity, tenant, and reference types for Contextra.",
+  "",
+  "# Architecture Role",
+  "Zero internal dependencies. Standalone micro-kernel for identifiers."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-ids/src/lib.rs",
+   "module": "crate",
+   "lines": 720
+  }
+ ],
+ "counts": {
+  "unwrap": 0,
+  "expect": 0,
+  "panic_macro": 0,
+  "todo_unimpl": 0,
+  "index_bracket": 8,
+  "cfg_feature_gates": 7,
+  "deprecated_attr": 2
+ },
+ "grep_pub_decl": 83,
+ "all_pub_decl": 79,
+ "public_items": [
+  {
+   "kind": "const",
+   "name": "ID_WIDTH_BITS",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub const ID_WIDTH_BITS: u32 = if cfg!(feature = \"\")",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 15,
+   "doc": [
+    "Bit width of `DocId` and associated identifiers in the current build."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "TOMBSTONE_BIT",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub const TOMBSTONE_BIT: u64 = 1 << 63",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 31,
+   "doc": [
+    "Bit 63 einer Sequenznummer kennzeichnet einen Tombstone (Soft-Deletion)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_SEARCH_K",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub const MAX_SEARCH_K: usize = 1_000",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 34,
+   "doc": [
+    "Maximale Anzahl an Suchergebnissen (Top-K Begrenzung)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_REF_LEN",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub const MAX_REF_LEN: usize = 256",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 37,
+   "doc": [
+    "Maximale Bytelänge für Referenz-Strings / Byte-Identifier."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "IdError",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub enum IdError",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 42,
+   "doc": [
+    "Specific error type for identifier, reference, and tenant scope operations."
+   ],
+   "attrs": [
+    "#[non_exhaustive]",
+    "#[derive(Debug, Error, PartialEq, Eq, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "EmptyKey",
+     "shape": "",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 45
+    },
+    {
+     "name": "EmptyIdentifier",
+     "shape": "",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 48
+    },
+    {
+     "name": "IdentifierTooLong",
+     "shape": "",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 51
+    },
+    {
+     "name": "TenantSystemReserved",
+     "shape": "",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 54
+    },
+    {
+     "name": "CollectionZero",
+     "shape": "",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 57
+    },
+    {
+     "name": "TenantScopeViolation",
+     "shape": "{",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 60
+    },
+    {
+     "name": "TxIdAllocationOverflow",
+     "shape": "(u64)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 68
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "Result",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub type Result<T> = core::result::Result<T, IdError>",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 72,
+   "doc": [
+    "Result alias for identifier operations."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "TenantId",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct TenantId(pub u64)",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 79,
+   "doc": [
+    "Mandanten-ID."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]",
+    "#[repr(transparent)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "SYSTEM",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const SYSTEM: Self = Self(0)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 83,
+     "doc": [
+      "SYSTEM tenant identifier (`0`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "DEFAULT",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const DEFAULT: Self = Self(0)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 86,
+     "doc": [
+      "Der implizite Default-Mandant für Single-Tenant-Deployments."
+     ],
+     "attrs": [
+      "#[deprecated(note = \"Identisch zu TenantId::SYSTEM — nutze SYSTEM für Klarheit.\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "INVALID",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const INVALID: Self = Self(0)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 88,
+     "doc": [
+      "Invalid tenant identifier sentinel value (`0`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 92,
+     "doc": [
+      "Creates a new `TenantId` wrapping the provided `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new(id: u64) -> Result<Self>",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 97,
+     "doc": [
+      "Sicherer Konstruktor. Gibt Err wenn id == 0."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 107,
+     "doc": [
+      "Returns the inner raw `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 113,
+     "doc": [
+      "Returns the inner raw `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_system",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn is_system(self) -> bool",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 119,
+     "doc": [
+      "Returns `true` if this tenant is the SYSTEM tenant (`TenantId(0)`)."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TenantId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 81,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for TenantId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 124,
+     "in_test": false
+    },
+    {
+     "trait": "TryFrom<u64>",
+     "generics": "",
+     "signature": "impl TryFrom<u64> for TenantId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 130,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Display",
+     "generics": "",
+     "signature": "impl fmt::Display for TenantId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 139,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "CollectionId",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct CollectionId(pub u64)",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 148,
+   "doc": [
+    "Collection-ID."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]",
+    "#[repr(transparent)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "SYSTEM",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const SYSTEM: Self = Self(0)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 152,
+     "doc": [
+      "SYSTEM collection identifier (`0`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "INVALID",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const INVALID: Self = Self(0)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 154,
+     "doc": [
+      "Invalid collection identifier sentinel value (`0`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 158,
+     "doc": [
+      "Creates a new `CollectionId` wrapping the provided `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new(id: u64) -> Result<Self>",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 163,
+     "doc": [
+      "Creates a new `CollectionId`, ensuring `id != 0`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 173,
+     "doc": [
+      "Returns the inner raw `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 179,
+     "doc": [
+      "Returns the inner raw `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl CollectionId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 150,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for CollectionId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 184,
+     "in_test": false
+    },
+    {
+     "trait": "From<u64>",
+     "generics": "",
+     "signature": "impl From<u64> for CollectionId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 190,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Display",
+     "generics": "",
+     "signature": "impl fmt::Display for CollectionId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 197,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DocId",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct DocId(pub u64)",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 224,
+   "doc": [
+    "Dokument-ID."
+   ],
+   "attrs": [
+    "#[cfg(not(feature = \"docid-128\"))]",
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]",
+    "#[repr(transparent)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "MAX",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const MAX: Self = Self(u64::MAX)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 235,
+     "doc": [
+      "Maximum possible `DocId` value (`u64::MAX`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "MIN",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const MIN: Self = Self(0)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 237,
+     "doc": [
+      "Minimum possible `DocId` value (`0`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 241,
+     "doc": [
+      "Creates a new `DocId` wrapping the provided `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_key(key: &str) -> Result<Self>",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 246,
+     "doc": [
+      "Derives a `DocId` from a string key using the first 8 bytes (64 bits) of its BLAKE3 hash."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 255,
+     "doc": [
+      "Returns the inner raw identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 261,
+     "doc": [
+      "Returns the inner raw identifier as `u64`."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "MAX",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const MAX: Self = Self(u128::MAX)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 269,
+     "doc": [
+      "Maximum possible `DocId` value (`u128::MAX`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "MIN",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const MIN: Self = Self(0)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 271,
+     "doc": [
+      "Minimum possible `DocId` value (`0`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u128) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 275,
+     "doc": [
+      "Creates a new `DocId` wrapping the provided `u128` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_key(key: &str) -> Result<Self>",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 280,
+     "doc": [
+      "Derives a 128-bit `DocId` from a string key using the first 16 bytes (128 bits) of its BLAKE3 hash."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u128",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 289,
+     "doc": [
+      "Returns the inner raw identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 295,
+     "doc": [
+      "Returns the lower 64 bits of the identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl DocId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 233,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl DocId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 267,
+     "in_test": false
+    },
+    {
+     "trait": "From<u64>",
+     "generics": "",
+     "signature": "impl From<u64> for DocId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 300,
+     "in_test": false
+    },
+    {
+     "trait": "From<u128>",
+     "generics": "",
+     "signature": "impl From<u128> for DocId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 315,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Display",
+     "generics": "",
+     "signature": "impl fmt::Display for DocId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 322,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DocId",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct DocId(pub u128)",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 230,
+   "doc": [
+    "Dokument-ID (128-Bit)."
+   ],
+   "attrs": [
+    "#[cfg(feature = \"docid-128\")]",
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]",
+    "#[repr(C, align(16))]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EntityId",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct EntityId(pub u64)",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 331,
+   "doc": [
+    "Entity-ID für Graph- und semantische Knoten."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]",
+    "#[repr(transparent)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 336,
+     "doc": [
+      "Creates a new `EntityId` wrapping the provided `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 342,
+     "doc": [
+      "Returns the inner raw `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 348,
+     "doc": [
+      "Returns the inner raw `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_bytes(&self) -> Vec<u8>",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 353,
+     "doc": [
+      "Converts the entity identifier into its string byte representation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_doc_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_doc_id(doc_id: DocId) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 359,
+     "doc": [
+      "Creates an `EntityId` directly from a `DocId`."
+     ],
+     "attrs": [
+      "#[cfg(not(feature = \"docid-128\"))]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_doc_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_doc_id(doc_id: DocId) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 365,
+     "doc": [
+      "Creates an `EntityId` directly from a `DocId`."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"docid-128\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_key(key: &str) -> Result<Self>",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 370,
+     "doc": [
+      "Derives an `EntityId` from a string key using the first 8 bytes of its BLAKE3 hash."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EntityId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 333,
+     "in_test": false
+    },
+    {
+     "trait": "From<u64>",
+     "generics": "",
+     "signature": "impl From<u64> for EntityId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 375,
+     "in_test": false
+    },
+    {
+     "trait": "From<&str>",
+     "generics": "",
+     "signature": "impl From<&str> for EntityId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 382,
+     "in_test": false
+    },
+    {
+     "trait": "From<String>",
+     "generics": "",
+     "signature": "impl From<String> for EntityId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 392,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Display",
+     "generics": "",
+     "signature": "impl fmt::Display for EntityId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 398,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "TxId",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct TxId(pub u64)",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 407,
+   "doc": [
+    "Transaktions-Identifikator."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]",
+    "#[repr(transparent)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "INVALID",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const INVALID: Self = Self(0)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 411,
+     "doc": [
+      "Invalid or uninitialized transaction identifier sentinel value (`0`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "MAX_COLLECTION_SEQUENCE",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const MAX_COLLECTION_SEQUENCE: u64 = 1_000_000_000_000",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 414,
+     "doc": [
+      "Upper bound of the Collection-sequenced transaction ID range (`10^12`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "INTERNAL_BASE",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const INTERNAL_BASE: u64 = u64::MAX - 1_000_000",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 417,
+     "doc": [
+      "Lower bound of the internal system transaction ID range."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 421,
+     "doc": [
+      "Creates a new `TxId` wrapping the provided `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 427,
+     "doc": [
+      "Returns the inner raw `u64` identifier."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 434,
+     "doc": [
+      "Deprecated backwards compatibility alias for inner."
+     ],
+     "attrs": [
+      "#[deprecated(note = \"Nutze inner()\")]",
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "internal",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn internal() -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 440,
+     "doc": [
+      "Returns a new internal/system transaction ID."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_from_internal_offset",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_from_internal_offset(offset: u64) -> Result<Self>",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 445,
+     "doc": [
+      "Safely constructs an internal system TxId from an offset relative to `TxId::INTERNAL_BASE`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_valid_origin",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_valid_origin(&self) -> bool",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 454,
+     "doc": [
+      "Checks if the transaction ID originates from a valid range."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_internal",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn is_internal(self) -> bool",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 460,
+     "doc": [
+      "Returns `true` if this `TxId` was allocated by the internal system range."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_valid",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn is_valid(self) -> bool",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 466,
+     "doc": [
+      "Returns `true` if this `TxId` represents a valid initialized transaction (`id > 0`)."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TxId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 409,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for TxId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 475,
+     "in_test": false
+    },
+    {
+     "trait": "From<u64>",
+     "generics": "",
+     "signature": "impl From<u64> for TxId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 481,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Display",
+     "generics": "",
+     "signature": "impl fmt::Display for TxId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 488,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "FileId",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct FileId(pub [u8",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 498,
+   "doc": [
+    "16-Byte Dateikennung (SPEC F.1)."
+   ],
+   "attrs": [
+    "#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(bytes: [u8",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 502,
+     "doc": [
+      "Erzeugt eine `FileId` aus rohen 16 Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 507,
+     "doc": [
+      "Liefert die 16 Bytes als Slice."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl FileId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 500,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for FileId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 512,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "StoreId",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct StoreId(pub [u8",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 524,
+   "doc": [
+    "16-Byte Speicherinstanz-Kennung (SPEC F.1)."
+   ],
+   "attrs": [
+    "#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(bytes: [u8",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 528,
+     "doc": [
+      "Erzeugt eine `StoreId` aus rohen 16 Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 533,
+     "doc": [
+      "Liefert die 16 Bytes als Slice."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl StoreId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 526,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for StoreId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 538,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Seq",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct Seq(pub u64)",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 552,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "ZERO",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const ZERO: Self = Self(0)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 556,
+     "doc": [
+      "Minimale Sequenznummer."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(val: u64) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 559,
+     "doc": [
+      "Erzeugt eine neue Sequenznummer."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(&self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 564,
+     "doc": [
+      "Liefert den numerischen Wert als u64."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "next",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn next(self) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 569,
+     "doc": [
+      "Liefert die nächste Sequenznummer."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Seq",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 554,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Timestamp",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct Timestamp(pub u64)",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 578,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "ZERO",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const ZERO: Self = Self(0)",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 582,
+     "doc": [
+      "Null-Zeitstempel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_micros",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn from_micros(micros: u64) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 585,
+     "doc": [
+      "Erzeugt einen neuen Zeitstempel aus Mikrosekunden seit Unix-Epoche."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_micros",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_micros(&self) -> u64",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 590,
+     "doc": [
+      "Liefert den Mikrosekunden-Wert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Timestamp",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 580,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DocRef",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct DocRef",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 649,
+   "doc": [
+    "Eindeutige Dokumentenadresse: Betroffener ist unveränderlicher Teil der Identität (SPEC 7.2, D-70)."
+   ],
+   "attrs": [
+    "#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "subject",
+     "type": "Option<SubjectRef>",
+     "vis": "pub",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 651
+    },
+    {
+     "name": "key",
+     "type": "DocKey",
+     "vis": "pub",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 653
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "TenantScopeViolation",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub enum TenantScopeViolation",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 660,
+   "doc": [
+    "Errors raised when attempting an illegal or mismatched tenant scope unpacking operation."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Error)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Mismatch",
+     "shape": "{",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 664
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "TenantScoped",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub struct TenantScoped<T>",
+   "file": "crates/contextra-ids/src/lib.rs",
+   "line": 674,
+   "doc": [
+    "Ein Wrapper-Typ, der einen Wert untrennbar an eine `TenantId` bindet."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(tenant_id: TenantId, value: T) -> Self",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 682,
+     "doc": [
+      "Creates a new `TenantScoped` value bound to the specified `TenantId`."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "tenant_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn tenant_id(&self) -> &TenantId",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 688,
+     "doc": [
+      "Returns a reference to the bound `TenantId`."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "value",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn value(&self) -> &T",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 694,
+     "doc": [
+      "Referenz auf den inneren Wert."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "into_inner_checked",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn into_inner_checked( self, expected: &TenantId, ) -> core::result::Result<T, TenantScopeViolation>",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 699,
+     "doc": [
+      "Gibt den Wert nur zurück, wenn die aufrufende Seite die erwartete `TenantId` nennt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "map",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn map<U>(self, f: impl FnOnce(T) -> U) -> TenantScoped<U>",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 714,
+     "doc": [
+      "Transforms the inner value `T` into `U` using `f` while preserving the bound `TenantId`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<T>",
+     "signature": "impl<T> TenantScoped<T>",
+     "file": "crates/contextra-ids/src/lib.rs",
+     "line": 679,
+     "in_test": false
+    }
+   ]
+  }
+ ],
+ "reexports": [],
+ "macros": [],
+ "used_by": [
+  "contextra-checkpoint",
+  "contextra-crypto",
+  "contextra-graph",
+  "contextra-mvcc",
+  "contextra-store",
+  "contextra-text",
+  "contextra-types",
+  "contextra-vector"
+ ]
+}

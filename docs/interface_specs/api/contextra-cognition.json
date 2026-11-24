@@ -1,0 +1,5191 @@
+{
+ "name": "contextra-cognition",
+ "version": "workspace",
+ "path": "crates/contextra-cognition",
+ "role": "Konsolidierung und Gedächtnis",
+ "features": {
+  "default": [],
+  "graph-connectivity-health": [
+   "contextra-graph/physio-percolation"
+  ],
+  "edge-reinforcement-learning": [
+   "contextra-graph/edge-reinforcement-learning"
+  ]
+ },
+ "deps": {
+  "contextra-types": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-ports": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-graph": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-rank": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-text": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "bytes": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "ahash": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tokio": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "parking_lot": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tokio-util": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "async-trait": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "blake3": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tempfile": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-testkit": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-db": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "# Kognitions-Engine (`contextra-cognition`)",
+  "",
+  "Die Crate `contextra-cognition` bildet die Kognitions- und Konsolidierungsschicht",
+  "im Contextra-Workspace (Ebene E2 nach Spezifikation docs/SPEC.md v3).",
+  "Sie stellt Hintergrundprozesse für Gedächtniskonsolidierung (Memory Consolidation),",
+  "Kontext-Kompaktierung (Context Compaction), semantische Aggregation (LeanRAG / Hyperedge Consolidation)",
+  "und Wartungsplanung (Maintenance Scheduling) bereit.",
+  "",
+  "## Ring-Zugehörigkeit und Abhängigkeiten",
+  "- **Abhängigkeiten (eingehend):** Wird von höheren Orchestrierungsschichten wie `contextra-db` eingebunden.",
+  "- **Abhängigkeiten (ausgehend):** Nutzt Basis- und Speicher-Crates:",
+  "- `contextra-types`: Domänentypen, Fehlermodelle, Mandanten-IDs.",
+  "- `contextra-ports`: Abstrakte Port-Schnittstellen (Storage, Clock, Rng, Metrics).",
+  "- `contextra-engine`: Ausführungs- und Storage-Subsysteme.",
+  "- `contextra-store`: Schlüssel-Wert- und LSM-Speicher (Key-Value-Store).",
+  "- `contextra-vector`: Vektorindizes und Embeddings.",
+  "- `contextra-graph`: CSR-Graphdarstellung und Hyperedges.",
+  "",
+  "## Kernkomponenten",
+  "- [`ContextManager`]: Verwaltet Kontexte, Raumgrenzen (SpatialFence) und Token-Budgets.",
+  "- [`ContextCompactor`]: Führt Transaktions- und Dialogkompaktierung durch.",
+  "- [`ConsolidationEngine`]: Hintergrund-Worker für Schlafzyklen (Sleep Cycles) und semantische Verschmelzung.",
+  "- [`MaintenanceScheduler`]: Steuert periodische Wartungsläufe und Speicherbereinigungen.",
+  "",
+  "## Invarianten",
+  "- **Kein Unsafe-Code:** `#![forbid(unsafe_code)]` wird strikt auf Crate-Ebene erzwungen.",
+  "- **Mandantentrennung:** Strikte Isolierung nach `tenant_id` (VETO-F10).",
+  "- **Deterministische Sortierung:** Alle aggregierten und vorverdichteten Strukturen werden deterministisch sortiert."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "module": "aggregation_phase",
+   "lines": 930
+  },
+  {
+   "file": "crates/contextra-cognition/src/channel.rs",
+   "module": "channel",
+   "lines": 149
+  },
+  {
+   "file": "crates/contextra-cognition/src/collection.rs",
+   "module": "collection",
+   "lines": 395
+  },
+  {
+   "file": "crates/contextra-cognition/src/collection_types.rs",
+   "module": "collection_types",
+   "lines": 38
+  },
+  {
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "module": "consolidation_executor",
+   "lines": 1161
+  },
+  {
+   "file": "crates/contextra-cognition/src/consolidation_locks.rs",
+   "module": "consolidation_locks",
+   "lines": 131
+  },
+  {
+   "file": "crates/contextra-cognition/src/context.rs",
+   "module": "context",
+   "lines": 660
+  },
+  {
+   "file": "crates/contextra-cognition/src/context_compaction/cleanup.rs",
+   "module": "context_compaction::cleanup",
+   "lines": 62
+  },
+  {
+   "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+   "module": "context_compaction::compactor",
+   "lines": 392
+  },
+  {
+   "file": "crates/contextra-cognition/src/context_compaction/mod.rs",
+   "module": "context_compaction",
+   "lines": 42
+  },
+  {
+   "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+   "module": "context_compaction::session",
+   "lines": 364
+  },
+  {
+   "file": "crates/contextra-cognition/src/context_compaction/tests.rs",
+   "module": "context_compaction::tests",
+   "lines": 657
+  },
+  {
+   "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+   "module": "context_compaction::types",
+   "lines": 67
+  },
+  {
+   "file": "crates/contextra-cognition/src/decay.rs",
+   "module": "decay",
+   "lines": 190
+  },
+  {
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "module": "engine_local",
+   "lines": 25
+  },
+  {
+   "file": "crates/contextra-cognition/src/error.rs",
+   "module": "error",
+   "lines": 91
+  },
+  {
+   "file": "crates/contextra-cognition/src/graph_local.rs",
+   "module": "graph_local",
+   "lines": 19
+  },
+  {
+   "file": "crates/contextra-cognition/src/graph_sink.rs",
+   "module": "graph_sink",
+   "lines": 114
+  },
+  {
+   "file": "crates/contextra-cognition/src/leanrag_input.rs",
+   "module": "leanrag_input",
+   "lines": 140
+  },
+  {
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "module": "crate",
+   "lines": 124
+  },
+  {
+   "file": "crates/contextra-cognition/src/maintenance_config.rs",
+   "module": "maintenance_config",
+   "lines": 118
+  },
+  {
+   "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+   "module": "maintenance_scheduler",
+   "lines": 568
+  },
+  {
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "module": "memory_consolidation",
+   "lines": 1315
+  },
+  {
+   "file": "crates/contextra-cognition/src/ports.rs",
+   "module": "ports",
+   "lines": 136
+  },
+  {
+   "file": "crates/contextra-cognition/src/ports_local.rs",
+   "module": "ports_local",
+   "lines": 17
+  },
+  {
+   "file": "crates/contextra-cognition/src/semantic_aggregation_facade.rs",
+   "module": "semantic_aggregation_facade",
+   "lines": 130
+  },
+  {
+   "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+   "module": "synthesis_phase",
+   "lines": 250
+  },
+  {
+   "file": "crates/contextra-cognition/src/transitivity_veto.rs",
+   "module": "transitivity_veto",
+   "lines": 178
+  },
+  {
+   "file": "crates/contextra-cognition/src/types_local.rs",
+   "module": "types_local",
+   "lines": 15
+  }
+ ],
+ "counts": {
+  "unwrap": 16,
+  "expect": 31,
+  "panic_macro": 0,
+  "todo_unimpl": 1,
+  "index_bracket": 48,
+  "deprecated_attr": 2,
+  "cfg_feature_gates": 8
+ },
+ "grep_pub_decl": 194,
+ "all_pub_decl": 194,
+ "public_items": [
+  {
+   "kind": "struct",
+   "name": "AggregationConfig",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub struct AggregationConfig",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 43,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "validate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn validate(&self) -> Result<()>",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 85,
+     "doc": [
+      "Validiert die Konfigurationseinstellungen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "max_compaction_peak_memory_mb",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 45
+    },
+    {
+     "name": "clustering_tau_threshold",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 47
+    },
+    {
+     "name": "gmm_deterministic_seed",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 49
+    },
+    {
+     "name": "max_llm_calls_per_cycle",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 51
+    },
+    {
+     "name": "max_clusters",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 53
+    },
+    {
+     "name": "min_cluster_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 55
+    },
+    {
+     "name": "em_max_iterations",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 57
+    },
+    {
+     "name": "em_tolerance",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 59
+    },
+    {
+     "name": "min_type_compat_score",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 61
+    },
+    {
+     "name": "stability_cycles_required",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 63
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for AggregationConfig",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 66,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl AggregationConfig",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 83,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "AggregationPhaseResult",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub struct AggregationPhaseResult",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 135,
+   "doc": [
+    "Ergebnis der Aggregationsphase."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "raw_edges_invalidated",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 137
+    },
+    {
+     "name": "abstract_hyperedges_created",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 139
+    },
+    {
+     "name": "peak_memory_used_mb",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 141
+    },
+    {
+     "name": "child_edge_ids_written",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 143
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ConsolidationPipelineResult",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub struct ConsolidationPipelineResult",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 150,
+   "doc": [
+    "Gesamtergebnis der dreistufigen Konsolidierungspipeline."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "structural",
+     "type": "ConsolidationPhaseResult",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 152
+    },
+    {
+     "name": "synthesis",
+     "type": "crate::memory_consolidation::SynthesisPhaseResult",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 154
+    },
+    {
+     "name": "aggregation",
+     "type": "Option<AggregationPhaseResult>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 156
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "AggregationNode",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub struct AggregationNode",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 163,
+   "doc": [
+    "Eingabeknoten für die Aggregationsphase."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "entity",
+     "type": "EntityId",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 165
+    },
+    {
+     "name": "embedding",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 167
+    },
+    {
+     "name": "type_id",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 169
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "AggregationEdge",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub struct AggregationEdge",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 176,
+   "doc": [
+    "Eingabekante für die Aggregationsphase."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "HyperEdgeId",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 178
+    },
+    {
+     "name": "predicate_type",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 180
+    },
+    {
+     "name": "participants",
+     "type": "Vec<EntityId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 182
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SuperEdgeDraft",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub struct SuperEdgeDraft",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 189,
+   "doc": [
+    "Entwurf einer abstrakten Super-Hyperkante."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "participants",
+     "type": "Vec<EntityId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 193
+    },
+    {
+     "name": "child_edge_ids",
+     "type": "Vec<HyperEdgeId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 195
+    },
+    {
+     "name": "weight",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 197
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "AlphaNode",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub struct AlphaNode",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 204,
+   "doc": [
+    "Synthetisierter abstrakter Alpha-Knoten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "cluster_id",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 206
+    },
+    {
+     "name": "members",
+     "type": "Vec<EntityId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 208
+    },
+    {
+     "name": "summary",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 210
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "SuperEdgeSink",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub trait SuperEdgeSink",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 216,
+   "doc": [
+    "Senkentrait für Superkanten und Tombstones."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "invalidate_edge",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn invalidate_edge(&mut self, id: HyperEdgeId) -> Result<()>",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 218,
+     "doc": [
+      "Markiert eine Kante als invalidiert (superseded)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "SuperEdgeSink"
+    },
+    {
+     "name": "write_super_edge",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn write_super_edge(&mut self, draft: SuperEdgeDraft) -> Result<HyperEdgeId>",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 220,
+     "doc": [
+      "Schreibt eine neue Super-Hyperkante und gibt deren zugewiesene ID zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "SuperEdgeSink"
+    },
+    {
+     "name": "commit",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn commit(&mut self) -> Result<()>",
+     "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+     "line": 222,
+     "doc": [
+      "Atomarer Commit aller Änderungen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "SuperEdgeSink"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "check_compaction_budget",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub fn check_compaction_budget(peak_bytes: usize, cfg: &AggregationConfig) -> Result<()>",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 228,
+   "doc": [
+    "Prüft den geschätzten Speicherbedarf gegen das konfigurierte Budget."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compute_entity_community_hash",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub fn compute_entity_community_hash(members: &[EntityId]) -> u64",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 274,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_aggregation_pass",
+   "vis": "pub",
+   "module": "aggregation_phase",
+   "signature": "pub async fn run_aggregation_pass( nodes: &[AggregationNode], edges: &[AggregationEdge], cfg: &AggregationConfig, llm: &dyn LlmTextGenerator, tracker: &mut CommunityStabilityTracker, sink: &mut dyn SuperEdgeSink, ) -> Result<(AggregationPhaseResult, Vec<AlphaNode>)>",
+   "file": "crates/contextra-cognition/src/aggregation_phase.rs",
+   "line": 584,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "CognitiveInputChannel",
+   "vis": "pub",
+   "module": "channel",
+   "signature": "pub trait CognitiveInputChannel: Send + Sync",
+   "file": "crates/contextra-cognition/src/channel.rs",
+   "line": 25,
+   "doc": [
+    "Abstract asynchronous input channel for feeding cognitive inputs."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "send_pre_condensed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn send_pre_condensed<'a>( &'a self, target_tenant_id: &'a TenantId, inputs: &'a [PreCondensedInput], ) -> BoxFuture<'a, Result<Vec<TurnSegment>>>",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 27,
+     "doc": [
+      "Ingests a pre-condensed input batch into the cognition engine."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CognitiveInputChannel"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "CognitiveOutputSink",
+   "vis": "pub",
+   "module": "channel",
+   "signature": "pub trait CognitiveOutputSink<T>: Send + Sync",
+   "file": "crates/contextra-cognition/src/channel.rs",
+   "line": 36,
+   "doc": [
+    "Abstract asynchronous output sink for dispatching consolidated or synthesized chunks."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "emit",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn emit<'a>(&'a self, item: T) -> BoxFuture<'a, Result<()>>",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 38,
+     "doc": [
+      "Emits a consolidated item to the destination sink."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CognitiveOutputSink"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "InMemoryCognitiveChannel",
+   "vis": "pub",
+   "module": "channel",
+   "signature": "pub struct InMemoryCognitiveChannel",
+   "file": "crates/contextra-cognition/src/channel.rs",
+   "line": 48,
+   "doc": [
+    "In-Memory asynchronous MPSC implementation of `CognitiveInputChannel`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(capacity: usize) -> (Self, mpsc::Receiver<(TenantId, Vec<PreCondensedInput>)>)",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 54,
+     "doc": [
+      "Creates a new `InMemoryCognitiveChannel` with given buffer capacity."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl InMemoryCognitiveChannel",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 52,
+     "in_test": false
+    },
+    {
+     "trait": "CognitiveInputChannel",
+     "generics": "",
+     "signature": "impl CognitiveInputChannel for InMemoryCognitiveChannel",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 60,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DirectCognitiveChannel",
+   "vis": "pub",
+   "module": "channel",
+   "signature": "pub struct DirectCognitiveChannel",
+   "file": "crates/contextra-cognition/src/channel.rs",
+   "line": 86,
+   "doc": [
+    "Standalone synchronous/direct intake adapter implementing `CognitiveInputChannel`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "CognitiveInputChannel",
+     "generics": "",
+     "signature": "impl CognitiveInputChannel for DirectCognitiveChannel",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 88,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "InMemoryOutputSink",
+   "vis": "pub",
+   "module": "channel",
+   "signature": "pub struct InMemoryOutputSink<T>",
+   "file": "crates/contextra-cognition/src/channel.rs",
+   "line": 107,
+   "doc": [
+    "In-memory queue sink collecting emitted items in an `Arc<parking_lot::Mutex<Vec<T>>>`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 113,
+     "doc": [
+      "Creates a new empty `InMemoryOutputSink`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "collected",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn collected(&self) -> Vec<T>",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 120,
+     "doc": [
+      "Returns a copy of all collected items."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 125,
+     "doc": [
+      "Returns the number of collected items."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 130,
+     "doc": [
+      "Checks if the sink is empty."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<T: Send + Sync + Clone + 'static>",
+     "signature": "impl<T: Send + Sync + Clone + 'static> InMemoryOutputSink<T>",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 111,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "<T: Send + Sync + Clone + 'static>",
+     "signature": "impl<T: Send + Sync + Clone + 'static> Default for InMemoryOutputSink<T>",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 135,
+     "in_test": false
+    },
+    {
+     "trait": "CognitiveOutputSink<T>",
+     "generics": "<T: Send + Sync + Clone + 'static>",
+     "signature": "impl<T: Send + Sync + Clone + 'static> CognitiveOutputSink<T> for InMemoryOutputSink<T>",
+     "file": "crates/contextra-cognition/src/channel.rs",
+     "line": 141,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DbTransaction",
+   "vis": "pub",
+   "module": "collection",
+   "signature": "pub struct DbTransaction<S: StorageEngine, V: VectorIndex>",
+   "file": "crates/contextra-cognition/src/collection.rs",
+   "line": 22,
+   "doc": [
+    "Lokale Transaktionsstruktur für 2-Phase Commits in der Konsolidierungssitzung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(collection: Collection<S, V>, tx_id: TxId) -> Self",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 31,
+     "doc": [
+      "Erzeugt eine neue Transaktion."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "commit",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn commit(self) -> Result<()>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 41,
+     "doc": [
+      "Führt den Transaktions-Commit aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "tx_id",
+     "type": "TxId",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 23
+    },
+    {
+     "name": "staged_deletes",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 26
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<S: StorageEngine, V: VectorIndex>",
+     "signature": "impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 29,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Collection",
+   "vis": "pub",
+   "module": "collection",
+   "signature": "pub struct Collection<S: StorageEngine, V: VectorIndex>",
+   "file": "crates/contextra-cognition/src/collection.rs",
+   "line": 68,
+   "doc": [
+    "Repräsentiert eine namensraumisolierte Collection innerhalb der Kognitions-Engine."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( name: String, storage: Arc<S>, index: Arc<V>, graph_index: Arc<CsrGraph>, next_tx: Arc<AtomicU64>, dimension: usize, language: Language, ) -> Self",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 100,
+     "doc": [
+      "Erstellt eine neue Collection."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "name",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn name(&self) -> &str",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 130,
+     "doc": [
+      "Gibt den Namen der Collection zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "dimension",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn dimension(&self) -> usize",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 135,
+     "doc": [
+      "Gibt die Vektordimension zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "storage",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn storage(&self) -> &S",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 140,
+     "doc": [
+      "Gibt eine Referenz auf den physischen Speicher zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "index",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn index(&self) -> &V",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 145,
+     "doc": [
+      "Gibt den Vektorindex zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "graph_index",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn graph_index(&self) -> Arc<CsrGraph>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 150,
+     "doc": [
+      "Gibt den Wissensgraphen zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "namespaced_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn namespaced_key(&self, raw: &[u8], key_type: u8) -> Vec<u8>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 155,
+     "doc": [
+      "Erzeugt einen namensraumisolierten Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "user_key_prefix",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn user_key_prefix(&self) -> Vec<u8>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 164,
+     "doc": [
+      "Gibt das Schlüsselpräfix für reguläre Benutzerdaten zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "allocate_tx",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn allocate_tx(&self) -> Result<TxId>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 171,
+     "doc": [
+      "Allokiert eine Transaktions-ID."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "begin_transaction",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn begin_transaction(&self) -> Result<DbTransaction<S, V>>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 177,
+     "doc": [
+      "Beginnt eine neue Transaktion."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_doc_tx",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn get_doc_tx(&self, _doc_id: DocId) -> Result<Option<TxId>>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 183,
+     "doc": [
+      "Ruft den Transaktionszeitstempel eines Dokuments ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "consolidation_in_progress",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn consolidation_in_progress(&self) -> Arc<AtomicBool>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 188,
+     "doc": [
+      "Prüft, ob eine Konsolidierung aktiv ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert_op",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn insert_op( &self, db_tx: &DbTransaction<S, V>, id: &str, embedding: &[f32], metadata: Option<serde_json::Value>, ) -> Result<()>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 193,
+     "doc": [
+      "Bereitet das Einfügen eines Dokuments in einer Transaktion vor."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "delete_op",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn delete_op(&self, db_tx: &mut DbTransaction<S, V>, id: &str) -> Result<()>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 215,
+     "doc": [
+      "Bereitet das Löschen eines Dokuments in einer Transaktion vor."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn get(&self, id: &str) -> Result<Option<StoredDocument>>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 224,
+     "doc": [
+      "Ruft ein Dokument ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "delete",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn delete(&self, id: &str) -> Result<()>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 242,
+     "doc": [
+      "Löscht ein Dokument direkt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert_text_only",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn insert_text_only( &self, id: &str, text: &str, mut metadata: Option<serde_json::Value>, ) -> Result<()>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 254,
+     "doc": [
+      "Inserts a text document."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "put_kv",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn put_kv(&self, key: &str, value: &serde_json::Value) -> Result<()>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 273,
+     "doc": [
+      "Schreibt einen beliebigen Schlüssel-Wert-Eintrag."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "evict_decayed_chunks",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn evict_decayed_chunks( &self, _controller: &AdaptiveDecayController, _limit: usize, ) -> Result<usize>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 284,
+     "doc": [
+      "Bereinigt abgewertete Chunks."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn insert( &self, id: &str, embedding: &[f32], metadata: Option<serde_json::Value>, ) -> Result<()>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 296,
+     "doc": [
+      "Fügt ein Dokument mit Embedding und optionalen Metadaten ein.",
+      "",
+      "Schlanke Insert-Methode, die `insert_op` intern nutzt.",
+      "Keine Backpressure oder komplexes Locking — geeignet für Testszenarien."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert_typed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn insert_typed( &self, id: &str, embedding: &[f32], _memory_type: contextra_types::MemoryType, metadata: Option<serde_json::Value>, ) -> Result<()>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 311,
+     "doc": [
+      "Fügt ein Dokument mit typisiertem `MemoryType` ein (Wrapper um `insert`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "update",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn update( &self, id: &str, embedding: &[f32], metadata: Option<serde_json::Value>, ) -> Result<()>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 322,
+     "doc": [
+      "Aktualisiert ein Dokument (upsert-Semantik, Alias für `insert`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "relate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn relate( &self, from: &str, to: &str, label: &str, ) -> Result<()>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 332,
+     "doc": [
+      "Erstellt eine gerichtete Relation zwischen zwei Dokumenten im Graph-Index."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "consolidation_guard",
+     "type": "Arc<tokio::sync::Mutex<()>>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 77
+    },
+    {
+     "name": "consolidation_in_progress",
+     "type": "Arc<AtomicBool>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 78
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Clone",
+     "generics": "<S: StorageEngine, V: VectorIndex>",
+     "signature": "impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 81,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<S: StorageEngine, V: VectorIndex>",
+     "signature": "impl<S: StorageEngine, V: VectorIndex> Collection<S, V>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 98,
+     "in_test": false
+    },
+    {
+     "trait": "CollectionOps",
+     "generics": "<S: StorageEngine, V: VectorIndex>",
+     "signature": "impl<S: StorageEngine, V: VectorIndex> CollectionOps for Collection<S, V>",
+     "file": "crates/contextra-cognition/src/collection.rs",
+     "line": 351,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "StoredDocument",
+   "vis": "pub",
+   "module": "collection_types",
+   "signature": "pub struct StoredDocument",
+   "file": "crates/contextra-cognition/src/collection_types.rs",
+   "line": 13,
+   "doc": [
+    "Dokumentenstruktur für gespeicherte Entitäten und Chunks."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/collection_types.rs",
+     "line": 15
+    },
+    {
+     "name": "embedding",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/collection_types.rs",
+     "line": 17
+    },
+    {
+     "name": "metadata",
+     "type": "Option<serde_json::Value>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/collection_types.rs",
+     "line": 19
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "StoredDocumentMeta",
+   "vis": "pub",
+   "module": "collection_types",
+   "signature": "pub struct StoredDocumentMeta",
+   "file": "crates/contextra-cognition/src/collection_types.rs",
+   "line": 24,
+   "doc": [
+    "Leichtgewichtige Metadaten für Dokumente (ohne Embedding-Vektor)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/collection_types.rs",
+     "line": 26
+    },
+    {
+     "name": "metadata",
+     "type": "Option<serde_json::Value>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/collection_types.rs",
+     "line": 28
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<&StoredDocument>",
+     "generics": "",
+     "signature": "impl From<&StoredDocument> for StoredDocumentMeta",
+     "file": "crates/contextra-cognition/src/collection_types.rs",
+     "line": 31,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ConsolidationLockGuard",
+   "vis": "pub",
+   "module": "consolidation_executor",
+   "signature": "pub struct ConsolidationLockGuard",
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "line": 60,
+   "doc": [
+    "RAII-Guard zur Absicherung gegen parallele Konsolidierungsläufe."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "try_acquire",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_acquire(flag: &Arc<AtomicBool>) -> Option<Self>",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 68,
+     "doc": [
+      "Versucht, das Konsolidierungs-Lock atomic zu erwerben (`compare_exchange`).",
+      "Gibt `Some(ConsolidationLockGuard)` zurück, wenn das Lock erfolgreich reserviert wurde.",
+      "Gibt `None` zurück, falls bereits ein Konsolidierungslauf aktiv ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ConsolidationLockGuard",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 64,
+     "in_test": false
+    },
+    {
+     "trait": "Drop",
+     "generics": "",
+     "signature": "impl Drop for ConsolidationLockGuard",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 80,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "execute_consolidation_pass",
+   "vis": "pub",
+   "module": "consolidation_executor",
+   "signature": "pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>( collection: &Collection<S, V>, turns: &[(DocId, Vec<f32>)], config: &ConsolidationConfig, ) -> Result<ConsolidationPhaseResult>",
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "line": 126,
+   "doc": [
+    "Führt den Structural Pass aus und wendet Änderungen auf die Collection an."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "GroundingValidatorAdapter",
+   "vis": "pub",
+   "module": "consolidation_executor",
+   "signature": "pub struct GroundingValidatorAdapter<'a>(pub &'a dyn GroundingValidator)",
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "line": 192,
+   "doc": [
+    "Adapter für GroundingValidator auf ResponseGroundingValidator."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "ResponseGroundingValidator",
+     "generics": "<'a>",
+     "signature": "impl<'a> ResponseGroundingValidator for GroundingValidatorAdapter<'a>",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 194,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "execute_background_consolidation",
+   "vis": "pub",
+   "module": "consolidation_executor",
+   "signature": "pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>( collection: &Collection<S, V>, turns: &[(DocId, Vec<f32>)], consolidation_config: &ConsolidationConfig, synthesis_config: Option<&SynthesisConfig>, llm: Option<&dyn LlmTextGenerator>, validator: Option<&dyn ResponseGroundingValidator>, stability_tracker: Option<&mut CommunityStabilityTracker>, ) -> Result<(ConsolidationPhaseResult, Option<SynthesisPhaseResult>)>",
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "line": 246,
+   "doc": [
+    "Führt die vollständige Hintergrund-Konsolidierung aus."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "execute_background_consolidation_with_rich_validator",
+   "vis": "pub",
+   "module": "consolidation_executor",
+   "signature": "pub async fn execute_background_consolidation_with_rich_validator< S: StorageEngine, V: VectorIndex, >( collection: &Collection<S, V>, turns: &[(DocId, Vec<f32>)], consolidation_config: &ConsolidationConfig, synthesis_config: Option<&SynthesisConfig>, llm: Option<&dyn LlmTextGenerator>, validator: Option<&dyn ResponseGroundingValidator>, rich_validator: Option<&dyn GroundingValidator>, stability_tracker: Option<&mut CommunityStabilityTracker>, ) -> Result<(ConsolidationPhaseResult, Option<SynthesisPhaseResult>)>",
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "line": 373,
+   "doc": [
+    "Führt Hintergrund-Konsolidierung mit Unterstützung für Rich-Grounding-Validatoren aus."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "execute_leanrag_aggregation_stage",
+   "vis": "pub",
+   "module": "consolidation_executor",
+   "signature": "pub async fn execute_leanrag_aggregation_stage<S: StorageEngine, V: VectorIndex>( collection: &Collection<S, V>, nodes: &[AggregationNode], edges: &[AggregationEdge], cfg: &AggregationConfig, llm: &dyn LlmTextGenerator, tracker: &mut CommunityStabilityTracker, wal_tx: contextra_types::TxId, ) -> Result<(AggregationPhaseResult, Vec<AlphaNode>)>",
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "line": 440,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "execute_sleep_cycle",
+   "vis": "pub",
+   "module": "consolidation_executor",
+   "signature": "pub async fn execute_sleep_cycle<S: StorageEngine, V: VectorIndex>( collection: &Collection<S, V>, turns: &[(DocId, Vec<f32>)], consolidation_config: &ConsolidationConfig, synthesis_config: Option<&SynthesisConfig>, llm: Option<&dyn LlmTextGenerator>, stability_tracker: Option<&mut CommunityStabilityTracker>, ) -> Result<(ConsolidationPhaseResult, Option<SynthesisPhaseResult>)>",
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "line": 463,
+   "doc": [
+    "Veralteter Wrapper für execute_background_consolidation."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "start_consolidation_worker",
+   "vis": "pub",
+   "module": "consolidation_executor",
+   "signature": "pub fn start_consolidation_worker<S: StorageEngine + 'static, V: VectorIndex + 'static>( collection: Arc<Collection<S, V>>, consolidation_config: ConsolidationConfig, synthesis_config: SynthesisConfig, interval: std::time::Duration, cancel_token: tokio_util::sync::CancellationToken, ) -> tokio::task::JoinHandle<()>",
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "line": 486,
+   "doc": [
+    "Startet einen Hintergrund-Worker für periodische Konsolidierung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "start_consolidation_reaper",
+   "vis": "pub",
+   "module": "consolidation_executor",
+   "signature": "pub fn start_consolidation_reaper<S: StorageEngine + 'static, V: VectorIndex + 'static>( collection: Arc<Collection<S, V>>, consolidation_config: ConsolidationConfig, synthesis_config: SynthesisConfig, interval: std::time::Duration, cancel_token: tokio_util::sync::CancellationToken, ) -> tokio::task::JoinHandle<()>",
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "line": 508,
+   "doc": [
+    "Veralteter Alias für start_consolidation_worker."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ConsolidationEngine",
+   "vis": "pub",
+   "module": "consolidation_executor",
+   "signature": "pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex>",
+   "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+   "line": 530,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( collection: Arc<Collection<S, V>>, consolidation_config: ConsolidationConfig, synthesis_config: SynthesisConfig, interval: std::time::Duration, cancel_token: tokio_util::sync::CancellationToken, ) -> Self",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 545,
+     "doc": [
+      "Erstellt eine neue `ConsolidationEngine`-Instanz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_llm",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_llm(mut self, llm: Arc<dyn LlmTextGenerator>) -> Self",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 567,
+     "doc": [
+      "Fügt ein optionales LLM für die generative Wissenssynthese hinzu."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_leanrag",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_leanrag(mut self, cfg: AggregationConfig) -> Self",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 573,
+     "doc": [
+      "Fügt eine optionale AggregationConfig für LeanRAG Stage 3 (Opt-in) hinzu."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_validator",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_validator(mut self, validator: Arc<dyn ResponseGroundingValidator>) -> Self",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 579,
+     "doc": [
+      "Fügt einen optionalen Grounding-Validator für den Generative Synthesis Pass hinzu."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_rich_validator",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_rich_validator(mut self, validator: Arc<dyn GroundingValidator>) -> Self",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 585,
+     "doc": [
+      "Fügt einen optionalen reichhaltigen Grounding-Validator (`GroundingValidator`) mit Kalibrierung & Policy-Violation-Semantik hinzu."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "start",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn start(self: Arc<Self>) -> tokio::task::JoinHandle<()>",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 591,
+     "doc": [
+      "Startet die Engine als Tokio-Background-Task."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "start_worker",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn start_worker( collection: Arc<Collection<S, V>>, consolidation_config: ConsolidationConfig, synthesis_config: SynthesisConfig, interval: std::time::Duration, cancel_token: tokio_util::sync::CancellationToken, ) -> tokio::task::JoinHandle<()>",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 598,
+     "doc": [
+      "Starts a background task for periodic consolidation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "run",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn run(&self)",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 616,
+     "doc": [
+      "Hauptschleife der `ConsolidationEngine`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "run_cycle",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn run_cycle( &self, ) -> Result<(ConsolidationPhaseResult, Option<SynthesisPhaseResult>)>",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 754,
+     "doc": [
+      "Führt einen einzelnen Konsolidierungszyklus aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<S: StorageEngine + 'static, V: VectorIndex + 'static>",
+     "signature": "impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S, V>",
+     "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+     "line": 543,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ConsolidationNodesGuard",
+   "vis": "pub",
+   "module": "consolidation_locks",
+   "signature": "pub struct ConsolidationNodesGuard<'a, S: StorageEngine, V: VectorIndex>",
+   "file": "crates/contextra-cognition/src/consolidation_locks.rs",
+   "line": 48,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "try_acquire",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_acquire(collection: &'a Collection<S, V>) -> Option<Self>",
+     "file": "crates/contextra-cognition/src/consolidation_locks.rs",
+     "line": 58,
+     "doc": [
+      "Versucht, das Konsolidierungs-Lock atomar zu erwerben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "collection",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn collection(&self) -> &'a Collection<S, V>",
+     "file": "crates/contextra-cognition/src/consolidation_locks.rs",
+     "line": 72,
+     "doc": [
+      "Liefert eine Referenz auf die geschützte Collection."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "cascade_invalidate_edges_ordered",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn cascade_invalidate_edges_ordered( &self, superseded_doc_ids: &[DocId], wal_seq: u64, ) -> (Vec<(DocId, Result<CascadeInvalidationReport>)>, Vec<String>)",
+     "file": "crates/contextra-cognition/src/consolidation_locks.rs",
+     "line": 83,
+     "doc": [
+      "Führt kaskadierende Graph-Edge-Invalidierungen in kanonischer Reihenfolge aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a, S: StorageEngine, V: VectorIndex>",
+     "signature": "impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationNodesGuard<'a, S, V>",
+     "file": "crates/contextra-cognition/src/consolidation_locks.rs",
+     "line": 53,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ContextManager",
+   "vis": "pub",
+   "module": "context",
+   "signature": "pub struct ContextManager",
+   "file": "crates/contextra-cognition/src/context.rs",
+   "line": 53,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(budget: TokenBudget) -> Self",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 70,
+     "doc": [
+      "Erstellt einen neuen ContextManager mit dem angegebenen TokenBudget."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_defaults",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_defaults() -> Self",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 80,
+     "doc": [
+      "Erstellt einen ContextManager mit Standardeinstellungen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_relevance_threshold",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_relevance_threshold(&mut self, threshold: f32)",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 87,
+     "doc": [
+      "Setzt die Mindestrelevanzschwelle für einzubindende Chunks."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "relevance_threshold",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn relevance_threshold(&self) -> f32",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 94,
+     "doc": [
+      "Liefert die aktuelle Mindestrelevanzschwelle."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "prepare_context",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn prepare_context(&self, mut chunks: Vec<ContextChunk>) -> Result<ContextWindow>",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 104,
+     "doc": [
+      "Bereitet das finale ContextWindow aus übergebenen Chunks vor."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "estimate_tokens",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn estimate_tokens(text: &str) -> usize",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 180,
+     "doc": [
+      "Schätzt die Token-Anzahl eines Textes heuristisch nach BPE-Regeln."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for ContextManager",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 60,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ContextManager",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 66,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SpatialFence",
+   "vis": "pub",
+   "module": "context",
+   "signature": "pub struct SpatialFence",
+   "file": "crates/contextra-cognition/src/context.rs",
+   "line": 262,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(region: impl Into<String>) -> Self",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 273,
+     "doc": [
+      "Erstellt eine neue SpatialFence für die angegebene Region."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "matches",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn matches(&self, chunk: &ContextChunk) -> bool",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 283,
+     "doc": [
+      "Prüft, ob ein Chunk den regionalen Kriterien entspricht."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "region",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 264
+    },
+    {
+     "name": "field_name",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 266
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SpatialFence",
+     "file": "crates/contextra-cognition/src/context.rs",
+     "line": 269,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "cleanup_orphaned_consolidation_intents",
+   "vis": "pub",
+   "module": "context_compaction::cleanup",
+   "signature": "pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>( storage: &S, next_tx: &std::sync::atomic::AtomicU64, ) -> Result<usize>",
+   "file": "crates/contextra-cognition/src/context_compaction/cleanup.rs",
+   "line": 31,
+   "doc": [
+    "Aufgerufen beim Öffnen einer Collection / DB. Findet und entfernt verwaiste",
+    "ConsolidationIntents aus dem WAL/Storage.",
+    "",
+    "Verwaiste Intents entstehen wenn consolidate_with_retry() nach commit(intent_key)",
+    "aber vor dem eigentlichen Dokument-Commit crashed."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ContextCompactor",
+   "vis": "pub",
+   "module": "context_compaction::compactor",
+   "signature": "pub struct ContextCompactor",
+   "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+   "line": 40,
+   "doc": [
+    "Zentrale Kompaktierungs-Engine."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new_with_rng",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_rng( budget: TokenBudget, strategy: CompactionStrategy, rng: Arc<dyn Rng>, ) -> Self",
+     "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+     "line": 118,
+     "doc": [
+      "Erstellt einen ContextCompactor mit explizit injiziertem RNG."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(budget: TokenBudget, strategy: CompactionStrategy) -> Self",
+     "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+     "line": 138,
+     "doc": [
+      "Erstellt einen ContextCompactor mit Standard-RNG (veraltet)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_rng",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_rng(mut self, rng: Arc<dyn Rng>) -> Self",
+     "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+     "line": 148,
+     "doc": [
+      "Setzt den Zufallszahlengenerator für Backoff-Jitter."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "compact",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn compact(&self, chunks: Vec<ContextChunk>) -> CompactedContext",
+     "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+     "line": 164,
+     "doc": [
+      "Kompaktiert Chunks auf das konfigurierte Token-Budget."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "consolidate_via_llm",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn consolidate_via_llm( &self, tenant: TenantId, chunks: &[ContextChunk], generator: &(impl LlmTextGenerator + ?Sized), _model: &str, ) -> Result<CompactedContext>",
+     "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+     "line": 239,
+     "doc": [
+      "Konsolidiert Chunks per LLM zu einem einzigen Zusammenfassungs-Chunk."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "consolidate_with_retry",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn consolidate_with_retry<S, V, G>( collection: &Collection<S, V>, source_doc_ids: &[DocId], target_doc_id: DocId, generator: &G, max_retries: usize, ) -> Result<()> where S: StorageEngine, V: VectorIndex, G: LlmTextGenerator + ?Sized,",
+     "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+     "line": 319,
+     "doc": [
+      "Führt Konsolidierung mit automatischem Retry bei OCC-Konflikten aus (veraltet)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "consolidate_with_retry_with_rng",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn consolidate_with_retry_with_rng<S, V, G>( collection: &Collection<S, V>, source_doc_ids: &[DocId], target_doc_id: DocId, generator: &G, max_retries: usize, rng: &dyn Rng, ) -> Result<()> where S: StorageEngine, V: VectorIndex, G: LlmTextGenerator + ?Sized,",
+     "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+     "line": 350,
+     "doc": [
+      "Führt Konsolidierung mit automatischem Retry und injiziertem RNG aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for ContextCompactor",
+     "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+     "line": 46,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ContextCompactor",
+     "file": "crates/contextra-cognition/src/context_compaction/compactor.rs",
+     "line": 109,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ConsolidationSession",
+   "vis": "pub",
+   "module": "context_compaction::session",
+   "signature": "pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex>",
+   "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+   "line": 41,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "start",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn start( collection: &'a Collection<S, V>, source_doc_ids: &[DocId], target_id: DocId, ) -> Result<Self>",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 59,
+     "doc": [
+      "Startet eine neue Konsolidierungs-Session und sichert Versionen der Quelldokumente."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "validate_occ",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn validate_occ(&self) -> Result<()>",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 97,
+     "doc": [
+      "Validiert die optimistische Nebenläufigkeitskontrolle."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "refresh",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn refresh(&mut self) -> Result<Vec<DocId>>",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 131,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "abort",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn abort(self) -> Result<()>",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 175,
+     "doc": [
+      "Bricht die Session ab und entfernt den Intent-Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "execute",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn execute<G>(&self, generator: &G) -> Result<()> where G: LlmTextGenerator + ?Sized,",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 194,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "commit",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn commit( self, target_string_id: &str, embedding: &[f32], summary_content: &str, metadata: Option<serde_json::Value>, ) -> Result<()>",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 269,
+     "doc": [
+      "Committet das konsolidierte Dokument und löscht Quelldokumente."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "commit_ref",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn commit_ref( &self, target_string_id: &str, embedding: &[f32], summary_content: &str, metadata: Option<serde_json::Value>, ) -> Result<()>",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 283,
+     "doc": [
+      "Committet das konsolidierte Dokument unter Beibehaltung der Session-Referenz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "intent_key",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 47
+    },
+    {
+     "name": "target_id",
+     "type": "DocId",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 49
+    },
+    {
+     "name": "base_tx",
+     "type": "TxId",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 51
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a, S: StorageEngine, V: VectorIndex>",
+     "signature": "impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V>",
+     "file": "crates/contextra-cognition/src/context_compaction/session.rs",
+     "line": 54,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "CompactionStrategy",
+   "vis": "pub",
+   "module": "context_compaction::types",
+   "signature": "pub enum CompactionStrategy",
+   "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+   "line": 23,
+   "doc": [
+    "Strategie für Context Compaction."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Truncate",
+     "shape": "",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 25
+    },
+    {
+     "name": "Summarize",
+     "shape": "",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 27
+    },
+    {
+     "name": "StatusToken",
+     "shape": "",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 29
+    },
+    {
+     "name": "LlmSummarize",
+     "shape": "{",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 31
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "CompactedContext",
+   "vis": "pub",
+   "module": "context_compaction::types",
+   "signature": "pub struct CompactedContext",
+   "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+   "line": 45,
+   "doc": [
+    "Kompaktierter Kontext für LLM-Übergabe."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "retained_chunks",
+     "type": "Vec<ContextChunk>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 47
+    },
+    {
+     "name": "status_tokens",
+     "type": "Vec<StatusToken>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 49
+    },
+    {
+     "name": "tokens_used",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 51
+    },
+    {
+     "name": "source_doc_ids",
+     "type": "Vec<DocId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 53
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "StatusToken",
+   "vis": "pub",
+   "module": "context_compaction::types",
+   "signature": "pub struct StatusToken",
+   "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+   "line": 59,
+   "doc": [
+    "Kompakter Stellvertreter für einen oder mehrere kompaktierte Chunks."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "summary",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 61
+    },
+    {
+     "name": "replaced_tokens",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 63
+    },
+    {
+     "name": "replaced_doc_ids",
+     "type": "Vec<DocId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/context_compaction/types.rs",
+     "line": 65
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "DecaySignalInputs",
+   "vis": "pub",
+   "module": "decay",
+   "signature": "pub struct DecaySignalInputs",
+   "file": "crates/contextra-cognition/src/decay.rs",
+   "line": 16,
+   "doc": [
+    "Inputs für den Adaptive Decay Controller."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "tombstone_ratio",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 18
+    },
+    {
+     "name": "query_load_inverse",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 20
+    },
+    {
+     "name": "w_tombstone",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 22
+    },
+    {
+     "name": "w_query",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 24
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for DecaySignalInputs",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 27,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DecayControllerConfig",
+   "vis": "pub",
+   "module": "decay",
+   "signature": "pub struct DecayControllerConfig",
+   "file": "crates/contextra-cognition/src/decay.rs",
+   "line": 40,
+   "doc": [
+    "Konfiguration für den Adaptive Decay Controller."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "kappa",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 42
+    },
+    {
+     "name": "base_half_life_tx",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 44
+    },
+    {
+     "name": "eviction_threshold",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 46
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for DecayControllerConfig",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 49,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "AdaptiveDecayController",
+   "vis": "pub",
+   "module": "decay",
+   "signature": "pub struct AdaptiveDecayController",
+   "file": "crates/contextra-cognition/src/decay.rs",
+   "line": 61,
+   "doc": [
+    "Adaptive Decay Controller für time-weighted Cache-Eviction mit injizierter Clock."
+   ],
+   "attrs": [
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(config: DecayControllerConfig) -> Self",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 78,
+     "doc": [
+      "Erstellt eine neue Instanz des `AdaptiveDecayController` mit der gegebenen Konfiguration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock(config: DecayControllerConfig, clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 87,
+     "doc": [
+      "Erstellt eine neue Instanz des `AdaptiveDecayController` mit injizierter Clock."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_base_half_life_ms",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_base_half_life_ms(mut self, base_ms: u64) -> Self",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 96,
+     "doc": [
+      "Setzt die Basis-Halbwertszeit in Millisekunden für Wall-Clock-Decay."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_defaults",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_defaults() -> Self",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 102,
+     "doc": [
+      "Initialisiert den Controller mit den Standardwerten der Spezifikation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_clock(&mut self, clock: Arc<dyn Clock>)",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 107,
+     "doc": [
+      "Setzt oder aktualisiert die injizierte Clock."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn config(&self) -> &DecayControllerConfig",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 112,
+     "doc": [
+      "Konfiguration des Controllers abrufen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "system_temperature",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn system_temperature(&self, inputs: &DecaySignalInputs) -> f32",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 118,
+     "doc": [
+      "Berechnet die aktuelle Systemtemperatur basierend auf Tombstone-Verhältnis und Abfragelast."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "effective_half_life",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn effective_half_life(&self, temperature: f32) -> f32",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 125,
+     "doc": [
+      "Berechnet die temperaturangepasste effektive Halbwertszeit in Transaktionszyklen."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "effective_half_life_ms",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn effective_half_life_ms(&self, temperature: f32) -> f32",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 131,
+     "doc": [
+      "Berechnet die temperaturangepasste effektive Halbwertszeit in Millisekunden."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "effective_score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn effective_score( &self, base_score: f32, elapsed_tx: u64, inputs: &DecaySignalInputs, ) -> f32",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 137,
+     "doc": [
+      "Berechnet den aktuellen abgewerteten Score eines Objekts unter Berücksichtigung von Alter und Systemtemperatur."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "effective_score_wall_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn effective_score_wall_clock( &self, base_score: f32, created_at_ms: u64, inputs: &DecaySignalInputs, ) -> f32",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 150,
+     "doc": [
+      "Berechnet den abgewerteten Score basierend auf der Zeitdifferenz zur injizierten Clock."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "should_evict",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn should_evict( &self, base_score: f32, elapsed_tx: u64, inputs: &DecaySignalInputs, ) -> bool",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 170,
+     "doc": [
+      "Prüft, ob ein Eintrag aufgrund seines verfallenen Scores unter den Eviktions-Schwellenwert gefallen ist."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "should_evict_wall_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn should_evict_wall_clock( &self, base_score: f32, created_at_ms: u64, inputs: &DecaySignalInputs, ) -> bool",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 181,
+     "doc": [
+      "Prüft, ob ein Eintrag unter Verwendung der injizierten Clock eviktiert werden soll."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for AdaptiveDecayController",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 67,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl AdaptiveDecayController",
+     "file": "crates/contextra-cognition/src/decay.rs",
+     "line": 76,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "collection",
+   "vis": "pub",
+   "module": "engine_local",
+   "signature": "pub mod collection",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 14,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "decay_controller",
+   "vis": "pub",
+   "module": "engine_local",
+   "signature": "pub mod decay_controller",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 19,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "transaction",
+   "vis": "pub",
+   "module": "engine_local",
+   "signature": "pub mod transaction",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 23,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "CognitionError",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum CognitionError",
+   "file": "crates/contextra-cognition/src/error.rs",
+   "line": 21,
+   "doc": [
+    "Lokaler Fehlertyp für Kognitions-, Konsolidierungs- und Kompaktierungsoperationen.",
+    "",
+    "Garantiert strukturierte Fehlerbehandlung innerhalb des Bausteins ohne",
+    "direkte Abhängigkeit von Workspace-Fehlern im Kern."
+   ],
+   "attrs": [
+    "#[derive(Debug, Error)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "InvalidInput",
+     "shape": "(String)",
+     "file": "crates/contextra-cognition/src/error.rs",
+     "line": 24
+    },
+    {
+     "name": "PolicyViolation",
+     "shape": "(String)",
+     "file": "crates/contextra-cognition/src/error.rs",
+     "line": 28
+    },
+    {
+     "name": "Internal",
+     "shape": "(String)",
+     "file": "crates/contextra-cognition/src/error.rs",
+     "line": 32
+    },
+    {
+     "name": "BudgetExceeded",
+     "shape": "{",
+     "file": "crates/contextra-cognition/src/error.rs",
+     "line": 36
+    },
+    {
+     "name": "StaleRead",
+     "shape": "(String)",
+     "file": "crates/contextra-cognition/src/error.rs",
+     "line": 45
+    },
+    {
+     "name": "NotFound",
+     "shape": "(String)",
+     "file": "crates/contextra-cognition/src/error.rs",
+     "line": 49
+    },
+    {
+     "name": "Serialization",
+     "shape": "(String)",
+     "file": "crates/contextra-cognition/src/error.rs",
+     "line": 53
+    },
+    {
+     "name": "Transaction",
+     "shape": "(String)",
+     "file": "crates/contextra-cognition/src/error.rs",
+     "line": 57
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "CsrGraphSuperEdgeSink",
+   "vis": "pub",
+   "module": "graph_sink",
+   "signature": "pub struct CsrGraphSuperEdgeSink<'a>",
+   "file": "crates/contextra-cognition/src/graph_sink.rs",
+   "line": 39,
+   "doc": [
+    "Gepufferte Senke zum Schreiben synthetischer Hyperkanten und Tombstone-Anfragen in den CsrGraph."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(graph: &'a CsrGraph, wal_tx: TxId) -> Self",
+     "file": "crates/contextra-cognition/src/graph_sink.rs",
+     "line": 50,
+     "doc": [
+      "Erstellt eine neue CsrGraphSuperEdgeSink gebunden an den Graphen und die WAL-Transaktion."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> CsrGraphSuperEdgeSink<'a>",
+     "file": "crates/contextra-cognition/src/graph_sink.rs",
+     "line": 46,
+     "in_test": false
+    },
+    {
+     "trait": "SuperEdgeSink",
+     "generics": "<'a>",
+     "signature": "impl<'a> SuperEdgeSink for CsrGraphSuperEdgeSink<'a>",
+     "file": "crates/contextra-cognition/src/graph_sink.rs",
+     "line": 60,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_LEANRAG_NODES",
+   "vis": "pub",
+   "module": "leanrag_input",
+   "signature": "pub const DEFAULT_MAX_LEANRAG_NODES: usize = 10_000",
+   "file": "crates/contextra-cognition/src/leanrag_input.rs",
+   "line": 35,
+   "doc": [
+    "Standard-Obergrenze für LeanRAG-Knoten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "LeanRagInputs",
+   "vis": "pub",
+   "module": "leanrag_input",
+   "signature": "pub struct LeanRagInputs",
+   "file": "crates/contextra-cognition/src/leanrag_input.rs",
+   "line": 44,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "nodes",
+     "type": "Vec<AggregationNode>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/leanrag_input.rs",
+     "line": 46
+    },
+    {
+     "name": "edges",
+     "type": "Vec<AggregationEdge>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/leanrag_input.rs",
+     "line": 48
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "build_leanrag_inputs",
+   "vis": "pub",
+   "module": "leanrag_input",
+   "signature": "pub fn build_leanrag_inputs<S: StorageEngine, V: VectorIndex>( collection: &Collection<S, V>, turns: &[(DocId, Vec<f32>)], max_nodes: usize, ) -> LeanRagInputs",
+   "file": "crates/contextra-cognition/src/leanrag_input.rs",
+   "line": 69,
+   "doc": [
+    "Baut LeanRagInputs aus Turns und Graphendaten deterministisch auf."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 43,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "ports",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod ports",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 44,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "aggregation_phase",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod aggregation_phase",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 49,
+   "doc": [
+    "Modul für Aggregationsphase (LeanRAG Stage 3)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "channel",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod channel",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 51,
+   "doc": [
+    "Modul für entkoppelte Eingabe- und Ausgabe-Channels (Baukasten-Integration)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "consolidation_executor",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod consolidation_executor",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 53,
+   "doc": [
+    "Modul für die Ausführung der Konsolidierung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "consolidation_locks",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod consolidation_locks",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 55,
+   "doc": [
+    "Modul für Konsolidierungs-Locks und Kaskaden-Invalidierung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "context",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod context",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 57,
+   "doc": [
+    "Modul für autonome Kontextverwaltung und Token-Budgetierung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "context_compaction",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod context_compaction",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 59,
+   "doc": [
+    "Modul für Kontext-Kompaktierung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "collection",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod collection",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 60,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "collection_types",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod collection_types",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 61,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "decay",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod decay",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 62,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "graph_sink",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod graph_sink",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 66,
+   "doc": [
+    "Modul für Graph-Senken (Super-Hyperkanten)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "leanrag_input",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod leanrag_input",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 68,
+   "doc": [
+    "Modul zur Vorbereitung von LeanRAG-Eingabedaten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "maintenance_config",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod maintenance_config",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 70,
+   "doc": [
+    "Modul für Wartungskonfigurationen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "maintenance_scheduler",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod maintenance_scheduler",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 72,
+   "doc": [
+    "Modul für periodische Wartungsplanung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "memory_consolidation",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod memory_consolidation",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 74,
+   "doc": [
+    "Modul für Gedächtniskonsolidierung (Structural Pass)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "semantic_aggregation_facade",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod semantic_aggregation_facade",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 77,
+   "doc": [
+    "Modul für die Fassadenschnittstelle zur semantischen Aggregation."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "synthesis_phase",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod synthesis_phase",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 79,
+   "doc": [
+    "Modul für generative Wissenssynthese (LLM-Pass)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "transitivity_veto",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod transitivity_veto",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 81,
+   "doc": [
+    "Modul für Transitivitäts-Veto-Prüfungen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PercolationConfig",
+   "vis": "pub",
+   "module": "maintenance_config",
+   "signature": "pub struct PercolationConfig",
+   "file": "crates/contextra-cognition/src/maintenance_config.rs",
+   "line": 28,
+   "doc": [
+    "Fallback-Konfiguration für Perkolationsprüfungen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "critical_threshold",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 29
+    },
+    {
+     "name": "rebonding_similarity",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 30
+    },
+    {
+     "name": "max_new_edges_per_pass",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 31
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for PercolationConfig",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 35,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "MaintenanceConfig",
+   "vis": "pub",
+   "module": "maintenance_config",
+   "signature": "pub struct MaintenanceConfig",
+   "file": "crates/contextra-cognition/src/maintenance_config.rs",
+   "line": 52,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "tick_interval_secs",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 54
+    },
+    {
+     "name": "decay_enabled",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 59
+    },
+    {
+     "name": "decay_config",
+     "type": "DecayControllerConfig",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 62
+    },
+    {
+     "name": "edge_reinforcement",
+     "type": "crate::graph_local::EdgeReinforcementConfig",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 67
+    },
+    {
+     "name": "percolation_enabled",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 71
+    },
+    {
+     "name": "percolation",
+     "type": "PercolationConfig",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 74
+    },
+    {
+     "name": "replicator_enabled",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 78
+    },
+    {
+     "name": "replicator_lr",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 80
+    },
+    {
+     "name": "coherence_bonus_beta",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 84
+    },
+    {
+     "name": "background_consolidation_enabled",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 89
+    },
+    {
+     "name": "background_consolidation_episode_threshold",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 92
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for MaintenanceConfig",
+     "file": "crates/contextra-cognition/src/maintenance_config.rs",
+     "line": 100,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "MaintenanceScheduler",
+   "vis": "pub",
+   "module": "maintenance_scheduler",
+   "signature": "pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex>",
+   "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+   "line": 48,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( config: MaintenanceConfig, collection: Arc<Collection<S, V>>, consolidation_config: ConsolidationConfig, ) -> Self",
+     "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+     "line": 62,
+     "doc": [
+      "Erstellt eine neue Instanz des MaintenanceScheduler."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+     "line": 81,
+     "doc": [
+      "Setzt die Uhr für den Scheduler (Clock-Port Injektion nach Regel 3)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_edge_reinforcement_buffer",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_edge_reinforcement_buffer( mut self, buffer: Arc<crate::graph_local::EdgeReinforcementBuffer>, ) -> Self",
+     "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+     "line": 90,
+     "doc": [
+      "Setzt den optionalen Puffer für Kantenverstärkung."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "active_agent_sessions",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn active_agent_sessions(&self) -> usize",
+     "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+     "line": 101,
+     "doc": [
+      "Liefert die Anzahl aktuell aktiver Agenten-Sessions."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "increment_active_sessions",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn increment_active_sessions(&self) -> usize",
+     "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+     "line": 108,
+     "doc": [
+      "Erhöht die Anzahl aktiver Agenten-Sessions."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "decrement_active_sessions",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn decrement_active_sessions(&self) -> usize",
+     "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+     "line": 115,
+     "doc": [
+      "Verringert die Anzahl aktiver Agenten-Sessions."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "start",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn start( self: Arc<Self>, cancel_token: tokio_util::sync::CancellationToken, ) -> tokio::task::JoinHandle<()>",
+     "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+     "line": 124,
+     "doc": [
+      "Startet den Scheduler in einem eigenen Tokio-Hintergrund-Task."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "run_tick",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn run_tick(&self)",
+     "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+     "line": 302,
+     "doc": [
+      "Führt einen einzelnen sequenziellen Wartungs-Tick aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<S: StorageEngine + 'static, V: VectorIndex + 'static>",
+     "signature": "impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<S, V>",
+     "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+     "line": 58,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ConsolidationConfig",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub struct ConsolidationConfig",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 55,
+   "doc": [
+    "Konfiguration für den Structural Consolidation Pass."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "min_turns_per_segment",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 57
+    },
+    {
+     "name": "max_turns_per_segment",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 59
+    },
+    {
+     "name": "segment_cohesion_threshold",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 63
+    },
+    {
+     "name": "near_duplicate_cosine_threshold",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 67
+    },
+    {
+     "name": "aggregation_config",
+     "type": "crate::aggregation_phase::AggregationConfig",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 69
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for ConsolidationConfig",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 72,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "TurnSegment",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub struct TurnSegment",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 88,
+   "doc": [
+    "Semantisch zusammenhängendes Segment aufeinanderfolgender Turns."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "turn_ids",
+     "type": "Vec<DocId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 90
+    },
+    {
+     "name": "representative_embedding",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 94
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ConsolidationPhaseResult",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub struct ConsolidationPhaseResult",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 101,
+   "doc": [
+    "Ergebnis des Structural Consolidation Pass."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "segments_created",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 103
+    },
+    {
+     "name": "duplicates_superseded",
+     "type": "Vec<DocId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 105
+    },
+    {
+     "name": "cascade_edge_invalidations_needed",
+     "type": "Vec<DocId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 109
+    },
+    {
+     "name": "cascade_errors",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 111
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "group_turns_into_segments",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub fn group_turns_into_segments( turns: &[(DocId, Vec<f32>)], config: &ConsolidationConfig, ) -> Vec<TurnSegment>",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 177,
+   "doc": [
+    "Gruppiert benachbarte Turns via Sliding-Window-Clustering."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "detect_near_duplicates",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub fn detect_near_duplicates(turns: &[(DocId, Vec<f32>)], threshold: f32) -> Vec<(DocId, DocId)>",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 281,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_consolidation_pass",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub fn run_consolidation_pass( turns: &[(DocId, Vec<f32>)], config: &ConsolidationConfig, ) -> ConsolidationPhaseResult",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 322,
+   "doc": [
+    "Orchestriert den deterministischen Structural Consolidation Pass."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SynthesisConfig",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub struct SynthesisConfig",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 375,
+   "doc": [
+    "Konfiguration für den Generative Synthesis Pass."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "min_community_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 377
+    },
+    {
+     "name": "stability_cycles_required",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 379
+    },
+    {
+     "name": "max_llm_calls_per_cycle",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 381
+    },
+    {
+     "name": "min_grounding_score",
+     "type": "Option<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 383
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for SynthesisConfig",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 386,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "CommunityStabilityTracker",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub struct CommunityStabilityTracker",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 401,
+   "doc": [
+    "Verfolgt die Stabilität von Graph-Communities über Zyklen hinweg."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 406,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "observe",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn observe(&mut self, community_members_hash: u64) -> u32",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 413,
+     "doc": [
+      "Registriert die Beobachtung einer Community und liefert die aktualisierte Anzahl aufeinanderfolgender Zyklen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reset_if_absent",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reset_if_absent(&mut self, currently_observed: &AHashSet<u64>)",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 420,
+     "doc": [
+      "Setzt nicht mehr beobachtete Communities zurück/entfernt sie aus der Historie."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl CommunityStabilityTracker",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 405,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "MetaChunk",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub struct MetaChunk",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 430,
+   "doc": [
+    "Generativ synthetisierter Wissens-Chunk mit Provenienz."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "content",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 432
+    },
+    {
+     "name": "abstracts_from",
+     "type": "Vec<DocId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 434
+    },
+    {
+     "name": "source_community_hash",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 436
+    },
+    {
+     "name": "created_at_tx",
+     "type": "TxId",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 438
+    },
+    {
+     "name": "llm_model_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 440
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SynthesisPhaseResult",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub struct SynthesisPhaseResult",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 447,
+   "doc": [
+    "Ergebnis des Generative Synthesis Pass."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "synthesized",
+     "type": "Vec<MetaChunk>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 449
+    },
+    {
+     "name": "deferred_community_hashes",
+     "type": "Vec<u64>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 451
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compute_community_hash",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub fn compute_community_hash(member_doc_ids: &[DocId]) -> u64",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 457,
+   "doc": [
+    "Berechnet einen deterministischen 64-Bit-Hash für Member-DocIds."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_structural_synthesis_pass",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub async fn run_structural_synthesis_pass( stable_communities: &[(u64, Vec<DocId>)], source_texts: &AHashMap<DocId, String>, llm: &dyn LlmTextGenerator, config: &SynthesisConfig, validator: Option<&dyn ResponseGroundingValidator>, ) -> contextra_types::Result<SynthesisPhaseResult>",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 598,
+   "doc": [
+    "Führt den Syntheselauf über stabile Graph-Communities aus."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_PRE_CONDENSED_DIGEST_LEN",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub const MAX_PRE_CONDENSED_DIGEST_LEN: usize = 8192",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 649,
+   "doc": [
+    "Maximale Länge für text_digest in PreCondensedInput."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_PRE_CONDENSED_LABEL_LEN",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub const MAX_PRE_CONDENSED_LABEL_LEN: usize = 512",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 654,
+   "doc": [
+    "Maximale Länge für source_label in PreCondensedInput."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_PRE_CONDENSED_PROVENANCE_COUNT",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub const MAX_PRE_CONDENSED_PROVENANCE_COUNT: usize = 256",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 659,
+   "doc": [
+    "Maximale Anzahl an Provenienz-IDs in PreCondensedInput."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PreCondensedInput",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub struct PreCondensedInput",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 668,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "tenant_id",
+     "type": "contextra_types::TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 669
+    },
+    {
+     "name": "source_label",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 670
+    },
+    {
+     "name": "text_digest",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 671
+    },
+    {
+     "name": "token_count",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 672
+    },
+    {
+     "name": "provenance",
+     "type": "Vec<DocId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+     "line": 673
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "intake_pre_condensed_inputs",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub fn intake_pre_condensed_inputs( target_tenant_id: &contextra_types::TenantId, inputs: &[PreCondensedInput], validator: Option<&dyn ResponseGroundingValidator>, min_grounding_score: Option<f32>, ) -> contextra_types::Result<Vec<TurnSegment>>",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 808,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compact_segment_via_context_compactor",
+   "vis": "pub",
+   "module": "memory_consolidation",
+   "signature": "pub fn compact_segment_via_context_compactor( segment: &TurnSegment, compactor: &ContextCompactor, chunks: &[ContextChunk], ) -> CompactedContext",
+   "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+   "line": 847,
+   "doc": [
+    "Kompaktiert ein einzelnes Segment via ContextCompactor."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "CommitIntent",
+   "vis": "pub",
+   "module": "ports",
+   "signature": "pub enum CommitIntent",
+   "file": "crates/contextra-cognition/src/ports.rs",
+   "line": 21,
+   "doc": [
+    "Lokaler Ersatztyp für `CommitIntent`, falls die direkte Engine-Bindung entfällt.",
+    "",
+    "Hält die für atomare Transaktionsabschlüsse notwendigen Metadaten",
+    "isoliert von der physischen Speicher-Engine."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Pending",
+     "shape": "{",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 23
+    },
+    {
+     "name": "Committed",
+     "shape": "",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 33
+    },
+    {
+     "name": "Aborted",
+     "shape": "",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 35
+    },
+    {
+     "name": "Consolidation",
+     "shape": "{",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 37
+    },
+    {
+     "name": "Failed",
+     "shape": "{ reason: String }",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 43
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "DocumentSource",
+   "vis": "pub",
+   "module": "ports",
+   "signature": "pub trait DocumentSource: Send + Sync",
+   "file": "crates/contextra-cognition/src/ports.rs",
+   "line": 57,
+   "doc": [
+    "Abstrakte Quelle für Dokumente zur Konsolidierung.",
+    "",
+    "Entkoppelt das Laden von Chunks oder Gesprächs-Turns von der konkreten",
+    "Datenbank- oder Vektordatenbank-Implementierung."
+   ],
+   "attrs": [
+    "#[async_trait]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "fetch_turns",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "async fn fetch_turns(&self) -> Result<Vec<(DocId, Vec<f32>)>>",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 59,
+     "doc": [
+      "Lädt Turns / Dokumente für die angegebene Kollektion oder den Kontext."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "DocumentSource"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "ConsolidationSink",
+   "vis": "pub",
+   "module": "ports",
+   "signature": "pub trait ConsolidationSink: Send + Sync",
+   "file": "crates/contextra-cognition/src/ports.rs",
+   "line": 68,
+   "doc": [
+    "Abstrakte Senke für Konsolidierungsergebnisse.",
+    "",
+    "Garantiert, dass konsolidierte Chunks atomar in das Zielsubsystem",
+    "eingepflegt werden können."
+   ],
+   "attrs": [
+    "#[async_trait]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "apply_intent",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "async fn apply_intent(&self, intent: CommitIntent) -> Result<()>",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 70,
+     "doc": [
+      "Wendet einen Commit-Intent atomar an."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "ConsolidationSink"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "HyperedgeSink",
+   "vis": "pub",
+   "module": "ports",
+   "signature": "pub trait HyperedgeSink: Send + Sync",
+   "file": "crates/contextra-cognition/src/ports.rs",
+   "line": 78,
+   "doc": [
+    "Senke für synthetische Hyperkanten und Kaskaden-Invalidierungen.",
+    "",
+    "Wird in der semantischen Aggregationsphase (LeanRAG Stage 3) verwendet,",
+    "um verdichtete Superkanten im Wissensgraphen anzulegen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "invalidate_edge",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn invalidate_edge(&mut self, edge_id: u64)",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 80,
+     "doc": [
+      "Invalidiert eine bestehende Hyperkante anhand ihrer ID."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "HyperedgeSink"
+    },
+    {
+     "name": "write_super_edge",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn write_super_edge(&mut self, edge_data: Vec<u8>)",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 82,
+     "doc": [
+      "Schreibt eine neu synthetisierte Hyperkante."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "HyperedgeSink"
+    },
+    {
+     "name": "commit",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn commit(&mut self) -> Result<()>",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 84,
+     "doc": [
+      "Veröffentlicht alle gesammelten Änderungen atomar."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "HyperedgeSink"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "DecayPolicy",
+   "vis": "pub",
+   "module": "ports",
+   "signature": "pub trait DecayPolicy: Send + Sync",
+   "file": "crates/contextra-cognition/src/ports.rs",
+   "line": 91,
+   "doc": [
+    "Richtlinie zur adaptiven Abwertung zeitlicher Relevanz (Decay Control).",
+    "",
+    "Erlaubt anpassbare Abklingfunktionen für Langzeitgedächtnisse."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "compute_decay",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn compute_decay(&self, elapsed_secs: u64, access_count: u64) -> f32",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 93,
+     "doc": [
+      "Berechnet den aktuellen Dämpfungsfaktor für ein Dokument."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "DecayPolicy"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "CollectionOps",
+   "vis": "pub",
+   "module": "ports",
+   "signature": "pub trait CollectionOps: Send + Sync",
+   "file": "crates/contextra-cognition/src/ports.rs",
+   "line": 101,
+   "doc": [
+    "Abstrakte Port-Schnittstelle für Collection-Operationen (SPEC S-63).",
+    "",
+    "Entkoppelt contextra-cognition von konkreten Storage- und Index-Engines."
+   ],
+   "attrs": [
+    "#[async_trait]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "name",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn name(&self) -> &str",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 103,
+     "doc": [
+      "Gibt den Namen der Collection zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CollectionOps"
+    },
+    {
+     "name": "namespaced_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn namespaced_key(&self, raw: &[u8], key_type: u8) -> Vec<u8>",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 106,
+     "doc": [
+      "Erzeugt einen namensraumisolierten Schlüssel für den physischen Speicher."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CollectionOps"
+    },
+    {
+     "name": "user_key_prefix",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn user_key_prefix(&self) -> Vec<u8>",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 109,
+     "doc": [
+      "Gibt das Schlüsselpräfix für reguläre Benutzerdaten zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CollectionOps"
+    },
+    {
+     "name": "consolidation_in_progress",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn consolidation_in_progress(&self) -> bool",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 112,
+     "doc": [
+      "Prüft, ob aktuell eine Konsolidierung läuft."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CollectionOps"
+    },
+    {
+     "name": "dimension",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn dimension(&self) -> usize",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 115,
+     "doc": [
+      "Ermittelt die Vektordimension der Collection."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CollectionOps"
+    },
+    {
+     "name": "allocate_tx",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn allocate_tx(&self) -> Result<TxId>",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 118,
+     "doc": [
+      "Allokiert eine monoton steigende Transaktions-ID."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CollectionOps"
+    },
+    {
+     "name": "get",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "async fn get(&self, id: &str) -> Result<Option<crate::collection_types::StoredDocument>>",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 121,
+     "doc": [
+      "Ruft ein Dokument anhand seines Bezeichners ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CollectionOps"
+    },
+    {
+     "name": "delete",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "async fn delete(&self, id: &str) -> Result<()>",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 124,
+     "doc": [
+      "Löscht ein Dokument anhand seines Bezeichners."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CollectionOps"
+    },
+    {
+     "name": "put_kv",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "async fn put_kv(&self, key: &str, value: &serde_json::Value) -> Result<()>",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 127,
+     "doc": [
+      "Schreibt einen Schlüssel-Wert-Eintrag."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CollectionOps"
+    },
+    {
+     "name": "evict_decayed_chunks",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "async fn evict_decayed_chunks( &self, controller: &crate::decay::AdaptiveDecayController, limit: usize, ) -> Result<usize>",
+     "file": "crates/contextra-cognition/src/ports.rs",
+     "line": 130,
+     "doc": [
+      "Führt die zeitliche Abwertung und Bereinigung verfallener Chunks durch."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "CollectionOps"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "consolidate_semantic_hyperedges",
+   "vis": "pub",
+   "module": "semantic_aggregation_facade",
+   "signature": "pub async fn consolidate_semantic_hyperedges<S: StorageEngine, V: VectorIndex>( collection: &Collection<S, V>, embedder: &dyn TextEmbeddingEngine, llm: &dyn LlmTextGenerator, config: &AggregationConfig, ) -> Result<AggregationPhaseResult>",
+   "file": "crates/contextra-cognition/src/semantic_aggregation_facade.rs",
+   "line": 61,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SegmentSynthesisResult",
+   "vis": "pub",
+   "module": "synthesis_phase",
+   "signature": "pub struct SegmentSynthesisResult",
+   "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+   "line": 31,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "synthesized_chunks",
+     "type": "Vec<SynthesizedChunk>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+     "line": 33
+    },
+    {
+     "name": "skipped_segments",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+     "line": 35
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "type",
+   "name": "SynthesisPhaseResult",
+   "vis": "pub",
+   "module": "synthesis_phase",
+   "signature": "pub type SynthesisPhaseResult = SegmentSynthesisResult",
+   "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+   "line": 41,
+   "doc": [
+    "Veralteter Typalias für SegmentSynthesisResult."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SynthesizedChunk",
+   "vis": "pub",
+   "module": "synthesis_phase",
+   "signature": "pub struct SynthesizedChunk",
+   "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+   "line": 47,
+   "doc": [
+    "Ein generativ synthetisierter Wissens-Chunk mit Provenienz."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "content",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+     "line": 49
+    },
+    {
+     "name": "source_turn_ids",
+     "type": "Vec<DocId>",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+     "line": 51
+    },
+    {
+     "name": "model_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+     "line": 53
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "run_synthesis_pass",
+   "vis": "pub",
+   "module": "synthesis_phase",
+   "signature": "pub async fn run_synthesis_pass( segments: &[TurnSegment], segment_texts: &[Vec<String>], synthesizer: &dyn SegmentSynthesizer, min_turns_for_synthesis: usize, ) -> SegmentSynthesisResult",
+   "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+   "line": 73,
+   "doc": [
+    "Führt den generativen Syntheselauf über Turn-Segmente aus."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "validate_transitivity_veto",
+   "vis": "pub",
+   "module": "transitivity_veto",
+   "signature": "pub fn validate_transitivity_veto( node_a: &AggregationNode, node_b: &AggregationNode, node_c: &AggregationNode, threshold: f32, ) -> bool",
+   "file": "crates/contextra-cognition/src/transitivity_veto.rs",
+   "line": 47,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "filter_candidates_with_transitivity_veto",
+   "vis": "pub",
+   "module": "transitivity_veto",
+   "signature": "pub fn filter_candidates_with_transitivity_veto( turns: &[(DocId, Vec<f32>)], threshold: f32, agg_cfg: &AggregationConfig, ) -> Vec<(DocId, DocId)>",
+   "file": "crates/contextra-cognition/src/transitivity_veto.rs",
+   "line": 135,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use cleanup::cleanup_orphaned_consolidation_intents",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/context_compaction/mod.rs",
+   "line": 38,
+   "in_test": false,
+   "module": "context_compaction"
+  },
+  {
+   "signature": "pub use compactor::ContextCompactor",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/context_compaction/mod.rs",
+   "line": 39,
+   "in_test": false,
+   "module": "context_compaction"
+  },
+  {
+   "signature": "pub use session::ConsolidationSession",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/context_compaction/mod.rs",
+   "line": 40,
+   "in_test": false,
+   "module": "context_compaction"
+  },
+  {
+   "signature": "pub use types::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/context_compaction/mod.rs",
+   "line": 41,
+   "in_test": false,
+   "module": "context_compaction"
+  },
+  {
+   "signature": "pub use crate::collection::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 7,
+   "in_test": false,
+   "module": "engine_local"
+  },
+  {
+   "signature": "pub use crate::collection_types::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 8,
+   "in_test": false,
+   "module": "engine_local"
+  },
+  {
+   "signature": "pub use crate::decay::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 9,
+   "in_test": false,
+   "module": "engine_local"
+  },
+  {
+   "signature": "pub use crate::ports::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 10,
+   "in_test": false,
+   "module": "engine_local"
+  },
+  {
+   "signature": "pub use contextra_rank::fusion::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 11,
+   "in_test": false,
+   "module": "engine_local"
+  },
+  {
+   "signature": "pub use contextra_text::Language",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 12,
+   "in_test": false,
+   "module": "engine_local"
+  },
+  {
+   "signature": "pub use crate::collection::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 15,
+   "in_test": false,
+   "module": "engine_local::collection"
+  },
+  {
+   "signature": "pub use crate::collection_types::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 16,
+   "in_test": false,
+   "module": "engine_local::collection"
+  },
+  {
+   "signature": "pub use crate::decay::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 20,
+   "in_test": false,
+   "module": "engine_local::decay_controller"
+  },
+  {
+   "signature": "pub use crate::ports::CommitIntent",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/engine_local.rs",
+   "line": 24,
+   "in_test": false,
+   "module": "engine_local::transaction"
+  },
+  {
+   "signature": "pub use contextra_graph as graph",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/graph_local.rs",
+   "line": 10,
+   "in_test": false,
+   "module": "graph_local"
+  },
+  {
+   "signature": "pub use graph::cascade::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/graph_local.rs",
+   "line": 11,
+   "in_test": false,
+   "module": "graph_local"
+  },
+  {
+   "signature": "pub use graph::cascade_invalidate_edges_for_superseded_doc",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/graph_local.rs",
+   "line": 12,
+   "in_test": false,
+   "module": "graph_local"
+  },
+  {
+   "signature": "pub use graph::csr::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/graph_local.rs",
+   "line": 13,
+   "in_test": false,
+   "module": "graph_local"
+  },
+  {
+   "signature": "pub use graph::hyperedge::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/graph_local.rs",
+   "line": 14,
+   "in_test": false,
+   "module": "graph_local"
+  },
+  {
+   "signature": "pub use graph::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/graph_local.rs",
+   "line": 15,
+   "in_test": false,
+   "module": "graph_local"
+  },
+  {
+   "signature": "pub use graph::percolation::PercolationConfig",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/graph_local.rs",
+   "line": 18,
+   "in_test": false,
+   "module": "graph_local"
+  },
+  {
+   "signature": "pub use error::CognitionError",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 45,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use aggregation_phase::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 89,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use channel::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 94,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use consolidation_executor::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 99,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use consolidation_locks::ConsolidationNodesGuard",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 104,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use context::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 105,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use context_compaction::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 106,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use graph_sink::CsrGraphSuperEdgeSink",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 110,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use leanrag_input::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 111,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use maintenance_config::MaintenanceConfig",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 112,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use maintenance_scheduler::MaintenanceScheduler",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 113,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use memory_consolidation::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 114,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use semantic_aggregation_facade::consolidate_semantic_hyperedges",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 121,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use synthesis_phase::run_synthesis_pass",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 122,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use transitivity_veto::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/lib.rs",
+   "line": 123,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use contextra_ports as ports",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/ports_local.rs",
+   "line": 10,
+   "in_test": false,
+   "module": "ports_local"
+  },
+  {
+   "signature": "pub use ports::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/ports_local.rs",
+   "line": 11,
+   "in_test": false,
+   "module": "ports_local"
+  },
+  {
+   "signature": "pub use crate::ports_local::SegmentSynthesizer as TraitSegmentSynthesizer",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+   "line": 57,
+   "in_test": false,
+   "module": "synthesis_phase"
+  },
+  {
+   "signature": "pub use contextra_types as types",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/types_local.rs",
+   "line": 10,
+   "in_test": false,
+   "module": "types_local"
+  },
+  {
+   "signature": "pub use types::",
+   "vis": "pub",
+   "file": "crates/contextra-cognition/src/types_local.rs",
+   "line": 11,
+   "in_test": false,
+   "module": "types_local"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra-db"
+ ]
+}

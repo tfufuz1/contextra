@@ -1,0 +1,1276 @@
+{
+ "name": "contextra-infer-onnx",
+ "version": "workspace",
+ "path": "crates/contextra-infer-onnx",
+ "role": "Inferenz ONNX",
+ "features": {
+  "default": [],
+  "std": [],
+  "serde": [
+   "dep:serde",
+   "dep:serde_json"
+  ],
+  "tracing": [
+   "dep:tracing"
+  ],
+  "download": [
+   "dep:reqwest"
+  ],
+  "reranking": [
+   "onnx"
+  ],
+  "onnx": [
+   "dep:ort",
+   "dep:tokenizers",
+   "dep:ndarray",
+   "dep:sha2"
+  ],
+  "test-utils": [],
+  "workspace": [
+   "dep:contextra-ports",
+   "dep:contextra-types"
+  ]
+ },
+ "deps": {
+  "contextra-ports": {
+   "kind": "normal",
+   "source": "path",
+   "optional": true
+  },
+  "contextra-types": {
+   "kind": "normal",
+   "source": "path",
+   "optional": true
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "parking_lot": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "blake3": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": true
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": true
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": true
+  },
+  "sha2": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "reqwest": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "ort": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "tokenizers": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "ndarray": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": true
+  },
+  "tempfile": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "tokio": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "criterion": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "proptest": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "`contextra-infer-onnx` — Autarke In-Process Inferenz für Embeddings und Reranking (Klasse A, Ring 2).",
+  "",
+  "Stellt isolierte lokale Inferenz-Funktionalität hinter Feature-Flags bereit.",
+  "Standard-Build ist vollständig Pure-Rust ohne externe Shared-Libraries oder C-FFI."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-infer-onnx/src/compat/embedding_provider.rs",
+   "module": "compat::embedding_provider",
+   "lines": 56
+  },
+  {
+   "file": "crates/contextra-infer-onnx/src/compat/mod.rs",
+   "module": "compat",
+   "lines": 5
+  },
+  {
+   "file": "crates/contextra-infer-onnx/src/config.rs",
+   "module": "config",
+   "lines": 216
+  },
+  {
+   "file": "crates/contextra-infer-onnx/src/embedder.rs",
+   "module": "embedder",
+   "lines": 251
+  },
+  {
+   "file": "crates/contextra-infer-onnx/src/error.rs",
+   "module": "error",
+   "lines": 62
+  },
+  {
+   "file": "crates/contextra-infer-onnx/src/fakes.rs",
+   "module": "fakes",
+   "lines": 148
+  },
+  {
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "module": "crate",
+   "lines": 34
+  },
+  {
+   "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+   "module": "reranker",
+   "lines": 200
+  },
+  {
+   "file": "crates/contextra-infer-onnx/src/traits.rs",
+   "module": "traits",
+   "lines": 44
+  }
+ ],
+ "counts": {
+  "unwrap": 0,
+  "expect": 0,
+  "panic_macro": 0,
+  "todo_unimpl": 0,
+  "index_bracket": 0,
+  "cfg_feature_gates": 20
+ },
+ "grep_pub_decl": 36,
+ "all_pub_decl": 36,
+ "public_items": [
+  {
+   "kind": "mod",
+   "name": "embedding_provider",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod embedding_provider",
+   "file": "crates/contextra-infer-onnx/src/compat/mod.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "ModelHash",
+   "vis": "pub",
+   "module": "config",
+   "signature": "pub enum ModelHash",
+   "file": "crates/contextra-infer-onnx/src/config.rs",
+   "line": 11,
+   "doc": [
+    "Unterstützte kryptografische Hash-Verfahren zur Modellverifikation."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "verify_file",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn verify_file(&self, path: &Path) -> Result<()>",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 24,
+     "doc": [
+      "Überprüft den Hash einer Datei am angegebenen Pfad.",
+      "",
+      "# Errors",
+      "Gibt `Error::HashMismatch` zurück, wenn die Prüfsumme nicht übereinstimmt,",
+      "oder `Error::Io` bei Lesefehlern."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Blake3",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 13
+    },
+    {
+     "name": "Sha256",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 15
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ModelHash",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 18,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "verify_path_safety",
+   "vis": "pub",
+   "module": "config",
+   "signature": "pub fn verify_path_safety(base: &Path, user_path: &Path) -> Result<PathBuf>",
+   "file": "crates/contextra-infer-onnx/src/config.rs",
+   "line": 71,
+   "doc": [
+    "Prüft, ob ein übergebener Zielpfad sicher innerhalb eines Basisverzeichnisses liegt.",
+    "",
+    "Schützt vor Path-Traversal (`..`, absolute Pfade außerhalb des Root).",
+    "",
+    "# Errors",
+    "Gibt `Error::SecurityViolation` zurück, falls der Pfad das Basisverzeichnis verlässt."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "PoolingMode",
+   "vis": "pub",
+   "module": "config",
+   "signature": "pub enum PoolingMode",
+   "file": "crates/contextra-infer-onnx/src/config.rs",
+   "line": 92,
+   "doc": [
+    "Pooling-Modus für Embeddings aus Transformer-Hidden-States."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Mean",
+     "shape": "",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 95
+    },
+    {
+     "name": "Cls",
+     "shape": "",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 97
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EmbedderConfig",
+   "vis": "pub",
+   "module": "config",
+   "signature": "pub struct EmbedderConfig",
+   "file": "crates/contextra-infer-onnx/src/config.rs",
+   "line": 102,
+   "doc": [
+    "Konfiguration für einen ONNX-Embedder."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(model_path: PathBuf, tokenizer_path: PathBuf, expected_dimension: usize) -> Self",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 126,
+     "doc": [
+      "Erstellt eine Basiskonfiguration mit sicheren Standardwerten."
+     ],
+     "attrs": [
+      "#[must_use]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "validate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn validate(&self) -> Result<()>",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 144,
+     "doc": [
+      "Validiert die Konfiguration und prüft ggf. Dateiprüfsummen.",
+      "",
+      "# Errors",
+      "Gibt Fehler bei ungültigen Dimensionen, Thread-Zahlen oder Hash-Abweichungen zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "model_path",
+     "type": "PathBuf",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 104
+    },
+    {
+     "name": "tokenizer_path",
+     "type": "PathBuf",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 106
+    },
+    {
+     "name": "expected_dimension",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 108
+    },
+    {
+     "name": "max_sequence_length",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 110
+    },
+    {
+     "name": "pooling",
+     "type": "PoolingMode",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 112
+    },
+    {
+     "name": "normalize_l2",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 114
+    },
+    {
+     "name": "num_threads",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 116
+    },
+    {
+     "name": "model_hash",
+     "type": "Option<ModelHash>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 118
+    },
+    {
+     "name": "tokenizer_hash",
+     "type": "Option<ModelHash>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 120
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EmbedderConfig",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 123,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RerankerConfig",
+   "vis": "pub",
+   "module": "config",
+   "signature": "pub struct RerankerConfig",
+   "file": "crates/contextra-infer-onnx/src/config.rs",
+   "line": 168,
+   "doc": [
+    "Konfiguration für einen ONNX Cross-Encoder Reranker."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(model_path: PathBuf, tokenizer_path: PathBuf) -> Self",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 186,
+     "doc": [
+      "Erstellt eine Basiskonfiguration für den Reranker."
+     ],
+     "attrs": [
+      "#[must_use]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "validate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn validate(&self) -> Result<()>",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 201,
+     "doc": [
+      "Validiert die Reranker-Konfiguration.",
+      "",
+      "# Errors",
+      "Meldet Konfigurationsfehler oder Hash-Mismatches."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "model_path",
+     "type": "PathBuf",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 170
+    },
+    {
+     "name": "tokenizer_path",
+     "type": "PathBuf",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 172
+    },
+    {
+     "name": "max_length",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 174
+    },
+    {
+     "name": "num_threads",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 176
+    },
+    {
+     "name": "model_hash",
+     "type": "Option<ModelHash>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 178
+    },
+    {
+     "name": "tokenizer_hash",
+     "type": "Option<ModelHash>",
+     "vis": "pub",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 180
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl RerankerConfig",
+     "file": "crates/contextra-infer-onnx/src/config.rs",
+     "line": 183,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "OnnxEmbedder",
+   "vis": "pub",
+   "module": "embedder",
+   "signature": "pub struct OnnxEmbedder",
+   "file": "crates/contextra-infer-onnx/src/embedder.rs",
+   "line": 22,
+   "doc": [
+    "ONNX-basierter Embedding-Provider mit Session-Pool und Tokenizer."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(config: EmbedderConfig) -> Result<Self>",
+     "file": "crates/contextra-infer-onnx/src/embedder.rs",
+     "line": 35,
+     "doc": [
+      "Initialisiert einen neuen `OnnxEmbedder` anhand der übergebenen Konfiguration.",
+      "",
+      "# Errors",
+      "Gibt `Error` zurück, wenn Validierung, Hash-Verifikation, Tokenizer oder ONNX-Session fehlschlagen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn config(&self) -> &EmbedderConfig",
+     "file": "crates/contextra-infer-onnx/src/embedder.rs",
+     "line": 67,
+     "doc": [
+      "Gibt eine Referenz auf die Konfiguration zurück."
+     ],
+     "attrs": [
+      "#[must_use]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "EmbeddingProvider",
+     "generics": "",
+     "signature": "impl EmbeddingProvider for OnnxEmbedder",
+     "file": "crates/contextra-infer-onnx/src/compat/embedding_provider.rs",
+     "line": 7,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl OnnxEmbedder",
+     "file": "crates/contextra-infer-onnx/src/embedder.rs",
+     "line": 30,
+     "in_test": false
+    },
+    {
+     "trait": "Embedder",
+     "generics": "",
+     "signature": "impl Embedder for OnnxEmbedder",
+     "file": "crates/contextra-infer-onnx/src/embedder.rs",
+     "line": 72,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "Error",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum Error",
+   "file": "crates/contextra-infer-onnx/src/error.rs",
+   "line": 11,
+   "doc": [
+    "Primärer Fehlertyp für Inferenz-, Modelllade- und Validierungsoperationen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Error)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "ModelNotFound",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-onnx/src/error.rs",
+     "line": 14
+    },
+    {
+     "name": "SecurityViolation",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-onnx/src/error.rs",
+     "line": 18
+    },
+    {
+     "name": "HashMismatch",
+     "shape": "{",
+     "file": "crates/contextra-infer-onnx/src/error.rs",
+     "line": 22
+    },
+    {
+     "name": "InvalidDimension",
+     "shape": "{",
+     "file": "crates/contextra-infer-onnx/src/error.rs",
+     "line": 33
+    },
+    {
+     "name": "Tokenization",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-onnx/src/error.rs",
+     "line": 42
+    },
+    {
+     "name": "Inference",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-onnx/src/error.rs",
+     "line": 46
+    },
+    {
+     "name": "Io",
+     "shape": "(#[from] std::io::Error)",
+     "file": "crates/contextra-infer-onnx/src/error.rs",
+     "line": 50
+    },
+    {
+     "name": "InvalidConfig",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-onnx/src/error.rs",
+     "line": 54
+    },
+    {
+     "name": "Unsupported",
+     "shape": "(String)",
+     "file": "crates/contextra-infer-onnx/src/error.rs",
+     "line": 58
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "Result",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub type Result<T> = std::result::Result<T, Error>",
+   "file": "crates/contextra-infer-onnx/src/error.rs",
+   "line": 62,
+   "doc": [
+    "Kanonischer Result-Typ für `contextra-infer-onnx`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "FakeEmbedder",
+   "vis": "pub",
+   "module": "fakes",
+   "signature": "pub struct FakeEmbedder",
+   "file": "crates/contextra-infer-onnx/src/fakes.rs",
+   "line": 11,
+   "doc": [
+    "Deterministischer Fake-Embedder für Tests und isolierte Umgebungen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(dimension: usize) -> Result<Self>",
+     "file": "crates/contextra-infer-onnx/src/fakes.rs",
+     "line": 20,
+     "doc": [
+      "Erstellt einen neuen `FakeEmbedder` mit der gewünschten Vektordimension.",
+      "",
+      "# Errors",
+      "Gibt `Error::InvalidDimension` zurück, wenn dimension == 0 ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "EmbeddingProvider",
+     "generics": "",
+     "signature": "impl EmbeddingProvider for crate::fakes::FakeEmbedder",
+     "file": "crates/contextra-infer-onnx/src/compat/embedding_provider.rs",
+     "line": 33,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl FakeEmbedder",
+     "file": "crates/contextra-infer-onnx/src/fakes.rs",
+     "line": 15,
+     "in_test": false
+    },
+    {
+     "trait": "Embedder",
+     "generics": "",
+     "signature": "impl Embedder for FakeEmbedder",
+     "file": "crates/contextra-infer-onnx/src/fakes.rs",
+     "line": 31,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "FakeReranker",
+   "vis": "pub",
+   "module": "fakes",
+   "signature": "pub struct FakeReranker",
+   "file": "crates/contextra-infer-onnx/src/fakes.rs",
+   "line": 72,
+   "doc": [
+    "Deterministischer Fake-Reranker für Tests."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Default)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-infer-onnx/src/fakes.rs",
+     "line": 77,
+     "doc": [
+      "Erstellt eine neue Instanz des Fake-Rerankers."
+     ],
+     "attrs": [
+      "#[must_use]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl FakeReranker",
+     "file": "crates/contextra-infer-onnx/src/fakes.rs",
+     "line": 74,
+     "in_test": false
+    },
+    {
+     "trait": "Reranker",
+     "generics": "",
+     "signature": "impl Reranker for FakeReranker",
+     "file": "crates/contextra-infer-onnx/src/fakes.rs",
+     "line": 82,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "compat",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod compat",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 10,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"workspace\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "config",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod config",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 11,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "embedder",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod embedder",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 12,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 13,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "fakes",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod fakes",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 15,
+   "doc": [],
+   "attrs": [
+    "#[cfg(any(test, feature = \"test-utils\"))]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "reranker",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod reranker",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 16,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "traits",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod traits",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 17,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "default_model_cache_dir",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub fn default_model_cache_dir() -> std::path::PathBuf",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 32,
+   "doc": [
+    "Standard-Cacheverzeichnis für heruntergeladene Modelle."
+   ],
+   "attrs": [
+    "#[must_use]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "OnnxReranker",
+   "vis": "pub",
+   "module": "reranker",
+   "signature": "pub struct OnnxReranker",
+   "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+   "line": 19,
+   "doc": [
+    "ONNX-basierter Cross-Encoder Reranker."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(config: RerankerConfig) -> Result<Self>",
+     "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+     "line": 32,
+     "doc": [
+      "Erstellt eine neue Instanz des `OnnxReranker`.",
+      "",
+      "# Errors",
+      "Gibt `Error` zurück, falls Konfigurationsvalidierung, Hash-Prüfung oder Modellinitialisierung fehlschlagen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn config(&self) -> &RerankerConfig",
+     "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+     "line": 64,
+     "doc": [
+      "Gibt eine Referenz auf die Konfiguration zurück."
+     ],
+     "attrs": [
+      "#[must_use]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl OnnxReranker",
+     "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+     "line": 27,
+     "in_test": false
+    },
+    {
+     "trait": "Reranker",
+     "generics": "",
+     "signature": "impl Reranker for OnnxReranker",
+     "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+     "line": 69,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "CrossEncoderReranker",
+   "vis": "pub",
+   "module": "reranker",
+   "signature": "pub enum CrossEncoderReranker",
+   "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+   "line": 167,
+   "doc": [
+    "Universeller Cross-Encoder Wrapper, der entweder ONNX Runtime oder eine Fake/Passthrough-Engine nutzt."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "passthrough",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn passthrough() -> Self",
+     "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+     "line": 179,
+     "doc": [
+      "Erstellt einen Passthrough- / Fake-Reranker ohne externe Modell-Abhängigkeiten."
+     ],
+     "attrs": [
+      "#[cfg(any(test, feature = \"test-utils\"))]",
+      "#[must_use]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_config(config: RerankerConfig) -> Result<Self>",
+     "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+     "line": 187,
+     "doc": [
+      "Erstellt einen ONNX-gestützten Reranker.",
+      "",
+      "# Errors",
+      "Gibt `Error` zurück, falls die Initialisierung scheitert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Onnx",
+     "shape": "(OnnxReranker)",
+     "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+     "line": 169
+    },
+    {
+     "name": "Fake",
+     "shape": "(crate::fakes::FakeReranker)",
+     "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+     "line": 172
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl CrossEncoderReranker",
+     "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+     "line": 175,
+     "in_test": false
+    },
+    {
+     "trait": "Reranker",
+     "generics": "",
+     "signature": "impl Reranker for CrossEncoderReranker",
+     "file": "crates/contextra-infer-onnx/src/reranker/mod.rs",
+     "line": 192,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "Embedder",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub trait Embedder: Send + Sync",
+   "file": "crates/contextra-infer-onnx/src/traits.rs",
+   "line": 9,
+   "doc": [
+    "Synchroner Trait für Vektor-Embeddings."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "embed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn embed(&self, text: &str) -> Result<Vec<f32>>",
+     "file": "crates/contextra-infer-onnx/src/traits.rs",
+     "line": 14,
+     "doc": [
+      "Erzeugt ein Embedding für einen einzelnen Text.",
+      "",
+      "# Errors",
+      "Gibt einen Fehler zurück, falls Tokenisierung oder Inferenz fehlschlagen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Embedder"
+    },
+    {
+     "name": "embed_batch",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>>",
+     "file": "crates/contextra-infer-onnx/src/traits.rs",
+     "line": 23,
+     "doc": [
+      "Erzeugt Embeddings für einen Batch von Texten.",
+      "",
+      "Das Ergebnis muss bit- oder innerhalb enger numerischer Toleranz äquivalent",
+      "zu sequentiellen Einzelaufrufen von `embed` sein.",
+      "",
+      "# Errors",
+      "Gibt einen Fehler zurück, wenn die Batch-Verarbeitung fehlschlägt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Embedder"
+    },
+    {
+     "name": "dimension",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn dimension(&self) -> usize",
+     "file": "crates/contextra-infer-onnx/src/traits.rs",
+     "line": 32,
+     "doc": [
+      "Gibt die feste Ausgabedimension des Modells zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Embedder"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Reranker",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub trait Reranker: Send + Sync",
+   "file": "crates/contextra-infer-onnx/src/traits.rs",
+   "line": 36,
+   "doc": [
+    "Synchroner Trait für Cross-Encoder Reranking."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn score(&self, query: &str, docs: &[&str]) -> Result<Vec<f32>>",
+     "file": "crates/contextra-infer-onnx/src/traits.rs",
+     "line": 43,
+     "doc": [
+      "Berechnet Relevanz-Scores für eine Query und eine Liste von Dokumenten.",
+      "",
+      "Gibt einen Vektor von Scores gleicher Länge wie `docs` zurück.",
+      "",
+      "# Errors",
+      "Gibt einen Fehler zurück, falls die Berechnung fehlschlägt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Reranker"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use config::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 20,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use embedder::OnnxEmbedder",
+   "vis": "pub",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 23,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use error::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 24,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use fakes::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 26,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use reranker::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 27,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use traits::",
+   "vis": "pub",
+   "file": "crates/contextra-infer-onnx/src/lib.rs",
+   "line": 28,
+   "in_test": false,
+   "module": "crate"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra-db",
+  "contextra-mcp"
+ ]
+}

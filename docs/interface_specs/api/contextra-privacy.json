@@ -1,0 +1,4590 @@
+{
+ "name": "contextra-privacy",
+ "version": "workspace",
+ "path": "crates/contextra-privacy",
+ "role": "Datenschutz-Egress und Surrogate",
+ "features": {
+  "default": [
+   "std"
+  ],
+  "std": [],
+  "serde": [],
+  "tracing": []
+ },
+ "deps": {
+  "thiserror": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "rand": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "zeroize": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "parking_lot": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "tokio": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "scc": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "blake3": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "regex": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "bincode": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "criterion": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  },
+  "tempfile": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "`contextra-privacy` — Cloud Egress Security, DLP & Exfiltration Protection",
+  "",
+  "# Zweck und Architektur",
+  "Dieses Crate implementiert die Sicherheits- und Datenschutzschicht für ausgehende Datenströme",
+  "(Cloud Egress) in Contextra. Ziel ist es, Data Loss Prevention (DLP, Schutz vor Datenverlust),",
+  "Erkennung von Exfiltrationsversuchen, automatisierte Pseudonymisierung über Surrogat-Token",
+  "sowie unveränderbare Audit-Protokolle bereitzustellen.",
+  "",
+  "# Ebene und Rolle",
+  "Ebene E0 (Autarker Baustein). Das Crate ist vollständig eigenständig kompilier- und testbar.",
+  "",
+  "# Einbindung und Abhängigkeiten",
+  "- **Eingehend:** Wird eingebunden von `contextra-mcp`.",
+  "- **Ausgehend:** Vollkommen autark (keine internen Pflichtabhängigkeiten).",
+  "",
+  "# Wichtigste Module",
+  "- [`contract`]: Minimale Umwelt- und Port-Traits (`Clock`, `EgressPolicy`, `TextSearchEngine`, `EntityRecognizer`).",
+  "- [`egress_vault`]: DLP-Prüfung, Regex-Klassifikation und `SurrogateVault`-Pseudonymisierung.",
+  "- [`entity_recognizer`]: Erkennung personenbezogener Daten (PII) wie IBAN, E-Mail, Kreditkarten.",
+  "- [`egress_guard`]: Semantische k-NN Vektorähnlichkeitsprüfung gegen Datenabfluss.",
+  "- [`egress_gateway`]: Zentrales Schutzgateway (Egress Shield) vor Weiterleitung in externe Cloud-Dienste.",
+  "- [`bulk_exfiltration_detector`]: Sitzungsbasiertes Rate-Limiting gegen Massenabflüsse.",
+  "- [`context_edit_audit`]: Kryptografisch verkettete Audit-Aufzeichnungen von Kontextbearbeitungen.",
+  "- [`processing_registry`]: Verzeichnis von Verarbeitungstätigkeiten (VVT).",
+  "- [`guarded_payload`]: Type-State-Muster zur Verhinderung ungesäuberter Datenabflüsse zur Compile-Zeit."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-privacy/src/audit_trace.rs",
+   "module": "audit_trace",
+   "lines": 123
+  },
+  {
+   "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+   "module": "bulk_exfiltration_detector",
+   "lines": 458
+  },
+  {
+   "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+   "module": "context_edit_audit",
+   "lines": 380
+  },
+  {
+   "file": "crates/contextra-privacy/src/contract.rs",
+   "module": "contract",
+   "lines": 16
+  },
+  {
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "module": "egress_gateway",
+   "lines": 870
+  },
+  {
+   "file": "crates/contextra-privacy/src/egress_guard.rs",
+   "module": "egress_guard",
+   "lines": 544
+  },
+  {
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "module": "egress_vault",
+   "lines": 1009
+  },
+  {
+   "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+   "module": "entity_recognizer",
+   "lines": 1391
+  },
+  {
+   "file": "crates/contextra-privacy/src/error.rs",
+   "module": "error",
+   "lines": 190
+  },
+  {
+   "file": "crates/contextra-privacy/src/guarded_payload.rs",
+   "module": "guarded_payload",
+   "lines": 128
+  },
+  {
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "module": "crate",
+   "lines": 80
+  },
+  {
+   "file": "crates/contextra-privacy/src/processing_registry.rs",
+   "module": "processing_registry",
+   "lines": 422
+  },
+  {
+   "file": "crates/contextra-privacy/src/types.rs",
+   "module": "types",
+   "lines": 171
+  }
+ ],
+ "counts": {
+  "unwrap": 9,
+  "expect": 18,
+  "panic_macro": 4,
+  "todo_unimpl": 0,
+  "index_bracket": 10,
+  "deprecated_attr": 11,
+  "cfg_feature_gates": 1
+ },
+ "grep_pub_decl": 186,
+ "all_pub_decl": 186,
+ "public_items": [
+  {
+   "kind": "fn",
+   "name": "extract_rule_id",
+   "vis": "pub",
+   "module": "audit_trace",
+   "signature": "pub fn extract_rule_id(classification: &EgressClassification) -> String",
+   "file": "crates/contextra-privacy/src/audit_trace.rs",
+   "line": 36,
+   "doc": [
+    "Extrahiert eine stabile, nicht-leere Regel-Kennung aus einer [`EgressClassification`].",
+    "",
+    "# Ablauf",
+    "1. Bei `EgressClassification::Allow` wird die statische Kennung `\"ALLOW\"` zurückgegeben.",
+    "2. Bei `EgressClassification::Block(reason)` wird der Grund differenziert:",
+    "- `SensitivePattern`: Gibt die konkrete Regel-ID (z. B. `\"R-001\"`) zurück.",
+    "- `PolicyDenied`: Formatiert mit Präfix `\"POLICY_DENIED:\"`.",
+    "- `EgressPolicyDenied`: Formatiert mit Präfix `\"EGRESS_POLICY_DENIED:\"`.",
+    "- `ClassificationTimeout`: Gibt `\"CLASSIFICATION_TIMEOUT\"` zurück.",
+    "- `InternalError`: Formatiert mit Präfix `\"INTERNAL_ERROR:\"`.",
+    "",
+    "# Parameter",
+    "* `classification`: Die zu untersuchende Klassifikationsentscheidung.",
+    "",
+    "# Rückgabe",
+    "Stabile Kennung als `String`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compute_audit_trace",
+   "vis": "pub",
+   "module": "audit_trace",
+   "signature": "pub fn compute_audit_trace(payload: &str, rule_id: &str, nanos: u64) -> [u8",
+   "file": "crates/contextra-privacy/src/audit_trace.rs",
+   "line": 62,
+   "doc": [
+    "Berechnet einen deterministischen 32-Byte-BLAKE3-Hash-Trace für eine Klassifikationsentscheidung.",
+    "",
+    "Segmente werden in fester Byte-Reihenfolge mit 8-Byte Little-Endian Längenpräfixen serialisiert:",
+    "1. Payload-Länge (u64 LE) + Payload-Bytes.",
+    "2. Regel-ID-Länge (u64 LE) + Regel-ID-Bytes.",
+    "3. Zeitstempel-Länge (8 Bytes, u64 LE) + Zeitstempel (Nanosekunden seit Unix-Epoche, u64 LE).",
+    "",
+    "# Vorbedingungen",
+    "`nanos` muss aus einem standardkonformen Clock-Port stammen (Regel 3 aus CLAUDE.md).",
+    "",
+    "# Nachbedingungen",
+    "Liefert reproduzierbar denselben 32-Byte BLAKE3-Hashwert für identische Eingaben."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "EgressClassifierTrace",
+   "vis": "pub",
+   "module": "audit_trace",
+   "signature": "pub trait EgressClassifierTrace: EgressClassifier",
+   "file": "crates/contextra-privacy/src/audit_trace.rs",
+   "line": 87,
+   "doc": [
+    "Erweiterter Trait für Egress-Klassifikatoren mit kryptografischem Audit-Trace.",
+    "",
+    "Kombiniert die reguläre Klassifikation mit der deterministischen Trace-Berechnung über einen Zeitstempel-Port."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "classify_with_trace",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn classify_with_trace<'a>( &'a self, payload: &'a str, clock: &'a dyn Clock, ) -> BoxFuture<'a, (EgressClassification, [u8",
+     "file": "crates/contextra-privacy/src/audit_trace.rs",
+     "line": 100,
+     "doc": [
+      "Klassifiziert einen Payload und liefert sowohl das Klassifikationsergebnis",
+      "als auch einen 32-Byte-BLAKE3-Hash-Trace.",
+      "",
+      "# Ablauf",
+      "1. Liest den aktuellen Zeitstempel in Nanosekunden aus `clock.now_unix_nanos()`.",
+      "2. Führt die asynchrone Klassifikation über `self.classify(payload)` aus.",
+      "3. Extrahiert die Regel-Kennung via [`extract_rule_id`].",
+      "4. Berechnet den Audit-Trace via [`compute_audit_trace`].",
+      "5. Gibt das Tupel `(Klassifikation, Trace)` zurück.",
+      "",
+      "# Nebenwirkungen",
+      "Liest Zeit über den injizierten `Clock`-Port (Port-Entkopplung gemäß Regel 3)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "EgressClassifierTrace"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "DeterministicBlake3Hasher",
+   "vis": "pub",
+   "module": "bulk_exfiltration_detector",
+   "signature": "pub struct DeterministicBlake3Hasher",
+   "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+   "line": 28,
+   "doc": [
+    "Deterministischer, P28-konformer Hasher auf Basis von BLAKE3."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Hasher",
+     "generics": "",
+     "signature": "impl Hasher for DeterministicBlake3Hasher",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 32,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DeterministicBuildHasher",
+   "vis": "pub",
+   "module": "bulk_exfiltration_detector",
+   "signature": "pub struct DeterministicBuildHasher",
+   "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+   "line": 48,
+   "doc": [
+    "Deterministischer BuildHasher für sessions in `BulkExfiltrationDetector`."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "BuildHasher",
+     "generics": "",
+     "signature": "impl BuildHasher for DeterministicBuildHasher",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 50,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SessionId",
+   "vis": "pub",
+   "module": "bulk_exfiltration_detector",
+   "signature": "pub struct SessionId(pub String)",
+   "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+   "line": 61,
+   "doc": [
+    "Eindeutige Sitzungs-Kennung (SessionId) zur Gruppierung von Egress-Rate-Limiting-Buckets."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<String>",
+     "generics": "",
+     "signature": "impl From<String> for SessionId",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 63,
+     "in_test": false
+    },
+    {
+     "trait": "From<&str>",
+     "generics": "",
+     "signature": "impl From<&str> for SessionId",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 69,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "BulkExfiltrationOutcome",
+   "vis": "pub",
+   "module": "bulk_exfiltration_detector",
+   "signature": "pub enum BulkExfiltrationOutcome",
+   "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+   "line": 78,
+   "doc": [
+    "Ergebnis der Auswertung des ausgehenden Datenvolumens gegen die konfigurierten Sitzungslimits."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Allow",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 80
+    },
+    {
+     "name": "Block",
+     "shape": "{",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 82
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "BulkExfiltrationDetector",
+   "vis": "pub",
+   "module": "bulk_exfiltration_detector",
+   "signature": "pub struct BulkExfiltrationDetector",
+   "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+   "line": 159,
+   "doc": [
+    "Volumen- und Zeitfenster-basierter Rate-Limiter für Cloud-Egress-Anfragen (Layer 4)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(max_bytes_per_window: usize, window: Duration) -> Self",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 184,
+     "doc": [
+      "Erstellt einen neuen `BulkExfiltrationDetector` mit Standard-Systemzeit-Clock.",
+      "",
+      "# Parameter",
+      "* `max_bytes_per_window`: Maximale Byteanzahl im Fenster.",
+      "* `window`: Dauer des Fensters als [`Duration`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock( max_bytes_per_window: usize, window: Duration, clock: Arc<dyn Clock>, ) -> Self",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 195,
+     "doc": [
+      "Erstellt einen neuen `BulkExfiltrationDetector` mit einem spezifischen [`Clock`]-Port.",
+      "",
+      "# Parameter",
+      "* `max_bytes_per_window`: Maximale Byteanzahl im Fenster.",
+      "* `window`: Dauer des Fensters.",
+      "* `clock`: Trait-Objekt für monotone Zeitmessung."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_and_check",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_and_check( &self, session: SessionId, payload_len: usize, ) -> BulkExfiltrationOutcome",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 216,
+     "doc": [
+      "Registriert `payload_len` Bytes für `session` und bewertet, ob das Limit im gleitenden Fenster überschritten wurde.",
+      "",
+      "Thread-sicher für nebenläufige Anfragen über mehrere Sitzungen hinweg.",
+      "",
+      "# Nebenwirkungen",
+      "Liest monotone Zeit über den internen `Clock`-Port."
+     ],
+     "attrs": [
+      "#[allow(clippy::disallowed_methods)] // ADR-098: Monotonic sliding window timestamp in BulkExfiltrationDetector"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_and_check_with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_and_check_with_clock( &self, session: SessionId, payload_len: usize, clock: &dyn Clock, ) -> BulkExfiltrationOutcome",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 226,
+     "doc": [
+      "Registriert Bytes für eine Sitzung unter Verwendung einer explizit übergebenen [`Clock`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "record_and_check_at_nanos",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn record_and_check_at_nanos( &self, session: SessionId, payload_len: usize, now_nanos: u64, ) -> BulkExfiltrationOutcome",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 243,
+     "doc": [
+      "Interner Hilfsablauf zur Auswertung an einem expliziten Nanosekunden-Zeitstempel.",
+      "",
+      "# Ablauf",
+      "1. Sucht den Sitzungs-Eintrag in der `scc::HashMap` oder erzeugt ihn atomar.",
+      "2. Konvertiert die Fensterdauer in Nanosekunden.",
+      "3. Sperrt den Sitzungs-Mutex kurzzeitig.",
+      "4. Führt `record_and_check` auf dem `SlidingWindowCounter` aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "max_bytes_per_window",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 161
+    },
+    {
+     "name": "window",
+     "type": "Duration",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 163
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for BulkExfiltrationDetector",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 168,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl BulkExfiltrationDetector",
+     "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+     "line": 177,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "ContextEditKind",
+   "vis": "pub",
+   "module": "context_edit_audit",
+   "signature": "pub enum ContextEditKind",
+   "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+   "line": 25,
+   "doc": [
+    "Art der Kontext-Änderung am temporären Agenten-Scratchpad."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Append",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 27
+    },
+    {
+     "name": "Replace",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 29
+    },
+    {
+     "name": "Remove",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 31
+    },
+    {
+     "name": "CheckpointReset",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 33
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "ContextEditAuditError",
+   "vis": "pub",
+   "module": "context_edit_audit",
+   "signature": "pub enum ContextEditAuditError",
+   "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+   "line": 39,
+   "doc": [
+    "Lokaler Fehlertyp für Audit-Ketten-Verifizierungsfehler."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "ChainTampered",
+     "shape": "{",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 43
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ContextEditInput",
+   "vis": "pub",
+   "module": "context_edit_audit",
+   "signature": "pub struct ContextEditInput",
+   "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+   "line": 52,
+   "doc": [
+    "Eingabe-Parameter zur Erstellung eines Audit-Datensatzes für eine Kontext-Änderung."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "task_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 54
+    },
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 56
+    },
+    {
+     "name": "kind",
+     "type": "ContextEditKind",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 58
+    },
+    {
+     "name": "chunk_label",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 60
+    },
+    {
+     "name": "bytes_affected",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 62
+    },
+    {
+     "name": "subgoal_index",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 64
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ContextEditAuditRecord",
+   "vis": "pub",
+   "module": "context_edit_audit",
+   "signature": "pub struct ContextEditAuditRecord",
+   "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+   "line": 72,
+   "doc": [
+    "Nachvollziehbarer, kryptografisch verketteter Audit-Datensatz für eine Änderung am temporären Agenten-Kontext.",
+    "",
+    "**Sicherheitsgarantie:** Enthält keinen Klartext des Scratchpad-Inhalts (nur Längen, Hashes und Labels)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "previous_hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 74
+    },
+    {
+     "name": "record_hash",
+     "type": "[u8; 32]",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 76
+    },
+    {
+     "name": "task_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 78
+    },
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 80
+    },
+    {
+     "name": "kind",
+     "type": "ContextEditKind",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 82
+    },
+    {
+     "name": "chunk_label",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 84
+    },
+    {
+     "name": "bytes_affected",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 86
+    },
+    {
+     "name": "recorded_at_tx",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 88
+    },
+    {
+     "name": "subgoal_index",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+     "line": 90
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compute_record_hash",
+   "vis": "pub",
+   "module": "context_edit_audit",
+   "signature": "pub fn compute_record_hash( previous_hash: [u8",
+   "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+   "line": 114,
+   "doc": [
+    "Berechnet den deterministischen BLAKE3-Hash über alle Datenfelder eines Audit-Records.",
+    "",
+    "# Ablauf",
+    "1. Hash-Initialisierung mit `blake3::Hasher`.",
+    "2. Hinzufügen von `previous_hash` (32 Bytes).",
+    "3. Längenpräfix und Bytes der `task_id`.",
+    "4. `tenant_id` als 64-Bit Little-Endian.",
+    "5. Operationsart (`kind`) als einzelnes Byte (1..=4).",
+    "6. Optionale Kennung `chunk_label` mit Vorhandenseins-Flag und Längenpräfix.",
+    "7. Anzahl `bytes_affected` als 64-Bit Little-Endian.",
+    "8. Zeitstempel `recorded_at_tx` als 64-Bit Little-Endian.",
+    "9. `subgoal_index` als 64-Bit Little-Endian.",
+    "",
+    "# Parameter",
+    "* `previous_hash`: BLAKE3-Hash des direkten Vorgängers.",
+    "* `input`: Metadaten zur Kontext-Änderung.",
+    "* `recorded_at_tx`: Transaktionszeitpunkt in Unix-Nanosekunden.",
+    "",
+    "# Rückgabe",
+    "32-Byte Hashwert des Datensatzes."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "build_context_edit_audit_record",
+   "vis": "pub",
+   "module": "context_edit_audit",
+   "signature": "pub fn build_context_edit_audit_record( previous_hash: [u8",
+   "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+   "line": 175,
+   "doc": [
+    "Konstruiert deterministisch einen neuen [`ContextEditAuditRecord`] mit Hash-Verkettung.",
+    "",
+    "Der Zeitstempel wird ausschließlich über den injizierten `Clock`-Port bezogen (kein SystemTime::now()).",
+    "",
+    "# Ablauf",
+    "1. Bezieht aktuellen Zeitstempel über `clock.now_unix_nanos()`.",
+    "2. Berechnet den Hashwert via [`compute_record_hash`].",
+    "3. Gibt den fertig zusammengestellten Datensatz zurück.",
+    "",
+    "# Nebenwirkungen",
+    "Greift auf den injizierten `Clock`-Port zu."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "verify_audit_chain",
+   "vis": "pub",
+   "module": "context_edit_audit",
+   "signature": "pub fn verify_audit_chain(chain: &[ContextEditAuditRecord]) -> Result<(), ContextEditAuditError>",
+   "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+   "line": 210,
+   "doc": [
+    "Verifiziert die Integrität und Hash-Verkettung einer Reihe von Audit-Records.",
+    "",
+    "# Ablauf",
+    "1. Initialisiert den erwarteten Vorgängerhash mit Nullen (`[0u8; 32]`).",
+    "2. Iteriert über alle Datensätze der Kette:",
+    "a. Prüft, ob `record.previous_hash` dem erwarteten Hash entspricht.",
+    "b. Rekonstruiert die Eingabedaten und berechnet den Soll-Hashwert neu.",
+    "c. Prüft, ob `record.record_hash` mit dem Soll-Hashwert übereinstimmt.",
+    "d. Setzt `expected_previous_hash` auf den aktuellen `record_hash`.",
+    "3. Bricht beim ersten Fehler mit `ContextEditAuditError::ChainTampered` ab (Fail-Closed).",
+    "",
+    "# Rückgabe",
+    "`Ok(())` bei intakter Kette oder `Err(ContextEditAuditError::ChainTampered { index })`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "render_audit_line",
+   "vis": "pub",
+   "module": "context_edit_audit",
+   "signature": "pub fn render_audit_line(record: &ContextEditAuditRecord) -> String",
+   "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+   "line": 250,
+   "doc": [
+    "Formatiert einen Audit-Datensatz in eine einzeilige, menschenlesbare Log-Zeile.",
+    "",
+    "### Format",
+    "`\"task={task_id} tenant={tenant_id} kind={kind:?} chunk_label={chunk_label} bytes={bytes_affected} recorded_at_tx={recorded_at_tx} subgoal={subgoal_index} prev_hash={prev_hash_hex} record_hash={record_hash_hex}\"`",
+    "",
+    "# Ablauf",
+    "1. Wandelt optionale Labels um (Fallback auf `\"none\"`).",
+    "2. Kodiert Vorgängerhash und Record-Hash in Hexadezimaldarstellung.",
+    "3. Formatiert alle Attribute in einen standardisierten Log-String."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "type",
+   "name": "DefaultEgressClassifier",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub type DefaultEgressClassifier = EgressVault",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 38,
+   "doc": [
+    "Standardmäßiger Klassifikator auf Basis von [`EgressVault`]."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_SEARCH_QUERY_BYTES",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub const MAX_SEARCH_QUERY_BYTES: usize = 64 * 1024",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 42,
+   "doc": [
+    "Maximale Suchanfragengröße in Bytes (64 KiB = 65.536 Bytes)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "EgressGuardCheck",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub trait EgressGuardCheck: Send + Sync",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 46,
+   "doc": [
+    "Trait-Vertrag für Layer-4 k-NN Vektor-Ähnlichkeitsprüfungen gegen Bulk-Exfiltration."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "check",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn check<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification>",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 48,
+     "doc": [
+      "Evaluates the outbound payload against vector index / similarity models."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "EgressGuardCheck"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "DefaultEgressGuard",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub struct DefaultEgressGuard",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 53,
+   "doc": [
+    "Standardmäßiger Pass-Through Guard, falls kein separater L4-Vektor-Guard konfiguriert ist."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "EgressGuardCheck",
+     "generics": "",
+     "signature": "impl EgressGuardCheck for DefaultEgressGuard",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 55,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "InjectionDetector",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub trait InjectionDetector: Send + Sync",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 63,
+   "doc": [
+    "Trait zur Prüfung auf Prompt-Injection in eingehenden Cloud-Antworten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "detect",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn detect(&self, text: &str) -> Option<String>",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 65,
+     "doc": [
+      "Prüft den Text auf Muster."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "InjectionDetector"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EgressGateway",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub struct EgressGateway",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 75,
+   "doc": [
+    "Einheitliches Egress-Gateway zur Durchsetzung der 5-stufigen Schutzpipeline:",
+    "1. Policy/Guard check",
+    "2. Entity recognition",
+    "3. Surrogate replacement",
+    "4. Bulk volume detector check",
+    "5. Audit trace logging"
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "builder",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn builder() -> EgressGatewayBuilder",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 205,
+     "doc": [
+      "Erzeugt einen neuen EgressGatewayBuilder."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "process",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn process( &self, request: TenantScoped<CloudQueryRequest>, expected_tenant_id: &TenantId, ) -> Result<CloudQueryResponse, EgressError>",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 210,
+     "doc": [
+      "Executes the standard, mandatory 5-stage egress pipeline for a tenant-scoped request."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "process_with_components",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn process_with_components( &self, request: TenantScoped<CloudQueryRequest>, expected_tenant_id: &TenantId, classifier: &dyn EgressClassifier, egress_guard: Option<&dyn EgressGuardCheck>, bulk_detector: Option<(&BulkExfiltrationDetector, SessionId)>, ) -> Result<CloudQueryResponse, EgressError>",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 231,
+     "doc": [
+      "Executes the standard 5-stage egress pipeline with optional custom classifier, guard, or bulk detector overrides:",
+      "1. Policy/Guard check -> block on violation/error",
+      "2. Entity recognition -> detect PII entities",
+      "3. Surrogate replacement -> anonymize PII",
+      "4. Bulk volume detector -> check rate/volume limits",
+      "5. Audit trace -> record audit trace with clock timestamp and rule ID"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for EgressGateway",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 84,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EgressGateway",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 203,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EgressGatewayBuilder",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub struct EgressGatewayBuilder",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 94,
+   "doc": [
+    "Builder zur typsicheren Konstruktion einer [`EgressGateway`]-Instanz."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 106,
+     "doc": [
+      "Erzeugt eine neue Builder-Instanz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_classifier",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_classifier(mut self, classifier: Arc<dyn EgressClassifier>) -> Self",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 111,
+     "doc": [
+      "Setzt den Klassifikator."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_egress_guard",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_egress_guard(mut self, guard: Arc<dyn EgressGuardCheck>) -> Self",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 117,
+     "doc": [
+      "Setzt den Egress-Guard."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_recognizer",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_recognizer(mut self, recognizer: Arc<dyn EntityRecognizer>) -> Self",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 123,
+     "doc": [
+      "Setzt den Entitätserkenner."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_egress_vault",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_egress_vault(mut self, vault: Arc<EgressVault>) -> Self",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 129,
+     "doc": [
+      "Setzt den Egress-Tresor."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_surrogate_vault",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_surrogate_vault(mut self, surrogate_vault: Arc<SurrogateVault>) -> Self",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 135,
+     "doc": [
+      "Setzt den Surrogat-Tresor."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_bulk_detector",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_bulk_detector( mut self, detector: Arc<BulkExfiltrationDetector>, session_id: SessionId, ) -> Self",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 141,
+     "doc": [
+      "Setzt den Massenabfluss-Detektor."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 151,
+     "doc": [
+      "Setzt die Uhr-Quelle."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "build",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn build(self) -> Result<EgressGateway, EgressError>",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 157,
+     "doc": [
+      "Builds the `EgressGateway`, strictly enforcing that mandatory components (including `egress_guard`) are present."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EgressGatewayBuilder",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 104,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "CloudResponseRehydrator",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub struct CloudResponseRehydrator",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 310,
+   "doc": [
+    "Rehydrierer zur sicheren Rückübersetzung von Surrogat-Tokens in Cloud-Antworten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(vault_map: impl IntoIterator<Item = (String, String)>) -> Self",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 316,
+     "doc": [
+      "Creates a new `CloudResponseRehydrator` with the provided surrogate-to-entity map."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "rehydrate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn rehydrate(&self, cloud_response_text: &str) -> String",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 326,
+     "doc": [
+      "Rehydrates surrogate tokens matching `[USER_ENTITY_[0-9a-fA-F]{4}]` back to original entity values.",
+      "Unknown or missing surrogate tokens remain unchanged without panicking.",
+      "",
+      "Guarantees zero panics on arbitrary UTF-8 byte boundaries by using character slice bounds."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl CloudResponseRehydrator",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 314,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "pii_vault_requires_isolated_retention",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub fn pii_vault_requires_isolated_retention(is_pii_match: bool, is_memory_only: bool) -> bool",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 388,
+   "doc": [
+    "Evaluates whether PII vault data requires isolated retention mode for an affected document (neutral API)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "pii_vault_forces_crypto_shred",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub fn pii_vault_forces_crypto_shred(is_pii_match: bool, is_memory_only: bool) -> bool",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 398,
+   "doc": [
+    "Entscheidet anhand von PII-Match und Speichermodus, ob kryptografisches Schreddern erzwungen wird.",
+    "",
+    "Hinweis: Veralteter Bezeichner; bitte zukünftig `pii_vault_requires_isolated_retention` verwenden."
+   ],
+   "attrs": [
+    "#[deprecated(note = \"Neutralisierte API: verwende pii_vault_requires_isolated_retention\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "resolve_effective_retention_mode",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub fn resolve_effective_retention_mode<D, K>( is_pii_match: bool, durability_mode: D, preset_mode: K, isolated_mode: K, ) -> K where D: std::fmt::Debug, K: Copy,",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 404,
+   "doc": [
+    "Resolves the effective retention mode given PII status and storage configuration (neutral API)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "resolve_effective_kv_delete_mode",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub fn resolve_effective_kv_delete_mode<D, K>( is_pii_match: bool, durability_mode: D, preset_kv_delete_mode: K, crypto_shred_mode: K, ) -> K where D: std::fmt::Debug, K: Copy,",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 430,
+   "doc": [
+    "Bestimmt den effektiven Löschmodus (Shredding vs. Tombstone) unter Berücksichtigung von PII-Vorgaben.",
+    "",
+    "Hinweis: Veralteter Bezeichner; bitte zukünftig `resolve_effective_retention_mode` verwenden."
+   ],
+   "attrs": [
+    "#[deprecated(note = \"Neutralisierte API: verwende resolve_effective_retention_mode\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "CloudQueryRequest",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub struct CloudQueryRequest",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 451,
+   "doc": [
+    "Anfrage-Struktur für ausgehende Cloud-Queries."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "query",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 453
+    },
+    {
+     "name": "collection",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 455
+    },
+    {
+     "name": "max_results",
+     "type": "Option<usize>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 457
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "CloudQueryResponse",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub struct CloudQueryResponse",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 463,
+   "doc": [
+    "Antwort-Struktur nach erfolgreicher Bereinigung und Durchlauf der Egress-Pipeline."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "status",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 465
+    },
+    {
+     "name": "query",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 467
+    },
+    {
+     "name": "abstracted",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 469
+    },
+    {
+     "name": "results",
+     "type": "Vec<Value>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 471
+    },
+    {
+     "name": "abstraction_notice",
+     "type": "Option<String>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_gateway.rs",
+     "line": 473
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "handle_cloud_query",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub async fn handle_cloud_query( request: CloudQueryRequest, classifier: &dyn EgressClassifier, ) -> Result<CloudQueryResponse, EgressError>",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 478,
+   "doc": [
+    "Verarbeitet eine ausgehende Cloud-Query über die Standard-Schutz-Pipeline."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "handle_cloud_query_scoped",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub async fn handle_cloud_query_scoped( request: TenantScoped<CloudQueryRequest>, expected_tenant_id: &TenantId, classifier: &dyn EgressClassifier, ) -> Result<CloudQueryResponse, EgressError>",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 491,
+   "doc": [
+    "Verarbeitet eine mandantengebundene Cloud-Query ([`TenantScoped`])."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "handle_cloud_query_scoped_with_guard",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub async fn handle_cloud_query_scoped_with_guard( request: TenantScoped<CloudQueryRequest>, expected_tenant_id: &TenantId, classifier: &dyn EgressClassifier, egress_guard: Option<&dyn EgressGuardCheck>, ) -> Result<CloudQueryResponse, EgressError>",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 514,
+   "doc": [
+    "Verarbeitet eine mandantengebundene Cloud-Query mit zusätzlichem Layer-4 Vektor-Guard."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "handle_cloud_query_scoped_with_bulk_detector",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub async fn handle_cloud_query_scoped_with_bulk_detector( request: TenantScoped<CloudQueryRequest>, expected_tenant_id: &TenantId, classifier: &dyn EgressClassifier, egress_guard: Option<&dyn EgressGuardCheck>, bulk_detector: Option<(&BulkExfiltrationDetector, SessionId)>, ) -> Result<CloudQueryResponse, EgressError>",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 538,
+   "doc": [
+    "Vollständige Prüfung inklusive Mandantenisolation, L4-Guard und Bulk-Exfiltrations-Detektor."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "handle_cloud_query_with_guard",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub async fn handle_cloud_query_with_guard( request: CloudQueryRequest, classifier: &dyn EgressClassifier, egress_guard: Option<&dyn EgressGuardCheck>, ) -> Result<CloudQueryResponse, EgressError>",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 568,
+   "doc": [
+    "Verarbeitet eine Cloud-Query mit zusätzlichem Layer-4 Vektor-Guard."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "check_bulk_exfiltration",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub fn check_bulk_exfiltration( detector: &BulkExfiltrationDetector, session: SessionId, payload: &str, ) -> Result<(), EgressError>",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 583,
+   "doc": [
+    "Überprüft eine Anfrage gegen den Bulk-Exfiltrations-Detektor."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "handle_cloud_query_with_bulk_detector",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub async fn handle_cloud_query_with_bulk_detector( request: CloudQueryRequest, classifier: &dyn EgressClassifier, egress_guard: Option<&dyn EgressGuardCheck>, bulk_detector: Option<(&BulkExfiltrationDetector, SessionId)>, ) -> Result<CloudQueryResponse, EgressError>",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 605,
+   "doc": [
+    "Führt die Cloud-Query-Prüfung mit L4-Guard und Bulk-Exfiltrations-Detektor durch."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "process_cloud_response",
+   "vis": "pub",
+   "module": "egress_gateway",
+   "signature": "pub async fn process_cloud_response( raw_response: &str, injection_guard: &dyn InjectionDetector, rehydrator: &CloudResponseRehydrator, ) -> Result<String, EgressError>",
+   "file": "crates/contextra-privacy/src/egress_gateway.rs",
+   "line": 629,
+   "doc": [
+    "Verarbeitet die Antwort einer Cloud-Query (Rehydrierung und Prompt-Injection-Erkennung)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "TextSearchResult",
+   "vis": "pub",
+   "module": "egress_guard",
+   "signature": "pub struct TextSearchResult",
+   "file": "crates/contextra-privacy/src/egress_guard.rs",
+   "line": 27,
+   "doc": [
+    "Vereinfachtes Kandidaten-Ergebnis einer Text- bzw. Vektorähnlichkeitssuche."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 29
+    },
+    {
+     "name": "score",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 31
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "TextSearchEngine",
+   "vis": "pub",
+   "module": "egress_guard",
+   "signature": "pub trait TextSearchEngine: Send + Sync",
+   "file": "crates/contextra-privacy/src/egress_guard.rs",
+   "line": 36,
+   "doc": [
+    "Abstraktions-Trait für die Textähnlichkeitssuche zur Entkopplung von konkreten Datenbank-Engines."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "search_text",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn search_text<'a>( &'a self, text: &'a str, limit: usize, ) -> BoxFuture<'a, Result<Vec<TextSearchResult>, String>>",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 38,
+     "doc": [
+      "Führt eine Textsuche nach relevanten Dokumenten durch."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "TextSearchEngine"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_EGRESS_GUARD_TIMEOUT",
+   "vis": "pub",
+   "module": "egress_guard",
+   "signature": "pub const DEFAULT_EGRESS_GUARD_TIMEOUT: Duration = Duration::from_millis(200)",
+   "file": "crates/contextra-privacy/src/egress_guard.rs",
+   "line": 47,
+   "doc": [
+    "Standard-Timeout für EgressGuard Vector-Search (200 ms)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_EGRESS_GUARD_THRESHOLD",
+   "vis": "pub",
+   "module": "egress_guard",
+   "signature": "pub const DEFAULT_EGRESS_GUARD_THRESHOLD: f32 = 0.85",
+   "file": "crates/contextra-privacy/src/egress_guard.rs",
+   "line": 50,
+   "doc": [
+    "Standard-Schwellwert für Cosine-Similarity-Übereinstimmung (0.85 = 85 % Ähnlichkeit)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_EGRESS_GUARD_MIN_BYTES",
+   "vis": "pub",
+   "module": "egress_guard",
+   "signature": "pub const DEFAULT_EGRESS_GUARD_MIN_BYTES: usize = 128",
+   "file": "crates/contextra-privacy/src/egress_guard.rs",
+   "line": 53,
+   "doc": [
+    "Minimale Byte-Länge des Payloads, ab der die Ähnlichkeitsprüfung durchgeführt wird (128 Bytes)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EgressGuard",
+   "vis": "pub",
+   "module": "egress_guard",
+   "signature": "pub struct EgressGuard",
+   "file": "crates/contextra-privacy/src/egress_guard.rs",
+   "line": 63,
+   "doc": [
+    "Layer-4 EgressGuard zur Erkennung und Blockierung von Bulk-Exfiltrationen.",
+    "",
+    "Baut auf einem Text-Sucher (`TextSearchEngine`) auf.",
+    "Outbound-Payloads mit mindestens `min_bytes` werden über `search_text` abgefragt.",
+    "Bei Cosine Similarity $\\ge$ `threshold` wird die Anfrage blockiert.",
+    "Strikte **Fail-Closed**-Semantik bei Index-Fehlern, Timeouts oder leeren Ergebnissen."
+   ],
+   "attrs": [
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(search_engine: Arc<dyn TextSearchEngine>, threshold: f32, min_bytes: usize) -> Self",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 73,
+     "doc": [
+      "Erstellt eine neue `EgressGuard`-Instanz mit Standard-Timeout (200 ms)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_timeout",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_timeout(mut self, timeout: Duration) -> Self",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 84,
+     "doc": [
+      "Setzt ein benutzerdefiniertes Timeout für die Index-Abfrage."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "threshold",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn threshold(&self) -> f32",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 91,
+     "doc": [
+      "Gibt den gesetzten Schwellwert für Ähnlichkeitsprüfungen zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "min_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn min_bytes(&self) -> usize",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 97,
+     "doc": [
+      "Gibt die minimale Payload-Länge in Bytes zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "timeout",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn timeout(&self) -> Duration",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 103,
+     "doc": [
+      "Gibt das konfigurierte Abfrage-Timeout zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "check_scoped",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn check_scoped( &self, payload: crate::types::TenantScoped<&str>, expected_tenant_id: &crate::types::TenantId, ) -> EgressClassification",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 111,
+     "doc": [
+      "Prüft einen an einen Mandanten gebundenen Payload ([`crate::types::TenantScoped`]) mit Mandantenisolationsprüfung.",
+      "",
+      "Liefert `Block(BlockReason::PolicyDenied(...))` bei Mandantenkonflikten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "check",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn check(&self, payload: &str) -> EgressClassification",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 136,
+     "doc": [
+      "Prüft einen Egress-Payload auf mögliche Bulk-Exfiltration gegen die Collection.",
+      "",
+      "Gemäß **v17 Teil 10.3** (Priorität P1, \"Fail-Closed-Randfall\"), Invariante **INV-EGRESS-AUDIT-1**",
+      "und dem generellen **Fail-Closed-Prinzip** (Teil 12, \"Fail-closed als Default\"):",
+      "- Liefert `Allow`, wenn `payload.len() < min_bytes`.",
+      "- Führt k-NN Suche ($k=1$) via `search_text` aus.",
+      "- Bei Score $\\ge$ `threshold` (0.85): `Block(BlockReason::SensitivePattern(\"bulk-exfiltration-hnsw-match\"))`.",
+      "- Bei Score < `threshold`: `Allow`.",
+      "- Bei Index-Fehler, uninitialisiertem Index oder leeren Ergebnissen: strikt **Fail-Closed** mit",
+      "`Block(BlockReason::InternalError(\"egress guard index unavailable — fail-closed\"))`.",
+      "- Bei Timeout (200 ms): strikt **Fail-Closed** mit `Block(BlockReason::ClassificationTimeout)`.",
+      "- Jede Egress-Entscheidung (inkl. aller Fail-Closed-Entscheidungen) wird über `EgressClassifierTrace`",
+      "vollständig auditiert (**INV-EGRESS-AUDIT-1**)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EgressGuard",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 70,
+     "in_test": false
+    },
+    {
+     "trait": "EgressClassifier",
+     "generics": "",
+     "signature": "impl EgressClassifier for EgressGuard",
+     "file": "crates/contextra-privacy/src/egress_guard.rs",
+     "line": 189,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "EntityRecognizer",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub trait EntityRecognizer: Send + Sync",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 31,
+   "doc": [
+    "Trait zur Erkennung benannter Entitäten (NER) im Text ohne Abhängigkeit von Machine-Learning-Crates."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "recognize",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn recognize(&self, text: &str) -> Vec<(std::ops::Range<usize>, String)>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 33,
+     "doc": [
+      "Recognizes entities in the text and returns byte ranges and category labels."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "EntityRecognizer"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "NoOpRecognizer",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub struct NoOpRecognizer",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 39,
+   "doc": [
+    "No-Op-Implementierung von [`EntityRecognizer`], die keine Entitäten erkennt (Null-Objekt-Muster)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "EntityRecognizer",
+     "generics": "",
+     "signature": "impl EntityRecognizer for NoOpRecognizer",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 41,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SurrogateVault",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub struct SurrogateVault",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 51,
+   "doc": [
+    "Sitzungsgebundener Tresor zur bidirektionalen Abbildung zwischen Klartext-PII und Surrogat-Tokens.",
+    "",
+    "Alle kryptografischen Schlüssel, Salts und Zuordnungen werden bei Drop flüchtig genullt (Zeroization)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(session_salt: [u8",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 68,
+     "doc": [
+      "Erstellt einen neuen `SurrogateVault` mit dem übergebenen 16-Byte Sitzungssalz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "random_salt",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn random_salt() -> Self",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 77,
+     "doc": [
+      "Erstellt einen neuen `SurrogateVault` mit einem kryptografisch sicheren Zufallssalz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "generate_surrogate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn generate_surrogate(&self, entity_text: &str) -> Result<String, EgressVaultError>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 97,
+     "doc": [
+      "Generates a session-stable surrogate identifier for `entity_text` and stores the surrogate -> entity mapping.",
+      "",
+      "# Backward Compatibility & Token Format Note",
+      "",
+      "The surrogate format uses 16 hex characters (64-bit entropy derived from Blake3 hash over `entity_text ‖ session_salt`).",
+      "Legacy/historical sessions prior to v17 used 4 hex characters (16-bit entropy).",
+      "Older 16-bit tokens from previous sessions/runs are intentionally NOT automatically migrated to 64-bit tokens;",
+      "sessions starting under the new format generate 64-bit surrogate tokens.",
+      "",
+      "# Errors",
+      "",
+      "Returns [`EgressVaultError::SurrogateCollision`] if the generated surrogate key already maps to a",
+      "different entity text within the current vault session."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_entity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_entity(&self, surrogate: &str) -> Option<String>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 123,
+     "doc": [
+      "Retrieves the original entity text for a given surrogate key if present."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 132,
+     "doc": [
+      "Returns the current count of stored surrogate mappings."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 137,
+     "doc": [
+      "Returns true if the vault contains no surrogate mappings."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clear",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clear(&self)",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 143,
+     "doc": [
+      "Clears and zeroizes all cached surrogate mappings (neutral maintenance / B8 / SPEC §6)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "compact",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn compact(&self)",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 155,
+     "doc": [
+      "Compacts the internal mapping storage (neutral maintenance / SPEC §6)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for SurrogateVault",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 56,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SurrogateVault",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 65,
+     "in_test": false
+    },
+    {
+     "trait": "Drop",
+     "generics": "",
+     "signature": "impl Drop for SurrogateVault",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 163,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "BoxFuture",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 178,
+   "doc": [
+    "Typalias für gepinnte, sende-fähige dynamische Zukunfts-Futures."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "PolicyCategory",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub enum PolicyCategory",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 184,
+   "doc": [
+    "Policy-Kategorie für Audit-Logging und Zugriffskontrolle."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "LocalAccess",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 186
+    },
+    {
+     "name": "CloudEgress",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 188
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "BlockReason",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub enum BlockReason",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 195,
+   "doc": [
+    "Grund für das Blockieren einer Egress-Anfrage."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "category",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn category(&self) -> PolicyCategory",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 210,
+     "doc": [
+      "Gibt die zugehörige Policy-Kategorie des Blockierungsgrunds zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "SensitivePattern",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 197
+    },
+    {
+     "name": "PolicyDenied",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 199
+    },
+    {
+     "name": "EgressPolicyDenied",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 201
+    },
+    {
+     "name": "ClassificationTimeout",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 203
+    },
+    {
+     "name": "InternalError",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 205
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl BlockReason",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 208,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "EgressClassification",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub enum EgressClassification",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 222,
+   "doc": [
+    "Klassifikationsergebnis der Egress-Prüfung."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Allow",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 224
+    },
+    {
+     "name": "Block",
+     "shape": "(BlockReason)",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 226
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "CompiledPattern",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub struct CompiledPattern",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 232,
+   "doc": [
+    "Ein vorkompiliertes Regex-Muster für die Egress-Klassifikation."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(name: impl Into<String>, pattern: &str) -> Result<Self, EgressVaultError>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 241,
+     "doc": [
+      "Erstellt ein neues `CompiledPattern`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "name",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 234
+    },
+    {
+     "name": "regex",
+     "type": "regex::Regex",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 236
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl CompiledPattern",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 239,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "EgressVaultError",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub enum EgressVaultError",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 258,
+   "doc": [
+    "Fehler beim Erstellen oder Laden des EgressVaults."
+   ],
+   "attrs": [
+    "#[derive(Debug, thiserror::Error)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "InvalidPattern",
+     "shape": "{",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 261
+    },
+    {
+     "name": "PayloadTooLarge",
+     "shape": "{",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 269
+    },
+    {
+     "name": "TenantScopeViolation",
+     "shape": "(#[from] crate::types::TenantScopeViolation)",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 277
+    },
+    {
+     "name": "SurrogateCollision",
+     "shape": "{",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 280
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "MAX_CLASSIFY_PAYLOAD_BYTES",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub const MAX_CLASSIFY_PAYLOAD_BYTES: usize = 65_536",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 292,
+   "doc": [
+    "Maximale zulässige Payload-Länge in Bytes für Layer-1-Klassifikation (64 KiB = 65.536 Bytes)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "classify_layer1",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub async fn classify_layer1( payload: &str, patterns: &[CompiledPattern], timeout: Duration, ) -> EgressClassification",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 297,
+   "doc": [
+    "Führt eine Layer-1-Regex-Klassifikation auf dem Payload mit neuem Task und hartem Timeout aus.",
+    "",
+    "Invariante: **Fail-Closed**. Bei Timeout, Panic oder Fehler wird stets `Block(...)` zurückgegeben."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "classify_layer1_arc",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub async fn classify_layer1_arc( payload: &str, patterns: Arc<Vec<CompiledPattern>>, regex_set: Arc<regex::RegexSet>, timeout: Duration, ) -> EgressClassification",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 316,
+   "doc": [
+    "Optimierter Ausführungspfad für `classify_layer1` unter Wiederverwendung von vorkompilierten `Arc`-Mengen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EgressVault",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub struct EgressVault",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 373,
+   "doc": [
+    "Cloud Egress Vault zur Abhandlung und Bündelung von Layer-1-Klassifikationen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "DEFAULT_TIMEOUT",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const DEFAULT_TIMEOUT: Duration = Duration::from_millis(100)",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 382,
+     "doc": [
+      "Standard-Timeout für Klassifikationsprüfungen (100 ms)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "default_patterns",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn default_patterns() -> Vec<String>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 385,
+     "doc": [
+      "Standard-DLP-Muster für Egress-Klassifikationen (Secrets, API-Keys, PII, E-Mail)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_default",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_default() -> Result<Self, EgressVaultError>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 396,
+     "doc": [
+      "Versucht, eine `EgressVault`-Instanz mit den Standard-DLP-Mustern zu erstellen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(patterns: Vec<String>) -> Result<Self, EgressVaultError>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 402,
+     "doc": [
+      "Erstellt eine neue `EgressVault`-Instanz aus einer Liste von Regex-Patterns.",
+      "Jedem Pattern wird eine opake Regel-ID (\"R-001\", \"R-002\", ...) zugewiesen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_timeout",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_timeout(mut self, timeout: Duration) -> Self",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 425,
+     "doc": [
+      "Setzt ein benutzerdefiniertes Timeout für Klassifikationsabfragen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_surrogate_vault",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_surrogate_vault(mut self, surrogate_vault: Arc<SurrogateVault>) -> Self",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 431,
+     "doc": [
+      "Setzt einen benutzerdefinierten `SurrogateVault`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "patterns",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn patterns(&self) -> &[CompiledPattern]",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 437,
+     "doc": [
+      "Gibt die kompilierten Muster zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "policy_category",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn policy_category(&self) -> PolicyCategory",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 442,
+     "doc": [
+      "Gibt die Policy-Kategorie dieser Vault-Instanz für Cloud-Egress-Klassifizierungen zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "timeout",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn timeout(&self) -> Duration",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 447,
+     "doc": [
+      "Gibt das gesetzte Timeout zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "surrogate_vault",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn surrogate_vault(&self) -> &Arc<SurrogateVault>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 452,
+     "doc": [
+      "Gibt eine Referenz auf den verknüpften `SurrogateVault` zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "classify_scoped",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn classify_scoped( &self, payload: crate::types::TenantScoped<&str>, expected_tenant_id: &crate::types::TenantId, ) -> EgressClassification",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 458,
+     "doc": [
+      "Classifies a `TenantScoped` payload for egress export only if the bound `TenantId`",
+      "matches `expected_tenant_id`. If a tenant scope violation occurs, returns `Block(BlockReason::PolicyDenied(...))`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "sanitize_and_vault_scoped",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn sanitize_and_vault_scoped( &self, payload: crate::types::TenantScoped<&str>, expected_tenant_id: &crate::types::TenantId, recognizer: &dyn EntityRecognizer, ) -> Result<(crate::types::TenantScoped<String>, usize), EgressVaultError>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 471,
+     "doc": [
+      "Tokenizes and replaces recognized entities in a `TenantScoped` payload only if the bound",
+      "`TenantId` matches `expected_tenant_id`. Re-wraps the sanitized output in a `TenantScoped<String>`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "sanitize_and_vault",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn sanitize_and_vault( &self, payload: &str, recognizer: &dyn EntityRecognizer, ) -> Result<(String, usize), EgressVaultError>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 489,
+     "doc": [
+      "Tokenisiert und ersetzt erkannte strukturierte Regex-Muster sowie unstrukturierte NER-Entitäten",
+      "durch sitzungsstabile Surrogate und speichert die Zuordnungen im `SurrogateVault`.",
+      "",
+      "Gibt den bereinigten Text sowie die Anzahl ersetzter Entitäten zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EgressVault",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 380,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for EgressVault",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 561,
+     "in_test": false
+    },
+    {
+     "trait": "EgressClassifier",
+     "generics": "",
+     "signature": "impl EgressClassifier for EgressVault",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 581,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "EgressClassifier",
+   "vis": "pub",
+   "module": "egress_vault",
+   "signature": "pub trait EgressClassifier: Send + Sync",
+   "file": "crates/contextra-privacy/src/egress_vault.rs",
+   "line": 556,
+   "doc": [
+    "Schnittstelle für Downstream-Crates (`contextra-mcp`, `contextra-router`)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "classify",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification>",
+     "file": "crates/contextra-privacy/src/egress_vault.rs",
+     "line": 558,
+     "doc": [
+      "Klassifiziert einen Text-Payload für den Egress-Export."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "EgressClassifier"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_INPUT_LENGTH",
+   "vis": "pub",
+   "module": "entity_recognizer",
+   "signature": "pub const DEFAULT_MAX_INPUT_LENGTH: usize = MAX_CLASSIFY_PAYLOAD_BYTES",
+   "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+   "line": 25,
+   "doc": [
+    "Standardmäßige maximale Eingabelänge in Bytes für die Entitätserkennung (65.536 Bytes = 64 KiB)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "type",
+   "name": "PatternRecognizer",
+   "vis": "pub",
+   "module": "entity_recognizer",
+   "signature": "pub type PatternRecognizer = RuleBasedEntityRecognizer",
+   "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+   "line": 29,
+   "doc": [
+    "Alias für [`RuleBasedEntityRecognizer`] als standardmäßiger Mustererkenner."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EntityMatch",
+   "vis": "pub",
+   "module": "entity_recognizer",
+   "signature": "pub struct EntityMatch",
+   "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+   "line": 34,
+   "doc": [
+    "Strukturierte Information über eine erkannte Entität."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq)]",
+    "#[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "range",
+     "type": "Range<usize>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 36
+    },
+    {
+     "name": "entity_type",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 38
+    },
+    {
+     "name": "rule_id",
+     "type": "&'static str",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 40
+    },
+    {
+     "name": "confidence",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 42
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Gazetteer",
+   "vis": "pub",
+   "module": "entity_recognizer",
+   "signature": "pub struct Gazetteer",
+   "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+   "line": 48,
+   "doc": [
+    "Erweiterungspunkt für benutzerdefinierte Begriff-, Namens- oder Unternehmenslisten (Wörterbuch-Abgleich)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Default)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 55,
+     "doc": [
+      "Erstellt eine neue leere [`Gazetteer`]-Instanz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_term",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_term(&mut self, term: impl Into<String>)",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 63,
+     "doc": [
+      "Fügt dem Verzeichnis einen Begriff hinzu (wird für case-insensitiven Abgleich in Kleinbuchstaben normalisiert)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 72,
+     "doc": [
+      "Prüft, ob das Begriffsverzeichnis leer ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 77,
+     "doc": [
+      "Liefert die Anzahl der Begriffe im Gazetteer."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Gazetteer",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 52,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RuleBasedEntityRecognizer",
+   "vis": "pub",
+   "module": "entity_recognizer",
+   "signature": "pub struct RuleBasedEntityRecognizer",
+   "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+   "line": 87,
+   "doc": [
+    "Regelbasierter PII-Erkenner ohne externe Regex-Laufzeitabhängigkeit.",
+    "",
+    "Erkennt Kategorien personenbezogener Daten: EMAIL, IBAN, BIC, PHONE, CREDIT_CARD, STEUER_ID, IPV4, IPV6, PLZ, PLZ_ORT, LICENSE_PLATE, GAZETTEER."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 104,
+     "doc": [
+      "Erstellt eine neue Instanz von [`RuleBasedEntityRecognizer`] mit Standard-Längenlimit und leerem Gazetteer."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_gazetteer",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_gazetteer(gazetteer: Gazetteer) -> Self",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 110,
+     "doc": [
+      "Erstellt einen Erkenner mit einem vorkonfigurierten Begriffsverzeichnis ([`Gazetteer`])."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_max_input_length",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_max_input_length(mut self, limit: usize) -> Self",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 119,
+     "doc": [
+      "Konfiguriert das maximale Längenlimit in Bytes zur Begrenzung von DoS-Risiken."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "max_input_length",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn max_input_length(&self) -> usize",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 126,
+     "doc": [
+      "Liefert die Obergrenze für Eingabetexte in Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "add_gazetteer_term",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn add_gazetteer_term(mut self, term: impl Into<String>) -> Self",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 132,
+     "doc": [
+      "Ergänzt einen Begriff für das Verzeichnis über ein Builder-Muster."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "recognize",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn recognize(&self, text: &str) -> Vec<(Range<usize>, String)>",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 139,
+     "doc": [
+      "Führt die Erkennung auf dem übergebenen Text aus und liefert Byte-Bereiche und Kategorielabels."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "recognize_detailed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn recognize_detailed(&self, text: &str) -> Vec<EntityMatch>",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 144,
+     "doc": [
+      "Führt die Erkennung aus und liefert detaillierte [`EntityMatch`]-Objekte inklusive Regel-ID und Konfidenz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "recognize_bounded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn recognize_bounded( &self, text: &str, ) -> Result<Vec<(Range<usize>, String)>, EgressError>",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 152,
+     "doc": [
+      "Führt die Erkennung mit strikter Längenprüfung aus und liefert `Err(EgressError::CapacityExceeded)` bei Überschreitung.",
+      "",
+      "Gemäß `INV-PRIVACY-FAILCLOSED-1` wird bei Limitüberschreitung sofort blockiert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "recognize_detailed_bounded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn recognize_detailed_bounded(&self, text: &str) -> Result<Vec<EntityMatch>, EgressError>",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 167,
+     "doc": [
+      "Führt die detaillierte Erkennung mit strikter Längenprüfung aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for RuleBasedEntityRecognizer",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 92,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl RuleBasedEntityRecognizer",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 101,
+     "in_test": false
+    },
+    {
+     "trait": "EntityRecognizer",
+     "generics": "",
+     "signature": "impl EntityRecognizer for RuleBasedEntityRecognizer",
+     "file": "crates/contextra-privacy/src/entity_recognizer.rs",
+     "line": 228,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "PrivacyError",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum PrivacyError",
+   "file": "crates/contextra-privacy/src/error.rs",
+   "line": 17,
+   "doc": [
+    "Primärer Fehlertyp des Privacy- und Egress-Subsystems.",
+    "",
+    "Signalisiert spezifische Fehlerzustände bei der Analyse, Filterung und Weiterleitung",
+    "von Daten an externe Dienste."
+   ],
+   "attrs": [
+    "#[derive(Debug, Error)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "invalid_params",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn invalid_params(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 101,
+     "doc": [
+      "Konstruiert einen `PrivacyError::InvalidParams`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "invalid_input",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn invalid_input(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 106,
+     "doc": [
+      "Konstruiert einen `PrivacyError::InvalidInput`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "capacity_exceeded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn capacity_exceeded(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 111,
+     "doc": [
+      "Konstruiert einen `PrivacyError::CapacityExceeded`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "policy_violation",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn policy_violation(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 117,
+     "doc": [
+      "Konstruiert einen `PrivacyError::PolicyViolation`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "internal_error",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn internal_error(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 123,
+     "doc": [
+      "Konstruiert einen `PrivacyError::InternalError`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "io",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn io(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 128,
+     "doc": [
+      "Konstruiert einen `PrivacyError::Io`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "state_conflict",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn state_conflict(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 133,
+     "doc": [
+      "Konstruiert einen `PrivacyError::StateConflict`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "corrupt",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn corrupt(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 138,
+     "doc": [
+      "Konstruiert einen `PrivacyError::Corrupt`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "InvalidParams",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 20
+    },
+    {
+     "name": "InvalidInput",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 24
+    },
+    {
+     "name": "CapacityExceeded",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 28
+    },
+    {
+     "name": "PolicyViolation",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 32
+    },
+    {
+     "name": "InternalError",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 36
+    },
+    {
+     "name": "Io",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 40
+    },
+    {
+     "name": "StateConflict",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 44
+    },
+    {
+     "name": "Corrupt",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 48
+    },
+    {
+     "name": "SurrogateCollision",
+     "shape": "{",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 52
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "From<crate::egress_vault::EgressVaultError>",
+     "generics": "",
+     "signature": "impl From<crate::egress_vault::EgressVaultError> for PrivacyError",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 73,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PrivacyError",
+     "file": "crates/contextra-privacy/src/error.rs",
+     "line": 98,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "EgressError",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub type EgressError = PrivacyError",
+   "file": "crates/contextra-privacy/src/error.rs",
+   "line": 63,
+   "doc": [
+    "Abwärtskompatibler Alias für `PrivacyError`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "type",
+   "name": "Error",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub type Error = PrivacyError",
+   "file": "crates/contextra-privacy/src/error.rs",
+   "line": 66,
+   "doc": [
+    "Primärer Crate-Fehlertyp-Alias."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "type",
+   "name": "Result",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub type Result<T> = std::result::Result<T, PrivacyError>",
+   "file": "crates/contextra-privacy/src/error.rs",
+   "line": 69,
+   "doc": [
+    "Result-Typ für contextra-privacy."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Unsanitized",
+   "vis": "pub",
+   "module": "guarded_payload",
+   "signature": "pub struct Unsanitized",
+   "file": "crates/contextra-privacy/src/guarded_payload.rs",
+   "line": 18,
+   "doc": [
+    "Marker-Typ: Payload hat noch nicht alle Egress-Guard-Layer durchlaufen und gilt als unbereinigt."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Sanitized",
+   "vis": "pub",
+   "module": "guarded_payload",
+   "signature": "pub struct Sanitized",
+   "file": "crates/contextra-privacy/src/guarded_payload.rs",
+   "line": 22,
+   "doc": [
+    "Marker-Typ: Payload hat alle 5 Egress-Guard-Layer erfolgreich durchlaufen und ist bereinigt."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "GuardedPayload",
+   "vis": "pub",
+   "module": "guarded_payload",
+   "signature": "pub struct GuardedPayload<S>",
+   "file": "crates/contextra-privacy/src/guarded_payload.rs",
+   "line": 35,
+   "doc": [
+    "Type-State-Wrapper für Cloud-Egress-Payloads.",
+    "",
+    "Ein `GuardedPayload<Sanitized>` kann NUR durch den vollständigen Durchlauf",
+    "aller 5 Egress-Guard-Layer konstruiert werden (`egress_gateway.rs`).",
+    "Ein `GuardedPayload<Unsanitized>` an `dispatch_to_cloud()` zu übergeben ist ein COMPILE-FEHLER.",
+    "",
+    "# Invariante (§12.3)",
+    "`dispatch_to_cloud()` akzeptiert ausschließlich `GuardedPayload<Sanitized>`.",
+    "Diese Invariante ist nicht durch Laufzeit-Checks, sondern durch das Typsystem erzwungen."
+   ],
+   "attrs": [
+    "#[derive(Debug)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "session_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn session_id(&self) -> &str",
+     "file": "crates/contextra-privacy/src/guarded_payload.rs",
+     "line": 51,
+     "doc": [
+      "Gibt eine Referenz auf die zugeordnete Sitzungs-ID (`session_id`) zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(raw: String, session_id: String) -> Self",
+     "file": "crates/contextra-privacy/src/guarded_payload.rs",
+     "line": 64,
+     "doc": [
+      "Erstellt einen neuen unsanitizierten Payload (Eingang aus MCP-Client oder interner Engine).",
+      "",
+      "# Ablauf",
+      "1. Übernimmt den rohen Eingabestring `raw`.",
+      "2. Verknüpft die übergebene `session_id`.",
+      "3. Initialisiert den `PhantomData`-Marker mit Zustand `Unsanitized`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_sanitized",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_sanitized(sanitized: String, session_id: String) -> Self",
+     "file": "crates/contextra-privacy/src/guarded_payload.rs",
+     "line": 82,
+     "doc": [
+      "Konstruiert einen bereinigten Payload nach erfolgreicher Bereinigung.",
+      "",
+      "# Ablauf",
+      "Nur von `egress_gateway.rs` nach erfolgreichem Durchlauf aller Egress-Filter aufzurufen.",
+      "1. Kapselt den bereinigten String `sanitized`.",
+      "2. Verknüpft die `session_id`.",
+      "3. Weist den Compile-Zeit-Zustand `Sanitized` zu."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "into_inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn into_inner(mut self) -> String",
+     "file": "crates/contextra-privacy/src/guarded_payload.rs",
+     "line": 95,
+     "doc": [
+      "Extrahiert den bereinigten String aus dem Schutzbehälter für den Versand.",
+      "",
+      "# Ablauf",
+      "Konsumiert die Instanz und gibt das interne `String`-Objekt frei."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "inner",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/guarded_payload.rs",
+     "line": 36
+    },
+    {
+     "name": "session_id",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/guarded_payload.rs",
+     "line": 37
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Drop",
+     "generics": "<S>",
+     "signature": "impl<S> Drop for GuardedPayload<S>",
+     "file": "crates/contextra-privacy/src/guarded_payload.rs",
+     "line": 41,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<S>",
+     "signature": "impl<S> GuardedPayload<S>",
+     "file": "crates/contextra-privacy/src/guarded_payload.rs",
+     "line": 48,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl GuardedPayload<Unsanitized>",
+     "file": "crates/contextra-privacy/src/guarded_payload.rs",
+     "line": 56,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl GuardedPayload<Sanitized>",
+     "file": "crates/contextra-privacy/src/guarded_payload.rs",
+     "line": 73,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "audit_trace",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod audit_trace",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 29,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "bulk_exfiltration_detector",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod bulk_exfiltration_detector",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 30,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "context_edit_audit",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod context_edit_audit",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 31,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "contract",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod contract",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 32,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "egress_gateway",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod egress_gateway",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 33,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "egress_guard",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod egress_guard",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 34,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "egress_vault",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod egress_vault",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 35,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "entity_recognizer",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod entity_recognizer",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 36,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 37,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "guarded_payload",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod guarded_payload",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 38,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "processing_registry",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod processing_registry",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 39,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "types",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod types",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 40,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "ProcessorRole",
+   "vis": "pub",
+   "module": "processing_registry",
+   "signature": "pub enum ProcessorRole",
+   "file": "crates/contextra-privacy/src/processing_registry.rs",
+   "line": 31,
+   "doc": [
+    "Rolle bezüglich der Verarbeitungstätigkeit."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "as_str",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_str(&self) -> &'static str",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 41,
+     "doc": [
+      "Liefert die deutschsprachige Bezeichnung der Rolle."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Controller",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 33
+    },
+    {
+     "name": "Processor",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 35
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ProcessorRole",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 38,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "default_version",
+   "vis": "pub",
+   "module": "processing_registry",
+   "signature": "pub fn default_version() -> u32",
+   "file": "crates/contextra-privacy/src/processing_registry.rs",
+   "line": 51,
+   "doc": [
+    "Standard-Schemaversion für die Deserialisierung von Verarbeitungsdatensätzen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ProcessingActivityRecord",
+   "vis": "pub",
+   "module": "processing_registry",
+   "signature": "pub struct ProcessingActivityRecord",
+   "file": "crates/contextra-privacy/src/processing_registry.rs",
+   "line": 58,
+   "doc": [
+    "Ein Datensatz einer Verarbeitungstätigkeit."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "activity_name",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 60
+    },
+    {
+     "name": "controller_or_processor_role",
+     "type": "ProcessorRole",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 62
+    },
+    {
+     "name": "purpose",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 64
+    },
+    {
+     "name": "legal_basis",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 67
+    },
+    {
+     "name": "data_categories",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 69
+    },
+    {
+     "name": "data_subject_categories",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 71
+    },
+    {
+     "name": "recipients",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 73
+    },
+    {
+     "name": "third_country_transfers",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 75
+    },
+    {
+     "name": "retention_period",
+     "type": "String",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 77
+    },
+    {
+     "name": "technical_and_organizational_measures",
+     "type": "Vec<String>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 79
+    },
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 81
+    },
+    {
+     "name": "version",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 84
+    },
+    {
+     "name": "created_at_unix_secs",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 87
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ProcessingRegistry",
+   "vis": "pub",
+   "module": "processing_registry",
+   "signature": "pub struct ProcessingRegistry",
+   "file": "crates/contextra-privacy/src/processing_registry.rs",
+   "line": 93,
+   "doc": [
+    "Unveränderliches, append-only Verzeichnis von Verarbeitungstätigkeiten."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 100,
+     "doc": [
+      "Erstellt ein neues leeres `ProcessingRegistry`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "append_record",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn append_record(&mut self, mut record: ProcessingActivityRecord, clock: &dyn Clock)",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 109,
+     "doc": [
+      "Fügt einen Datensatz dem Verzeichnis hinzu (append-only) und belegt den Erstellungs-Zeitstempel",
+      "über die injizierte Uhr."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "records",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn records(&self) -> &[ProcessingActivityRecord]",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 120,
+     "doc": [
+      "Liefert die Datensätze des Verzeichnisses."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "export",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn export(&self) -> ProcessingRegistryExport",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 126,
+     "doc": [
+      "Exportiert das Verzeichnis in eine `ProcessingRegistryExport`-Struktur."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ProcessingRegistry",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 97,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ProcessingRegistryExport",
+   "vis": "pub",
+   "module": "processing_registry",
+   "signature": "pub struct ProcessingRegistryExport",
+   "file": "crates/contextra-privacy/src/processing_registry.rs",
+   "line": 136,
+   "doc": [
+    "Strukturierte Export-Repräsentation des Verzeichnisses von Verarbeitungstätigkeiten."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(records: Vec<ProcessingActivityRecord>) -> Self",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 144,
+     "doc": [
+      "Erstellt eine neue Export-Instanz mit den angegebenen Datensätzen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "filter_by_tenant",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn filter_by_tenant(&self, tenant_id: TenantId) -> Self",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 153,
+     "doc": [
+      "Filtert alle Verarbeitungstätigkeiten nach der angegebenen Mandanten-ID.",
+      "",
+      "Stellt strikte Mandantentrennung bei Auskunftsabfragen sicher, sodass nur Datensätze des Zielmandanten",
+      "zurückgegeben werden."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "records",
+     "type": "Vec<ProcessingActivityRecord>",
+     "vis": "pub",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 138
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ProcessingRegistryExport",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 141,
+     "in_test": false
+    },
+    {
+     "trait": "TextSearchEngine",
+     "generics": "",
+     "signature": "impl TextSearchEngine for ProcessingRegistryExport",
+     "file": "crates/contextra-privacy/src/processing_registry.rs",
+     "line": 165,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "generate_registry",
+   "vis": "pub",
+   "module": "processing_registry",
+   "signature": "pub fn generate_registry(records: &[ProcessingActivityRecord]) -> ProcessingRegistryExport",
+   "file": "crates/contextra-privacy/src/processing_registry.rs",
+   "line": 231,
+   "doc": [
+    "Erzeugt aus einer Reihe von Datensätzen eine strukturierte Export-Repräsentation."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "render_markdown",
+   "vis": "pub",
+   "module": "processing_registry",
+   "signature": "pub fn render_markdown(export: &ProcessingRegistryExport) -> String",
+   "file": "crates/contextra-privacy/src/processing_registry.rs",
+   "line": 251,
+   "doc": [
+    "Erzeugt eine druckfertige, deutschsprachige Markdown-Tabelle aus dem Export.",
+    "",
+    "Die Tabelle enthält eine Zeile pro `ProcessingActivityRecord` und Spalten für alle",
+    "geforderten Angaben."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Clock",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub trait Clock: Send + Sync",
+   "file": "crates/contextra-privacy/src/types.rs",
+   "line": 11,
+   "doc": [
+    "Trait für monotone und reale Zeitabfragen ohne Abhängigkeit von externen Ports."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "now_unix_nanos",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn now_unix_nanos(&self) -> u64",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 13,
+     "doc": [
+      "Liefert die aktuelle Zeit in Unix-Nanosekunden."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Clock"
+    },
+    {
+     "name": "monotonic_nanos",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn monotonic_nanos(&self) -> u64",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 15,
+     "doc": [
+      "Liefert einen monotonen Nanosekunden-Zähler."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Clock"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SystemClock",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub struct SystemClock",
+   "file": "crates/contextra-privacy/src/types.rs",
+   "line": 20,
+   "doc": [
+    "Standardmäßige Implementierung von [`Clock`] auf Basis von `std::time::SystemTime`."
+   ],
+   "attrs": [
+    "#[derive(Debug, Default, Clone, Copy)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 24,
+     "doc": [
+      "Erstellt eine neue [`SystemClock`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SystemClock",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 22,
+     "in_test": false
+    },
+    {
+     "trait": "Clock",
+     "generics": "",
+     "signature": "impl Clock for SystemClock",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 29,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "TenantId",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub struct TenantId(pub u64)",
+   "file": "crates/contextra-privacy/src/types.rs",
+   "line": 48,
+   "doc": [],
+   "attrs": [
+    "#[repr(transparent)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "SYSTEM",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const SYSTEM: Self = Self(0)",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 52,
+     "doc": [
+      "Systemmandant (0)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 55,
+     "doc": [
+      "Erstellt einen neuen `TenantId`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new(id: u64) -> Result<Self, TenantScopeViolation>",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 60,
+     "doc": [
+      "Versucht, einen Mandanten zu erzeugen (0 ist reserviert/Fehler für Benutzerdaten)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(&self) -> u64",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 69,
+     "doc": [
+      "Liefert den numerischen Wert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TenantId",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 50,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Display",
+     "generics": "",
+     "signature": "impl fmt::Display for TenantId",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 74,
+     "in_test": false
+    },
+    {
+     "trait": "From<u64>",
+     "generics": "",
+     "signature": "impl From<u64> for TenantId",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 80,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "TenantScopeViolation",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub enum TenantScopeViolation",
+   "file": "crates/contextra-privacy/src/types.rs",
+   "line": 88,
+   "doc": [
+    "Fehler bei Mandanten-Scope-Verletzungen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Mismatch",
+     "shape": "{",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 91
+    },
+    {
+     "name": "InvalidZero",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 99
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "TenantScoped",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub struct TenantScoped<T>",
+   "file": "crates/contextra-privacy/src/types.rs",
+   "line": 104,
+   "doc": [
+    "An einen Mandanten gebundener Datenbehälter zur Durchsetzung von Isolation."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(tenant_id: TenantId, data: T) -> Self",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 111,
+     "doc": [
+      "Erstellt einen neuen `TenantScoped`-Container."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "tenant_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn tenant_id(&self) -> &TenantId",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 116,
+     "doc": [
+      "Liefert die gebundene Mandanten-ID."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(&self) -> &T",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 121,
+     "doc": [
+      "Gibt eine Referenz auf die inneren Daten zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "into_inner_checked",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn into_inner_checked(self, expected: &TenantId) -> Result<T, TenantScopeViolation>",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 126,
+     "doc": [
+      "Prüft den Mandanten und entpackt die inneren Daten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<T>",
+     "signature": "impl<T> TenantScoped<T>",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 109,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "EgressDecision",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub enum EgressDecision",
+   "file": "crates/contextra-privacy/src/types.rs",
+   "line": 140,
+   "doc": [
+    "Entscheidung einer Egress-Richtlinienauswertung."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Allow",
+     "shape": "",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 142
+    },
+    {
+     "name": "Redact",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 144
+    },
+    {
+     "name": "Deny",
+     "shape": "(String)",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 146
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "EgressPolicy",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub trait EgressPolicy: Send + Sync",
+   "file": "crates/contextra-privacy/src/types.rs",
+   "line": 150,
+   "doc": [
+    "Crate-eigener dynamischer Trait für Egress-Richtlinien."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "evaluate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn evaluate(&self, payload: &str) -> EgressDecision",
+     "file": "crates/contextra-privacy/src/types.rs",
+     "line": 152,
+     "doc": [
+      "Bewertet, ob der ausgehende Payload die Richtlinie erfüllt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "EgressPolicy"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use crate::egress_guard::TextSearchEngine",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/contract.rs",
+   "line": 14,
+   "in_test": false,
+   "module": "contract"
+  },
+  {
+   "signature": "pub use crate::egress_vault::EntityRecognizer",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/contract.rs",
+   "line": 15,
+   "in_test": false,
+   "module": "contract"
+  },
+  {
+   "signature": "pub use crate::types::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/contract.rs",
+   "line": 16,
+   "in_test": false,
+   "module": "contract"
+  },
+  {
+   "signature": "pub use audit_trace::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 44,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use bulk_exfiltration_detector::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 45,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use context_edit_audit::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 48,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use contract::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 52,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use egress_gateway::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 54,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use egress_guard::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 61,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use egress_vault::NoOpRecognizer",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 66,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use egress_vault::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 67,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use entity_recognizer::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 71,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use error::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 74,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use guarded_payload::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 75,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use processing_registry::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 76,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use types::",
+   "vis": "pub",
+   "file": "crates/contextra-privacy/src/lib.rs",
+   "line": 80,
+   "in_test": false,
+   "module": "crate"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra-mcp"
+ ]
+}

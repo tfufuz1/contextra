@@ -1,0 +1,4372 @@
+{
+ "name": "contextra-storage-ports",
+ "version": "workspace",
+ "path": "crates/contextra-storage/crates/contextra-storage-ports",
+ "role": "Speicherkern: normative Ports",
+ "features": {
+  "testing": []
+ },
+ "deps": {
+  "bytes": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "zeroize": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "contextra-storage-ports: Verträge, Werttypen, Fehler, Limits. Keine Logik (SP-PORTS)."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "module": "change",
+   "lines": 104
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+   "module": "error",
+   "lines": 155
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/facade.rs",
+   "module": "facade",
+   "lines": 4
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "module": "ids",
+   "lines": 145
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+   "module": "keys",
+   "lines": 75
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "module": "crate",
+   "lines": 23
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "module": "limits",
+   "lines": 29
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+   "module": "traits::anchor",
+   "lines": 72
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+   "module": "traits::authority",
+   "lines": 48
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/cold.rs",
+   "module": "traits::cold",
+   "lines": 7
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/crypto.rs",
+   "module": "traits::crypto",
+   "lines": 37
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/engine.rs",
+   "module": "traits::engine",
+   "lines": 10
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+   "module": "traits::fs",
+   "lines": 93
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+   "module": "traits::memory",
+   "lines": 48
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "module": "traits",
+   "lines": 20
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "module": "traits::observe",
+   "lines": 235
+  },
+  {
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/spawn.rs",
+   "module": "traits::spawn",
+   "lines": 6
+  }
+ ],
+ "counts": {
+  "unwrap": 0,
+  "expect": 0,
+  "panic_macro": 0,
+  "todo_unimpl": 0,
+  "index_bracket": 0
+ },
+ "grep_pub_decl": 137,
+ "all_pub_decl": 137,
+ "public_items": [
+  {
+   "kind": "enum",
+   "name": "Protection",
+   "vis": "pub",
+   "module": "change",
+   "signature": "pub enum Protection",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "line": 6,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Sealed",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 7
+    },
+    {
+     "name": "Plain",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 8
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "ClusterLifecycle",
+   "vis": "pub",
+   "module": "change",
+   "signature": "pub enum ClusterLifecycle",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "line": 12,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Live",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 13
+    },
+    {
+     "name": "Retired",
+     "shape": "{ at: crate::ids::Stamp }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 14
+    },
+    {
+     "name": "Shredded",
+     "shape": "{ at: crate::ids::Stamp }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 15
+    },
+    {
+     "name": "Purged",
+     "shape": "{ at: crate::ids::Stamp }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 16
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "Durability",
+   "vis": "pub",
+   "module": "change",
+   "signature": "pub enum Durability",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "line": 20,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Durable",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 21
+    },
+    {
+     "name": "Relaxed",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 22
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "Origin",
+   "vis": "pub",
+   "module": "change",
+   "signature": "pub enum Origin",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "line": 26,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "User",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 27
+    },
+    {
+     "name": "Maintenance",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 28
+    },
+    {
+     "name": "Replication",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 29
+    },
+    {
+     "name": "Migration",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 30
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "CallerMeta",
+   "vis": "pub",
+   "module": "change",
+   "signature": "pub struct CallerMeta",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "line": 34,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "origin",
+     "type": "Origin",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 35
+    },
+    {
+     "name": "caller_seq",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 36
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Change",
+   "vis": "pub",
+   "module": "change",
+   "signature": "pub struct Change",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "line": 39,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "ops",
+     "type": "Vec<Op>",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 40
+    },
+    {
+     "name": "guards",
+     "type": "Vec<Guard>",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 41
+    },
+    {
+     "name": "idem",
+     "type": "Option<IdemToken>",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 42
+    },
+    {
+     "name": "durability",
+     "type": "Durability",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 43
+    },
+    {
+     "name": "allow_mixed",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 44
+    },
+    {
+     "name": "caller",
+     "type": "CallerMeta",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 45
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "Op",
+   "vis": "pub",
+   "module": "change",
+   "signature": "pub enum Op",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "line": 48,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Put",
+     "shape": "{",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 49
+    },
+    {
+     "name": "Delete",
+     "shape": "{",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 58
+    },
+    {
+     "name": "RangeDelete",
+     "shape": "{",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 65
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "Guard",
+   "vis": "pub",
+   "module": "change",
+   "signature": "pub enum Guard",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "line": 74,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Key",
+     "shape": "{",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 75
+    },
+    {
+     "name": "Range",
+     "shape": "{",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 83
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "Precondition",
+   "vis": "pub",
+   "module": "change",
+   "signature": "pub enum Precondition",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "line": 94,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Absent",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 95
+    },
+    {
+     "name": "Version",
+     "shape": "(Stamp)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 96
+    },
+    {
+     "name": "Unchanged",
+     "shape": "{ since: Stamp }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 97
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Receipt",
+   "vis": "pub",
+   "module": "change",
+   "signature": "pub struct Receipt",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+   "line": 101,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "stamp",
+     "type": "Stamp",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 102
+    },
+    {
+     "name": "durable",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/change.rs",
+     "line": 103
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "ErrorClass",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum ErrorClass",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+   "line": 7,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Transient",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 9
+    },
+    {
+     "name": "DiskFull",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 11
+    },
+    {
+     "name": "Poisoned",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 13
+    },
+    {
+     "name": "Indeterminate",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 15
+    },
+    {
+     "name": "Corrupt",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 17
+    },
+    {
+     "name": "Unsupported",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 19
+    },
+    {
+     "name": "Key",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 21
+    },
+    {
+     "name": "Usage",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 23
+    },
+    {
+     "name": "Conflict",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 25
+    },
+    {
+     "name": "Rollback",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 27
+    },
+    {
+     "name": "Internal",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 29
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "Error",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum Error",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+   "line": 34,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, ThisError)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "class",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn class(&self) -> ErrorClass",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 101,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "hint",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn hint(&self) -> &'static str",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 122,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Transient",
+     "shape": "{ role: &'static str }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 36
+    },
+    {
+     "name": "DiskFull",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 38
+    },
+    {
+     "name": "Poisoned",
+     "shape": "{ cause: &'static str }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 40
+    },
+    {
+     "name": "Indeterminate",
+     "shape": "{ first_stamp: u64, last_stamp: u64 }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 42
+    },
+    {
+     "name": "Corrupt",
+     "shape": "{ place: &'static str }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 44
+    },
+    {
+     "name": "Unsupported",
+     "shape": "{ what: &'static str }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 46
+    },
+    {
+     "name": "KeyUnavailable",
+     "shape": "{ retry_after_secs: Option<u64> }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 48
+    },
+    {
+     "name": "KeyLost",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 50
+    },
+    {
+     "name": "Shredded",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 52
+    },
+    {
+     "name": "ClusterRetired",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 54
+    },
+    {
+     "name": "UnknownCluster",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 56
+    },
+    {
+     "name": "BelowFloor",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 58
+    },
+    {
+     "name": "Erased",
+     "shape": "{ at: u64 }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 60
+    },
+    {
+     "name": "Restricted",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 62
+    },
+    {
+     "name": "Conflict",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 64
+    },
+    {
+     "name": "GuardRetry",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 66
+    },
+    {
+     "name": "ChangeTooLarge",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 68
+    },
+    {
+     "name": "IdemConflict",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 70
+    },
+    {
+     "name": "IdemCapacity",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 72
+    },
+    {
+     "name": "BranchClosed",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 74
+    },
+    {
+     "name": "BranchHasChildren",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 76
+    },
+    {
+     "name": "Lagged",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 78
+    },
+    {
+     "name": "EraseFanoutExceeded",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 80
+    },
+    {
+     "name": "ClockUncertain",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 82
+    },
+    {
+     "name": "ReservedSpace",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 84
+    },
+    {
+     "name": "Exhausted",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 86
+    },
+    {
+     "name": "Limit",
+     "shape": "{ limit: &'static str }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 88
+    },
+    {
+     "name": "CasLost",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 90
+    },
+    {
+     "name": "Rollback",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 92
+    },
+    {
+     "name": "Io",
+     "shape": "{",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 94
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Error",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/error.rs",
+     "line": 100,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "SYSTEM_SPACE_ID_MAX",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub const SYSTEM_SPACE_ID_MAX: u64 = 255",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 4,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "FIRST_USER_SPACE_ID",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub const FIRST_USER_SPACE_ID: u64 = SYSTEM_SPACE_ID_MAX + 1",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "type",
+   "name": "Stamp",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub type Stamp = u64",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 8,
+   "doc": [
+    "Stamp = globale Versionsmarke, 56 Bit nutzbar."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "STAMP_MAX",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub const STAMP_MAX: Stamp = (1u64 << 56) - 1",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 9,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Redacted",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct Redacted<T>(pub T)",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 12,
+   "doc": [
+    "Umhüllt einen Wert, dessen Inhalt nie in Debug-Ausgaben erscheinen darf."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "fmt::Debug",
+     "generics": "<T>",
+     "signature": "impl<T> fmt::Debug for Redacted<T>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 14,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ClusterId",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct ClusterId([u8",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 21,
+   "doc": [],
+   "attrs": [
+    "#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_wire",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_wire(raw: [u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 26,
+     "doc": [
+      "Nur für den Wire-Decoder (SP-CODEC). Weitere Konstruktionspfade existieren nicht."
+     ],
+     "attrs": [
+      "#[doc(hidden)]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 29,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ClusterId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 23,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for ClusterId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 34,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SpaceId",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct SpaceId(pub u64)",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 41,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "is_system",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn is_system(self) -> bool",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 44,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "user",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn user(value: u64) -> Result<Self, crate::Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 46,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SpaceId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 43,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "DataClass",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub enum DataClass",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 58,
+   "doc": [
+    "Explicit classification at the storage API boundary (SPEC §4.7).",
+    "",
+    "This is deliberately a closed enum.  Storage validates the combinations",
+    "involving this value before it starts catalog, key, or filesystem I/O; it",
+    "does not inspect user content to infer a classification."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "NonPersonal",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 59
+    },
+    {
+     "name": "Personal",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 60
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "InstanceId",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct InstanceId([u8",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 66,
+   "doc": [
+    "Stable identity of one storage instance.  A stamp is meaningful only with",
+    "this identity and must never be treated as a globally ordered value."
+   ],
+   "attrs": [
+    "#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_wire",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_wire(raw: [u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 71,
+     "doc": [
+      "Used by format and recovery codecs after validating the exact width."
+     ],
+     "attrs": [
+      "#[doc(hidden)]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 73,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl InstanceId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 68,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for InstanceId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 76,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DurablePosition",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct DurablePosition",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 84,
+   "doc": [
+    "A durable progress point in one instance's stamp domain."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "instance",
+     "type": "InstanceId",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 85
+    },
+    {
+     "name": "stamp",
+     "type": "Stamp",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 86
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "BranchId",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct BranchId(pub u32)",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 90,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "IdemToken",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct IdemToken([u8",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 93,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_bytes(raw: [u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 96,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl IdemToken",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 95,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EraseRequestId",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct EraseRequestId([u8",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 103,
+   "doc": [
+    "Separate idempotency domain for erase requests."
+   ],
+   "attrs": [
+    "#[derive(Clone, Copy, PartialEq, Eq, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_bytes(raw: [u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 106,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EraseRequestId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 105,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for EraseRequestId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 109,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Ticket",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct Ticket([u8",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 117,
+   "doc": [
+    "Opaque durable erase-ticket identity."
+   ],
+   "attrs": [
+    "#[derive(Clone, Copy, PartialEq, Eq, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_bytes(raw: [u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 120,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 122,
+     "doc": [
+      "Canonical wire representation for durable internal records."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Ticket",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 119,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for Ticket",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 125,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "TombId",
+   "vis": "pub",
+   "module": "ids",
+   "signature": "pub struct TombId([u8",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+   "line": 133,
+   "doc": [
+    "Pseudonymous, domain-separated ledger identifier; never a clear ClusterId."
+   ],
+   "attrs": [
+    "#[derive(Clone, Copy, PartialEq, Eq, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_bytes(raw: [u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 136,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 138,
+     "doc": [
+      "Canonical wire representation for the ledger only."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TombId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 135,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for TombId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/ids.rs",
+     "line": 141,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KekId",
+   "vis": "pub",
+   "module": "keys",
+   "signature": "pub struct KekId([u8",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+   "line": 9,
+   "doc": [
+    "Opaque identifier for a provider-managed key-encryption key."
+   ],
+   "attrs": [
+    "#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn from_bytes(raw: [u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 12,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KekId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 11,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for KekId",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 15,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "DestroyBehavior",
+   "vis": "pub",
+   "module": "keys",
+   "signature": "pub enum DestroyBehavior",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+   "line": 20,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Immediate",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 21
+    },
+    {
+     "name": "Scheduled",
+     "shape": "{ max_delay_secs: u64 }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 22
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KeyProviderInfo",
+   "vis": "pub",
+   "module": "keys",
+   "signature": "pub struct KeyProviderInfo",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+   "line": 26,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "destroy",
+     "type": "DestroyBehavior",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 27
+    },
+    {
+     "name": "keys_in_backups",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 28
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "KeyState",
+   "vis": "pub",
+   "module": "keys",
+   "signature": "pub enum KeyState",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+   "line": 32,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "DestroyReceipt",
+   "vis": "pub",
+   "module": "keys",
+   "signature": "pub struct DestroyReceipt",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+   "line": 37,
+   "doc": [
+    "Aggregate result of an idempotent destroy request. No key or cluster IDs",
+    "are included in this value."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "requested_clusters",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 38
+    },
+    {
+     "name": "absent_clusters",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 39
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Key32",
+   "vis": "pub",
+   "module": "keys",
+   "signature": "pub struct Key32(Zeroizing<[u8",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+   "line": 43,
+   "doc": [
+    "32-Byte-Schlüssel. Zeroized bei Drop, Debug redigiert, nicht Clone."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_array",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_array(raw: [u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 46,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "expose",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn expose(&self) -> &[u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 49,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Key32",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 45,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for Key32",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 54,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "KeyProvider",
+   "vis": "pub",
+   "module": "keys",
+   "signature": "pub trait KeyProvider: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+   "line": 60,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "info",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn info(&self) -> KeyProviderInfo",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 62,
+     "doc": [
+      "Describes key destruction timing and backup coverage."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KeyProvider"
+    },
+    {
+     "name": "kek",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn kek(&self, id: KekId) -> Result<Key32, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 64,
+     "doc": [
+      "Returns an available KEK by opaque provider identifier."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KeyProvider"
+    },
+    {
+     "name": "create_cluster_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn create_cluster_key(&self, cluster: ClusterId, entropy: &dyn crate::traits::Entropy) -> Result<u32, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 66,
+     "doc": [
+      "Creates or returns the current durable key epoch for a cluster."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KeyProvider"
+    },
+    {
+     "name": "cluster_key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn cluster_key(&self, cluster: ClusterId, epoch: u32) -> Result<Option<Key32>, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 69,
+     "doc": [
+      "Fetches one cluster epoch. `None` means the provider has no usable key;",
+      "recovery must distinguish legitimate destruction from key loss."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KeyProvider"
+    },
+    {
+     "name": "probe",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn probe(&self, cluster: ClusterId) -> Result<KeyState, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 71,
+     "doc": [
+      "Reports provider state across every epoch for a cluster."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KeyProvider"
+    },
+    {
+     "name": "list",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn list(&self) -> Result<Vec<ClusterId>, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 73,
+     "doc": [
+      "Lists provider-owned cluster identifiers for orphan reconciliation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KeyProvider"
+    },
+    {
+     "name": "destroy_many",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn destroy_many(&self, clusters: &[ClusterId]) -> Result<DestroyReceipt, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/keys.rs",
+     "line": 74,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KeyProvider"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "change",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod change",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 4,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "facade",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod facade",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 6,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "ids",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod ids",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 7,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "keys",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod keys",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 8,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "limits",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod limits",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 9,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "traits",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod traits",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 10,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "KIB",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const KIB: usize = 1 << 10",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 2,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MIB",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const MIB: usize = 1 << 20",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 3,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "GIB",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const GIB: u64 = 1 << 30",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 4,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "REDO_SEGMENT_BYTES",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const REDO_SEGMENT_BYTES: u64 = 64 * MIB as u64",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 6,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "REDO_ALIGN",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const REDO_ALIGN: u64 = 4096",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 7,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_BODY_BYTES",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const MAX_BODY_BYTES: usize = 4 * MIB",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 8,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_CHANGE_BYTES",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const MAX_CHANGE_BYTES: usize = 8 * MIB",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 9,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_GROUP_BYTES",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const MAX_GROUP_BYTES: usize = 4 * MIB",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 10,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_LAG_BYTES",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const MAX_LAG_BYTES: u64 = GIB",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 11,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MIN_ERASE_RESERVE_BYTES",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const MIN_ERASE_RESERVE_BYTES: u64 = 2 * GIB",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 14,
+   "doc": [
+    "Capacity reserved for erase progress, consumer retention, filesystem",
+    "metadata headroom, and the dedicated purge scratch slots (SPEC §16)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "RUN_BLOCK_TARGET_BYTES",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const RUN_BLOCK_TARGET_BYTES: usize = 16 * KIB",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 16,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "RUN_RESTART_INTERVAL",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const RUN_RESTART_INTERVAL: usize = 16",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 17,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "CATALOG_ROLLOVER_MIN_BYTES",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const CATALOG_ROLLOVER_MIN_BYTES: u64 = 8 * MIB as u64",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 19,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "STAMP_RESERVE",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const STAMP_RESERVE: u64 = 1 << 20",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 20,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "ID_RESERVE",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const ID_RESERVE: u64 = 1 << 16",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 21,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_CLUSTERS",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const DEFAULT_MAX_CLUSTERS: u64 = 4_000_000",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 23,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_MAX_OPEN_FILES",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const DEFAULT_MAX_OPEN_FILES: usize = 1024",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 24,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "KEY_GRACE_SECS",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const KEY_GRACE_SECS: u64 = 600",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 25,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "COHORT_MAX",
+   "vis": "pub",
+   "module": "limits",
+   "signature": "pub const COHORT_MAX: usize = 1024",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/limits.rs",
+   "line": 26,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "AnchorValue",
+   "vis": "pub",
+   "module": "traits::anchor",
+   "signature": "pub struct AnchorValue",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "erase_epoch",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 6
+    },
+    {
+     "name": "ledger_head",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 7
+    },
+    {
+     "name": "catalog_epoch",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 8
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "AnchorStrength",
+   "vis": "pub",
+   "module": "traits::anchor",
+   "signature": "pub enum AnchorStrength",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+   "line": 14,
+   "doc": [
+    "Strength is explicit because a local file prevents neither rollback of a",
+    "copied volume nor two restored hosts from writing concurrently."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Weak",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 15
+    },
+    {
+     "name": "Strong",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 16
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ClockReading",
+   "vis": "pub",
+   "module": "traits::anchor",
+   "signature": "pub struct ClockReading",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+   "line": 23,
+   "doc": [
+    "Injected time sample. `durable_utc_millis` is the persisted UTC high-water",
+    "mark; adapters must never move it backwards. `skew` is fail-closed when",
+    "the observed wall clock is implausibly far from that mark."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "deadline_utc_millis",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn deadline_utc_millis(self) -> Result<u64, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 38,
+     "doc": [
+      "Returns UTC usable for durable deadlines, rejecting clock rollback and",
+      "adapter-reported skew. Monotonic process time remains usable for",
+      "elapsed-duration measurement while this check fails."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "monotonic_nanos",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 25
+    },
+    {
+     "name": "utc_millis",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 27
+    },
+    {
+     "name": "durable_utc_millis",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 29
+    },
+    {
+     "name": "skew",
+     "type": "ClockSkew",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 31
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ClockReading",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 34,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "ClockSkew",
+   "vis": "pub",
+   "module": "traits::anchor",
+   "signature": "pub enum ClockSkew",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+   "line": 47,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Certain",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 48
+    },
+    {
+     "name": "Uncertain",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 49
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "Anchor",
+   "vis": "pub",
+   "module": "traits::anchor",
+   "signature": "pub trait Anchor: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+   "line": 52,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "read",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn read(&self) -> Result<AnchorValue, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 53,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Anchor"
+    },
+    {
+     "name": "advance",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn advance(&self, expect: AnchorValue, next: AnchorValue) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 55,
+     "doc": [
+      "Monoton; bei verlorenem Wettlauf Error::CasLost."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Anchor"
+    },
+    {
+     "name": "strength",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn strength(&self) -> AnchorStrength",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 56,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Anchor"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Clock",
+   "vis": "pub",
+   "module": "traits::anchor",
+   "signature": "pub trait Clock: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+   "line": 59,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "read",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn read(&self) -> Result<ClockReading, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 64,
+     "doc": [
+      "Returns monotone and UTC time plus the durable clock floor.",
+      "",
+      "Storage uses monotonic time for process-local expiry. Durable deadlines",
+      "must fail closed when `skew` is `Uncertain`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Clock"
+    },
+    {
+     "name": "advance_utc_floor",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn advance_utc_floor(&self, expect_millis: u64, next_millis: u64) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 67,
+     "doc": [
+      "Durably advances the UTC high-water mark with compare-and-swap",
+      "semantics. A lower value is rejected; a lost race returns `CasLost`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Clock"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Entropy",
+   "vis": "pub",
+   "module": "traits::anchor",
+   "signature": "pub trait Entropy: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+   "line": 70,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "fill",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn fill(&self, buf: &mut [u8]) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/anchor.rs",
+     "line": 71,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Entropy"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "Principal",
+   "vis": "pub",
+   "module": "traits::authority",
+   "signature": "pub struct Principal(Vec<u8>)",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+   "line": 10,
+   "doc": [],
+   "attrs": [
+    "#[derive(Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_opaque",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_opaque(bytes: Vec<u8>) -> Self",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+     "line": 13,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "differs_from",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn differs_from(&self, other: &Self) -> bool",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+     "line": 15,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Principal",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+     "line": 12,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for Principal",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+     "line": 18,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "FourEyesProof",
+   "vis": "pub",
+   "module": "traits::authority",
+   "signature": "pub struct FourEyesProof(Vec<u8>)",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+   "line": 24,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_opaque",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_opaque(bytes: Vec<u8>) -> Self",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+     "line": 27,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_bytes(&self) -> &[u8]",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+     "line": 29,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl FourEyesProof",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+     "line": 26,
+     "in_test": false
+    },
+    {
+     "trait": "fmt::Debug",
+     "generics": "",
+     "signature": "impl fmt::Debug for FourEyesProof",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+     "line": 32,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "Authority",
+   "vis": "pub",
+   "module": "traits::authority",
+   "signature": "pub trait Authority: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+   "line": 38,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "verify_four_eyes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn verify_four_eyes( &self, requester: &Principal, approver: &Principal, proof: &FourEyesProof, ) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/authority.rs",
+     "line": 42,
+     "doc": [
+      "Verifies the policy-layer proof for a lift.  The core rejects equal",
+      "principals before calling this port; providers must not log the opaque",
+      "values they receive."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Authority"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "ColdTier",
+   "vis": "pub",
+   "module": "traits::cold",
+   "signature": "pub trait ColdTier: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/cold.rs",
+   "line": 4,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "archive",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn archive(&self, key: &str, bytes: &[u8]) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/cold.rs",
+     "line": 5,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "ColdTier"
+    },
+    {
+     "name": "fetch",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn fetch(&self, key: &str, out: &mut Vec<u8>) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/cold.rs",
+     "line": 6,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "ColdTier"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Cipher",
+   "vis": "pub",
+   "module": "traits::crypto",
+   "signature": "pub trait Cipher: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/crypto.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "seal",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn seal( &self, key: &Key32, nonce: &[u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/crypto.rs",
+     "line": 6,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Cipher"
+    },
+    {
+     "name": "open",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn open( &self, key: &Key32, nonce: &[u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/crypto.rs",
+     "line": 15,
+     "doc": [
+      "Fehlschlag der Authentizität ⇒ Error::Corrupt, nie Teilausgabe."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Cipher"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Mac",
+   "vis": "pub",
+   "module": "traits::crypto",
+   "signature": "pub trait Mac: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/crypto.rs",
+   "line": 25,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "tag",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn tag(&self, key: &Key32, data: &[u8]) -> Result<[u8",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/crypto.rs",
+     "line": 28,
+     "doc": [
+      "Produces a fixed-width tag.  A fallible port avoids hiding a provider",
+      "or algorithm setup failure behind a fabricated authentication value."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Mac"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Kdf",
+   "vis": "pub",
+   "module": "traits::crypto",
+   "signature": "pub trait Kdf: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/crypto.rs",
+   "line": 31,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "derive",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn derive(&self, master: &Key32, label: &[u8]) -> Result<Key32, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/crypto.rs",
+     "line": 32,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Kdf"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Checksum",
+   "vis": "pub",
+   "module": "traits::crypto",
+   "signature": "pub trait Checksum: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/crypto.rs",
+   "line": 35,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "crc32c",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn crc32c(&self, data: &[u8]) -> u32",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/crypto.rs",
+     "line": 36,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Checksum"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Memtable",
+   "vis": "pub",
+   "module": "traits::engine",
+   "signature": "pub trait Memtable: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/engine.rs",
+   "line": 4,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "approx_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn approx_bytes(&self) -> u64",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/engine.rs",
+     "line": 5,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Memtable"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "ConsumerFeed",
+   "vis": "pub",
+   "module": "traits::engine",
+   "signature": "pub trait ConsumerFeed: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/engine.rs",
+   "line": 8,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "poll",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn poll(&self, max: usize) -> Result<usize, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/engine.rs",
+     "line": 9,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "ConsumerFeed"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "FileRole",
+   "vis": "pub",
+   "module": "traits::fs",
+   "signature": "pub enum FileRole",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+   "line": 6,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Catalog",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 7
+    },
+    {
+     "name": "Redo",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 8
+    },
+    {
+     "name": "Run",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 9
+    },
+    {
+     "name": "Blob",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 10
+    },
+    {
+     "name": "Keys",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 11
+    },
+    {
+     "name": "Anchor",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 12
+    },
+    {
+     "name": "Ledger",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 13
+    },
+    {
+     "name": "Format",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 14
+    },
+    {
+     "name": "PurgeScratch",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 15
+    },
+    {
+     "name": "Other",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 16
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "IoCtx",
+   "vis": "pub",
+   "module": "traits::fs",
+   "signature": "pub struct IoCtx",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+   "line": 20,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "role",
+     "type": "FileRole",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 21
+    },
+    {
+     "name": "purpose",
+     "type": "&'static str",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 22
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "FsCaps",
+   "vis": "pub",
+   "module": "traits::fs",
+   "signature": "pub struct FsCaps",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+   "line": 26,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "durable_file_sync",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 27
+    },
+    {
+     "name": "durable_dir_sync",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 28
+    },
+    {
+     "name": "atomic_rename",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 29
+    },
+    {
+     "name": "preallocation_reserves_space",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 30
+    },
+    {
+     "name": "hard_link",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 31
+    },
+    {
+     "name": "reflink",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 32
+    },
+    {
+     "name": "punch_hole",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 33
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ReadRange",
+   "vis": "pub",
+   "module": "traits::fs",
+   "signature": "pub struct ReadRange<'a>",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+   "line": 37,
+   "doc": [
+    "One caller-owned output buffer in a batched ordered read request."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "offset",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 38
+    },
+    {
+     "name": "buffer",
+     "type": "&'a mut [u8]",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 39
+    },
+    {
+     "name": "bytes_read",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 40
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "File",
+   "vis": "pub",
+   "module": "traits::fs",
+   "signature": "pub trait File: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+   "line": 43,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "read_at",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn read_at(&self, off: u64, buf: &mut [u8], ctx: IoCtx) -> Result<usize, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 44,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "File"
+    },
+    {
+     "name": "read_ranges",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn read_ranges(&self, ranges: &mut [ReadRange<'_>], ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 47,
+     "doc": [
+      "Reads caller-owned buffers in the supplied order. Short reads are",
+      "preserved in each `bytes_read`; implementations must not reorder."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "File"
+    },
+    {
+     "name": "append_prealloc",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn append_prealloc(&self, data: &[u8], ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 57,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "File"
+    },
+    {
+     "name": "preallocate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn preallocate(&self, len: u64, ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 59,
+     "doc": [
+      "Schreibt Nullen, nie sparse (AN-10). ENOSPC tritt nur hier auf."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "File"
+    },
+    {
+     "name": "sync_data",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn sync_data(&self, ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 60,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "File"
+    },
+    {
+     "name": "sync_all",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn sync_all(&self, ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 61,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "File"
+    },
+    {
+     "name": "size",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn size(&self) -> Result<u64, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 62,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "File"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Fs",
+   "vis": "pub",
+   "module": "traits::fs",
+   "signature": "pub trait Fs: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+   "line": 65,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "open",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn open(&self, path: &Path, ctx: IoCtx) -> Result<Box<dyn File>, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 66,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "create_new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn create_new(&self, path: &Path, ctx: IoCtx) -> Result<Box<dyn File>, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 67,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "rename",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn rename(&self, from: &Path, to: &Path, ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 68,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "unlink",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn unlink(&self, path: &Path, ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 69,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "lock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn lock(&self, _path: &Path, _ctx: IoCtx) -> Result<Box<dyn FsLock>, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 72,
+     "doc": [
+      "Acquires a process/host lock for `path`. Implementations without a",
+      "locking primitive must fail closed instead of returning a dummy lock."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "link",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn link(&self, _from: &Path, _to: &Path, _ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 77,
+     "doc": [
+      "Optional filesystem capabilities. Unsupported implementations return",
+      "a typed error and callers must preserve correctness without them."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "reflink",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn reflink(&self, _from: &Path, _to: &Path, _ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 80,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "punch_hole",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn punch_hole(&self, _path: &Path, _offset: u64, _length: u64, _ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 83,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "sync_dir",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn sync_dir(&self, dir: &Path, ctx: IoCtx) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 86,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "list",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn list(&self, dir: &Path) -> Result<Vec<PathBuf>, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 87,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "free_space",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn free_space(&self, dir: &Path) -> Result<u64, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 88,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    },
+    {
+     "name": "caps",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn caps(&self) -> FsCaps",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+     "line": 89,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Fs"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "FsLock",
+   "vis": "pub",
+   "module": "traits::fs",
+   "signature": "pub trait FsLock: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/fs.rs",
+   "line": 93,
+   "doc": [
+    "RAII handle for a filesystem lock. Dropping releases the lock."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "ResourceClass",
+   "vis": "pub",
+   "module": "traits::memory",
+   "signature": "pub enum ResourceClass",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+   "line": 6,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Memtable",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 7
+    },
+    {
+     "name": "ClusterMeta",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 8
+    },
+    {
+     "name": "Guard",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 9
+    },
+    {
+     "name": "BlockCache",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 10
+    },
+    {
+     "name": "KeyCache",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 11
+    },
+    {
+     "name": "ExtensionDelta",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 12
+    },
+    {
+     "name": "Inflight",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 13
+    },
+    {
+     "name": "PurgeScratch",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 14
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ResourcePermit",
+   "vis": "pub",
+   "module": "traits::memory",
+   "signature": "pub struct ResourcePermit",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+   "line": 19,
+   "doc": [
+    "A single successful reservation. Dropping it returns exactly the reserved",
+    "amount to the originating budget; permits are intentionally not cloneable."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( class: ResourceClass, bytes: u64, release: impl FnOnce() + Send + Sync + 'static, ) -> Self",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 26,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn bytes(&self) -> u64",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 34,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "class",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn class(&self) -> ResourceClass",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 35,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ResourcePermit",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 25,
+     "in_test": false
+    },
+    {
+     "trait": "Drop",
+     "generics": "",
+     "signature": "impl Drop for ResourcePermit",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 38,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "MemoryBudget",
+   "vis": "pub",
+   "module": "traits::memory",
+   "signature": "pub trait MemoryBudget: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+   "line": 44,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "try_reserve",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn try_reserve(&self, class: ResourceClass, bytes: u64) -> Result<ResourcePermit, Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/memory.rs",
+     "line": 47,
+     "doc": [
+      "Reserves before the caller allocates. Implementations must reject",
+      "overflow and class/total-limit exhaustion without changing accounting."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "MemoryBudget"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "anchor",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub mod anchor",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 2,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "authority",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub mod authority",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 3,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "cold",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub mod cold",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 4,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "crypto",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub mod crypto",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "engine",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub mod engine",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 6,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "fs",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub mod fs",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 7,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "memory",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub mod memory",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 8,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "observe",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub mod observe",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 9,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "spawn",
+   "vis": "pub",
+   "module": "traits",
+   "signature": "pub mod spawn",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 10,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "MetricName",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub enum MetricName",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 8,
+   "doc": [
+    "Fixed metric catalog from SPEC §16."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "as_str",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_str(self) -> &'static str",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 46,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "CommitsTotal",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 9
+    },
+    {
+     "name": "CommitGroupSize",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 10
+    },
+    {
+     "name": "CommitDurationNanoseconds",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 11
+    },
+    {
+     "name": "DurableStampLag",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 12
+    },
+    {
+     "name": "FsyncDurationNanoseconds",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 13
+    },
+    {
+     "name": "MemoryBytes",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 14
+    },
+    {
+     "name": "MemoryLimitBytes",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 15
+    },
+    {
+     "name": "DiskFull",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 16
+    },
+    {
+     "name": "CacheHitRatio",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 17
+    },
+    {
+     "name": "DiskReserveBytes",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 18
+    },
+    {
+     "name": "ScratchBytes",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 19
+    },
+    {
+     "name": "MaintenanceBytesTotal",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 20
+    },
+    {
+     "name": "MaintenanceDurationNanoseconds",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 21
+    },
+    {
+     "name": "EraseOpenTickets",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 22
+    },
+    {
+     "name": "EraseOldestPendingNanoseconds",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 23
+    },
+    {
+     "name": "EraseOperationsTotal",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 24
+    },
+    {
+     "name": "EraseDeadlineBreachesTotal",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 25
+    },
+    {
+     "name": "EraseGateDurationNanoseconds",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 26
+    },
+    {
+     "name": "EraseKeyDestroyDurationNanoseconds",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 27
+    },
+    {
+     "name": "EraseStageDurationNanoseconds",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 28
+    },
+    {
+     "name": "ErasePurgeBytesTotal",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 29
+    },
+    {
+     "name": "EraseReserveFreeBytes",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 30
+    },
+    {
+     "name": "EraseReserveUsedBytes",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 31
+    },
+    {
+     "name": "AnchorLagNanoseconds",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 32
+    },
+    {
+     "name": "ConsumerLagBytes",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 33
+    },
+    {
+     "name": "ConsumerLagStamps",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 34
+    },
+    {
+     "name": "ExtensionBlockedOwners",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 35
+    },
+    {
+     "name": "GuardSlowpathRatio",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 36
+    },
+    {
+     "name": "BranchCount",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 37
+    },
+    {
+     "name": "BranchMaxDepth",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 38
+    },
+    {
+     "name": "BranchOldestPinNanoseconds",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 39
+    },
+    {
+     "name": "BranchHistoryFloor",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 40
+    },
+    {
+     "name": "ErrorsTotal",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 41
+    },
+    {
+     "name": "Poisoned",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 42
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl MetricName",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 45,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "MetricResult",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub enum MetricResult",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 87,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "MaintenancePhase",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub enum MaintenancePhase",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 89,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "EraseStage",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub enum EraseStage",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 91,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "OwnerKind",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub enum OwnerKind",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 93,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "MetricLabelKey",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub enum MetricLabelKey",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 96,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Durability",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 97
+    },
+    {
+     "name": "Result",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 98
+    },
+    {
+     "name": "FileRole",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 99
+    },
+    {
+     "name": "ResourceClass",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 100
+    },
+    {
+     "name": "Phase",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 101
+    },
+    {
+     "name": "Stage",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 102
+    },
+    {
+     "name": "OwnerKind",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 103
+    },
+    {
+     "name": "ErrorClass",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 104
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "MetricLabel",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub enum MetricLabel",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 110,
+   "doc": [
+    "A single bounded label. The enum prevents identifiers and arbitrary text",
+    "from entering metric dimensions."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "key",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn key(self) -> MetricLabelKey",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 122,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "key_name",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn key_name(self) -> &'static str",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 135,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "value_name",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn value_name(self) -> &'static str",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 148,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Durability",
+     "shape": "(Durability)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 111
+    },
+    {
+     "name": "Result",
+     "shape": "(MetricResult)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 112
+    },
+    {
+     "name": "FileRole",
+     "shape": "(FileRole)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 113
+    },
+    {
+     "name": "ResourceClass",
+     "shape": "(ResourceClass)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 114
+    },
+    {
+     "name": "MaintenancePhase",
+     "shape": "(MaintenancePhase)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 115
+    },
+    {
+     "name": "EraseStage",
+     "shape": "(EraseStage)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 116
+    },
+    {
+     "name": "OwnerKind",
+     "shape": "(OwnerKind)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 117
+    },
+    {
+     "name": "ErrorClass",
+     "shape": "(ErrorClass)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 118
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl MetricLabel",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 121,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "MetricSample",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub enum MetricSample",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 207,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Counter",
+     "shape": "(u64)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 209
+    },
+    {
+     "name": "Gauge",
+     "shape": "(u64)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 211
+    },
+    {
+     "name": "Observe",
+     "shape": "(u64)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 213
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "Metrics",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub trait Metrics: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 216,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "record",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn record(&self, name: MetricName, sample: MetricSample, labels: &[MetricLabel])",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 219,
+     "doc": [
+      "Must be nonblocking. Names and labels are restricted to SPEC §16's",
+      "closed catalog, so call sites cannot attach identifiers or payloads."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Metrics"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "ObserverEvent",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub enum ObserverEvent",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 225,
+   "doc": [
+    "Content-free standard observer events. An event cannot carry user data,",
+    "identifiers, tokens, keys, or arbitrary strings."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Commit",
+     "shape": "{ result: MetricResult }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 226
+    },
+    {
+     "name": "FilePoisoned",
+     "shape": "{ role: FileRole }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 227
+    },
+    {
+     "name": "EraseStage",
+     "shape": "{ stage: EraseStage, result: MetricResult }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 228
+    },
+    {
+     "name": "RecoveryQuarantined",
+     "shape": "",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 229
+    },
+    {
+     "name": "ExtensionBlocked",
+     "shape": "{ owner: OwnerKind }",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 230
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "Observer",
+   "vis": "pub",
+   "module": "traits::observe",
+   "signature": "pub trait Observer: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+   "line": 233,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "event",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn event(&self, event: ObserverEvent)",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/observe.rs",
+     "line": 234,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Observer"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Spawner",
+   "vis": "pub",
+   "module": "traits::spawn",
+   "signature": "pub trait Spawner: Send + Sync",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/spawn.rs",
+   "line": 4,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "spawn",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn spawn(&self, name: &'static str, job: Box<dyn FnOnce() + Send>) -> Result<(), Error>",
+     "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/spawn.rs",
+     "line": 5,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Spawner"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use change::",
+   "vis": "pub",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 12,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use error::",
+   "vis": "pub",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 15,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use ids::",
+   "vis": "pub",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 16,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use keys::",
+   "vis": "pub",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/lib.rs",
+   "line": 21,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use anchor::",
+   "vis": "pub",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 12,
+   "in_test": false,
+   "module": "traits"
+  },
+  {
+   "signature": "pub use authority::",
+   "vis": "pub",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 13,
+   "in_test": false,
+   "module": "traits"
+  },
+  {
+   "signature": "pub use crypto::",
+   "vis": "pub",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 14,
+   "in_test": false,
+   "module": "traits"
+  },
+  {
+   "signature": "pub use fs::",
+   "vis": "pub",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 15,
+   "in_test": false,
+   "module": "traits"
+  },
+  {
+   "signature": "pub use memory::",
+   "vis": "pub",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 16,
+   "in_test": false,
+   "module": "traits"
+  },
+  {
+   "signature": "pub use observe::",
+   "vis": "pub",
+   "file": "crates/contextra-storage/crates/contextra-storage-ports/src/traits/mod.rs",
+   "line": 17,
+   "in_test": false,
+   "module": "traits"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra-crypto-ref",
+  "contextra-keys-cohort",
+  "contextra-keys-file",
+  "contextra-storage",
+  "contextra-storage-bridge",
+  "contextra-storage-fs"
+ ]
+}

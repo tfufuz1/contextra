@@ -1,0 +1,5195 @@
+{
+ "name": "contextra-adapt",
+ "version": "workspace",
+ "path": "crates/contextra-adapt",
+ "role": "Adaptive Regelung",
+ "features": {
+  "default": [
+   "std"
+  ],
+  "std": [],
+  "workspace": [
+   "dep:contextra-types",
+   "dep:contextra-ports"
+  ],
+  "types-compat": [
+   "dep:contextra-types"
+  ],
+  "ports-compat": [
+   "dep:contextra-ports"
+  ],
+  "bandit-routing": [],
+  "exp-bandit-routing": [
+   "bandit-routing"
+  ],
+  "flow-corrected-thompson": [
+   "exp-flow-thompson"
+  ],
+  "exp-flow-thompson": [
+   "bandit-routing"
+  ],
+  "rie-greedy-personalization": [
+   "exp-rie-greedy"
+  ],
+  "exp-rie-greedy": []
+ },
+ "deps": {
+  "ahash": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "blake3": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "contextra-ports": {
+   "kind": "normal",
+   "source": "path",
+   "optional": true
+  },
+  "contextra-types": {
+   "kind": "normal",
+   "source": "path",
+   "optional": true
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "criterion": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "proptest": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "Adaptive controllers, PID regulators, bandits, and Lyapunov drift watchers for Contextra."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-adapt/src/bandit.rs",
+   "module": "bandit",
+   "lines": 1219
+  },
+  {
+   "file": "crates/contextra-adapt/src/clock.rs",
+   "module": "clock",
+   "lines": 69
+  },
+  {
+   "file": "crates/contextra-adapt/src/compat/clock.rs",
+   "module": "compat::clock",
+   "lines": 18
+  },
+  {
+   "file": "crates/contextra-adapt/src/compat/error.rs",
+   "module": "compat::error",
+   "lines": 77
+  },
+  {
+   "file": "crates/contextra-adapt/src/compat/mod.rs",
+   "module": "compat",
+   "lines": 11
+  },
+  {
+   "file": "crates/contextra-adapt/src/contract.rs",
+   "module": "contract",
+   "lines": 44
+  },
+  {
+   "file": "crates/contextra-adapt/src/decay_controller.rs",
+   "module": "decay_controller",
+   "lines": 255
+  },
+  {
+   "file": "crates/contextra-adapt/src/drift.rs",
+   "module": "drift",
+   "lines": 322
+  },
+  {
+   "file": "crates/contextra-adapt/src/error.rs",
+   "module": "error",
+   "lines": 110
+  },
+  {
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "module": "flow_thompson",
+   "lines": 918
+  },
+  {
+   "file": "crates/contextra-adapt/src/homeostat.rs",
+   "module": "homeostat",
+   "lines": 232
+  },
+  {
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "module": "crate",
+   "lines": 107
+  },
+  {
+   "file": "crates/contextra-adapt/src/lyapunov.rs",
+   "module": "lyapunov",
+   "lines": 554
+  },
+  {
+   "file": "crates/contextra-adapt/src/offpolicy.rs",
+   "module": "offpolicy",
+   "lines": 307
+  },
+  {
+   "file": "crates/contextra-adapt/src/pid.rs",
+   "module": "pid",
+   "lines": 465
+  },
+  {
+   "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+   "module": "pid_latency_controller",
+   "lines": 309
+  },
+  {
+   "file": "crates/contextra-adapt/src/rie_greedy.rs",
+   "module": "rie_greedy",
+   "lines": 221
+  },
+  {
+   "file": "crates/contextra-adapt/src/rng.rs",
+   "module": "rng",
+   "lines": 44
+  },
+  {
+   "file": "crates/contextra-adapt/src/shadow_mode.rs",
+   "module": "shadow_mode",
+   "lines": 126
+  },
+  {
+   "file": "crates/contextra-adapt/src/strategy.rs",
+   "module": "strategy",
+   "lines": 20
+  }
+ ],
+ "counts": {
+  "unwrap": 0,
+  "expect": 0,
+  "panic_macro": 0,
+  "todo_unimpl": 0,
+  "index_bracket": 188,
+  "cfg_feature_gates": 25,
+  "deprecated_attr": 4
+ },
+ "grep_pub_decl": 195,
+ "all_pub_decl": 195,
+ "public_items": [
+  {
+   "kind": "const",
+   "name": "SHERMAN_MORRISON_REFACTORIZATION_INTERVAL",
+   "vis": "pub",
+   "module": "bandit",
+   "signature": "pub const SHERMAN_MORRISON_REFACTORIZATION_INTERVAL: u64 = 1000",
+   "file": "crates/contextra-adapt/src/bandit.rs",
+   "line": 31,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "BanditError",
+   "vis": "pub",
+   "module": "bandit",
+   "signature": "pub enum BanditError",
+   "file": "crates/contextra-adapt/src/bandit.rs",
+   "line": 36,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "DimensionMismatch",
+     "shape": "{",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 39
+    },
+    {
+     "name": "InvalidConfig",
+     "shape": "(String)",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 47
+    },
+    {
+     "name": "NonFiniteVariance",
+     "shape": "(f32)",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 50
+    },
+    {
+     "name": "PrecisionMatrixDriftDetected",
+     "shape": "{",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 53
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "AlignedF32Vec",
+   "vis": "pub",
+   "module": "bandit",
+   "signature": "pub struct AlignedF32Vec(pub Vec<f32>)",
+   "file": "crates/contextra-adapt/src/bandit.rs",
+   "line": 71,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(vec: Vec<f32>) -> Self",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 88,
+     "doc": [
+      "Erstellt einen neuen `AlignedF32Vec` aus einem `Vec<f32>`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "zeros",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn zeros(len: usize) -> Self",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 93,
+     "doc": [
+      "Erstellt einen neuen `AlignedF32Vec` mit `len` Nullen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::ops::Deref",
+     "generics": "",
+     "signature": "impl std::ops::Deref for AlignedF32Vec",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 73,
+     "in_test": false
+    },
+    {
+     "trait": "std::ops::DerefMut",
+     "generics": "",
+     "signature": "impl std::ops::DerefMut for AlignedF32Vec",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 80,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl AlignedF32Vec",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 86,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "BanditImplementation",
+   "vis": "pub",
+   "module": "bandit",
+   "signature": "pub enum BanditImplementation",
+   "file": "crates/contextra-adapt/src/bandit.rs",
+   "line": 102,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "ShermanMorrison",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 105
+    },
+    {
+     "name": "DiagonalApproximation",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 107
+    },
+    {
+     "name": "FlowCorrectedThompson",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 113
+    },
+    {
+     "name": "SketchedProjection",
+     "shape": "{",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 115
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SketchMatrix",
+   "vis": "pub",
+   "module": "bandit",
+   "signature": "pub struct SketchMatrix",
+   "file": "crates/contextra-adapt/src/bandit.rs",
+   "line": 124,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "derive_seed_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn derive_seed_u64(tenant_id: u64, base_seed: u64) -> u64",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 138,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "derive_seed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn derive_seed(namespace_id: u64, base_seed: u64) -> u64",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 149,
+     "doc": [
+      "Leitet einen isolierten PRNG-Seed via BLAKE3-Hash ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_seed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_seed( seed: u64, original_dim: usize, projected_dim: usize, ) -> Result<Self, BanditError>",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 155,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "project",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn project(&self, x: &[f32]) -> Vec<f32>",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 186,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "data",
+     "type": "AlignedF32Vec",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 126
+    },
+    {
+     "name": "projected_dim",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 128
+    },
+    {
+     "name": "original_dim",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 130
+    },
+    {
+     "name": "seed",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 132
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SketchMatrix",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 135,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "BanditPolicy",
+   "vis": "pub",
+   "module": "bandit",
+   "signature": "pub trait BanditPolicy: Send + Sync",
+   "file": "crates/contextra-adapt/src/bandit.rs",
+   "line": 197,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "apply_drift_penalty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn apply_drift_penalty(&mut self, k_drift: f32, alpha_max: f32, gamma: f32)",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 199,
+     "doc": [
+      "Wendet Drift-Penalty / Covariance Discounting bei erkannter concept drift an."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "BanditPolicy"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "BanditProfileState",
+   "vis": "pub",
+   "module": "bandit",
+   "signature": "pub struct BanditProfileState",
+   "file": "crates/contextra-adapt/src/bandit.rs",
+   "line": 320,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "cold_start",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn cold_start(d: usize, alpha_base: f32) -> Self",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 392,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "ensure_sketched_state",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn ensure_sketched_state(&mut self, projected_dim: usize) -> Result<(), BanditError>",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 426,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "expected_dim",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn expected_dim(&self) -> usize",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 491,
+     "doc": [
+      "Gibt die erwartete Dimension der Feature-Vektoren zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn score( &self, x: &[f32], cost: f32, is_cloud_transport: bool, ) -> Result<f32, BanditError>",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 516,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "update",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn update( &mut self, x: &[f32], r_outcome: f32, cost: f32, is_cloud_transport: bool, ) -> Result<(), BanditError>",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 660,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "on_drift_detected",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn on_drift_detected(&mut self, k_drift: f32)",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 803,
+     "doc": [],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "theta",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 322
+    },
+    {
+     "name": "sigma_sq",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 324
+    },
+    {
+     "name": "inv_a",
+     "type": "AlignedF32Vec",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 327
+    },
+    {
+     "name": "work_buf",
+     "type": "AlignedF32Vec",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 333
+    },
+    {
+     "name": "alpha",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 335
+    },
+    {
+     "name": "alpha_base",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 338
+    },
+    {
+     "name": "alpha_max_multiplier",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 341
+    },
+    {
+     "name": "lambda",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 343
+    },
+    {
+     "name": "mu",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 345
+    },
+    {
+     "name": "gamma",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 349
+    },
+    {
+     "name": "drift_gamma",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 352
+    },
+    {
+     "name": "drift_steps_remaining",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 355
+    },
+    {
+     "name": "drift_decay_window",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 358
+    },
+    {
+     "name": "implementation",
+     "type": "BanditImplementation",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 360
+    },
+    {
+     "name": "seed",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 363
+    },
+    {
+     "name": "sketch_matrix",
+     "type": "Option<SketchMatrix>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 366
+    },
+    {
+     "name": "sketch_theta",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 369
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "BanditPolicy",
+     "generics": "",
+     "signature": "impl BanditPolicy for BanditProfileState",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 372,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl BanditProfileState",
+     "file": "crates/contextra-adapt/src/bandit.rs",
+     "line": 389,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "Clock",
+   "vis": "pub",
+   "module": "clock",
+   "signature": "pub trait Clock: Send + Sync + 'static",
+   "file": "crates/contextra-adapt/src/clock.rs",
+   "line": 9,
+   "doc": [
+    "Trait für deterministische Zeitgeber."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "now_unix_nanos",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn now_unix_nanos(&self) -> u64",
+     "file": "crates/contextra-adapt/src/clock.rs",
+     "line": 11,
+     "doc": [
+      "Liefert die aktuelle Unix-Epochenzeit in Nanosekunden."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Clock"
+    },
+    {
+     "name": "monotonic_nanos",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn monotonic_nanos(&self) -> u64",
+     "file": "crates/contextra-adapt/src/clock.rs",
+     "line": 14,
+     "doc": [
+      "Liefert einen monoton steigenden Zeitstempel in Nanosekunden."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Clock"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SystemClock",
+   "vis": "pub",
+   "module": "clock",
+   "signature": "pub struct SystemClock",
+   "file": "crates/contextra-adapt/src/clock.rs",
+   "line": 19,
+   "doc": [
+    "Standard-Implementierung von [`Clock`] unter Verwendung des Betriebssystem-Zeitgebers."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-adapt/src/clock.rs",
+     "line": 33,
+     "doc": [
+      "Erstellt eine neue `SystemClock`-Instanz."
+     ],
+     "attrs": [
+      "#[allow(clippy::disallowed_methods)]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for SystemClock",
+     "file": "crates/contextra-adapt/src/clock.rs",
+     "line": 24,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SystemClock",
+     "file": "crates/contextra-adapt/src/clock.rs",
+     "line": 30,
+     "in_test": false
+    },
+    {
+     "trait": "Clock",
+     "generics": "",
+     "signature": "impl Clock for SystemClock",
+     "file": "crates/contextra-adapt/src/clock.rs",
+     "line": 50,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "PortsClockAdapter",
+   "vis": "pub",
+   "module": "compat::clock",
+   "signature": "pub struct PortsClockAdapter(pub Arc<dyn contextra_ports::Clock>)",
+   "file": "crates/contextra-adapt/src/compat/clock.rs",
+   "line": 8,
+   "doc": [
+    "Adapter für einen dynamischen `contextra_ports::Clock`-Referenzzeiger auf das lokale `Clock`-Trait."
+   ],
+   "attrs": [
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Clock",
+     "generics": "",
+     "signature": "impl Clock for PortsClockAdapter",
+     "file": "crates/contextra-adapt/src/compat/clock.rs",
+     "line": 10,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "clock",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod clock",
+   "file": "crates/contextra-adapt/src/compat/mod.rs",
+   "line": 6,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"ports-compat\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod error",
+   "file": "crates/contextra-adapt/src/compat/mod.rs",
+   "line": 8,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"types-compat\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "AdaptiveController",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub trait AdaptiveController: Send + Sync",
+   "file": "crates/contextra-adapt/src/contract.rs",
+   "line": 13,
+   "doc": [
+    "Trait für Regler mit Anti-Windup und Stellgrößenbegrenzung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "update",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn update(&mut self, dt: Duration, measurement: f64) -> f64",
+     "file": "crates/contextra-adapt/src/contract.rs",
+     "line": 15,
+     "doc": [
+      "Aktualisiert den Reglerzustand und berechnet das Stellsignal."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "AdaptiveController"
+    },
+    {
+     "name": "reset",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn reset(&mut self)",
+     "file": "crates/contextra-adapt/src/contract.rs",
+     "line": 17,
+     "doc": [
+      "Setzt den internen Akkumulator zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "AdaptiveController"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "BanditArmSelector",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub trait BanditArmSelector: Send + Sync",
+   "file": "crates/contextra-adapt/src/contract.rs",
+   "line": 21,
+   "doc": [
+    "Trait für kontextuelle Bandit-Arm-Auswahl und Regressions-Updates."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "select_arm",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn select_arm(&mut self, context: &[f32]) -> Result<usize>",
+     "file": "crates/contextra-adapt/src/contract.rs",
+     "line": 23,
+     "doc": [
+      "Wählt einen Arm basierend auf dem Kontextvektor aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "BanditArmSelector"
+    },
+    {
+     "name": "update",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn update(&mut self, arm: usize, context: &[f32], reward: f64) -> Result<()>",
+     "file": "crates/contextra-adapt/src/contract.rs",
+     "line": 25,
+     "doc": [
+      "Aktualisiert den Zustand für den gewählten Arm mit beobachteter Belohnung."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "BanditArmSelector"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "StateSnapshot",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub trait StateSnapshot",
+   "file": "crates/contextra-adapt/src/contract.rs",
+   "line": 29,
+   "doc": [
+    "Serialisierbarer Zustandsschnappschuss für Regler und Bandit-Profile."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "to_snapshot_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn to_snapshot_bytes(&self) -> Result<Vec<u8>>",
+     "file": "crates/contextra-adapt/src/contract.rs",
+     "line": 31,
+     "doc": [
+      "Serialisiert den Zustand in einen defensiven Byte-Puffer."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "StateSnapshot"
+    },
+    {
+     "name": "from_snapshot_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn from_snapshot_bytes(bytes: &[u8]) -> Result<Self> where Self: Sized",
+     "file": "crates/contextra-adapt/src/contract.rs",
+     "line": 33,
+     "doc": [
+      "Stellt den Zustand aus einem Byte-Puffer wieder her."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "StateSnapshot"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "_assert_contract_conformance",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub fn _assert_contract_conformance<T: StateSnapshot>(item: &T, bytes: &[u8]) -> Result<()>",
+   "file": "crates/contextra-adapt/src/contract.rs",
+   "line": 40,
+   "doc": [
+    "Konformitätsprüfung für Contract-Traits."
+   ],
+   "attrs": [
+    "#[doc(hidden)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "DecaySignalInputs",
+   "vis": "pub",
+   "module": "decay_controller",
+   "signature": "pub struct DecaySignalInputs",
+   "file": "crates/contextra-adapt/src/decay_controller.rs",
+   "line": 20,
+   "doc": [
+    "Inputs for Adaptive Decay Controller (Cache-Eviction mit Time-Weighted Decay) aus bestehenden System-Metriken."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "tombstone_ratio",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 22
+    },
+    {
+     "name": "query_load_inverse",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 26
+    },
+    {
+     "name": "w_tombstone",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 28
+    },
+    {
+     "name": "w_query",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 30
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for DecaySignalInputs",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 33,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DecayControllerConfig",
+   "vis": "pub",
+   "module": "decay_controller",
+   "signature": "pub struct DecayControllerConfig",
+   "file": "crates/contextra-adapt/src/decay_controller.rs",
+   "line": 46,
+   "doc": [
+    "Konfiguration für Adaptive Decay Controller (Cache-Eviction mit Time-Weighted Decay) (via MaintenanceConfig)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "kappa",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 48
+    },
+    {
+     "name": "base_half_life_tx",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 50
+    },
+    {
+     "name": "eviction_threshold",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 52
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for DecayControllerConfig",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 55,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "AdaptiveDecayController",
+   "vis": "pub",
+   "module": "decay_controller",
+   "signature": "pub struct AdaptiveDecayController",
+   "file": "crates/contextra-adapt/src/decay_controller.rs",
+   "line": 67,
+   "doc": [
+    "Adaptive Decay Controller für time-weighted Cache-Eviction."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(config: DecayControllerConfig) -> Self",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 73,
+     "doc": [
+      "Erstellt einen neuen `AdaptiveDecayController` mit der angegebenen Konfiguration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_defaults",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_defaults() -> Self",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 78,
+     "doc": [
+      "Erstellt einen neuen `AdaptiveDecayController` mit Standardwerten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn config(&self) -> &DecayControllerConfig",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 83,
+     "doc": [
+      "Liefer eine Referenz auf die Konfiguration zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "system_temperature",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn system_temperature(&self, inputs: &DecaySignalInputs) -> f32",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 89,
+     "doc": [
+      "Berechnet aktuelle Systemtemperatur T(t) ∈ `[0, 1]`."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "effective_half_life",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn effective_half_life(&self, temperature: f32) -> f32",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 96,
+     "doc": [
+      "Effektive Half-Life unter aktueller Temperatur."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "effective_score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn effective_score( &self, base_score: f32, elapsed_tx: u64, inputs: &DecaySignalInputs, ) -> f32",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 103,
+     "doc": [
+      "Temperatur-adjustierter Score für einen Chunk.",
+      "",
+      "`elapsed_tx`: TxId(now) - TxId(chunk_created). ADR-016: kein SystemTime."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "should_evict",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn should_evict( &self, base_score: f32, elapsed_tx: u64, inputs: &DecaySignalInputs, ) -> bool",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 119,
+     "doc": [
+      "Gibt true wenn Chunk unter Eviction-Schwelle.",
+      "Wird von Background Workers (background_workers.rs) für Sweep verwendet."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl AdaptiveDecayController",
+     "file": "crates/contextra-adapt/src/decay_controller.rs",
+     "line": 71,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "DriftSignal",
+   "vis": "pub",
+   "module": "drift",
+   "signature": "pub enum DriftSignal",
+   "file": "crates/contextra-adapt/src/drift.rs",
+   "line": 13,
+   "doc": [
+    "Drift detection signal returned by a [`DriftDetector`]."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Stable",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 15
+    },
+    {
+     "name": "Detected",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 17
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "DriftDetector",
+   "vis": "pub",
+   "module": "drift",
+   "signature": "pub trait DriftDetector",
+   "file": "crates/contextra-adapt/src/drift.rs",
+   "line": 27,
+   "doc": [
+    "Generic interface for sequential O(1) drift detectors.",
+    "",
+    "# Abgrenzung zu `contextra-rank::DriftDetector`",
+    "`contextra-adapt::DriftDetector` ist ein O(1) sequentielles Online-Signal-Trait für synchrone",
+    "Regler und Bandit-Policies in Ring 0. Es arbeitet direkt auf Skalaren (Scores/Rewards).",
+    "Im Gegensatz dazu führt `contextra-rank::DriftDetector` höherstufige Verteilungs- und Ranking-Analysen",
+    "auf gespeicherten Resultatlisten und Metrikserien durch."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "observe",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn observe(&mut self, reward: f32) -> DriftSignal",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 29,
+     "doc": [
+      "Observes a reward or non-conformity score and returns the updated drift signal."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "DriftDetector"
+    },
+    {
+     "name": "is_drifting",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn is_drifting(&self) -> bool",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 31,
+     "doc": [
+      "Returns `true` if drift is currently detected."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "DriftDetector"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "CatoniDriftDetector",
+   "vis": "pub",
+   "module": "drift",
+   "signature": "pub struct CatoniDriftDetector",
+   "file": "crates/contextra-adapt/src/drift.rs",
+   "line": 40,
+   "doc": [
+    "Catoni-M-estimator based robust drift detector (arXiv:2505.20051 & arXiv:2501.10974).",
+    "",
+    "Uses influence function $\\psi(x) = \\frac{x}{1 + |x|}$ for $O(1)$ robust mean estimation,",
+    "paired with CUSUM sequential change-point accumulation.",
+    "Deterministic (P28) and robust against isolated reward outliers."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(baseline_reward: f64, threshold: f64, alpha: f64) -> Self",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 61,
+     "doc": [
+      "Creates a new `CatoniDriftDetector` with specified baseline, threshold, and learning rate."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reset",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reset(&mut self)",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 72,
+     "doc": [
+      "Resets the CUSUM accumulator and restores `catoni_mu` to baseline."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "catoni_mu",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 42
+    },
+    {
+     "name": "cusum_sum",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 44
+    },
+    {
+     "name": "threshold",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 46
+    },
+    {
+     "name": "alpha",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 48
+    },
+    {
+     "name": "baseline_reward",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 50
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for CatoniDriftDetector",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 53,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl CatoniDriftDetector",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 59,
+     "in_test": false
+    },
+    {
+     "trait": "DriftDetector",
+     "generics": "",
+     "signature": "impl DriftDetector for CatoniDriftDetector",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 78,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EnsembleDriftWatcher",
+   "vis": "pub",
+   "module": "drift",
+   "signature": "pub struct EnsembleDriftWatcher",
+   "file": "crates/contextra-adapt/src/drift.rs",
+   "line": 110,
+   "doc": [
+    "Ensemble combination of [`LyapunovDriftWatcher`] and [`CatoniDriftDetector`].",
+    "",
+    "Triggers drift response ONLY if BOTH detectors independently detect drift,",
+    "significantly reducing false positive rates under noisy or outlier-prone reward streams."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(lyapunov: LyapunovDriftWatcher, catoni: CatoniDriftDetector) -> Self",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 128,
+     "doc": [
+      "Creates a new `EnsembleDriftWatcher`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "observe_and_decide",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn observe_and_decide(&mut self, reward: f32) -> bool",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 133,
+     "doc": [
+      "Observes a new reward / score and decides if drift is detected by BOTH detectors."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_baseline",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_baseline(&mut self, baseline_scores: &[f32])",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 140,
+     "doc": [
+      "Sets the baseline distribution for the Lyapunov watcher and baseline mean for the Catoni detector."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "lyapunov",
+     "type": "LyapunovDriftWatcher",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 112
+    },
+    {
+     "name": "catoni",
+     "type": "CatoniDriftDetector",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 114
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for EnsembleDriftWatcher",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 117,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EnsembleDriftWatcher",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 126,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DriftPolicyBridge",
+   "vis": "pub",
+   "module": "drift",
+   "signature": "pub struct DriftPolicyBridge",
+   "file": "crates/contextra-adapt/src/drift.rs",
+   "line": 154,
+   "doc": [
+    "Adapter zur Kopplung des `LyapunovDriftWatcher` mit einer `BanditPolicy`."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(window_size: usize, k_drift: f32, alpha_max: f32, gamma: f32) -> Self",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 178,
+     "doc": [
+      "Erstellt eine neue `DriftPolicyBridge` mit benutzerdefinierten Parametern."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "observe_and_react",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn observe_and_react<P: crate::bandit::BanditPolicy + ?Sized>( &mut self, current_scores: &[f32], policy: &mut P, ) -> LyapunovResult",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 190,
+     "doc": [
+      "Nimmt aktuelle Non-Conformity-Scores auf, wertet den Drift-Status aus und",
+      "wendet bei erkannter Drift eine Strafe auf die `BanditPolicy` an."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"bandit-routing\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "watcher",
+     "type": "LyapunovDriftWatcher",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 156
+    },
+    {
+     "name": "k_drift",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 158
+    },
+    {
+     "name": "alpha_max",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 160
+    },
+    {
+     "name": "gamma",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 162
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for DriftPolicyBridge",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 165,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl DriftPolicyBridge",
+     "file": "crates/contextra-adapt/src/drift.rs",
+     "line": 176,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "AdaptError",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum AdaptError",
+   "file": "crates/contextra-adapt/src/error.rs",
+   "line": 10,
+   "doc": [
+    "Zentraler Fehlertyp für alle adaptiven Regler, Bandits und Drift-Watcher."
+   ],
+   "attrs": [
+    "#[derive(Debug, Error, PartialEq, Clone)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "DimensionMismatch",
+     "shape": "{",
+     "file": "crates/contextra-adapt/src/error.rs",
+     "line": 13
+    },
+    {
+     "name": "InvalidConfig",
+     "shape": "(String)",
+     "file": "crates/contextra-adapt/src/error.rs",
+     "line": 22
+    },
+    {
+     "name": "NonFinite",
+     "shape": "(String)",
+     "file": "crates/contextra-adapt/src/error.rs",
+     "line": 26
+    },
+    {
+     "name": "PrecisionMatrixDriftDetected",
+     "shape": "{",
+     "file": "crates/contextra-adapt/src/error.rs",
+     "line": 30
+    },
+    {
+     "name": "ZeroPropensityViolation",
+     "shape": "(String)",
+     "file": "crates/contextra-adapt/src/error.rs",
+     "line": 39
+    },
+    {
+     "name": "InvalidInput",
+     "shape": "(String)",
+     "file": "crates/contextra-adapt/src/error.rs",
+     "line": 43
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "From<crate::bandit::BanditError>",
+     "generics": "",
+     "signature": "impl From<crate::bandit::BanditError> for AdaptError",
+     "file": "crates/contextra-adapt/src/error.rs",
+     "line": 47,
+     "in_test": false
+    },
+    {
+     "trait": "From<crate::flow_thompson::FcTsError>",
+     "generics": "",
+     "signature": "impl From<crate::flow_thompson::FcTsError> for AdaptError",
+     "file": "crates/contextra-adapt/src/error.rs",
+     "line": 69,
+     "in_test": false
+    },
+    {
+     "trait": "From<crate::flow_thompson::OffPolicyError>",
+     "generics": "",
+     "signature": "impl From<crate::flow_thompson::OffPolicyError> for AdaptError",
+     "file": "crates/contextra-adapt/src/error.rs",
+     "line": 84,
+     "in_test": false
+    },
+    {
+     "trait": "From<crate::rie_greedy::RieGreedyError>",
+     "generics": "",
+     "signature": "impl From<crate::rie_greedy::RieGreedyError> for AdaptError",
+     "file": "crates/contextra-adapt/src/error.rs",
+     "line": 95,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "Result",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub type Result<T> = std::result::Result<T, AdaptError>",
+   "file": "crates/contextra-adapt/src/error.rs",
+   "line": 110,
+   "doc": [
+    "Ergebnistyp für Operationen in `contextra-adapt`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "FcTsError",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub enum FcTsError",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 29,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "DimensionMismatch",
+     "shape": "{",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 32
+    },
+    {
+     "name": "NonFinite",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 40
+    },
+    {
+     "name": "InvalidConfig",
+     "shape": "(String)",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 43
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "FcTsRng",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub trait FcTsRng",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 48,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "next_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn next_u64(&mut self) -> u64",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 50,
+     "doc": [
+      "Generiert die nächste 64-Bit vorzeichenlose Ganzzahl."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "FcTsRng"
+    },
+    {
+     "name": "next_f32",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn next_f32(&mut self) -> f32",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 53,
+     "doc": [
+      "Generiert eine gleichverteilte Fließkommazahl im halboffenen Intervall `[0, 1)`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "FcTsRng"
+    },
+    {
+     "name": "next_standard_normal",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn next_standard_normal(&mut self) -> f32",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 59,
+     "doc": [
+      "Generiert eine standardnormalverteilte Fließkommazahl $\\mathcal{N}(0, 1)$ mittels Box-Muller-Transformation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "FcTsRng"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SplitMix64",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub struct SplitMix64",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 72,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(seed: u64) -> Self",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 78,
+     "doc": [
+      "Erstellt eine neue `SplitMix64`-Instanz mit dem gegebenen Seed."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SplitMix64",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 76,
+     "in_test": false
+    },
+    {
+     "trait": "FcTsRng",
+     "generics": "",
+     "signature": "impl FcTsRng for SplitMix64",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 83,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "FcTsConfig",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub struct FcTsConfig",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 96,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "validate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn validate(&self) -> Result<(), FcTsError>",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 129,
+     "doc": [
+      "Validiert die Konfigurationsparameter."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "dim",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 98
+    },
+    {
+     "name": "lambda",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 100
+    },
+    {
+     "name": "noise_var",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 102
+    },
+    {
+     "name": "window_capacity",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 104
+    },
+    {
+     "name": "explore_scale",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 106
+    },
+    {
+     "name": "drift_ridge",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 108
+    },
+    {
+     "name": "max_drift_norm",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 110
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for FcTsConfig",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 113,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl FcTsConfig",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 127,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Ring3Token",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub struct Ring3Token",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 170,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "ring3_background_task_token",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub fn ring3_background_task_token() -> Ring3Token",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 180,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "FlowCorrectedThompsonBandit",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub struct FlowCorrectedThompsonBandit",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 187,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(config: FcTsConfig) -> Result<Self, FcTsError>",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 241,
+     "doc": [
+      "Erstellt eine neue FC-TS-Bandit-Instanz mit der gegebenen Konfiguration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_shadow_sink",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_shadow_sink( mut self, sink: std::sync::Arc<dyn crate::shadow_mode::ShadowSink<u32>>, ) -> Self",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 273,
+     "doc": [
+      "Konfiguriert eine Diskrepanz-Senke für den Shadow-Mode-Vergleich (§12)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "shadow_sink",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn shadow_sink(&self) -> Option<&std::sync::Arc<dyn crate::shadow_mode::ShadowSink<u32>>>",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 282,
+     "doc": [
+      "Gibt eine Referenz auf die optional konfigurierte Diskrepanz-Senke zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn config(&self) -> &FcTsConfig",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 287,
+     "doc": [
+      "Gibt eine Referenz auf die Konfiguration zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "mu",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn mu(&self) -> &[f32]",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 292,
+     "doc": [
+      "Gibt den aktuellen Mittelwert-Vektor $\\mu$ zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "drift_rate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn drift_rate(&self) -> &[f32]",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 297,
+     "doc": [
+      "Gibt die aktuelle Drift-Rate $\\delta$ zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inv_a",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn inv_a(&self) -> &[f32]",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 302,
+     "doc": [
+      "Gibt die inverse Kovarianzmatrix $A^{-1}$ ($d \\times d$, row-major) zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "update_with_flow",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn update_with_flow( &mut self, context: &[f32], reward: f32, observation_time: u64, confidence_weight: f32, ) -> Result<(), FcTsError>",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 317,
+     "doc": [
+      "Akkumuliert ein neues Beobachtungstupel mit konfidenzgewichtetem Transport (§21.3).",
+      "",
+      "# Parameter",
+      "- `context`: Kontext-Vektor $x \\in \\mathbb{R}^d$.",
+      "- `reward`: Beobachtete Belohnung $r$.",
+      "- `observation_time`: Zeitstempel $t_{\\text{obs}}$ der Beobachtung.",
+      "- `confidence_weight`: Konfidenzgewicht $\\omega \\ge 0$.",
+      "",
+      "# Allokationsgarantie",
+      "Führt im Hotpath KEINERLEI Heap-Allokationen durch (O(d²) Sherman-Morrison mit",
+      "vorallokierten Arbeitspuffern und flachem Ringpuffer)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "sample_score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn sample_score(&self, context: &[f32], rng: &mut dyn FcTsRng) -> Result<f32, FcTsError>",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 430,
+     "doc": [
+      "Berechnet einen zufälligen Thompson-Sample Score für den Kontext $x$.",
+      "",
+      "$w_i = \\mu_i + v \\cdot \\sqrt{\\max(A^{-1}_{i,i}, 0)} \\cdot z_i$, $\\text{Score} = \\langle w, x \\rangle$.",
+      "",
+      "# Allokationsgarantie",
+      "Führt KEINERLEI Heap-Allokationen durch."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "baseline_score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn baseline_score(&self, context: &[f32]) -> Result<f32, FcTsError>",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 461,
+     "doc": [
+      "Berechnet den Baseline-Mittelwert-Score (Sherman-Morrison $\\langle \\mu, x \\rangle$) für den Kontext $x$."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "select_arm",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn select_arm(&self, context: &[f32], rng: &mut dyn FcTsRng) -> Result<u32, FcTsError>",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 487,
+     "doc": [
+      "Wählt die Aktion für diese Bandit-Instanz und protokolliert Diskrepanzen bei konfiguriertem Shadow-Sink."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "recompute_drift_rate_from_window",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn recompute_drift_rate_from_window(&mut self, _token: &Ring3Token)",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 514,
+     "doc": [
+      "Berechnet die Drift-Rate $\\delta$ aus dem aktuellen Fenster neu via Ridge-Regression (AK-18).",
+      "",
+      "Nutzt Conjugate Gradient zur Lösung von $(Z^T Z + \\rho I) \\delta = Z^T e$.",
+      "Diese Funktion ist die EINZIGE Stelle im Codebase, die `self.drift_rate` modifiziert.",
+      "",
+      "# Token-Erfordernis (AK-18)",
+      "",
+      "Aufrufe ohne `&Ring3Token` schlagen beim Kompilieren fehl:",
+      "```compile_fail",
+      "use contextra_adapt::flow_thompson::{FcTsConfig, FlowCorrectedThompsonBandit};",
+      "let mut bandit = FlowCorrectedThompsonBandit::new(FcTsConfig::default()).unwrap();",
+      "bandit.recompute_drift_rate_from_window(); // Error: missing token",
+      "```"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for FlowCorrectedThompsonBandit",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 223,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl FlowCorrectedThompsonBandit",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 239,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "DiagonalApproximationBandit",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub struct DiagonalApproximationBandit",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 640,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( propensities: std::collections::BTreeMap<crate::strategy::RetrievalStrategy, f32>, ) -> Self",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 647,
+     "doc": [
+      "Erstellt eine neue `DiagonalApproximationBandit`-Referenzpolitik mit der gegebenen Propensitätsmap."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_pairs",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_pairs( pairs: impl IntoIterator<Item = (crate::strategy::RetrievalStrategy, f32)>, ) -> Self",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 665,
+     "doc": [
+      "Erstellt eine `DiagonalApproximationBandit`-Referenzpolitik aus Strategie-Propensitäts-Paaren.",
+      "",
+      "```",
+      "use contextra_adapt::flow_thompson::DiagonalApproximationBandit;",
+      "use contextra_adapt::strategy::RetrievalStrategy;",
+      "",
+      "let bandit = DiagonalApproximationBandit::from_pairs([",
+      "(RetrievalStrategy::Vector, 0.7),",
+      "(RetrievalStrategy::Text, 0.3),",
+      "]);",
+      "assert_eq!(bandit.propensity(RetrievalStrategy::Vector), 0.7);",
+      "```"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "propensity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn propensity(&self, strategy: crate::strategy::RetrievalStrategy) -> f32",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 674,
+     "doc": [
+      "Liefert die Propensity P(a | x) für eine gegebene RetrievalStrategy."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl DiagonalApproximationBandit",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 645,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "OffPolicyCompatibility",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub trait OffPolicyCompatibility",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 681,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "verify_positivity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn verify_positivity( &self, reference_policy: &DiagonalApproximationBandit, ) -> Result<(), OffPolicyError>",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 686,
+     "doc": [
+      "Gibt `Err` zurück, wenn für irgendeinen Arm eine Propensity von 0",
+      "unter der Referenz-Policy gemessen wird, während FC-TS diesem Arm",
+      "eine positive Sampling-Wahrscheinlichkeit zuweist (Verstoß gegen",
+      "die Positivitätsannahme — IPS-Gewichte würden divergieren)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "OffPolicyCompatibility"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "OffPolicyError",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub enum OffPolicyError",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 695,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "ZeroPropensityViolation",
+     "shape": "(crate::strategy::RetrievalStrategy)",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 698
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "FcTsSamplingDistribution",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub struct FcTsSamplingDistribution",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 704,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( probabilities: std::collections::BTreeMap<crate::strategy::RetrievalStrategy, f32>, ) -> Self",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 711,
+     "doc": [
+      "Erstellt eine neue `FcTsSamplingDistribution`-Instanz mit der gegebenen Wahrscheinlichkeitsmap."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_pairs",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_pairs( pairs: impl IntoIterator<Item = (crate::strategy::RetrievalStrategy, f32)>, ) -> Self",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 729,
+     "doc": [
+      "Erstellt eine `FcTsSamplingDistribution`-Instanz aus Strategie-Wahrscheinlichkeits-Paaren.",
+      "",
+      "```",
+      "use contextra_adapt::flow_thompson::FcTsSamplingDistribution;",
+      "use contextra_adapt::strategy::RetrievalStrategy;",
+      "",
+      "let dist = FcTsSamplingDistribution::from_pairs([",
+      "(RetrievalStrategy::Hybrid, 0.8),",
+      "(RetrievalStrategy::Graph, 0.2),",
+      "]);",
+      "assert_eq!(dist.probability(RetrievalStrategy::Hybrid), 0.8);",
+      "```"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "probability",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn probability(&self, strategy: crate::strategy::RetrievalStrategy) -> f32",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 738,
+     "doc": [
+      "Liefert die FC-TS-Sampling-Wahrscheinlichkeit für eine gegebene RetrievalStrategy."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl FcTsSamplingDistribution",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 709,
+     "in_test": false
+    },
+    {
+     "trait": "OffPolicyCompatibility",
+     "generics": "",
+     "signature": "impl OffPolicyCompatibility for FcTsSamplingDistribution",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 743,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "FcTsArmSet",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub struct FcTsArmSet",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 763,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "with_shadow_sink",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_shadow_sink( mut self, sink: std::sync::Arc<dyn crate::shadow_mode::ShadowSink<u32>>, ) -> Self",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 770,
+     "doc": [
+      "Konfiguriert eine Diskrepanz-Senke für alle Arme in der Menge (§12)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "select_arm",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn select_arm(&self, context: &[f32], rng: &mut dyn FcTsRng) -> Result<u32, FcTsError>",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 785,
+     "doc": [
+      "Wählt den Arm mit dem höchsten gesampelten Score aus (Argmax).",
+      "",
+      "Bei Gleichstand wird der kleinste Arm-Index gewählt.",
+      "Bei konfiguriertem Shadow-Sink wird zusätzlich die Baseline (ohne Flow-Korrektur) berechnet",
+      "und über die Diskrepanz-Senke protokolliert. Das zurückgegebene Ergebnis ist stets der Kandidat."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "arms",
+     "type": "Vec<FlowCorrectedThompsonBandit>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 765
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl FcTsArmSet",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 768,
+     "in_test": false
+    },
+    {
+     "trait": "OffPolicyCompatibility",
+     "generics": "",
+     "signature": "impl OffPolicyCompatibility for FcTsArmSet",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 826,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "MIN_BANDIT_SHADOW_SAMPLES",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub const MIN_BANDIT_SHADOW_SAMPLES: u64 = 10_000",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 854,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_CUMULATIVE_REGRET_THRESHOLD",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub const MAX_CUMULATIVE_REGRET_THRESHOLD: f64 = 0.0",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 856,
+   "doc": [
+    "Maximales zulässiges kumulatives Regret für den Bandit-Default-Flip (≤ 0.0)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "BanditShadowReport",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub struct BanditShadowReport",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 861,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "sample_count",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 863
+    },
+    {
+     "name": "cumulative_regret",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 865
+    },
+    {
+     "name": "p99_latency_delta_us",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 867
+    },
+    {
+     "name": "reward_improvement_ratio",
+     "type": "Option<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 869
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "BanditDefaultFlipGate",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub trait BanditDefaultFlipGate",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 874,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "should_flip",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn should_flip(&self, report: &BanditShadowReport) -> bool",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 879,
+     "doc": [
+      "`true` ⇔ alle drei Bedingungen erfüllt:",
+      "1. `sample_count >= MIN_BANDIT_SHADOW_SAMPLES` (10_000)",
+      "2. `cumulative_regret <= MAX_CUMULATIVE_REGRET_THRESHOLD` (0.0)",
+      "3. `p99_latency_delta_us <= 0.0`"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "BanditDefaultFlipGate"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "DefaultBanditFlipGate",
+   "vis": "pub",
+   "module": "flow_thompson",
+   "signature": "pub struct DefaultBanditFlipGate",
+   "file": "crates/contextra-adapt/src/flow_thompson.rs",
+   "line": 885,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "BanditDefaultFlipGate",
+     "generics": "",
+     "signature": "impl BanditDefaultFlipGate for DefaultBanditFlipGate",
+     "file": "crates/contextra-adapt/src/flow_thompson.rs",
+     "line": 887,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RerankPidController",
+   "vis": "pub",
+   "module": "homeostat",
+   "signature": "pub struct RerankPidController",
+   "file": "crates/contextra-adapt/src/homeostat.rs",
+   "line": 21,
+   "doc": [],
+   "attrs": [
+    "#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( target_p95_latency_ms: f32, k_min: usize, k_max: usize, initial_pool: usize, ) -> Self",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 35,
+     "doc": [
+      "Creates a new `RerankPidController` with default PID coefficients and configured parameters."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "kp",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn kp(&self) -> f32",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 52,
+     "doc": [
+      "Accessor for `kp`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "ki",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn ki(&self) -> f32",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 57,
+     "doc": [
+      "Accessor for `ki`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "kd",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn kd(&self) -> f32",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 62,
+     "doc": [
+      "Accessor for `kd`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "target_p95_latency_ms",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn target_p95_latency_ms(&self) -> f32",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 67,
+     "doc": [
+      "Accessor for target latency."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "k_pool",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn k_pool(&self) -> usize",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 72,
+     "doc": [
+      "Accessor for current `k_pool`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "k_min",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn k_min(&self) -> usize",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 79,
+     "doc": [
+      "Accessor for `k_min`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "k_max",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn k_max(&self) -> usize",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 84,
+     "doc": [
+      "Accessor for `k_max`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "update",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn update(&mut self, observed_p95_latency_ms: f32) -> usize",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 89,
+     "doc": [
+      "Updates the controller state with observed latency and returns new pool size."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for RerankPidController",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 26,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl RerankPidController",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 33,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RerankDeadline",
+   "vis": "pub",
+   "module": "homeostat",
+   "signature": "pub struct RerankDeadline<C: ?Sized + Clock = SystemClock>",
+   "file": "crates/contextra-adapt/src/homeostat.rs",
+   "line": 102,
+   "doc": [
+    "Hard deadline manager for candidate retrieval and Cross-Encoder reranking phases (P11 requirement).",
+    "",
+    "# Intended Integration Point",
+    "Evaluated before or during candidate hydration and Cross-Encoder batch inference steps in `Collection::hybrid_search_reranked`.",
+    "If `deadline_exceeded(started_at)` or `deadline_exceeded_nanos` returns `true`, the search pipeline should immediately break out and return",
+    "the partially hydrated/reranked candidate results accumulated up to that point rather than blocking indefinitely."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(budget: Duration) -> Self",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 110,
+     "doc": [
+      "Creates a new `RerankDeadline` with the specified duration budget."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_clock(budget: Duration, clock: std::sync::Arc<C>) -> Self",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 117,
+     "doc": [
+      "Creates a new `RerankDeadline` with explicit `Clock` port injection."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "start_nanos",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn start_nanos(&self) -> u64",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 122,
+     "doc": [
+      "Returns current monotonic timestamp in nanoseconds from injected clock."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "deadline_exceeded_nanos",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn deadline_exceeded_nanos(&self, started_at_nanos: u64) -> bool",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 127,
+     "doc": [
+      "Checks if elapsed nanoseconds since `started_at_nanos` equals or exceeds deadline budget."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "deadline_exceeded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn deadline_exceeded(&self, started_at: std::time::Instant) -> bool",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 137,
+     "doc": [
+      "Legacy helper using monotonic_nanos delta based on Instant baseline."
+     ],
+     "attrs": [
+      "#[deprecated(since = \"0.1.0\", note = \"Use deadline_exceeded_nanos with start_nanos\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "budget",
+     "type": "Duration",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 104
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl RerankDeadline<SystemClock>",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 108,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<C: ?Sized + Clock>",
+     "signature": "impl<C: ?Sized + Clock> RerankDeadline<C>",
+     "file": "crates/contextra-adapt/src/homeostat.rs",
+     "line": 115,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "clock",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod clock",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 26,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"std\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "clock",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod clock",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 28,
+   "doc": [],
+   "attrs": [
+    "#[cfg(not(feature = \"std\"))]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "compat",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod compat",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 30,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"workspace\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "contract",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod contract",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 31,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 32,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "rng",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod rng",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 33,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "strategy",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod strategy",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 34,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "control",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod control",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 44,
+   "doc": [
+    "Regelungstechnik & Latenzsteuerung (PID, Latency Controller, Homeostat, Lyapunov)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "bandit_algorithms",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod bandit_algorithms",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 52,
+   "doc": [
+    "Bandit-Algorithmen (LinUCB, Sketched-Bandits, Flow-Corrected Thompson Sampling, RIE-Greedy)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "policy",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod policy",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 62,
+   "doc": [
+    "Policy-Evaluation & Shadow Execution (Off-Policy IPS, Shadow Mode)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "drift_detection",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod drift_detection",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 68,
+   "doc": [
+    "Konzept- und Verteilungs-Drift (Catoni M-Estimator, Ensemble Drift Watcher, Policy Bridge)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "decay",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod decay",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 73,
+   "doc": [
+    "Zeitliches und Score-basiertes Abklingen (Adaptive Decay Controller)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "bandit",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod bandit",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 80,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"bandit-routing\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "decay_controller",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod decay_controller",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 81,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "drift",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod drift",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 82,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "flow_thompson",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod flow_thompson",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 84,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"flow-corrected-thompson\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "homeostat",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod homeostat",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 85,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "lyapunov",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod lyapunov",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 86,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "offpolicy",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod offpolicy",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 87,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "pid",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod pid",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 88,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "pid_latency_controller",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod pid_latency_controller",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 89,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "rie_greedy",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod rie_greedy",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 91,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"rie-greedy-personalization\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "shadow_mode",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod shadow_mode",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 92,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "DriftReason",
+   "vis": "pub",
+   "module": "lyapunov",
+   "signature": "pub struct DriftReason",
+   "file": "crates/contextra-adapt/src/lyapunov.rs",
+   "line": 48,
+   "doc": [
+    "Grund für erkannte Verteilungsverschiebung (Distributional Drift)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "kl_divergence",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 50
+    },
+    {
+     "name": "lyapunov_exponent",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 52
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "LyapunovResult",
+   "vis": "pub",
+   "module": "lyapunov",
+   "signature": "pub enum LyapunovResult",
+   "file": "crates/contextra-adapt/src/lyapunov.rs",
+   "line": 58,
+   "doc": [
+    "Ergebnis der Lyapunov-Drift-Analyse."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "is_drift_detected",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_drift_detected(&self) -> bool",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 77,
+     "doc": [
+      "Returns `true` if this result represents a detected distributional drift."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "apply_drift_if_detected",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn apply_drift_if_detected<P: crate::bandit::BanditPolicy + ?Sized>( &self, policy: &mut P, k_drift: f32, alpha_max: f32, gamma: f32, ) -> bool",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 84,
+     "doc": [
+      "Wendet `apply_drift_penalty` auf die gegebene `BanditPolicy` an, falls `DriftDetected` vorliegt.",
+      "Gibt `true` zurück, falls Drift erkannt und die Penalty angewendet wurde."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"bandit-routing\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Stable",
+     "shape": "{",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 60
+    },
+    {
+     "name": "DriftDetected",
+     "shape": "{",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 65
+    },
+    {
+     "name": "InsufficientData",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 72
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl LyapunovResult",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 75,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "LyapunovDriftWatcher",
+   "vis": "pub",
+   "module": "lyapunov",
+   "signature": "pub struct LyapunovDriftWatcher",
+   "file": "crates/contextra-adapt/src/lyapunov.rs",
+   "line": 102,
+   "doc": [
+    "Proaktiver Drift-Wächter auf Basis diskreter Lyapunov-Exponenten über KL-Divergenzen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(window_size: usize) -> Self",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 121,
+     "doc": [
+      "Erstellt einen neuen `LyapunovDriftWatcher` mit der angegebenen Fenstergröße."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "observe_score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn observe_score(&mut self, score: f32) -> LyapunovResult",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 134,
+     "doc": [
+      "Fügt einen einzelnen Non-Conformity-Score zur Historie hinzu und aktualisiert den Drift-Status."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "analyze",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn analyze(&self) -> LyapunovResult",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 139,
+     "doc": [
+      "Gibt das neueste Analyseergebnis der Lyapunov-Drift-Berechnung zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "latest_result",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn latest_result(&self) -> Option<&LyapunovResult>",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 146,
+     "doc": [
+      "Gibt eine Referenz auf das neueste Analyseergebnis zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "status_str",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn status_str(&self) -> &'static str",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 151,
+     "doc": [
+      "Gibt den aktuellen Drift-Status als menschenlesbare Zeichenkette (\"stabil\", \"warnung\", \"kritisch\", \"unbekannt\") zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_baseline",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_baseline(&mut self, baseline_scores: &[f32])",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 168,
+     "doc": [
+      "Setzt die Baseline-Verteilung der Non-Conformity-Scores aus dem Kalibrierungs-Warmup."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "update",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn update(&mut self, current_scores: &[f32]) -> LyapunovResult",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 176,
+     "doc": [
+      "Nimmt aktuelle Non-Conformity-Scores auf und berechnet den Drift-Status."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "window_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 104
+    },
+    {
+     "name": "divergence_history",
+     "type": "VecDeque<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 106
+    },
+    {
+     "name": "baseline_distribution",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 108
+    },
+    {
+     "name": "latest_result",
+     "type": "Option<LyapunovResult>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 110
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for LyapunovDriftWatcher",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 113,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl LyapunovDriftWatcher",
+     "file": "crates/contextra-adapt/src/lyapunov.rs",
+     "line": 119,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RandomizedLoggingPolicy",
+   "vis": "pub",
+   "module": "offpolicy",
+   "signature": "pub struct RandomizedLoggingPolicy",
+   "file": "crates/contextra-adapt/src/offpolicy.rs",
+   "line": 22,
+   "doc": [
+    "Randomisierte Logging-Policy für unverzerrte Datensammlung zur Off-Policy-Evaluation (§B.5.2.4 & §8.5)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(epsilon: f32, num_actions: u32) -> Self",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 31,
+     "doc": [
+      "Erstellt eine neue `RandomizedLoggingPolicy`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "compute_propensities",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn compute_propensities(&self, greedy_action: u32) -> Vec<f32>",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 39,
+     "doc": [
+      "Berechnet die Propensity P(a | x) für jede Aktion 0..K-1 bei gegebener greedy/target Aktion."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "select_action",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn select_action(&self, greedy_action: u32, random_sample: f32) -> (u32, f32)",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 53,
+     "doc": [
+      "Wählt eine Aktion aus und gibt den (Aktionsindex, Propensity) Vektor/Tupel zurück.",
+      "`random_sample` muss im Intervall [0.0, 1.0) liegen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "epsilon",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 24
+    },
+    {
+     "name": "num_actions",
+     "type": "u32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 26
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl RandomizedLoggingPolicy",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 29,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "OffPolicyStats",
+   "vis": "pub",
+   "module": "offpolicy",
+   "signature": "pub struct OffPolicyStats",
+   "file": "crates/contextra-adapt/src/offpolicy.rs",
+   "line": 74,
+   "doc": [
+    "Statistiken über verworrene/ungültige Samples der Off-Policy-Evaluation."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "discarded",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 76
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "OffPolicyEvaluator",
+   "vis": "pub",
+   "module": "offpolicy",
+   "signature": "pub struct OffPolicyEvaluator",
+   "file": "crates/contextra-adapt/src/offpolicy.rs",
+   "line": 81,
+   "doc": [
+    "Evaluator für Inverse Propensity Scoring (IPS) zur kontrafaktischen Off-Policy-Schätzung."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 92,
+     "doc": [
+      "Erstellt einen neuen `OffPolicyEvaluator` mit leeren Akkumulatoren.",
+      "",
+      "*Hinweis zur Spezifikation:* Von der Spezifikation normativ nicht explizit genannt,",
+      "jedoch für die Instanziierung des Typs erforderlich."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "observe",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn observe( &mut self, target_action: u32, logged_action: u32, propensity: f32, reward: f32, )",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 110,
+     "doc": [
+      "Beobachtet ein geloggtes Event und akkumuliert den IPS-Wert.",
+      "",
+      "- `target_action`: Die Aktion, die von der zu evaluierenden Ziel-Policy gewählt worden wäre.",
+      "- `logged_action`: Die von der Logging-Policy tatsächlich gewählte und im Log aufgezeichnete Aktion.",
+      "- `propensity`: Wahrscheinlichkeit P(a_i | x_i) der Logging-Policy.",
+      "- `reward`: Der beobachtete Reward r_i.",
+      "",
+      "# Verhalten bei ungültiger Propensity",
+      "Falls `propensity` NaN, negativ oder größer 1.0 ist, wird der Sample verworfen",
+      "(`discarded` inkrementiert, `samples` inkrementiert, `cumulative_ips` bleibt unverändert)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "estimate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn estimate(&self) -> f64",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 134,
+     "doc": [
+      "Liefert den aktuellen IPS-Schätzwert V_IPS = cumulative_ips / samples.",
+      "",
+      "Falls noch keine Samples beobachtet wurden (`samples == 0`), wird 0.0 zurückgegeben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "cumulative_ips",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn cumulative_ips(&self) -> f64",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 139,
+     "doc": [
+      "Liefert die kumulative IPS-Summe Σ (r_i / max(p_i, 0.01))."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "samples",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn samples(&self) -> u64",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 144,
+     "doc": [
+      "Liefert die Gesamtanzahl beobachteter Samples (inklusive verworfener)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "discarded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn discarded(&self) -> u64",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 149,
+     "doc": [
+      "Liefert die Anzahl verworfener Ungültig-Propensity-Samples."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "stats",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn stats(&self) -> OffPolicyStats",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 154,
+     "doc": [
+      "Liefert die Off-Policy-Evaluator-Statistiken."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl OffPolicyEvaluator",
+     "file": "crates/contextra-adapt/src/offpolicy.rs",
+     "line": 87,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "PID_MIN_POOL_SIZE_DEFAULT",
+   "vis": "pub",
+   "module": "pid",
+   "signature": "pub const PID_MIN_POOL_SIZE_DEFAULT: usize = 50",
+   "file": "crates/contextra-adapt/src/pid.rs",
+   "line": 26,
+   "doc": [
+    "Minimale Kandidaten-Pool-Größe (Hard Floor = 50, Quality Knee per arXiv:2604.01733)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "PID_MAX_POOL_SIZE_DEFAULT",
+   "vis": "pub",
+   "module": "pid",
+   "signature": "pub const PID_MAX_POOL_SIZE_DEFAULT: usize = 200",
+   "file": "crates/contextra-adapt/src/pid.rs",
+   "line": 29,
+   "doc": [
+    "Maximale Kandidaten-Pool-Größe."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "AntiWindupController",
+   "vis": "pub",
+   "module": "pid",
+   "signature": "pub trait AntiWindupController: Send + Sync",
+   "file": "crates/contextra-adapt/src/pid.rs",
+   "line": 40,
+   "doc": [
+    "Erweitert PID-Regler um konditionelles Anti-Windup bei Aktuatorsättigung.",
+    "",
+    "Unterschied zu einfachem Integral-Clamping: Der Integrator akkumuliert",
+    "NUR, wenn die Stellgröße nicht gesättigt ist — verhindert träges Abklingen",
+    "nach I/O-Spitzen (Back-Calculation Anti-Windup Pattern).",
+    "",
+    "# P28-Konformität",
+    "`dt` MUSS aus einem injizierten Clock-Port abgeleitet werden, nicht aus",
+    "`SystemTime::now()` direkt."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "update_with_anti_windup",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn update_with_anti_windup( &mut self, dt: Duration, measured_latency_ms: f32, is_actuator_saturated: bool, ) -> usize",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 49,
+     "doc": [
+      "Aktualisiert den Regler mit konditionellem Integrator-Update.",
+      "",
+      "`dt`: Zeitdelta seit letztem Update (aus injiziertem Clock-Port).",
+      "`measured_latency_ms`: gemessene Latenz in Millisekunden.",
+      "`is_actuator_saturated`: true, wenn die Stellgröße am konfigurierten",
+      "Limit liegt (Pool-Größe = max oder = min).",
+      "",
+      "Gibt die neue Pool-Größe zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "AntiWindupController"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PidController",
+   "vis": "pub",
+   "module": "pid",
+   "signature": "pub struct PidController",
+   "file": "crates/contextra-adapt/src/pid.rs",
+   "line": 64,
+   "doc": [
+    "PID-Regler zur dynamischen Steuerung der Reranking-Kandidatenpool-Größe basierend auf Latenzmessungen.",
+    "",
+    "# Anti-Windup Strategien",
+    "- Standard-Methode [`update`](Self::update): Nutzt einfaches Integrations-Clamping auf `[-max_integral, max_integral]`.",
+    "- Erweiterte Methode [`update_with_anti_windup`](AntiWindupController::update_with_anti_windup): Stoppt die",
+    "Integrationsakkumulation vollständig, sobald `is_actuator_saturated = true` signalisiert wird (Back-Calculation Pattern)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( target_latency_ms: f32, min_pool_size: usize, max_pool_size: usize, initial_pool: Option<usize>, ) -> Self",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 99,
+     "doc": [
+      "Erstellt einen neuen `PidController` mit expliziten Parametern.",
+      "",
+      "`min_pool_size` wird strikt auf mindestens 50 erzwungen (`min_pool_size.max(50)`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "update",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn update(&mut self, dt: Duration, measured_latency_ms: f32) -> usize",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 125,
+     "doc": [
+      "Verarbeitet eine neue Latenz-Messung und gibt die neue Pool-Größe zurück.",
+      "",
+      "ANTI-WINDUP: Führt Integral-Update nur durch, wenn Stellwert nicht gesättigt ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "current_pool_size",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn current_pool_size(&self) -> Option<usize>",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 154,
+     "doc": [
+      "Gibt die aktuell empfohlene Pool-Größe zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reset",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reset(&mut self)",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 159,
+     "doc": [
+      "Setzt Integral und Derivative auf 0 zurück (z.B. bei Konfigurationsänderung)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "kp",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 66
+    },
+    {
+     "name": "ki",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 68
+    },
+    {
+     "name": "kd",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 70
+    },
+    {
+     "name": "target_latency_ms",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 72
+    },
+    {
+     "name": "min_pool_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 74
+    },
+    {
+     "name": "max_pool_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 76
+    },
+    {
+     "name": "current_pool_size",
+     "type": "Option<usize>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 78
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for PidController",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 84,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PidController",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 95,
+     "in_test": false
+    },
+    {
+     "trait": "AntiWindupController",
+     "generics": "",
+     "signature": "impl AntiWindupController for PidController",
+     "file": "crates/contextra-adapt/src/pid.rs",
+     "line": 166,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_TARGET_LATENCY_MS",
+   "vis": "pub",
+   "module": "pid_latency_controller",
+   "signature": "pub const DEFAULT_TARGET_LATENCY_MS: f64 = 100.0",
+   "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+   "line": 18,
+   "doc": [
+    "Konservativer Default für das P95-Latenzziel in Millisekunden (100ms).",
+    "",
+    "HINWEIS: implementation_plan-db2.md identifiziert den genauen P95-Zielwert",
+    "als offene Frage (50ms vs. 100ms). Wir wählen 100ms als konservativen Default",
+    "und machen den Zielwert über `PidLatencyController::new(target_latency_ms)`",
+    "vollständig konfigurierbar."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MIN_SCALING_FACTOR",
+   "vis": "pub",
+   "module": "pid_latency_controller",
+   "signature": "pub const MIN_SCALING_FACTOR: f64 = 0.3",
+   "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+   "line": 22,
+   "doc": [
+    "Unterer Clamp für den K-Pool-Skalierungsfaktor (30% des konfigurierten K-Pools),",
+    "um APM-RECALL-COLLAPSE in Standardlastszenarien zu verhindern."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_SCALING_FACTOR",
+   "vis": "pub",
+   "module": "pid_latency_controller",
+   "signature": "pub const MAX_SCALING_FACTOR: f64 = 1.0",
+   "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+   "line": 25,
+   "doc": [
+    "Oberer Clamp für den K-Pool-Skalierungsfaktor (100% des konfigurierten K-Pools)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_INTEGRAL",
+   "vis": "pub",
+   "module": "pid_latency_controller",
+   "signature": "pub const MAX_INTEGRAL: f64 = 10.0",
+   "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+   "line": 28,
+   "doc": [
+    "Max-Grenze für den I-Anteil (Anti-Windup Clamping)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PidLatencyController",
+   "vis": "pub",
+   "module": "pid_latency_controller",
+   "signature": "pub struct PidLatencyController",
+   "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+   "line": 38,
+   "doc": [
+    "Classical PID controller for dynamically scaling multi-step retrieval parameters (`k_pool`, `max_hops`).",
+    "",
+    "HINWEIS ZUR ANTI-WINDUP STRATEGIE:",
+    "Dieser Controller nutzt einfaches Integrations-Clamping auf `[-MAX_INTEGRAL, MAX_INTEGRAL]`.",
+    "Für Anwendungsfälle mit expliziter Aktuatorsättigung (z.B. Pool-Größe an Min-/Max-Grenzen)",
+    "steht in `pid.rs` der Trait [`AntiWindupController`](crate::AntiWindupController) mit",
+    "`update_with_anti_windup` bereit, welcher die Integrationsakkumulation bei Sättigung vollständig aussetzt."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(target_latency_ms: f64) -> Self",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 61,
+     "doc": [
+      "Creates a new `PidLatencyController` with specified target latency in milliseconds."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_params",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_params(kp: f64, ki: f64, kd: f64, target_latency_ms: f64) -> Self",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 79,
+     "doc": [
+      "Custom constructor specifying gains and target latency."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "compute_adjustment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn compute_adjustment(&mut self, observed_latency_ms: f64) -> f64",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 105,
+     "doc": [
+      "Calculates scaling adjustment factor in range `[0.3, 1.0]` based on observed latency.",
+      "",
+      "- Observed latency > target_latency => scaling factor decreases towards 0.3.",
+      "- Observed latency <= target_latency => scaling factor recovers towards 1.0.",
+      "- Non-finite inputs (NaN / Inf) are safely handled without panicking or corrupting state."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "integral",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn integral(&self) -> f64",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 143,
+     "doc": [
+      "Liefert den akkumulierten Integratorwert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "previous_error",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn previous_error(&self) -> Option<f64>",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 148,
+     "doc": [
+      "Liefert den vorherigen Regelfehler."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reset",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reset(&mut self)",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 153,
+     "doc": [
+      "Resets the controller integral state and error history."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "kp",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 40
+    },
+    {
+     "name": "ki",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 42
+    },
+    {
+     "name": "kd",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 44
+    },
+    {
+     "name": "target_latency_ms",
+     "type": "f64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 46
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for PidLatencyController",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 53,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PidLatencyController",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 59,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "LatencyBudgetGuard",
+   "vis": "pub",
+   "module": "pid_latency_controller",
+   "signature": "pub struct LatencyBudgetGuard<C: ?Sized + Clock = SystemClock>",
+   "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+   "line": 161,
+   "doc": [
+    "Simple, panic-free latency budget guard for iterative multi-step search loops."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(budget_ms: f64) -> Self",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 169,
+     "doc": [
+      "Creates a new `LatencyBudgetGuard` with the given budget in milliseconds using `SystemClock`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_clock(budget_ms: f64, clock: Arc<C>) -> Self",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 176,
+     "doc": [
+      "Creates a new `LatencyBudgetGuard` with an injected [`Clock`] port for deterministic time tracking."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "elapsed_ms",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn elapsed_ms(&self) -> f64",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 192,
+     "doc": [
+      "Returns elapsed time in milliseconds since guard instantiation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_exceeded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_exceeded(&self) -> bool",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 201,
+     "doc": [
+      "Returns `true` if the elapsed time has exceeded the configured budget."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "budget_ms",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn budget_ms(&self) -> f64",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 206,
+     "doc": [
+      "Returns configured budget in milliseconds."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl LatencyBudgetGuard<SystemClock>",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 167,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "<C: ?Sized + Clock>",
+     "signature": "impl<C: ?Sized + Clock> LatencyBudgetGuard<C>",
+     "file": "crates/contextra-adapt/src/pid_latency_controller.rs",
+     "line": 174,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "RieGreedyError",
+   "vis": "pub",
+   "module": "rie_greedy",
+   "signature": "pub enum RieGreedyError",
+   "file": "crates/contextra-adapt/src/rie_greedy.rs",
+   "line": 12,
+   "doc": [
+    "Fehlerzustände für den RIE-Greedy-Personalismus-Mechanismus (§10.4.1)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Error, PartialEq, Eq, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "DimensionMismatch",
+     "shape": "{",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 15
+    },
+    {
+     "name": "NonFinite",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 23
+    },
+    {
+     "name": "InvalidConfig",
+     "shape": "(String)",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 26
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RieGreedyProfile",
+   "vis": "pub",
+   "module": "rie_greedy",
+   "signature": "pub struct RieGreedyProfile",
+   "file": "crates/contextra-adapt/src/rie_greedy.rs",
+   "line": 34,
+   "doc": [
+    "Laufzeitzustand eines RIE-Greedy-Profils (§10.4.1).",
+    "",
+    "Implementiert die deterministisch-gierige Personalisierung mit",
+    "zeitlich diskontierter Präzisionsmatrix $\\Lambda_t$ und Informationsvektor $\\eta_t$."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(dim: usize, lambda: f32, gamma: f32) -> Self",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 49,
+     "doc": [
+      "Erstellt ein neues RIE-Greedy-Profil mit initialer Präzisionsmatrix $\\Lambda_0 = \\lambda I_d$."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "mu_hat",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn mu_hat(&self) -> Result<Vec<f32>, RieGreedyError>",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 78,
+     "doc": [
+      "Berechnet die Parameter-Schätzung $\\hat{\\mu}_t = \\Lambda_t^{-1} \\eta_t$."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "predict",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn predict(&self, context: &[f32]) -> Result<f32, RieGreedyError>",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 96,
+     "doc": [
+      "Berechnet die deterministisch-gierige Erwartungswert-Vorhersage $\\hat{\\mu}_t \\cdot x$."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "update",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn update(&mut self, context: &[f32], reward: f32) -> Result<(), RieGreedyError>",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 124,
+     "doc": [
+      "Führt die Diskontierung VOR dem Sherman-Morrison Rang-1 Update durch (§10.4.1, Spec §9.2).",
+      "",
+      "1. Diskontierung: $\\Lambda^{-1} \\leftarrow \\gamma^{-1} \\Lambda^{-1}$, $\\eta \\leftarrow \\gamma \\eta$",
+      "2. Rang-1-Update: Sherman-Morrison-Formel für $x x^T$, $\\eta \\leftarrow \\eta + r x$"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "trace_precision_inv",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn trace_precision_inv(&self) -> f32",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 197,
+     "doc": [
+      "Berechnet die Spur der inversen Präzisionsmatrix $\\text{Tr}(\\Lambda^{-1})$."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "precision_inv",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 36
+    },
+    {
+     "name": "info_vector",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 38
+    },
+    {
+     "name": "dim",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 40
+    },
+    {
+     "name": "lambda",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 42
+    },
+    {
+     "name": "gamma",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 44
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl RieGreedyProfile",
+     "file": "crates/contextra-adapt/src/rie_greedy.rs",
+     "line": 47,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "Rng",
+   "vis": "pub",
+   "module": "rng",
+   "signature": "pub trait Rng: Send + Sync",
+   "file": "crates/contextra-adapt/src/rng.rs",
+   "line": 6,
+   "doc": [
+    "Trait für Pseudozufallsgeneratoren in Bandit- und Sampling-Algorithmen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "next_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn next_u64(&mut self) -> u64",
+     "file": "crates/contextra-adapt/src/rng.rs",
+     "line": 8,
+     "doc": [
+      "Generiert die nächste vorzeichenlose 64-Bit-Ganzzahl."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Rng"
+    },
+    {
+     "name": "next_f32",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn next_f32(&mut self) -> f32",
+     "file": "crates/contextra-adapt/src/rng.rs",
+     "line": 11,
+     "doc": [
+      "Generiert eine 32-Bit-Fließkommazahl im halboffenen Intervall `[0, 1)`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Rng"
+    },
+    {
+     "name": "next_f64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn next_f64(&mut self) -> f64",
+     "file": "crates/contextra-adapt/src/rng.rs",
+     "line": 17,
+     "doc": [
+      "Generiert eine 64-Bit-Fließkommazahl im halboffenen Intervall `[0.0, 1.0)`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Rng"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SeededRng",
+   "vis": "pub",
+   "module": "rng",
+   "signature": "pub struct SeededRng",
+   "file": "crates/contextra-adapt/src/rng.rs",
+   "line": 25,
+   "doc": [
+    "Deterministischer SplitMix64 PRNG."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(seed: u64) -> Self",
+     "file": "crates/contextra-adapt/src/rng.rs",
+     "line": 31,
+     "doc": [
+      "Erstellt einen neuen `SeededRng` mit dem Startzustand `seed`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SeededRng",
+     "file": "crates/contextra-adapt/src/rng.rs",
+     "line": 29,
+     "in_test": false
+    },
+    {
+     "trait": "Rng",
+     "generics": "",
+     "signature": "impl Rng for SeededRng",
+     "file": "crates/contextra-adapt/src/rng.rs",
+     "line": 36,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ShadowDiscrepancy",
+   "vis": "pub",
+   "module": "shadow_mode",
+   "signature": "pub struct ShadowDiscrepancy<T>",
+   "file": "crates/contextra-adapt/src/shadow_mode.rs",
+   "line": 11,
+   "doc": [
+    "Diskrepanz-Eintrag: Baseline-Ergebnis vs. Kandidaten-Ergebnis, ohne Einfluss auf das",
+    "tatsächlich zurückgegebene Nutzerergebnis (§12 Integrationsregel)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "baseline",
+     "type": "T",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/shadow_mode.rs",
+     "line": 13
+    },
+    {
+     "name": "candidate",
+     "type": "T",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/shadow_mode.rs",
+     "line": 15
+    },
+    {
+     "name": "context_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-adapt/src/shadow_mode.rs",
+     "line": 17
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "ShadowSink",
+   "vis": "pub",
+   "module": "shadow_mode",
+   "signature": "pub trait ShadowSink<T>: Send + Sync",
+   "file": "crates/contextra-adapt/src/shadow_mode.rs",
+   "line": 21,
+   "doc": [
+    "Dyn-kompatibler Port (P27) für Diskrepanz-Senken (In-Memory für Tests, Tracing/Log für Produktion)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "record",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn record(&self, discrepancy: ShadowDiscrepancy<T>)",
+     "file": "crates/contextra-adapt/src/shadow_mode.rs",
+     "line": 23,
+     "doc": [
+      "Zeichnet einen Diskrepanz-Eintrag auf."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "ShadowSink"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "TracingShadowSink",
+   "vis": "pub",
+   "module": "shadow_mode",
+   "signature": "pub struct TracingShadowSink",
+   "file": "crates/contextra-adapt/src/shadow_mode.rs",
+   "line": 29,
+   "doc": [
+    "Referenzimplementierung über `tracing::debug!` — kein zusätzlicher I/O-Pfad, keine",
+    "Rng/Clock-Portverletzung (P28), da rein diagnostisch."
+   ],
+   "attrs": [
+    "#[derive(Debug, Default, Clone, Copy)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "ShadowSink<T>",
+     "generics": "<T: std::fmt::Debug>",
+     "signature": "impl<T: std::fmt::Debug> ShadowSink<T> for TracingShadowSink",
+     "file": "crates/contextra-adapt/src/shadow_mode.rs",
+     "line": 31,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "RetrievalStrategy",
+   "vis": "pub",
+   "module": "strategy",
+   "signature": "pub enum RetrievalStrategy",
+   "file": "crates/contextra-adapt/src/strategy.rs",
+   "line": 9,
+   "doc": [
+    "Retrieval-Strategie für Multi-Armed- und Contextual-Bandits."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Vector",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/strategy.rs",
+     "line": 11
+    },
+    {
+     "name": "Text",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/strategy.rs",
+     "line": 13
+    },
+    {
+     "name": "Graph",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/strategy.rs",
+     "line": 15
+    },
+    {
+     "name": "Hybrid",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/strategy.rs",
+     "line": 17
+    },
+    {
+     "name": "Global",
+     "shape": "",
+     "file": "crates/contextra-adapt/src/strategy.rs",
+     "line": 19
+    }
+   ]
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use clock::PortsClockAdapter",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/compat/mod.rs",
+   "line": 11,
+   "in_test": false,
+   "module": "compat"
+  },
+  {
+   "signature": "pub use crate::clock::Clock",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/contract.rs",
+   "line": 9,
+   "in_test": false,
+   "module": "contract"
+  },
+  {
+   "signature": "pub use crate::rng::Rng",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/contract.rs",
+   "line": 10,
+   "in_test": false,
+   "module": "contract"
+  },
+  {
+   "signature": "pub use clock::",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 36,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use error::",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 37,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use rng::",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 38,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use strategy::RetrievalStrategy",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 39,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use crate::homeostat::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 45,
+   "in_test": false,
+   "module": "control"
+  },
+  {
+   "signature": "pub use crate::lyapunov::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 46,
+   "in_test": false,
+   "module": "control"
+  },
+  {
+   "signature": "pub use crate::pid::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 47,
+   "in_test": false,
+   "module": "control"
+  },
+  {
+   "signature": "pub use crate::pid_latency_controller::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 48,
+   "in_test": false,
+   "module": "control"
+  },
+  {
+   "signature": "pub use crate::bandit::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 54,
+   "in_test": false,
+   "module": "bandit_algorithms"
+  },
+  {
+   "signature": "pub use crate::flow_thompson::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 56,
+   "in_test": false,
+   "module": "bandit_algorithms"
+  },
+  {
+   "signature": "pub use crate::rie_greedy::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 58,
+   "in_test": false,
+   "module": "bandit_algorithms"
+  },
+  {
+   "signature": "pub use crate::offpolicy::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 63,
+   "in_test": false,
+   "module": "policy"
+  },
+  {
+   "signature": "pub use crate::shadow_mode::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 64,
+   "in_test": false,
+   "module": "policy"
+  },
+  {
+   "signature": "pub use crate::drift::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 69,
+   "in_test": false,
+   "module": "drift_detection"
+  },
+  {
+   "signature": "pub use crate::decay_controller::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 74,
+   "in_test": false,
+   "module": "decay"
+  },
+  {
+   "signature": "pub use bandit::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 95,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use decay_controller::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 96,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use drift::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 97,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use flow_thompson::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 99,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use homeostat::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 100,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use lyapunov::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 101,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use offpolicy::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 102,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use pid::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 103,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use pid_latency_controller::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 104,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use rie_greedy::",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 106,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use shadow_mode::*",
+   "vis": "pub",
+   "file": "crates/contextra-adapt/src/lib.rs",
+   "line": 107,
+   "in_test": false,
+   "module": "crate"
+  }
+ ],
+ "macros": [],
+ "used_by": [
+  "contextra-db",
+  "contextra-router"
+ ]
+}

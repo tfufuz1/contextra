@@ -1,0 +1,6901 @@
+{
+ "name": "contextra-kvcache",
+ "version": "workspace",
+ "path": "crates/contextra-kvcache",
+ "role": "KV-Cache",
+ "features": {
+  "default": [
+   "std",
+   "kv-encryption"
+  ],
+  "std": [],
+  "workspace": [
+   "dep:contextra-types",
+   "dep:contextra-ports"
+  ],
+  "kv-encryption": [
+   "dep:contextra-crypto",
+   "contextra-crypto/kv-encryption"
+  ],
+  "exp-kivi": [],
+  "exp-content-addressed": [],
+  "ports-compat": [
+   "workspace"
+  ],
+  "types-compat": [
+   "workspace"
+  ],
+  "crypto-compat": [
+   "dep:contextra-crypto"
+  ],
+  "kivi-quantization": [
+   "exp-kivi"
+  ],
+  "kvcache-kivi-quant": [
+   "exp-kivi"
+  ],
+  "content-addressed-kv-cache": [
+   "exp-content-addressed"
+  ]
+ },
+ "deps": {
+  "contextra-env": {
+   "kind": "normal",
+   "source": "path",
+   "optional": false
+  },
+  "contextra-types": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "contextra-ports": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "contextra-crypto": {
+   "kind": "dev",
+   "source": "path",
+   "optional": false
+  },
+  "ahash": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "blake3": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "lru": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "parking_lot": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "thiserror": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "tracing": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "zeroize": {
+   "kind": "normal",
+   "source": "registry",
+   "optional": false
+  },
+  "serde": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "serde_json": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "bincode": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "bytes": {
+   "kind": "normal",
+   "source": "workspace",
+   "optional": false
+  },
+  "criterion": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "tokio": {
+   "kind": "dev",
+   "source": "workspace",
+   "optional": false
+  },
+  "proptest": {
+   "kind": "dev",
+   "source": "registry",
+   "optional": false
+  }
+ },
+ "crate_doc": [
+  "# Contextra KV-Cache (Ring 1)",
+  "",
+  "ANCHOR[contextra-kvcache:LIB-001]",
+  "",
+  "Dieses Modul bildet die zentrale Schnittstelle des `contextra-kvcache`-Crates.",
+  "",
+  "## Was ist ein KV-Cache?",
+  "In LLMs (Large Language Models = großen Sprachmodellen) bezeichnet der **KV-Cache**",
+  "(Key-Value-Cache) zwischengespeicherte Zwischenzustände von Aufmerksamkeitsmatrizen",
+  "(Attention-Keys und Values) vorheriger Token. Wenn mehrere Anfragen denselben Prompt-Präfix",
+  "teilen (z. B. System-Prompts oder Dokumentenkontexte), kann durch Wiederverwendung des Caches",
+  "massive Rechenzeit eingespart werden (Prompt Caching).",
+  "",
+  "## Architektur & Ring-Zugehörigkeit",
+  "- **Ring 1 (State & Storage)**:",
+  "Die Crate verwaltet kurzlebige und transiente Speicherstrukturen im RAM sowie verschlüsselte",
+  "Segmente im Rahmen des Tiering (Auslagerung auf sekundäre Speicher).",
+  "- **Erzwungene Sicherheit**: Es gilt `#![forbid(unsafe_code)]` – kein `unsafe` im gesamten Crate.",
+  "- **Abhängigkeiten (eingehend)**: Keine Workspace-Crate bindet `contextra-kvcache` aktuell",
+  "direkt als Abhängigkeit ein (wird jedoch im Workspace mitgebaut und getestet).",
+  "- **Abhängigkeiten (ausgehend)**:",
+  "- `contextra-types`: Domänentypen wie `TenantId` (Mandanten-Identifikator).",
+  "- `contextra-ports`: Abstrakte Schnittstellen (z. B. `KvPrefixStore`, `Clock`, `StorageEngine`).",
+  "- `contextra-crypto`: Kryptographische Primitiven für AEAD-Verschlüsselung und Crypto-Shredding.",
+  "",
+  "## Kernkomponenten",
+  "1. [`radix`]: Ein Prefix-Radix-Baum zur schnellen Identifikation geteilter Token-Sequenzen.",
+  "2. [`store`]: [`TenantIsolatedKvStore`] als mandantengetrennter In-Memory-LRU-Cache.",
+  "3. [`segment`]: [`KvSegment`] und [`ShreddableSegmentKey`] für kryptographisch geschützte Segmente.",
+  "4. [`eviction_worker`]: Asynchroner Hintergrund-Worker zur Speicherbereinigung und Verdrängung.",
+  "5. [`attention_score`]: Gewichtete Verdrängungsstrategien basierend auf Attention-Scores.",
+  "6. [`scratchpad_invalidation`]: Gezielte Invalidierung von Scratchpads bei Agenteninteraktionen.",
+  "7. `quantize_kivi`: Optionale KIVI 2-Bit Quantisierung für maximale Speichereffizienz (feature-gated).",
+  "8. [`adapters`]: Brückenadapter zu Embedding-Providern und Storage-Engines.",
+  "9. [`service`]: Hochrangige Fassade [`KvCacheService`] zur einfachen Verwendung."
+ ],
+ "files": [
+  {
+   "file": "crates/contextra-kvcache/src/attention_score.rs",
+   "module": "attention_score",
+   "lines": 347
+  },
+  {
+   "file": "crates/contextra-kvcache/src/cipher.rs",
+   "module": "cipher",
+   "lines": 27
+  },
+  {
+   "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+   "module": "compat::adapters",
+   "lines": 259
+  },
+  {
+   "file": "crates/contextra-kvcache/src/compat/error.rs",
+   "module": "compat::error",
+   "lines": 59
+  },
+  {
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "module": "compat",
+   "lines": 210
+  },
+  {
+   "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+   "module": "compat::prefix_store",
+   "lines": 687
+  },
+  {
+   "file": "crates/contextra-kvcache/src/compat/scanner.rs",
+   "module": "compat::scanner",
+   "lines": 156
+  },
+  {
+   "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+   "module": "compat::scratchpad_invalidation",
+   "lines": 325
+  },
+  {
+   "file": "crates/contextra-kvcache/src/contract.rs",
+   "module": "contract",
+   "lines": 117
+  },
+  {
+   "file": "crates/contextra-kvcache/src/error.rs",
+   "module": "error",
+   "lines": 89
+  },
+  {
+   "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+   "module": "eviction_worker",
+   "lines": 335
+  },
+  {
+   "file": "crates/contextra-kvcache/src/invalidation.rs",
+   "module": "invalidation",
+   "lines": 23
+  },
+  {
+   "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+   "module": "kv_encryption",
+   "lines": 254
+  },
+  {
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "module": "crate",
+   "lines": 112
+  },
+  {
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "module": "quantize_kivi",
+   "lines": 842
+  },
+  {
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "module": "radix",
+   "lines": 1198
+  },
+  {
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "module": "segment",
+   "lines": 650
+  },
+  {
+   "file": "crates/contextra-kvcache/src/service.rs",
+   "module": "service",
+   "lines": 637
+  },
+  {
+   "file": "crates/contextra-kvcache/src/spill.rs",
+   "module": "spill",
+   "lines": 95
+  },
+  {
+   "file": "crates/contextra-kvcache/src/store.rs",
+   "module": "store",
+   "lines": 1190
+  },
+  {
+   "file": "crates/contextra-kvcache/src/types.rs",
+   "module": "types",
+   "lines": 199
+  }
+ ],
+ "counts": {
+  "unwrap": 0,
+  "expect": 0,
+  "panic_macro": 0,
+  "todo_unimpl": 0,
+  "index_bracket": 50,
+  "cfg_feature_gates": 80
+ },
+ "grep_pub_decl": 285,
+ "all_pub_decl": 285,
+ "public_items": [
+  {
+   "kind": "trait",
+   "name": "AttentionScoreSource",
+   "vis": "pub",
+   "module": "attention_score",
+   "signature": "pub trait AttentionScoreSource: Send + Sync",
+   "file": "crates/contextra-kvcache/src/attention_score.rs",
+   "line": 31,
+   "doc": [
+    "Dyn-kompatible Trait-Schnittstelle zur Bereitstellung von Attention-Wichtigkeits-Scores.",
+    "",
+    "Wird von Upstream-Inferenz-Backends (z. B. Candle/Ollama) oder Test-Mocks implementiert,",
+    "um Aufmerksamkeitsscores bereitzustellen, ohne direkte Abhängigkeiten zu Tensor-Frameworks einzuführen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "importance_score",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn importance_score(&self, segment_id: u64) -> Option<f32>",
+     "file": "crates/contextra-kvcache/src/attention_score.rs",
+     "line": 37,
+     "doc": [
+      "Liefert den Wichtigkeits-Score für ein gegebenes `segment_id`.",
+      "",
+      "- Höhere Werte bedeuten höhere Relevanz (bleibt länger im Cache).",
+      "- Niedrigere Werte bedeuten geringe Relevanz (wird bevorzugt verdrängt).",
+      "- Liefert `None`, falls für dieses Segment kein Score bekannt ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "AttentionScoreSource"
+    },
+    {
+     "name": "importance_score_for_tenant",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn importance_score_for_tenant(&self, _tenant_id: TenantId, segment_id: u64) -> Option<f32>",
+     "file": "crates/contextra-kvcache/src/attention_score.rs",
+     "line": 42,
+     "doc": [
+      "Liefert den Wichtigkeits-Score für einen Mandanten und ein `segment_id`.",
+      "",
+      "Standardmäßig wird an [`Self::importance_score`] delegiert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "AttentionScoreSource"
+    },
+    {
+     "name": "register_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn register_segment(&self, _tenant_id: TenantId, _segment_id: u64, _request_id: RequestId)",
+     "file": "crates/contextra-kvcache/src/attention_score.rs",
+     "line": 47,
+     "doc": [
+      "Registriert eine Zuordnung von `(tenant_id, segment_id)` zu `request_id`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "AttentionScoreSource"
+    },
+    {
+     "name": "unregister_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn unregister_segment(&self, _tenant_id: TenantId, _segment_id: u64)",
+     "file": "crates/contextra-kvcache/src/attention_score.rs",
+     "line": 50,
+     "doc": [
+      "Entfernt eine Zuordnung, wenn das Segment verdrängt oder freigegeben wurde."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "AttentionScoreSource"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "NullAttentionScoreSource",
+   "vis": "pub",
+   "module": "attention_score",
+   "signature": "pub struct NullAttentionScoreSource",
+   "file": "crates/contextra-kvcache/src/attention_score.rs",
+   "line": 61,
+   "doc": [
+    "Standard-Implementierung, die keine Attention-Scores liefert (reines LRU-Verhalten).",
+    "",
+    "# Fallback-Verhalten",
+    "Wenn kein Attention-Signal verfügbar ist, erfolgt die Verdrängung streng deterministisch",
+    "nach dem LRU-Prinzip (älteste Zugriffszeit zuerst).",
+    "Im Monitoring wird eine Warnmeldung geloggt, um das Fehlen des Signals transparent zu machen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Default, Clone, Copy)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "AttentionScoreSource",
+     "generics": "",
+     "signature": "impl AttentionScoreSource for NullAttentionScoreSource",
+     "file": "crates/contextra-kvcache/src/attention_score.rs",
+     "line": 63,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "rank_for_eviction",
+   "vis": "pub",
+   "module": "attention_score",
+   "signature": "pub fn rank_for_eviction( candidates: &[(u64, Instant)], scores: &dyn AttentionScoreSource, ) -> Vec<u64>",
+   "file": "crates/contextra-kvcache/src/attention_score.rs",
+   "line": 82,
+   "doc": [
+    "Bewertet Verdrängungskandidaten mit Standard-Gewichtung (50% LRU-Alter, 50% Attention-Score).",
+    "",
+    "Gibt eine sortierte Liste von Segment-IDs zurück (erstes Element = wird zuerst verdrängt)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "rank_for_eviction_weighted",
+   "vis": "pub",
+   "module": "attention_score",
+   "signature": "pub fn rank_for_eviction_weighted( candidates: &[(u64, Instant)], scores: &dyn AttentionScoreSource, attention_weight: f32, ) -> Vec<u64>",
+   "file": "crates/contextra-kvcache/src/attention_score.rs",
+   "line": 96,
+   "doc": [
+    "Bewertet Verdrängungskandidaten unter Kombination von normalisiertem LRU-Alter und Attention-Score.",
+    "",
+    "# Parameter",
+    "- `candidates`: Liste aus Tupeln `(Segment-ID, Zugriffszeitstempel)`.",
+    "- `scores`: Quelle für Aufmerksamkeitsscores.",
+    "- `attention_weight`: Gewichtung zwischen `0.0` (rein LRU) und `1.0` (rein Attention)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "rank_for_eviction_weighted_for_tenant",
+   "vis": "pub",
+   "module": "attention_score",
+   "signature": "pub fn rank_for_eviction_weighted_for_tenant( tenant_id: TenantId, candidates: &[(u64, Instant)], scores: &dyn AttentionScoreSource, attention_weight: f32, ) -> Vec<u64>",
+   "file": "crates/contextra-kvcache/src/attention_score.rs",
+   "line": 115,
+   "doc": [
+    "Bewertet Verdrängungskandidaten mandantenspezifisch.",
+    "",
+    "# Ablauf",
+    "1. Schnellausstieg bei 0 oder 1 Kandidaten.",
+    "2. Zeitstempel normalisieren: Zeitdifferenz zur ältesten Anfrage ermitteln.",
+    "3. Attention-Scores der Kandidaten abfragen und ungültige/nicht-endliche Werte (NaN, Inf) filtern.",
+    "4. Min/Max-Skalierung (Min-Max-Normalization) über gefundene Scores berechnen.",
+    "5. Zusammengesetzten Eviction-Score berechnen:",
+    "`composite_score = (1.0 - weight) * norm_lru + weight * norm_importance`.",
+    "6. Stabil aufsteigend nach zusammengesetztem Score sortieren (niedrigste Wichtigkeit zuerst)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "rank_for_eviction_weighted_for_tenant_nanos",
+   "vis": "pub",
+   "module": "attention_score",
+   "signature": "pub fn rank_for_eviction_weighted_for_tenant_nanos( tenant_id: TenantId, candidates: &[(u64, u64)], scores: &dyn AttentionScoreSource, attention_weight: f32, ) -> Vec<u64>",
+   "file": "crates/contextra-kvcache/src/attention_score.rs",
+   "line": 146,
+   "doc": [
+    "Bewertet Verdrängungskandidaten mandantenspezifisch basierend auf monotonen Nanosekunden-Zeitstempeln."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "SegmentCipher",
+   "vis": "pub",
+   "module": "cipher",
+   "signature": "pub trait SegmentCipher: Send + Sync",
+   "file": "crates/contextra-kvcache/src/cipher.rs",
+   "line": 7,
+   "doc": [
+    "Trait zur Segment-Verschlüsselung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "encrypt_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn encrypt_segment(&self, key: &SegmentKey, plaintext: &[u8]) -> Result<Vec<u8>>",
+     "file": "crates/contextra-kvcache/src/cipher.rs",
+     "line": 9,
+     "doc": [
+      "Verschlüsselt Klartextbytes mit dem angegebenen Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "SegmentCipher"
+    },
+    {
+     "name": "decrypt_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn decrypt_segment(&self, key: &SegmentKey, ciphertext: &[u8]) -> Result<Vec<u8>>",
+     "file": "crates/contextra-kvcache/src/cipher.rs",
+     "line": 12,
+     "doc": [
+      "Entschlüsselt Geheimtextbytes mit dem angegebenen Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "SegmentCipher"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PlaintextSegmentCipher",
+   "vis": "pub",
+   "module": "cipher",
+   "signature": "pub struct PlaintextSegmentCipher",
+   "file": "crates/contextra-kvcache/src/cipher.rs",
+   "line": 17,
+   "doc": [
+    "No-Op Cipher für Klartext-Caches und Tests."
+   ],
+   "attrs": [
+    "#[derive(Debug, Default, Clone, Copy)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "SegmentCipher",
+     "generics": "",
+     "signature": "impl SegmentCipher for PlaintextSegmentCipher",
+     "file": "crates/contextra-kvcache/src/cipher.rs",
+     "line": 19,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "StorageEngineKvBridge",
+   "vis": "pub",
+   "module": "compat::adapters",
+   "signature": "pub struct StorageEngineKvBridge",
+   "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+   "line": 42,
+   "doc": [
+    "Produktiver Tier-2 Spill-over Adapter über das generische [`StorageEngine`]-Interface.",
+    "",
+    "Bietet mandantengetrennte Persistierung von KV-Segmenten im Storage-Layer."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(engine: Arc<dyn StorageEngine>) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 48,
+     "doc": [
+      "Erstellt eine neue `StorageEngineKvBridge` um eine gegebene [`StorageEngine`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl StorageEngineKvBridge",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 46,
+     "in_test": false
+    },
+    {
+     "trait": "KvBridgeStorage",
+     "generics": "",
+     "signature": "impl KvBridgeStorage for StorageEngineKvBridge",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 53,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "EmbeddingProviderSemanticEmbedder",
+   "vis": "pub",
+   "module": "compat::adapters",
+   "signature": "pub struct EmbeddingProviderSemanticEmbedder",
+   "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+   "line": 77,
+   "doc": [
+    "Adaptiert einen generischen [`EmbeddingProvider`] für den `SemanticEmbedder`-Trait im KV-Cache."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(provider: Arc<dyn EmbeddingProvider>) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 83,
+     "doc": [
+      "Erstellt einen neuen `EmbeddingProviderSemanticEmbedder`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "provider",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn provider(&self) -> &Arc<dyn EmbeddingProvider>",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 88,
+     "doc": [
+      "Liefert eine Referenz auf den zugrundeliegenden [`EmbeddingProvider`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EmbeddingProviderSemanticEmbedder",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 81,
+     "in_test": false
+    },
+    {
+     "trait": "SemanticEmbedder",
+     "generics": "",
+     "signature": "impl SemanticEmbedder for EmbeddingProviderSemanticEmbedder",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 94,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvCachePluginConfig",
+   "vis": "pub",
+   "module": "compat::adapters",
+   "signature": "pub struct KvCachePluginConfig",
+   "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+   "line": 130,
+   "doc": [
+    "Validierte Konfiguration für das KV-Cache-Plugin-Manifest."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "validate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn validate(&self) -> ContextraResult<()>",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 151,
+     "doc": [
+      "Validiert die Konfigurationsparameter (mindestens 1 MiB RAM erforderlich)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "max_memory_bytes",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 134
+    },
+    {
+     "name": "feature_ring_required",
+     "type": "FeatureRing",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 136
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for KvCachePluginConfig",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 139,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvCachePluginConfig",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 149,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvCachePluginManifest",
+   "vis": "pub",
+   "module": "compat::adapters",
+   "signature": "pub struct KvCachePluginManifest",
+   "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+   "line": 164,
+   "doc": [
+    "Konkrete, validierte [`PluginManifest`]-Implementierung für `contextra-kvcache`."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(config: KvCachePluginConfig) -> ContextraResult<Self>",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 170,
+     "doc": [
+      "Erstellt ein neues, validiertes `KvCachePluginManifest`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvCachePluginManifest",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 168,
+     "in_test": false
+    },
+    {
+     "trait": "PluginManifest",
+     "generics": "",
+     "signature": "impl PluginManifest for KvCachePluginManifest",
+     "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+     "line": 176,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "mod",
+   "name": "adapters",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod adapters",
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "line": 1,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod error",
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "line": 2,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "prefix_store",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod prefix_store",
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "line": 3,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "scanner",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod scanner",
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "line": 4,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "scratchpad_invalidation",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub mod scratchpad_invalidation",
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "line": 5,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "CryptoSegmentCipher",
+   "vis": "pub",
+   "module": "compat",
+   "signature": "pub struct CryptoSegmentCipher",
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "line": 79,
+   "doc": [
+    "Adapter, der contextra-crypto an SegmentCipher anbindet."
+   ],
+   "attrs": [
+    "#[cfg(feature = \"crypto-compat\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "SegmentCipher",
+     "generics": "",
+     "signature": "impl SegmentCipher for CryptoSegmentCipher",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 82,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "DEFAULT_BYTE_BUDGET_PER_TENANT",
+   "vis": "pub",
+   "module": "compat::prefix_store",
+   "signature": "pub const DEFAULT_BYTE_BUDGET_PER_TENANT: usize = 256 * 1024 * 1024",
+   "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+   "line": 30,
+   "doc": [
+    "Standard-Byte-Budget pro Mandant (256 MiB)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "TenantPrefixKvStore",
+   "vis": "pub",
+   "module": "compat::prefix_store",
+   "signature": "pub struct TenantPrefixKvStore",
+   "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+   "line": 72,
+   "doc": [
+    "Mandantenisolierter KV-Prefix-Store.",
+    "",
+    "Bietet strukturelle Isolation via `(TenantId, PrefixKey)`-Key in den Partitionen.",
+    "Unterstützt konfigurierbares Byte-Budget pro Mandant und LRU-Eviction bei Überschreitung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 82,
+     "doc": [
+      "Erstellt einen neuen `TenantPrefixKvStore` mit Standard-Konfiguration (256 MiB Budget)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_byte_budget_per_tenant",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_byte_budget_per_tenant(mut self, budget: usize) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 93,
+     "doc": [
+      "Konfiguriert das maximale Byte-Budget pro Mandant über alle seine Präfix-Partitionen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_reuse_policy",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_reuse_policy(mut self, policy: KvReusePolicy) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 99,
+     "doc": [
+      "Konfiguriert die Wiederverwendungs-Policy ([`KvReusePolicy`])."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "lookup",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn lookup(&self, tenant: TenantId, key: &PrefixKey, tokens: &[u32]) -> Option<KvPrefixHit>",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 114,
+     "doc": [
+      "Sucht nach dem längsten übereinstimmenden Präfix in Blöcken für die angegebenen Tokens.",
+      "",
+      "# Parameter",
+      "- `tenant`: Eigentümer-Mandant.",
+      "- `key`: Modell- und Layout-Präfix-Key.",
+      "- `tokens`: Abzufragende Token-Sequenz.",
+      "",
+      "# Rückgabe",
+      "Liefert einen [`KvPrefixHit`] mit den gematchten Tokens und Klonen der Blöcke,",
+      "oder `None` bei einem Cache-Miss."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert( &self, tenant: TenantId, key: &PrefixKey, tokens: &[u32], blocks: Vec<KvBlock>, ) -> Result<(), ContextraError>",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 143,
+     "doc": [
+      "Fügt KV-Blöcke für ein Token-Präfix in den Store ein.",
+      "",
+      "# Ablauf",
+      "1. Eingabe prüfen (weder Tokens noch Blöcke dürfen leer sein).",
+      "2. Prüfen, ob die Blockgruppe allein das Mandanten-Budget überschreitet (`PolicyViolation`).",
+      "3. Vorhandene alte Gruppe für diese Token-Kette entfernen.",
+      "4. Neue Gruppe einfügen und Radix-Baum aktualisieren.",
+      "5. Bei Überschreiten des Budgets älteste Einträge des Mandanten verdrängen (`evict_to_budget_internal`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "evict",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn evict(&self, tenant: TenantId, key: &PrefixKey) -> Result<u64, ContextraError>",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 204,
+     "doc": [
+      "Evictiert KV-Präfix-Einträge für den angegebenen Mandanten und PrefixKey.",
+      "Gibt die Anzahl der entfernten Blöcke zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "invalidate_prefix_scope_keys",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn invalidate_prefix_scope_keys( &self, tenant: TenantId, scratchpad_key_prefix: &[u32], keys: &[PrefixKey], ) -> Result<usize, ContextraError>",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 218,
+     "doc": [
+      "Gezielte Invalidation eines Scratchpad-Scopes für den angegebenen Mandanten über alle oder spezifische PrefixKeys.",
+      "",
+      "Entfernt ausschließlich Einträge, deren Tokens mit `scratchpad_key_prefix` beginnen.",
+      "Gibt die Anzahl der invalidierten Block-Gruppen/Segmente zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TenantPrefixKvStore",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 80,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for TenantPrefixKvStore",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 331,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for TenantPrefixKvStore",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 337,
+     "in_test": false
+    },
+    {
+     "trait": "KvPrefixStore",
+     "generics": "",
+     "signature": "impl KvPrefixStore for TenantPrefixKvStore",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 348,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "NamespacePrefixStore",
+   "vis": "pub",
+   "module": "compat::prefix_store",
+   "signature": "pub struct NamespacePrefixStore",
+   "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+   "line": 467,
+   "doc": [
+    "Partitionsisolierter Prefix-Store über `namespace: u64`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(byte_budget: usize, max_blocks: usize) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 478,
+     "doc": [
+      "Erstellt einen neuen `NamespacePrefixStore`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_reuse_policy",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_reuse_policy(mut self, policy: KvReusePolicy) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 490,
+     "doc": [
+      "Konfiguriert die Wiederverwendungs-Policy."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "lookup",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn lookup(&self, namespace: u64, tokens: &[u32]) -> Option<KvPrefixHit>",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 496,
+     "doc": [
+      "Sucht nach dem längsten Präfix für den gegebenen Namespace."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "pin_sequence",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn pin_sequence(&self, namespace: u64, tokens: &[u32]) -> Result<bool, ContextraError>",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 518,
+     "doc": [
+      "Pinnt eine Sequenz im Namespace (schützt vor Verdrängung)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "unpin_sequence",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn unpin_sequence(&self, namespace: u64, tokens: &[u32]) -> Result<bool, ContextraError>",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 540,
+     "doc": [
+      "Hebt das Pinning einer Sequenz im Namespace auf."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert( &self, namespace: u64, tokens: &[u32], blocks: Vec<KvBlock>, ) -> Result<(), ContextraError>",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 562,
+     "doc": [
+      "Fügt Blöcke für eine Token-Sequenz im Namespace ein."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "entry_count",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn entry_count(&self, namespace: u64) -> usize",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 671,
+     "doc": [
+      "Gibt die Gesamtzahl gespeicherter Block-Gruppen im Namespace zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "total_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn total_bytes(&self, namespace: u64) -> usize",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 680,
+     "doc": [
+      "Gibt die gesamten allokierten Bytes im Namespace zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl NamespacePrefixStore",
+     "file": "crates/contextra-kvcache/src/compat/prefix_store.rs",
+     "line": 476,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvCachePruner",
+   "vis": "pub",
+   "module": "compat::scanner",
+   "signature": "pub struct KvCachePruner",
+   "file": "crates/contextra-kvcache/src/compat/scanner.rs",
+   "line": 9,
+   "doc": [
+    "Bereinigungs-Adapter für physische Segmentspeicher-Freigabe im KV-Cache gemäß Port-Schnittstelle."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(store: Arc<TenantIsolatedKvStore>) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/scanner.rs",
+     "line": 15,
+     "doc": [
+      "Erstellt einen neuen `KvCachePruner`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvCachePruner",
+     "file": "crates/contextra-kvcache/src/compat/scanner.rs",
+     "line": 13,
+     "in_test": false
+    },
+    {
+     "trait": "LayerPurger",
+     "generics": "",
+     "signature": "impl LayerPurger for KvCachePruner",
+     "file": "crates/contextra-kvcache/src/compat/scanner.rs",
+     "line": 20,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvCacheScanner",
+   "vis": "pub",
+   "module": "compat::scanner",
+   "signature": "pub struct KvCacheScanner",
+   "file": "crates/contextra-kvcache/src/compat/scanner.rs",
+   "line": 50,
+   "doc": [
+    "Scanner-Adapter zur Restmengen-Messung im KV-Cache gemäß Port-Schnittstelle."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(store: Arc<TenantIsolatedKvStore>) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/scanner.rs",
+     "line": 56,
+     "doc": [
+      "Erstellt einen neuen `KvCacheScanner`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvCacheScanner",
+     "file": "crates/contextra-kvcache/src/compat/scanner.rs",
+     "line": 54,
+     "in_test": false
+    },
+    {
+     "trait": "contextra_ports::scanner::LayerScanner",
+     "generics": "",
+     "signature": "impl contextra_ports::scanner::LayerScanner for KvCacheScanner",
+     "file": "crates/contextra-kvcache/src/compat/scanner.rs",
+     "line": 68,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ScratchpadCacheScope",
+   "vis": "pub",
+   "module": "compat::scratchpad_invalidation",
+   "signature": "pub struct ScratchpadCacheScope",
+   "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+   "line": 30,
+   "doc": [
+    "Definiert den Bereich (Scope) eines Agenten-Scratchpads für die Cache-Invalidierung."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(tenant_id: TenantId, scratchpad_key_prefix: Vec<u32>) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 39,
+     "doc": [
+      "Erstellt einen neuen [`ScratchpadCacheScope`] für den angegebenen Mandanten und das Token-Präfix."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(tenant_id: impl Into<TenantId>, scratchpad_key_prefix: Vec<u32>) -> Self",
+     "file": "crates/contextra-kvcache/src/invalidation.rs",
+     "line": 17,
+     "doc": [
+      "Erstellt einen neuen [`ScratchpadCacheScope`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 32
+    },
+    {
+     "name": "scratchpad_key_prefix",
+     "type": "Vec<u32>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 34
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ScratchpadCacheScope",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 37,
+     "in_test": false
+    },
+    {
+     "trait": "From<crate::invalidation::ScratchpadCacheScope>",
+     "generics": "",
+     "signature": "impl From<crate::invalidation::ScratchpadCacheScope> for ScratchpadCacheScope",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 309,
+     "in_test": false
+    },
+    {
+     "trait": "From<ScratchpadCacheScope>",
+     "generics": "",
+     "signature": "impl From<ScratchpadCacheScope> for crate::invalidation::ScratchpadCacheScope",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 318,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ScratchpadCacheScope",
+     "file": "crates/contextra-kvcache/src/invalidation.rs",
+     "line": 15,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "ScratchpadInvalidator",
+   "vis": "pub",
+   "module": "compat::scratchpad_invalidation",
+   "signature": "pub trait ScratchpadInvalidator",
+   "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+   "line": 49,
+   "doc": [
+    "Schnittstelle zur gezielten Invalidation von Scratchpad-Cache-Scopes."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "invalidate_scope",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn invalidate_scope(&self, scope: &ScratchpadCacheScope) -> Result<usize>",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 54,
+     "doc": [
+      "Invalidiert alle Gruppen/Blöcke im Radix-Baum, die zum angegebenen [`ScratchpadCacheScope`] gehören.",
+      "",
+      "# Fehler",
+      "Gibt ein `Result<usize>` zurück, wobei `usize` die Anzahl invalidierter Segmente/Blöcke darstellt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "ScratchpadInvalidator"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PrefixStoreScratchpadInvalidator",
+   "vis": "pub",
+   "module": "compat::scratchpad_invalidation",
+   "signature": "pub struct PrefixStoreScratchpadInvalidator<'a>",
+   "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+   "line": 59,
+   "doc": [
+    "Implementierung von [`ScratchpadInvalidator`] für [`TenantPrefixKvStore`]."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(store: &'a TenantPrefixKvStore) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 68,
+     "doc": [
+      "Erstellt einen neuen [`PrefixStoreScratchpadInvalidator`] für den angegebenen Store."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_keys",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_keys(mut self, keys: Vec<PrefixKey>) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 76,
+     "doc": [
+      "Konfiguriert die zu prüfenden [`PrefixKey`]s für die Invalidation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "store",
+     "type": "&'a TenantPrefixKvStore",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 61
+    },
+    {
+     "name": "keys",
+     "type": "Vec<PrefixKey>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 63
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> PrefixStoreScratchpadInvalidator<'a>",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 66,
+     "in_test": false
+    },
+    {
+     "trait": "ScratchpadInvalidator",
+     "generics": "<'a>",
+     "signature": "impl<'a> ScratchpadInvalidator for PrefixStoreScratchpadInvalidator<'a>",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 82,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "InvalidationBudget",
+   "vis": "pub",
+   "module": "compat::scratchpad_invalidation",
+   "signature": "pub struct InvalidationBudget",
+   "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+   "line": 250,
+   "doc": [
+    "Konfiguration zur Begrenzung von Scratchpad-Invalidierungs-Operationen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "max_depth",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 252
+    },
+    {
+     "name": "max_entries",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 254
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for InvalidationBudget",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 257,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "BoundedScratchpadInvalidator",
+   "vis": "pub",
+   "module": "compat::scratchpad_invalidation",
+   "signature": "pub struct BoundedScratchpadInvalidator<'a>",
+   "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+   "line": 267,
+   "doc": [
+    "Begrenzter Invalidator für Scratchpads mit deterministischer Schranke."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(store: &'a TenantPrefixKvStore, budget: InvalidationBudget) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 275,
+     "doc": [
+      "Erstellt einen neuen bounded Invalidator mit Budget."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_keys",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_keys(mut self, keys: Vec<PrefixKey>) -> Self",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 284,
+     "doc": [
+      "Setzt die zu prüfenden PrefixKeys."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "invalidate_bounded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn invalidate_bounded(&self, scope: &ScratchpadCacheScope) -> Result<usize>",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 290,
+     "doc": [
+      "Führt die Invalidierung unter Beachtung des Budgets aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "store",
+     "type": "&'a TenantPrefixKvStore",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 268
+    },
+    {
+     "name": "keys",
+     "type": "Vec<PrefixKey>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 269
+    },
+    {
+     "name": "budget",
+     "type": "InvalidationBudget",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 270
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "<'a>",
+     "signature": "impl<'a> BoundedScratchpadInvalidator<'a>",
+     "file": "crates/contextra-kvcache/src/compat/scratchpad_invalidation.rs",
+     "line": 273,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "Clock",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub trait Clock: Send + Sync",
+   "file": "crates/contextra-kvcache/src/contract.rs",
+   "line": 15,
+   "doc": [
+    "Minimaler Zeiterfassungs-Trait für das KV-Cache-Subsystem."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "now_unix_ms",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn now_unix_ms(&self) -> u64",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 17,
+     "doc": [
+      "Liefert die aktuellen Unix-Epochen-Millisekunden."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Clock"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "Rng",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub trait Rng: Send",
+   "file": "crates/contextra-kvcache/src/contract.rs",
+   "line": 28,
+   "doc": [
+    "Minimaler Zufallszahlen-Generator-Trait für Cache-Algorithmen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "next_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn next_u64(&mut self) -> u64",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 30,
+     "doc": [
+      "Erzeugt eine 64-Bit Pseudozufallszahl."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "Rng"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "KvCacheEngine",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub trait KvCacheEngine: Send + Sync",
+   "file": "crates/contextra-kvcache/src/contract.rs",
+   "line": 34,
+   "doc": [
+    "Kernabstraktion für mandantenisolierte KV-Cache-Operationen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "insert",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn insert(&self, tenant_id: TenantId, segment: KvSegment) -> Result<()>",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 36,
+     "doc": [
+      "Fügt ein KV-Segment ein."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KvCacheEngine"
+    },
+    {
+     "name": "get",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn get(&self, tenant_id: TenantId, segment_id: u64) -> Option<Vec<u8>>",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 39,
+     "doc": [
+      "Ruft die Rohbytes eines Segments ab."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KvCacheEngine"
+    },
+    {
+     "name": "find_longest_prefix",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn find_longest_prefix( &self, tenant_id: TenantId, tokens: &[u32], policy: KvReusePolicy, ) -> Option<PrefixMatch>",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 42,
+     "doc": [
+      "Sucht den längsten übereinstimmenden Präfix für eine Token-Sequenz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KvCacheEngine"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "MemoryKvCache",
+   "vis": "pub",
+   "module": "contract",
+   "signature": "pub struct MemoryKvCache",
+   "file": "crates/contextra-kvcache/src/contract.rs",
+   "line": 52,
+   "doc": [
+    "I/O-freie Referenzimplementierung eines KV-Caches im Hauptspeicher."
+   ],
+   "attrs": [
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 58,
+     "doc": [
+      "Erstellt eine neue Instanz des Memory-KV-Caches."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_shard_count",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_shard_count(shard_count: usize) -> Self",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 65,
+     "doc": [
+      "Erstellt eine Instanz mit benutzerdefinierter Shard-Anzahl."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "store",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn store(&self) -> &Arc<TenantIsolatedKvStore>",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 72,
+     "doc": [
+      "Liefert eine Referenz auf den internen Store."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl MemoryKvCache",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 56,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for MemoryKvCache",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 77,
+     "in_test": false
+    },
+    {
+     "trait": "KvCacheEngine",
+     "generics": "",
+     "signature": "impl KvCacheEngine for MemoryKvCache",
+     "file": "crates/contextra-kvcache/src/contract.rs",
+     "line": 83,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "KvCacheError",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub enum KvCacheError",
+   "file": "crates/contextra-kvcache/src/error.rs",
+   "line": 8,
+   "doc": [
+    "Zentraler Fehlertyp für alle KV-Cache-Operationen."
+   ],
+   "attrs": [
+    "#[derive(Debug, Error)]",
+    "#[non_exhaustive]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "pin_budget_exceeded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 77,
+     "doc": [
+      "Hilfskonstruktor für PinBudgetExceeded."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "InvalidTenant",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 11
+    },
+    {
+     "name": "InvalidInput",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 15
+    },
+    {
+     "name": "InvalidSegment",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 19
+    },
+    {
+     "name": "SegmentNotFound",
+     "shape": "(u64)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 23
+    },
+    {
+     "name": "CryptoError",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 27
+    },
+    {
+     "name": "SegmentKeyDestroyed",
+     "shape": "",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 31
+    },
+    {
+     "name": "BudgetExceeded",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 35
+    },
+    {
+     "name": "PinBudgetExceeded",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 39
+    },
+    {
+     "name": "LimitExceeded",
+     "shape": "{",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 43
+    },
+    {
+     "name": "PolicyViolation",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 52
+    },
+    {
+     "name": "Serialization",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 56
+    },
+    {
+     "name": "Internal",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 60
+    },
+    {
+     "name": "ConfigError",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 64
+    },
+    {
+     "name": "QuantizationError",
+     "shape": "(String)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 68
+    },
+    {
+     "name": "IoError",
+     "shape": "(#[source] std::io::Error)",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 72
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "From<ContextraError>",
+     "generics": "",
+     "signature": "impl From<ContextraError> for KvCacheError",
+     "file": "crates/contextra-kvcache/src/compat/error.rs",
+     "line": 40,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvCacheError",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 75,
+     "in_test": false
+    },
+    {
+     "trait": "From<std::io::Error>",
+     "generics": "",
+     "signature": "impl From<std::io::Error> for KvCacheError",
+     "file": "crates/contextra-kvcache/src/error.rs",
+     "line": 82,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "Result",
+   "vis": "pub",
+   "module": "error",
+   "signature": "pub type Result<T> = std::result::Result<T, KvCacheError>",
+   "file": "crates/contextra-kvcache/src/error.rs",
+   "line": 89,
+   "doc": [
+    "Standard-Ergebnistyp für `contextra-kvcache`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EvictionWorker",
+   "vis": "pub",
+   "module": "eviction_worker",
+   "signature": "pub struct EvictionWorker",
+   "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+   "line": 91,
+   "doc": [
+    "Asynchroner Hintergrund-Worker für die KV-Cache-Verdrängung.",
+    "",
+    "Läuft auf einem eigenständigen Betriebssystem-Thread, um die Tokio-Worker-Threads",
+    "nicht durch aufwendige Speicherfreigaben und Zeroize-Routinen zu belasten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "spawn",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn spawn(store: Arc<TenantIsolatedKvStore>) -> Self",
+     "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+     "line": 107,
+     "doc": [
+      "Spawnt den Eviction-Worker auf einem dedizierten OS-Thread.",
+      "",
+      "# Ablauf",
+      "1. Initialisiert Standard-[`NullAttentionScoreSource`].",
+      "2. Erzeugt einen MPSC-Kanal für Verdrängungsbefehle.",
+      "3. Startet einen benannten Thread `kv-eviction-worker`.",
+      "4. Verarbeitet eingehende Befehle in einer Schleife bis zum Shutdown."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_attention_exporter",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_attention_exporter(self, exporter: Arc<dyn AttentionExporter>) -> Self",
+     "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+     "line": 154,
+     "doc": [
+      "Builder-Methode zur Injektion eines echten Attention-Backends via [`AttentionExporter`]."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"workspace\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "register_segment_request",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn register_segment_request( &self, tenant_id: impl Into<TenantId>, segment_id: u64, request_id: impl Into<RequestId>, )",
+     "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+     "line": 163,
+     "doc": [
+      "Registriert eine Zuordnung von `(tenant_id, segment_id)` zu einer `request_id`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "unregister_segment_request",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn unregister_segment_request(&self, tenant_id: impl Into<TenantId>, segment_id: u64)",
+     "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+     "line": 175,
+     "doc": [
+      "Entfernt die Zuordnung für `(tenant_id, segment_id)`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "attention_source",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn attention_source(&self) -> Arc<dyn AttentionScoreSource>",
+     "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+     "line": 182,
+     "doc": [
+      "Liefert die aktuell konfigurierte [`AttentionScoreSource`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "trigger_eviction",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn trigger_eviction(&self, target_free_bytes: usize)",
+     "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+     "line": 189,
+     "doc": [
+      "Löst nicht-blockierend eine Verdrängung im Hintergrund aus.",
+      "",
+      "Sendet den Auftrag über den MPSC-Kanal an den Worker-Thread und kehrt sofort zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "notify_block_released",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn notify_block_released(&self, block_id: u64)",
+     "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+     "line": 197,
+     "doc": [
+      "Benachrichtigt den EvictionWorker, dass eine Block-Referenz freigegeben wurde."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "shutdown",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn shutdown(&self)",
+     "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+     "line": 205,
+     "doc": [
+      "Beendet den Worker-Thread geordnet und wartet auf dessen Abschluss (Join)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl EvictionWorker",
+     "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+     "line": 99,
+     "in_test": false
+    },
+    {
+     "trait": "Drop",
+     "generics": "",
+     "signature": "impl Drop for EvictionWorker",
+     "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+     "line": 213,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "emergency_wipe",
+   "vis": "pub",
+   "module": "eviction_worker",
+   "signature": "pub fn emergency_wipe(store: &TenantIsolatedKvStore)",
+   "file": "crates/contextra-kvcache/src/eviction_worker.rs",
+   "line": 225,
+   "doc": [
+    "Synchroner Notfall-Wipe für sofortige Speicherbereinigung.",
+    "",
+    "Löscht blockierend alle Segmente im Store synchron aus dem RAM und stellt",
+    "sicher, dass alle vertraulichen Tensordaten mittels Zeroize überschrieben sind,",
+    "bevor die Funktion zurückkehrt."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ScratchpadCacheScope",
+   "vis": "pub",
+   "module": "invalidation",
+   "signature": "pub struct ScratchpadCacheScope",
+   "file": "crates/contextra-kvcache/src/invalidation.rs",
+   "line": 8,
+   "doc": [
+    "Definiert den Bereich (Scope) eines Agenten-Scratchpads für die Cache-Invalidierung."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/invalidation.rs",
+     "line": 10
+    },
+    {
+     "name": "scratchpad_key_prefix",
+     "type": "Vec<u32>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/invalidation.rs",
+     "line": 12
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "EncryptedSegmentPayload",
+   "vis": "pub",
+   "module": "kv_encryption",
+   "signature": "pub struct EncryptedSegmentPayload",
+   "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+   "line": 26,
+   "doc": [
+    "Verschlüsselte Layer-Repräsentation innerhalb eines `KvSegment`, wenn Feature `kv-encryption` aktiv ist."
+   ],
+   "attrs": [
+    "#[derive(Zeroize, ZeroizeOnDrop)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "layer",
+     "type": "EncryptedKvLayer",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 28
+    },
+    {
+     "name": "key_derivation_version",
+     "type": "u8",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 31
+    },
+    {
+     "name": "bound_segment_id",
+     "type": "Option<u64>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 34
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "CryptoKeyAead",
+   "vis": "pub",
+   "module": "kv_encryption",
+   "signature": "pub struct CryptoKeyAead(pub CryptoKey)",
+   "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+   "line": 38,
+   "doc": [
+    "Wrapper um `contextra_crypto::CryptoKey`, der das lokale `SegmentAead`-Trait implementiert."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "SegmentAead",
+     "generics": "",
+     "signature": "impl SegmentAead for CryptoKeyAead",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 40,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "fn",
+   "name": "to_crypto_tenant",
+   "vis": "pub",
+   "module": "kv_encryption",
+   "signature": "pub fn to_crypto_tenant<T: serde::de::DeserializeOwned + Default>(tenant: TenantId) -> T",
+   "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+   "line": 252,
+   "doc": [
+    "Konvertiert einen lokalen `TenantId` in den von `contextra-crypto` erwarteten Typ."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "cipher",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod cipher",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 47,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "compat",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod compat",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 49,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"workspace\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "contract",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod contract",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 53,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "error",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod error",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 54,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "types",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod types",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 55,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "attention_score",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod attention_score",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 64,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "invalidation",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod invalidation",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 65,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "kv_encryption",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod kv_encryption",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 67,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"kv-encryption\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "spill",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod spill",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 68,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "eviction_worker",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod eviction_worker",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 69,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "quantize_kivi",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod quantize_kivi",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 71,
+   "doc": [],
+   "attrs": [
+    "#[cfg(feature = \"exp-kivi\")]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "radix",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod radix",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 72,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "segment",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod segment",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 73,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "service",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod service",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 74,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "mod",
+   "name": "store",
+   "vis": "pub",
+   "module": "crate",
+   "signature": "pub mod store",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 75,
+   "doc": [],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "KiviQuantizeConfig",
+   "vis": "pub",
+   "module": "quantize_kivi",
+   "signature": "pub struct KiviQuantizeConfig",
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "line": 33,
+   "doc": [
+    "Konfiguration für die KIVI-Quantisierungsparameter."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "key_group_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 35
+    },
+    {
+     "name": "quantize_values",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 37
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for KiviQuantizeConfig",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 40,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvTensorView",
+   "vis": "pub",
+   "module": "quantize_kivi",
+   "signature": "pub struct KvTensorView",
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "line": 52,
+   "doc": [
+    "Sicht (View) auf unquantisierte Roh-Tensoren für Keys und Values."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( keys: Vec<f32>, values: Vec<f32>, num_tokens: usize, num_channels: usize, ) -> Result<Self>",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 68,
+     "doc": [
+      "Erstellt einen neuen `KvTensorView` und prüft die Dimensionen gegen die Elementanzahl.",
+      "",
+      "# Fehler",
+      "Liefert [`KvCacheError::InvalidInput`], falls `keys.len()` oder `values.len()` nicht `num_tokens * num_channels` entsprechen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "to_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn to_bytes(&self) -> Result<Vec<u8>>",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 102,
+     "doc": [
+      "Serialisiert die Tensor-Sicht in Bytes via Bincode."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_bytes(bytes: &[u8]) -> Result<Self>",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 107,
+     "doc": [
+      "Deserialisiert eine Tensor-Sicht aus Bytes via Bincode."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "keys",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 54
+    },
+    {
+     "name": "values",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 56
+    },
+    {
+     "name": "num_tokens",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 58
+    },
+    {
+     "name": "num_channels",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 60
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvTensorView",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 63,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KiviBlockMeta",
+   "vis": "pub",
+   "module": "quantize_kivi",
+   "signature": "pub struct KiviBlockMeta",
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "line": 115,
+   "doc": [
+    "Metadaten zur Dequantisierung eines 2-Bit KIVI-Blocks."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "bits_per_value",
+     "type": "u8",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 117
+    },
+    {
+     "name": "scale",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 119
+    },
+    {
+     "name": "zero_point",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 121
+    },
+    {
+     "name": "original_len",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 123
+    },
+    {
+     "name": "num_tokens",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 127
+    },
+    {
+     "name": "num_channels",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 130
+    },
+    {
+     "name": "key_group_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 133
+    },
+    {
+     "name": "quantize_values",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 136
+    },
+    {
+     "name": "key_scales",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 139
+    },
+    {
+     "name": "key_zero_points",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 142
+    },
+    {
+     "name": "value_scales",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 145
+    },
+    {
+     "name": "value_zero_points",
+     "type": "Vec<f32>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 148
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "KiviQuantizedBlock",
+   "vis": "pub",
+   "module": "quantize_kivi",
+   "signature": "pub struct KiviQuantizedBlock",
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "line": 154,
+   "doc": [
+    "2-Bit-quantisierter Byte-Block mit zugehörigen Dequantisierungs-Metadaten."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "meta",
+     "type": "KiviBlockMeta",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 156
+    },
+    {
+     "name": "packed",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+     "line": 158
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "kivi_quantize",
+   "vis": "pub",
+   "module": "quantize_kivi",
+   "signature": "pub fn kivi_quantize(raw: &KvTensorView, config: KiviQuantizeConfig) -> Result<KiviQuantizedBlock>",
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "line": 177,
+   "doc": [
+    "Quantisiert einen unkomprimierten [`KvTensorView`] in einen 2-Bit [`KiviQuantizedBlock`].",
+    "",
+    "# Ablauf",
+    "1. Dimensionen prüfen und Gruppengröße festlegen.",
+    "2. **Keys quantisieren**: Für jede Kanalgruppe Min- und Max-Werte ermitteln,",
+    "Scale und Zero-Point berechnen und die Werte auf 2 Bit (0..=3) packen (4 Werte pro Byte).",
+    "3. **Values quantisieren**: Pro Token Min/Max berechnen und in 2 Bit packen",
+    "(bzw. unquantisiert serialisieren, falls `quantize_values == false`).",
+    "4. Metadaten und gepackte Byte-Payload in [`KiviQuantizedBlock`] assemblieren."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "kivi_dequantize",
+   "vis": "pub",
+   "module": "quantize_kivi",
+   "signature": "pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorView>",
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "line": 372,
+   "doc": [
+    "Dequantisiert gepackte 2-Bit-Bytes zurück in einen [`KvTensorView`].",
+    "",
+    "# Ablauf",
+    "1. Metadaten validieren (`bits_per_value == 2`, Skalen und Nullpunkte müssen endlich sein).",
+    "2. Payload deserialisieren.",
+    "3. 2-Bit-Codes entpacken und mit `v = zp + code * sc` in f32 zurückrechnen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "unpack_kivi_block",
+   "vis": "pub",
+   "module": "quantize_kivi",
+   "signature": "pub fn unpack_kivi_block(block: &KiviQuantizedBlock) -> Result<Vec<f32>>",
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "line": 520,
+   "doc": [
+    "Entpackt einen einzelnen linearen 2-Bit-Block zurück in ein `Vec<f32>`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "pack_kivi_block",
+   "vis": "pub",
+   "module": "quantize_kivi",
+   "signature": "pub fn pack_kivi_block(values: &[f32]) -> KiviQuantizedBlock",
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "line": 568,
+   "doc": [
+    "Referenz-Implementierung für lineare 2-Bit Min/Max-Quantisierung eines Fließkomma-Slices."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "compress_bytes",
+   "vis": "pub",
+   "module": "quantize_kivi",
+   "signature": "pub fn compress_bytes(input: &[u8]) -> Vec<u8>",
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "line": 651,
+   "doc": [
+    "Komprimiert ein Byte-Slice verlustfrei für Tier-2 Auslagerungen (LSM-Spill).",
+    "",
+    "Nutzt ein einfaches Run-Length-Encoding (RLE) mit Header `0x43` ('C' für Compressed)",
+    "bzw. Fallback `0x55` ('U' für Uncompressed), falls RLE keine Ersparnis bringt."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "fn",
+   "name": "decompress_bytes",
+   "vis": "pub",
+   "module": "quantize_kivi",
+   "signature": "pub fn decompress_bytes(input: &[u8]) -> Result<Vec<u8>>",
+   "file": "crates/contextra-kvcache/src/quantize_kivi.rs",
+   "line": 688,
+   "doc": [
+    "Dekomprimiert ein zuvor mit [`compress_bytes`] komprimiertes Byte-Slice.",
+    "",
+    "# Fehler",
+    "Liefert [`KvCacheError::QuantizationError`], falls die Eingabe leer ist oder der Header ungültig ist."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "enum",
+   "name": "KvReusePolicy",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub enum KvReusePolicy",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 37,
+   "doc": [
+    "Policy zur Steuerung von Prefix-Reuse (§9.2).",
+    "",
+    "Definiert, ab wann ein gefundener Präfix-Treffer lohnend genug ist, um einen Cache-Treffer",
+    "zu melden (da kurze Treffer von 1–3 Tokens oft mehr Lookup-Overhead erzeugen als Inferenzzeit sparen)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "should_reuse",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn should_reuse(&self, matched_len: usize) -> bool",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 60,
+     "doc": [
+      "Prüft, ob ein Treffer mit der Länge `matched_len` wiederverwendet werden soll.",
+      "",
+      "# Parameter",
+      "- `matched_len`: Anzahl übereinstimmender Tokens.",
+      "",
+      "# Rückgabe",
+      "`true`, wenn die Policy eine Wiederverwendung empfiehlt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Always",
+     "shape": "",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 39
+    },
+    {
+     "name": "CostBased",
+     "shape": "{ min_prefix_len: usize }",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 41
+    },
+    {
+     "name": "Never",
+     "shape": "",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 43
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for KvReusePolicy",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 46,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvReusePolicy",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 52,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvBlockGuard",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub struct KvBlockGuard",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 75,
+   "doc": [
+    "RAII-Guard für ausgeliehene/gematchte KV-Blöcke.",
+    "",
+    "Verhindert, dass ein Block während einer laufenden Modell-Inferenz vom `EvictionWorker`",
+    "verdrängt wird. Dekrementiert bei `Drop` atomar die Referenzzählung des Blocks und",
+    "benachrichtigt ggf. den `EvictionWorker`, wenn der Zähler auf 0 fällt."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( block_id: u64, tenant_id: TenantId, ref_counter: Arc<AtomicUsize>, worker: Option<Arc<EvictionWorker>>, ) -> Self",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 88,
+     "doc": [
+      "Erstellt einen neuen Guard und inkrementiert den Referenzzähler atomar (`SeqCst`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "block_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn block_id(&self) -> u64",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 104,
+     "doc": [
+      "Gibt die Block-ID zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "tenant_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn tenant_id(&self) -> TenantId",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 109,
+     "doc": [
+      "Gibt die Mandanten-ID zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "active_refs",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn active_refs(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 114,
+     "doc": [
+      "Gibt die aktuelle Anzahl aktiver Referenzen zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "block_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 77
+    },
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 79
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvBlockGuard",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 86,
+     "in_test": false
+    },
+    {
+     "trait": "Drop",
+     "generics": "",
+     "signature": "impl Drop for KvBlockGuard",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 119,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for KvBlockGuard",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 138,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "PrefixMatch",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub struct PrefixMatch",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 151,
+   "doc": [
+    "Ergebnis eines Präfix-Matches im Radix-Baum."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "matched_tokens",
+     "type": "Vec<u32>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 153
+    },
+    {
+     "name": "matched_len",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 155
+    },
+    {
+     "name": "block_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 157
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "PrefixRadixTree",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub struct PrefixRadixTree",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 190,
+   "doc": [
+    "Komprimierter Prefix-Radix-Baum für Token-Sequenzen.",
+    "",
+    "Bietet schnelle Präfixsuche und automatische Knoten-Aufspaltung (Node Splitting),",
+    "wenn sich Sequenzen in gemeinsame Teilpfade verzweigen."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(tenant_id: impl Into<TenantId>) -> Self",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 198,
+     "doc": [
+      "Erstellt einen neuen Prefix-Radix-Baum für den angegebenen Mandanten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "tenant_id",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn tenant_id(&self) -> TenantId",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 207,
+     "doc": [
+      "Gibt die Mandanten-ID des Radix-Baums zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert(&mut self, tokens: &[u32], block_id: u64) -> Result<()>",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 218,
+     "doc": [
+      "Fügt eine Token-Sequenz mit assoziierter KV-Block-ID ein.",
+      "",
+      "# Ablauf",
+      "1. Prüfen, ob die Sequenz nicht leer ist (leere Sequenzen erzeugen [`KvCacheError::InvalidInput`]).",
+      "2. Rekursiv durch Kindknoten traversieren und LCP berechnen.",
+      "3. Falls ein partieller LCP existiert, Knoten aufspalten (Node Split).",
+      "4. Block-ID am Endknoten setzen und Gesamtzähler inkrementieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "find_longest_prefix",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn find_longest_prefix( &self, tokens: &[u32], policy: KvReusePolicy, ) -> Option<PrefixMatch>",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 296,
+     "doc": [
+      "Sucht das längste übereinstimmende Präfix unter Anwendung der [`KvReusePolicy`].",
+      "",
+      "# Ablauf",
+      "1. Schnellausstieg bei leeren Tokens oder Policy `Never`.",
+      "2. Iteratives Absteigen entlang der Knoten mit maximaler Übereinstimmung.",
+      "3. Gefundene Teilsequenz kumulieren.",
+      "4. Sobald ein Knoten eine `block_id` besitzt und die Policy erfüllt ist, Treffer merken.",
+      "5. Längsten Treffer als [`PrefixMatch`] zurückgeben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "remove",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn remove(&mut self, tokens: &[u32]) -> Option<u64>",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 350,
+     "doc": [
+      "Entfernt eine Token-Sequenz aus dem Baum und gibt die bisherige Block-ID zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 381,
+     "doc": [
+      "Gibt die Anzahl gespeicherter Präfixe zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 386,
+     "doc": [
+      "Prüft, ob der Baum leer ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clear",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clear(&mut self)",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 391,
+     "doc": [
+      "Leert den gesamten Baum vollständig."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl PrefixRadixTree",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 196,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvSegmentRef",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub struct KvSegmentRef",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 641,
+   "doc": [
+    "Referenz auf ein gecachtes KV-Segment im content-adressierten Store."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(segment_id: u64, tenant_id: TenantId, matched_tokens: Vec<u32>) -> Self",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 653,
+     "doc": [
+      "Erstellt eine neue Segment-Referenz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "matched_len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn matched_len(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 662,
+     "doc": [
+      "Gibt die Anzahl der gematchten Tokens zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "segment_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 643
+    },
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 645
+    },
+    {
+     "name": "matched_tokens",
+     "type": "Vec<u32>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 647
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvSegmentRef",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 651,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "KvLookupResult",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub enum KvLookupResult",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 671,
+   "doc": [
+    "Ergebnis eines KV-Cache-Lookups mit [`ContentAddressedKvStore`]."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "ExactPrefixHit",
+     "shape": "(KvSegmentRef)",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 673
+    },
+    {
+     "name": "ContentHashHit",
+     "shape": "(KvSegmentRef)",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 675
+    },
+    {
+     "name": "SemanticSimilarityHit",
+     "shape": "{",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 677
+    },
+    {
+     "name": "Miss",
+     "shape": "",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 682
+    }
+   ]
+  },
+  {
+   "kind": "trait",
+   "name": "SemanticEmbedder",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub trait SemanticEmbedder: Send + Sync",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 688,
+   "doc": [
+    "Trait für semantische Embedding-Generierung auf KV-Cache-Keys."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "embed",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>>",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 690,
+     "doc": [
+      "Erzeugt ein Embedding für eine Token-Sequenz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "SemanticEmbedder"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SemanticCacheConfig",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub struct SemanticCacheConfig",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 697,
+   "doc": [
+    "Konfiguration für opt-in semantische Vektor-Cache-Lookups."
+   ],
+   "attrs": [
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(embedder: Arc<dyn SemanticEmbedder>, similarity_threshold: f32) -> Self",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 707,
+     "doc": [
+      "Erstellt eine neue Konfiguration mit Embedder und Mindestähnlichkeit."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "embedder",
+     "type": "Arc<dyn SemanticEmbedder>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 699
+    },
+    {
+     "name": "similarity_threshold",
+     "type": "f32",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 701
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SemanticCacheConfig",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 705,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ContentAddressedKvStore",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub struct ContentAddressedKvStore",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 723,
+   "doc": [
+    "Content-adressierter KV-Store mit mehrstufiger Lookup-Kaskade.",
+    "",
+    "Unterstützt:",
+    "1. Schnelle Präfix-Suche im Radix-Baum.",
+    "2. Inhalts-Hash-Suche via BLAKE3 für exakt gleiche Token-Slices an anderer Position.",
+    "3. Optionale semantische Ähnlichkeitssuche mittels Embeddings."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(primary_tenant: TenantId) -> Self",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 735,
+     "doc": [
+      "Erstellt einen neuen `ContentAddressedKvStore` für den primären Mandanten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_reuse_policy",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_reuse_policy(mut self, policy: KvReusePolicy) -> Self",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 747,
+     "doc": [
+      "Konfiguriert die Präfix-Wiederverwendungs-Policy."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_semantic_config",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_semantic_config(mut self, config: SemanticCacheConfig) -> Self",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 753,
+     "doc": [
+      "Konfiguriert den opt-in semantischen Embedder und Schwellenwert."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "position_index",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn position_index(&self) -> &PrefixRadixTree",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 759,
+     "doc": [
+      "Gibt eine Referenz auf den primären `position_index` zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "hash_tokens",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn hash_tokens(tokens: &[u32]) -> blake3::Hash",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 764,
+     "doc": [
+      "Konvertiert Token-IDs deterministisch in LE-Bytes (Little Endian) und berechnet den BLAKE3-Hash."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert(&mut self, tenant: TenantId, tokens: &[u32], segment_id: u64) -> Result<()>",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 779,
+     "doc": [
+      "Fügt eine Token-Sequenz und Segment-Referenz in den Store ein.",
+      "",
+      "# Ablauf",
+      "1. Validieren, dass die Sequenz nicht leer ist.",
+      "2. In den mandantenspezifischen `position_index` (PrefixRadixTree) einfügen.",
+      "3. BLAKE3-Hash berechnen und in den `content_index` unter `(tenant, hash)` einfügen.",
+      "4. Optional semantisches Embedding berechnen und registrieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "lookup",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn lookup(&self, tenant: TenantId, token_ids: &[u32]) -> KvLookupResult",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 816,
+     "doc": [
+      "Lookup-Kaskade:",
+      "1. **Exact prefix hit** via `position_index`",
+      "2. **Content hash hit** via `content_index.get(&(tenant, blake3::hash(tokens)))`",
+      "3. **Semantic similarity hit** via Vektorsuche gegen Cache-Key-Embeddings (opt-in)",
+      "4. Fallback zu [`KvLookupResult::Miss`]"
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "remove",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn remove(&mut self, tenant: TenantId, tokens: &[u32]) -> Option<KvSegmentRef>",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 877,
+     "doc": [
+      "Entfernt einen Eintrag aus allen Indizes für einen Mandanten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 899,
+     "doc": [
+      "Gibt die Anzahl gespeicherter Content-Index-Einträge zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 904,
+     "doc": [
+      "Prüft, ob der Content-Index leer ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "position_index",
+     "type": "PrefixRadixTree",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 725
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ContentAddressedKvStore",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 733,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SharedSegmentRef",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub struct SharedSegmentRef",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 935,
+   "doc": [
+    "Referenzzählungs- und Segment-Tracking-Struktur für `INV-KV-PREFIX-1`."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(segment_id: u64) -> Self",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 944,
+     "doc": [
+      "Erstellt eine neue geteilte Referenz mit initialem Referenzzähler 1."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "retain",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn retain(&self) -> Self",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 952,
+     "doc": [
+      "Klont die Referenz und inkrementiert den Zähler atomar."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "current_refs",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn current_refs(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 961,
+     "doc": [
+      "Gibt die aktuelle Anzahl von Referenzen zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "release",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn release(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 966,
+     "doc": [
+      "Dekrementiert den Zähler und gibt den verbleibenden Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "segment_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 937
+    },
+    {
+     "name": "ref_count",
+     "type": "Arc<AtomicUsize>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 939
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SharedSegmentRef",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 942,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "NamespaceRadixTree",
+   "vis": "pub",
+   "module": "radix",
+   "signature": "pub struct NamespaceRadixTree",
+   "file": "crates/contextra-kvcache/src/radix.rs",
+   "line": 994,
+   "doc": [
+    "Partitionsisolierter Radix-Baum über `namespace: u64`."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(namespace: u64) -> Self",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 1003,
+     "doc": [
+      "Erstellt einen neuen partitionsisolierten Radix-Baum."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "namespace",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn namespace(&self) -> u64",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 1014,
+     "doc": [
+      "Gibt den zugehörigen Namespace zurück."
+     ],
+     "attrs": [
+      "#[inline]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert(&mut self, tokens: &[u32], segment_id: u64) -> Result<SharedSegmentRef>",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 1019,
+     "doc": [
+      "Fügt eine Token-Sequenz ein."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "find_longest_prefix",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn find_longest_prefix( &self, tokens: &[u32], policy: KvReusePolicy, ) -> Option<PrefixMatch>",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 1096,
+     "doc": [
+      "Sucht das längste übereinstimmende Präfix im Namespace."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "remove",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn remove(&mut self, tokens: &[u32]) -> Option<u64>",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 1149,
+     "doc": [
+      "Entfernt eine Sequenz und dekrementiert die geteilte Referenz."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 1185,
+     "doc": [
+      "Gibt die Gesamtzahl gespeicherter Präfixe zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 1190,
+     "doc": [
+      "Prüft, ob der Baum leer ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "segment_registry",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn segment_registry(&self) -> &ahash::AHashMap<Vec<u32>, SharedSegmentRef>",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 1195,
+     "doc": [
+      "Gibt eine Referenz auf die interne Segment-Registrierung zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl NamespaceRadixTree",
+     "file": "crates/contextra-kvcache/src/radix.rs",
+     "line": 1001,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "KvSegmentContent",
+   "vis": "pub",
+   "module": "segment",
+   "signature": "pub enum KvSegmentContent",
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "line": 48,
+   "doc": [
+    "Repräsentation des Inhalts eines KV-Segments.",
+    "",
+    "Kann entweder als rohe Bytes vorliegen oder in einem KIVI-quantisierten Format."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Raw",
+     "shape": "(bytes::Bytes)",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 50
+    },
+    {
+     "name": "KiviQuantized",
+     "shape": "(KiviQuantizedBlock)",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 53
+    }
+   ]
+  },
+  {
+   "kind": "const",
+   "name": "CURRENT_KV_KEY_DERIVATION_VERSION",
+   "vis": "pub",
+   "module": "segment",
+   "signature": "pub const CURRENT_KV_KEY_DERIVATION_VERSION: u8 = 1",
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "line": 60,
+   "doc": [
+    "Aktuelle Version der KV-Segment-Schlüsselableitung (HKDF = HMAC-based Extract-and-Expand Key Derivation Function).",
+    "",
+    "Erhöhe diesen Wert, wenn sich der HKDF-Info-String oder der Salt-Aufbau ändert."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "SegmentAead",
+   "vis": "pub",
+   "module": "segment",
+   "signature": "pub trait SegmentAead: Send + Sync",
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "line": 64,
+   "doc": [
+    "Lokales Trait für AEAD-Segmentverschlüsselung (Authenticated Encryption with Associated Data)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "encrypt",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn encrypt(&self, plaintext: &[u8]) -> Result<(Vec<u8>, [u8",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 66,
+     "doc": [
+      "Verschlüsselt Daten mit AEAD und liefert (Ciphertext, 12-Byte Nonce)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "SegmentAead"
+    },
+    {
+     "name": "decrypt",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn decrypt(&self, ciphertext: &[u8], nonce: &[u8",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 68,
+     "doc": [
+      "Entschlüsselt Daten mit AEAD unter Verwendung der 12-Byte Nonce."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "SegmentAead"
+    },
+    {
+     "name": "wipe",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn wipe(&mut self)",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 70,
+     "doc": [
+      "Überschreibt das Schlüsselmaterial sicher im Speicher."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "SegmentAead"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "ShreddableSegmentKey",
+   "vis": "pub",
+   "module": "segment",
+   "signature": "pub struct ShreddableSegmentKey",
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "line": 80,
+   "doc": [
+    "Shred-fähiger Schlüssel für Tier-2 Segmentdateien (Crypto-Shredding).",
+    "",
+    "Durch Aufruf von `shred()` wird der Schlüssel im Speicher mit Nullen überschrieben",
+    "und aus dem `RwLock` entfernt.",
+    "Ausgelagerte Segmentdateien auf Disk werden dadurch mathematisch dauerhaft unlesbar."
+   ],
+   "attrs": [
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "try_new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self>",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 60,
+     "doc": [
+      "Erstellt einen neuen shred-fähigen Schlüssel aus Passphrase und Salt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_new_random",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new_random(passphrase: &str) -> Result<Self>",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 67,
+     "doc": [
+      "Erstellt einen neuen shred-fähigen Schlüssel mit zufällig erzeugtem Salt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_aead",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_aead(aead: Box<dyn SegmentAead>) -> Self",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 86,
+     "doc": [
+      "Erzeugt einen neuen `ShreddableSegmentKey` aus einer dynamischen `SegmentAead`-Implementierung."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "shredded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn shredded() -> Self",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 93,
+     "doc": [
+      "Erzeugt einen leeren oder bereits ge-shreddeten Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "encrypt",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn encrypt(&self, plaintext: &[u8]) -> Result<(Vec<u8>, [u8",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 100,
+     "doc": [
+      "Verschlüsselt Daten mit AEAD und automatisch generiertem Nonce."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "decrypt",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn decrypt(&self, ciphertext: &[u8], nonce: &[u8",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 111,
+     "doc": [
+      "Entschlüsselt Daten mit AEAD unter Verwendung der 12-Byte-Nonce."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "shred",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn shred(&self)",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 122,
+     "doc": [
+      "Crypto-Shredding: Überschreibt den Schlüssel im Speicher mit Nullen."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_shredded",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_shredded(&self) -> bool",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 129,
+     "doc": [
+      "Prüft, ob der Schlüssel bereits ge-shredded (vernichtet) wurde."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ShreddableSegmentKey",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 58,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ShreddableSegmentKey",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 84,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for ShreddableSegmentKey",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 134,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "Tier2EncryptedSegment",
+   "vis": "pub",
+   "module": "segment",
+   "signature": "pub struct Tier2EncryptedSegment",
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "line": 145,
+   "doc": [
+    "Verschlüsselte Tier-2 Segmentdatei (ausgelagerter KV-Block auf persistentem Speicher)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new( tenant_id: TenantId, segment_id: u64, plaintext: &[u8], key: ShreddableSegmentKey, ) -> Result<Self>",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 155,
+     "doc": [
+      "Verschlüsselt Klartext-Tensor-Bytes und erstellt ein neues Tier-2 Segment."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "read_and_decrypt",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn read_and_decrypt(&self) -> Result<Vec<u8>>",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 172,
+     "doc": [
+      "Liest und entschlüsselt das Segment."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 146
+    },
+    {
+     "name": "segment_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 147
+    },
+    {
+     "name": "ciphertext",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 148
+    },
+    {
+     "name": "nonce",
+     "type": "[u8; 12]",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 149
+    },
+    {
+     "name": "key",
+     "type": "ShreddableSegmentKey",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 150
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl Tier2EncryptedSegment",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 153,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvSegment",
+   "vis": "pub",
+   "module": "segment",
+   "signature": "pub struct KvSegment",
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "line": 184,
+   "doc": [
+    "Ein KV-Cache-Segment im Hauptspeicher.",
+    "",
+    "Erfüllt die P9-Sicherheitsanforderung: Zeroize-on-Drop für vertrauliche Daten.",
+    "Darf niemals unverschlüsselt auf Sekundärspeicher (Tier-2) geschrieben werden."
+   ],
+   "attrs": [
+    "#[derive(Zeroize, ZeroizeOnDrop)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new_encrypted",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_encrypted( cipher: &KvSegmentCipher, tenant_id: impl Into<TenantId>, segment_id: u64, model_fingerprint: ModelFingerprint, rope_offset: Option<usize>, plaintext: &[u8], ) -> std::result::Result<Self, CryptoError>",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 76,
+     "doc": [
+      "Erstellt ein verschlüsseltes KV-Cache-Segment aus einem Klartext-Tensor."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "decrypt_data",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn decrypt_data( &self, cipher: &KvSegmentCipher, ) -> std::result::Result<Vec<u8>, CryptoError>",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 115,
+     "doc": [
+      "Entschlüsselt die Daten des Segments, falls es verschlüsselt ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "write_quantized",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn write_quantized( &mut self, raw_kv: &KvTensorView, config: KiviQuantizeConfig, cipher: &dyn KvCipher, ) -> Result<()>",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 163,
+     "doc": [
+      "Schreibt ein quantisiertes und verschlüsseltes Segment (Reihenfolge: Quantisierung -> Komprimierung -> AEAD-Verschlüsselung)."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"exp-kivi\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "read_dequantized",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn read_dequantized(&self, cipher: &dyn KvCipher) -> Result<KvTensorView>",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 190,
+     "doc": [
+      "Liest ein quantisiertes und verschlüsseltes Segment (Reihenfolge: AEAD-Entschlüsselung -> Dekomprimierung -> Dequantisierung)."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"exp-kivi\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(tenant_id: impl Into<TenantId>, segment_id: u64, data: Vec<u8>) -> Self",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 219,
+     "doc": [
+      "Erstellt ein neues Klartext-KV-Cache-Segment (Default / Zero-Config, P12-konform).",
+      "",
+      "# Parameter",
+      "- `tenant_id`: Zugehöriger Mandant.",
+      "- `segment_id`: Eindeutige Kennung.",
+      "- `data`: Rohe Tensor-Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new_with_metadata",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new_with_metadata( tenant_id: TenantId, segment_id: u64, data: Vec<u8>, #[cfg(feature = \"\")] model_fingerprint: Option<crate::kv_encryption::ModelFingerprint>, rope_offset: Option<usize>, ) -> Self",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 240,
+     "doc": [
+      "Erstellt ein neues Klartext-KV-Cache-Segment mit optionalen Metadaten.",
+      "",
+      "Ermöglicht die Übergabe eines RoPE-Offsets und eines Modell-Fingerprints."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "active_refs",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn active_refs(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 266,
+     "doc": [
+      "Gibt die aktuelle Anzahl aktiver Referenzen (`KvBlockGuard`) zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "acquire_guard",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn acquire_guard(&self, worker: Option<Arc<EvictionWorker>>) -> KvBlockGuard",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 271,
+     "doc": [
+      "Erstellt einen [`KvBlockGuard`] für diesen Block und inkrementiert den Referenzzähler atomar."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "to_spill_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn to_spill_bytes(&self) -> Vec<u8>",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 282,
+     "doc": [
+      "Serialisiert das Segment bzw. dessen verschlüsselte Layer für Tier-2-LSM-Spill (Auslagerung)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn as_bytes(&self) -> &[u8]",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 295,
+     "doc": [
+      "Read-Only-Zugriff auf die Rohdaten.",
+      "",
+      "Kein unverschlüsselter Export nach außen ohne explizite Autorisierung."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 300,
+     "doc": [
+      "Länge der Tensor-Bytes in Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 305,
+     "doc": [
+      "Prüft, ob das Segment leer ist (0 Bytes)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [
+    {
+     "name": "tenant_id",
+     "type": "TenantId",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 186
+    },
+    {
+     "name": "segment_id",
+     "type": "u64",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 188
+    },
+    {
+     "name": "key_derivation_version",
+     "type": "u8",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 191
+    },
+    {
+     "name": "encrypted",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 194
+    },
+    {
+     "name": "model_fingerprint",
+     "type": "Option<crate::kv_encryption::ModelFingerprint>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 197
+    },
+    {
+     "name": "rope_offset",
+     "type": "Option<usize>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 200
+    },
+    {
+     "name": "active_refs",
+     "type": "Arc<AtomicUsize>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 203
+    },
+    {
+     "name": "data",
+     "type": "Vec<u8>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 205
+    },
+    {
+     "name": "content",
+     "type": "KvSegmentContent",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 207
+    },
+    {
+     "name": "encrypted_payload",
+     "type": "Option<EncryptedSegmentPayload>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 209
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvSegment",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 74,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvSegment",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 212,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Debug",
+     "generics": "",
+     "signature": "impl std::fmt::Debug for KvSegment",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 310,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "SegmentKey",
+   "vis": "pub",
+   "module": "segment",
+   "signature": "pub type SegmentKey = ShreddableSegmentKey",
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "line": 494,
+   "doc": [
+    "Neutraler Segmentschlüssel (Klasse A Baustein)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SegmentPoolConfig",
+   "vis": "pub",
+   "module": "segment",
+   "signature": "pub struct SegmentPoolConfig",
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "line": 498,
+   "doc": [
+    "Configuration for the bounded segment pool."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "block_size",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 500
+    },
+    {
+     "name": "max_blocks",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 502
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "SegmentHandle",
+   "vis": "pub",
+   "module": "segment",
+   "signature": "pub struct SegmentHandle",
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "line": 507,
+   "doc": [
+    "Generational handle to an allocated segment in the pool."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "slot_index",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn slot_index(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 514,
+     "doc": [
+      "Returns the slot index of this handle."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "generation",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn generation(&self) -> u64",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 519,
+     "doc": [
+      "Returns the generation counter of this handle."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SegmentHandle",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 512,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "SegmentPool",
+   "vis": "pub",
+   "module": "segment",
+   "signature": "pub struct SegmentPool",
+   "file": "crates/contextra-kvcache/src/segment.rs",
+   "line": 534,
+   "doc": [
+    "Bounded segment pool providing generational safety, use-after-free & double-free prevention,",
+    "zeroization on deallocation, and fragmentation metrics tracking."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new(config: SegmentPoolConfig) -> Self",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 541,
+     "doc": [
+      "Creates a new `SegmentPool` with the given configuration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "allocate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn allocate(&self, namespace: u64, data: &[u8]) -> Result<SegmentHandle>",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 559,
+     "doc": [
+      "Allocates a segment block within the given namespace, storing the payload data."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "deallocate",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn deallocate(&self, namespace: u64, handle: SegmentHandle) -> Result<()>",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 586,
+     "doc": [
+      "Deallocates the segment slot indicated by handle, zeroizing payload memory and bumping generation."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "read",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn read(&self, namespace: u64, handle: SegmentHandle) -> Result<Vec<u8>>",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 608,
+     "doc": [
+      "Reads payload data from an active handle."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "allocated_blocks",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn allocated_blocks(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 625,
+     "doc": [
+      "Returns the total count of currently allocated blocks."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "allocated_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn allocated_bytes(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 630,
+     "doc": [
+      "Returns the sum of actual bytes stored across allocated blocks."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "fragmentation_ratio",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn fragmentation_ratio(&self) -> f64",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 641,
+     "doc": [
+      "Returns the fragmentation ratio: 1.0 - (allocated_bytes / capacity_of_allocated_blocks).",
+      "If 0 blocks are allocated, returns 0.0."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl SegmentPool",
+     "file": "crates/contextra-kvcache/src/segment.rs",
+     "line": 539,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvCacheStats",
+   "vis": "pub",
+   "module": "service",
+   "signature": "pub struct KvCacheStats",
+   "file": "crates/contextra-kvcache/src/service.rs",
+   "line": 74,
+   "doc": [
+    "Statistiken über die KV-Cache-Nutzung eines Mandanten."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "segment_count",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 76
+    },
+    {
+     "name": "radix_entry_count",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 78
+    }
+   ],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "KvCacheConfig",
+   "vis": "pub",
+   "module": "service",
+   "signature": "pub struct KvCacheConfig",
+   "file": "crates/contextra-kvcache/src/service.rs",
+   "line": 84,
+   "doc": [
+    "Konfiguration für die Fassade [`KvCacheService`]."
+   ],
+   "attrs": [
+    "#[derive(Clone)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [
+    {
+     "name": "memory_budget_bytes",
+     "type": "usize",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 86
+    },
+    {
+     "name": "reuse_policy",
+     "type": "KvReusePolicy",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 88
+    },
+    {
+     "name": "spill_enabled",
+     "type": "bool",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 90
+    },
+    {
+     "name": "kivi_config",
+     "type": "Option<KiviQuantizeConfig>",
+     "vis": "pub",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 93
+    }
+   ],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for KvCacheConfig",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 96,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvCacheServiceBuilder",
+   "vis": "pub",
+   "module": "service",
+   "signature": "pub struct KvCacheServiceBuilder",
+   "file": "crates/contextra-kvcache/src/service.rs",
+   "line": 110,
+   "doc": [
+    "Builder zur Erstellung von [`KvCacheService`]."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 123,
+     "doc": [
+      "Erstellt einen neuen Builder mit Standardkonfiguration."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "memory_budget_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn memory_budget_bytes(mut self, bytes: usize) -> Self",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 137,
+     "doc": [
+      "Konfiguriert das Speicherbudget in Bytes (mindestens 1 MiB)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "reuse_policy",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn reuse_policy(mut self, policy: KvReusePolicy) -> Self",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 143,
+     "doc": [
+      "Konfiguriert die Prefix-Wiederverwendungs-Policy ([`KvReusePolicy`])."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "spill_enabled",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn spill_enabled(mut self, enabled: bool) -> Self",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 149,
+     "doc": [
+      "Aktiviert oder deaktiviert den Tier-2 Spill auf Sekundärspeicher."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "enable_kivi_quantization",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn enable_kivi_quantization(mut self, config: Option<KiviQuantizeConfig>) -> Self",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 156,
+     "doc": [
+      "Aktiviert oder deaktiviert die KIVI 2-Bit Quantisierung."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"exp-kivi\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clock(mut self, clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 162,
+     "doc": [
+      "Injiziert die Clock-Port-Implementierung zur Einhaltung deterministischer Zeitvorgaben (P28 / Regel 3)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "spill_storage",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn spill_storage( mut self, storage: Arc<dyn crate::spill::KvSpillStorage>, ) -> Self",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 168,
+     "doc": [
+      "Konfiguriert den Tier-2 Spill-Storage Adapter ([`KvSpillStorage`])."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "cipher",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn cipher(mut self, cipher: Arc<KvSegmentCipher>) -> Self",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 178,
+     "doc": [
+      "Konfiguriert den Segment-Cipher für verschlüsselten Tier-2-Spill."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"kv-encryption\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "attention_source",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn attention_source(mut self, source: Arc<dyn AttentionScoreSource>) -> Self",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 184,
+     "doc": [
+      "Konfiguriert eine benutzerdefinierte [`AttentionScoreSource`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "attention_exporter",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn attention_exporter( mut self, exporter: Arc<dyn crate::compat::adapters::AttentionExporter>, ) -> Self",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 191,
+     "doc": [
+      "Konfiguriert einen [`AttentionExporter`] für den [`EvictionWorker`]."
+     ],
+     "attrs": [
+      "#[cfg(feature = \"workspace\")]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "build",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn build(self) -> KvCacheService",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 206,
+     "doc": [
+      "Baut die [`KvCacheService`]-Instanz.",
+      "",
+      "# Ablauf",
+      "1. Clock und Store initialisieren.",
+      "2. EvictionWorker spawnen und Attention-Quellen injizieren.",
+      "3. Tier-2 SpillHandler registrieren, falls konfiguriert.",
+      "4. Service-Struktur zusammenbauen und zurückgeben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvCacheServiceBuilder",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 121,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for KvCacheServiceBuilder",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 283,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "KvCacheService",
+   "vis": "pub",
+   "module": "service",
+   "signature": "pub struct KvCacheService",
+   "file": "crates/contextra-kvcache/src/service.rs",
+   "line": 294,
+   "doc": [
+    "Öffentlicher mandantenisolierter KV-Cache-Dienst.",
+    "",
+    "Zentrale Facade für Inferenz-Laufzeiten: verbindet Radix-Präfixsuche,",
+    "Speicher-LRU, Hintergrundverdrängung und Tier-2 Persistenz."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "get_or_insert_prefix",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_or_insert_prefix( &self, tenant_id: impl Into<TenantId>, tokens: &[u32], data: &[u8], ) -> Result<Option<(PrefixMatch, KvBlockGuard)>>",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 318,
+     "doc": [
+      "Sucht nach einem übereinstimmenden Prefix oder fügt ein neues KV-Segment ein.",
+      "",
+      "Fail-closed: `tenant_id` ist Pflichtparameter jeder Operation.",
+      "",
+      "# Ablauf",
+      "1. Eingaben validieren (Tokens und Daten dürfen nicht leer sein).",
+      "2. Im Prefix-Radix-Baum des Mandanten nach übereinstimmendem Präfix suchen.",
+      "3. Falls Treffer: Guard erzeugen und `Some((match, guard))` zurückliefern.",
+      "4. Falls Miss: Prüfen des Speicherbudgets und ggf. Hintergrund-Eviction anstoßen.",
+      "5. Segment quantisieren/komprimieren (falls aktiviert), in den Store einfügen und im Radix-Baum registrieren."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "read_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn read_segment( &self, tenant_id: impl Into<TenantId>, segment_id: u64, ) -> Result<Option<Vec<u8>>>",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 412,
+     "doc": [
+      "Liest ein Segment-Payload aus RAM oder Tier-2 Spill-Storage.",
+      "",
+      "# Ablauf",
+      "1. Versuch, das Segment direkt aus dem RAM-Store zu lesen und zu dekomprimieren/dequantisieren.",
+      "2. Falls nicht im RAM: Versuch, das Segment aus dem Tier-2 Spill-Storage abzurufen und zu entschlüsseln."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "spill_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub async fn spill_segment( &self, tx_id: TxId, tenant_id: TenantId, segment_id: u64, payload: &[u8], ) -> Result<()>",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 448,
+     "doc": [
+      "Persistiert ein Segment explizit verschlüsselt auf Tier-2 Sekundärspeicher."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "invalidate_scratchpad",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn invalidate_scratchpad( &self, tenant_id: TenantId, scope: ScratchpadCacheScope, ) -> Result<usize>",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 504,
+     "doc": [
+      "Invalidiert Scratchpad-Tokens, die zum angegebenen Scope gehören."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "delete_tenant",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn delete_tenant(&self, tenant_id: impl Into<TenantId>)",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 526,
+     "doc": [
+      "Entfernt alle RAM-Segmente und Radix-Knoten für einen Mandanten (Mandanten-Bereinigung).",
+      "",
+      "# Ablauf",
+      "1. Alle Segment-IDs des Mandanten ermitteln und RAM-Zähler korrigieren.",
+      "2. Segmente aus dem Store löschen (ZeroizeOnDrop).",
+      "3. Radix-Baum des Mandanten entfernen.",
+      "4. Assoziierte Tier-2 Spill-Einträge auf dem Sekundärspeicher überschreiben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "trigger_eviction",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn trigger_eviction(&self, target_free_bytes: usize)",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 566,
+     "doc": [
+      "Löst eine nicht-blockierende Verdrängung im Hintergrund aus."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clock(&self) -> &Arc<dyn Clock>",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 571,
+     "doc": [
+      "Liefert eine Referenz auf den injizierten Clock-Port."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "stats",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn stats(&self, tenant_id: impl Into<TenantId>) -> KvCacheStats",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 576,
+     "doc": [
+      "Liefert Nutzungsstatistiken für den angegebenen Mandanten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl KvCacheService",
+     "file": "crates/contextra-kvcache/src/service.rs",
+     "line": 307,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "BoxFuture",
+   "vis": "pub",
+   "module": "spill",
+   "signature": "pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>",
+   "file": "crates/contextra-kvcache/src/spill.rs",
+   "line": 13,
+   "doc": [
+    "Dyn-kompatibler lokaler Future-Typ ohne externe Laufzeitabhängigkeit."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "trait",
+   "name": "KvSpillStorage",
+   "vis": "pub",
+   "module": "spill",
+   "signature": "pub trait KvSpillStorage: Send + Sync",
+   "file": "crates/contextra-kvcache/src/spill.rs",
+   "line": 17,
+   "doc": [
+    "Lokales Persistenz-Interface für die Tier-2-Auslagerung von KV-Segmenten."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "get",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>>",
+     "file": "crates/contextra-kvcache/src/spill.rs",
+     "line": 19,
+     "doc": [
+      "Liest einen Wert unter dem angegebenen Schlüssel."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KvSpillStorage"
+    },
+    {
+     "name": "put",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>>",
+     "file": "crates/contextra-kvcache/src/spill.rs",
+     "line": 22,
+     "doc": [
+      "Schreibt ein Schlüssel-Wert-Paar im Kontext einer Transaktion (`tx_id`)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KvSpillStorage"
+    },
+    {
+     "name": "commit",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>",
+     "file": "crates/contextra-kvcache/src/spill.rs",
+     "line": 25,
+     "doc": [
+      "Bestätigt die Transaktion mit der ID `tx_id`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": "KvSpillStorage"
+    }
+   ],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "InMemoryKvSpillStorage",
+   "vis": "pub",
+   "module": "spill",
+   "signature": "pub struct InMemoryKvSpillStorage",
+   "file": "crates/contextra-kvcache/src/spill.rs",
+   "line": 31,
+   "doc": [
+    "Deterministischer In-Memory-Spill-Speicher als Adoptions-Baustein für Standalone-Setups."
+   ],
+   "attrs": [
+    "#[derive(Debug, Default)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-kvcache/src/spill.rs",
+     "line": 38,
+     "doc": [
+      "Erstellt eine neue Instanz des In-Memory Spill-Speichers."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn len(&self) -> usize",
+     "file": "crates/contextra-kvcache/src/spill.rs",
+     "line": 43,
+     "doc": [
+      "Gibt die Anzahl gespeicherter persistenter Einträge zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_empty",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn is_empty(&self) -> bool",
+     "file": "crates/contextra-kvcache/src/spill.rs",
+     "line": 48,
+     "doc": [
+      "Prüft, ob der Speicher leer ist."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl InMemoryKvSpillStorage",
+     "file": "crates/contextra-kvcache/src/spill.rs",
+     "line": 36,
+     "in_test": false
+    },
+    {
+     "trait": "KvSpillStorage",
+     "generics": "",
+     "signature": "impl KvSpillStorage for InMemoryKvSpillStorage",
+     "file": "crates/contextra-kvcache/src/spill.rs",
+     "line": 53,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "type",
+   "name": "SpillHandler",
+   "vis": "pub",
+   "module": "store",
+   "signature": "pub type SpillHandler = Arc<dyn Fn(TenantId, u64, Vec<u8>) + Send + Sync>",
+   "file": "crates/contextra-kvcache/src/store.rs",
+   "line": 46,
+   "doc": [
+    "Optionaler Callback-Hook für Tier-2-LSM-Spill bei Eviction aus dem In-Memory LRU Cache.",
+    "",
+    "Wird aufgerufen, wenn ein Segment aus dem RAM verdrängt wird, um es auf persistente Medien",
+    "(LSM-Tree = Log-Structured Merge-Tree) auszulagern."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "const",
+   "name": "MAX_PINNED_BYTES_PER_TENANT",
+   "vis": "pub",
+   "module": "store",
+   "signature": "pub const MAX_PINNED_BYTES_PER_TENANT: u64 = 64 << 20",
+   "file": "crates/contextra-kvcache/src/store.rs",
+   "line": 52,
+   "doc": [
+    "Maximal erlaubte Gesamtgröße gepinnter Bytes pro Mandant für ungepinnte Segmente ohne Ablaufdatum (`Pin { ttl: None }`).",
+    "",
+    "Verhindert Denial-of-Service (DoS) durch unbegrenztes Festpinnen von Speicher (64 MiB)."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": []
+  },
+  {
+   "kind": "struct",
+   "name": "TenantIsolatedKvStore",
+   "vis": "pub",
+   "module": "store",
+   "signature": "pub struct TenantIsolatedKvStore",
+   "file": "crates/contextra-kvcache/src/store.rs",
+   "line": 328,
+   "doc": [
+    "Mandantenisolierter KV-Segment-Store im Hauptspeicher.",
+    "",
+    "Bildet den zentralen RAM-Zwischenspeicher für KV-Caches mit Sharding,",
+    "LRU-Verdrängung, Aufmerksamkeitsscoring und Transaktions-Rollback-Unterstützung."
+   ],
+   "attrs": [],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "insert_encrypted_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert_encrypted_segment( &self, cipher: &KvSegmentCipher, tenant: impl Into<TenantId>, segment_id: u64, model_fingerprint: ModelFingerprint, rope_offset: Option<usize>, plaintext: &[u8], ) -> std::result::Result<(), CryptoError>",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 209,
+     "doc": [
+      "Verschlüsselt einen Klartext-Tensor und fügt ein verschlüsseltes Segment ein."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_decrypted_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_decrypted_segment( &self, cipher: &KvSegmentCipher, tenant: impl Into<TenantId>, segment_id: u64, ) -> std::result::Result<Option<Vec<u8>>, CryptoError>",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 232,
+     "doc": [
+      "Liest ein Segment und entschlüsselt es falls nötig."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "DEFAULT_SHARD_COUNT",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const DEFAULT_SHARD_COUNT: usize = 32",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 351,
+     "doc": [
+      "Standardanzahl paralleler Shards (32)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "DEFAULT_SEGMENT_CAPACITY_PER_TENANT",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const DEFAULT_SEGMENT_CAPACITY_PER_TENANT: usize = 256",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 353,
+     "doc": [
+      "Standardkapazität an Segmenten pro Mandant (256)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn new() -> Self",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 356,
+     "doc": [
+      "Erstellt einen neuen tenant-isolierten KV-Store mit Standard-Sharding."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_shard_count",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_shard_count(n: usize) -> Self",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 361,
+     "doc": [
+      "Erstellt einen Store mit benutzerdefinierter Shard-Anzahl (wird auf Zweierpotenz aufgerundet)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_shard_count_and_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_shard_count_and_clock(n: usize, clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 366,
+     "doc": [
+      "Erstellt einen Store mit benutzerdefinierter Shard-Anzahl und injizierter Uhr."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_clock(clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 392,
+     "doc": [
+      "Erstellt einen Store mit injizierter Uhr und Standard-Sharding."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_attention_source",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_attention_source(&self, source: Arc<dyn AttentionScoreSource>)",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 397,
+     "doc": [
+      "Setzt die konfigurierte Standard-[`AttentionScoreSource`] für diesen Store."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "attention_source",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn attention_source(&self) -> Arc<dyn AttentionScoreSource>",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 402,
+     "doc": [
+      "Liefert die konfigurierte Standard-[`AttentionScoreSource`] für diesen Store."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_capacity",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_capacity(segment_capacity_per_tenant: usize) -> Self",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 407,
+     "doc": [
+      "Erstellt einen Store mit konfigurierter Segment-Kapazität pro Mandant."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "with_capacity_and_clock",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn with_capacity_and_clock(segment_capacity_per_tenant: usize, clock: Arc<dyn Clock>) -> Self",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 415,
+     "doc": [
+      "Erstellt einen Store mit konfigurierter Segment-Kapazität pro Mandant und injizierter Uhr."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "set_spill_handler",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn set_spill_handler(&self, handler: SpillHandler)",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 423,
+     "doc": [
+      "Registriert einen Spill-Handler für evictierte Segmente (Tier-2 Auslagerung)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert_segment_with_directive",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert_segment_with_directive( &self, tenant: impl Into<TenantId>, segment: KvSegment, directive: CacheDirective, ) -> Result<()>",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 441,
+     "doc": [
+      "Fügt ein Segment mit einer deklarativen [`CacheDirective`] ein.",
+      "",
+      "# Ablauf",
+      "1. Bei `CacheDirective::NeverCache` sofort abbrechen (No-Op).",
+      "2. Shard anhand der Mandanten-ID ermitteln und Schreibsperre anfordern.",
+      "3. Mandantenspezifischen `TenantState` abrufen oder initialisieren.",
+      "4. Segment einfügen und eventuell verdrängtes Segment entgegennehmen.",
+      "5. Falls verdrängt und SpillHandler registriert: ausgelagertes Segment an Handler übergeben."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert_segment(&self, tenant: impl Into<TenantId>, segment: KvSegment)",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 475,
+     "doc": [
+      "Fügt ein Segment für einen bestimmten Mandanten mit Standard-Direktive (`Auto`) ein."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "release_step",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn release_step(&self, tenant: impl Into<TenantId>, step_id: impl Into<StepId>)",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 481,
+     "doc": [
+      "Gibt transiente Segmente frei, die mit einem bestimmten Ausführungsschritt verknüpft sind."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "insert_token_sequence",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn insert_token_sequence( &self, tenant: impl Into<TenantId>, tokens: &[u32], block_id: u64, ) -> Result<()>",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 494,
+     "doc": [
+      "Fügt eine Token-Sequenz und deren assoziierte Block-ID in den Prefix-Radix-Baum ein."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "find_prefix_match",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn find_prefix_match( &self, tenant: impl Into<TenantId>, tokens: &[u32], policy: KvReusePolicy, worker: Option<Arc<EvictionWorker>>, ) -> Option<(PrefixMatch, KvBlockGuard)>",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 511,
+     "doc": [
+      "Sucht ein Präfix-Match für die angegebenen Tokens unter der gewünschten [`KvReusePolicy`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "acquire_block_guard",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn acquire_block_guard( &self, tenant: impl Into<TenantId>, block_id: u64, worker: Option<Arc<EvictionWorker>>, ) -> Option<KvBlockGuard>",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 526,
+     "doc": [
+      "Erstellt einen [`KvBlockGuard`] für einen bestimmten Block."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "on_rollback",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn on_rollback(&self, tenant: impl Into<TenantId>, chunk_ids: &[u64])",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 540,
+     "doc": [
+      "Bereinigt assoziierte KV-Segmente bei einem transaktionalen Rollback (z. B. nach Abbruch einer Inferenz)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "remove_segments_for_rollback",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn remove_segments_for_rollback(&self, tenant: impl Into<TenantId>, segment_ids: &[u64])",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 546,
+     "doc": [
+      "Entfernt Segmente mit den angegebenen IDs für einen Mandanten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "remove_segment",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn remove_segment(&self, tenant: impl Into<TenantId>, segment_id: u64)",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 582,
+     "doc": [
+      "Entfernt ein einzelnes Segment."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_segment_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_segment_bytes(&self, tenant: impl Into<TenantId>, segment_id: u64) -> Option<Vec<u8>>",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 588,
+     "doc": [
+      "Liefert unverschlüsselte Segment-Bytes für einen Mandanten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_segments",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_segments(&self, tenant: impl Into<TenantId>) -> Vec<u64>",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 599,
+     "doc": [
+      "Liefert alle gespeicherten Segment-IDs eines Mandanten."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "get_tenant_segment_len",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn get_tenant_segment_len(&self, tenant: impl Into<TenantId>) -> usize",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 611,
+     "doc": [
+      "Gibt die Anzahl der gespeicherten Segmente für einen Mandanten zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "evict_fair",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn evict_fair(&self, target_free_bytes: usize, scores: &dyn AttentionScoreSource) -> usize",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 625,
+     "doc": [
+      "Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und Attention-Scores (Default 50/50 Gewichtung)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "evict_weighted_fair",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn evict_weighted_fair( &self, target_free_bytes: usize, scores: &dyn AttentionScoreSource, attention_weight: f32, ) -> usize",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 630,
+     "doc": [
+      "Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und gewichteten Attention-Scores."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "evict_lru_fair",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn evict_lru_fair(&self, target_free_bytes: usize) -> usize",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 651,
+     "doc": [
+      "Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und Guard-Schutz (`active_refs == 0`).",
+      "",
+      "# Ablauf",
+      "1. Ruft [`Self::attention_source`] ab.",
+      "2. Delegiert an [`Self::evict_fair`]."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "evict_lru_fair_with_hook",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn evict_lru_fair_with_hook<F>(&self, target_free_bytes: usize, mut hook: F) -> usize where F: FnMut(),",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 657,
+     "doc": [],
+     "attrs": [
+      "#[cfg(test)]"
+     ],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "clear_all",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn clear_all(&self)",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 769,
+     "doc": [
+      "Löscht alle Segmente synchron aus dem Speicher und stellt Zeroization sicher (Emergency Wipe)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TenantIsolatedKvStore",
+     "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+     "line": 207,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TenantIsolatedKvStore",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 339,
+     "in_test": false
+    },
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for TenantIsolatedKvStore",
+     "file": "crates/contextra-kvcache/src/store.rs",
+     "line": 787,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "TenantId",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub struct TenantId(pub u64)",
+   "file": "crates/contextra-kvcache/src/types.rs",
+   "line": 7,
+   "doc": [
+    "Mandanten-Identifier (lokaler Typ)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "SYSTEM",
+     "kind": "const",
+     "vis": "pub",
+     "signature": "pub const SYSTEM: Self = Self(0)",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 11,
+     "doc": [
+      "Reservierter System-Mandant."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 14,
+     "doc": [
+      "Erzeugt eine neue `TenantId`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "try_new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn try_new(id: u64) -> Result<Self, crate::error::KvCacheError>",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 19,
+     "doc": [
+      "Validierte Erzeugung (Mandant 0 ist reserviert/ungültig für reguläre Mandanten)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u64",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 28,
+     "doc": [
+      "Gibt den inneren raw `u64`-Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(&self) -> u64",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 33,
+     "doc": [
+      "Gibt den numerischen Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "is_system",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn is_system(&self) -> bool",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 38,
+     "doc": [
+      "Gibt an, ob es sich um den System-Mandanten handelt."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<TenantId>",
+     "generics": "",
+     "signature": "impl From<TenantId> for contextra_types::TenantId",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 17,
+     "in_test": false
+    },
+    {
+     "trait": "From<contextra_types::TenantId>",
+     "generics": "",
+     "signature": "impl From<contextra_types::TenantId> for TenantId",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 24,
+     "in_test": false
+    },
+    {
+     "trait": "PartialEq<contextra_types::TenantId>",
+     "generics": "",
+     "signature": "impl PartialEq<contextra_types::TenantId> for TenantId",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 199,
+     "in_test": false
+    },
+    {
+     "trait": "PartialEq<TenantId>",
+     "generics": "",
+     "signature": "impl PartialEq<TenantId> for contextra_types::TenantId",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 206,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TenantId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 9,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Display",
+     "generics": "",
+     "signature": "impl std::fmt::Display for TenantId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 43,
+     "in_test": false
+    },
+    {
+     "trait": "From<u64>",
+     "generics": "",
+     "signature": "impl From<u64> for TenantId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 49,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "TxId",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub struct TxId(pub u64)",
+   "file": "crates/contextra-kvcache/src/types.rs",
+   "line": 57,
+   "doc": [
+    "Transaktions-Identifier (lokaler Newtype für Speicheroperationen)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 61,
+     "doc": [
+      "Erzeugt eine neue `TxId`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u64",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 66,
+     "doc": [
+      "Gibt den inneren raw `u64`-Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(&self) -> u64",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 71,
+     "doc": [
+      "Gibt den numerischen Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<TxId>",
+     "generics": "",
+     "signature": "impl From<TxId> for contextra_types::TxId",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 31,
+     "in_test": false
+    },
+    {
+     "trait": "From<contextra_types::TxId>",
+     "generics": "",
+     "signature": "impl From<contextra_types::TxId> for TxId",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 38,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl TxId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 59,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Display",
+     "generics": "",
+     "signature": "impl std::fmt::Display for TxId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 76,
+     "in_test": false
+    },
+    {
+     "trait": "From<u64>",
+     "generics": "",
+     "signature": "impl From<u64> for TxId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 82,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "StepId",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub struct StepId(pub u64)",
+   "file": "crates/contextra-kvcache/src/types.rs",
+   "line": 90,
+   "doc": [
+    "Sequenzschritt / Token-Offset."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 94,
+     "doc": [
+      "Erzeugt einen neuen `StepId`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u64",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 99,
+     "doc": [
+      "Gibt den inneren raw `u64`-Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(&self) -> u64",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 104,
+     "doc": [
+      "Gibt den numerischen Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl StepId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 92,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Display",
+     "generics": "",
+     "signature": "impl std::fmt::Display for StepId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 109,
+     "in_test": false
+    },
+    {
+     "trait": "From<u64>",
+     "generics": "",
+     "signature": "impl From<u64> for StepId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 115,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "RequestId",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub struct RequestId(pub u64)",
+   "file": "crates/contextra-kvcache/src/types.rs",
+   "line": 123,
+   "doc": [
+    "Eindeutige ID einer Inferenzanfrage."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "new",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn new(id: u64) -> Self",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 127,
+     "doc": [
+      "Erzeugt eine `RequestId` aus einem `u64`."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "inner",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn inner(self) -> u64",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 132,
+     "doc": [
+      "Gibt den inneren `u64`-Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_u64",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_u64(self) -> u64",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 137,
+     "doc": [
+      "Gibt den inneren `u64`-Wert zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<RequestId>",
+     "generics": "",
+     "signature": "impl From<RequestId> for contextra_ports::RequestId",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 45,
+     "in_test": false
+    },
+    {
+     "trait": "From<contextra_ports::RequestId>",
+     "generics": "",
+     "signature": "impl From<contextra_ports::RequestId> for RequestId",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 52,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl RequestId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 125,
+     "in_test": false
+    },
+    {
+     "trait": "std::fmt::Display",
+     "generics": "",
+     "signature": "impl std::fmt::Display for RequestId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 142,
+     "in_test": false
+    },
+    {
+     "trait": "From<u64>",
+     "generics": "",
+     "signature": "impl From<u64> for RequestId",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 148,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "struct",
+   "name": "ModelFingerprint",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub struct ModelFingerprint(pub [u8",
+   "file": "crates/contextra-kvcache/src/types.rs",
+   "line": 156,
+   "doc": [
+    "Fingerabdruck eines Modells (32-Byte Hash)."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [
+    {
+     "name": "from_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn from_bytes(bytes: [u8",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 160,
+     "doc": [
+      "Erzeugt einen ModelFingerprint aus 32 Bytes."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "from_str_hash",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub fn from_str_hash(s: &str) -> Self",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 165,
+     "doc": [
+      "Erzeugt einen ModelFingerprint aus einem String (BLAKE3 gehasht)."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    },
+    {
+     "name": "as_bytes",
+     "kind": "fn",
+     "vis": "pub",
+     "signature": "pub const fn as_bytes(&self) -> &[u8",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 171,
+     "doc": [
+      "Gibt die 32 Bytes zurück."
+     ],
+     "attrs": [],
+     "in_test": false,
+     "via_trait": null
+    }
+   ],
+   "fields": [],
+   "variants": [],
+   "impl_blocks": [
+    {
+     "trait": "From<ModelFingerprint>",
+     "generics": "",
+     "signature": "impl From<ModelFingerprint> for contextra_types::model_fingerprint::ModelFingerprint",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 59,
+     "in_test": false
+    },
+    {
+     "trait": "From<contextra_types::model_fingerprint::ModelFingerprint>",
+     "generics": "",
+     "signature": "impl From<contextra_types::model_fingerprint::ModelFingerprint> for ModelFingerprint",
+     "file": "crates/contextra-kvcache/src/compat/mod.rs",
+     "line": 66,
+     "in_test": false
+    },
+    {
+     "trait": null,
+     "generics": "",
+     "signature": "impl ModelFingerprint",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 158,
+     "in_test": false
+    }
+   ]
+  },
+  {
+   "kind": "enum",
+   "name": "CacheDirective",
+   "vis": "pub",
+   "module": "types",
+   "signature": "pub enum CacheDirective",
+   "file": "crates/contextra-kvcache/src/types.rs",
+   "line": 178,
+   "doc": [
+    "Cache-Direktive für granulare Lebenszyklus-Steuerung."
+   ],
+   "attrs": [
+    "#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]"
+   ],
+   "in_test": false,
+   "methods": [],
+   "fields": [],
+   "variants": [
+    {
+     "name": "Pin",
+     "shape": "{",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 180
+    },
+    {
+     "name": "NeverCache",
+     "shape": "",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 185
+    },
+    {
+     "name": "Auto",
+     "shape": "",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 187
+    },
+    {
+     "name": "ReleaseAfterStep",
+     "shape": "{",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 189
+    }
+   ],
+   "impl_blocks": [
+    {
+     "trait": "Default",
+     "generics": "",
+     "signature": "impl Default for CacheDirective",
+     "file": "crates/contextra-kvcache/src/types.rs",
+     "line": 195,
+     "in_test": false
+    }
+   ]
+  }
+ ],
+ "reexports": [
+  {
+   "signature": "pub use contextra_ports::attention::AttentionExporter",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+   "line": 13,
+   "in_test": false,
+   "module": "compat::adapters"
+  },
+  {
+   "signature": "pub use contextra_ports::kv_bridge_port::KvBridgeStorage",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/compat/adapters.rs",
+   "line": 15,
+   "in_test": false,
+   "module": "compat::adapters"
+  },
+  {
+   "signature": "pub use adapters::*",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "line": 7,
+   "in_test": false,
+   "module": "compat"
+  },
+  {
+   "signature": "pub use prefix_store::*",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "line": 8,
+   "in_test": false,
+   "module": "compat"
+  },
+  {
+   "signature": "pub use scanner::*",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "line": 9,
+   "in_test": false,
+   "module": "compat"
+  },
+  {
+   "signature": "pub use scratchpad_invalidation::*",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/compat/mod.rs",
+   "line": 10,
+   "in_test": false,
+   "module": "compat"
+  },
+  {
+   "signature": "pub use contextra_crypto::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/kv_encryption/mod.rs",
+   "line": 6,
+   "in_test": false,
+   "module": "kv_encryption"
+  },
+  {
+   "signature": "pub use compat::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 52,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use cipher::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 57,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use error::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 58,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use types::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 59,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use adapters::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 78,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use attention_score::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 82,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use eviction_worker::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 85,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use prefix_store::TenantPrefixKvStore",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 87,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use quantize_kivi::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 89,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use radix::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 94,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use radix::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 97,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use scratchpad_invalidation::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 99,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use segment::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 102,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use service::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 107,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use compat::scanner::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 109,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use store::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 110,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use invalidation::ScratchpadCacheScope",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 111,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use spill::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/lib.rs",
+   "line": 112,
+   "in_test": false,
+   "module": "crate"
+  },
+  {
+   "signature": "pub use crate::types::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/store.rs",
+   "line": 27,
+   "in_test": false,
+   "module": "store"
+  },
+  {
+   "signature": "pub use crate::compat::scanner::",
+   "vis": "pub",
+   "file": "crates/contextra-kvcache/src/store.rs",
+   "line": 794,
+   "in_test": false,
+   "module": "store"
+  }
+ ],
+ "macros": [],
+ "used_by": []
+}
