@@ -14,8 +14,8 @@
 //! Prüft die Isolation und Konfliktfreiheit paralleler Transaktionen und CheckpointGuards.
 
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_types::{Result, TxId};
+use contextra_checkpoint::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_checkpoint::contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

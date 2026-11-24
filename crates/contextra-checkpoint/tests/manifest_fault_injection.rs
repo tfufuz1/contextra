@@ -14,7 +14,7 @@
 //! Simuliert Dateibeschädigung und unvollständige Schreibvorgänge in Checkpoint-Manifesten.
 
 use contextra_checkpoint::{CheckpointManifest, CheckpointMeta};
-use contextra_types::TxId;
+use contextra_checkpoint::contextra_types::TxId;
 
 fn sample_meta() -> CheckpointMeta {
     CheckpointMeta {

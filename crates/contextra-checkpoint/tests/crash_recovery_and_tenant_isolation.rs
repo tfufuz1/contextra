@@ -19,8 +19,8 @@ use contextra_checkpoint::{
     CheckpointHardlinkCloner, DefaultHardlinkCloner, PersistentCheckpointStore, PinnedSeqNoOrphan,
     StateCheckpoint,
 };
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_types::{ContextraError, Result, TxId};
+use contextra_checkpoint::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_checkpoint::contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;

@@ -53,7 +53,7 @@ impl SnapshotPinner for Arc<contextra_mvcc::SnapshotRegistry> {
         Box::new(self.register(seq_no))
     }
 }
-use contextra_types::{ContextraError, Result};
+use crate::contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 #[cfg(feature = "mvcc")]
 use std::sync::Arc;
@@ -166,7 +166,7 @@ pub trait CheckpointHardlinkCloner: Send + Sync {
         source_dir: &'a Path,
         target_dir: &'a Path,
         snapshot_pinner: &'a (dyn SnapshotPinner + 'a),
-    ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>>;
+    ) -> crate::contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>>;
 }
 
 // ANCHOR[contextra-checkpoint:CLONE-003]
@@ -199,7 +199,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
         source_dir: &'a Path,
         target_dir: &'a Path,
         snapshot_pinner: &'a (dyn SnapshotPinner + 'a),
-    ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>> {
+    ) -> crate::contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>> {
         Box::pin(async move {
             // 1. Pin snapshot in SnapshotRegistry for the duration of the clone operation
             // NOTE: Der Guard wird über die gesamte Future gehalten, damit kein GC-Lauf SSTables löscht

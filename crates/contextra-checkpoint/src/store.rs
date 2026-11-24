@@ -4,7 +4,7 @@
 //!
 //! ## Ring & Rolle
 //! Gehört zu **Ring 1 (Persistenz)**. Verwaltet Metadaten und MVCC-Sequenznummern konsistent über Neustarts hinweg
-//! und synchronisiert diese mit der physischen Speicher-Engine ([`contextra_ports::StorageEngine`]).
+//! und synchronisiert diese mit der physischen Speicher-Engine ([`crate::contextra_ports::StorageEngine`]).
 //!
 //! ## Hauptkomponenten
 //! - [`CheckpointRegistry`]: Trait für erweiterte Checkpoint-Operationen (Save, Load, Orphan-Recovery).
@@ -28,8 +28,8 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::{
     clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan, RecoveryReport,
 };
-use contextra_ports::BoxFuture;
-use contextra_types::{ContextraError, Result, TxId, WorkflowState};
+use crate::contextra_ports::BoxFuture;
+use crate::contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -41,7 +41,7 @@ use std::sync::Arc;
 /// Trait für die erweiterte Checkpoint-Verwaltung inklusive Orphan-Recovery.
 ///
 /// Definiert die Schnittstelle zum Speichern, Laden und Bereinigen von Checkpoints.
-pub trait CheckpointRegistry: contextra_ports::Checkpoint + Send + Sync {
+pub trait CheckpointRegistry: crate::contextra_ports::Checkpoint + Send + Sync {
     /// Speichert die Metadaten eines Checkpoints asynchron ab.
     fn save_checkpoint<'a>(&'a self, meta: CheckpointMeta) -> BoxFuture<'a, Result<()>>;
     /// Lädt die Metadaten eines Checkpoints anhand der Sequenznummer.
@@ -140,7 +140,7 @@ struct TxCounterMeta {
 const TX_BATCH_SIZE: u64 = 100;
 
 /// Ermittelt beim Öffnen des Stores die Grenzen für den internen TxId-Zähler.
-async fn determine_tx_counter_bounds<S: contextra_ports::StorageEngine>(
+async fn determine_tx_counter_bounds<S: crate::contextra_ports::StorageEngine>(
     storage: &Arc<S>,
     namespace: &str,
 ) -> Result<(u64, u64)> {
@@ -200,7 +200,7 @@ async fn determine_tx_counter_bounds<S: contextra_ports::StorageEngine>(
 }
 
 /// Persistiert den neuen High-Water-Mark des TxId-Zählers synchron in der Storage-Engine.
-async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
+async fn persist_hwm_internal<S: crate::contextra_ports::StorageEngine>(
     storage: &Arc<S>,
     namespace: &str,
     hwm: u64,
@@ -229,7 +229,7 @@ async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
 /// - Alle Methoden sind durch `RwLock` thread-sicher
 /// - `StorageEngine`-Zugriffe nutzen atomare Transaktionen via `TxId`
 /// - Keine Panics (Zero-Panic Doctrine)
-pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
+pub struct PersistentCheckpointStore<S: crate::contextra_ports::StorageEngine> {
     storage: Arc<S>,
     /// Registrierter Checkpoint-Index im Arbeitsspeicher — geschützt durch ein konsolidiertes RwLock (P-23)
     index: RwLock<CheckpointIndex>,
@@ -250,12 +250,12 @@ pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
     /// Instanz-spezifischer Zähler für verpasste Rollbacks
     skipped_rollbacks: Arc<AtomicU64>,
     /// Injizierbarer Zeitgeber (P28)
-    clock: Arc<dyn contextra_ports::Clock>,
+    clock: Arc<dyn crate::contextra_ports::Clock>,
     /// Injected metrics sink for operational monitoring
-    metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+    metrics_sink: Option<Arc<dyn crate::contextra_ports::MetricsSink>>,
 }
 
-impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
+impl<S: crate::contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     // ANCHOR[contextra-checkpoint:STO-003]
     /// Öffnet einen PersistentCheckpointStore und führt eine vollständige Orphan-Recovery für Pins und Checkpoints durch.
     ///
@@ -449,7 +449,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     ///
     /// # Composition Root
     /// Der Composition Root setzt per `with_clock` eine injizierte Uhr (Default ist `SystemClock`).
-    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+    pub fn with_clock(mut self, clock: Arc<dyn crate::contextra_ports::Clock>) -> Self {
         if let Some(reg) = Arc::get_mut(&mut self.orphan_registry) {
             reg.set_clock(clock.clone());
         }
@@ -458,17 +458,17 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Liefert den aktuellen Clock-Port.
-    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+    pub fn clock(&self) -> &Arc<dyn crate::contextra_ports::Clock> {
         &self.clock
     }
 
     /// Setzt die Metrik-Senke.
-    pub fn set_metrics_sink(&mut self, sink: Arc<dyn contextra_ports::MetricsSink>) {
+    pub fn set_metrics_sink(&mut self, sink: Arc<dyn crate::contextra_ports::MetricsSink>) {
         self.metrics_sink = Some(sink);
     }
 
     /// Konfiguriert den Store mit einer Metrik-Senke.
-    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn crate::contextra_ports::MetricsSink>) -> Self {
         self.metrics_sink = Some(sink);
         self
     }
@@ -906,7 +906,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 }
 
-impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpointStore<S> {
+impl<S: crate::contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpointStore<S> {
     fn save_checkpoint<'a>(&'a self, meta: CheckpointMeta) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let _guard = self.write_lock.lock().await;
@@ -946,7 +946,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpo
     }
 }
 
-impl<S: contextra_ports::StorageEngine> contextra_ports::CheckpointCoordinator
+impl<S: crate::contextra_ports::StorageEngine> crate::contextra_ports::CheckpointCoordinator
     for PersistentCheckpointStore<S>
 {
     type Meta = CheckpointMeta;
@@ -976,7 +976,7 @@ impl<S: contextra_ports::StorageEngine> contextra_ports::CheckpointCoordinator
     }
 }
 
-impl<S: contextra_ports::StorageEngine> contextra_ports::Checkpoint
+impl<S: crate::contextra_ports::StorageEngine> crate::contextra_ports::Checkpoint
     for PersistentCheckpointStore<S>
 {
     fn take_snapshot<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<WorkflowState>> {

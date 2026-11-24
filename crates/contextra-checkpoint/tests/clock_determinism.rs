@@ -15,7 +15,7 @@
 
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore, PinGuard};
 use contextra_testkit::{InMemoryStorageEngine, ManualClock};
-use contextra_types::TxId;
+use contextra_checkpoint::contextra_types::TxId;
 use std::sync::Arc;
 
 // Testet: test checkpoint store clock determinism.

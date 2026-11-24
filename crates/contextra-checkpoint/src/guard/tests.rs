@@ -3,7 +3,7 @@
 //! Dieses Modul enthält Unit-Tests für `PinGuard` und `CheckpointGuard`.
 
 use super::*;
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use crate::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 

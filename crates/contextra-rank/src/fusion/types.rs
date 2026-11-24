@@ -161,8 +161,6 @@ pub type FusedScore = SearchResult;
 /// # Abgrenzung
 /// Dieser Typ (`contextra_rank::fusion::Signal`) bezeichnet die spezifische Suchsignal-Art
 /// (z. B. `Vector`, `Text`, `Graph`) innerhalb von Suchberichten (`SearchReport`) der Fusion.
-/// Er unterscheidet sich von `contextra_types::Signal`, welches temporale bzw. System-Signale
-/// repräsentiert.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// Kennzeichnung der Signalherkunft.
 pub enum Signal {

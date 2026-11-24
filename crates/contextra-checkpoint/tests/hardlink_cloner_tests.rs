@@ -14,7 +14,7 @@
 //! Überprüft die Erstellung von Hardlink-Klonen, Dateisystem-Fallbacks und Cross-Device-Verhalten.
 
 use contextra_checkpoint::{CheckpointHardlinkCloner, DefaultHardlinkCloner, SnapshotPinner};
-use contextra_types::ContextraError;
+use contextra_checkpoint::contextra_types::ContextraError;
 use std::fs;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -47,7 +47,7 @@ impl SnapshotPinner for CountingPinner {
 
 // Testet: test successful hardlink clone and inode identity.
 #[tokio::test]
-async fn test_successful_hardlink_clone_and_inode_identity() -> contextra_types::Result<()> {
+async fn test_successful_hardlink_clone_and_inode_identity() -> contextra_checkpoint::contextra_types::Result<()> {
     let source_dir = TempDir::new().map_err(ContextraError::Io)?;
     let target_dir = TempDir::new().map_err(ContextraError::Io)?;
 
@@ -103,7 +103,7 @@ async fn test_successful_hardlink_clone_and_inode_identity() -> contextra_types:
 
 // Testet: test cross device link error handling.
 #[tokio::test]
-async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> {
+async fn test_cross_device_link_error_handling() -> contextra_checkpoint::contextra_types::Result<()> {
     let source_dir = TempDir::new().map_err(ContextraError::Io)?;
     // Mount point /dev/shm is a tmpfs mount on Linux (distinct filesystem from /rom/overlay)
     let shm_base = std::path::Path::new("/dev/shm");
@@ -148,7 +148,7 @@ async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> 
 // Testet: test snapshot registry compaction gc exclusion during cloning.
 #[tokio::test]
 async fn test_snapshot_registry_compaction_gc_exclusion_during_cloning(
-) -> contextra_types::Result<()> {
+) -> contextra_checkpoint::contextra_types::Result<()> {
     let source_dir = TempDir::new().map_err(ContextraError::Io)?;
     let target_dir = TempDir::new().map_err(ContextraError::Io)?;
 

@@ -32,7 +32,7 @@
 
 use crate::error::{ContextraError, Result};
 use crate::types::{TenantId, TOMBSTONE_BIT};
-use contextra_ports::{Clock, SystemClock};
+use crate::contextra_ports::{Clock, SystemClock};
 use parking_lot::Mutex;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -536,7 +536,7 @@ impl Drop for SnapshotGuard {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_testkit::ManualClock;
+    use crate::contextra_ports::ManualClock;
     use proptest::prop_assert_eq;
 
     // Prüft den Basis-Lebenszyklus eines SnapshotGuards: Registrierung, Minimum-Berechnung und automatisches Zurücksetzen beim Drop.

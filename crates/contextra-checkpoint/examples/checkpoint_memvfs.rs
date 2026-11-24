@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let store = PersistentCheckpointStore::open(storage, "demo_namespace").await?;
 
     // Checkpoint mit Ziel-Tx erzeugen
-    let tx = contextra_types::TxId::new(contextra_types::TxId::INTERNAL_BASE + 100);
+    let tx = contextra_checkpoint::contextra_types::TxId::new(contextra_checkpoint::contextra_types::TxId::INTERNAL_BASE + 100);
     let cp_meta = store
         .create_checkpoint(
             "demo_cp",

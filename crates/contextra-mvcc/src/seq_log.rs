@@ -23,7 +23,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use contextra_ports::{Clock, SystemClock};
+use crate::contextra_ports::{Clock, SystemClock};
 
 use crate::types::DocId;
 
@@ -490,7 +490,7 @@ impl SequenceLog {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_testkit::ManualClock;
+    use crate::contextra_ports::ManualClock;
 
     // Prüft die O(1)-Sichtbarkeitsprüfung eines einzelnen SeqLogEntry-Eintrags an verschiedenen Grenzwerten.
     #[test]

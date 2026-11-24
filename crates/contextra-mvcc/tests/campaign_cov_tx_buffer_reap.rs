@@ -12,8 +12,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_mvcc::tx_buffer::{TxBuffer, TxBufferConfig};
-use contextra_testkit::ManualClock;
-use contextra_types::TxId;
+use contextra_mvcc::contextra_ports::ManualClock;
+use contextra_mvcc::TxId;
 use std::sync::Arc;
 use std::time::Duration;
 

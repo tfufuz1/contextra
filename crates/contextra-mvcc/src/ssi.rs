@@ -32,7 +32,7 @@ use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
 use crate::snapshot::SnapshotRegistry;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
-use contextra_ports::{Clock, SystemClock};
+use crate::contextra_ports::{self, Clock, SystemClock};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::hash::Hasher;

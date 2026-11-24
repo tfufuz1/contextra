@@ -6,7 +6,7 @@
 //! vollständig freigegeben wird.
 
 use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer, TxBufferConfig, STAGING_ENTRY_OVERHEAD_BYTES};
-use contextra_types::{ContextraError, DocId, TxId};
+use contextra_mvcc::{ContextraError, DocId, TxId};
 use std::time::Duration;
 
 // Prüft, dass das Überschreiten des Byte-Budgets einer Transaktion mit einem Fehler abgewiesen wird.

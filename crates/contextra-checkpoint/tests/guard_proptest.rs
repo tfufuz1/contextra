@@ -15,8 +15,8 @@
 //! Generiert zufällige Transaktionsfolgen zur Verifikation der Guard-Invarianten.
 
 use contextra_checkpoint::{CheckpointManifest, CheckpointMeta, PersistentCheckpointStore};
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_types::{Result, TxId};
+use contextra_checkpoint::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_checkpoint::contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use proptest::prelude::*;
 use std::collections::{HashMap, HashSet};

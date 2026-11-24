@@ -15,7 +15,7 @@
 
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore};
 use contextra_testkit::{InMemoryStorageEngine, ManualClock};
-use contextra_types::TxId;
+use contextra_checkpoint::contextra_types::TxId;
 use std::sync::Arc;
 
 // Testet: test a stores with same clock produce identical timestamps.

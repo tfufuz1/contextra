@@ -13,7 +13,7 @@
 
 use super::*;
 use crate::orphan::pending_rollback_count;
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use crate::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 
@@ -410,7 +410,7 @@ async fn test_checkpoint_guard_commit_prevents_rollback() {
 #[tokio::test]
 // Prüft, dass ein frisch initialisierter Store zunächst eine leere Checkpoint-Liste liefert.
 async fn test_list_checkpoints_empty_initially() {
-    use contextra_ports::CheckpointCoordinator;
+    use crate::contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     let store = PersistentCheckpointStore::new(storage, "test").unwrap();
 
@@ -421,7 +421,7 @@ async fn test_list_checkpoints_empty_initially() {
 #[tokio::test]
 // Prüft, dass die Wiederherstellung eines nicht existierenden Checkpoints mit CheckpointNotFound fehlschlägt.
 async fn test_checkpoint_not_found_returns_err() {
-    use contextra_ports::CheckpointCoordinator;
+    use crate::contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     let store = PersistentCheckpointStore::new(storage, "test").unwrap();
 
@@ -432,7 +432,7 @@ async fn test_checkpoint_not_found_returns_err() {
 #[tokio::test]
 // Prüft, dass benannte Checkpoints auch nach dem Schließen und Wiederöffnen des Stores vollständig lesbar sind.
 async fn test_list_named_checkpoints_after_reopen() {
-    use contextra_ports::CheckpointCoordinator;
+    use crate::contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     {
         let store1 = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
@@ -469,7 +469,7 @@ async fn test_list_named_checkpoints_after_reopen() {
 #[tokio::test]
 // Prüft die Konsistenz zwischen dem In-Memory Cache und dem persistenten Storage.
 async fn test_list_checkpoints_cache_matches_storage() {
-    use contextra_ports::CheckpointCoordinator;
+    use crate::contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     let store1 = Arc::new(PersistentCheckpointStore::new(storage.clone(), "test").unwrap());
 
@@ -499,7 +499,7 @@ async fn test_list_checkpoints_cache_matches_storage() {
 #[tokio::test]
 // Prüft die Threadsicherheit und Fehlerfreiheit bei nebenläufiger Erstellung mehrerer Checkpoints.
 async fn test_concurrent_checkpoint_creation_is_safe() {
-    use contextra_ports::CheckpointCoordinator;
+    use crate::contextra_ports::CheckpointCoordinator;
     use tokio::task::JoinSet;
 
     let storage = Arc::new(MockStorage::new());
@@ -897,7 +897,7 @@ async fn test_concurrent_checkpoint_index_atomicity() {
 
 #[tokio::test]
 async fn test_store_traits_roundtrip_coverage() {
-    use contextra_ports::{Checkpoint, CheckpointCoordinator};
+    use crate::contextra_ports::{Checkpoint, CheckpointCoordinator};
     let storage = Arc::new(MockStorage::new());
     let store = PersistentCheckpointStore::new(storage, "test_traits").unwrap();
 

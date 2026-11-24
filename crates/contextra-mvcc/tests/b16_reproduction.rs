@@ -75,7 +75,7 @@ fn test_b16_coarsening_prevents_false_negatives() {
 #[test]
 fn test_long_lived_snapshot_pin_blocker_alarm() {
     use contextra_mvcc::SnapshotRegistry;
-    use contextra_testkit::ManualClock;
+    use contextra_mvcc::contextra_ports::ManualClock;
     use std::sync::Arc;
     use std::time::Duration;
 

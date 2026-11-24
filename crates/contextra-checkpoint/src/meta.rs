@@ -11,7 +11,7 @@
 //! - [`StateCheckpoint`]: Minimaler Transaktions-Snapshot mit Zeitstempel und optionalem Namespace.
 //! - [`validate_identifier`]: Validierungsfunktion für sichere String-Bezeichner.
 
-use contextra_types::{ContextraError, Result, TxId, WorkflowState};
+use crate::contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use serde::{Deserialize, Serialize};
 
 // RESOLVED: AGT-CKPT-001 — UTF-8 char counting used for 256 char limit (TS: 2026-09-01T23:07:05Z) (SESSION: 358e3b0a)

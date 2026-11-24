@@ -14,8 +14,8 @@
 //! Prüft alle Pfade, über die ein CheckpointGuard finalisiert oder vorzeitig verlassen wird.
 
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore};
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_types::{ContextraError, Result, TxId};
+use contextra_checkpoint::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_checkpoint::contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

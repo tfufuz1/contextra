@@ -10,27 +10,17 @@
 //!
 //! ## Öffentliche Checkpoint-Subsystem Architecture (gemäß ADR-011)
 //! `contextra-checkpoint` ist der **einzige öffentlich sichtbare Einstiegspunkt** für das Checkpoint-Konzept.
-//! Es stellt den Trait [`contextra_ports::CheckpointCoordinator`], die Registry [`PersistentCheckpointStore`]
+//! Es stellt den Trait [`crate::contextra_ports::CheckpointCoordinator`], die Registry [`PersistentCheckpointStore`]
 //! sowie den RAII-Guard [`CheckpointGuard`] für automatisches Rollback bei Fehlern bereit.
 //!
-//! **Hinweis zur Abgrenzung:**
-//! Das Crate `contextra-store` besitzt ein lokales, crate-internes Checkpoint-Modul (`pub(crate)`). Dieses ist ein reines
-//! Implementierungsdetail für MVCC-Snapshot-Pinning (gekoppelt an `SnapshotRegistry`) und darf NIEMALS direkt von außerhalb
-//! des Store-Crates verwendet werden.
-//!
 //! ## Architektur & Crash-Safety
-//! `PersistentCheckpointStore` delegiert Persistenz an ein [`contextra_ports::StorageEngine`]-Objekt
+//! `PersistentCheckpointStore` delegiert Persistenz an ein [`crate::contextra_ports::StorageEngine`]-Objekt
 //! und cacht aktive Checkpoints in einem thread-sicheren In-Memory-Store (`parking_lot::RwLock`).
 //!
 //! **Drop-Semantik & Non-Blocking-I/O:**
 //! `CheckpointGuard::drop()` und `PinGuard::drop()` führen ausschließlich In-Memory-Mutationen im
 //! `InstanceOrphanRegistry` aus ohne blockierendes Disk-I/O. Persistenz auf Disk erfolgt entkoppelt
 //! über Piggyback-Flushes (z.B. bei commit/rollback/unpin) sowie explizite Lifecycle-Flushes (`shutdown()`, `close()`).
-//!
-//! ## Einbindung & Abhängigkeiten
-//! - **Abhängigkeiten (normal):** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `bytes`, `tokio`, `tracing`, `serde`, `serde_json`, `parking_lot`, `blake3`, `futures-executor`, `dirs`.
-//! - **Abhängigkeiten (dev):** `contextra-testkit`, `contextra-store`, `tempfile`, `proptest`, `criterion`.
-//! - **Wird eingebunden von:** `contextra-agent`, `contextra-db`, `contextra-engine`.
 
 #![forbid(unsafe_code)]
 
@@ -41,6 +31,11 @@
 // SIEHE AUCH:  ADR-011
 // REVIEW-PASS[1/2] (TS: 2026-09-15T15:09:43Z) (SESSION: 2e382e86) PRÜFER-KONTEXT: FRESH
 // REVIEW-PASS[2/2] (TS: 2026-09-16T16:23:23Z) (SESSION: 8d62c439) PRÜFER-KONTEXT: FRESH
+
+pub mod crate::contextra_ports;
+pub mod crate::contextra_types;
+
+pub use crate::contextra_types::{ContextraError, Result, TxId, WorkflowState};
 
 // ANCHOR[contextra-checkpoint:MOD-001]
 // NOTE: Die Aufteilung in Untermodule kapselt Guards, Cloner, Manifest, Metadaten, Orphan-Reaping und Store.

@@ -14,9 +14,9 @@
 //! Simuliert plötzliche Abstürze vor, während und nach dem Schreiben von Checkpoints.
 
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_checkpoint::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_testkit::InMemoryStorageEngine;
-use contextra_types::{ContextraError, Result, TxId};
+use contextra_checkpoint::contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};

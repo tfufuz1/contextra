@@ -13,7 +13,7 @@
 //!
 //! Prüft die deterministische Vergabe interner Checkpoint-Transaktions-IDs.
 
-use contextra_ports::{IdGen, SequentialIdGen};
+use contextra_checkpoint::contextra_ports::{IdGen, SequentialIdGen};
 use std::sync::Arc;
 
 // Testet: test checkpoint id gen determinism.

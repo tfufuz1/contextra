@@ -5,7 +5,7 @@
 //!
 //! ## Ring & Rolle
 //! Gehört zu **Ring 1 (Persistenz)**. Bildet die Brücke zwischen laufenden Transaktionen der Anwendungslogik
-//! (z. B. Agenten-Workflows in Ring 2/3) und der Persistenzebene ([`contextra_ports::StorageEngine`]).
+//! (z. B. Agenten-Workflows in Ring 2/3) und der Persistenzebene ([`crate::contextra_ports::StorageEngine`]).
 //!
 //! ## Hauptkomponenten
 //! - [`PinGuard`]: Schützt gepinnte MVCC-Sequenznummern vor versehentlichem Löschen durch den LSM-Compactor.
@@ -19,8 +19,8 @@
 
 use crate::meta::StateCheckpoint;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinnedSeqNoOrphan};
-use contextra_ports::SystemClock;
-use contextra_types::{ContextraError, Result, TxId};
+use crate::contextra_ports::SystemClock;
+use crate::contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -38,14 +38,14 @@ use std::sync::Arc;
 /// - `orphan_registry`: Instanzgebundene Registry für verwaiste Einträge bei unkontrolliertem Drop.
 /// - `clock`: Injizierter Uhrzeit-Port für deterministische Zeitmessung.
 #[must_use = "PinGuard must be defused upon successful checkpoint storage"]
-pub struct PinGuard<S: contextra_ports::StorageEngine> {
+pub struct PinGuard<S: crate::contextra_ports::StorageEngine> {
     storage: Arc<S>,
     seq_no: Option<u64>,
     orphan_registry: Arc<InstanceOrphanRegistry>,
-    clock: Arc<dyn contextra_ports::Clock>,
+    clock: Arc<dyn crate::contextra_ports::Clock>,
 }
 
-impl<S: contextra_ports::StorageEngine> PinGuard<S> {
+impl<S: crate::contextra_ports::StorageEngine> PinGuard<S> {
     // ANCHOR[contextra-checkpoint:GRD-002]
     /// Pinnt eine Sequenznummer in der Storage-Engine unter Verwendung der Clock aus der Orphan-Registry.
     ///
@@ -75,7 +75,7 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
         storage: Arc<S>,
         seq_no: u64,
         orphan_registry: Arc<InstanceOrphanRegistry>,
-        clock: Arc<dyn contextra_ports::Clock>,
+        clock: Arc<dyn crate::contextra_ports::Clock>,
     ) -> Result<Self> {
         // NOTE: Pinnen verhindert das physische Löschen von SSTables durch den LSM-Compactor
         storage.pin_checkpoint(seq_no).await?;
@@ -88,7 +88,7 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
     }
 
     /// Liefert eine Referenz auf den injizierten Clock-Port.
-    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+    pub fn clock(&self) -> &Arc<dyn crate::contextra_ports::Clock> {
         &self.clock
     }
 
@@ -116,7 +116,7 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
     }
 }
 
-impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
+impl<S: crate::contextra_ports::StorageEngine> Drop for PinGuard<S> {
     // ANCHOR[contextra-checkpoint:GRD-005]
     // Ablauf von `PinGuard::drop`:
     // Wenn `seq_no` noch gesetzt ist (Guard wurde nicht defused oder unpinned):
@@ -149,21 +149,21 @@ impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
 /// wird KEIN asynchroner Hintergrund-Rollback gespawnt, um Kollisionen mit späteren Transaktionen zu verhindern.
 /// Stattdessen wird der Checkpoint als "orphaned" registriert/persistiert und beim nächsten kontrollierten Recovery-Zyklus verarbeitet.
 #[must_use = "CheckpointGuard must be explicitly finalized via .commit() or .rollback().await"]
-pub struct CheckpointGuard<S: contextra_ports::StorageEngine> {
+pub struct CheckpointGuard<S: crate::contextra_ports::StorageEngine> {
     pub(crate) checkpoint: Option<StateCheckpoint>,
     pub(crate) storage: Arc<S>,
     pub(crate) namespace: String,
     pub(crate) orphan_registry: Arc<InstanceOrphanRegistry>,
     pub(crate) skipped_rollbacks: Arc<AtomicU64>,
-    pub(crate) clock: Arc<dyn contextra_ports::Clock>,
-    pub(crate) metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+    pub(crate) clock: Arc<dyn crate::contextra_ports::Clock>,
+    pub(crate) metrics_sink: Option<Arc<dyn crate::contextra_ports::MetricsSink>>,
     pub(crate) created_at_nanos: u64,
 }
 
-impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
+impl<S: crate::contextra_ports::StorageEngine> CheckpointGuard<S> {
     /// Erzeugt einen neuen `CheckpointGuard` mit Standard-SystemClock.
     pub fn new(checkpoint: StateCheckpoint, storage: Arc<S>, namespace: impl Into<String>) -> Self {
-        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+        let clock: Arc<dyn crate::contextra_ports::Clock> = Arc::new(SystemClock::new());
         Self::with_clock(checkpoint, storage, namespace, clock)
     }
 
@@ -172,7 +172,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         checkpoint: StateCheckpoint,
         storage: Arc<S>,
         namespace: impl Into<String>,
-        clock: Arc<dyn contextra_ports::Clock>,
+        clock: Arc<dyn crate::contextra_ports::Clock>,
     ) -> Self {
         let ns = namespace.into();
         let orphan_path = std::path::PathBuf::from(format!("{ns}_orphaned_checkpoints.json"));
@@ -233,7 +233,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         namespace: impl Into<String>,
         orphan_registry: Arc<InstanceOrphanRegistry>,
         skipped_rollbacks: Arc<AtomicU64>,
-        clock: Arc<dyn contextra_ports::Clock>,
+        clock: Arc<dyn crate::contextra_ports::Clock>,
     ) -> Self {
         let created_at_nanos = clock.monotonic_nanos();
         Self {
@@ -249,7 +249,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
     }
 
     /// Ergänzt den Guard um eine Metrik-Senke zur Erfassung von Ausführungsdauern.
-    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn crate::contextra_ports::MetricsSink>) -> Self {
         self.metrics_sink = Some(sink);
         self
     }
@@ -257,14 +257,14 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
     /// Ergänzt den Guard optional um eine Metrik-Senke.
     pub fn with_metrics_sink_opt(
         mut self,
-        sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+        sink: Option<Arc<dyn crate::contextra_ports::MetricsSink>>,
     ) -> Self {
         self.metrics_sink = sink;
         self
     }
 
     /// Liefert den verwendeten Clock-Port.
-    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+    pub fn clock(&self) -> &Arc<dyn crate::contextra_ports::Clock> {
         &self.clock
     }
 
@@ -299,7 +299,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
     pub async fn for_agent_step_with_clock(
         storage: Arc<S>,
         tx: TxId,
-        clock: Arc<dyn contextra_ports::Clock>,
+        clock: Arc<dyn crate::contextra_ports::Clock>,
     ) -> Result<Self> {
         let ns = "agent_step";
         let orphan_path = std::path::PathBuf::from(format!("{ns}_orphaned_checkpoints.json"));
@@ -464,7 +464,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
     }
 }
 
-impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
+impl<S: crate::contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
     // ANCHOR[contextra-checkpoint:GRD-011]
     // Ablauf von `CheckpointGuard::drop`:
     // Wenn `checkpoint` noch vorhanden ist (kein explizites commit() oder rollback()):
@@ -511,7 +511,7 @@ impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
 )]
 mod tests {
     use super::*;
-    use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+    use crate::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
     use parking_lot::Mutex;
     use std::collections::{HashMap, HashSet};
 
@@ -768,7 +768,7 @@ mod tests {
     #[allow(non_snake_case)]
     #[tokio::test]
     async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
-        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+        let clock: Arc<dyn crate::contextra_ports::Clock> = Arc::new(SystemClock::new());
         let dummy_storage = Arc::new(MockStorage::new());
         let consumed_guard = CheckpointGuard::<MockStorage> {
             checkpoint: None,
@@ -828,7 +828,7 @@ mod tests {
             namespace: Some("test".to_string()),
         };
         let guard = CheckpointGuard::new(cp, storage, "test")
-            .with_metrics_sink(metrics.clone() as Arc<dyn contextra_ports::MetricsSink>);
+            .with_metrics_sink(metrics.clone() as Arc<dyn crate::contextra_ports::MetricsSink>);
 
         let committed = guard.commit().unwrap();
         assert_eq!(committed.tx_id, TxId::new(100));
@@ -863,7 +863,7 @@ mod tests {
             namespace: Some("test".to_string()),
         };
         let guard = CheckpointGuard::new(cp, storage, "test")
-            .with_metrics_sink(metrics.clone() as Arc<dyn contextra_ports::MetricsSink>);
+            .with_metrics_sink(metrics.clone() as Arc<dyn crate::contextra_ports::MetricsSink>);
 
         // Drop guard without calling commit
         drop(guard);

@@ -10,7 +10,7 @@
 //! - [`CheckpointManifest`]: Struktur bestehend aus Metadaten, Komponentenliste und BLAKE3-Prüfsumme.
 
 use crate::meta::{validate_identifier, CheckpointMeta};
-use contextra_types::{ContextraError, Result};
+use crate::contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
 /// AI-TAG\[PANIC-SAFETY\]\[CRITICAL\] RESOLVED: AGT-CKPT-f3a1b2c4 (TS:2026-08-29T08:06:29Z) (SESSION:14348074)
@@ -104,7 +104,7 @@ impl CheckpointManifest {
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_types::TxId;
+    use crate::contextra_types::TxId;
 
     // Prüft, dass eine Komponente mit reinem Whitespace bei der Manifest-Erstellung abgelehnt wird.
     #[test]

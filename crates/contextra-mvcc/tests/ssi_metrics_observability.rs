@@ -8,12 +8,67 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use contextra_mvcc::contextra_ports::{ManualClock, MetricsSink};
 use contextra_mvcc::SequenceLogSsiValidator;
 use contextra_mvcc::SnapshotRegistry;
-use contextra_ports::MetricsSink;
-use contextra_testkit::{ManualClock, MetricEvent, TestMetricsSink};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
+
+#[derive(Debug, Clone)]
+enum MetricEvent {
+    #[allow(dead_code)]
+    Counter {
+        name: String,
+        value: u64,
+        labels: Vec<(String, String)>,
+    },
+    Gauge {
+        name: String,
+        value: f64,
+        #[allow(dead_code)]
+        labels: Vec<(String, String)>,
+    },
+}
+
+struct TestMetricsSink {
+    events: Mutex<Vec<MetricEvent>>,
+}
+
+impl TestMetricsSink {
+    fn new() -> Self {
+        Self {
+            events: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn events(&self) -> Vec<MetricEvent> {
+        self.events.lock().clone()
+    }
+}
+
+impl MetricsSink for TestMetricsSink {
+    fn increment_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
+        self.events.lock().push(MetricEvent::Counter {
+            name: name.to_string(),
+            value,
+            labels: labels
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                .collect(),
+        });
+    }
+
+    fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
+        self.events.lock().push(MetricEvent::Gauge {
+            name: name.to_string(),
+            value,
+            labels: labels
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                .collect(),
+        });
+    }
+}
 
 // Prüft die Emission von Füllstands- und Coarsening-Gauges beim Überschreiten der 80 %-Schwelle.
 #[test]

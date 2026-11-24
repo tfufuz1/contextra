@@ -7,7 +7,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
-use contextra_types::{ContextraError, TxId};
+use contextra_mvcc::{ContextraError, TxId};
 
 // Prüft, dass forget_from alle Schreibregistrierungen eines abgebrochenen Batches ab einer Sequenznummer entfernt.
 #[test]
