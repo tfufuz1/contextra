@@ -91,6 +91,37 @@ impl RunReader {
     pub fn section_meta(&self, cluster: ClusterId) -> Option<&ClusterDirectoryEntry> {
         self.directory.find(cluster)
     }
+
+    /// Reads and decodes a cluster entry by key using Filter -> SubIndex -> 1 DataBlock.
+    pub fn get_entry(
+        &self,
+        ctx: &super::section::SectionReadContext<'_>,
+        branch: contextra_storage_ports::BranchId,
+        user_key: &[u8],
+        stamp_cap: contextra_storage_ports::Stamp,
+        max_section_bytes: usize,
+    ) -> Result<Option<super::block::BlockEntry>, Error> {
+        let Some(sec) = self.read_section(ctx.cluster, max_section_bytes)? else {
+            return Ok(None);
+        };
+        super::section::get_in_section(&sec, ctx, branch, user_key, stamp_cap)
+    }
+
+    /// Scans visible cluster entries inside `[start_inclusive, end_exclusive)` up to `stamp_cap`.
+    pub fn scan_entries(
+        &self,
+        ctx: &super::section::SectionReadContext<'_>,
+        branch: contextra_storage_ports::BranchId,
+        start_inclusive: Option<&[u8]>,
+        end_exclusive: Option<&[u8]>,
+        stamp_cap: contextra_storage_ports::Stamp,
+        max_section_bytes: usize,
+    ) -> Result<Vec<super::block::BlockEntry>, Error> {
+        let Some(sec) = self.read_section(ctx.cluster, max_section_bytes)? else {
+            return Ok(Vec::new());
+        };
+        super::section::scan_section(&sec, ctx, branch, start_inclusive, end_exclusive, stamp_cap)
+    }
 }
 
 fn read_vec(file: &dyn File, offset: u64, len: usize) -> Result<Vec<u8>, Error> {

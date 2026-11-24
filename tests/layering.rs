@@ -60,16 +60,20 @@ impl Ring {
     pub fn for_crate(name: &str) -> Option<Ring> {
         match name {
             // Ring 0: Foundation & Core Domain Logic
-            "contextra-types" | "contextra-ports" | "contextra-mvcc" | "contextra-vector"
+            "contextra-ids" | "contextra-env" | "contextra-durable-fs"
+            | "contextra-types" | "contextra-ports" | "contextra-mvcc" | "contextra-vector"
             | "contextra-rank" | "contextra-adapt" | "contextra-text" | "contextra-graph"
             | "contextra-crypto" | "contextra-simd" | "contextra-sys" | "contextra-wire"
-        | "contextra-core" => Some(Ring::Ring0),
+            | "contextra-core" | "contextra-ingest" | "contextra-prompt-guard" => Some(Ring::Ring0),
 
             // Ring 1: Storage & State Persistence
-            "contextra-store" | "contextra-checkpoint" | "contextra-kvcache" => Some(Ring::Ring1),
+            "contextra-store" | "contextra-storage" | "contextra-storage-ports"
+            | "contextra-checkpoint" | "contextra-kvcache" => Some(Ring::Ring1),
 
-            // Ring 2: External Integrations & Execution Sandboxes
-            "contextra-sandbox" | "contextra-infer-onnx" | "contextra-infer-candle"
+            // Ring 2: Storage Adapters, External Integrations & Execution Sandboxes
+            "contextra-storage-fs" | "contextra-crypto-ref" | "contextra-keys-file"
+            | "contextra-keys-cohort" | "contextra-storage-bridge"
+            | "contextra-sandbox" | "contextra-infer-onnx" | "contextra-infer-candle"
             | "contextra-infer-ollama" => Some(Ring::Ring2),
 
             // Ring 3: Engine, Reasoning & Cognition

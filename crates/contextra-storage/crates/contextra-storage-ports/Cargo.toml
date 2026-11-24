@@ -10,9 +10,9 @@ rust-version.workspace = true
 testing = []
 
 [dependencies]
-bytes = "1"
-thiserror = "1"
-zeroize = "1"
+bytes = { workspace = true }
+thiserror = { workspace = true }
+zeroize = { workspace = true }
 
 [lints]
 workspace = true

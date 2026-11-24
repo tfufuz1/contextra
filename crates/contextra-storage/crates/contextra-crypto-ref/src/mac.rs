@@ -2,19 +2,22 @@
 use contextra_storage_ports::{traits::Mac, Key32};
 use hmac::{Hmac, Mac as HmacTrait};
 use sha2::Sha256;
+use subtle::ConstantTimeEq;
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct Blake3Mac;
-
-impl Mac for Blake3Mac {
-    fn tag(&self, key: &Key32, data: &[u8]) -> Result<[u8; 32], contextra_storage_ports::Error> {
-        Ok(*blake3::keyed_hash(key.expose(), data).as_bytes())
-    }
-}
-
-/// HMAC-SHA256 required by the Authenticated SealFrame mode (E-68).
+/// HMAC-SHA256 required by the Authenticated SealFrame mode and Ledger (E-68).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct HmacSha256;
+
+impl HmacSha256 {
+    /// Constant-time verification of a truncated or full MAC tag.
+    pub fn verify_tag(&self, key: &Key32, data: &[u8], expected_prefix: &[u8]) -> Result<bool, contextra_storage_ports::Error> {
+        let full = self.tag(key, data)?;
+        if expected_prefix.len() > full.len() {
+            return Ok(false);
+        }
+        Ok(full[..expected_prefix.len()].ct_eq(expected_prefix).into())
+    }
+}
 
 impl Mac for HmacSha256 {
     fn tag(&self, key: &Key32, data: &[u8]) -> Result<[u8; 32], contextra_storage_ports::Error> {
@@ -41,5 +44,6 @@ mod tests {
             0x7a, 0x3b, 0x16, 0x96, 0xa0, 0xb6, 0x8c, 0xf7,
         ];
         assert_eq!(actual, expected);
+        assert!(HmacSha256.verify_tag(&key, b"Hi There", &expected[..16]).unwrap());
     }
 }

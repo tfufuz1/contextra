@@ -318,17 +318,82 @@ allowed_internal = []
 [crates.contextra-prompt-guard.dev_allowed]
 test = "cargo test -p contextra-prompt-guard --locked"
 
-[crates.contextra-vault]
-group = "safety"
+[crates.contextra-storage-ports]
+group = "storage"
 level = 1
 tier = "experimental"
-path = "crates/contextra-vault"
+path = "crates/contextra-storage/crates/contextra-storage-ports"
 unsafe_island = false
-allowed_internal = ["contextra-sys"]
-[crates.contextra-vault.feature_closure_allowed]
-workspace = ["contextra-types"]
-[crates.contextra-vault.dev_allowed]
-test = "cargo test -p contextra-vault --locked"
+allowed_internal = []
+[crates.contextra-storage-ports.feature_closure_allowed]
+[crates.contextra-storage-ports.dev_allowed]
+test = "cargo test -p contextra-storage-ports --locked"
+
+[crates.contextra-storage]
+group = "storage"
+level = 1
+tier = "experimental"
+path = "crates/contextra-storage/crates/contextra-storage"
+unsafe_island = false
+allowed_internal = ["contextra-storage-ports"]
+[crates.contextra-storage.feature_closure_allowed]
+[crates.contextra-storage.dev_allowed]
+test = "cargo test -p contextra-storage --locked"
+
+[crates.contextra-storage-fs]
+group = "storage"
+level = 2
+tier = "experimental"
+path = "crates/contextra-storage/crates/contextra-storage-fs"
+unsafe_island = false
+allowed_internal = ["contextra-storage-ports"]
+[crates.contextra-storage-fs.feature_closure_allowed]
+[crates.contextra-storage-fs.dev_allowed]
+test = "cargo test -p contextra-storage-fs --locked"
+
+[crates.contextra-crypto-ref]
+group = "storage"
+level = 2
+tier = "experimental"
+path = "crates/contextra-storage/crates/contextra-crypto-ref"
+unsafe_island = false
+allowed_internal = ["contextra-storage-ports"]
+[crates.contextra-crypto-ref.feature_closure_allowed]
+[crates.contextra-crypto-ref.dev_allowed]
+test = "cargo test -p contextra-crypto-ref --locked"
+
+[crates.contextra-keys-file]
+group = "storage"
+level = 2
+tier = "experimental"
+path = "crates/contextra-storage/crates/contextra-keys-file"
+unsafe_island = false
+allowed_internal = ["contextra-storage-ports"]
+[crates.contextra-keys-file.feature_closure_allowed]
+[crates.contextra-keys-file.dev_allowed]
+test = "cargo test -p contextra-keys-file --locked"
+
+[crates.contextra-keys-cohort]
+group = "storage"
+level = 2
+tier = "experimental"
+path = "crates/contextra-storage/crates/contextra-keys-cohort"
+unsafe_island = false
+allowed_internal = ["contextra-storage-ports"]
+[crates.contextra-keys-cohort.feature_closure_allowed]
+[crates.contextra-keys-cohort.dev_allowed]
+test = "cargo test -p contextra-keys-cohort --locked"
+
+[crates.contextra-storage-bridge]
+group = "storage"
+level = 2
+tier = "experimental"
+path = "crates/contextra-storage/crates/contextra-storage-bridge"
+unsafe_island = false
+allowed_internal = ["contextra-storage", "contextra-storage-ports"]
+[crates.contextra-storage-bridge.feature_closure_allowed]
+[crates.contextra-storage-bridge.dev_allowed]
+test = "cargo test -p contextra-storage-bridge --locked"
 
 [crates.contextra-agent]
 group = "agentic"
@@ -353,18 +418,6 @@ allowed_internal = ["contextra-types", "contextra-ports"]
 exp-hyperedge = ["contextra-graph"]
 [crates.contextra-cognition.dev_allowed]
 test = "cargo test -p contextra-cognition --locked"
-
-[crates.contextra-erasure]
-group = "compliance"
-level = 0
-tier = "frozen"
-path = "crates/contextra-erasure"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-erasure.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-erasure.dev_allowed]
-test = "cargo test -p contextra-erasure --locked"
 
 [crates.contextra-engine]
 group = "integration"

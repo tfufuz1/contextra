@@ -10,10 +10,11 @@ testing = []
 
 [dependencies]
 contextra-storage-ports = { path = "../contextra-storage-ports" }
-bytes = "1"
-thiserror = "1"
-zeroize = "1"
+bytes = { workspace = true }
+thiserror = { workspace = true }
+zeroize = { workspace = true }
 crossbeam-skiplist = { workspace = true }
+siphasher = "1"
 
 [dev-dependencies]
 contextra-crypto-ref = { path = "../contextra-crypto-ref", features = ["testing"] }

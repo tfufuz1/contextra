@@ -1,3 +1,5 @@
-//! RealFs (SP-ENV §3.5). Einziger Crate mit unsafe-Erlaubnis; Budget per cargo-geiger.
-//! Kein Lint-Vererben: unsafe bleibt hier gesperrt, bis WP-03.3 entscheidet (rustix bevorzugt).
+//! RealFs (SP-ENV §3.5, SPEC §3.7.3). Safe Rust only (`std` + `rustix`).
+#![forbid(unsafe_code)]
+
+pub mod host;
 pub mod realfs;

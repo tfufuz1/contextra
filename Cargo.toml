@@ -41,7 +41,6 @@ members = [
     "crates/contextra-engine",
     "crates/contextra-cognition",
     "crates/contextra-rank",
-    "crates/contextra-erasure",
     "crates/contextra-ingest",
     "crates/contextra-prompt-guard",
 ]
@@ -176,7 +175,6 @@ contextra-kvcache = { path = "crates/contextra-kvcache" }
 contextra-engine = { path = "crates/contextra-engine" }
 contextra-cognition = { path = "crates/contextra-cognition" }
 contextra-rank = { path = "crates/contextra-rank" }
-contextra-erasure = { path = "crates/contextra-erasure" }
 contextra-ingest = { path = "crates/contextra-ingest" }
 
 # Ingestion dependencies

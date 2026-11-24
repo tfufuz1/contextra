@@ -1,13 +1,13 @@
-//! RealFs implementation using standard POSIX filesystem operations (SP-ENV §3.5, SPEC §3.2).
+//! RealFs implementation using std + rustix (SP-ENV §3.5, SPEC §3.7.3).
 #![forbid(unsafe_code)]
 
 use contextra_storage_ports::traits::{File, FileRole, Fs, FsCaps, FsLock, IoCtx};
 use contextra_storage_ports::Error;
 use std::fs::{File as StdFile, OpenOptions, TryLockError};
 use std::io::ErrorKind;
+use std::os::unix::fs::FileExt;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -27,10 +27,19 @@ fn role_name(role: FileRole) -> &'static str {
 }
 
 fn map_io_error(e: std::io::Error, role: FileRole) -> Error {
+    if e.kind() == ErrorKind::StorageFull {
+        return Error::DiskFull;
+    }
     Error::Io {
         role: role_name(role),
         kind: e.kind(),
     }
+}
+
+#[cfg(unix)]
+fn map_errno(err: rustix::io::Errno, role: FileRole) -> Error {
+    let io_err = std::io::Error::from_raw_os_error(err.raw_os_error());
+    map_io_error(io_err, role)
 }
 
 struct RealFileState {
@@ -53,6 +62,19 @@ impl RealFile {
                 allocated: len,
             }),
         })
+    }
+
+    fn zero_fill_range(&self, start: u64, end: u64, ctx: IoCtx) -> Result<(), Error> {
+        const ZEROS: [u8; 8192] = [0u8; 8192];
+        let mut offset = start;
+        while offset < end {
+            let chunk = ((end - offset) as usize).min(ZEROS.len());
+            self.file
+                .write_all_at(&ZEROS[..chunk], offset)
+                .map_err(|e| map_io_error(e, ctx.role))?;
+            offset += chunk as u64;
+        }
+        Ok(())
     }
 }
 
@@ -92,7 +114,8 @@ impl File for RealFile {
         Ok(())
     }
 
-    /// Writes explicit zero blocks (never sparse) so ENOSPC surfaces during preallocation (AN-10).
+    /// Reserves physical blocks via `fallocate` where available, falling back to
+    /// explicit zero-blocks so ENOSPC surfaces during preallocation (AN-10).
     fn preallocate(&self, len: u64, ctx: IoCtx) -> Result<(), Error> {
         let mut state = self.state.lock().map_err(|_| Error::Poisoned {
             cause: "RealFile state lock",
@@ -100,21 +123,25 @@ impl File for RealFile {
         if len <= state.allocated {
             return Ok(());
         }
-        const ZEROS: [u8; 8192] = [0u8; 8192];
-        let mut offset = state.allocated;
-        while offset < len {
-            let chunk = ((len - offset) as usize).min(ZEROS.len());
-            self.file
-                .write_all_at(&ZEROS[..chunk], offset)
-                .map_err(|e| {
-                    if e.kind() == ErrorKind::StorageFull {
-                        Error::DiskFull
-                    } else {
-                        map_io_error(e, ctx.role)
-                    }
-                })?;
-            offset += chunk as u64;
+        let start = state.allocated;
+        #[cfg(target_os = "linux")]
+        {
+            let delta = len - start;
+            match rustix::fs::fallocate(
+                &self.file,
+                rustix::fs::FallocateFlags::empty(),
+                start,
+                delta,
+            ) {
+                Ok(()) => {
+                    state.allocated = len;
+                    return Ok(());
+                }
+                Err(rustix::io::Errno::OPNOTSUPP | rustix::io::Errno::NOSYS) => {}
+                Err(err) => return Err(map_errno(err, ctx.role)),
+            }
         }
+        self.zero_fill_range(start, len, ctx)?;
         state.allocated = len;
         Ok(())
     }
@@ -185,6 +212,35 @@ impl Fs for RealFs {
         std::fs::hard_link(from, to).map_err(|e| map_io_error(e, ctx.role))
     }
 
+    fn punch_hole(&self, path: &Path, offset: u64, length: u64, ctx: IoCtx) -> Result<(), Error> {
+        #[cfg(target_os = "linux")]
+        {
+            let file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(path)
+                .map_err(|e| map_io_error(e, ctx.role))?;
+            let flags = rustix::fs::FallocateFlags::PUNCH_HOLE
+                | rustix::fs::FallocateFlags::KEEP_SIZE;
+            return rustix::fs::fallocate(&file, flags, offset, length).map_err(|err| {
+                if err == rustix::io::Errno::OPNOTSUPP || err == rustix::io::Errno::NOSYS {
+                    Error::Unsupported {
+                        what: "hole punching",
+                    }
+                } else {
+                    map_errno(err, ctx.role)
+                }
+            });
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (path, offset, length, ctx);
+            Err(Error::Unsupported {
+                what: "hole punching",
+            })
+        }
+    }
+
     fn lock(&self, path: &Path, ctx: IoCtx) -> Result<Box<dyn FsLock>, Error> {
         let mut opts = OpenOptions::new();
         opts.read(true).write(true).create(true).truncate(false);
@@ -221,15 +277,25 @@ impl Fs for RealFs {
     }
 
     fn free_space(&self, dir: &Path) -> Result<u64, Error> {
-        if !dir.exists() {
-            return Err(Error::Io {
-                role: "other",
-                kind: ErrorKind::NotFound,
-            });
+        #[cfg(unix)]
+        {
+            let stat = rustix::fs::statvfs(dir).map_err(|err| map_errno(err, FileRole::Other))?;
+            let avail = stat.f_bavail as u64;
+            let block = stat.f_frsize as u64;
+            return Ok(avail.saturating_mul(block));
         }
-        // Safe-Rust fallback without unsafe libc::statvfs; production hosts can
-        // wrap with a dedicated platform probe.
-        Ok(1024 * 1024 * 1024 * 1024)
+        #[cfg(not(unix))]
+        {
+            if !dir.exists() {
+                return Err(Error::Io {
+                    role: "other",
+                    kind: ErrorKind::NotFound,
+                });
+            }
+            Err(Error::Unsupported {
+                what: "free_space on non-unix host",
+            })
+        }
     }
 
     fn caps(&self) -> FsCaps {
@@ -240,7 +306,7 @@ impl Fs for RealFs {
             preallocation_reserves_space: true,
             hard_link: true,
             reflink: false,
-            punch_hole: false,
+            punch_hole: cfg!(target_os = "linux"),
         }
     }
 }

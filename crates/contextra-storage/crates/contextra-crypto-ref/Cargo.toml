@@ -10,11 +10,11 @@ testing = []
 
 [dependencies]
 contextra-storage-ports = { path = "../contextra-storage-ports" }
-blake3 = { workspace = true }
 chacha20poly1305 = { workspace = true }
 hkdf = { workspace = true }
 hmac = "0.12"
 sha2 = { workspace = true }
+subtle = "2"
 zeroize = { workspace = true }
 
 [lints]

@@ -882,12 +882,12 @@ dependencies = [
 name = "contextra-crypto-ref"
 version = "0.1.0"
 dependencies = [
- "blake3",
  "chacha20poly1305",
  "contextra-storage-ports",
  "hkdf",
  "hmac",
  "sha2",
+ "subtle",
  "zeroize",
 ]
 
@@ -1142,14 +1142,21 @@ dependencies = [
 name = "contextra-keys-cohort"
 version = "0.1.0"
 dependencies = [
+ "chacha20poly1305",
  "contextra-storage-ports",
+ "getrandom 0.3.4",
+ "zeroize",
 ]
 
 [[package]]
 name = "contextra-keys-file"
 version = "0.1.0"
 dependencies = [
+ "argon2",
+ "chacha20poly1305",
  "contextra-storage-ports",
+ "getrandom 0.3.4",
+ "zeroize",
 ]
 
 [[package]]
@@ -1374,7 +1381,8 @@ dependencies = [
  "contextra-storage-fs",
  "contextra-storage-ports",
  "crossbeam-skiplist",
- "thiserror 1.0.69",
+ "siphasher",
+ "thiserror 2.0.20",
  "zeroize",
 ]
 
@@ -1391,6 +1399,7 @@ name = "contextra-storage-fs"
 version = "0.1.0"
 dependencies = [
  "contextra-storage-ports",
+ "rustix",
 ]
 
 [[package]]
@@ -1398,7 +1407,7 @@ name = "contextra-storage-ports"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
  "zeroize",
 ]
 

@@ -10,3 +10,7 @@ testing = []
 
 [dependencies]
 contextra-storage-ports = { path = "../contextra-storage-ports" }
+rustix = { version = "1", default-features = false, features = ["fs", "std"] }
+
+[lints]
+workspace = true

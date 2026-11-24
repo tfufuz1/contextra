@@ -10,7 +10,8 @@ pub mod limits;
 pub mod traits;
 
 pub use change::{
-    CallerMeta, Change, ClusterLifecycle, Durability, Guard, Op, Origin, Precondition, Protection, Receipt,
+    CallerMeta, Change, ClusterLifecycle, Durability, EraseLocality, Guard, Op, Origin,
+    Precondition, Protection, Receipt,
 };
 pub use error::{Error, ErrorClass};
 pub use ids::{
@@ -19,5 +20,7 @@ pub use ids::{
     FIRST_USER_SPACE_ID, STAMP_MAX, SYSTEM_SPACE_ID_MAX,
 };
 pub use keys::{
-    DestroyBehavior, DestroyReceipt, KekId, Key32, KeyProvider, KeyProviderInfo, KeyState,
+    BatchId, DestroyBehavior, DestroyReceipt, KekId, Key32, KeyAssurance, KeyCreateResult,
+    KeyListEntry, KeyLookup, KeyProvider, KeyProviderInfo, KeyState, KeysInBackups,
+    KEY_PROVIDER_BATCH_MAX,
 };

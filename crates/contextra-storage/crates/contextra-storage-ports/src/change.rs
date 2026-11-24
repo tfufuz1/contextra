@@ -8,6 +8,21 @@ pub enum Protection {
     Plain,
 }
 
+/// Physical erase placement locality for a cluster (SPEC §4.3, K-37).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EraseLocality {
+    PackedBounded { max_file_bytes: u64 },
+    ClusterLocal,
+}
+
+impl Default for EraseLocality {
+    fn default() -> Self {
+        Self::PackedBounded {
+            max_file_bytes: 64 * 1024 * 1024,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClusterLifecycle {
     Live,
