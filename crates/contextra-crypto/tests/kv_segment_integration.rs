@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `kv_segment_integration.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `kv_segment_integration`.

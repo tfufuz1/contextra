@@ -1,13 +1,6 @@
 //! Lovász extension and subgradient calculations for TL-HFD (Spec §21.1).
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Topologisches Lovász-High-Order-Diffusionsverfahren.
-// INVARIANTEN: Submodulare Optimierung, schattenmodus-fähig.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-use crate::types::EntityId;
+use contextra_types::EntityId;
 use std::cmp::Ordering;
 
 /// Truncates hyperedge participants to at most `max_sort_size` top x-value participants plus the min x-value participant.
@@ -18,8 +11,6 @@ use std::cmp::Ordering;
 /// # Complexity
 /// Time complexity $O(|P| \log |P|)$, where $|P|$ is the number of hyperedge participants.
 // ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-001]
-
-// SECTION Lovasz Core Implementation
 pub fn truncate_participants(
     participants: &[EntityId],
     get_x: impl Fn(EntityId) -> f32,
@@ -206,5 +197,3 @@ mod tests {
         );
     }
 }
-
-// !SECTION Lovasz Core Implementation

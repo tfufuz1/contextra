@@ -1,8 +1,7 @@
 use contextra_ports::VectorIndex;
-use contextra_types::{ContextraError, DocId, TxId};
+use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::MmapIndex;
-use contextra_vector::types::DistanceMetric;
 
 #[tokio::test]
 async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_types::Result<()> {
@@ -70,11 +69,11 @@ async fn test_docid_format_mismatch_detection() -> contextra_types::Result<()> {
     let bad_vector_offset = 9999u64;
     bytes[vec_offset_start..vec_offset_start + 8].copy_from_slice(&bad_vector_offset.to_le_bytes());
 
-    std::fs::write(&path, &bytes).unwrap();
+    std::fs::write(&path, &bytes).map_err(|e| ContextraError::Storage(e.to_string()))?;
 
     let res = MmapIndex::open(&path);
     assert!(res.is_err(), "Expected storage error on format mismatch");
-    if let Err(contextra_vector::error::VectorError::Storage(msg)) = res {
+    if let Err(ContextraError::Storage(msg)) = res {
         assert!(
             msg.contains("mismatch") || msg.contains("size"),
             "Unexpected error message: {}",

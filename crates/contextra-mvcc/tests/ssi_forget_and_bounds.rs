@@ -7,8 +7,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
-use contextra_mvcc::MvccError;
-use contextra_ids::TxId;
+use contextra_types::{ContextraError, TxId};
 
 // Prüft, dass forget_from alle Schreibregistrierungen eines abgebrochenen Batches ab einer Sequenznummer entfernt.
 #[test]
@@ -64,7 +63,7 @@ fn committed_writes_bounded() {
 
     // Because tracked_commit_keys >= max_keys (2 >= 2), validate must fail closed
     let res = bounded_val.validate(tx, &rs);
-    assert!(matches!(res, Err(MvccError::Conflict(_))));
+    assert!(matches!(res, Err(ContextraError::Conflict(_))));
 }
 
 // Prüft, dass das Hinzufügen eines passenden Schlüssels einen Konflikt mit einem gelesenen Präfix erzeugt.
@@ -82,7 +81,7 @@ fn phantom_prefix_conflict() {
 
     // Tx A validation must detect phantom conflict
     let res = validator.validate(tx_a, &rs_a);
-    assert!(matches!(res, Err(MvccError::Conflict(_))));
+    assert!(matches!(res, Err(ContextraError::Conflict(_))));
 
     // A commit without prefix match (e.g. "order:1") at commit_seq 15 should not conflict with prefix "user:"
     let validator2 = SequenceLogSsiValidator::new();

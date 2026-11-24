@@ -3,15 +3,6 @@
 //! # Zweck
 //! Orchestriert Dense-, Forward-Push- und Schattenmodus-Verfahren zur Relevanzbewertung.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
-// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-
-// SECTION Mod Core Implementation
 pub mod cost;
 pub mod dense;
 pub mod forward_push;
@@ -22,12 +13,11 @@ pub mod types;
 use self::cost::{estimate_ppr_cost, GraphStats};
 use self::dense::compute_ppr_dense;
 use self::forward_push::forward_push_ppr;
-pub use self::snapshot::compute_ppr_at;
 pub use self::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
-use crate::types::{EntityId, PprAlgorithm, PprConfig};
+use contextra_types::{EntityId, PprAlgorithm, PprConfig};
 
-pub fn compute_ppr(
+pub(crate) fn compute_ppr(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
     config: &PprConfig,
@@ -148,7 +138,7 @@ fn execute_tl_hfd(
     config: &PprConfig,
     deleted_nodes: &DeletedView,
     ctx: &mut PprContext,
-    params: &crate::types::TlHfdParams,
+    params: &contextra_types::TlHfdParams,
 ) -> Vec<(EntityId, f32)> {
     let g_params = crate::tl_hfd::TlHfdParams {
         sigma: params.sigma,
@@ -381,5 +371,3 @@ impl crate::path_rag::PathGraph for GraphInner {
 
 #[cfg(test)]
 mod tests;
-
-// !SECTION Mod Core Implementation

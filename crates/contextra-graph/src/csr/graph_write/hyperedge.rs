@@ -3,21 +3,12 @@
 //! # Zweck
 //! Verwaltet n-stellige Beziehungen zwischen mehreren Entitäten samt Rollenbindungen.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::CsrGraph;
-use crate::error::{GraphMutationError, Result};
-use crate::types::{DocId, EntityId, TxId};
+use crate::error::GraphMutationError;
+use contextra_types::{DocId, EntityId, Result, TxId};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-
-// SECTION Hyperedge Core Implementation
 fn dfs_upward_cascade(
     graph: &CsrGraph,
     node: crate::hyperedge::HyperEdgeId,
@@ -97,9 +88,7 @@ impl CsrGraph {
                 }
             }
 
-            #[cfg(feature = "ports-compat")]
-            #[cfg(feature = "ports-compat")]
-        if let Some(storage) = self.storage() {
+            if let Some(storage) = self.storage() {
                 let key = format!(
                     "{}{:016x}:{:016x}",
                     crate::cascade::CASCADE_QUEUE_PREFIX,
@@ -141,7 +130,6 @@ impl CsrGraph {
         tx: TxId,
         hyperedge: &crate::hyperedge::HyperEdge,
     ) -> Result<()> {
-        #[cfg(feature = "ports-compat")]
         if let Some(storage) = self.storage() {
             let key = format!(
                 "{}{:016x}",
@@ -397,5 +385,3 @@ impl CsrGraph {
         self.insert_hyperedge_direct(edge);
     }
 }
-
-// !SECTION Hyperedge Core Implementation

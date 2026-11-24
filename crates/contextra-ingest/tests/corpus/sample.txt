@@ -1,3 +1,0 @@
-Erster Absatz mit deutschem Umlaut: Ä, Ö, Ü, ß.
-
-Zweiter Absatz mit Zahlen 12345 und Text.

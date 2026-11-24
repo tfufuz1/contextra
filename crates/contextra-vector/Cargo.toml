@@ -14,12 +14,9 @@ ring = "0"
 klasse = "A"
 
 [dependencies]
-contextra-ids = { workspace = true }
-contextra-env = { workspace = true }
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
-contextra-mvcc = { workspace = true }
-contextra-simd = { workspace = true, optional = true }
+contextra-mvcc = { workspace = true, optional = true }
 contextra-sys = { workspace = true, optional = true }
 subtle = "2.6"
 ahash = { workspace = true }
@@ -34,29 +31,26 @@ thiserror = { workspace = true }
 blake3 = { workspace = true }
 
 [features]
-default = ["std"]
+default = ["std", "ports-compat"]
 std = []
-simd = ["dep:contextra-simd", "contextra-simd?/serde"]
 serde = []
 tracing = []
 inspect = []
 experimental = ["experimental-diskann", "experimental-rabitq", "experimental-predicate-augmented-search"]
-mmap = ["dep:contextra-sys"]
+mmap = []
 diskann = ["experimental-diskann"]
 quantize-rabitq = ["experimental-rabitq"]
-workspace = [
+ports-compat = [
     "dep:contextra-ports",
     "dep:contextra-types",
+    "dep:contextra-mvcc",
     "dep:contextra-sys",
-    "mmap",
 ]
-ports-compat = ["workspace"]
-docid-128 = ["contextra-ids/docid-128"]
+docid-128 = []
 experimental-diskann = []
 experimental-rabitq = []
 experimental-predicate-augmented-search = []
 graph = []
-experimental-all = ["experimental-diskann", "experimental-rabitq", "experimental-predicate-augmented-search"]
 # ACHTUNG: partial-index-rebuild aktiviert den lokalen Partial-Rebuild-Pfad (F-02).
 # Gemäß VETOES.md (VETO-F02, bestätigt 2026-11-08) und SPEC §11.4 sind Tombstone-Pruning,
 # sofortige Slot-Nullung (INV-VEC-ZEROIZE-1) und inkrementeller Neuaufbau unter Erhalt
@@ -67,7 +61,6 @@ experimental-all = ["experimental-diskann", "experimental-rabitq", "experimental
 partial-index-rebuild = []
 
 [dev-dependencies]
-serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 criterion = "0.5"
 tempfile = "3"
@@ -112,14 +105,6 @@ harness = false
 name = "filtered_search_selectivity_bench"
 harness = false
 required-features = ["experimental-diskann"]
-
-[[test]]
-name = "hnsw_tests"
-required-features = ["workspace"]
-
-[[test]]
-name = "simd_differential_test"
-required-features = ["simd"]
 
 [[test]]
 name = "diskann_fault_injection_test"

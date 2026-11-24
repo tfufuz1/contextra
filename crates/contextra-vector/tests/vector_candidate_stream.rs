@@ -1,7 +1,6 @@
 use contextra_ports::{VectorIndex, VectorIndexStats};
-use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId};
+use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
-use contextra_vector::types::DistanceMetric;
 use contextra_vector::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 use rand::Rng;
 use std::collections::HashSet;
@@ -16,7 +15,7 @@ fn create_hnsw_index(dim: usize, max_elements: usize) -> Result<HnswIndex> {
         distance_metric: DistanceMetric::Cosine,
         ..Default::default()
     };
-    Ok(HnswIndex::try_new(config)?)
+    HnswIndex::try_new(config)
 }
 
 fn generate_random_vector(dim: usize, rng: &mut impl Rng) -> Vec<f32> {
@@ -220,8 +219,8 @@ async fn test_seq_no_snapshot() -> Result<()> {
     let mut stream_mock = VectorCandidateStream::new(&mock_index, vec![1.0; dim], Some(1));
     let res = stream_mock.next_batch().await;
     match res {
-        Err(contextra_vector::error::VectorError::Unsupported(reason)) => {
-            assert!(reason.contains("snapshot_read_at") || reason.contains("search_at"));
+        Err(ContextraError::CapabilityUnsupported { capability, .. }) => {
+            assert_eq!(capability, "snapshot_read_at");
         }
         _ => {
             return Err(ContextraError::Index(

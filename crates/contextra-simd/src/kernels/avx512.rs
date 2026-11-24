@@ -23,7 +23,6 @@ use std::arch::x86_64::*;
 
 use crate::kernels::scalar::CosineSimilarityPartsU8;
 
-// SECTION AVX512-F32-KERNELS
 // ANCHOR[contextra-simd:AVX512-COSINE-F32]
 /// Calculates cosine distance between two float vectors using AVX-512 instructions.
 ///
@@ -192,9 +191,7 @@ pub(crate) unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
 
     -dot
 }
-// !SECTION AVX512-F32-KERNELS
 
-// SECTION AVX512-BYTES-KERNELS
 // ANCHOR[contextra-simd:AVX512-COSINE-F32-BYTES]
 /// Calculates cosine distance between an f32 vector and raw LE f32 bytes using AVX-512 instructions.
 ///
@@ -424,9 +421,7 @@ pub(crate) unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
     // SAFETY: Target feature `avx512f` is enabled and `v32` contains a valid scalar float at lane 0.
     unsafe { _mm_cvtss_f32(v32) }
 }
-// !SECTION AVX512-BYTES-KERNELS
 
-// SECTION AVX512-U8-KERNELS
 // ANCHOR[contextra-simd:AVX512-DOT-U8-VNNI]
 /// Calculates dot product between two byte vectors using AVX-512 VNNI instructions.
 ///
@@ -441,12 +436,6 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
 
     // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
     let mut sum_v = unsafe { _mm512_setzero_si512() };
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
-    let mut sum_a = unsafe { _mm512_setzero_si512() };
-    // SAFETY: Target feature `avx512bw` is verified by caller and enabled on function attribute.
-    let c128 = unsafe { _mm512_set1_epi8(-128i8 as u8 as i8) };
-    // SAFETY: Target feature `avx512bw` is verified by caller and enabled on function attribute.
-    let ones = unsafe { _mm512_set1_epi8(1i8) };
 
     while i + 64 <= len {
         // SAFETY:
@@ -460,21 +449,11 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
             )
         };
 
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512i`.
-        let vb_s = unsafe { _mm512_xor_si512(vb, c128) };
-
         // SAFETY: Target feature `avx512vnni` is enabled and registers are valid `__m512i`.
-        // `_mm512_dpbusd_epi32` computes va (u8) * vb_s (i8 = b - 128) = va * b - 128 * va.
-        sum_v = unsafe { _mm512_dpbusd_epi32(sum_v, va, vb_s) };
-        // Accumulate va * 1 to add back the 128 * va term.
-        sum_a = unsafe { _mm512_dpbusd_epi32(sum_a, va, ones) };
+        sum_v = unsafe { _mm512_dpbusd_epi32(sum_v, va, vb) };
 
         i += 64;
     }
-
-    // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512i`.
-    // Add 128 * sum(a) correction: sum_a << 7.
-    sum_v = unsafe { _mm512_add_epi32(sum_v, _mm512_slli_epi32(sum_a, 7)) };
 
     // SAFETY: Target feature `avx512f` is enabled and `sum_v` is a valid `__m512i` vector register.
     let mut sum = u32::from_ne_bytes(unsafe { hsum512_epi32_avx512(sum_v) }.to_ne_bytes());
@@ -579,14 +558,6 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
     let mut norm_a_v = unsafe { _mm512_setzero_si512() };
     // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
     let mut norm_b_v = unsafe { _mm512_setzero_si512() };
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
-    let mut sum_a_v = unsafe { _mm512_setzero_si512() };
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
-    let mut sum_b_v = unsafe { _mm512_setzero_si512() };
-    // SAFETY: Target feature `avx512bw` is verified by caller and enabled on function attribute.
-    let c128 = unsafe { _mm512_set1_epi8(-128i8 as u8 as i8) };
-    // SAFETY: Target feature `avx512bw` is verified by caller and enabled on function attribute.
-    let ones = unsafe { _mm512_set1_epi8(1i8) };
 
     while i + 64 <= len {
         // SAFETY:
@@ -600,32 +571,15 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
             )
         };
 
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512i`.
-        let va_s = unsafe { _mm512_xor_si512(va, c128) };
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512i`.
-        let vb_s = unsafe { _mm512_xor_si512(vb, c128) };
-
         // SAFETY: Target feature `avx512vnni` is enabled and registers are valid `__m512i`.
-        // `_mm512_dpbusd_epi32` computes va (u8) * vb_s (i8 = b - 128) = va * b - 128 * va.
-        dot_v = unsafe { _mm512_dpbusd_epi32(dot_v, va, vb_s) };
-        // va * va_s = va * a - 128 * va.
-        norm_a_v = unsafe { _mm512_dpbusd_epi32(norm_a_v, va, va_s) };
-        // vb * vb_s = vb * b - 128 * vb.
-        norm_b_v = unsafe { _mm512_dpbusd_epi32(norm_b_v, vb, vb_s) };
-
-        // Accumulate va * 1 and vb * 1 for the 128 * sum correction.
-        sum_a_v = unsafe { _mm512_dpbusd_epi32(sum_a_v, va, ones) };
-        sum_b_v = unsafe { _mm512_dpbusd_epi32(sum_b_v, vb, ones) };
+        dot_v = unsafe { _mm512_dpbusd_epi32(dot_v, va, vb) };
+        // SAFETY: Target feature `avx512vnni` is enabled and registers are valid `__m512i`.
+        norm_a_v = unsafe { _mm512_dpbusd_epi32(norm_a_v, va, va) };
+        // SAFETY: Target feature `avx512vnni` is enabled and registers are valid `__m512i`.
+        norm_b_v = unsafe { _mm512_dpbusd_epi32(norm_b_v, vb, vb) };
 
         i += 64;
     }
-
-    // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512i`.
-    dot_v = unsafe { _mm512_add_epi32(dot_v, _mm512_slli_epi32(sum_a_v, 7)) };
-    // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512i`.
-    norm_a_v = unsafe { _mm512_add_epi32(norm_a_v, _mm512_slli_epi32(sum_a_v, 7)) };
-    // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512i`.
-    norm_b_v = unsafe { _mm512_add_epi32(norm_b_v, _mm512_slli_epi32(sum_b_v, 7)) };
 
     // SAFETY: Target feature `avx512f` is enabled and vector registers are valid `__m512i`.
     let (mut dot, mut norm_a_sq, mut norm_b_sq) = unsafe {
@@ -677,4 +631,3 @@ pub(crate) unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {
     // SAFETY: Target feature `avx512f` is enabled and `v32` contains a valid 32-bit int at lane 0.
     unsafe { _mm_cvtsi128_si32(v32) }
 }
-// !SECTION AVX512-U8-KERNELS

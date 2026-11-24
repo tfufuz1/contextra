@@ -17,7 +17,7 @@ def load():
     default = {pathlib.Path(m).name for m in ws["default-members"]}
     cap = tomllib.loads((ROOT / "capabilities.toml").read_text())["crates"]
     lay = (ROOT / "tests/layering.rs").read_text()
-    layer_names = set(re.findall(r'"(contextra[a-z0-9-]*)"', lay))
+    layer_names = set(re.findall(r'"(acta[a-z0-9-]*)"', lay))
     return members, default, cap, layer_names
 
 def crates():

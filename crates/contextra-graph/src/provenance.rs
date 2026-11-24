@@ -10,8 +10,8 @@
 // SIEHE AUCH: crates/contextra-graph/src/cascade.rs
 
 use crate::consistency_enforcement::EdgeId;
-use crate::types::{DocId, TxId};
 use ahash::{AHashMap, AHashSet};
+use contextra_types::{DocId, TxId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
@@ -20,8 +20,6 @@ use serde::{Deserialize, Serialize};
 /// der ihre Quell-Dokumente zurückverfolgbar macht.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 // ANCHOR[contextra-graph:SRC-PROVENANCE-001]
-
-// SECTION Provenance Core Implementation
 pub struct EdgeProvenance {
     /// Identifikator der Kante (from_entity_id, to_entity_id).
     pub edge_id: EdgeId,
@@ -95,7 +93,7 @@ impl DocEdgeIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::EntityId;
+    use contextra_types::EntityId;
 
     // ANCHOR[contextra-graph:SRC-PROVENANCE-009]
     #[test]
@@ -194,5 +192,3 @@ mod tests {
         assert_eq!(deserialized.created_at_tx, prov.created_at_tx);
     }
 }
-
-// !SECTION Provenance Core Implementation

@@ -1,16 +1,10 @@
 //! Secret key and payload containers with zeroize-on-drop and constant-time equality.
 
-// SECTION [epic=crypto-secret,seq=1] Imports & Zeroize-Infrastruktur
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Fixed-size secret key that is wiped on drop and never printed.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-// !SECTION
-
-// SECTION [epic=crypto-secret,seq=2] Feste Schlüsselcontainer (SecretKey)
-// ANCHOR[contextra-crypto:SEC-001] Fester Schlüsselbehälter mit ZeroizeOnDrop
-// NOTE: Verhindert Speicherlecks und maskiert Ausgaben in Logs (TS:2026-11-11)
 pub struct SecretKey<const N: usize> {
     bytes: [u8; N],
 }
@@ -62,10 +56,6 @@ impl<const N: usize> Eq for SecretKey<N> {}
 
 /// Dynamically-sized secret container that is wiped on drop and never printed.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-// !SECTION
-
-// SECTION [epic=crypto-secret,seq=3] Dynamische Geheimbehälter (Secret)
-// ANCHOR[contextra-crypto:SEC-002] Generischer Geheimbehälter
 pub struct Secret<T: Zeroize> {
     inner: T,
 }
@@ -101,10 +91,7 @@ impl<T: Zeroize> std::fmt::Display for Secret<T> {
     }
 }
 
-// !SECTION
-
-// SECTION [epic=crypto-secret,seq=4] Serialisierungsschutz
-// NOTE: Expliziter Fehler verhindert versehentliche Serialisierung ins JSON/Log (TS:2026-11-11)
+#[cfg(feature = "serde")]
 impl<const N: usize> serde::Serialize for SecretKey<N> {
     fn serialize<S>(&self, _serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -115,6 +102,7 @@ impl<const N: usize> serde::Serialize for SecretKey<N> {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<T: Zeroize> serde::Serialize for Secret<T> {
     fn serialize<S>(&self, _serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -125,9 +113,6 @@ impl<T: Zeroize> serde::Serialize for Secret<T> {
     }
 }
 
-// !SECTION
-
-// SECTION [epic=crypto-secret,seq=5] Tests
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,4 +144,3 @@ mod tests {
         assert!(debug_str.contains("[REDACTED]"));
     }
 }
-// !SECTION

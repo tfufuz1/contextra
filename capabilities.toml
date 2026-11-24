@@ -4,495 +4,495 @@
 [version]
 schema = "3"
 
-[crates.contextra-ids]
+[crates.acta-ids]
 group = "foundation"
 level = 0
 tier = "stable"
-path = "crates/contextra-ids"
+path = "crates/acta-ids"
 unsafe_island = false
 allowed_internal = []
-[crates.contextra-ids.feature_closure_allowed]
+[crates.acta-ids.feature_closure_allowed]
 docid-128 = []
-[crates.contextra-ids.dev_allowed]
-test = "cargo test -p contextra-ids --locked"
+[crates.acta-ids.dev_allowed]
+test = "cargo test -p acta-ids --locked"
 
-[crates.contextra-env]
+[crates.acta-env]
 group = "foundation"
 level = 0
 tier = "stable"
-path = "crates/contextra-env"
+path = "crates/acta-env"
 unsafe_island = false
 allowed_internal = []
-[crates.contextra-env.feature_closure_allowed]
+[crates.acta-env.feature_closure_allowed]
 test-utils = []
-[crates.contextra-env.dev_allowed]
-test = "cargo test -p contextra-env --locked"
+[crates.acta-env.dev_allowed]
+test = "cargo test -p acta-env --locked"
 
-[crates.contextra-sys]
+[crates.acta-sys]
 group = "foundation"
 level = 0
 tier = "stable"
-path = "crates/contextra-sys"
+path = "crates/acta-sys"
 unsafe_island = true
 allowed_internal = []
-[crates.contextra-sys.feature_closure_allowed]
-[crates.contextra-sys.dev_allowed]
-test = "cargo test -p contextra-sys --locked"
+[crates.acta-sys.feature_closure_allowed]
+[crates.acta-sys.dev_allowed]
+test = "cargo test -p acta-sys --locked"
 
-[crates.contextra-durable-fs]
+[crates.acta-durable-fs]
 group = "foundation"
 level = 0
 tier = "experimental"
-path = "crates/contextra-durable-fs"
+path = "crates/acta-durable-fs"
 unsafe_island = false
 allowed_internal = []
-[crates.contextra-durable-fs.feature_closure_allowed]
-[crates.contextra-durable-fs.dev_allowed]
-test = "cargo test -p contextra-durable-fs --locked"
+[crates.acta-durable-fs.feature_closure_allowed]
+[crates.acta-durable-fs.dev_allowed]
+test = "cargo test -p acta-durable-fs --locked"
 
-[crates.contextra-simd]
+[crates.acta-simd]
 group = "foundation"
 level = 0
 tier = "beta"
-path = "crates/contextra-simd"
+path = "crates/acta-simd"
 unsafe_island = true
 allowed_internal = []
-[crates.contextra-simd.feature_closure_allowed]
-workspace = ["contextra-types"]
-[crates.contextra-simd.dev_allowed]
-test = "cargo test -p contextra-simd --locked"
+[crates.acta-simd.feature_closure_allowed]
+workspace = ["acta-types"]
+[crates.acta-simd.dev_allowed]
+test = "cargo test -p acta-simd --locked"
 
-[crates.contextra-wire]
+[crates.acta-wire]
 group = "foundation"
 level = 0
 tier = "stable"
-path = "crates/contextra-wire"
+path = "crates/acta-wire"
 unsafe_island = true
 allowed_internal = []
-[crates.contextra-wire.feature_closure_allowed]
-[crates.contextra-wire.dev_allowed]
-test = "cargo test -p contextra-wire --locked"
+[crates.acta-wire.feature_closure_allowed]
+[crates.acta-wire.dev_allowed]
+test = "cargo test -p acta-wire --locked"
 
-[crates.contextra-mvcc]
+[crates.acta-mvcc]
 group = "foundation"
 level = 1
 tier = "stable"
-path = "crates/contextra-mvcc"
+path = "crates/acta-mvcc"
 unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-mvcc.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-mvcc.dev_allowed]
-test = "cargo test -p contextra-mvcc --locked"
+allowed_internal = ["acta-ids", "acta-env"]
+[crates.acta-mvcc.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-mvcc.dev_allowed]
+test = "cargo test -p acta-mvcc --locked"
 
-[crates.contextra-crypto]
+[crates.acta-crypto]
 group = "foundation"
 level = 1
 tier = "beta"
-path = "crates/contextra-crypto"
+path = "crates/acta-crypto"
 unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-crypto.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-crypto.dev_allowed]
-test = "cargo test -p contextra-crypto --locked"
+allowed_internal = ["acta-ids", "acta-env"]
+[crates.acta-crypto.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-crypto.dev_allowed]
+test = "cargo test -p acta-crypto --locked"
 
-[crates.contextra-types]
+[crates.acta-types]
 group = "contracts"
 level = 2
 tier = "stable"
-path = "crates/contextra-types"
+path = "crates/acta-types"
 unsafe_island = false
-allowed_internal = ["contextra-ids"]
-[crates.contextra-types.feature_closure_allowed]
-docid-128 = ["contextra-ids"]
-[crates.contextra-types.dev_allowed]
-test = "cargo test -p contextra-types --locked"
+allowed_internal = ["acta-ids"]
+[crates.acta-types.feature_closure_allowed]
+docid-128 = ["acta-ids"]
+[crates.acta-types.dev_allowed]
+test = "cargo test -p acta-types --locked"
 
-[crates.contextra-ports]
+[crates.acta-ports]
 group = "contracts"
 level = 2
 tier = "stable"
-path = "crates/contextra-ports"
+path = "crates/acta-ports"
 unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ids", "contextra-env"]
-[crates.contextra-ports.feature_closure_allowed]
-[crates.contextra-ports.dev_allowed]
-test = "cargo test -p contextra-ports --locked"
+allowed_internal = ["acta-types", "acta-ids", "acta-env"]
+[crates.acta-ports.feature_closure_allowed]
+[crates.acta-ports.dev_allowed]
+test = "cargo test -p acta-ports --locked"
 
-[crates.contextra-store]
+[crates.acta-store]
 group = "storage"
 level = 1
 tier = "beta"
-path = "crates/contextra-store"
+path = "crates/acta-store"
 unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env", "contextra-sys", "contextra-mvcc", "contextra-crypto"]
-[crates.contextra-store.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-store.dev_allowed]
-testkit = ["contextra-testkit"]
-test = "cargo test -p contextra-store --locked"
+allowed_internal = ["acta-ids", "acta-env", "acta-sys", "acta-mvcc", "acta-crypto"]
+[crates.acta-store.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-store.dev_allowed]
+testkit = ["acta-testkit"]
+test = "cargo test -p acta-store --locked"
 
-[crates.contextra-vector]
+[crates.acta-vector]
 group = "retrieval"
 level = 1
 tier = "beta"
-path = "crates/contextra-vector"
+path = "crates/acta-vector"
 unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env", "contextra-mvcc"]
-[crates.contextra-vector.feature_closure_allowed]
-mmap = ["contextra-sys"]
-simd = ["contextra-simd"]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-vector.dev_allowed]
-testkit = ["contextra-testkit"]
-test = "cargo test -p contextra-vector --locked"
+allowed_internal = ["acta-ids", "acta-env", "acta-mvcc"]
+[crates.acta-vector.feature_closure_allowed]
+mmap = ["acta-sys"]
+simd = ["acta-simd"]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-vector.dev_allowed]
+testkit = ["acta-testkit"]
+test = "cargo test -p acta-vector --locked"
 
-[crates.contextra-text]
+[crates.acta-text]
 group = "retrieval"
 level = 1
 tier = "beta"
-path = "crates/contextra-text"
+path = "crates/acta-text"
 unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-text.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-text.dev_allowed]
-testkit = ["contextra-testkit"]
-test = "cargo test -p contextra-text --locked"
+allowed_internal = ["acta-ids", "acta-env"]
+[crates.acta-text.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-text.dev_allowed]
+testkit = ["acta-testkit"]
+test = "cargo test -p acta-text --locked"
 
-[crates.contextra-graph]
+[crates.acta-graph]
 group = "retrieval"
 level = 1
 tier = "experimental"
-path = "crates/contextra-graph"
+path = "crates/acta-graph"
 unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-graph.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-graph.dev_allowed]
-testkit = ["contextra-testkit"]
-test = "cargo test -p contextra-graph --locked"
+allowed_internal = ["acta-ids", "acta-env"]
+[crates.acta-graph.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-graph.dev_allowed]
+testkit = ["acta-testkit"]
+test = "cargo test -p acta-graph --locked"
 
-[crates.contextra-rank]
+[crates.acta-rank]
 group = "retrieval"
 level = 1
 tier = "stable"
-path = "crates/contextra-rank"
+path = "crates/acta-rank"
 unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-rank.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-rank.dev_allowed]
-test = "cargo test -p contextra-rank --locked"
+allowed_internal = ["acta-ids", "acta-env"]
+[crates.acta-rank.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-rank.dev_allowed]
+test = "cargo test -p acta-rank --locked"
 
-[crates.contextra-checkpoint]
+[crates.acta-checkpoint]
 group = "retrieval"
 level = 1
 tier = "beta"
-path = "crates/contextra-checkpoint"
+path = "crates/acta-checkpoint"
 unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-checkpoint.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-checkpoint.dev_allowed]
-testkit = ["contextra-testkit"]
-test = "cargo test -p contextra-checkpoint --locked"
+allowed_internal = ["acta-ids", "acta-env"]
+[crates.acta-checkpoint.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-checkpoint.dev_allowed]
+testkit = ["acta-testkit"]
+test = "cargo test -p acta-checkpoint --locked"
 
-[crates.contextra-kvcache]
+[crates.acta-kvcache]
 group = "llm"
 level = 1
 tier = "beta"
-path = "crates/contextra-kvcache"
+path = "crates/acta-kvcache"
 unsafe_island = false
-allowed_internal = ["contextra-env", "contextra-crypto"]
-[crates.contextra-kvcache.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-kvcache.dev_allowed]
-test = "cargo test -p contextra-kvcache --locked"
+allowed_internal = ["acta-env", "acta-crypto"]
+[crates.acta-kvcache.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-kvcache.dev_allowed]
+test = "cargo test -p acta-kvcache --locked"
 
-[crates.contextra-router]
+[crates.acta-router]
 group = "llm"
 level = 2
 tier = "stable"
-path = "crates/contextra-router"
+path = "crates/acta-router"
 unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports", "contextra-adapt"]
-[crates.contextra-router.feature_closure_allowed]
-subprocess-dispatch = ["contextra-wire"]
-[crates.contextra-router.dev_allowed]
-test = "cargo test -p contextra-router --locked"
+allowed_internal = ["acta-types", "acta-ports", "acta-adapt"]
+[crates.acta-router.feature_closure_allowed]
+subprocess-dispatch = ["acta-wire"]
+[crates.acta-router.dev_allowed]
+test = "cargo test -p acta-router --locked"
 
-[crates.contextra-adapt]
+[crates.acta-adapt]
 group = "llm"
 level = 0
 tier = "beta"
-path = "crates/contextra-adapt"
+path = "crates/acta-adapt"
 unsafe_island = false
 allowed_internal = []
-[crates.contextra-adapt.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-adapt.dev_allowed]
-test = "cargo test -p contextra-adapt --locked"
+[crates.acta-adapt.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-adapt.dev_allowed]
+test = "cargo test -p acta-adapt --locked"
 
-[crates.contextra-infer-ollama]
+[crates.acta-infer-ollama]
 group = "llm"
 level = 1
 tier = "experimental"
-path = "crates/contextra-infer-ollama"
+path = "crates/acta-infer-ollama"
 unsafe_island = false
-allowed_internal = ["contextra-env"]
-[crates.contextra-infer-ollama.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-infer-ollama.dev_allowed]
-test = "cargo test -p contextra-infer-ollama --locked"
+allowed_internal = ["acta-env"]
+[crates.acta-infer-ollama.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-infer-ollama.dev_allowed]
+test = "cargo test -p acta-infer-ollama --locked"
 
-[crates.contextra-infer-candle]
+[crates.acta-infer-candle]
 group = "llm"
 level = 1
 tier = "experimental"
-path = "crates/contextra-infer-candle"
+path = "crates/acta-infer-candle"
 unsafe_island = false
-allowed_internal = ["contextra-env"]
-[crates.contextra-infer-candle.feature_closure_allowed]
-kv-bridge = ["contextra-kvcache"]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-infer-candle.dev_allowed]
-test = "cargo test -p contextra-infer-candle --locked"
+allowed_internal = ["acta-env"]
+[crates.acta-infer-candle.feature_closure_allowed]
+kv-bridge = ["acta-kvcache"]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-infer-candle.dev_allowed]
+test = "cargo test -p acta-infer-candle --locked"
 
-[crates.contextra-infer-onnx]
+[crates.acta-infer-onnx]
 group = "llm"
 level = 0
 tier = "experimental"
-path = "crates/contextra-infer-onnx"
+path = "crates/acta-infer-onnx"
 unsafe_island = false
 allowed_internal = []
-[crates.contextra-infer-onnx.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-infer-onnx.dev_allowed]
-test = "cargo test -p contextra-infer-onnx --locked"
+[crates.acta-infer-onnx.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-infer-onnx.dev_allowed]
+test = "cargo test -p acta-infer-onnx --locked"
 
-[crates.contextra-ingest]
+[crates.acta-ingest]
 group = "data"
 level = 0
 tier = "experimental"
-path = "crates/contextra-ingest"
+path = "crates/acta-ingest"
 unsafe_island = false
 allowed_internal = []
-[crates.contextra-ingest.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ids"]
-[crates.contextra-ingest.dev_allowed]
-test = "cargo test -p contextra-ingest --locked"
+[crates.acta-ingest.feature_closure_allowed]
+workspace = ["acta-types", "acta-ids"]
+[crates.acta-ingest.dev_allowed]
+test = "cargo test -p acta-ingest --locked"
 
-[crates.contextra-privacy]
+[crates.acta-privacy]
 group = "safety"
 level = 0
 tier = "stable"
-path = "crates/contextra-privacy"
+path = "crates/acta-privacy"
 unsafe_island = false
 allowed_internal = []
-[crates.contextra-privacy.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-privacy.dev_allowed]
-test = "cargo test -p contextra-privacy --locked"
+[crates.acta-privacy.feature_closure_allowed]
+workspace = ["acta-types", "acta-ports"]
+[crates.acta-privacy.dev_allowed]
+test = "cargo test -p acta-privacy --locked"
 
-[crates.contextra-sandbox]
+[crates.acta-sandbox]
 group = "safety"
 level = 0
 tier = "stable"
-path = "crates/contextra-sandbox"
+path = "crates/acta-sandbox"
 unsafe_island = false
 allowed_internal = []
-[crates.contextra-sandbox.feature_closure_allowed]
-[crates.contextra-sandbox.dev_allowed]
-test = "cargo test -p contextra-sandbox --locked"
+[crates.acta-sandbox.feature_closure_allowed]
+[crates.acta-sandbox.dev_allowed]
+test = "cargo test -p acta-sandbox --locked"
 
-[crates.contextra-prompt-guard]
+[crates.acta-prompt-guard]
 group = "safety"
 level = 0
 tier = "experimental"
-path = "crates/contextra-prompt-guard"
+path = "crates/acta-prompt-guard"
 unsafe_island = false
 allowed_internal = []
-[crates.contextra-prompt-guard.feature_closure_allowed]
-[crates.contextra-prompt-guard.dev_allowed]
-test = "cargo test -p contextra-prompt-guard --locked"
+[crates.acta-prompt-guard.feature_closure_allowed]
+[crates.acta-prompt-guard.dev_allowed]
+test = "cargo test -p acta-prompt-guard --locked"
 
-[crates.contextra-storage-ports]
+[crates.acta-storage-ports]
 group = "storage"
 level = 1
 tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-storage-ports"
+path = "crates/acta-storage/crates/acta-storage-ports"
 unsafe_island = false
 allowed_internal = []
-[crates.contextra-storage-ports.feature_closure_allowed]
-[crates.contextra-storage-ports.dev_allowed]
-test = "cargo test -p contextra-storage-ports --locked"
+[crates.acta-storage-ports.feature_closure_allowed]
+[crates.acta-storage-ports.dev_allowed]
+test = "cargo test -p acta-storage-ports --locked"
 
-[crates.contextra-storage]
+[crates.acta-storage]
 group = "storage"
 level = 1
 tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-storage"
+path = "crates/acta-storage/crates/acta-storage"
 unsafe_island = false
-allowed_internal = ["contextra-storage-ports"]
-[crates.contextra-storage.feature_closure_allowed]
-[crates.contextra-storage.dev_allowed]
-test = "cargo test -p contextra-storage --locked"
+allowed_internal = ["acta-storage-ports"]
+[crates.acta-storage.feature_closure_allowed]
+[crates.acta-storage.dev_allowed]
+test = "cargo test -p acta-storage --locked"
 
-[crates.contextra-storage-fs]
+[crates.acta-storage-fs]
 group = "storage"
 level = 2
 tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-storage-fs"
+path = "crates/acta-storage/crates/acta-storage-fs"
 unsafe_island = false
-allowed_internal = ["contextra-storage-ports"]
-[crates.contextra-storage-fs.feature_closure_allowed]
-[crates.contextra-storage-fs.dev_allowed]
-test = "cargo test -p contextra-storage-fs --locked"
+allowed_internal = ["acta-storage-ports"]
+[crates.acta-storage-fs.feature_closure_allowed]
+[crates.acta-storage-fs.dev_allowed]
+test = "cargo test -p acta-storage-fs --locked"
 
-[crates.contextra-crypto-ref]
+[crates.acta-crypto-ref]
 group = "storage"
 level = 2
 tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-crypto-ref"
+path = "crates/acta-storage/crates/acta-crypto-ref"
 unsafe_island = false
-allowed_internal = ["contextra-storage-ports"]
-[crates.contextra-crypto-ref.feature_closure_allowed]
-[crates.contextra-crypto-ref.dev_allowed]
-test = "cargo test -p contextra-crypto-ref --locked"
+allowed_internal = ["acta-storage-ports"]
+[crates.acta-crypto-ref.feature_closure_allowed]
+[crates.acta-crypto-ref.dev_allowed]
+test = "cargo test -p acta-crypto-ref --locked"
 
-[crates.contextra-keys-file]
+[crates.acta-keys-file]
 group = "storage"
 level = 2
 tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-keys-file"
+path = "crates/acta-storage/crates/acta-keys-file"
 unsafe_island = false
-allowed_internal = ["contextra-storage-ports"]
-[crates.contextra-keys-file.feature_closure_allowed]
-[crates.contextra-keys-file.dev_allowed]
-test = "cargo test -p contextra-keys-file --locked"
+allowed_internal = ["acta-storage-ports"]
+[crates.acta-keys-file.feature_closure_allowed]
+[crates.acta-keys-file.dev_allowed]
+test = "cargo test -p acta-keys-file --locked"
 
-[crates.contextra-keys-cohort]
+[crates.acta-keys-cohort]
 group = "storage"
 level = 2
 tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-keys-cohort"
+path = "crates/acta-storage/crates/acta-keys-cohort"
 unsafe_island = false
-allowed_internal = ["contextra-storage-ports"]
-[crates.contextra-keys-cohort.feature_closure_allowed]
-[crates.contextra-keys-cohort.dev_allowed]
-test = "cargo test -p contextra-keys-cohort --locked"
+allowed_internal = ["acta-storage-ports"]
+[crates.acta-keys-cohort.feature_closure_allowed]
+[crates.acta-keys-cohort.dev_allowed]
+test = "cargo test -p acta-keys-cohort --locked"
 
-[crates.contextra-storage-bridge]
+[crates.acta-storage-bridge]
 group = "storage"
 level = 2
 tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-storage-bridge"
+path = "crates/acta-storage/crates/acta-storage-bridge"
 unsafe_island = false
-allowed_internal = ["contextra-storage", "contextra-storage-ports"]
-[crates.contextra-storage-bridge.feature_closure_allowed]
-[crates.contextra-storage-bridge.dev_allowed]
-test = "cargo test -p contextra-storage-bridge --locked"
+allowed_internal = ["acta-storage", "acta-storage-ports"]
+[crates.acta-storage-bridge.feature_closure_allowed]
+[crates.acta-storage-bridge.dev_allowed]
+test = "cargo test -p acta-storage-bridge --locked"
 
-[crates.contextra-agent]
+[crates.acta-agent]
 group = "agentic"
 level = 2
 tier = "beta"
-path = "crates/contextra-agent"
+path = "crates/acta-agent"
 unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports"]
-[crates.contextra-agent.feature_closure_allowed]
-storage-bindings = ["contextra-db", "contextra-graph", "contextra-checkpoint", "contextra-router"]
-[crates.contextra-agent.dev_allowed]
-test = "cargo test -p contextra-agent --locked"
+allowed_internal = ["acta-types", "acta-ports"]
+[crates.acta-agent.feature_closure_allowed]
+storage-bindings = ["acta-db", "acta-graph", "acta-checkpoint", "acta-router"]
+[crates.acta-agent.dev_allowed]
+test = "cargo test -p acta-agent --locked"
 
-[crates.contextra-cognition]
+[crates.acta-cognition]
 group = "agentic"
 level = 2
 tier = "beta"
-path = "crates/contextra-cognition"
+path = "crates/acta-cognition"
 unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports"]
-[crates.contextra-cognition.feature_closure_allowed]
-exp-hyperedge = ["contextra-graph"]
-[crates.contextra-cognition.dev_allowed]
-test = "cargo test -p contextra-cognition --locked"
+allowed_internal = ["acta-types", "acta-ports"]
+[crates.acta-cognition.feature_closure_allowed]
+exp-hyperedge = ["acta-graph"]
+[crates.acta-cognition.dev_allowed]
+test = "cargo test -p acta-cognition --locked"
 
-[crates.contextra-engine]
+[crates.acta-engine]
 group = "integration"
 level = 2
 tier = "stable"
-path = "crates/contextra-engine"
+path = "crates/acta-engine"
 unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports", "contextra-store", "contextra-vector", "contextra-text", "contextra-graph", "contextra-mvcc", "contextra-rank", "contextra-checkpoint", "contextra-adapt", "contextra-kvcache"]
-[crates.contextra-engine.feature_closure_allowed]
-[crates.contextra-engine.dev_allowed]
-test = "cargo test -p contextra-engine --locked"
+allowed_internal = ["acta-types", "acta-ports", "acta-store", "acta-vector", "acta-text", "acta-graph", "acta-mvcc", "acta-rank", "acta-checkpoint", "acta-adapt", "acta-kvcache"]
+[crates.acta-engine.feature_closure_allowed]
+[crates.acta-engine.dev_allowed]
+test = "cargo test -p acta-engine --locked"
 
-[crates.contextra-db]
+[crates.acta-db]
 group = "integration"
 level = 2
 tier = "stable"
-path = "crates/contextra-db"
+path = "crates/acta-db"
 unsafe_island = false
-allowed_internal = ["contextra-engine", "contextra-types", "contextra-ports"]
-[crates.contextra-db.feature_closure_allowed]
-[crates.contextra-db.dev_allowed]
-test = "cargo test -p contextra-db --locked"
+allowed_internal = ["acta-engine", "acta-types", "acta-ports"]
+[crates.acta-db.feature_closure_allowed]
+[crates.acta-db.dev_allowed]
+test = "cargo test -p acta-db --locked"
 
-[crates.contextra]
+[crates.acta]
 group = "integration"
 level = 2
 tier = "stable"
-path = "crates/contextra"
+path = "crates/acta"
 unsafe_island = false
-allowed_internal = ["contextra-db", "contextra-types", "contextra-ports"]
-[crates.contextra.feature_closure_allowed]
-infer-candle = ["contextra-infer-candle"]
-[crates.contextra.dev_allowed]
-test = "cargo test -p contextra --locked"
+allowed_internal = ["acta-db", "acta-types", "acta-ports"]
+[crates.acta.feature_closure_allowed]
+infer-candle = ["acta-infer-candle"]
+[crates.acta.dev_allowed]
+test = "cargo test -p acta --locked"
 
-[crates.contextra-mcp]
+[crates.acta-mcp]
 group = "apps"
 level = 3
 tier = "beta"
-path = "crates/contextra-mcp"
+path = "crates/acta-mcp"
 unsafe_island = false
-allowed_internal = ["contextra", "contextra-types", "contextra-ports", "contextra-wire", "contextra-rank", "contextra-crypto", "contextra-privacy", "contextra-router", "contextra-prompt-guard"]
-[crates.contextra-mcp.feature_closure_allowed]
-[crates.contextra-mcp.dev_allowed]
-test = "cargo test -p contextra-mcp --locked"
+allowed_internal = ["acta", "acta-types", "acta-ports", "acta-wire", "acta-rank", "acta-crypto", "acta-privacy", "acta-router", "acta-prompt-guard"]
+[crates.acta-mcp.feature_closure_allowed]
+[crates.acta-mcp.dev_allowed]
+test = "cargo test -p acta-mcp --locked"
 
-[crates.contextra-py]
+[crates.acta-py]
 group = "apps"
 level = 3
 tier = "stable"
-path = "crates/contextra-py"
+path = "crates/acta-py"
 unsafe_island = false
-allowed_internal = ["contextra-types", "contextra", "contextra-wire"]
-[crates.contextra-py.feature_closure_allowed]
-[crates.contextra-py.dev_allowed]
-test = "cargo test -p contextra-py --locked"
+allowed_internal = ["acta-types", "acta", "acta-wire"]
+[crates.acta-py.feature_closure_allowed]
+[crates.acta-py.dev_allowed]
+test = "cargo test -p acta-py --locked"
 
-[crates.contextra-testkit]
+[crates.acta-testkit]
 group = "testing"
 level = 3
 tier = "stable"
-path = "crates/contextra-testkit"
+path = "crates/acta-testkit"
 unsafe_island = false
-allowed_internal = ["contextra-ports", "contextra-types", "contextra-env"]
-[crates.contextra-testkit.feature_closure_allowed]
-[crates.contextra-testkit.dev_allowed]
-test = "cargo test -p contextra-testkit --locked"
+allowed_internal = ["acta-ports", "acta-types", "acta-env"]
+[crates.acta-testkit.feature_closure_allowed]
+[crates.acta-testkit.dev_allowed]
+test = "cargo test -p acta-testkit --locked"
 
-[crates.contextra-bench]
+[crates.acta-bench]
 group = "testing"
 level = 3
 tier = "stable"
-path = "benchmarks/contextra-bench"
+path = "benchmarks/acta-bench"
 unsafe_island = false
-allowed_internal = ["contextra-store", "contextra-vector", "contextra-text", "contextra-db"]
-[crates.contextra-bench.feature_closure_allowed]
-[crates.contextra-bench.dev_allowed]
-test = "cargo test -p contextra-bench --locked"
+allowed_internal = ["acta-store", "acta-vector", "acta-text", "acta-db"]
+[crates.acta-bench.feature_closure_allowed]
+[crates.acta-bench.dev_allowed]
+test = "cargo test -p acta-bench --locked"

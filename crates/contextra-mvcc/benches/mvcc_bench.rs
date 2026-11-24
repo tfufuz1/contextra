@@ -9,7 +9,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use contextra_mvcc::{SeqLogEntry, SnapshotRegistry};
-use contextra_ids::DocId;
+use contextra_types::DocId;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 
@@ -80,7 +80,7 @@ fn bench_seq_log_entry_is_visible(c: &mut Criterion) {
 // Benchmark für die SSI-Validierung und Konfliktprüfung je nach Größe der Lesemenge.
 fn bench_ssi_validation_by_read_set_size(c: &mut Criterion) {
     use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
-    use contextra_ids::TxId;
+    use contextra_types::TxId;
 
     let mut group = c.benchmark_group("ssi_validation_by_read_set_size");
 

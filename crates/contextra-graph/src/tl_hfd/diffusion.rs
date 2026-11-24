@@ -1,24 +1,15 @@
 //! Core diffusion loop and active region management for TL-HFD (Spec §21.1).
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Topologisches Lovász-High-Order-Diffusionsverfahren.
-// INVARIANTEN: Submodulare Optimierung, schattenmodus-fähig.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::error::TlHfdError;
 use super::lovasz::{compute_lovasz_extension, truncate_participants};
 use super::params::TlHfdParams;
 use crate::path_rag::PathGraph;
 use ahash::{AHashMap, AHashSet};
-use crate::types::EntityId;
+use contextra_types::EntityId;
 use std::cmp::Ordering;
 
 /// Internal representation of a deduplicated edge (binary or hyperedge) touching the active region.
 #[derive(Debug, Clone)]
-
-// SECTION Diffusion Core Implementation
 struct ActiveEdge {
     weight: f32,
     participants: Vec<EntityId>,
@@ -252,5 +243,3 @@ pub fn run_diffusion<G: PathGraph>(
 
     Ok(result)
 }
-
-// !SECTION Diffusion Core Implementation

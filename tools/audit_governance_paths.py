@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-audit_governance_paths.py — Audits governance files and path references across contextra repo.
+audit_governance_paths.py — Audits governance files and path references across acta repo.
 Generates Table A (file inventory), Table B (path reference audit), git history, diffs, and section 4.
 """
 

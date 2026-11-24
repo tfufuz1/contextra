@@ -18,7 +18,7 @@ use crate::csr::CsrGraph;
 #[cfg(feature = "edge-reinforcement-learning")]
 use crate::edge_reinforcement::EdgeReinforcementConfig;
 #[cfg(feature = "edge-reinforcement-learning")]
-use crate::types::EntityId;
+use contextra_types::EntityId;
 #[cfg(feature = "edge-reinforcement-learning")]
 use parking_lot::Mutex;
 
@@ -26,8 +26,6 @@ use parking_lot::Mutex;
 #[cfg(feature = "edge-reinforcement-learning")]
 #[derive(Debug, Clone)]
 // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-001]
-
-// SECTION Edge Reinforcement Buffer Core Implementation
 pub struct CooccurrenceSignal {
     pub from: EntityId,
     pub to: EntityId,
@@ -151,7 +149,7 @@ impl EdgeReinforcementBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::EntityId;
+    use contextra_types::EntityId;
 
     // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-010]
     #[test]
@@ -182,9 +180,8 @@ mod tests {
     async fn test_flush_with_populated_graph_edges() {
         use crate::csr::CsrGraph;
         use crate::edge_reinforcement::EdgeReinforcementConfig;
-        #[cfg(feature = "workspace")]
         use contextra_ports::GraphIndex;
-        use crate::types::{Edge, Entity, TxId};
+        use contextra_types::{Edge, Entity, TxId};
 
         let graph = CsrGraph::new();
         let tx = TxId::new(1);
@@ -219,5 +216,3 @@ mod tests {
         assert_eq!(buf.traversal_count(), 0);
     }
 }
-
-// !SECTION Edge Reinforcement Buffer Core Implementation

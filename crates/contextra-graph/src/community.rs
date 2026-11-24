@@ -19,17 +19,13 @@
 // SIEHE AUCH: crates/contextra-graph/src/csr.rs
 
 use crate::CsrGraph;
-// TODO(baukasten): Community Detection & Graph-Perkolation entkoppeln (AD-2/AD-4). Algorithmen müssen vollkommen autark ohne contextra-types funktionieren.
-use crate::types::EntityId;
-use crate::error::Result;
+use contextra_types::{EntityId, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Configuration for Leiden Community Detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 // ANCHOR[contextra-graph:SRC-COMMUNITY-001]
-
-// SECTION Community Core Implementation
 pub struct CommunityDetectionConfig {
     /// Maximum number of propagation / modularity optimization iterations.
     pub max_iterations: u32,
@@ -638,5 +634,3 @@ pub async fn detect_communities(
 
 #[cfg(test)]
 mod tests;
-
-// !SECTION Community Core Implementation

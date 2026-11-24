@@ -1,10 +1,8 @@
-// =========================================================================
-// ANCHOR[id=sys-acl-main,epic=sys-acl,seq=0] Zugriffskontrolle und Besitzverifikation
-// =========================================================================
-// LINK crates/contextra-sys/src/lib.rs
-// NOTE: Win32 & POSIX ACL restriction and file ownership verification wrappers (Ring 0 / E0 / docs/SPEC.md §7.7 / §10.1).
-// Invariante: Safe Rust facade; zero panic; cross-platform file permissions enforcement.
-// Keine unzulässigen Garantieversprechen (SPEC §6.4).
+// FILE-CONTEXT
+// STAND: 2026-10-28T00:00:00Z
+// ZWECK: Win32 & POSIX ACL restriction and file ownership verification wrappers (Ring 0 / SPEC 7.7)
+// INVARIANTEN: 100% safe Rust facade; zero panic; cross-platform file permissions enforcement
+// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7
 
 //! # Modul: Zugriffskontrolle und Besitzverifikation für Dateien (`acl_win32`)
 //!
@@ -13,26 +11,24 @@
 //! Write-Ahead-Logs (WAL).
 //!
 //! ## Ring-Zugehörigkeit und Zweck
-//! - **Ring 0 / Ebene E0 (Systemnaher Kern):** Kapselt FFI-Aufrufe (Foreign Function Interface) nach POSIX (`libc`)
+//! - **Ring 0 (Systemnaher Kern):** Kapselt FFI-Aufrufe (Foreign Function Interface) nach POSIX (`libc`)
 //!   und Windows (`windows-sys`).
-//! - **Sicherheitsziel (Fail-Closed):** Eine Datei mit sensiblen Daten darf nicht von
+//! - **Sicherheitsziel (Fail-Closed):** Eine Datei mit sensiblen Daten darf unter keinen Umständen von
 //!   anderen Benutzern des Betriebssystems gelesen oder modifiziert werden können. Kann dies nicht
-//!   verifiziert oder durchgesetzt werden, schlägt die Operation fehl.
+//!   garantiert oder verifiziert werden, schlägt die Operation fehl.
 //!
 //! ## Plattformunterstützung
 //! - **Unix/POSIX:** Setzen des Dateimodus auf `0600` (`-rw-------`) und Verifikation, dass keine Gruppen-
 //!   oder Welt-Rechte existieren sowie die Besitzer-UID (User ID) exakt mit der effektiven UID des aktuellen
 //!   Prozesses übereinstimmt.
 //! - **Windows (Win32):** Erstellung und Verifikation einer DACL (Discretionary Access Control List), die
-//!   ausschließlich den SID (Security Identifier) des aktuellen Prozesses berechtigt und Vererbung blockiert (`SE_DACL_PROTECTED`).
+//!   ausschließlich den SID (Security Identifier) des aktuellen Prozesses berechtigt und Vererbung blockiert.
 //! - **Andere Plattformen:** Best-Effort-Fallback (No-Op), falls weder Unix noch Windows vorliegen.
 
 use std::path::Path;
 
-// SECTION POSIX ACL & Permissions
-// ANCHOR[id=sys-acl-unix,epic=sys-acl,seq=1] Unix Chmod 0600 & UID-Prüfung
-
 #[cfg(unix)]
+// ANCHOR[contextra-sys:ACL-SET-UNIX-001]
 /// Beschränkt die Zugriffsrechte der angegebenen Datei unter Unix auf den Besitzer (`0600` / `-rw-------`).
 ///
 /// # Ablauf
@@ -68,6 +64,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(unix)]
+// ANCHOR[contextra-sys:ACL-VERIFY-UNIX-001]
 /// Verifiziert unter Unix, dass eine Datei strikt auf den Besitzer beschränkt ist (`0600`) und dem aktuellen Prozess gehört.
 ///
 /// # Ablauf
@@ -110,12 +107,9 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     }
     Ok(())
 }
-// !SECTION POSIX ACL & Permissions
-
-// SECTION Windows Win32 DACL
-// ANCHOR[id=sys-acl-win32,epic=sys-acl,seq=2] Windows DACL & SID-Verifikation
 
 #[cfg(windows)]
+// ANCHOR[contextra-sys:ACL-WIN32-TOKEN-001]
 /// RAII-Wächter (Resource Acquisition Is Initialization) für Windows-Prozesstoken-Handles (`HANDLE`).
 /// Schließt das Handle automatisch beim Verlassen des Gültigkeitsbereichs mittels `CloseHandle`.
 struct TokenGuard(windows_sys::Win32::Foundation::HANDLE);
@@ -133,6 +127,7 @@ impl Drop for TokenGuard {
 }
 
 #[cfg(windows)]
+// ANCHOR[contextra-sys:ACL-WIN32-SID-001]
 /// Ermittelt die Sicherheits-ID (SID = Security Identifier) des aktuellen Windows-Prozesses.
 ///
 /// # Ablauf
@@ -186,6 +181,7 @@ fn get_process_owner_sid_buffer() -> std::io::Result<(TokenGuard, Vec<u8>)> {
 }
 
 #[cfg(windows)]
+// ANCHOR[contextra-sys:ACL-SET-WIN32-001]
 /// Beschränkt unter Windows die Zugriffsrechte der angegebenen Datei auf den Prozessbesitzer mittels Win32-DACL.
 ///
 /// # Ablauf
@@ -269,6 +265,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(windows)]
+// ANCHOR[contextra-sys:ACL-VERIFY-WIN32-001]
 /// Verifiziert unter Windows, dass die Datei über eine geschützte DACL verfügt, die ausschließlich dem aktuellen Prozessbesitzer Zugriff gewährt.
 ///
 /// # Ablauf
@@ -321,6 +318,7 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
         }
     }
 
+    // ANCHOR[contextra-sys:ACL-WIN32-SECDESC-001]
     // RAII-Guard: Stellt sicher, dass der von Windows allokierte Sicherheitsdeskriptor über LocalFree freigegeben wird.
     struct SecDescGuard(PSECURITY_DESCRIPTOR);
     impl Drop for SecDescGuard {
@@ -399,12 +397,9 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
 
     Ok(())
 }
-// !SECTION Windows Win32 DACL
-
-// SECTION Fallback Platforms
-// ANCHOR[id=sys-acl-fallback,epic=sys-acl,seq=3] Fallback für Nicht-Unix & Nicht-Windows
 
 #[cfg(not(any(unix, windows)))]
+// ANCHOR[contextra-sys:ACL-FALLBACK-001]
 /// Best-Effort-Fallback für Zielarchitekturen, die weder Unix noch Windows sind (No-Op).
 pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
     let _ = path;
@@ -412,19 +407,19 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(not(any(unix, windows)))]
+// ANCHOR[contextra-sys:ACL-FALLBACK-002]
 /// Best-Effort-Fallback für Zielarchitekturen, die weder Unix noch Windows sind (No-Op).
 pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     let _ = path;
     Ok(())
 }
-// !SECTION Fallback Platforms
 
-// SECTION Unit Tests
-// ANCHOR[id=sys-acl-tests,epic=sys-acl,seq=4] Modultests für Dateiberechtigungen
+// ANCHOR[contextra-sys:ACL-TESTS-001]
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ANCHOR[contextra-sys:ACL-TEST-ROUNDTRIP-001]
     // Prüft den regulären Lebenszyklus: Setzen von 0600-Rechten und anschließende erfolgreiche Verifikation.
     #[test]
     fn test_set_and_verify_file_acl_owner_only() -> std::io::Result<()> {
@@ -439,6 +434,7 @@ mod tests {
         Ok(())
     }
 
+    // ANCHOR[contextra-sys:ACL-TEST-NONEXISTENT-001]
     // Prüft, dass die Verifikation bei einer nicht existierenden Datei wie erwartet fehlschlägt.
     #[test]
     fn test_verify_file_acl_owner_only_nonexistent_file() {
@@ -447,6 +443,7 @@ mod tests {
         assert!(res.is_err());
     }
 
+    // ANCHOR[contextra-sys:ACL-TEST-SET-NONEXISTENT-001]
     // Prüft, dass das Setzen von Rechten bei einer nicht existierenden Datei fehlschlägt.
     #[test]
     fn test_set_restrictive_file_acl_nonexistent_file() {
@@ -455,6 +452,7 @@ mod tests {
         assert!(res.is_err());
     }
 
+    // ANCHOR[contextra-sys:ACL-TEST-PERMISSIVE-001]
     // Prüft den Fail-Closed-Schutz: Zu freizügige Rechte (0666) werden von der Verifikation abgelehnt.
     #[test]
     fn test_verify_file_acl_owner_only_negative_permissions() -> std::io::Result<()> {
@@ -474,6 +472,7 @@ mod tests {
         Ok(())
     }
 
+    // ANCHOR[contextra-sys:ACL-TEST-EXEC-001]
     // Prüft, dass Ausführungsrechte für Gruppen (0610) zuverlässig erkannt und abgewiesen werden.
     #[test]
     fn test_verify_file_acl_owner_only_group_executable() -> std::io::Result<()> {
@@ -493,6 +492,7 @@ mod tests {
         Ok(())
     }
 
+    // ANCHOR[contextra-sys:ACL-TEST-OTHER-001]
     // Prüft, dass Leserechte für andere Benutzer (0604) zuverlässig abgelehnt werden.
     #[test]
     fn test_verify_file_acl_owner_only_other_read() -> std::io::Result<()> {
@@ -515,4 +515,3 @@ mod tests {
         Ok(())
     }
 }
-// !SECTION Unit Tests

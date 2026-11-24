@@ -1,71 +1,31 @@
+# Build
 target/
 **/target/
-target/evidence
-target/xtask
-*.swp
-*.swo
+target_local/
+**/target_local
+
+# Editor / OS
 .idea/
 .vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Python
 __pycache__/
 *.pyc
-CLAUDE.local.md
 .venv/
-*.so
-*.dylib
-*.dll
-*.pyd
 
-# --- contextra cleanup: added by 05-harden-gitignore.sh ---
-# Lokale Umgebungs-/Cache-Verzeichnisse (nie versionieren)
-.cache/
-.local/
-.config/
-.nix-defexpr/
-.nix-profile
-
-# Build-/Lint-Logs
-*.log
-clippy*.log
-*_output.txt
-contextra_orphaned_checkpoints.json
-*_orphaned_checkpoints.json
-contextra_orphaned_pins.json
-*_orphaned_pins.json
-
-# TODO: .unwrap-baseline.json is tracked in repository to provide baseline for Gate 2
-
-# Benchmark-Datenbanken / Downloads
-benchmarks/contextra-bench/tests/data/
-
-# Kompilierte Ad-hoc-Binaries ohne Cargo-Build-System
-/fix_unsafe
-
-# Cargo fuzz corpus & artifacts
+# Fuzz
 **/fuzz/corpus/
 **/fuzz/artifacts/
 **/fuzz/Cargo.lock
-coverage.json
 
-# Generierte Benchmark-/Test-Ergebnisse
+# Messung und Nachweise
+evidence/
 results/
+coverage.json
+*.log
 
-# Jules Session History Log (alt: .jules/, neu: .agents/jules/)
-.jules/session_history.jsonl*
-.agents/jules/session_history.jsonl*
-
-.jules/claims.json
-.jules/SESSION.md
-.jules/verify/claim_precheck.sh
-.jules/context/
-
-# Jules dynamischer Kontext (bei jedem Task-Start neu erzeugt → nicht versionieren)
-.agents/jules/context/*.md
-.agents/jules/context/*.txt
-!.agents/jules/context/.gitkeep
-
-# Jules local state and gate artifacts (untracked)
-/.jules/gate_ledger.json
-/.jules/session.env
-/.jules/local/
-.agents/jules/session.env
-.agents/jules/gate_ledger.json
+# Lokale Notizen
+CLAUDE.local.md

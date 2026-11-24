@@ -1,24 +1,15 @@
 // FILE-CONTEXT
 // ZWECK: Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - Header-Format.
-// INVARIANTEN: Zero-Panic bei Deserialisierung; HNSW_MAGIC = 0x484E5357; HNSW_VERSION = 2.
-// HOTSPOTS: HnswHeader::try_from_bytes, HnswHeader::to_bytes, HnswHeader::checksum
-// STAND: TS:2026-11-12T00:00:00Z
+// INVARIANTEN: Zero-Panic bei Deserialisierung.
 
-use crate::error::{Result, VectorError};
 use crate::hnsw::Sq8Bias;
+use contextra_types::{ContextraError, Result};
 
-// SECTION Konstanten
-
-// ANCHOR[contextra-vector:PERSIST-MAGIC]
 /// Magic number for HNSW files (0x484E5357 = "HNSW").
 pub const HNSW_MAGIC: u32 = 0x484E5357;
 /// Current file format version.
 pub const HNSW_VERSION: u16 = 2;
-// !SECTION
 
-// SECTION HnswHeader Struktur & Deserialisierung
-
-// ANCHOR[contextra-vector:PERSIST-HEADER-STRUCT]
 /// The header of an HNSW persistent file.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HnswHeader {
@@ -237,21 +228,20 @@ impl HnswHeader {
         (self.q_min, self.q_max)
     }
 
-    // ANCHOR[contextra-vector:PERSIST-TRY-FROM-BYTES]
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 64 {
-            return Err(VectorError::Storage("Header too small".into()));
+            return Err(ContextraError::Storage("Header too small".into()));
         }
 
         let magic = u32::from_le_bytes(
             bytes
                 .get(0..4)
-                .ok_or_else(|| VectorError::Storage("Invalid magic offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid magic offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid magic bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid magic bytes".into()))?,
         );
         if magic != HNSW_MAGIC {
-            return Err(VectorError::Storage(
+            return Err(ContextraError::Storage(
                 "Not a valid HNSW file: bad magic".into(),
             ));
         }
@@ -259,12 +249,12 @@ impl HnswHeader {
         let version = u16::from_le_bytes(
             bytes
                 .get(4..6)
-                .ok_or_else(|| VectorError::Storage("Invalid version offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid version offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid version bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid version bytes".into()))?,
         );
         if version != 1 && version != 2 {
-            return Err(VectorError::Storage(format!(
+            return Err(ContextraError::Storage(format!(
                 "Unsupported HNSW version: {}, expected 1 or 2",
                 version
             )));
@@ -273,103 +263,105 @@ impl HnswHeader {
         let dimension = u32::from_le_bytes(
             bytes
                 .get(6..10)
-                .ok_or_else(|| VectorError::Storage("Invalid dimension offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid dimension offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid dimension bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid dimension bytes".into()))?,
         );
 
         let m = u32::from_le_bytes(
             bytes
                 .get(10..14)
-                .ok_or_else(|| VectorError::Storage("Invalid m offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid m offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid m bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid m bytes".into()))?,
         );
 
         let metric = *bytes
             .get(14)
-            .ok_or_else(|| VectorError::Storage("Invalid metric offset".into()))?;
+            .ok_or_else(|| ContextraError::Storage("Invalid metric offset".into()))?;
 
         let quantized = *bytes
             .get(15)
-            .ok_or_else(|| VectorError::Storage("Invalid quantized offset".into()))?;
+            .ok_or_else(|| ContextraError::Storage("Invalid quantized offset".into()))?;
 
         let q_min = f32::from_le_bytes(
             bytes
                 .get(16..20)
-                .ok_or_else(|| VectorError::Storage("Invalid q_min offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid q_min offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid q_min bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid q_min bytes".into()))?,
         );
 
         let q_max = f32::from_le_bytes(
             bytes
                 .get(20..24)
-                .ok_or_else(|| VectorError::Storage("Invalid q_max offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid q_max offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid q_max bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid q_max bytes".into()))?,
         );
 
         let node_count = u64::from_le_bytes(
             bytes
                 .get(24..32)
-                .ok_or_else(|| VectorError::Storage("Invalid node_count offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid node_count offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid node_count bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid node_count bytes".into()))?,
         );
 
         let entry_point = i64::from_le_bytes(
             bytes
                 .get(32..40)
-                .ok_or_else(|| VectorError::Storage("Invalid entry_point offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid entry_point offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid entry_point bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid entry_point bytes".into()))?,
         );
 
         let nodes_offset = u64::from_le_bytes(
             bytes
                 .get(40..48)
-                .ok_or_else(|| VectorError::Storage("Invalid nodes_offset offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid nodes_offset offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid nodes_offset bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid nodes_offset bytes".into()))?,
         );
 
         let connections_offset = u64::from_le_bytes(
             bytes
                 .get(48..56)
-                .ok_or_else(|| VectorError::Storage("Invalid connections_offset offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid connections_offset offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid connections_offset bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid connections_offset bytes".into()))?,
         );
 
         let last_tx_id = u64::from_le_bytes(
             bytes
                 .get(56..64)
-                .ok_or_else(|| VectorError::Storage("Invalid last_tx_id offset".into()))?
+                .ok_or_else(|| ContextraError::Storage("Invalid last_tx_id offset".into()))?
                 .try_into()
-                .map_err(|_| VectorError::Storage("Invalid last_tx_id bytes".into()))?,
+                .map_err(|_| ContextraError::Storage("Invalid last_tx_id bytes".into()))?,
         );
 
         let (quant_calibration_offset, quant_calibration_len) = if version == 2 {
             if bytes.len() < 76 {
-                return Err(VectorError::Storage("Header too small for v2".into()));
+                return Err(ContextraError::Storage("Header too small for v2".into()));
             }
             let off = u64::from_le_bytes(
                 bytes
                     .get(64..72)
-                    .ok_or_else(|| VectorError::Storage("Invalid quant_calibration_offset".into()))?
+                    .ok_or_else(|| {
+                        ContextraError::Storage("Invalid quant_calibration_offset".into())
+                    })?
                     .try_into()
                     .map_err(|_| {
-                        VectorError::Storage("Invalid quant_calibration_offset bytes".into())
+                        ContextraError::Storage("Invalid quant_calibration_offset bytes".into())
                     })?,
             );
             let len = u32::from_le_bytes(
                 bytes
                     .get(72..76)
-                    .ok_or_else(|| VectorError::Storage("Invalid quant_calibration_len".into()))?
+                    .ok_or_else(|| ContextraError::Storage("Invalid quant_calibration_len".into()))?
                     .try_into()
                     .map_err(|_| {
-                        VectorError::Storage("Invalid quant_calibration_len bytes".into())
+                        ContextraError::Storage("Invalid quant_calibration_len bytes".into())
                     })?,
             );
             (off, len)
@@ -382,16 +374,18 @@ impl HnswHeader {
             let mean = f32::from_le_bytes(
                 bytes
                     .get(76..80)
-                    .ok_or_else(|| VectorError::Storage("Invalid sq8_bias_mean".into()))?
+                    .ok_or_else(|| ContextraError::Storage("Invalid sq8_bias_mean".into()))?
                     .try_into()
-                    .map_err(|_| VectorError::Storage("Invalid sq8_bias_mean bytes".into()))?,
+                    .map_err(|_| ContextraError::Storage("Invalid sq8_bias_mean bytes".into()))?,
             );
             let variance = f32::from_le_bytes(
                 bytes
                     .get(80..84)
-                    .ok_or_else(|| VectorError::Storage("Invalid sq8_bias_variance".into()))?
+                    .ok_or_else(|| ContextraError::Storage("Invalid sq8_bias_variance".into()))?
                     .try_into()
-                    .map_err(|_| VectorError::Storage("Invalid sq8_bias_variance bytes".into()))?,
+                    .map_err(|_| {
+                        ContextraError::Storage("Invalid sq8_bias_variance bytes".into())
+                    })?,
             );
             (mean, variance)
         } else {
@@ -419,26 +413,6 @@ impl HnswHeader {
         })
     }
 
-    /// Computes the cryptographic BLAKE3 checksum of the serialized header.
-    // ANCHOR[contextra-vector:PERSIST-CHECKSUM]
-    pub fn checksum(&self) -> [u8; 32] {
-        *blake3::hash(&self.to_bytes()).as_bytes()
-    }
-
-    /// Verifies that the serialized bytes match the expected BLAKE3 checksum.
-    pub fn verify_checksum(&self, expected: &[u8; 32]) -> Result<()> {
-        let computed = self.checksum();
-        if &computed != expected {
-            return Err(VectorError::Storage(format!(
-                "HnswHeader checksum mismatch: expected {}, got {}",
-                hex_fmt(expected),
-                hex_fmt(&computed)
-            )));
-        }
-        Ok(())
-    }
-
-    // ANCHOR[contextra-vector:PERSIST-TO-BYTES]
     pub fn to_bytes(&self) -> [u8; Self::SIZE] {
         let mut buf = [0u8; Self::SIZE];
         buf[0..4].copy_from_slice(&self.magic.to_le_bytes());
@@ -461,8 +435,3 @@ impl HnswHeader {
         buf
     }
 }
-
-fn hex_fmt(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{:02x}", b)).collect()
-}
-// !SECTION

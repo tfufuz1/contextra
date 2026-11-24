@@ -1,90 +1,90 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/contextra-storage/crates/contextra-storage",
-    "crates/contextra-storage/crates/contextra-storage-ports",
-    "crates/contextra-storage/crates/contextra-storage-fs",
-    "crates/contextra-storage/crates/contextra-crypto-ref",
-    "crates/contextra-storage/crates/contextra-keys-file",
-    "crates/contextra-storage/crates/contextra-keys-cohort",
-    "crates/contextra-storage/crates/contextra-storage-bridge",
-    "crates/contextra-ids",
-    "crates/contextra-env",
-    "crates/contextra-durable-fs",
-    "crates/contextra-wire",
-    "crates/contextra-sys",
-    "crates/contextra-simd",
-    "crates/contextra-store",
-    "crates/contextra-vector",
-    "crates/contextra-db",
-    "crates/contextra-text",
-    "crates/contextra-checkpoint",
-    "crates/contextra-crypto",
-    "crates/contextra-privacy",
-    "crates/contextra-graph",
-    "crates/contextra-infer-onnx",
-    "crates/contextra-mcp",
-    "crates/contextra-agent",
-    "crates/contextra-infer-ollama",
-    "crates/contextra-router",
-    "benchmarks/contextra-bench",
-    "crates/contextra-infer-candle",
-    "crates/contextra-sandbox",
-    "crates/contextra-py",
-    "crates/contextra-testkit",
-    "crates/contextra",
-    "crates/contextra-types",
-    "crates/contextra-ports",
-    "crates/contextra-mvcc",
-    "crates/contextra-adapt",
-    "crates/contextra-kvcache",
-    "crates/contextra-engine",
-    "crates/contextra-cognition",
-    "crates/contextra-rank",
-    "crates/contextra-ingest",
-    "crates/contextra-prompt-guard",
+    "crates/acta-storage/crates/acta-storage",
+    "crates/acta-storage/crates/acta-storage-ports",
+    "crates/acta-storage/crates/acta-storage-fs",
+    "crates/acta-storage/crates/acta-crypto-ref",
+    "crates/acta-storage/crates/acta-keys-file",
+    "crates/acta-storage/crates/acta-keys-cohort",
+    "crates/acta-storage/crates/acta-storage-bridge",
+    "crates/acta-ids",
+    "crates/acta-env",
+    "crates/acta-durable-fs",
+    "crates/acta-wire",
+    "crates/acta-sys",
+    "crates/acta-simd",
+    "crates/acta-store",
+    "crates/acta-vector",
+    "crates/acta-db",
+    "crates/acta-text",
+    "crates/acta-checkpoint",
+    "crates/acta-crypto",
+    "crates/acta-privacy",
+    "crates/acta-graph",
+    "crates/acta-infer-onnx",
+    "crates/acta-mcp",
+    "crates/acta-agent",
+    "crates/acta-infer-ollama",
+    "crates/acta-router",
+    "benchmarks/acta-bench",
+    "crates/acta-infer-candle",
+    "crates/acta-sandbox",
+    "crates/acta-py",
+    "crates/acta-testkit",
+    "crates/acta",
+    "crates/acta-types",
+    "crates/acta-ports",
+    "crates/acta-mvcc",
+    "crates/acta-adapt",
+    "crates/acta-kvcache",
+    "crates/acta-engine",
+    "crates/acta-cognition",
+    "crates/acta-rank",
+    "crates/acta-ingest",
+    "crates/acta-prompt-guard",
 ]
 exclude = [
-    "crates/contextra-vault",
+    "crates/acta-vault",
 ]
 # Restored archived crates to default-members:
-# contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama
+# acta-graph, acta-cognition, acta-adapt, acta-kvcache, acta-router, acta-agent, acta-infer-onnx, acta-infer-ollama
 default-members = [
-    "crates/contextra-storage/crates/contextra-storage",
-    "crates/contextra-storage/crates/contextra-storage-ports",
-    "crates/contextra-storage/crates/contextra-storage-fs",
-    "crates/contextra-storage/crates/contextra-crypto-ref",
-    "crates/contextra-storage/crates/contextra-keys-file",
-    "crates/contextra-storage/crates/contextra-keys-cohort",
-    "crates/contextra-storage/crates/contextra-storage-bridge",
-    "crates/contextra-ids",
-    "crates/contextra-env",
-    "crates/contextra-durable-fs",
-    "crates/contextra-wire",
-    "crates/contextra-sys",
-    "crates/contextra-simd",
-    "crates/contextra-types",
-    "crates/contextra-ports",
-    "crates/contextra-mvcc",
-    "crates/contextra-crypto",
-    "crates/contextra-vector",
-    "crates/contextra-text",
-    "crates/contextra-rank",
-    "crates/contextra-store",
-    "crates/contextra-checkpoint",
-    "crates/contextra-engine",
-    "crates/contextra-db",
-    "crates/contextra-mcp",
-    "crates/contextra",
-    "crates/contextra-testkit",
-    "crates/contextra-graph",
-    "crates/contextra-cognition",
-    "crates/contextra-adapt",
-    "crates/contextra-kvcache",
-    "crates/contextra-router",
-    "crates/contextra-agent",
-    "crates/contextra-infer-onnx",
-    "crates/contextra-infer-ollama",
+    "crates/acta-storage/crates/acta-storage",
+    "crates/acta-storage/crates/acta-storage-ports",
+    "crates/acta-storage/crates/acta-storage-fs",
+    "crates/acta-storage/crates/acta-crypto-ref",
+    "crates/acta-storage/crates/acta-keys-file",
+    "crates/acta-storage/crates/acta-keys-cohort",
+    "crates/acta-storage/crates/acta-storage-bridge",
+    "crates/acta-ids",
+    "crates/acta-env",
+    "crates/acta-durable-fs",
+    "crates/acta-wire",
+    "crates/acta-sys",
+    "crates/acta-simd",
+    "crates/acta-types",
+    "crates/acta-ports",
+    "crates/acta-mvcc",
+    "crates/acta-crypto",
+    "crates/acta-vector",
+    "crates/acta-text",
+    "crates/acta-rank",
+    "crates/acta-store",
+    "crates/acta-checkpoint",
+    "crates/acta-engine",
+    "crates/acta-db",
+    "crates/acta-mcp",
+    "crates/acta",
+    "crates/acta-testkit",
+    "crates/acta-graph",
+    "crates/acta-cognition",
+    "crates/acta-adapt",
+    "crates/acta-kvcache",
+    "crates/acta-router",
+    "crates/acta-agent",
+    "crates/acta-infer-onnx",
+    "crates/acta-infer-ollama",
 ]
 
 [workspace.package]
@@ -95,9 +95,9 @@ rust-version = "1.89"
 publish = false
 
 [workspace.dependencies]
-contextra-ids = { path = "crates/contextra-ids" }
-contextra-env = { path = "crates/contextra-env" }
-contextra-durable-fs = { path = "crates/contextra-durable-fs" }
+acta-ids = { path = "crates/acta-ids" }
+acta-env = { path = "crates/acta-env" }
+acta-durable-fs = { path = "crates/acta-durable-fs" }
 # Error handling
 thiserror = "2"
 
@@ -141,41 +141,41 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Workspace crates
-contextra-wire = { path = "crates/contextra-wire" }
-contextra-sys = { path = "crates/contextra-sys" }
-contextra-simd = { path = "crates/contextra-simd" }
-contextra-store = { path = "crates/contextra-store" }
-contextra-storage = { path = "crates/contextra-storage/crates/contextra-storage" }
-contextra-vector = { path = "crates/contextra-vector" }
-contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" } # <!-- crate-ref-ignore -->
-contextra-db = { path = "crates/contextra-db" }
-contextra-text = { path = "crates/contextra-text" }
-contextra-checkpoint = { path = "crates/contextra-checkpoint" }
-contextra-crypto = { path = "crates/contextra-crypto" }
-contextra-privacy = { path = "crates/contextra-privacy" }
-contextra-graph = { path = "crates/contextra-graph" }
-contextra-infer-onnx = { path = "crates/contextra-infer-onnx" }
-contextra-embed = { package = "contextra-infer-onnx", path = "crates/contextra-infer-onnx" } # <!-- crate-ref-ignore -->
-contextra-mcp   = { path = "crates/contextra-mcp" }
-contextra-agent = { path = "crates/contextra-agent" }
-contextra-infer-ollama = { path = "crates/contextra-infer-ollama" }
-contextra-ollama = { package = "contextra-infer-ollama", path = "crates/contextra-infer-ollama" } # <!-- crate-ref-ignore -->
-contextra-router = { path = "crates/contextra-router" }
-contextra-infer-candle = { path = "crates/contextra-infer-candle" }
-contextra-candle = { package = "contextra-infer-candle", path = "crates/contextra-infer-candle" } # <!-- crate-ref-ignore -->
-contextra-sandbox = { path = "crates/contextra-sandbox" }
-contextra-py = { path = "crates/contextra-py" }
-contextra-testkit = { path = "crates/contextra-testkit" }
-contextra = { path = "crates/contextra" }
-contextra-types = { path = "crates/contextra-types" }
-contextra-ports = { path = "crates/contextra-ports" }
-contextra-mvcc = { path = "crates/contextra-mvcc" }
-contextra-adapt = { path = "crates/contextra-adapt" }
-contextra-kvcache = { path = "crates/contextra-kvcache" }
-contextra-engine = { path = "crates/contextra-engine" }
-contextra-cognition = { path = "crates/contextra-cognition" }
-contextra-rank = { path = "crates/contextra-rank" }
-contextra-ingest = { path = "crates/contextra-ingest" }
+acta-wire = { path = "crates/acta-wire" }
+acta-sys = { path = "crates/acta-sys" }
+acta-simd = { path = "crates/acta-simd" }
+acta-store = { path = "crates/acta-store" }
+acta-storage = { path = "crates/acta-storage/crates/acta-storage" }
+acta-vector = { path = "crates/acta-vector" }
+acta-index = { package = "acta-vector", path = "crates/acta-vector" } # <!-- crate-ref-ignore -->
+acta-db = { path = "crates/acta-db" }
+acta-text = { path = "crates/acta-text" }
+acta-checkpoint = { path = "crates/acta-checkpoint" }
+acta-crypto = { path = "crates/acta-crypto" }
+acta-privacy = { path = "crates/acta-privacy" }
+acta-graph = { path = "crates/acta-graph" }
+acta-infer-onnx = { path = "crates/acta-infer-onnx" }
+acta-embed = { package = "acta-infer-onnx", path = "crates/acta-infer-onnx" } # <!-- crate-ref-ignore -->
+acta-mcp   = { path = "crates/acta-mcp" }
+acta-agent = { path = "crates/acta-agent" }
+acta-infer-ollama = { path = "crates/acta-infer-ollama" }
+acta-ollama = { package = "acta-infer-ollama", path = "crates/acta-infer-ollama" } # <!-- crate-ref-ignore -->
+acta-router = { path = "crates/acta-router" }
+acta-infer-candle = { path = "crates/acta-infer-candle" }
+acta-candle = { package = "acta-infer-candle", path = "crates/acta-infer-candle" } # <!-- crate-ref-ignore -->
+acta-sandbox = { path = "crates/acta-sandbox" }
+acta-py = { path = "crates/acta-py" }
+acta-testkit = { path = "crates/acta-testkit" }
+acta = { path = "crates/acta" }
+acta-types = { path = "crates/acta-types" }
+acta-ports = { path = "crates/acta-ports" }
+acta-mvcc = { path = "crates/acta-mvcc" }
+acta-adapt = { path = "crates/acta-adapt" }
+acta-kvcache = { path = "crates/acta-kvcache" }
+acta-engine = { path = "crates/acta-engine" }
+acta-cognition = { path = "crates/acta-cognition" }
+acta-rank = { path = "crates/acta-rank" }
+acta-ingest = { path = "crates/acta-ingest" }
 
 # Ingestion dependencies
 unicode-segmentation = "1.12"
@@ -193,15 +193,15 @@ yaml-rust2 = "0.9"
 toml = "0.8"
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
-# contextra-cluster, contextra-sandbox, contextra-saos-agent wurden in Phase 0 ausgelagert. <!-- crate-ref-ignore -->
-# contextra-embed    → ONNX-Embeddings (wird via Feature-Flag optional) <!-- crate-ref-ignore -->
+# acta-cluster, acta-sandbox, acta-saos-agent wurden in Phase 0 ausgelagert. <!-- crate-ref-ignore -->
+# acta-embed    → ONNX-Embeddings (wird via Feature-Flag optional) <!-- crate-ref-ignore -->
 
 # 🧊 Frozen Zone — external deps for future reactivation
 # openraft = { version = "0.9", features = ["storage-v2", "serde"] }
 # tonic = { version = "0.12", features = ["tls"] }
 # prost = "0.13"
 #
-# Embedding & ML (activate with contextra-infer-onnx feature)
+# Embedding & ML (activate with acta-infer-onnx feature)
 # ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "tls-rustls", "copy-dylibs", "api-24"] }
 # hf-hub = { version = "0.3", default-features = false }
 # tokenizers = "0.19"

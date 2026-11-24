@@ -1,10 +1,7 @@
-// =========================================================================
-// ANCHOR[id=sys-mmap-main,epic=sys-mmap,seq=0] Read-Only Memory Mapping Fassade
-// =========================================================================
-// LINK crates/contextra-sys/src/lib.rs
-// NOTE: Read-only memory mapping facade over memmap2 (Ring 0 / E0 / docs/SPEC.md §10.1 / INV-IO-1 / INV-ENCRYPT-REST-2).
-// Invariante: Zero panic; typed error propagation; read-only mapping; bounds checks.
-// Keine unzulässigen Garantieversprechen (SPEC §6.4).
+// STAND: 2026-11-08T00:00:00Z
+// ZWECK: Read-only memory mapping facade over memmap2 (Ring 0 / SPEC §10.1 / INV-IO-1 / INV-ENCRYPT-REST-2)
+// INVARIANTEN: Zero panic; typed error propagation; read-only mapping; bounded bounds checks
+// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1
 
 //! # Modul: Nur-Lese-Speicherabbildung (`mmap`)
 //!
@@ -12,9 +9,9 @@
 //! bereit, basierend auf der Crate `memmap2`.
 //!
 //! ## Ring-Zugehörigkeit und Verwendung
-//! - **Ring 0 / Ebene E0 (Kern / Unsafe-Insel):** Kapselt den `unsafe`-Aufruf `memmap2::Mmap::map(file)`.
+//! - **Ring 0 (Kern / Unsafe-Insel):** Kapselt den `unsafe`-Aufruf `memmap2::Mmap::map(file)`.
 //! - **Verwendung im System:** Wird von `contextra-vector` (DiskANN-Vektorindizes) und
-//!   `contextra-store` (SSTables) verwendet, um große Datenmengen speichereffizient
+//!   `contextra-store` (SSTables) verwendet, um große Datenmengen extrem speichereffizient
 //!   direkt aus dem Betriebssystem-Seitencache (Page Cache) ohne Heap-Kopien (Zero-Copy) zu lesen.
 //!
 //! ## Sicherheitsinvariante: Striktes Read-Only
@@ -28,27 +25,14 @@ use std::io;
 
 use crate::error::{Error, Result};
 
-// SECTION Raw Readonly Mapping
-// ANCHOR[id=sys-mmap-raw,epic=sys-mmap,seq=1] mmap_readonly
-
+// ANCHOR[contextra-sys:MMAP-READONLY-001]
 /// Erstellt eine unveränderliche Nur-Lese-Speicherabbildung (Read-Only Memory Map) für eine geöffnete Datei.
-///
-/// # Vorbedingungen
-/// * `file`: Gültiger, lesbarer Dateideskriptor.
-///
-/// # Fehler
-/// Liefert [`std::io::Error`], falls das Betriebssystem das Mapping ablehnt (z. B. unzureichender virtueller Adressraum).
 pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
-    // SAFETY: `file` ist ein gültiger, geöffneter Read-Only-Dateideskriptor.
-    // Die Read-Only-Abbildung verhindert Data Races im Rust-Adressraum.
-    // Seitenfehler (Page Faults) werden transparent vom Betriebssystemkernel behandelt.
+    // SAFETY: `file` ist ein gültiger, geöffneter Read-Only-Dateideskriptor. Die Read-Only-Abbildung verhindert Data Races im Rust-Adressraum. Seitenfehler (Page Faults) werden transparent vom Betriebssystemkernel behandelt.
     unsafe { memmap2::Mmap::map(file) }
 }
-// !SECTION Raw Readonly Mapping
 
-// SECTION Sealed File Abstraction
-// ANCHOR[id=sys-mmap-sealed,epic=sys-mmap,seq=2] Typisierte Versiegelung (Typestate)
-
+// ANCHOR[contextra-sys:MMAP-TYPINVARIANT-001]
 /// Typzustands-Marker: Zeigt an, dass eine Datei vollständig versiegelt, unveränderlich
 /// und prüfsummenverifiziert ist (gemäß INV-IO-1 und INV-ENCRYPT-REST-2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,10 +52,7 @@ pub struct SealedFile<State = SealedReadOnly> {
 }
 
 impl SealedFile<SealedReadOnly> {
-    /// Erstellt eine versiegelte Dateireferenz nach erfolgreicher Integritäts- und Längenprüfung.
-    ///
-    /// # Fehler
-    /// Liefert [`std::io::ErrorKind::InvalidData`], wenn die Dateilänge nicht mit `expected_len` übereinstimmt.
+    /// Erstellt eine versiegelte Dateireferenz nach erfolgreicher Integritäts- und Prüfsummenverifikation.
     pub fn new_verified(file: File, expected_len: u64) -> io::Result<Self> {
         let meta = file.metadata()?;
         if meta.len() != expected_len {
@@ -106,11 +87,8 @@ impl SealedFile<SealedReadOnly> {
         SealedMap::map_sealed(self)
     }
 }
-// !SECTION Sealed File Abstraction
 
-// SECTION Sealed Map Abstraction
-// ANCHOR[id=sys-mmap-sealed-map,epic=sys-mmap,seq=3] SealedMap
-
+// ANCHOR[contextra-sys:MMAP-SEALED-MAP-001]
 /// Sichere Nur-Lese-Speicherabbildung für versiegelte, unveränderliche Dateien (INV-IO-1).
 #[derive(Debug)]
 pub struct SealedMap {
@@ -119,9 +97,6 @@ pub struct SealedMap {
 
 impl SealedMap {
     /// Mappt eine nachweislich versiegelte Datei in den virtuellen Adressraum.
-    ///
-    /// # Fehler
-    /// Liefert [`std::io::ErrorKind::InvalidData`], wenn die gemappte Größe von der erwarteten Größe abweicht.
     pub fn map_sealed(file: &SealedFile<SealedReadOnly>) -> io::Result<Self> {
         let inner = mmap_readonly(file.as_file())?;
         let mapped_len = inner.len() as u64;
@@ -139,9 +114,6 @@ impl SealedMap {
     }
 
     /// Liest einen Teilbereich der Speicherabbildung mit sicherer Grenzenprüfung.
-    ///
-    /// # Fehler
-    /// Liefert [`crate::Error::InvalidInput`], falls Bereichsgrenzen überschritten werden oder ein Überlauf auftritt.
     pub fn get_subslice(&self, offset: usize, len: usize) -> Result<&[u8]> {
         let end = offset.checked_add(len).ok_or_else(|| {
             Error::InvalidInput("slice offset + len overflowed usize".to_string())
@@ -180,10 +152,8 @@ impl AsRef<[u8]> for SealedMap {
         &self.inner[..]
     }
 }
-// !SECTION Sealed Map Abstraction
 
-// SECTION Unit Tests
-// ANCHOR[id=sys-mmap-tests,epic=sys-mmap,seq=4] Mmap-Modultests
+// ANCHOR[contextra-sys:MMAP-TESTS-001]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302,4 +272,3 @@ mod tests {
         Ok(())
     }
 }
-// !SECTION Unit Tests

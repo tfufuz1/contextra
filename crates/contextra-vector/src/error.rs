@@ -1,89 +1,55 @@
-// FILE-CONTEXT
-// ZWECK: Zentrales Fehler-Enum VectorError für contextra-vector (B4/R3-Konformität).
-// INVARIANTEN: Zero-Panic, thiserror, non_exhaustive, saubere Zuordnung lokaler Fehler.
-// HOTSPOTS: VectorError, Result<T>
-// STAND: 2026-11-11
-
-//! # Fehlerbehandlung für `contextra-vector` (B4- & R3-Konformität)
+//! # Error types for `contextra-vector` (B4-compliance).
 //!
-//! Stellt das typsichere, non-exhaustive Fehler-Enum [`VectorError`] bereit, welches alle
-//! Fehlerzustände der Vektor-Indexierungs-, Such- und Persistenzoperationen abbildet.
+//! Provides a dedicated, non-exhaustive error enum capturing all error states of the vector index.
 
 use thiserror::Error;
 
-// SECTION Fehler-Definitionen
-
-// ANCHOR[contextra-vector:ERR-VECTOR-ERROR]
-/// Fehlerzustände von `contextra-vector`.
+/// Error states of `contextra-vector`.
 #[derive(Debug, Error, PartialEq, Clone)]
 #[non_exhaustive]
 pub enum VectorError {
-    /// Ungültige Eingabe oder Konfigurationsparameter.
-    #[error("Invalid input: {0}")]
+    /// Invalid input or configuration parameter.
+    #[error("invalid input: {0}")]
     InvalidInput(String),
 
-    /// Strukturelle Beschädigung oder Inkonsistenz des Index.
-    #[error("Index error: {0}")]
+    /// Index structure corruption or inconsistency.
+    #[error("index error: {0}")]
     Index(String),
 
-    /// Speicher- oder Persistenzfehler.
-    #[error("Storage error: {0}")]
-    Storage(String),
-
-    /// Dimensionsabweichung bei Einfüge- oder Suchoperationen.
-    #[error("Embedding dimension mismatch: expected {expected}, got {actual}")]
+    /// Dimension mismatch during insertion or search.
+    #[error("dimension mismatch: expected {expected}, got {actual}")]
     DimensionMismatch {
-        /// Erwartete Vektor-Dimensionalität.
+        /// Expected vector dimensionality.
         expected: usize,
-        /// Tatsächlich übergebene Vektor-Dimensionalität.
+        /// Actual vector dimensionality provided.
         actual: usize,
     },
 
-    /// HNSW-Konnektivitätsdegradation festgestellt.
-    #[error("HNSW graph connectivity degraded: {deleted_ratio:.1}% deleted nodes")]
+    /// HNSW connectivity degradation detected.
+    #[error("HNSW connectivity degraded: deleted ratio {deleted_ratio:.4}")]
     ConnectivityDegraded {
-        /// Verhältnis von gelöschten zu Gesamtknoten.
+        /// Ratio of deleted to total nodes.
         deleted_ratio: f64,
     },
 
-    /// Fehler bei der Graph-Reparatur während Knotenlösung/Tombstone-Pruning.
+    /// Graph repair failure during node deletion.
     #[error("graph repair failed: {0}")]
     GraphRepairFailed(String),
 
-    /// Ressource, Knoten oder Dokument nicht gefunden.
-    #[error("Not found: {0}")]
-    NotFound(String),
-
-    /// Konflikt bei Schreiboperation oder Transaktion.
-    #[error("Conflict: {0}")]
-    Conflict(String),
-
-    /// Fehler bei Nebenläufigkeit oder Sperren-Erfassung.
-    #[error("Concurrency error: {0}")]
+    /// Concurrency or lock acquisition failure.
+    #[error("concurrency error: {0}")]
     Concurrency(String),
 
-    /// Ein-/Ausgabe- oder Persistenzfehler.
-    #[error("I/O error: {0}")]
+    /// I/O or storage persistence error.
+    #[error("io error: {0}")]
     Io(String),
 
-    /// Nicht unterstützte Fähigkeit der Index-Engine.
-    #[error("Capability unsupported: vector - {0}")]
+    /// Capability unsupported by the index engine.
+    #[error("unsupported capability: {0}")]
     Unsupported(String),
-
-    /// Interner Fehlerzustand.
-    #[error("Internal error: {0}")]
-    Internal(String),
 }
 
-impl VectorError {
-    /// Hilfsmethode zur Konstruktion von `InvalidInput`.
-    pub fn invalid_input(msg: impl Into<String>) -> Self {
-        Self::InvalidInput(msg.into())
-    }
-}
-
-// ANCHOR[contextra-vector:ERR-RESULT]
-/// Standardmäßiger Result-Typ für `contextra-vector`.
+/// Standard Result type for `contextra-vector`.
 pub type Result<T> = std::result::Result<T, VectorError>;
 
 impl From<std::io::Error> for VectorError {
@@ -91,4 +57,54 @@ impl From<std::io::Error> for VectorError {
         Self::Io(err.to_string())
     }
 }
-// !SECTION
+
+#[cfg(feature = "ports-compat")]
+impl From<VectorError> for contextra_types::ContextraError {
+    fn from(err: VectorError) -> Self {
+        match err {
+            VectorError::InvalidInput(msg) => contextra_types::ContextraError::invalid_input(msg),
+            VectorError::Index(msg) => contextra_types::ContextraError::Index(msg),
+            VectorError::DimensionMismatch { expected, actual } => {
+                contextra_types::ContextraError::invalid_input(format!(
+                    "dimension mismatch: expected {expected}, got {actual}"
+                ))
+            }
+            VectorError::ConnectivityDegraded { deleted_ratio } => {
+                contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio }
+            }
+            VectorError::GraphRepairFailed(_msg) => {
+                contextra_types::ContextraError::GraphRepairFailed(
+                    contextra_types::HnswDeletionError::VerificationFailed {
+                        remaining_pointers: 1,
+                    },
+                )
+            }
+            VectorError::Concurrency(msg) => contextra_types::ContextraError::Index(msg),
+            VectorError::Io(msg) => contextra_types::ContextraError::Io(std::io::Error::other(msg)),
+            VectorError::Unsupported(msg) => {
+                contextra_types::ContextraError::capability_unsupported("vector", msg)
+            }
+        }
+    }
+}
+
+#[cfg(feature = "ports-compat")]
+impl From<contextra_types::ContextraError> for VectorError {
+    fn from(err: contextra_types::ContextraError) -> Self {
+        match err {
+            contextra_types::ContextraError::InvalidInput(msg) => VectorError::InvalidInput(msg),
+            contextra_types::ContextraError::Index(msg) => VectorError::Index(msg),
+            contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio } => {
+                VectorError::ConnectivityDegraded { deleted_ratio }
+            }
+            contextra_types::ContextraError::GraphRepairFailed(e) => {
+                VectorError::GraphRepairFailed(e.to_string())
+            }
+            contextra_types::ContextraError::Io(e) => VectorError::Io(e.to_string()),
+            contextra_types::ContextraError::CapabilityUnsupported { capability, reason } => {
+                VectorError::Unsupported(format!("{capability}: {reason}"))
+            }
+            other => VectorError::Index(other.to_string()),
+        }
+    }
+}

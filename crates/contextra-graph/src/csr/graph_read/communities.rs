@@ -3,21 +3,11 @@
 //! # Zweck
 //! Verknüpft Knotenindizes mit identifizierten Community-Gruppen für globales Clustering.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::super::graph_write::CsrGraph;
 use super::super::types::GRAPH_COMMUNITY_PREFIX;
-use crate::error::Result;
-use crate::types::EntityId;
+use contextra_types::{EntityId, Result};
 use std::collections::HashMap;
 
-
-// SECTION Communities Core Implementation
 impl CsrGraph {
     // ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-COMMUNITIES-001]
     pub fn set_communities_batch(&self, assignments: &[crate::CommunityAssignment]) {
@@ -40,10 +30,7 @@ impl CsrGraph {
                     map.insert(eid, comm_id);
                 }
             }
-            #[cfg(feature = "ports-compat")]
             let done = inner.communities_loaded || self.storage.is_none() || entity_ids.is_empty();
-            #[cfg(not(feature = "ports-compat"))]
-            let done = true;
             (map, done)
         };
 
@@ -51,38 +38,29 @@ impl CsrGraph {
             return Ok(map);
         }
 
-        #[cfg(feature = "ports-compat")]
-        {
-            if let Some(ref storage) = self.storage {
-                let entries = storage.scan_prefix(GRAPH_COMMUNITY_PREFIX).await?;
-                let mut inner = self.inner_write();
-                inner.communities_loaded = true;
-                for (raw_key, raw_val) in entries {
-                    if let Some(key_payload) = raw_key.get(GRAPH_COMMUNITY_PREFIX.len()..) {
-                        if let Ok(key_str) = std::str::from_utf8(key_payload) {
-                            let eid = EntityId::from(key_str);
-                            if let Ok(comm_id) = serde_json::from_slice::<u64>(&raw_val) {
-                                inner.communities.insert(eid, comm_id);
-                            }
+        if let Some(ref storage) = self.storage {
+            let entries = storage.scan_prefix(GRAPH_COMMUNITY_PREFIX).await?;
+            let mut inner = self.inner_write();
+            inner.communities_loaded = true;
+            for (raw_key, raw_val) in entries {
+                if let Some(key_payload) = raw_key.get(GRAPH_COMMUNITY_PREFIX.len()..) {
+                    if let Ok(key_str) = std::str::from_utf8(key_payload) {
+                        let eid = EntityId::from(key_str);
+                        if let Ok(comm_id) = serde_json::from_slice::<u64>(&raw_val) {
+                            inner.communities.insert(eid, comm_id);
                         }
                     }
                 }
-                let mut map = HashMap::with_capacity(entity_ids.len());
-                for &eid in entity_ids {
-                    if let Some(&comm_id) = inner.communities.get(&eid) {
-                        map.insert(eid, comm_id);
-                    }
-                }
-                Ok(map)
-            } else {
-                Ok(HashMap::new())
             }
-        }
-        #[cfg(not(feature = "ports-compat"))]
-        {
+            let mut map = HashMap::with_capacity(entity_ids.len());
+            for &eid in entity_ids {
+                if let Some(&comm_id) = inner.communities.get(&eid) {
+                    map.insert(eid, comm_id);
+                }
+            }
+            Ok(map)
+        } else {
             Ok(HashMap::new())
         }
     }
 }
-
-// !SECTION Communities Core Implementation

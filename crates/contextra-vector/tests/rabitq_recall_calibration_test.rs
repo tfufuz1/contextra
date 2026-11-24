@@ -1,4 +1,3 @@
-#![cfg(feature = "experimental-rabitq")]
 // FILE-CONTEXT
 // ZWECK: Recall- und Kalibrierungstests für RaBitQ (randomisierte binäre Quantisierung).
 

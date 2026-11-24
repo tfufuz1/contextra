@@ -3,17 +3,10 @@
 //! Implementiert n-äre Hyperkanten für komplexe Wissensrepräsentation (IP-20 / ADR-064).
 //! Persistenz erfolgt serde/bincode-kompatibel analog zu `PersistedEdgePayload`.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Hyperkanten-Datenstrukturen und n-äre Rollenbindungen.
-// INVARIANTEN: Valide Rollen und minimale Teilnehmeranzahl.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use crate::arc_slice::ArcSlice;
 use crate::csr::EdgeType;
-use crate::error::{GraphError, GraphMutationError, Result};
-use crate::types::{DocId, EntityId, TxId};
+use crate::error::GraphMutationError;
+use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
 use scc::HashMap;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
@@ -22,8 +15,6 @@ use std::sync::Arc;
 
 /// LSM-Key-Präfix für Hyperkanten.
 // ANCHOR[contextra-graph:SRC-HYPEREDGE-001]
-
-// SECTION Hyperedge Core Implementation
 pub const HYPEREDGE_PREFIX: &str = "__graph:hyperedge:";
 
 /// LSM-Key-Präfix für Hyperkanten-Index nach Entity.
@@ -44,8 +35,8 @@ pub fn star_weight(weight: f32, cardinality: usize) -> f32 {
     }
 }
 
-// Re-export core hyperedge identity and binding types from single source of truth in `types`.
-pub use crate::types::{HyperEdgeId, RoleBinding, RoleId};
+// Re-export core hyperedge identity and binding types from single source of truth in `contextra_ports`.
+pub use contextra_ports::graph::{HyperEdgeId, RoleBinding, RoleId};
 
 /// Eine n-äre Hyperkante zur Verbindung von 2 oder mehr Entitäten mit spezifischen Rollen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -200,7 +191,7 @@ impl HyperEdge {
     // ANCHOR[contextra-graph:SRC-HYPEREDGE-011]
     pub fn serialize(&self) -> Result<Vec<u8>> {
         bincode::serialize(self).map_err(|e| {
-            GraphError::Serialization(format!("Failed to serialize hyperedge {}: {e}", self.id))
+            ContextraError::Internal(format!("Failed to serialize hyperedge {}: {e}", self.id))
         })
     }
 
@@ -211,7 +202,7 @@ impl HyperEdge {
             return Ok(edge);
         }
         let legacy: LegacyHyperEdgeV1 = bincode::deserialize(bytes).map_err(|e| {
-            GraphError::Serialization(format!("Failed to deserialize hyperedge: {e}"))
+            ContextraError::Internal(format!("Failed to deserialize hyperedge: {e}"))
         })?;
         Ok(Self {
             id: legacy.id,
@@ -803,5 +794,3 @@ mod tests {
         }
     }
 }
-
-// !SECTION Hyperedge Core Implementation

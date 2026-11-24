@@ -1,15 +1,7 @@
-#![cfg(feature = "workspace")]
 //! Tests für `PprContext` und Speicherpuffer-Wiederverwendung.
 //!
 //! # Zweck
 //! Verifiziert die Vermeidung wiederholter Heap-Allokationen in wiederkehrenden Aufrufen.
-
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
-// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::super::*;
 use crate::csr::CsrGraph;
@@ -18,8 +10,6 @@ use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-
-// SECTION Context Tests Core Implementation
 struct LogCaptureLayer(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
 impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for LogCaptureLayer {
     fn on_event(
@@ -854,5 +844,3 @@ async fn test_ppr_tl_hfd_and_shadow_mode_context_dispatch() {
         "ShadowModeTlHfd should return non-empty PPR results"
     );
 }
-
-// !SECTION Context Tests Core Implementation

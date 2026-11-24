@@ -4,7 +4,7 @@
 use contextra_text::posting_list::{Posting, PostingList, BLOCK_SIZE, POSTING_LIST_V2_MAGIC};
 
 #[cfg(not(feature = "types-compat"))]
-use contextra_ids::DocId;
+use contextra_text::types::DocId;
 #[cfg(feature = "types-compat")]
 use contextra_types::DocId;
 

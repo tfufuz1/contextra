@@ -2,10 +2,10 @@
 import os
 import re
 
-VECTOR_DIR = "crates/contextra-vector"
+VECTOR_DIR = "crates/acta-vector"
 
 TYPES = {
-    "ContextraError", "DocId", "TxId", "DistanceMetric", "Result",
+    "ActaError", "DocId", "TxId", "DistanceMetric", "Result",
     "ScoredDocument", "MAX_SEARCH_K", "HnswDeletionError"
 }
 
@@ -52,25 +52,25 @@ def replace_use_statement(match):
     lines = []
     if types_imports:
         if len(types_imports) == 1:
-            lines.append(f"use contextra_types::{types_imports[0]};")
+            lines.append(f"use acta_types::{types_imports[0]};")
         else:
-            lines.append(f"use contextra_types::{{{', '.join(types_imports)}}};")
+            lines.append(f"use acta_types::{{{', '.join(types_imports)}}};")
 
     if ports_imports:
         if len(ports_imports) == 1:
-            lines.append(f"use contextra_ports::{ports_imports[0]};")
+            lines.append(f"use acta_ports::{ports_imports[0]};")
         else:
-            lines.append(f"use contextra_ports::{{{', '.join(ports_imports)}}};")
+            lines.append(f"use acta_ports::{{{', '.join(ports_imports)}}};")
 
     if mvcc_imports:
         if len(mvcc_imports) == 1:
-            lines.append(f"use contextra_mvcc::{mvcc_imports[0]};")
+            lines.append(f"use acta_mvcc::{mvcc_imports[0]};")
         else:
-            lines.append(f"use contextra_mvcc::{{{', '.join(mvcc_imports)}}};")
+            lines.append(f"use acta_mvcc::{{{', '.join(mvcc_imports)}}};")
 
     if unknown_imports:
         print(f"UNKNOWN IMPORTS: {unknown_imports}")
-        lines.append(f"use contextra_core::{{{', '.join(unknown_imports)}}};")
+        lines.append(f"use acta_core::{{{', '.join(unknown_imports)}}};")
 
     return "\n".join(lines)
 
@@ -80,21 +80,21 @@ def process_file(filepath):
 
     original = content
 
-    pattern = re.compile(r"use\s+contextra_core::(\{[^}]+\}|[a-zA-Z0-9_:]+);")
+    pattern = re.compile(r"use\s+acta_core::(\{[^}]+\}|[a-zA-Z0-9_:]+);")
     content = pattern.sub(replace_use_statement, content)
 
-    content = content.replace("contextra_core::ContextraError", "contextra_types::ContextraError")
-    content = content.replace("contextra_core::DocId", "contextra_types::DocId")
-    content = content.replace("contextra_core::TxId", "contextra_types::TxId")
-    content = content.replace("contextra_core::DistanceMetric", "contextra_types::DistanceMetric")
-    content = content.replace("contextra_core::Result", "contextra_types::Result")
-    content = content.replace("contextra_core::ScoredDocument", "contextra_types::ScoredDocument")
-    content = content.replace("contextra_core::MAX_SEARCH_K", "contextra_types::MAX_SEARCH_K")
-    content = content.replace("contextra_core::SequenceLog", "contextra_mvcc::SequenceLog")
-    content = content.replace("contextra_core::SeqLogChange", "contextra_mvcc::SeqLogChange")
-    content = content.replace("contextra_core::TxBuffer", "contextra_mvcc::TxBuffer")
-    content = content.replace("contextra_core::VectorIndex", "contextra_ports::VectorIndex")
-    content = content.replace("contextra_core::traits::VectorIndex", "contextra_ports::VectorIndex")
+    content = content.replace("acta_core::ActaError", "acta_types::ActaError")
+    content = content.replace("acta_core::DocId", "acta_types::DocId")
+    content = content.replace("acta_core::TxId", "acta_types::TxId")
+    content = content.replace("acta_core::DistanceMetric", "acta_types::DistanceMetric")
+    content = content.replace("acta_core::Result", "acta_types::Result")
+    content = content.replace("acta_core::ScoredDocument", "acta_types::ScoredDocument")
+    content = content.replace("acta_core::MAX_SEARCH_K", "acta_types::MAX_SEARCH_K")
+    content = content.replace("acta_core::SequenceLog", "acta_mvcc::SequenceLog")
+    content = content.replace("acta_core::SeqLogChange", "acta_mvcc::SeqLogChange")
+    content = content.replace("acta_core::TxBuffer", "acta_mvcc::TxBuffer")
+    content = content.replace("acta_core::VectorIndex", "acta_ports::VectorIndex")
+    content = content.replace("acta_core::traits::VectorIndex", "acta_ports::VectorIndex")
 
     if content != original:
         with open(filepath, "w", encoding="utf-8") as f:

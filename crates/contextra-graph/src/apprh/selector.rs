@@ -14,7 +14,7 @@ use super::gate_monitor::ApprhGateMonitor;
 use super::params::ApprhParams;
 use super::shadow::{normalize_and_sort, shadow_compare_forward_push_vs_apprh};
 use crate::path_rag::{forward_push_ppr, PathGraph, PprParams};
-use crate::types::EntityId;
+use contextra_types::EntityId;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -22,8 +22,6 @@ use std::sync::Arc;
 /// Operating mode for [`ApprhSelector`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 // ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-001]
-
-// SECTION Selector Core Implementation
 pub enum ApprhMode {
     /// APPRH disabled; authoritative Forward-Push PPR is returned.
     Off,
@@ -222,5 +220,3 @@ impl std::fmt::Debug for ApprhSelector {
             .finish()
     }
 }
-
-// !SECTION Selector Core Implementation

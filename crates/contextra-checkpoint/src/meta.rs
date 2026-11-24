@@ -11,17 +11,7 @@
 //! - [`StateCheckpoint`]: Minimaler Transaktions-Snapshot mit Zeitstempel und optionalem Namespace.
 //! - [`validate_identifier`]: Validierungsfunktion für sichere String-Bezeichner.
 
-use crate::error::{CheckpointError, Result};
-use contextra_ids::TxId;
-/// Defines a frozen workflow state acting as a savepoint.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WorkflowState {
-    /// Associated transaction.
-    pub tx: TxId,
-    /// Agent memory graph state footprint (BLAKE3 hash digest).
-    pub graph_hash: [u8; 32],
-}
-
+use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use serde::{Deserialize, Serialize};
 
 // RESOLVED: AGT-CKPT-001 — UTF-8 char counting used for 256 char limit (TS: 2026-09-01T23:07:05Z) (SESSION: 358e3b0a)
@@ -29,8 +19,8 @@ use serde::{Deserialize, Serialize};
 /// Validiert Bezeichner-Strings (z. B. Checkpoint-Namen, Collection-IDs) gegen leere Eingaben und Längenbeschränkungen.
 ///
 /// # Zweck
-/// Verhindert ungültige oder schädliche Pfade/Schlüssel in der Speicher-Engine und sichert
-/// wohldefinierte Namensräume ab.
+/// Verhindert ungültige oder schädliche Pfade/Schlüssel in der Speicher-Engine und garantiert
+/// wohldefinierte Namensräume.
 ///
 /// # Ablauf von `validate_identifier`:
 /// 1. Prüfen, ob der getrimmte Wert leer oder reines Whitespace ist -> Fehler `InvalidInput`.
@@ -38,18 +28,18 @@ use serde::{Deserialize, Serialize};
 /// 3. Prüfen, ob die Zeichenanzahl maximal 256 beträgt -> bei Überschreitung Fehler `InvalidInput`.
 ///
 /// # Fehler
-/// Gibt [`CheckpointError::InvalidInput`] zurück, wenn der String leer ist oder mehr als 256 Zeichen enthält.
+/// Gibt [`ContextraError::InvalidInput`] zurück, wenn der String leer ist oder mehr als 256 Zeichen enthält.
 pub(crate) fn validate_identifier(field_name: &str, value: &str) -> Result<()> {
     // NOTE: Whitespace-Prüfung verhindert versehentliche Leerzeichen als Bezeichner
     if value.trim().is_empty() {
-        return Err(CheckpointError::InvalidInput(format!(
+        return Err(ContextraError::InvalidInput(format!(
             "{field_name} cannot be empty or whitespace-only"
         )));
     }
     let char_count = value.chars().count();
     // NOTE: 256 Zeichen Begrenzung schützt vor DoS und Pufferüberläufen in Speicherformaten
     if char_count > 256 {
-        return Err(CheckpointError::InvalidInput(format!(
+        return Err(ContextraError::InvalidInput(format!(
             "{field_name} exceeds maximum length of 256 characters (got {char_count})"
         )));
     }
@@ -72,43 +62,15 @@ pub(crate) fn validate_identifier(field_name: &str, value: &str) -> Result<()> {
 /// - `created_at`: Unix-Zeitstempel der Erstellung in Millisekunden.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CheckpointMeta {
-    /// Eindeutiger Name des Checkpoints.
     pub name: String,
-    /// ID der zugeordneten Collection.
     pub collection_id: String,
-    /// LSM-Sequenznummer zum Erstellungszeitpunkt.
     pub seq_no: u64,
-    /// Transaktions-ID zum Erstellungszeitpunkt.
     pub tx_id: TxId,
-    /// Zusätzliche anwendungsspezifische Metadaten als JSON.
     pub metadata: serde_json::Value,
-    /// Erstellungszeitpunkt in Millisekunden seit der Epoche.
     pub created_at: u64,
-    /// ID-Breite in Bits (SPEC §5.2). 64 oder 128 Bit.
-    #[serde(default = "default_id_width_bits")]
-    pub id_width_bits: u16,
-}
-
-/// Aktuelle ID-Breite in Bits (SPEC §5.2).
-pub const CURRENT_ID_WIDTH_BITS: u16 = if cfg!(feature = "docid-128") { 128 } else { 64 };
-
-fn default_id_width_bits() -> u16 {
-    CURRENT_ID_WIDTH_BITS
 }
 
 impl CheckpointMeta {
-    /// Validiert die ID-Breite gegen die aktuelle Build-Konfiguration (SPEC §5.2).
-    pub fn validate_id_width(&self) -> Result<()> {
-        let expected = CURRENT_ID_WIDTH_BITS;
-        if self.id_width_bits != expected {
-            return Err(CheckpointError::IdWidthMismatch {
-                stored: self.id_width_bits,
-                build: expected,
-            });
-        }
-        Ok(())
-    }
-
     /// Konvertiert die Metadaten in einen [`WorkflowState`].
     ///
     /// # Kompatibilität
@@ -147,11 +109,8 @@ impl CheckpointMeta {
 /// - `namespace`: Optionaler logischer Namensraum zur Isolation von Workflows.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StateCheckpoint {
-    /// Transaktions-ID des Zustands-Snapshots.
     pub tx_id: TxId,
-    /// Zeitstempel der Erstellung in Millisekunden.
     pub timestamp_ms: u64,
-    /// Optionaler Namespace bzw. Mandant des Checkpoints.
     #[serde(default)]
     pub namespace: Option<String>,
 }
@@ -179,7 +138,6 @@ mod tests {
             tx_id: TxId::new(1001),
             metadata: serde_json::json!({"step": 42, "env": "prod"}),
             created_at: 1690000000,
-            id_width_bits: CURRENT_ID_WIDTH_BITS,
         };
 
         let json = serde_json::to_string(&meta).expect("// expect #[cfg(test)]");
@@ -237,7 +195,6 @@ mod tests {
             tx_id: TxId::new(2026),
             metadata: serde_json::json!({"agent_phase": "reasoning"}),
             created_at: 5000,
-            id_width_bits: CURRENT_ID_WIDTH_BITS,
         };
 
         let state = meta.into_workflow_state();
@@ -255,16 +212,16 @@ mod tests {
 
         let name_257 = "a".repeat(257);
         let res = validate_identifier("field", &name_257);
-        assert!(matches!(res, Err(CheckpointError::InvalidInput(_))));
+        assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
     }
 
     // Prüft, dass leere Strings oder reine Whitespace-Strings als Identifier abgewiesen werden.
     #[test]
     fn test_validate_identifier_empty_or_whitespace() {
         let res_empty = validate_identifier("field", "");
-        assert!(matches!(res_empty, Err(CheckpointError::InvalidInput(_))));
+        assert!(matches!(res_empty, Err(ContextraError::InvalidInput(_))));
 
         let res_ws = validate_identifier("field", "   \t\n  ");
-        assert!(matches!(res_ws, Err(CheckpointError::InvalidInput(_))));
+        assert!(matches!(res_ws, Err(ContextraError::InvalidInput(_))));
     }
 }

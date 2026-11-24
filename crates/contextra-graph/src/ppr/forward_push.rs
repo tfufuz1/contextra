@@ -1,10 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
-// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 // ANCHOR[contextra-graph:SRC-PPR-FORWARD-PUSH-001]
 //! Forward-Push-Algorithmus (Andersen et al.) für personalisierten PageRank.
 //!
@@ -14,11 +7,9 @@
 use super::dense::{collect_valid_seeds, compute_out_weight_sums};
 use super::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
-use crate::types::{EntityId, PprConfig};
+use contextra_types::{EntityId, PprConfig};
 use std::collections::BTreeMap;
 
-
-// SECTION Forward Push Core Implementation
 pub(crate) fn push_mass_to_neighbors(
     inner: &GraphInner,
     u: usize,
@@ -274,5 +265,3 @@ pub(crate) fn forward_push_ppr(
 
     extract_push_results(inner, p, deleted_nodes)
 }
-
-// !SECTION Forward Push Core Implementation

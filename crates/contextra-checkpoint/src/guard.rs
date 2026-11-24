@@ -5,7 +5,7 @@
 //!
 //! ## Ring & Rolle
 //! Gehört zu **Ring 1 (Persistenz)**. Bildet die Brücke zwischen laufenden Transaktionen der Anwendungslogik
-//! (z. B. Agenten-Workflows in Ring 2/3) und der Persistenzebene ([`SnapshotSource`]).
+//! (z. B. Agenten-Workflows in Ring 2/3) und der Persistenzebene ([`contextra_ports::StorageEngine`]).
 //!
 //! ## Hauptkomponenten
 //! - [`PinGuard`]: Schützt gepinnte MVCC-Sequenznummern vor versehentlichem Löschen durch den LSM-Compactor.
@@ -17,12 +17,10 @@
 //! Stattdessen wird der betroffene Zustand synchron in der [`InstanceOrphanRegistry`] vorgemerkt,
 //! sodass spätere Recovery-Durchläufe die Ressourcen gefahrlos freigeben können.
 
-use crate::error::{CheckpointError, Result};
 use crate::meta::StateCheckpoint;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinnedSeqNoOrphan};
-use crate::snapshot_source::SnapshotSource;
-use contextra_env::{Clock, MetricsSink, SystemClock};
-use contextra_ids::TxId;
+use contextra_ports::SystemClock;
+use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -30,7 +28,7 @@ use std::sync::Arc;
 /// RAII-Guard für gepinnte Checkpoint-Sequenznummern (gemäß ADR-015).
 ///
 /// # Zweck
-/// Stellt sicher, dass eine gepinnte Sequenznummer bei einem Fehler oder Panic während des Schreibens
+/// Garantiert, dass eine gepinnte Sequenznummer bei einem Fehler oder Panic während des Schreibens
 /// automatisch entpinnt oder als verwaist registriert wird, um dauerhafte GC-Blockaden (LSM-Compaction)
 /// zu verhindern.
 ///
@@ -40,14 +38,14 @@ use std::sync::Arc;
 /// - `orphan_registry`: Instanzgebundene Registry für verwaiste Einträge bei unkontrolliertem Drop.
 /// - `clock`: Injizierter Uhrzeit-Port für deterministische Zeitmessung.
 #[must_use = "PinGuard must be defused upon successful checkpoint storage"]
-pub struct PinGuard<S: SnapshotSource> {
+pub struct PinGuard<S: contextra_ports::StorageEngine> {
     storage: Arc<S>,
     seq_no: Option<u64>,
     orphan_registry: Arc<InstanceOrphanRegistry>,
-    clock: Arc<dyn Clock>,
+    clock: Arc<dyn contextra_ports::Clock>,
 }
 
-impl<S: SnapshotSource> PinGuard<S> {
+impl<S: contextra_ports::StorageEngine> PinGuard<S> {
     // ANCHOR[contextra-checkpoint:GRD-002]
     /// Pinnt eine Sequenznummer in der Storage-Engine unter Verwendung der Clock aus der Orphan-Registry.
     ///
@@ -77,7 +75,7 @@ impl<S: SnapshotSource> PinGuard<S> {
         storage: Arc<S>,
         seq_no: u64,
         orphan_registry: Arc<InstanceOrphanRegistry>,
-        clock: Arc<dyn Clock>,
+        clock: Arc<dyn contextra_ports::Clock>,
     ) -> Result<Self> {
         // NOTE: Pinnen verhindert das physische Löschen von SSTables durch den LSM-Compactor
         storage.pin_checkpoint(seq_no).await?;
@@ -90,7 +88,7 @@ impl<S: SnapshotSource> PinGuard<S> {
     }
 
     /// Liefert eine Referenz auf den injizierten Clock-Port.
-    pub fn clock(&self) -> &Arc<dyn Clock> {
+    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
         &self.clock
     }
 
@@ -118,7 +116,7 @@ impl<S: SnapshotSource> PinGuard<S> {
     }
 }
 
-impl<S: SnapshotSource> Drop for PinGuard<S> {
+impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
     // ANCHOR[contextra-checkpoint:GRD-005]
     // Ablauf von `PinGuard::drop`:
     // Wenn `seq_no` noch gesetzt ist (Guard wurde nicht defused oder unpinned):
@@ -151,21 +149,21 @@ impl<S: SnapshotSource> Drop for PinGuard<S> {
 /// wird KEIN asynchroner Hintergrund-Rollback gespawnt, um Kollisionen mit späteren Transaktionen zu verhindern.
 /// Stattdessen wird der Checkpoint als "orphaned" registriert/persistiert und beim nächsten kontrollierten Recovery-Zyklus verarbeitet.
 #[must_use = "CheckpointGuard must be explicitly finalized via .commit() or .rollback().await"]
-pub struct CheckpointGuard<S: SnapshotSource> {
+pub struct CheckpointGuard<S: contextra_ports::StorageEngine> {
     pub(crate) checkpoint: Option<StateCheckpoint>,
     pub(crate) storage: Arc<S>,
     pub(crate) namespace: String,
     pub(crate) orphan_registry: Arc<InstanceOrphanRegistry>,
     pub(crate) skipped_rollbacks: Arc<AtomicU64>,
-    pub(crate) clock: Arc<dyn Clock>,
-    pub(crate) metrics_sink: Option<Arc<dyn MetricsSink>>,
+    pub(crate) clock: Arc<dyn contextra_ports::Clock>,
+    pub(crate) metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
     pub(crate) created_at_nanos: u64,
 }
 
-impl<S: SnapshotSource> CheckpointGuard<S> {
+impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
     /// Erzeugt einen neuen `CheckpointGuard` mit Standard-SystemClock.
     pub fn new(checkpoint: StateCheckpoint, storage: Arc<S>, namespace: impl Into<String>) -> Self {
-        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
+        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
         Self::with_clock(checkpoint, storage, namespace, clock)
     }
 
@@ -174,7 +172,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         checkpoint: StateCheckpoint,
         storage: Arc<S>,
         namespace: impl Into<String>,
-        clock: Arc<dyn Clock>,
+        clock: Arc<dyn contextra_ports::Clock>,
     ) -> Self {
         let ns = namespace.into();
         let orphan_path = std::path::PathBuf::from(format!("{ns}_orphaned_checkpoints.json"));
@@ -235,7 +233,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         namespace: impl Into<String>,
         orphan_registry: Arc<InstanceOrphanRegistry>,
         skipped_rollbacks: Arc<AtomicU64>,
-        clock: Arc<dyn Clock>,
+        clock: Arc<dyn contextra_ports::Clock>,
     ) -> Self {
         let created_at_nanos = clock.monotonic_nanos();
         Self {
@@ -251,19 +249,22 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
     }
 
     /// Ergänzt den Guard um eine Metrik-Senke zur Erfassung von Ausführungsdauern.
-    pub fn with_metrics_sink(mut self, sink: Arc<dyn MetricsSink>) -> Self {
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
         self.metrics_sink = Some(sink);
         self
     }
 
     /// Ergänzt den Guard optional um eine Metrik-Senke.
-    pub fn with_metrics_sink_opt(mut self, sink: Option<Arc<dyn MetricsSink>>) -> Self {
+    pub fn with_metrics_sink_opt(
+        mut self,
+        sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+    ) -> Self {
         self.metrics_sink = sink;
         self
     }
 
     /// Liefert den verwendeten Clock-Port.
-    pub fn clock(&self) -> &Arc<dyn Clock> {
+    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
         &self.clock
     }
 
@@ -298,7 +299,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
     pub async fn for_agent_step_with_clock(
         storage: Arc<S>,
         tx: TxId,
-        clock: Arc<dyn Clock>,
+        clock: Arc<dyn contextra_ports::Clock>,
     ) -> Result<Self> {
         let ns = "agent_step";
         let orphan_path = std::path::PathBuf::from(format!("{ns}_orphaned_checkpoints.json"));
@@ -316,7 +317,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
     pub fn checkpoint(&self) -> Result<&StateCheckpoint> {
         self.checkpoint
             .as_ref()
-            .ok_or_else(|| CheckpointError::Internal("Checkpoint already consumed".into()))
+            .ok_or_else(|| ContextraError::Internal("Checkpoint already consumed".into()))
     }
 
     // ANCHOR[contextra-checkpoint:GRD-008]
@@ -331,7 +332,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         let cp = self
             .checkpoint
             .take()
-            .ok_or_else(|| CheckpointError::Internal("Checkpoint already consumed".into()))?;
+            .ok_or_else(|| ContextraError::Internal("Checkpoint already consumed".into()))?;
         if let Some(ref sink) = self.metrics_sink {
             let elapsed_nanos = self
                 .clock
@@ -387,7 +388,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
             let last_tx = self.storage.last_tx_id().await?;
             // NOTE: Verhindert versehentliches Überschreiben bereits persistierter neuerer Transaktionen
             if last_tx > cp.tx_id {
-                return Err(CheckpointError::Transaction(format!(
+                return Err(ContextraError::Transaction(format!(
                     "Serialization barrier violation: Cannot rollback to TxId {} because newer committed transaction TxId {} exists in storage",
                     cp.tx_id.inner(),
                     last_tx.inner()
@@ -399,7 +400,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
             }
             res
         } else {
-            Err(CheckpointError::Internal(
+            Err(ContextraError::Internal(
                 "Checkpoint already consumed".into(),
             ))
         }
@@ -411,12 +412,12 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
     /// # Einschränkung
     /// Diese Methode darf **nicht** aus einem laufenden asynchronen Tokio-Kontext heraus aufgerufen werden.
     /// In asynchronem Kontext führt ein Aufruf von `rollback_blocking` zu einem Fehler
-    /// [`CheckpointError::Internal`], um Deadlocks und Tokio-Panics zu verhindern. Verwende in async-Kontexten
+    /// [`ContextraError::Internal`], um Deadlocks und Tokio-Panics zu verhindern. Verwende in async-Kontexten
     /// stattdessen [`rollback`](Self::rollback).
     pub fn rollback_blocking(mut self) -> Result<()> {
         // NOTE: Schutz vor Deadlocks durch block_on innerhalb laufender Tokio-Runtime
         if tokio::runtime::Handle::try_current().is_ok() {
-            return Err(CheckpointError::Internal(
+            return Err(ContextraError::Internal(
                 "Cannot call rollback_blocking from within an active async Tokio runtime context; use rollback().await instead"
                     .to_string(),
             ));
@@ -425,7 +426,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         let cp = self
             .checkpoint
             .take()
-            .ok_or_else(|| CheckpointError::Internal("Checkpoint already consumed".into()))?;
+            .ok_or_else(|| ContextraError::Internal("Checkpoint already consumed".into()))?;
 
         if let Some(ref sink) = self.metrics_sink {
             let elapsed_nanos = self
@@ -444,7 +445,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
             .enable_all()
             .build()
             .map_err(|e| {
-                CheckpointError::Internal(format!(
+                ContextraError::Internal(format!(
                     "Failed to create Tokio runtime for rollback_blocking: {e}"
                 ))
             })?;
@@ -452,7 +453,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         rt.block_on(async {
             let last_tx = self.storage.last_tx_id().await?;
             if last_tx > cp.tx_id {
-                return Err(CheckpointError::Transaction(format!(
+                return Err(ContextraError::Transaction(format!(
                     "Serialization barrier violation: Cannot rollback to TxId {} because newer committed transaction TxId {} exists in storage",
                     cp.tx_id.inner(),
                     last_tx.inner()
@@ -463,7 +464,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
     }
 }
 
-impl<S: SnapshotSource> Drop for CheckpointGuard<S> {
+impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
     // ANCHOR[contextra-checkpoint:GRD-011]
     // Ablauf von `CheckpointGuard::drop`:
     // Wenn `checkpoint` noch vorhanden ist (kein explizites commit() oder rollback()):
@@ -510,7 +511,7 @@ impl<S: SnapshotSource> Drop for CheckpointGuard<S> {
 )]
 mod tests {
     use super::*;
-    use crate::snapshot_source::{BoxFuture, SnapshotSource};
+    use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
     use parking_lot::Mutex;
     use std::collections::{HashMap, HashSet};
 
@@ -530,11 +531,17 @@ mod tests {
         }
     }
 
-    impl SnapshotSource for MockStorage {
+    impl StorageEngine for MockStorage {
         fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
         }
-
+        fn get_at_seq<'a>(
+            &'a self,
+            key: &'a [u8],
+            _seq: u64,
+        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { self.get(key).await })
+        }
         fn put<'a>(
             &'a self,
             _tx_id: TxId,
@@ -573,7 +580,15 @@ mod tests {
         fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-
+        fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+            Box::pin(async move {
+                Ok(StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
         fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move {
                 self.pinned.lock().insert(seq_no);
@@ -598,6 +613,14 @@ mod tests {
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .collect())
             })
+        }
+        fn scan<'a>(
+            &'a self,
+            _s: std::ops::Bound<&'a [u8]>,
+            _e: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(Vec::new()) })
         }
     }
 
@@ -674,12 +697,12 @@ mod tests {
             res.is_err(),
             "rollback_blocking called from async context must return error immediately to prevent deadlock"
         );
-        if let Err(CheckpointError::Internal(msg)) = res {
+        if let Err(ContextraError::Internal(msg)) = res {
             assert!(msg.contains("active async Tokio runtime context"));
             assert!(msg.contains("rollback().await"));
         } else {
             panic!(
-                "Expected CheckpointError::Internal error message instructing to use rollback().await"
+                "Expected ContextraError::Internal error message instructing to use rollback().await"
             );
         }
     }
@@ -745,7 +768,7 @@ mod tests {
     #[allow(non_snake_case)]
     #[tokio::test]
     async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
-        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
+        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
         let dummy_storage = Arc::new(MockStorage::new());
         let consumed_guard = CheckpointGuard::<MockStorage> {
             checkpoint: None,
@@ -759,7 +782,7 @@ mod tests {
         };
         assert!(matches!(
             consumed_guard.checkpoint(),
-            Err(CheckpointError::Internal(_))
+            Err(ContextraError::Internal(_))
         ));
 
         let consumed_guard2 = CheckpointGuard::<MockStorage> {
@@ -774,7 +797,7 @@ mod tests {
         };
         assert!(matches!(
             consumed_guard2.commit(),
-            Err(CheckpointError::Internal(_))
+            Err(ContextraError::Internal(_))
         ));
 
         let consumed_guard3 = CheckpointGuard::<MockStorage> {
@@ -788,13 +811,13 @@ mod tests {
             created_at_nanos: clock.monotonic_nanos(),
         };
         let res = consumed_guard3.rollback().await;
-        assert!(matches!(res, Err(CheckpointError::Internal(_))));
+        assert!(matches!(res, Err(ContextraError::Internal(_))));
     }
 
     // Prüft die Erfassung von Dauer-Histogrammmetriken beim erfolgreichen Commit eines Guards.
     #[tokio::test]
     async fn test_checkpoint_metrics_commit_duration() {
-        use contextra_env::InMemoryMetricsSink as TestMetricsSink;
+        use contextra_testkit::{MetricEvent, TestMetricsSink};
 
         let storage = Arc::new(MockStorage::new());
         let metrics = Arc::new(TestMetricsSink::new());
@@ -805,27 +828,31 @@ mod tests {
             namespace: Some("test".to_string()),
         };
         let guard = CheckpointGuard::new(cp, storage, "test")
-            .with_metrics_sink(metrics.clone() as Arc<dyn MetricsSink>);
+            .with_metrics_sink(metrics.clone() as Arc<dyn contextra_ports::MetricsSink>);
 
         let committed = guard.commit().unwrap();
         assert_eq!(committed.tx_id, TxId::new(100));
 
-        let snapshot = metrics.snapshot();
-        assert_eq!(snapshot.histograms.len(), 1);
-        let (key, hist) = snapshot.histograms.iter().next().unwrap();
-        assert_eq!(key.name, "checkpoint_duration_seconds");
-        assert_eq!(hist.count, 1);
-        assert!(hist.sum >= 0.0);
-        assert_eq!(
-            key.labels,
-            vec![("status".to_string(), "commit".to_string())]
-        );
+        let events = metrics.events();
+        assert_eq!(events.len(), 1);
+        if let MetricEvent::Histogram {
+            name,
+            value,
+            labels,
+        } = &events[0]
+        {
+            assert_eq!(name, "checkpoint_duration_seconds");
+            assert!(*value >= 0.0);
+            assert_eq!(labels, &vec![("status".to_string(), "commit".to_string())]);
+        } else {
+            panic!("Expected Histogram metric event");
+        }
     }
 
     // Prüft die Erfassung von Rollback-Metriken, wenn ein Guard ohne Commit gedroppt wird.
     #[tokio::test]
     async fn test_checkpoint_metrics_drop_rollback_duration() {
-        use contextra_env::InMemoryMetricsSink as TestMetricsSink;
+        use contextra_testkit::{MetricEvent, TestMetricsSink};
 
         let storage = Arc::new(MockStorage::new());
         let metrics = Arc::new(TestMetricsSink::new());
@@ -836,20 +863,27 @@ mod tests {
             namespace: Some("test".to_string()),
         };
         let guard = CheckpointGuard::new(cp, storage, "test")
-            .with_metrics_sink(metrics.clone() as Arc<dyn MetricsSink>);
+            .with_metrics_sink(metrics.clone() as Arc<dyn contextra_ports::MetricsSink>);
 
         // Drop guard without calling commit
         drop(guard);
 
-        let snapshot = metrics.snapshot();
-        assert_eq!(snapshot.histograms.len(), 1);
-        let (key, hist) = snapshot.histograms.iter().next().unwrap();
-        assert_eq!(key.name, "checkpoint_duration_seconds");
-        assert_eq!(hist.count, 1);
-        assert!(hist.sum >= 0.0);
-        assert_eq!(
-            key.labels,
-            vec![("status".to_string(), "rollback".to_string())]
-        );
+        let events = metrics.events();
+        assert_eq!(events.len(), 1);
+        if let MetricEvent::Histogram {
+            name,
+            value,
+            labels,
+        } = &events[0]
+        {
+            assert_eq!(name, "checkpoint_duration_seconds");
+            assert!(*value >= 0.0);
+            assert_eq!(
+                labels,
+                &vec![("status".to_string(), "rollback".to_string())]
+            );
+        } else {
+            panic!("Expected Histogram metric event");
+        }
     }
 }

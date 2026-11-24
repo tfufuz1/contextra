@@ -13,7 +13,6 @@
 //!
 //! Prüft das Verhalten bei ungültigen Eingaben, Überläufen und Systemfehlern.
 
-use contextra_checkpoint::CheckpointError;
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{ContextraError, Result, TxId};
@@ -51,7 +50,7 @@ impl StorageEngine for FaultyMockStorage {
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_put {
-                return Err(ContextraError::Internal(
+                return Err(ContextraError::Storage(
                     "Disk full / I/O write error".into(),
                 ));
             }
@@ -68,7 +67,7 @@ impl StorageEngine for FaultyMockStorage {
     fn commit<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_commit {
-                return Err(ContextraError::Internal(
+                return Err(ContextraError::Storage(
                     "Commit failed / fsync error".into(),
                 ));
             }
@@ -148,7 +147,7 @@ impl StorageEngine for FaultyMockStorage {
     }
 }
 
-/// Test Storage Write Failure: returns `Err(ContextraError::Internal)`, no panic, seq_no unpinned.
+/// Test Storage Write Failure: returns `Err(ContextraError::Storage)`, no panic, seq_no unpinned.
 #[tokio::test]
 async fn test_storage_put_failure_handling() {
     let storage = Arc::new(FaultyMockStorage::new(true, false));
@@ -164,8 +163,8 @@ async fn test_storage_put_failure_handling() {
     );
     if let Err(e) = res {
         assert!(
-            matches!(e, CheckpointError::Internal(_)),
-            "Error variant must be ContextraError::Internal"
+            matches!(e, ContextraError::Storage(_)),
+            "Error variant must be ContextraError::Storage"
         );
     }
     assert!(
@@ -174,7 +173,7 @@ async fn test_storage_put_failure_handling() {
     );
 }
 
-/// Test Storage Commit Failure: returns `Err(ContextraError::Internal)`, no panic, seq_no unpinned.
+/// Test Storage Commit Failure: returns `Err(ContextraError::Storage)`, no panic, seq_no unpinned.
 #[tokio::test]
 async fn test_storage_commit_failure_handling() {
     let storage = Arc::new(FaultyMockStorage::new(false, true));
@@ -200,7 +199,7 @@ async fn test_storage_commit_failure_handling() {
     );
 }
 
-/// Test Restore Nonexistent Checkpoint Name: returns `contextra_checkpoint::CheckpointError::CheckpointNotFound`.
+/// Test Restore Nonexistent Checkpoint Name: returns `ContextraError::CheckpointNotFound`.
 #[tokio::test]
 async fn test_restore_nonexistent_checkpoint_returns_not_found() {
     let storage = Arc::new(FaultyMockStorage::new(false, false));
@@ -208,8 +207,8 @@ async fn test_restore_nonexistent_checkpoint_returns_not_found() {
 
     let res = store.restore_checkpoint("does_not_exist").await;
     assert!(
-        matches!(res, Err(contextra_checkpoint::CheckpointError::CheckpointNotFound)),
-        "Restoring nonexistent checkpoint must return contextra_checkpoint::CheckpointError::CheckpointNotFound"
+        matches!(res, Err(ContextraError::CheckpointNotFound)),
+        "Restoring nonexistent checkpoint must return ContextraError::CheckpointNotFound"
     );
 }
 
@@ -223,50 +222,32 @@ async fn test_identifier_input_boundary_validation() {
     let res = store
         .create_checkpoint("", "col1", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(
-        res,
-        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
-    ));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 
     // 2. Whitespace-only checkpoint name
     let res = store
         .create_checkpoint("   \t  ", "col1", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(
-        res,
-        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
-    ));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 
     // 3. Empty collection ID
     let res = store
         .create_checkpoint("cp1", "", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(
-        res,
-        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
-    ));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 
     // 4. Oversized checkpoint name (> 256 chars)
     let long_name = "x".repeat(257);
     let res = store
         .create_checkpoint(&long_name, "col1", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(
-        res,
-        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
-    ));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 
     // 5. Drop checkpoint with empty name
     let res = store.drop_checkpoint("").await;
-    assert!(matches!(
-        res,
-        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
-    ));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 
     // 6. Get checkpoint with empty name
     let res = store.get_checkpoint("   ").await;
-    assert!(matches!(
-        res,
-        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
-    ));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 }

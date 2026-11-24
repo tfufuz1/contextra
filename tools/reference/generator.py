@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Unabhängiger Referenzcodierer für contextra-storage (SPEC §19.4, Anhang A).
+"""Unabhängiger Referenzcodierer für acta-storage (SPEC §19.4, Anhang A).
 
 Dieses Skript ist die Pflichtquelle der Goldens. Es hängt nicht vom Rust-Kern ab
-und schreibt die Golden-Dateien unter crates/contextra-storage/tests/format/golden/.
+und schreibt die Golden-Dateien unter crates/acta-storage/tests/format/golden/.
 
 Abschnitt „Seal-Rahmen“ (SPEC §10.10, §10.1, §10.4, §10.5, §10.7, §16.3):
   - XChaCha20-Poly1305 (UE-10): HChaCha20-Ableitung plus ChaCha20-Poly1305
@@ -31,7 +31,7 @@ import sys
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-GOLDEN_DIR = ROOT / "crates" / "contextra-storage" / "tests" / "format" / "golden"
+GOLDEN_DIR = ROOT / "crates" / "acta-storage" / "tests" / "format" / "golden"
 
 MASK32 = 0xFFFFFFFF
 SEAL_NONCE_LEN = 24

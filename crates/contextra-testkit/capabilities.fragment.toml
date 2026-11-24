@@ -1,4 +1,0 @@
-[crates.contextra-testkit]
-klasse = "T"
-may_depend_on = ["contextra-ports", "contextra-types"]
-transitional = []

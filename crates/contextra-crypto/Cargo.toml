@@ -1,43 +1,16 @@
-[lints.rust]
-unexpected_cfgs = { level = "deny", check-cfg = ['cfg(loom)'] }
-deprecated = "allow"
-
-[lints.clippy]
-undocumented_unsafe_blocks = "deny"
-panic = "allow"
-todo = "deny"
-unimplemented = "deny"
-unreachable = "deny"
-await_holding_lock = "deny"
-await_holding_refcell_ref = "deny"
-dbg_macro = "deny"
-unwrap_used = "allow"
-expect_used = "allow"
-indexing_slicing = "allow"
-cast_possible_truncation = "allow"
-cast_sign_loss = "allow"
-doc_lazy_continuation = "allow"
-disallowed_methods = "allow"
-disallowed_types = "allow"
+[lints]
+workspace = true
 
 [package]
-autobenches = false
 name = "contextra-crypto"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version = "1.89"
+rust-version.workspace = true
 description = "Encryption at Rest and KV-Cache Security utilities for Contextra"
-readme = "README.md"
-repository = "https://github.com/tfufuz1/contextra"
-keywords = ["cryptography", "aead", "kdf", "wal", "zeroize"]
-categories = ["cryptography"]
-# Internes Bausteinlager fuer die Contextra-Architektur, kein externes Crates.io-Release
-publish = false
 
 [package.metadata.contextra]
 ring = "0"
-klasse = "A"
 
 [dependencies]
 thiserror = { workspace = true }
@@ -51,10 +24,8 @@ blake3 = { workspace = true }
 bincode = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-contextra-ids = { path = "../contextra-ids", version = "0.1.0" }
-contextra-env = { path = "../contextra-env", version = "0.1.0" }
-contextra-types = { path = "../contextra-types", version = "0.1.0", optional = true }
-contextra-ports = { path = "../contextra-ports", version = "0.1.0", optional = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 rand = { workspace = true }
 tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
@@ -62,21 +33,17 @@ parking_lot = { workspace = true }
 ahash = { workspace = true }
 lru = "0.16.4"
 regex = { workspace = true }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [features]
-default = ["kv-encryption"]
-workspace = ["dep:contextra-types", "dep:contextra-ports"]
-types-compat = ["workspace"]
-ports-compat = ["workspace"]
+default = ["legacy-erasure", "kv-encryption", "test-utils"]
+legacy-erasure = []
 test-utils = []
-kv-encryption = []
+kv-encryption = ["legacy-erasure"]
 cloud-egress-guard = []
 
 [dev-dependencies]
-contextra-crypto = { path = ".", features = ["test-utils"] }
-contextra-types = { path = "../contextra-types" }
-contextra-ports = { path = "../contextra-ports" }
-contextra-env = { path = "../contextra-env", features = ["test-utils"] }
+contextra-testkit = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
@@ -86,3 +53,8 @@ loom = "0.7"
 [[bench]]
 name = "crypto_benchmarks"
 harness = false
+
+[[bench]]
+name = "deletion_proof_latency_bench"
+harness = false
+required-features = ["legacy-erasure"]

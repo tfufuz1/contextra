@@ -125,7 +125,7 @@ async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> 
     let _ = fs::remove_dir_all(&target_dir_path);
 
     match result {
-        Err(contextra_checkpoint::CheckpointError::CrossDeviceLink {
+        Err(ContextraError::CrossDeviceLink {
             source_path,
             target_path,
             ..

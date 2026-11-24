@@ -1,14 +1,5 @@
 //! Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Topologisches Lovász-High-Order-Diffusionsverfahren.
-// INVARIANTEN: Submodulare Optimierung, schattenmodus-fähig.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-
-// SECTION Mod Core Implementation
 pub mod diffusion;
 pub mod error;
 pub mod lovasz;
@@ -27,7 +18,7 @@ pub use shadow::{
 use crate::csr::CsrGraph;
 use crate::path_rag::PathGraph;
 use ahash::AHashMap;
-use crate::types::EntityId;
+use contextra_types::EntityId;
 
 /// Computes Thresholded Local Hyper-Flow Diffusion (TL-HFD) over a generic [`PathGraph`].
 ///
@@ -67,7 +58,7 @@ impl CsrGraph {
 mod tests {
     use super::*;
     use crate::csr::CsrGraph;
-    use crate::types::Entity;
+    use contextra_types::Entity;
 
     // ANCHOR[contextra-graph:SRC-TL-HFD-MOD-003]
     #[tokio::test]
@@ -105,5 +96,3 @@ mod tests {
         assert!(scores.contains_key(&e1));
     }
 }
-
-// !SECTION Mod Core Implementation

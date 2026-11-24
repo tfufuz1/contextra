@@ -1,10 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 // ANCHOR[contextra-graph:SRC-CSR-PATH-GRAPH-001]
 //! Implementierung des `PathGraph`-Traits für den CSR-Graphen.
 //!
@@ -13,13 +6,10 @@
 
 use std::sync::Arc;
 
-use crate::types::EntityId;
+use contextra_types::EntityId;
 
 use super::graph_write::CsrGraph;
 
-
-// SECTION Path Graph Core Implementation
-#[cfg(any(feature = "types-compat", feature = "ports-compat"))]
 impl crate::provider::GraphProvider for CsrGraph {
     fn node_ids(&self) -> Vec<EntityId> {
         let inner = self.inner_read();
@@ -208,5 +198,3 @@ impl crate::path_rag::PathGraph for Arc<CsrGraph> {
         self.as_ref().get_hyperedge(id)
     }
 }
-
-// !SECTION Path Graph Core Implementation

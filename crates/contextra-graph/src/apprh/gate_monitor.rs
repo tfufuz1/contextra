@@ -17,8 +17,6 @@ use std::collections::VecDeque;
 /// Configuration for [`ApprhGateMonitor`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 // ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-001]
-
-// SECTION Gate Monitor Core Implementation
 pub struct ApprhGateMonitorConfig {
     /// Maximum capacity of the sliding window for historical observations.
     pub window_size: usize,
@@ -277,5 +275,3 @@ impl std::fmt::Debug for ApprhGateMonitor {
             .finish()
     }
 }
-
-// !SECTION Gate Monitor Core Implementation

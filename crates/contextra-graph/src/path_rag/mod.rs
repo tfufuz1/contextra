@@ -10,16 +10,7 @@
 //! INTEGRATION: PathRAG liefert ein RRF-Signal neben Vektor- und BM25-Signal.
 //! Resultat von to_rrf_signal() wird in FusionEngine als drittes Signal eingespeist.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Path-RAG und budgetierte K-Path Traversierung.
-// INVARIANTEN: Snapshot-Isolation bei Pfadsuche.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 #[cfg(feature = "k-path-diffusion")]
-
-// SECTION Mod Core Implementation
 pub mod k_path;
 
 #[cfg(feature = "k-path-diffusion")]
@@ -30,8 +21,8 @@ pub use snapshot::SnapshotPathGraph;
 
 pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use ahash::AHashMap;
-use crate::types::DocId;
-pub use crate::types::EntityId;
+use contextra_types::DocId;
+pub use contextra_types::EntityId;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 use std::sync::Arc;
@@ -468,9 +459,16 @@ impl<G: PathGraph> PathRAGEngine<G> {
             }
         }
 
+        #[cfg(not(feature = "docid-128"))]
         let mut result: Vec<(DocId, f32)> = scored
             .into_iter()
-            .map(|(id, score)| (DocId::from(id), score))
+            .map(|(id, score)| (DocId(id), score))
+            .collect();
+
+        #[cfg(feature = "docid-128")]
+        let mut result: Vec<(DocId, f32)> = scored
+            .into_iter()
+            .map(|(id, score)| (DocId(id as u128), score))
             .collect();
 
         result.sort_by(|a, b| b.1.total_cmp(&a.1));
@@ -480,5 +478,3 @@ impl<G: PathGraph> PathRAGEngine<G> {
 
 #[cfg(test)]
 mod tests;
-
-// !SECTION Mod Core Implementation

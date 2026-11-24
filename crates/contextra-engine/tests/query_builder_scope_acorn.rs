@@ -13,8 +13,7 @@ use tempfile::TempDir;
 use contextra_engine::collection::query_builder::ScopeConstraint;
 use contextra_engine::{Collection, DistanceMetric, Language};
 use contextra_graph::CsrGraph;
-use contextra_ports::{Result as PortResult, TxId, VectorIndex, VectorIndexStats};
-use contextra_types::ScoredDocument;
+use contextra_ports::{Result as PortResult, ScoredDocument, TxId, VectorIndex, VectorIndexStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId};
 use contextra_vector::acorn::{AcornError, FilteredIndex};
@@ -31,7 +30,7 @@ impl MockFilteredIndex {
     fn new(dimension: usize) -> Self {
         let config = HnswConfig {
             dimension,
-            distance_metric: DistanceMetric::Cosine.into(),
+            distance_metric: DistanceMetric::Cosine,
             ..Default::default()
         };
         Self {
@@ -151,7 +150,7 @@ async fn create_standard_collection(name: &str) -> (Collection<LsmStorage, HnswI
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
     let hnsw_config = HnswConfig {
         dimension: 4,
-        distance_metric: DistanceMetric::Cosine.into(),
+        distance_metric: DistanceMetric::Cosine,
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap());

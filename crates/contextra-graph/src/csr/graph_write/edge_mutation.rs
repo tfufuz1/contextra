@@ -3,22 +3,12 @@
 //! # Zweck
 //! Führt Kantenaktualisierungen durch und pflegt Adjazenzvektoren sowie Inverted Lists.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::super::types::EdgePayload;
 use super::CsrGraph;
 use crate::consistency_enforcement::EdgeAssertion;
-use crate::error::{GraphError, Result};
-use crate::types::{DocId, EntityId, TxId};
+use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
 use std::sync::Arc;
 
-
-// SECTION Edge Mutation Core Implementation
 impl CsrGraph {
     fn check_consistency_before_insert(
         &self,
@@ -40,7 +30,7 @@ impl CsrGraph {
                             suppression_count = pattern.contradiction_count,
                             "ConsistencyEnforcer: edge insertion suppressed by conflict pattern"
                         );
-                        return Err(GraphError::PolicyViolation(
+                        return Err(ContextraError::PolicyViolation(
                             "Contradictory edge suppressed by consistency enforcer".to_string(),
                         ));
                     }
@@ -68,7 +58,7 @@ impl CsrGraph {
         object_repr: Option<Vec<u8>>,
     ) -> Result<()> {
         if !weight.is_finite() || weight < 0.0 {
-            return Err(GraphError::InvalidInput(format!(
+            return Err(ContextraError::InvalidInput(format!(
                 "Invalid edge weight {weight}: weight must be finite and non-negative"
             )));
         }
@@ -190,7 +180,7 @@ impl CsrGraph {
         source_doc_id: Option<DocId>,
     ) -> Result<()> {
         if !weight.is_finite() || weight < 0.0 {
-            return Err(GraphError::InvalidInput(format!(
+            return Err(ContextraError::InvalidInput(format!(
                 "Invalid edge weight {weight}: weight must be finite and non-negative"
             )));
         }
@@ -223,5 +213,3 @@ impl CsrGraph {
         Ok(())
     }
 }
-
-// !SECTION Edge Mutation Core Implementation

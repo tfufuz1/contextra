@@ -30,7 +30,7 @@ allow = [
     "Zlib",
 ]
 clarify = [
-    { name = "contextra-mcp", expression = "MIT OR Apache-2.0", license-files = [] },
+    { name = "acta-mcp", expression = "MIT OR Apache-2.0", license-files = [] },
 ]
 confidence-threshold = 0.8
 
@@ -44,40 +44,40 @@ deny = [
         "hyper",
         "hyper-rustls",
         "hyper-util",
-        "contextra",
-        "contextra-agent",
-        "contextra-bench",
-        "contextra-checkpoint", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-cognition",
-        "contextra-crypto", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-db",
-        "contextra-engine",
-        "contextra-graph", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-infer-candle",
-        "contextra-infer-ollama",
-        "contextra-infer-onnx",
-        "contextra-kvcache", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-mcp",
-        "contextra-mvcc", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-ports", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-privacy",
-        "contextra-py",
-        "contextra-rank", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-router",
-        "contextra-sandbox",
-        "contextra-store", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-testkit",
-        "contextra-text", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-vector", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "acta",
+        "acta-agent",
+        "acta-bench",
+        "acta-checkpoint", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "acta-cognition",
+        "acta-crypto", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "acta-db",
+        "acta-engine",
+        "acta-graph", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "acta-infer-candle",
+        "acta-infer-ollama",
+        "acta-infer-onnx",
+        "acta-kvcache", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "acta-mcp",
+        "acta-mvcc", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "acta-ports", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "acta-privacy",
+        "acta-py",
+        "acta-rank", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "acta-router",
+        "acta-sandbox",
+        "acta-store", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "acta-testkit",
+        "acta-text", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "acta-vector", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "reqwest",
         "tokio-rustls",
         "tokio-util",
         "tower",
     ] },
-    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "contextra-infer-candle"] },
-    { crate = "pyo3", wrappers = ["contextra-py", "numpy", "pythonize"] },
-    { crate = "reqwest", wrappers = ["contextra-infer-ollama"] },
-    { crate = "wasmtime", wrappers = ["contextra-sandbox"] },
+    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "acta-infer-candle"] },
+    { crate = "pyo3", wrappers = ["acta-py", "numpy", "pythonize"] },
+    { crate = "reqwest", wrappers = ["acta-infer-ollama"] },
+    { crate = "wasmtime", wrappers = ["acta-sandbox"] },
 ]
 
 [sources]

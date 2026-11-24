@@ -14,10 +14,8 @@
 //! Index nachlädt. Dadurch muss bei großen Ergebnismengen nicht sofort die maximale
 //! Trefferzahl (`MAX_SEARCH_K`) ermittelt werden.
 
-use crate::error::Result;
-use crate::storage::PostingStore;
-use crate::types::MAX_SEARCH_K;
-use contextra_ids::DocId;
+use contextra_ports::StorageEngine;
+use contextra_types::{DocId, Result, MAX_SEARCH_K};
 use std::collections::{BTreeSet, VecDeque};
 
 use crate::inverted::InvertedIndex;
@@ -28,7 +26,20 @@ pub const DEFAULT_STREAM_BATCH_SIZE: usize = 16;
 
 // ANCHOR[contextra-text:STREAM-002]
 /// Asynchroner Pull-Stream zum bedarfsgerechten Nachladen von BM25-Kandidaten.
-pub struct Bm25CandidateStream<'a, S: PostingStore> {
+///
+/// # Kandidaten-Sortierung & Determinismus
+/// Ergebnisse werden strikt deterministisch geliefert: Relevanz-Score absteigend,
+/// bei Punktegleichstand nach [`DocId`] aufsteigend.
+///
+/// # Geometrisches Nachladen
+/// Kandidaten werden stufenweise geometrisch verdoppelt ($k' = 16, 32, 64, \dots, 1000$).
+/// Der Gesamtaufwand bleibt damit durch $\le 2\times$ der final abgerufenen Tiefe beschränkt.
+///
+/// # Snapshot-Isolation & Tiefenbegrenzung
+/// Zur Sicherstellung konsistenter Ergebnisse über mehrere Nachladestufen hinweg wird
+/// `max_seq = Some(snapshot_seq)` verwendet. Die maximale Tiefe ist hardgecapped auf
+/// `MAX_SEARCH_K` (1.000).
+pub struct Bm25CandidateStream<'a, S: StorageEngine> {
     index: &'a InvertedIndex<S>,
     query: String,
     max_seq: Option<u64>,
@@ -40,9 +51,14 @@ pub struct Bm25CandidateStream<'a, S: PostingStore> {
     exhausted: bool,
 }
 
-impl<'a, S: PostingStore> Bm25CandidateStream<'a, S> {
+impl<'a, S: StorageEngine> Bm25CandidateStream<'a, S> {
     // ANCHOR[contextra-text:STREAM-003]
     /// Erzeugt einen neuen Kandidaten-Stream für die übergebene Abfrage und Index-Snapshot.
+    ///
+    /// # Parameter
+    /// - `index`: Referenz auf den invertierten Index.
+    /// - `query`: Suchanfrage (wird in `String` konvertiert).
+    /// - `max_seq`: Optionaler MVCC-Sequenznummer-Snapshot zur Konsistenzsicherung.
     pub fn new(
         index: &'a InvertedIndex<S>,
         query: impl Into<String>,
@@ -70,6 +86,12 @@ impl<'a, S: PostingStore> Bm25CandidateStream<'a, S> {
 
     // ANCHOR[contextra-text:STREAM-005]
     /// Holt den nächsten Batch von Kandidaten-Dokumenten (bis zu `batch_size`).
+    /// Liefert einen leeren Vektor, sobald der Stream erschöpft ist.
+    ///
+    /// # Ablauf
+    /// 1. Prüfen, ob der interne Puffer mindestens `batch_size` Elemente enthält; falls nicht, intern nachladen (`refill`).
+    /// 2. Entnahme von bis zu `batch_size` Elementen aus dem Puffer.
+    /// 3. Aktualisierung des `yielded`-Zählers.
     pub async fn next_batch(&mut self) -> Result<Vec<(DocId, f32)>> {
         while self.buffer.len() < self.batch_size && !self.exhausted {
             self.refill().await?;
@@ -88,6 +110,7 @@ impl<'a, S: PostingStore> Bm25CandidateStream<'a, S> {
 
     // ANCHOR[contextra-text:STREAM-006]
     /// Holt die nächste einzelne Dokument-ID aus dem Stream.
+    /// Liefert `Ok(None)`, wenn keine weiteren Treffer vorliegen.
     pub async fn next_doc(&mut self) -> Result<Option<DocId>> {
         if self.buffer.is_empty() && !self.exhausted {
             self.refill().await?;
@@ -120,6 +143,11 @@ impl<'a, S: PostingStore> Bm25CandidateStream<'a, S> {
     }
 
     // ANCHOR[contextra-text:STREAM-010]
+    // Lädt die nächste Stufe an Kandidaten geometrisch verdoppelnd aus dem InvertedIndex nach.
+    // 1. Ziel-k geometrisch verdoppeln (mindestens batch_size, max MAX_SEARCH_K).
+    // 2. Suche auf dem Snapshot ausführen.
+    // 3. Neue, noch nicht gesehene Dokumente in den internen Ringpuffer einfügen.
+    // 4. Erschöpfungsbedingung prüfen (weniger Treffer als angefordert oder Obergrenze erreicht).
     async fn refill(&mut self) -> Result<()> {
         if self.exhausted {
             return Ok(());

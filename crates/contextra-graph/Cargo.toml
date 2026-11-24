@@ -7,40 +7,29 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "CSR-Graph for entity-relation traversal and graph algorithms"
+description = "CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)"
 
 [package.metadata.contextra]
-ring = "1"
+ring = "0"
 klasse = "A"
 
 [features]
-default = [
-    "session-dag",
-    "entity-extraction",
-    "hyperedge-suggest",
-    "experimental-graph",
-]
-workspace = ["dep:contextra-types", "dep:contextra-ports", "types-compat", "ports-compat"]
-session-dag = []
-entity-extraction = []
-hyperedge-suggest = []
-apprh-diffusion = []
-k-path-diffusion = []
+default = ["types-compat", "ports-compat", "experimental-graph"]
+experimental-graph = []
+types-compat = ["dep:contextra-types", "dep:contextra-ports"]
+ports-compat = ["types-compat"]
+docid-128 = []
 graph-connectivity-health = []
 edge-reinforcement-learning = []
-docid-128 = []
-test-support = []
-
-# Deprecated alias features retained until G-92
-types-compat = ["dep:contextra-types", "dep:contextra-ports"]
-ports-compat = ["dep:contextra-types", "dep:contextra-ports"]
-experimental-graph = ["session-dag"]
-physio-percolation = ["graph-connectivity-health"]
+# Retained for CI compatibility (.github/workflows/rust-ci.yml); PPR forward-push is baseline in ppr.rs
 ppr-forward-push = []
+k-path-diffusion = []
+apprh-diffusion = []
+
+# Deprecated alias features for backward compatibility with contextra-db
+physio-percolation = ["graph-connectivity-health"]
 
 [dependencies]
-contextra-ids = { workspace = true }
-contextra-env = { workspace = true }
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
 bytes = { workspace = true }
@@ -56,7 +45,6 @@ scc = "2"
 thiserror = { workspace = true }
 
 [dev-dependencies]
-contextra-graph = { path = ".", features = ["test-support"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 proptest = "1.4"

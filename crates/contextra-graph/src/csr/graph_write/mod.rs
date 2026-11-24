@@ -3,15 +3,6 @@
 //! # Zweck
 //! Definiert den Haupttyp `CsrGraph` und synchronisiert parallele Modifikationen über Mutexe.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-
-// SECTION Mod Core Implementation
 pub mod edge_mutation;
 pub mod entity;
 pub mod hyperedge;
@@ -24,9 +15,9 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 use crate::consistency_enforcement::ConsistencyEnforcer;
-#[cfg(feature = "ports-compat")]
-use contextra_ports::StorageEngine;
-use crate::types::{DocId, EntityId};
+use crate::error::GraphMutationError;
+use contextra_ports::{GraphCollectionMutation, StorageEngine};
+use contextra_types::{DocId, EntityId};
 
 use super::inner::{GraphInner, InnerWriteGuard, MemoryEstimate};
 use super::types::CsrGraphConfig;
@@ -36,7 +27,6 @@ pub struct CsrGraph {
     pub config: CsrGraphConfig,
     pub inner: Arc<ArcSwap<GraphInner>>,
     pub write_state: Arc<Mutex<GraphInner>>,
-    #[cfg(feature = "ports-compat")]
     pub storage: Option<Arc<dyn StorageEngine>>,
     pub last_tx_id: AtomicU64,
     pub consistency_enforcer: Option<RwLock<ConsistencyEnforcer>>,
@@ -57,7 +47,6 @@ impl CsrGraph {
             config,
             inner: Arc::new(ArcSwap::from(initial.clone())),
             write_state: Arc::new(Mutex::new((*initial).clone())),
-            #[cfg(feature = "ports-compat")]
             storage: None,
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: None,
@@ -67,13 +56,11 @@ impl CsrGraph {
     }
 
     // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-004]
-    #[cfg(feature = "ports-compat")]
     pub fn with_storage(storage: Arc<dyn StorageEngine>) -> Self {
         Self::with_config_and_storage(CsrGraphConfig::default(), storage)
     }
 
     // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-005]
-    #[cfg(feature = "ports-compat")]
     pub fn with_config_and_storage(
         config: CsrGraphConfig,
         storage: Arc<dyn StorageEngine>,
@@ -98,7 +85,6 @@ impl CsrGraph {
             config: CsrGraphConfig::default(),
             inner: Arc::new(ArcSwap::from(initial.clone())),
             write_state: Arc::new(Mutex::new((*initial).clone())),
-            #[cfg(feature = "ports-compat")]
             storage: None,
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: Some(RwLock::new(ConsistencyEnforcer::new(
@@ -109,6 +95,27 @@ impl CsrGraph {
         }
     }
 
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-007]
+    /// Delegiert an [`GraphIndex::personalized_page_rank_at`].
+    pub fn personalized_page_rank_at<'a>(
+        &'a self,
+        seed_nodes: &'a [contextra_types::EntityId],
+        config: &'a contextra_types::PprConfig,
+        seq_no: u64,
+    ) -> contextra_ports::BoxFuture<
+        'a,
+        contextra_types::Result<Vec<(contextra_types::EntityId, f32)>>,
+    > {
+        contextra_ports::GraphIndex::personalized_page_rank_at(self, seed_nodes, config, seq_no)
+    }
+
+    /// Delegiert an [`GraphIndex::rollback_to_tx`].
+    pub fn rollback_to_tx<'a>(
+        &'a self,
+        tx_id: contextra_types::TxId,
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+        contextra_ports::GraphIndex::rollback_to_tx(self, tx_id)
+    }
 
     pub fn inner_read(&self) -> arc_swap::Guard<Arc<GraphInner>> {
         self.inner.load()
@@ -122,13 +129,11 @@ impl CsrGraph {
     }
 
     // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-008]
-    #[cfg(feature = "ports-compat")]
     pub fn set_storage(&mut self, storage: Arc<dyn StorageEngine>) {
         self.storage = Some(storage);
     }
 
     // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-009]
-    #[cfg(feature = "ports-compat")]
     pub fn storage(&self) -> Option<Arc<dyn StorageEngine>> {
         self.storage.clone()
     }
@@ -205,4 +210,70 @@ impl CsrGraph {
     }
 }
 
-// !SECTION Mod Core Implementation
+impl GraphCollectionMutation for CsrGraph {
+    fn relate_n_ary(
+        &self,
+        predicate_tag: u32,
+        participants: &[contextra_ports::graph::RoleBinding],
+        doc_id: DocId,
+    ) -> std::result::Result<
+        contextra_ports::graph::HyperEdgeId,
+        contextra_ports::graph::GraphMutationError,
+    > {
+        let next_id = crate::hyperedge::HyperEdgeId::new(self.max_hyperedge_id() + 1);
+        let mapped_participants: Vec<crate::hyperedge::RoleBinding> = participants
+            .iter()
+            .map(|p| {
+                crate::hyperedge::RoleBinding::new(
+                    crate::hyperedge::RoleId::new(p.role.inner()),
+                    p.entity,
+                )
+            })
+            .collect();
+
+        let _ = predicate_tag;
+        let hyperedge = self
+            .relate_n_ary(
+                next_id,
+                crate::csr::EdgeType::Default,
+                mapped_participants,
+                1.0,
+                Some(doc_id),
+            )
+            .map_err(|err| match err {
+                GraphMutationError::LockAcquisitionTimeout(msg) => {
+                    contextra_ports::graph::GraphMutationError::LockAcquisitionTimeout(msg)
+                }
+                GraphMutationError::RoleBindingInvalid(msg) => {
+                    contextra_ports::graph::GraphMutationError::RoleBindingInvalid(msg)
+                }
+                GraphMutationError::EpochReclamationPending(epoch) => {
+                    contextra_ports::graph::GraphMutationError::EpochReclamationPending(epoch)
+                }
+                GraphMutationError::InsufficientParticipants { expected, found } => {
+                    contextra_ports::graph::GraphMutationError::InsufficientParticipants {
+                        expected,
+                        found,
+                    }
+                }
+                GraphMutationError::HyperedgeNotFound(id) => {
+                    contextra_ports::graph::GraphMutationError::HyperedgeNotFound(id)
+                }
+                GraphMutationError::InvalidWeight { weight, reason } => {
+                    contextra_ports::graph::GraphMutationError::InvalidWeight { weight, reason }
+                }
+                GraphMutationError::Internal(msg) => {
+                    contextra_ports::graph::GraphMutationError::Internal(msg)
+                }
+                GraphMutationError::DuplicateHyperEdgeId(id) => {
+                    contextra_ports::graph::GraphMutationError::DuplicateHyperEdgeId(
+                        contextra_ports::graph::HyperEdgeId::new(id),
+                    )
+                }
+            })?;
+
+        Ok(contextra_ports::graph::HyperEdgeId::new(
+            hyperedge.id.inner(),
+        ))
+    }
+}

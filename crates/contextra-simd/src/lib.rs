@@ -25,13 +25,10 @@
 
 #![allow(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
-#![deny(missing_docs)]
 #![allow(clippy::missing_safety_doc)]
 #![allow(unused_unsafe)]
 
-// SECTION MODULE-DECLARATIONS
 // ANCHOR[contextra-simd:CORE-MOD-DISPATCH]
-pub mod contract;
 // Dynamische CPU-Erkennung und Funktionszeiger-Auswahl.
 pub mod dispatch;
 pub mod error;
@@ -40,13 +37,6 @@ pub mod error;
 pub mod kernels;
 pub mod metric;
 
-#[cfg(feature = "workspace")]
-pub mod compat;
-// !SECTION MODULE-DECLARATIONS
-
-// SECTION RE-EXPORTS
-// ANCHOR[contextra-simd:RE-EXPORTS]
-pub use contract::{DistanceFn, MetricDistanceFn};
 pub use dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
     dot_product_distance_f32_bytes, dot_product_u8, euclidean_distance,
@@ -63,9 +53,7 @@ pub use kernels::scalar::{
     normalize_inplace, CosineSimilarityPartsF32U8, CosineSimilarityPartsU8,
 };
 pub use metric::DistanceMetric;
-// !SECTION RE-EXPORTS
 
-// SECTION PUBLIC-API-FACADE
 // ANCHOR[contextra-simd:CORE-VALIDATE-VEC]
 /// Prüft, ob ein Vektor gültige endliche Zahlen enthält (kein NaN und kein Unendlich).
 ///
@@ -96,7 +84,6 @@ pub use metric::DistanceMetric;
 /// ```
 #[inline]
 pub fn validate_vector(vec: &[f32]) -> Result<()> {
-    // NOTE: Iteration prüft jedes Element auf Endlichkeit
     if vec.iter().any(|v| !v.is_finite()) {
         return Err(SimdError::InvalidInput(
             "NaN or Infinity detected in vector",
@@ -135,10 +122,8 @@ pub fn validate_vector(vec: &[f32]) -> Result<()> {
 /// ```
 #[inline]
 pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32> {
-    // Schritt 1 & 2: Validierung beider Eingabevektoren gegen NaN / Inf
     validate_vector(a)?;
     validate_vector(b)?;
-    // Schritt 3: Delegation an trusted Pfad
     compute_distance_trusted(a, b, metric)
 }
 
@@ -160,7 +145,6 @@ pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<
 /// Keine.
 #[inline]
 pub fn compute_distance_trusted(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32> {
-    // NOTE: Schneller Match ohne erneute Allokation
     match metric {
         DistanceMetric::Cosine => cosine_distance(a, b),
         DistanceMetric::Euclidean => euclidean_distance(a, b),
@@ -192,11 +176,9 @@ pub fn compute_distance_f32_bytes_trusted(
     b_bytes: &[u8],
     metric: DistanceMetric,
 ) -> Result<f32> {
-    // NOTE: Zero-Copy-Auswertung der Byte-Slice
     match metric {
         DistanceMetric::Cosine => cosine_distance_f32_bytes(a, b_bytes),
         DistanceMetric::Euclidean => euclidean_distance_f32_bytes(a, b_bytes),
         DistanceMetric::DotProduct => dot_product_distance_f32_bytes(a, b_bytes),
     }
 }
-// !SECTION PUBLIC-API-FACADE

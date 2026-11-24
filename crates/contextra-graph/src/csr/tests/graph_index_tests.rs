@@ -1,29 +1,18 @@
-#![cfg(feature = "workspace")]
 //! Tests für die `GraphIndex`-Port-Schnittstelle auf `CsrGraph`.
 //!
 //! # Zweck
 //! Sichert die Einhaltung der Schnittstellenvereinbarungen gegen funktionale Regressionen ab.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
 use super::super::*;
 use super::basic_tests::setup_test_graph;
 use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload, MAX_VISITED_NODES};
 use contextra_ports::{GraphIndex, StorageEngine};
-use crate::error::GraphError;
-use contextra_types::{Edge, Entity, EntityId, TxId};
+use contextra_types::{ContextraError, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-001]
 #[tokio::test]
 #[allow(non_snake_case)]
-
-// SECTION Graph Index Tests Core Implementation
 async fn test_set_storage_and_with_config_and_storage_CASE_initialization() {
     use crate::test_doubles::InMemoryStorageEngine;
 
@@ -218,13 +207,13 @@ async fn test_traverse_CASE_exceeds_max_hops_returns_invalid_input() {
     let graph = setup_test_graph().await;
 
     let err = graph.traverse(EntityId::new(1), 101).await.unwrap_err();
-    assert!(matches!(err, GraphError::InvalidInput(_)));
+    assert!(matches!(err, ContextraError::InvalidInput(_)));
 
     let err_time = graph
         .traverse_at_time(EntityId::new(1), 101, TxId::new(100))
         .await
         .unwrap_err();
-    assert!(matches!(err_time, GraphError::InvalidInput(_)));
+    assert!(matches!(err_time, ContextraError::InvalidInput(_)));
 }
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-008]
@@ -582,7 +571,7 @@ async fn test_consistency_enforcer_contradiction_suppression() {
     );
     let err = res3.unwrap_err();
     assert!(
-        matches!(err, GraphError::PolicyViolation(ref msg) if msg.contains("Contradictory edge suppressed by consistency enforcer")),
+        matches!(err, ContextraError::PolicyViolation(ref msg) if msg.contains("Contradictory edge suppressed by consistency enforcer")),
         "Expected policy violation error, got: {:?}",
         err
     );
@@ -694,5 +683,3 @@ fn test_edge_store_invalidated_after_compact() {
             "edge_store must be cleared by compact() so deleted/tombstoned edges are no longer returned"
         );
 }
-
-// !SECTION Graph Index Tests Core Implementation

@@ -712,13 +712,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
-name = "contextra"
+name = "acta"
 version = "0.1.0"
 dependencies = [
- "contextra-db",
- "contextra-infer-candle",
- "contextra-ports",
- "contextra-types",
+ "acta-db",
+ "acta-infer-candle",
+ "acta-ports",
+ "acta-types",
  "serde",
  "serde_json",
  "tempfile",
@@ -731,13 +731,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-adapt"
+name = "acta-adapt"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "blake3",
- "contextra-ports",
- "contextra-types",
+ "acta-ports",
+ "acta-types",
  "criterion",
  "proptest",
  "serde",
@@ -747,20 +747,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-agent"
+name = "acta-agent"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "contextra-checkpoint",
- "contextra-db",
- "contextra-graph",
- "contextra-ports",
- "contextra-router",
- "contextra-store",
- "contextra-testkit",
- "contextra-text",
- "contextra-types",
- "contextra-vector",
+ "acta-checkpoint",
+ "acta-db",
+ "acta-graph",
+ "acta-ports",
+ "acta-router",
+ "acta-store",
+ "acta-testkit",
+ "acta-text",
+ "acta-types",
+ "acta-vector",
  "serde",
  "serde_json",
  "tempfile",
@@ -772,17 +772,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-bench"
+name = "acta-bench"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "contextra-db",
- "contextra-rank",
- "contextra-store",
- "contextra-sys",
- "contextra-text",
- "contextra-types",
- "contextra-vector",
+ "acta-db",
+ "acta-rank",
+ "acta-store",
+ "acta-sys",
+ "acta-text",
+ "acta-types",
+ "acta-vector",
  "criterion",
  "hdrhistogram",
  "libc",
@@ -798,16 +798,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-checkpoint"
+name = "acta-checkpoint"
 version = "0.1.0"
 dependencies = [
  "blake3",
  "bytes",
- "contextra-env",
- "contextra-ids",
- "contextra-ports",
- "contextra-testkit",
- "contextra-types",
+ "acta-env",
+ "acta-ids",
+ "acta-ports",
+ "acta-testkit",
+ "acta-types",
  "criterion",
  "parking_lot 0.12.5",
  "proptest",
@@ -820,20 +820,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-cognition"
+name = "acta-cognition"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "async-trait",
  "blake3",
  "bytes",
- "contextra-db",
- "contextra-graph",
- "contextra-ports",
- "contextra-rank",
- "contextra-testkit",
- "contextra-text",
- "contextra-types",
+ "acta-db",
+ "acta-graph",
+ "acta-ports",
+ "acta-rank",
+ "acta-testkit",
+ "acta-text",
+ "acta-types",
  "parking_lot 0.12.5",
  "serde",
  "serde_json",
@@ -845,7 +845,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-crypto"
+name = "acta-crypto"
 version = "0.1.0"
 dependencies = [
  "aes-gcm-siv",
@@ -853,11 +853,11 @@ dependencies = [
  "argon2",
  "bincode",
  "blake3",
- "contextra-crypto",
- "contextra-env",
- "contextra-ids",
- "contextra-ports",
- "contextra-types",
+ "acta-crypto",
+ "acta-env",
+ "acta-ids",
+ "acta-ports",
+ "acta-types",
  "criterion",
  "hkdf",
  "hmac",
@@ -879,11 +879,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-crypto-ref"
+name = "acta-crypto-ref"
 version = "0.1.0"
 dependencies = [
  "chacha20poly1305",
- "contextra-storage-ports",
+ "acta-storage-ports",
  "hkdf",
  "hmac",
  "sha2",
@@ -892,28 +892,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-db"
+name = "acta-db"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "blake3",
  "bytes",
- "contextra-adapt",
- "contextra-checkpoint",
- "contextra-cognition",
- "contextra-graph",
- "contextra-infer-onnx",
- "contextra-ingest",
- "contextra-mvcc",
- "contextra-ports",
- "contextra-rank",
- "contextra-sandbox",
- "contextra-store",
- "contextra-testkit",
- "contextra-text",
- "contextra-types",
- "contextra-vault",
- "contextra-vector",
+ "acta-adapt",
+ "acta-checkpoint",
+ "acta-cognition",
+ "acta-graph",
+ "acta-infer-onnx",
+ "acta-ingest",
+ "acta-mvcc",
+ "acta-ports",
+ "acta-rank",
+ "acta-sandbox",
+ "acta-store",
+ "acta-testkit",
+ "acta-text",
+ "acta-types",
+ "acta-vault",
+ "acta-vector",
  "criterion",
  "parking_lot 0.12.5",
  "proptest",
@@ -930,7 +930,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-durable-fs"
+name = "acta-durable-fs"
 version = "0.1.0"
 dependencies = [
  "crc32fast",
@@ -943,21 +943,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-engine"
+name = "acta-engine"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "contextra-checkpoint",
- "contextra-db",
- "contextra-graph",
- "contextra-ingest",
- "contextra-ports",
- "contextra-rank",
- "contextra-store",
- "contextra-testkit",
- "contextra-text",
- "contextra-types",
- "contextra-vector",
+ "acta-checkpoint",
+ "acta-db",
+ "acta-graph",
+ "acta-ingest",
+ "acta-ports",
+ "acta-rank",
+ "acta-store",
+ "acta-testkit",
+ "acta-text",
+ "acta-types",
+ "acta-vector",
  "proptest",
  "serde",
  "serde_json",
@@ -968,11 +968,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-env"
+name = "acta-env"
 version = "0.1.0"
 
 [[package]]
-name = "contextra-erasure"
+name = "acta-erasure"
 version = "0.1.0"
 dependencies = [
  "aes-gcm-siv",
@@ -999,7 +999,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-graph"
+name = "acta-graph"
 version = "0.1.0"
 dependencies = [
  "ahash",
@@ -1007,11 +1007,11 @@ dependencies = [
  "bincode",
  "blake3",
  "bytes",
- "contextra-env",
- "contextra-graph",
- "contextra-ids",
- "contextra-ports",
- "contextra-types",
+ "acta-env",
+ "acta-graph",
+ "acta-ids",
+ "acta-ports",
+ "acta-types",
  "criterion",
  "futures",
  "parking_lot 0.12.5",
@@ -1027,7 +1027,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-ids"
+name = "acta-ids"
 version = "0.1.0"
 dependencies = [
  "bincode",
@@ -1039,7 +1039,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-infer-candle"
+name = "acta-infer-candle"
 version = "0.1.0"
 dependencies = [
  "bincode",
@@ -1047,11 +1047,11 @@ dependencies = [
  "candle-core",
  "candle-nn",
  "candle-transformers",
- "contextra-crypto",
- "contextra-env",
- "contextra-ports",
- "contextra-rank",
- "contextra-types",
+ "acta-crypto",
+ "acta-env",
+ "acta-ports",
+ "acta-rank",
+ "acta-types",
  "criterion",
  "futures-util",
  "half",
@@ -1067,11 +1067,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-infer-ollama"
+name = "acta-infer-ollama"
 version = "0.1.0"
 dependencies = [
- "contextra-ports",
- "contextra-types",
+ "acta-ports",
+ "acta-types",
  "criterion",
  "futures",
  "futures-util",
@@ -1089,12 +1089,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-infer-onnx"
+name = "acta-infer-onnx"
 version = "0.1.0"
 dependencies = [
  "blake3",
- "contextra-ports",
- "contextra-types",
+ "acta-ports",
+ "acta-types",
  "criterion",
  "ndarray 0.15.6",
  "ort",
@@ -1112,13 +1112,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-ingest"
+name = "acta-ingest"
 version = "0.1.0"
 dependencies = [
  "blake3",
  "calamine",
  "cfb",
- "contextra-types",
+ "acta-types",
  "criterion",
  "csv",
  "encoding_rs",
@@ -1139,38 +1139,38 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-keys-cohort"
+name = "acta-keys-cohort"
 version = "0.1.0"
 dependencies = [
  "chacha20poly1305",
- "contextra-storage-ports",
+ "acta-storage-ports",
  "getrandom 0.3.4",
  "zeroize",
 ]
 
 [[package]]
-name = "contextra-keys-file"
+name = "acta-keys-file"
 version = "0.1.0"
 dependencies = [
  "argon2",
  "chacha20poly1305",
- "contextra-storage-ports",
+ "acta-storage-ports",
  "getrandom 0.3.4",
  "zeroize",
 ]
 
 [[package]]
-name = "contextra-kvcache"
+name = "acta-kvcache"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
  "blake3",
  "bytes",
- "contextra-crypto",
- "contextra-env",
- "contextra-ports",
- "contextra-types",
+ "acta-crypto",
+ "acta-env",
+ "acta-ports",
+ "acta-types",
  "criterion",
  "lru",
  "parking_lot 0.12.5",
@@ -1184,21 +1184,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-mcp"
+name = "acta-mcp"
 version = "0.1.0"
 dependencies = [
- "contextra",
- "contextra-crypto",
- "contextra-infer-candle",
- "contextra-infer-ollama",
- "contextra-infer-onnx",
- "contextra-ports",
- "contextra-privacy",
- "contextra-prompt-guard",
- "contextra-rank",
- "contextra-router",
- "contextra-types",
- "contextra-wire",
+ "acta",
+ "acta-crypto",
+ "acta-infer-candle",
+ "acta-infer-ollama",
+ "acta-infer-onnx",
+ "acta-ports",
+ "acta-privacy",
+ "acta-prompt-guard",
+ "acta-rank",
+ "acta-router",
+ "acta-types",
+ "acta-wire",
  "futures-util",
  "parking_lot 0.12.5",
  "rand 0.8.8",
@@ -1216,16 +1216,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-mvcc"
+name = "acta-mvcc"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
  "bytes",
- "contextra-env",
- "contextra-ids",
- "contextra-ports",
- "contextra-types",
+ "acta-env",
+ "acta-ids",
+ "acta-ports",
+ "acta-types",
  "criterion",
  "loom",
  "parking_lot 0.12.5",
@@ -1238,14 +1238,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-ports"
+name = "acta-ports"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "blake3",
  "bytes",
- "contextra-env",
- "contextra-types",
+ "acta-env",
+ "acta-types",
  "futures-util",
  "proptest",
  "serde",
@@ -1255,7 +1255,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-privacy"
+name = "acta-privacy"
 version = "0.1.0"
 dependencies = [
  "bincode",
@@ -1275,7 +1275,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-prompt-guard"
+name = "acta-prompt-guard"
 version = "0.1.0"
 dependencies = [
  "serde",
@@ -1287,12 +1287,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-py"
+name = "acta-py"
 version = "0.1.0"
 dependencies = [
- "contextra",
- "contextra-types",
- "contextra-wire",
+ "acta",
+ "acta-types",
+ "acta-wire",
  "flatbuffers",
  "numpy",
  "parking_lot 0.12.5",
@@ -1304,12 +1304,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-rank"
+name = "acta-rank"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "contextra-ports",
- "contextra-types",
+ "acta-ports",
+ "acta-types",
  "criterion",
  "proptest",
  "serde",
@@ -1320,14 +1320,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-router"
+name = "acta-router"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
- "contextra-adapt",
- "contextra-ports",
- "contextra-types",
- "contextra-wire",
+ "acta-adapt",
+ "acta-ports",
+ "acta-types",
+ "acta-wire",
  "criterion",
  "parking_lot 0.12.5",
  "proptest",
@@ -1342,7 +1342,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-sandbox"
+name = "acta-sandbox"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1356,11 +1356,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-simd"
+name = "acta-simd"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "contextra-types",
+ "acta-types",
  "criterion",
  "proptest",
  "serde",
@@ -1371,15 +1371,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-storage"
+name = "acta-storage"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "contextra-crypto-ref",
- "contextra-keys-cohort",
- "contextra-keys-file",
- "contextra-storage-fs",
- "contextra-storage-ports",
+ "acta-crypto-ref",
+ "acta-keys-cohort",
+ "acta-keys-file",
+ "acta-storage-fs",
+ "acta-storage-ports",
  "crossbeam-skiplist",
  "siphasher",
  "thiserror 2.0.20",
@@ -1387,23 +1387,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-storage-bridge"
+name = "acta-storage-bridge"
 version = "0.1.0"
 dependencies = [
- "contextra-storage",
- "contextra-storage-ports",
+ "acta-storage",
+ "acta-storage-ports",
 ]
 
 [[package]]
-name = "contextra-storage-fs"
+name = "acta-storage-fs"
 version = "0.1.0"
 dependencies = [
- "contextra-storage-ports",
+ "acta-storage-ports",
  "rustix",
 ]
 
 [[package]]
-name = "contextra-storage-ports"
+name = "acta-storage-ports"
 version = "0.1.0"
 dependencies = [
  "bytes",
@@ -1412,20 +1412,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-store"
+name = "acta-store"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "blake3",
  "bytes",
- "contextra-crypto",
- "contextra-env",
- "contextra-ids",
- "contextra-mvcc",
- "contextra-ports",
- "contextra-sys",
- "contextra-testkit",
- "contextra-types",
+ "acta-crypto",
+ "acta-env",
+ "acta-ids",
+ "acta-mvcc",
+ "acta-ports",
+ "acta-sys",
+ "acta-testkit",
+ "acta-types",
  "crc32fast",
  "criterion",
  "futures",
@@ -1449,7 +1449,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-sys"
+name = "acta-sys"
 version = "0.1.0"
 dependencies = [
  "criterion",
@@ -1462,12 +1462,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-testkit"
+name = "acta-testkit"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "contextra-ports",
- "contextra-types",
+ "acta-ports",
+ "acta-types",
  "criterion",
  "parking_lot 0.12.5",
  "tempfile",
@@ -1476,16 +1476,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-text"
+name = "acta-text"
 version = "0.1.0"
 dependencies = [
  "bincode",
  "blake3",
  "bytes",
- "contextra-env",
- "contextra-ids",
- "contextra-ports",
- "contextra-types",
+ "acta-env",
+ "acta-ids",
+ "acta-ports",
+ "acta-types",
  "criterion",
  "futures",
  "itoa",
@@ -1502,14 +1502,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-types"
+name = "acta-types"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
  "blake3",
  "bytes",
- "contextra-ids",
+ "acta-ids",
  "criterion",
  "proptest",
  "serde",
@@ -1519,29 +1519,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-vault"
+name = "acta-vault"
 version = "0.1.0"
 dependencies = [
- "contextra-sys",
+ "acta-sys",
  "thiserror 2.0.20",
  "tracing",
  "zeroize",
 ]
 
 [[package]]
-name = "contextra-vector"
+name = "acta-vector"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
  "blake3",
- "contextra-env",
- "contextra-ids",
- "contextra-mvcc",
- "contextra-ports",
- "contextra-simd",
- "contextra-sys",
- "contextra-types",
+ "acta-env",
+ "acta-ids",
+ "acta-mvcc",
+ "acta-ports",
+ "acta-simd",
+ "acta-sys",
+ "acta-types",
  "criterion",
  "loom",
  "memmap2",
@@ -1560,7 +1560,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-wire"
+name = "acta-wire"
 version = "0.1.0"
 dependencies = [
  "bytes",

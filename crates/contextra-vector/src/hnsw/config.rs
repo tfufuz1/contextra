@@ -1,18 +1,7 @@
-// FILE-CONTEXT
-// ZWECK: Konfiguration und Builder für den HNSW-Index (Hyperparameter, Resource Limits).
-// INVARIANTEN: ef_construction >= m, M-Werte begrenzt (4..256), Rebuild-Threshold im Intervall (0.0..1.0).
-// HOTSPOTS: HnswConfig::validate, HnswConfigBuilder::build
-// STAND: 2026-11-12
-
-use crate::error::{Result, VectorError};
-use crate::types::DistanceMetric;
+use contextra_types::{ContextraError, DistanceMetric, Result};
 
 use super::types::HNSW_REBUILD_DELETION_RATIO;
 
-// SECTION HnswConfig
-
-// ANCHOR[contextra-vector:HNSW-CONFIG-STRUCT]
-/// Konfiguration für den HNSW-Graph-Index.
 #[derive(Debug, Clone)]
 pub struct HnswConfig {
     /// Vector dimensionality.
@@ -78,35 +67,34 @@ pub(super) fn validate_vector(vec: &[f32]) -> Result<()> {
 
 impl HnswConfig {
     /// Validates that the configuration parameters are within acceptable bounds.
-    // ANCHOR[contextra-vector:HNSW-CONFIG-VALIDATE]
     pub fn validate(&self) -> Result<()> {
         if self.dimension == 0 {
-            return Err(VectorError::invalid_input(
+            return Err(ContextraError::invalid_input(
                 "dimension must be greater than 0",
             ));
         }
         if self.m == 0 {
-            return Err(VectorError::invalid_input("m must be greater than 0"));
+            return Err(ContextraError::invalid_input("m must be greater than 0"));
         }
         if self.ef_search == 0 {
-            return Err(VectorError::invalid_input(
+            return Err(ContextraError::invalid_input(
                 "ef_search must be greater than 0",
             ));
         }
         if self.ef_construction < self.m {
-            return Err(VectorError::invalid_input(format!(
+            return Err(ContextraError::invalid_input(format!(
                 "ef_construction ({}) must be >= m ({})",
                 self.ef_construction, self.m
             )));
         }
         if !(0.0..=1.0).contains(&self.rebuild_threshold) {
-            return Err(VectorError::invalid_input(format!(
+            return Err(ContextraError::invalid_input(format!(
                 "rebuild_threshold ({}) must be between 0.0 and 1.0",
                 self.rebuild_threshold
             )));
         }
         if !(0.0..=1.0).contains(&self.quantizer_drift_threshold) {
-            return Err(VectorError::invalid_input(format!(
+            return Err(ContextraError::invalid_input(format!(
                 "quantizer_drift_threshold ({}) must be between 0.0 and 1.0",
                 self.quantizer_drift_threshold
             )));
@@ -114,11 +102,7 @@ impl HnswConfig {
         Ok(())
     }
 }
-// !SECTION
 
-// SECTION HnswConfigBuilder
-
-// ANCHOR[contextra-vector:HNSW-CONFIG-BUILDER]
 /// Builder for HnswConfig with resource limit enforcements to prevent OOM.
 #[derive(Debug, Clone)]
 pub struct HnswConfigBuilder {
@@ -219,10 +203,8 @@ impl HnswConfigBuilder {
     }
 
     /// Build the configuration after validating bounds.
-    // ANCHOR[contextra-vector:HNSW-CONFIG-BUILD]
     pub fn build(self) -> Result<HnswConfig> {
         self.config.validate()?;
         Ok(self.config)
     }
 }
-// !SECTION

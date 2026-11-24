@@ -17,8 +17,7 @@ klasse = "A"
 default = ["std"]
 std = []
 serde = ["dep:serde"]
-workspace = ["dep:contextra-types"]
-types-compat = ["workspace"]
+types-compat = ["dep:contextra-types"]
 simd-avx512 = []
 
 [dependencies]
@@ -32,7 +31,6 @@ contextra-types = { workspace = true, optional = true }
 proptest = "1.4"
 criterion = "0.5"
 simsimd = "6.5"
-serde_json = { workspace = true }
 
 [[bench]]
 name = "simd_bench"

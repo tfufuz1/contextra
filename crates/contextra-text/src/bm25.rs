@@ -15,9 +15,12 @@
 //! Die inverse Dokumenthäufigkeit (IDF = Inverse Document Frequency) wird mit der
 //! Robertson-Spärck-Jones-Glättung berechnet:
 //! $\text{IDF} = \ln\left(1 + \frac{N - \text{df} + 0.5}{\text{df} + 0.5}\right)$.
-//! Dadurch gilt $\text{IDF} \ge 0$ für alle $df \le N$.
+//! Dadurch ist garantiert, dass $\text{IDF} \ge 0$ für alle $df \le N$ gilt.
 
-use crate::error::{Result, TextError};
+#[cfg(not(feature = "types-compat"))]
+use crate::error::{Result, TextError as ContextraError};
+#[cfg(feature = "types-compat")]
+use contextra_types::{ContextraError, Result};
 
 // ANCHOR[contextra-text:BM25-001]
 /// Standard-k1-Parameter für die Termfrequenz-Sättigung in BM25 (1.5).
@@ -34,9 +37,7 @@ pub const BM25_B: f32 = 0.75;
 /// - `b`: Steuert den Einfluss der Dokumentlänge auf die Bewertung. Standardwert: 0.75.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BM25 {
-    /// Sättigungsparameter für Termhäufigkeit (k1 >= 0).
     pub k1: f32,
-    /// Dämpfungsparameter für Dokumentenlänge (0.0 <= b <= 1.0).
     pub b: f32,
 }
 
@@ -45,14 +46,16 @@ impl BM25 {
     /// Erzeugt eine neue `BM25`-Instanz mit validierten Hyperparametern.
     ///
     /// # Fehler
-    /// Liefert [`TextError::InvalidInput`], falls `k1 < 0.0` bzw. NaN ist,
+    /// Liefert [`ContextraError::InvalidInput`], falls `k1 < 0.0` bzw. NaN ist,
     /// oder `b` außerhalb des Intervalls `[0.0, 1.0]` bzw. NaN ist.
     pub fn new(k1: f32, b: f32) -> Result<Self> {
         if k1 < 0.0 || k1.is_nan() {
-            return Err(TextError::InvalidInput("k1 must be >= 0.0".into()));
+            return Err(ContextraError::InvalidInput("k1 must be >= 0.0".into()));
         }
         if !(0.0..=1.0).contains(&b) || b.is_nan() {
-            return Err(TextError::InvalidInput("b must be in [0.0, 1.0]".into()));
+            return Err(ContextraError::InvalidInput(
+                "b must be in [0.0, 1.0]".into(),
+            ));
         }
         Ok(Self { k1, b })
     }
@@ -138,11 +141,8 @@ pub type FieldId = u32;
 /// Feldgewichtungskonfiguration für ein bestimmtes Feld in BM25F.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FieldWeight {
-    /// Feld-Identifikator.
     pub field_id: FieldId,
-    /// Gewichtungsfaktor des Feldes.
     pub weight: f32,
-    /// Längendämpfungsparameter des Feldes.
     pub b: f32,
 }
 
@@ -151,12 +151,14 @@ impl FieldWeight {
     /// Erzeugt eine neue `FieldWeight`-Konfiguration nach Validierung von `weight` und `b`.
     pub fn new(field_id: FieldId, weight: f32, b: f32) -> Result<Self> {
         if weight < 0.0 || weight.is_nan() {
-            return Err(TextError::InvalidInput(
+            return Err(ContextraError::InvalidInput(
                 "field weight must be >= 0.0".into(),
             ));
         }
         if !(0.0..=1.0).contains(&b) || b.is_nan() {
-            return Err(TextError::InvalidInput("b must be in [0.0, 1.0]".into()));
+            return Err(ContextraError::InvalidInput(
+                "b must be in [0.0, 1.0]".into(),
+            ));
         }
         Ok(Self {
             field_id,
@@ -170,9 +172,7 @@ impl FieldWeight {
 /// Konfiguration für feldgewichtetes BM25F-Scoring (§11.3).
 #[derive(Debug, Clone, PartialEq)]
 pub struct BM25F {
-    /// Sättigungsparameter k1.
     pub k1: f32,
-    /// Konfigurierte Feldgewichtungen.
     pub field_weights: Vec<FieldWeight>,
     cached_weights: Vec<(FieldId, f32, f32)>,
 }
@@ -182,7 +182,7 @@ impl BM25F {
     /// Erzeugt ein neues BM25F-Modell mit Feldgewichtungen.
     pub fn new(k1: f32, field_weights: Vec<FieldWeight>) -> Result<Self> {
         if k1 < 0.0 || k1.is_nan() {
-            return Err(TextError::InvalidInput("k1 must be >= 0.0".into()));
+            return Err(ContextraError::InvalidInput("k1 must be >= 0.0".into()));
         }
         let cached_weights = field_weights
             .iter()
@@ -340,27 +340,27 @@ mod tests {
 
         // Negative k1
         let err_k1 = BM25::new(-0.1, 0.75).unwrap_err();
-        assert!(matches!(err_k1, TextError::InvalidInput(_)));
-        if let TextError::InvalidInput(msg) = err_k1 {
+        assert!(matches!(err_k1, ContextraError::InvalidInput(_)));
+        if let ContextraError::InvalidInput(msg) = err_k1 {
             assert_eq!(msg, "k1 must be >= 0.0");
         }
 
         // NaN k1
         let err_k1_nan = BM25::new(f32::NAN, 0.75).unwrap_err();
-        assert!(matches!(err_k1_nan, TextError::InvalidInput(_)));
+        assert!(matches!(err_k1_nan, ContextraError::InvalidInput(_)));
 
         // b out of bounds
         let err_b_neg = BM25::new(1.5, -0.01).unwrap_err();
-        assert!(matches!(err_b_neg, TextError::InvalidInput(_)));
-        if let TextError::InvalidInput(msg) = err_b_neg {
+        assert!(matches!(err_b_neg, ContextraError::InvalidInput(_)));
+        if let ContextraError::InvalidInput(msg) = err_b_neg {
             assert_eq!(msg, "b must be in [0.0, 1.0]");
         }
 
         let err_b_high = BM25::new(1.5, 1.01).unwrap_err();
-        assert!(matches!(err_b_high, TextError::InvalidInput(_)));
+        assert!(matches!(err_b_high, ContextraError::InvalidInput(_)));
 
         let err_b_nan = BM25::new(1.5, f32::NAN).unwrap_err();
-        assert!(matches!(err_b_nan, TextError::InvalidInput(_)));
+        assert!(matches!(err_b_nan, ContextraError::InvalidInput(_)));
     }
 
     #[test]

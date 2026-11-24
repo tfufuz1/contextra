@@ -3,7 +3,6 @@
 // INVARIANTEN: Lock-Hierarchie: write_mutex (exklusive Mutation/Rebuild) -> entry_point -> nodes / doc_to_node / deleted_nodes (HotState/ColdState).
 // NICHT-OFFENSICHTLICH: Multi-threaded Reads sperren nie write_mutex; background rebuild tauscht Core atomar via Swap.
 // HOTSPOTS: mod.rs (HnswIndex::insert, search, delete, rebuild, save)
-// STAND: 2026-11-12
 
 //! HNSW (Hierarchical Navigable Small World) vector index module.
 //!
@@ -16,52 +15,32 @@
 //!
 //! Invariante: Kein Lock-Guard darf über I/O oder `.await`-Grenzen gehalten werden.
 
-// SECTION Öffentliche HNSW-Submodule
-
-// ANCHOR[contextra-vector:HNSW-MOD-ADAPTIVE-EF]
-// Dynamische Anpassung des ef-Search-Parameters basierend auf Selektivität und Latenz.
 pub mod adaptive_ef;
-// ANCHOR[contextra-vector:HNSW-MOD-ARENA]
-// Lock-freie und cache-effiziente Kanten-Arena für Graph-Nachbarschaften.
 pub mod arena;
-// ANCHOR[contextra-vector:HNSW-MOD-CLOCK]
-// Monotoner Zähler-Takt für deterministische Tests und Benchmarks.
 pub mod clock;
-// ANCHOR[contextra-vector:HNSW-MOD-DELETION]
-// Tombstone-Verwaltung, Slot-Nullung und GhostFreeVectorIndex.
 pub mod deletion;
-// ANCHOR[contextra-vector:HNSW-MOD-SQ8-BIAS]
-// Asymmetrische Distanzkorrektur für quantisierte Vektoren.
+pub mod purge;
+pub mod scanner;
 pub mod sq8_bias;
-// !SECTION
-
-// SECTION Kompatibilitäts-Exporte (Transitional Bridge)
 
 #[allow(deprecated)]
-#[cfg(feature = "ports-compat")]
-pub use crate::compat::purge::{hnsw_purger, HnswPurger};
+pub use purge::{hnsw_purger, HnswPurger};
 #[allow(deprecated)]
-#[cfg(feature = "ports-compat")]
-pub use crate::compat::scanner::{hnsw_scanner, HnswScanner};
-// !SECTION
-
-// SECTION Private & Interne Module
+pub use scanner::{hnsw_scanner, HnswScanner};
 
 mod acorn_filtered;
-pub(crate) mod batch;
-pub(crate) mod config;
+mod batch;
+mod config;
 mod core_insert;
 mod core_rebuild;
 mod core_search;
 pub mod staging;
-pub(crate) mod types;
+mod types;
+mod vector_index_impl;
 
-// !SECTION
+#[cfg(test)]
+mod tests;
 
-// SECTION Re-Exports der HNSW-Komponenten
-
-#[cfg(feature = "ports-compat")]
-pub use crate::compat::hnsw_vector_index::{HnswCompactStats, Index, Maintain};
 pub use adaptive_ef::{AdaptiveEfPolicy, AdaptiveEfStateMachine, AdaptiveEfStats};
 pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
@@ -74,6 +53,6 @@ pub use types::{
     RebuildStatus, SnapshotPinGuard, VectorData, HNSW_REBUILD_DELETION_RATIO,
     SENTINEL_NO_ENTRY_POINT,
 };
+pub use vector_index_impl::{HnswCompactStats, Index, Maintain};
 
 pub use staging::{VectorStagingOp, VectorTxBuffer};
-// !SECTION

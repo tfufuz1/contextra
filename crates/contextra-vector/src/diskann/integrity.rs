@@ -1,6 +1,6 @@
 //! Standalone DiskANN integrity hasher replacing the external `contextra-crypto` edge.
 
-use crate::error::{Result, VectorError};
+use contextra_types::{ContextraError, Result};
 
 /// Standalone keyed BLAKE3 hasher for DiskANN file integrity.
 pub struct DiskAnnHmac {
@@ -11,10 +11,12 @@ impl DiskAnnHmac {
     /// Creates a new `DiskAnnHmac` using the provided integrity key.
     pub fn new(integrity_key: &[u8]) -> Result<Self> {
         if integrity_key.is_empty() {
-            return Err(VectorError::InvalidInput("Key cannot be empty".to_string()));
+            return Err(ContextraError::InvalidInput(
+                "Key cannot be empty".to_string(),
+            ));
         }
         if integrity_key.len() > 10_000 {
-            return Err(VectorError::InvalidInput(format!(
+            return Err(ContextraError::InvalidInput(format!(
                 "integrity_key length {} exceeds maximum allowed bound of 10000 bytes",
                 integrity_key.len()
             )));

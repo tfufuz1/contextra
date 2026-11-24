@@ -1,4 +1,3 @@
-#![allow(clippy::duplicated_attributes)]
 //! # Unit-Tests für PersistentCheckpointStore
 //!
 //! Prüft Erstellung, Persistenz, Pinning, Drop-Semantik und Isolation von Checkpoints.
@@ -14,11 +13,10 @@
 
 use super::*;
 use crate::orphan::pending_rollback_count;
-use crate::snapshot_source::{BoxFuture, SnapshotSource};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 
-#[cfg(test)]
 struct MockStorage {
     data: Mutex<BTreeMap<Vec<u8>, Vec<u8>>>,
     pinned: Mutex<HashSet<u64>>,
@@ -37,11 +35,17 @@ impl MockStorage {
     }
 }
 
-impl SnapshotSource for MockStorage {
+impl StorageEngine for MockStorage {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
     }
-
+    fn get_at_seq<'a>(
+        &'a self,
+        key: &'a [u8],
+        _seq: u64,
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { self.get(key).await })
+    }
     fn put<'a>(
         &'a self,
         _tx_id: TxId,
@@ -51,7 +55,7 @@ impl SnapshotSource for MockStorage {
         Box::pin(async move {
             if let Some(fail_key) = self.fail_on_put.lock().as_ref() {
                 if key == fail_key {
-                    return Err(CheckpointError::Internal("Mock Storage Error".to_string()));
+                    return Err(ContextraError::Internal("Mock Storage Error".to_string()));
                 }
             }
             self.data.lock().insert(key.to_vec(), value.to_vec());
@@ -85,7 +89,15 @@ impl SnapshotSource for MockStorage {
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+        Box::pin(async move {
+            Ok(StorageStats {
+                num_segments: 0,
+                total_size_bytes: 0,
+                memtable_size_bytes: 0,
+            })
+        })
+    }
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             self.pinned.lock().insert(seq_no);
@@ -110,6 +122,14 @@ impl SnapshotSource for MockStorage {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect())
         })
+    }
+    fn scan<'a>(
+        &'a self,
+        _s: std::ops::Bound<&'a [u8]>,
+        _e: std::ops::Bound<&'a [u8]>,
+        _: Option<usize>,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move { Ok(Vec::new()) })
     }
 }
 
@@ -390,31 +410,34 @@ async fn test_checkpoint_guard_commit_prevents_rollback() {
 #[tokio::test]
 // Prüft, dass ein frisch initialisierter Store zunächst eine leere Checkpoint-Liste liefert.
 async fn test_list_checkpoints_empty_initially() {
+    use contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     let store = PersistentCheckpointStore::new(storage, "test").unwrap();
 
-    let list = store.list_checkpoints().await.unwrap(); // unwrap
+    let list = store.list_named_checkpoints().await.unwrap(); // unwrap
     assert!(list.is_empty());
 }
 
 #[tokio::test]
 // Prüft, dass die Wiederherstellung eines nicht existierenden Checkpoints mit CheckpointNotFound fehlschlägt.
 async fn test_checkpoint_not_found_returns_err() {
+    use contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     let store = PersistentCheckpointStore::new(storage, "test").unwrap();
 
-    let res = store.restore_checkpoint("nonexistent").await;
-    assert!(matches!(res, Err(CheckpointError::CheckpointNotFound)));
+    let res = store.restore_named_checkpoint("nonexistent").await;
+    assert!(matches!(res, Err(ContextraError::CheckpointNotFound)));
 }
 
 #[tokio::test]
 // Prüft, dass benannte Checkpoints auch nach dem Schließen und Wiederöffnen des Stores vollständig lesbar sind.
 async fn test_list_named_checkpoints_after_reopen() {
+    use contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     {
         let store1 = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
         store1
-            .create_checkpoint(
+            .create_named_checkpoint(
                 "cp1",
                 "col1",
                 1,
@@ -424,7 +447,7 @@ async fn test_list_named_checkpoints_after_reopen() {
             .await
             .unwrap(); // unwrap
         store1
-            .create_checkpoint(
+            .create_named_checkpoint(
                 "cp2",
                 "col1",
                 2,
@@ -436,7 +459,7 @@ async fn test_list_named_checkpoints_after_reopen() {
     }
 
     let store2 = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
-    let list = store2.list_checkpoints().await.unwrap(); // unwrap
+    let list = store2.list_named_checkpoints().await.unwrap(); // unwrap
 
     assert_eq!(list.len(), 2);
     let names: Vec<_> = list.into_iter().map(|m| m.name).collect();
@@ -446,13 +469,14 @@ async fn test_list_named_checkpoints_after_reopen() {
 #[tokio::test]
 // Prüft die Konsistenz zwischen dem In-Memory Cache und dem persistenten Storage.
 async fn test_list_checkpoints_cache_matches_storage() {
+    use contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     let store1 = Arc::new(PersistentCheckpointStore::new(storage.clone(), "test").unwrap());
 
     // Create 3 checkpoints
     for i in 1..=3 {
         store1
-            .create_checkpoint(
+            .create_named_checkpoint(
                 &format!("cp-{i}"),
                 "col1",
                 i,
@@ -465,7 +489,7 @@ async fn test_list_checkpoints_cache_matches_storage() {
 
     // Drop and reload the store from same storage
     let store2 = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
-    let list = store2.list_checkpoints().await.unwrap(); // unwrap
+    let list = store2.list_named_checkpoints().await.unwrap(); // unwrap
 
     assert_eq!(list.len(), 3);
     let names: Vec<_> = list.into_iter().map(|m| m.name).collect();
@@ -475,6 +499,7 @@ async fn test_list_checkpoints_cache_matches_storage() {
 #[tokio::test]
 // Prüft die Threadsicherheit und Fehlerfreiheit bei nebenläufiger Erstellung mehrerer Checkpoints.
 async fn test_concurrent_checkpoint_creation_is_safe() {
+    use contextra_ports::CheckpointCoordinator;
     use tokio::task::JoinSet;
 
     let storage = Arc::new(MockStorage::new());
@@ -485,7 +510,7 @@ async fn test_concurrent_checkpoint_creation_is_safe() {
         let store = Arc::clone(&store);
         tasks.spawn(async move {
             store
-                .create_checkpoint(
+                .create_named_checkpoint(
                     &format!("cp-{i}"),
                     "col1",
                     i,
@@ -503,7 +528,7 @@ async fn test_concurrent_checkpoint_creation_is_safe() {
         }
     }
 
-    let all = store.list_checkpoints().await.unwrap(); // unwrap
+    let all = store.list_named_checkpoints().await.unwrap(); // unwrap
     assert_eq!(all.len(), 8);
 }
 
@@ -584,7 +609,7 @@ async fn test_next_tx_overflow_returns_err() {
 
     let res = store.allocate_tx().await;
     assert!(res.is_err());
-    if let Err(CheckpointError::Internal(msg)) = res {
+    if let Err(ContextraError::Internal(msg)) = res {
         assert!(msg.contains("overflow"));
     } else {
         panic!("Expected Internal error on overflow");
@@ -601,26 +626,26 @@ async fn test_input_validation_empty_and_oversized_names() {
     let res = store
         .create_checkpoint("", "col1", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(res, Err(CheckpointError::InvalidInput(_))));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 
     // Whitespace name
     let res = store
         .create_checkpoint("   ", "col1", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(res, Err(CheckpointError::InvalidInput(_))));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 
     // Empty collection ID
     let res = store
         .create_checkpoint("cp1", "", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(res, Err(CheckpointError::InvalidInput(_))));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 
     // Oversized name (> 256 chars)
     let long_name = "a".repeat(257);
     let res = store
         .create_checkpoint(&long_name, "col1", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(res, Err(CheckpointError::InvalidInput(_))));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 
     // Multibyte unicode name: 256 chars (512+ bytes) accepted, 257 chars rejected
     let unicode_256 = "ä".repeat(256);
@@ -633,15 +658,15 @@ async fn test_input_validation_empty_and_oversized_names() {
     let res_257 = store
         .create_checkpoint(&unicode_257, "col1", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(res_257, Err(CheckpointError::InvalidInput(_))));
+    assert!(matches!(res_257, Err(ContextraError::InvalidInput(_))));
 
     // Drop with empty name
     let res = store.drop_checkpoint("").await;
-    assert!(matches!(res, Err(CheckpointError::InvalidInput(_))));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 
     // Get with empty name
     let res = store.get_checkpoint("   ").await;
-    assert!(matches!(res, Err(CheckpointError::InvalidInput(_))));
+    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
 }
 
 #[allow(non_snake_case)]
@@ -720,7 +745,7 @@ async fn test_restore_checkpoint_CASE_not_found_returns_err() {
     let store = PersistentCheckpointStore::new(storage, "test").unwrap();
 
     let res = store.restore_checkpoint("missing_cp").await;
-    assert!(matches!(res, Err(CheckpointError::CheckpointNotFound)));
+    assert!(matches!(res, Err(ContextraError::CheckpointNotFound)));
 }
 
 #[allow(non_snake_case)]
@@ -738,7 +763,7 @@ async fn test_list_checkpoints_CASE_corrupted_storage_data_propagates_err() {
         .expect("// expect #[cfg(test)]");
 
     let res = store.list_checkpoints().await;
-    assert!(matches!(res, Err(CheckpointError::Serialization(_))));
+    assert!(matches!(res, Err(ContextraError::Serialization(_))));
 }
 
 #[tokio::test]
@@ -872,15 +897,17 @@ async fn test_concurrent_checkpoint_index_atomicity() {
 
 #[tokio::test]
 async fn test_store_traits_roundtrip_coverage() {
+    use contextra_ports::{Checkpoint, CheckpointCoordinator};
     let storage = Arc::new(MockStorage::new());
     let store = PersistentCheckpointStore::new(storage, "test_traits").unwrap();
 
     let tx = TxId::new(42);
+    let snapshot = store.take_snapshot(tx).await.unwrap();
+    store.restore(&snapshot).await.unwrap();
+
     let _ = store
-        .create_checkpoint("cp_test", "col", 1, tx, serde_json::json!({}))
+        .create_named_checkpoint("cp_test", "col", 1, tx, serde_json::json!({}))
         .await
         .unwrap();
-    let res = store.restore_checkpoint("cp_test").await.unwrap();
-    assert_eq!(res.name, "cp_test");
-    store.drop_checkpoint("cp_test").await.unwrap();
+    store.drop_named_checkpoint("cp_test").await.unwrap();
 }

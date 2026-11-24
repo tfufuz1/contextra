@@ -6,36 +6,22 @@ name = "contextra-rank"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version = "1.89"
+rust-version.workspace = true
 description = "4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for Contextra Cognitive OS"
-readme = "README.md"
-repository = "https://github.com/tfufuz1/contextra"
-keywords = ["ranking", "rrf", "fusion", "calibration", "retrieval"]
-categories = ["algorithms", "science"]
-include = ["src/**/*", "Cargo.toml", "README.md", "CHANGELOG.md", "LICENSE-*"]
-publish = false # Interner modularer Baustein des Contextra-Systems (AD-1)
 
 [package.metadata.contextra]
 ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "exp-dibud", "exp-resonance", "experimental-rank"]
+default = ["std", "types-compat"]
 std = []
-workspace = ["dep:contextra-types", "dep:contextra-ports"]
-types-compat = ["workspace"]
-ports-compat = ["workspace"]
-
-# Experimente
-dibud = ["exp-dibud"]
-exp-dibud = []
-exp-resonance = []
-experimental-all = ["exp-dibud", "exp-resonance"]
-experimental-rank = ["experimental-all"]
+types-compat = ["dep:contextra-types", "dep:contextra-ports"]
+dibud = []
 
 [dependencies]
-contextra-types = { path = "../contextra-types", version = "0.1.0", default-features = false, optional = true }
-contextra-ports = { path = "../contextra-ports", version = "0.1.0", default-features = false, optional = true }
+contextra-types = { workspace = true, optional = true }
+contextra-ports = { workspace = true, optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { workspace = true }
 ahash = { version = "0.8", features = ["serde"] }
@@ -43,8 +29,6 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-contextra-types = { path = "../contextra-types", version = "0.1.0" }
-contextra-ports = { path = "../contextra-ports", version = "0.1.0" }
 proptest = "1"
 criterion = { workspace = true }
 tokio = { version = "1", features = ["rt", "macros"] }

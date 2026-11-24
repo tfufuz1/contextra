@@ -2,7 +2,7 @@
 """
 tools/baseline/run_baseline.py
 
-Reproducible Baseline Runner for Contextra Workspace (35 members).
+Reproducible Baseline Runner for Acta Workspace (35 members).
 Produces uncut raw logs, json summaries, root cause attribution for compiler/clippy errors,
 and test execution metrics with timeout tracking.
 
@@ -165,7 +165,7 @@ def write_log_file(log_dir: pathlib.Path, command_slug: str, content: str, repo_
 def find_owning_crate(file_path: str, packages: dict, repo_root: pathlib.Path = REPO_ROOT) -> str:
     """
     Finds the workspace crate that owns a given relative file path.
-    e.g., 'crates/contextra-types/src/lib.rs' -> 'contextra-types'
+    e.g., 'crates/acta-types/src/lib.rs' -> 'acta-types'
     """
     norm_file = normalize_path(file_path, repo_root)
     # Check package directories
@@ -316,7 +316,7 @@ def parse_test_results(raw_output: str) -> dict:
                 slowest_tests.append({"name": t_name, "duration_seconds": float(dur_str)})
             continue
 
-        # Nextest start: "START [   0.001s] ( 1/55) contextra agent_memory::tests::test_foo"
+        # Nextest start: "START [   0.001s] ( 1/55) acta agent_memory::tests::test_foo"
         n_start_m = re.match(r"^START\s+\[[\s\d\.]+\w*\](?:\s+\([\s\d/]+\))?(?:\s+\S+)?\s+(\S+)$", line_s)
         if n_start_m:
             t_name = n_start_m.group(1)
@@ -324,7 +324,7 @@ def parse_test_results(raw_output: str) -> dict:
                 started_tests.append(t_name)
             continue
 
-        # Nextest end: "PASS [   0.012s] ( 1/55) contextra agent_memory::tests::test_foo"
+        # Nextest end: "PASS [   0.012s] ( 1/55) acta agent_memory::tests::test_foo"
         n_end_m = re.match(r"^(PASS|FAIL|CANCEL)\s+\[\s*([\d\.]+)s\](?:\s+\([\s\d/]+\))?(?:\s+\S+)?\s+(\S+)$", line_s)
         if n_end_m:
             dur = float(n_end_m.group(2))
@@ -500,9 +500,9 @@ def run_crate_baseline(
         ("cargo_test", test_cmd),
     ]
 
-    if pkg_name == "contextra":
+    if pkg_name == "acta":
         cmds.append(
-            ("cargo_test_deletion_chain_e2e", ["cargo", "test", "-p", "contextra", "--test", "deletion_chain_e2e", "--", "--test-threads=1", "--no-capture"])
+            ("cargo_test_deletion_chain_e2e", ["cargo", "test", "-p", "acta", "--test", "deletion_chain_e2e", "--", "--test-threads=1", "--no-capture"])
         )
 
     for slug, cmd in cmds:
@@ -641,13 +641,13 @@ def run_self_tests():
 
     # 1. Test path normalization
     dummy_root = pathlib.Path("/app")
-    sample_text = "Error in /app/crates/contextra-types/src/lib.rs:10"
+    sample_text = "Error in /app/crates/acta-types/src/lib.rs:10"
     normalized = normalize_path(sample_text, dummy_root)
-    assert normalized == "Error in crates/contextra-types/src/lib.rs:10", f"Got: {normalized}"
+    assert normalized == "Error in crates/acta-types/src/lib.rs:10", f"Got: {normalized}"
 
-    sample_text2 = "Error in /home/jules/contextra/crates/contextra-crypto/src/lib.rs:5"
+    sample_text2 = "Error in /home/jules/acta/crates/acta-crypto/src/lib.rs:5"
     normalized2 = normalize_path(sample_text2, REPO_ROOT)
-    assert "crates/contextra-crypto/src/lib.rs:5" in normalized2, f"Got: {normalized2}"
+    assert "crates/acta-crypto/src/lib.rs:5" in normalized2, f"Got: {normalized2}"
 
     print("Path normalization self-tests passed!", flush=True)
 
@@ -674,20 +674,20 @@ def run_self_tests():
 
     # 3. Test diagnostic JSON parsing & root cause attribution
     mock_packages = {
-        "contextra-types": {"rel_dir": "crates/contextra-types"},
-        "contextra": {"rel_dir": "crates/contextra"},
+        "acta-types": {"rel_dir": "crates/acta-types"},
+        "acta": {"rel_dir": "crates/acta"},
     }
 
     mock_json_line = json.dumps({
         "reason": "compiler-message",
-        "package_id": "contextra-types 0.1.0",
+        "package_id": "acta-types 0.1.0",
         "message": {
             "level": "error",
             "code": {"code": "clippy::cast_possible_truncation"},
             "rendered": "error: casting u64 to u32 may truncate",
             "spans": [
                 {
-                    "file_name": "/app/crates/contextra-types/src/types/domain/document.rs",
+                    "file_name": "/app/crates/acta-types/src/types/domain/document.rs",
                     "line_start": 143,
                     "column_start": 35,
                     "is_primary": True,
@@ -697,20 +697,20 @@ def run_self_tests():
     })
 
     diags, root_cause, caused_by_dep = parse_diagnostics_from_json_stream(
-        mock_json_line, "contextra", mock_packages, dummy_root
+        mock_json_line, "acta", mock_packages, dummy_root
     )
     assert len(diags) == 1
-    assert diags[0]["root_cause_crate"] == "contextra-types"
-    assert diags[0]["victim_crate"] == "contextra"
-    assert root_cause == "contextra-types"
-    assert caused_by_dep is True, "contextra was victim of contextra-types error"
+    assert diags[0]["root_cause_crate"] == "acta-types"
+    assert diags[0]["victim_crate"] == "acta"
+    assert root_cause == "acta-types"
+    assert caused_by_dep is True, "acta was victim of acta-types error"
 
     # Test ROOT_CAUSES.md generation
     md_path = REPO_ROOT / "target" / "test_ROOT_CAUSES.md"
     generate_root_causes_md(diags, "commit123", "rustc 1.89.0", md_path)
     assert md_path.exists()
     md_content = md_path.read_text(encoding="utf-8")
-    assert "`contextra-types`" in md_content
+    assert "`acta-types`" in md_content
     assert "`clippy::cast_possible_truncation`" in md_content
     if md_path.exists():
         md_path.unlink()
@@ -749,7 +749,7 @@ test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Contextra Baseline Execution Tool")
+    parser = argparse.ArgumentParser(description="Acta Baseline Execution Tool")
     parser.add_argument("--self-test", action="store_true", help="Run internal self-tests and exit")
     parser.add_argument("--timeout", type=int, default=1800, help="Per-crate timeout in seconds (default: 1800)")
     parser.add_argument("--crate", type=str, help="Run baseline only for a single crate")

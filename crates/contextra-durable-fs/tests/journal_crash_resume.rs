@@ -1,4 +1,3 @@
-#![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic, clippy::io_other_error)]
 use contextra_durable_fs::journal::PendingDeleteJournal;
 use std::fs;
 use tempfile::tempdir;

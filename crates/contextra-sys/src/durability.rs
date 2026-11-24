@@ -1,10 +1,7 @@
-// =========================================================================
-// ANCHOR[id=sys-durability-main,epic=sys-durability,seq=0] Haltbare Dateisystem-Synchronisation
-// =========================================================================
-// LINK crates/contextra-sys/src/lib.rs
-// NOTE: Platform-aware low-level durability primitives for file and directory flushes (Ring 0 / E0 / docs/SPEC.md §10.1 / INV-SYS-FSYNC-1).
-// Invariante: Zero panic; typed error propagation; fail-closed on unsupported targets; EINTR retry only; Handle-Poisoning on sync failure.
-// Keine unzulässigen Garantieversprechen (SPEC §6.4).
+// STAND: 2026-11-08T00:00:00Z
+// ZWECK: Platform-aware low-level durability primitives for file and directory flushes (Ring 0 / SPEC §10.1 / INV-SYS-FSYNC-1)
+// INVARIANTEN: Zero panic; typed error propagation; fail-closed on unsupported targets; EINTR retry only; Handle-Poisoning on sync failure
+// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1 (INV-SYS-FSYNC-1)
 
 //! # Modul: Dauerhaftigkeit und physische Synchronisation (`durability`)
 //!
@@ -13,11 +10,11 @@
 //! (SSD/HDD) dauerhaft persistiert werden (Durability gemäß ACID-Kriterien).
 //!
 //! ## Ring-Zugehörigkeit und Zweck
-//! - **Ring 0 / Ebene E0 (Kern):** Kapselt direkte Betriebssystem-Aufrufe (`libc::fsync`, `libc::fdatasync`,
+//! - **Ring 0 (Kern):** Kapselt direkte Betriebssystem-Aufrufe (`libc::fsync`, `libc::fdatasync`,
 //!   `libc::fcntl(F_FULLFSYNC)`, `FlushFileBuffers`).
 //! - **Verwendung im System:** Wird von `contextra-store` (Write-Ahead-Log WAL und LSM-SSTables)
 //!   sowie `contextra-durable-fs` genutzt.
-//! - **Persistenz & Fehlerrichtlinie (INV-SYS-FSYNC-1):**
+//! - **Persistenz & Fehlergarantie (INV-SYS-FSYNC-1):**
 //!   Schlägt ein `fsync`/`fdatasync` fehl, wird sofort ein [`crate::Error::SyncFailed`] bzw.
 //!   [`std::io::Error`] an den Aufrufer propagiert. Es gibt keinen stillen Retry auf demselben
 //!   Handle: Ein fehlerhaftes Handle wird permanent vergiftet ([`DurableFile`]) und alle
@@ -37,8 +34,6 @@ use std::path::Path;
 
 use crate::error::{Error, Result};
 
-// SECTION Fault Injection Harness
-// ANCHOR[id=sys-durability-fault,epic=sys-durability,seq=1] Test-Fehlerinjektion
 #[cfg(test)]
 pub(crate) mod fault_injection {
     use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
@@ -59,11 +54,8 @@ pub(crate) mod fault_injection {
         }
     }
 }
-// !SECTION Fault Injection Harness
 
-// SECTION OS Sync Primitives
-// ANCHOR[id=sys-durability-os-sync,epic=sys-durability,seq=2] raw_os_sync_file
-
+// ANCHOR[contextra-sys:DUR-FLUSH-FILE-RAW-001]
 /// Führt den rohen Betriebssystem-Sync-Syscall auf einem Dateideskriptor aus.
 ///
 /// # Invariante (INV-SYS-FSYNC-1)
@@ -165,16 +157,14 @@ fn raw_os_sync_file(_file: &File, _metadata_changed: bool) -> Result<()> {
         "durable_flush_file is not supported on this target architecture (fail-closed)",
     ))
 }
-// !SECTION OS Sync Primitives
 
-// SECTION High-level Flush Functions
-// ANCHOR[id=sys-durability-flush,epic=sys-durability,seq=3] durable_flush_file & durable_flush_dir
-
-/// Flasht Dateiinhalt und optional Metadaten auf den physischen Datenträger gemäß den Eigenschaften der Zielplattform.
+// ANCHOR[contextra-sys:DUR-FLUSH-FILE-001]
+/// Flasht Dateiinhalt und optional Metadaten auf den physischen Datenträger gemäß den Garantien der Zielplattform.
 pub fn durable_flush_file(file: &File, metadata_changed: bool) -> IoResult<()> {
     raw_os_sync_file(file, metadata_changed).map_err(Into::into)
 }
 
+// ANCHOR[contextra-sys:DUR-FLUSH-DIR-001]
 /// Flasht den Verzeichniseintrag (übergeordnetes Verzeichnis) einer neu erstellten oder umbenannten Datei.
 pub fn durable_flush_dir(path: &Path) -> IoResult<()> {
     #[cfg(unix)]
@@ -199,8 +189,7 @@ pub fn durable_flush_dir(path: &Path) -> IoResult<()> {
     }
 }
 
-// ANCHOR[id=sys-durability-write,epic=sys-durability,seq=4] write_all_durable
-
+// ANCHOR[contextra-sys:DUR-WRITE-ALL-001]
 /// Schreibt die gesamten Bytes aus `buf` zuverlässig in `file`, unter robuster Behandlung partieller Schreibvorgänge und Signal-Unterbrechungen.
 pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> IoResult<()> {
     while !buf.is_empty() {
@@ -222,13 +211,10 @@ pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> IoResult<()> {
     }
     Ok(())
 }
-// !SECTION High-level Flush Functions
 
-// SECTION Durable File Wrapper
-// ANCHOR[id=sys-durability-durable-file,epic=sys-durability,seq=5] DurableFile (Handle-Poisoning)
-
+// ANCHOR[contextra-sys:DUR-DURABLE-FILE-001]
 /// Ein sicherer RAII-Wrapper um [`std::fs::File`], der die Invariante **INV-SYS-FSYNC-1** erzwingt:
-/// Sobald ein `fsync`/`fdatasync` oder Flush-Aufruf fehlschlägt, wird das Handle dauerhaft vergiftet (`is_poisoned() == true`).
+/// Sobald ein `fsync`/`fdatasync` oder Flush-Aufruf fehlschlägt, wird das Handle permanent vergiftet (`is_poisoned() == true`).
 /// Alle nachfolgenden Schreib- und Synchronisationsaufrufe auf dieser Instanz schlagen sofort mit [`Error::HandlePoisoned`] fehl.
 #[derive(Debug)]
 pub struct DurableFile {
@@ -295,10 +281,8 @@ impl DurableFile {
         }
     }
 }
-// !SECTION Durable File Wrapper
 
-// SECTION Unit Tests
-// ANCHOR[id=sys-durability-tests,epic=sys-durability,seq=6] Durability-Modultests
+// ANCHOR[contextra-sys:DUR-TESTS-001]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -431,7 +415,8 @@ mod tests {
         }
     }
 
-    /// Prüft INV-SYS-FSYNC-1: Ein fehlgeschlagener Flush vergiftet das Handle dauerhaft.
+    // ANCHOR[contextra-sys:INV-SYS-FSYNC-1-TEST-001]
+    /// Prüft INV-SYS-FSYNC-1: Ein fehlgeschlagener Flush vergiftet das Handle unwiderruflich.
     #[test]
     fn test_inv_sys_fsync_1_poisoning() -> Result<()> {
         let temp_dir = std::env::temp_dir();
@@ -484,4 +469,3 @@ mod tests {
         Ok(())
     }
 }
-// !SECTION Unit Tests

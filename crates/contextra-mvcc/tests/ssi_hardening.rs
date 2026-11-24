@@ -6,10 +6,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use contextra_mvcc::error::ContextraError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::tx_buffer::TxBuffer;
 use contextra_mvcc::types::TxId;
-use contextra_mvcc::MvccError;
 use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
@@ -88,13 +88,13 @@ fn test_fail_closed_validation() {
 
     let res_old = validator.validate(TxId::new(1), &old_rs);
     assert!(res_old.is_err());
-    if let Err(MvccError::Conflict(msg)) = res_old {
+    if let Err(ContextraError::Conflict(msg)) = res_old {
         assert!(
             msg.contains("snapshot too old"),
             "Expected 'snapshot too old' in error message: {msg}"
         );
     } else {
-        panic!("Expected MvccError::Conflict");
+        panic!("Expected ContextraError::Conflict");
     }
 
     let mut valid_rs = ReadSet::new();
@@ -139,7 +139,10 @@ fn test_try_register_read_limit_and_updates() {
 
     // 3rd new key fails when max_keys is 2
     let res_overflow = buffer.try_register_read(tx, b"k3".to_vec(), 30, 2);
-    assert!(matches!(res_overflow, Err(MvccError::LimitExceeded { .. })));
+    assert!(matches!(
+        res_overflow,
+        Err(ContextraError::LimitExceeded { .. })
+    ));
 
     let rs = buffer.get_read_set(tx).unwrap();
     assert_eq!(rs.len(), 2);
@@ -180,7 +183,7 @@ proptest::proptest! {
 
         match (res_unpruned, res_pruned) {
             (Ok(()), Ok(())) => {},
-            (Err(MvccError::Conflict(_)), Err(MvccError::Conflict(_))) => {},
+            (Err(ContextraError::Conflict(_)), Err(ContextraError::Conflict(_))) => {},
             (un, pr) => proptest::prop_assert!(false, "Mismatch above watermark: unpruned={:?}, pruned={:?}", un, pr),
         }
     }

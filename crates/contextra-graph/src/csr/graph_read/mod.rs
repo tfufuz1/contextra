@@ -3,23 +3,12 @@
 //! # Zweck
 //! Bündelt Nachbarschaftsabfragen, PageRank-Evaluation und Pfadfindungszugriffe.
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
-// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-
-// SECTION Mod Core Implementation
 pub mod communities;
 pub mod pagerank;
 pub mod path_rag;
 
-#[cfg(feature = "ports-compat")]
 use crate::GraphIndexExt;
-use crate::error::Result;
-use crate::types::{EntityId, TxId};
+use contextra_types::{EntityId, Result, TxId};
 
 use super::graph_write::CsrGraph;
 
@@ -151,12 +140,11 @@ impl CsrGraph {
         if let Some(&idx) = inner.id_map.get(&id) {
             inner.entity_at(idx).is_some()
         } else {
-            inner.hyperedge_index.contains_key(&id)
+            false
         }
     }
 
     pub async fn is_entity_deleted(&self, entity: EntityId) -> bool {
-        #[cfg(feature = "ports-compat")]
         if let Some(storage) = &self.storage {
             let key = format!("graph:entity:deleted:{}", entity.0);
             return storage.get(key.as_bytes()).await.ok().flatten().is_some();
@@ -172,12 +160,7 @@ impl CsrGraph {
             + inner.staged_edges.values().map(|v| v.len()).sum::<usize>()
     }
 
-    #[cfg(feature = "ports-compat")]
     pub async fn remove_entity(&self, tx: TxId, entity: EntityId) -> Result<()> {
-        GraphIndexExt::remove_entity(self, tx, entity)
-            .await
-            .map_err(|e| crate::error::GraphError::Internal(e.to_string()))
+        GraphIndexExt::remove_entity(self, tx, entity).await
     }
 }
-
-// !SECTION Mod Core Implementation

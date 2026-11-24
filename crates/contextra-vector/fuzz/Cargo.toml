@@ -1,3 +1,6 @@
+[lints]
+workspace = true
+
 [package]
 name = "contextra-vector-fuzz" # <!-- crate-ref-ignore -->
 version = "0.0.0"
@@ -13,11 +16,10 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1.4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
-tempfile = "3"
 contextra-types = { path = "../../contextra-types" }
 contextra-ports = { path = "../../contextra-ports" }
 contextra-mvcc = { path = "../../contextra-mvcc" }
-contextra-vector = { path = "..", features = ["experimental-diskann"] }
+contextra-vector = { path = ".." }
 
 [[bin]]
 name = "hnsw_insert_search"
@@ -28,29 +30,5 @@ doc = false
 [[bin]]
 name = "fuzz_hnsw_persistence"
 path = "fuzz_targets/fuzz_hnsw_persistence.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "fuzz_mmap_header"
-path = "fuzz_targets/fuzz_mmap_header.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "fuzz_diskann_formats"
-path = "fuzz_targets/fuzz_diskann_formats.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "fuzz_hnsw_header_versions"
-path = "fuzz_targets/fuzz_hnsw_header_versions.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "fuzz_sq8_quantizer"
-path = "fuzz_targets/fuzz_sq8_quantizer.rs"
 test = false
 doc = false

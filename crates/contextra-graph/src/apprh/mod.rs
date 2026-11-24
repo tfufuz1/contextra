@@ -1,14 +1,5 @@
 //! Averaging-based Personalized PageRank for Hypergraphs (APPRH).
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Adaptiver PageRank mit Hyperkanten-Expansion (APPRH).
-// INVARIANTEN: Deterministische Diffusion, budgetierte Iterationen.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-
-// SECTION Mod Core Implementation
 pub mod diffusion;
 pub mod error;
 pub mod gate_monitor;
@@ -29,10 +20,9 @@ pub use shadow::{
 };
 
 use crate::csr::CsrGraph;
-use crate::error::{GraphError, Result as GraphResult};
 use crate::path_rag::{PathGraph, PprParams};
 use ahash::AHashMap;
-use crate::types::EntityId;
+use contextra_types::EntityId;
 
 /// Computes Averaging-based Personalized PageRank for Hypergraphs (APPRH) over a generic [`PathGraph`].
 ///
@@ -63,12 +53,12 @@ pub fn forward_push_apprh<G: PathGraph>(
     seeds: &[EntityId],
     params: &PprParams,
     hyperedge_decay_factor: f32,
-) -> GraphResult<AHashMap<EntityId, f32>> {
+) -> Result<AHashMap<EntityId, f32>, contextra_types::ContextraError> {
     if !hyperedge_decay_factor.is_finite() // NAN-CHECK-OK
         || hyperedge_decay_factor <= 0.0
         || hyperedge_decay_factor > 1.0
     {
-        return Err(GraphError::InvalidInput(format!(
+        return Err(contextra_types::ContextraError::InvalidInput(format!(
             "hyperedge_decay_factor must be in (0.0, 1.0] and finite, got {}",
             hyperedge_decay_factor
         )));
@@ -114,7 +104,7 @@ impl CsrGraph {
 mod tests {
     use super::*;
     use crate::csr::CsrGraph;
-    use crate::types::Entity;
+    use contextra_types::Entity;
 
     // ANCHOR[contextra-graph:SRC-APPRH-MOD-005]
     #[tokio::test]
@@ -157,5 +147,3 @@ mod tests {
         assert!(comparison.top_k_overlap >= 0.0 && comparison.top_k_overlap <= 1.0);
     }
 }
-
-// !SECTION Mod Core Implementation

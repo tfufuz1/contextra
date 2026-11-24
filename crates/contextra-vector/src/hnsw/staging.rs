@@ -2,10 +2,7 @@
 // ZWECK: Autarke Abstraktion für Transaktions-Staging und Versionsprotokollierung (Inversion of Control).
 // INVARIANTEN: Zero-Panic Doctrine; isolierte Puffer-Verwaltung ohne feste Bindung an konkrete MVCC-Implementierungen.
 
-use crate::types::{DocId, TxId};
-use parking_lot::RwLock;
-use std::collections::BTreeMap;
-use std::time::Duration;
+use contextra_types::{DocId, TxId};
 
 /// Operation within a transactional staging buffer.
 #[derive(Debug, Clone, PartialEq)]
@@ -22,42 +19,57 @@ pub enum VectorStagingOp {
 /// from direct coupling to storage transaction buffers.
 #[derive(Debug)]
 pub struct VectorTxBuffer {
-    buffers: RwLock<BTreeMap<u64, Vec<VectorStagingOp>>>,
-    capacity: usize,
-    #[allow(dead_code)]
-    timeout: Duration,
+    inner: contextra_mvcc::TxBuffer<Vec<f32>>,
 }
 
 impl VectorTxBuffer {
     /// Creates a new vector staging buffer with the specified concurrency ceiling and timeout.
-    pub fn new(capacity: usize, timeout: Duration) -> Self {
+    pub fn new(capacity: usize, timeout: std::time::Duration) -> Self {
         Self {
-            buffers: RwLock::new(BTreeMap::new()),
-            capacity,
-            timeout,
+            inner: contextra_mvcc::TxBuffer::new_with_config(capacity, timeout),
         }
     }
 
     /// Stages an operation into the transaction buffer.
-    pub fn stage(&self, tx: TxId, op: VectorStagingOp) -> crate::error::Result<()> {
-        let mut guard = self.buffers.write();
-        let ops = guard.entry(tx.inner()).or_default();
-        if ops.len() >= self.capacity {
-            return Err(crate::error::VectorError::Conflict(
-                "Staging buffer capacity exceeded for transaction".into(),
-            ));
+    pub fn stage(&self, tx: TxId, op: VectorStagingOp) -> contextra_types::Result<()> {
+        match op {
+            VectorStagingOp::Insert { doc_id, embedding } => {
+                self.inner.stage(
+                    tx,
+                    contextra_mvcc::IndexOp::Insert {
+                        doc_id,
+                        data: embedding,
+                    },
+                )?;
+            }
+            VectorStagingOp::Delete { doc_id } => {
+                self.inner
+                    .stage(tx, contextra_mvcc::IndexOp::Delete { doc_id, data: None })?;
+            }
         }
-        ops.push(op);
         Ok(())
     }
 
     /// Drains and returns all staged operations for a given transaction.
     pub fn drain(&self, tx: TxId) -> Vec<VectorStagingOp> {
-        self.buffers.write().remove(&tx.inner()).unwrap_or_default()
+        self.inner
+            .drain(tx)
+            .into_iter()
+            .filter_map(|op| match op {
+                contextra_mvcc::IndexOp::Insert { doc_id, data } => Some(VectorStagingOp::Insert {
+                    doc_id,
+                    embedding: data,
+                }),
+                contextra_mvcc::IndexOp::Delete { doc_id, .. } => {
+                    Some(VectorStagingOp::Delete { doc_id })
+                }
+                _ => None,
+            })
+            .collect()
     }
 
     /// Discards staged operations on transaction rollback.
     pub fn discard(&self, tx: TxId) {
-        self.buffers.write().remove(&tx.inner());
+        self.inner.discard(tx);
     }
 }
