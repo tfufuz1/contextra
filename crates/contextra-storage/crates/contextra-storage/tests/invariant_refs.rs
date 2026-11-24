@@ -18,6 +18,7 @@ fn spec_r8_1_invariant_references_are_compiled_with_the_test_suite() {
     // INV-ERA-7 INV-ERA-8 INV-ERA-9 INV-ERA-10 INV-ERA-11 INV-ERA-12
     // INV-LED-1 INV-ANCH-1 INV-KEY-1 INV-KEY-2 INV-KEY-3 INV-KEY-4
     // INV-PRIV-1 INV-VOL-1 INV-LIM-1 INV-DISK-1
-    // INV-BR-1 INV-BR-2 INV-BR-3 INV-BR-4
+    // INV-BR-1 INV-BR-2 INV-BR-3 INV-BR-4 INV-BR-5
+    // INV-ADM-1 INV-ERA-13 INV-KEY-5 INV-LED-2 INV-PIPE-1 INV-PIPE-2 INV-POL-1 INV-PRUNE-1 INV-VIEW-3
     assert!(true, "traceability anchors are intentionally compiled");
 }

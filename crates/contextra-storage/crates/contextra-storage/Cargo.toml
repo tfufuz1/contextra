@@ -17,6 +17,9 @@ crossbeam-skiplist = { workspace = true }
 
 [dev-dependencies]
 contextra-crypto-ref = { path = "../contextra-crypto-ref", features = ["testing"] }
+contextra-storage-fs = { path = "../contextra-storage-fs" }
+contextra-keys-file = { path = "../contextra-keys-file" }
+contextra-keys-cohort = { path = "../contextra-keys-cohort" }
 
 [lints]
 workspace = true
