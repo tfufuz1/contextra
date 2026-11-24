@@ -18,4 +18,4 @@ Wichtig: Das Projekt scheiterte bisher an der sauberen Löschung darum wird der 
 Es ist also nichts final entschieden und du hast volle Entscheidungsfreiheit um aus Contextra ein hochwertiges sauber konzipiertes Produkt zu machen.
 
 
-Rust ist in der VM nicht installiert, und das Projekt verlangt Toolchain 1.89.`static.rust-lang.org` ist nicht erreichbar, `crates.io` dagegen schon. Nutze Umweg über conda-forge, da `conda.anaconda.org` in der Allowlist steht oder macromamba cd /tmp/cf && curl -s -O https://conda.anaconda.org/conda-forge/linux-64/micromamba-2.10.0-0.tar.bz2 && mkdir -p mm && tar -xjf micromamba-2.10.0-0.tar.bz2 -C mm && ls mm/bin && export MAMBA_ROOT_PREFIX=/tmp/mamba && (timeout 900 mm/bin/micromamba create -y -n rs -c conda-forge rust=1.100 c-compiler 2>&1 | tail -8); ls /tmp/mamba/envs/rs/bin | grep -E 'cargo|rustc' .
+Rust ist in der VM nicht installiert, und das Projekt verlangt Toolchain 1.89.`static.rust-lang.org` ist nicht erreichbar, `crates.io` dagegen schon. Falls apt nichts gibt, Nutze Umweg über conda-forge, da `conda.anaconda.org` in der Allowlist steht 
