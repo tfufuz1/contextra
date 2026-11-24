@@ -175,6 +175,30 @@ impl ErasureReceipt {
             TicketStatus::CompleteWithResidual(_) => 4,
             TicketStatus::Failed => 5,
         });
+        match self.residual {
+            None => buf.push(0),
+            Some(Residual::LogicalOnly) => buf.push(1),
+            Some(Residual::BoundedBackupKeys { until_utc }) => {
+                buf.push(2);
+                buf.extend_from_slice(&until_utc.to_be_bytes());
+            }
+            Some(Residual::WeakKeyAssurance) => buf.push(3),
+            Some(Residual::DeclaredHostOrDeviceExposure) => buf.push(4),
+        }
+        varint_put(&mut buf, self.measures.len() as u64);
+        for m in &self.measures {
+            buf.push(match m.kind {
+                MeasureKind::NoLiveRunBlobOrRedo => 1,
+                MeasureKind::MemtablesClean => 2,
+                MeasureKind::KeyProbeAbsent => 3,
+                MeasureKind::LedgerChainValid => 4,
+            });
+            buf.push(match m.status {
+                MeasureStatus::Complete => 1,
+                MeasureStatus::NotMeasured => 2,
+                MeasureStatus::NotImplemented => 3,
+            });
+        }
         buf
     }
 }
@@ -213,12 +237,52 @@ pub fn verify_receipt(
                 reason: "physical time preceded logical time",
             });
         }
+        if let Some(tc) = receipt.t_crypto {
+            if tp < tc {
+                return Ok(ReceiptVerdict::Invalid {
+                    reason: "physical time preceded crypto time",
+                });
+            }
+        }
     }
     if let Some(tv) = receipt.t_verified {
         if tv < receipt.t_logical {
             return Ok(ReceiptVerdict::Invalid {
                 reason: "verification time preceded logical time",
             });
+        }
+    }
+
+    // 2b. INV-VER-1: Complete / CompleteWithResidual requires complete mandatory measures
+    if matches!(
+        receipt.status,
+        TicketStatus::Complete | TicketStatus::CompleteWithResidual(_)
+    ) {
+        for m in &receipt.measures {
+            if m.status != MeasureStatus::Complete {
+                return Ok(ReceiptVerdict::Invalid {
+                    reason: "incomplete mandatory measurement for completed receipt",
+                });
+            }
+        }
+        if receipt.level == EraseLevel::Cryptographic {
+            let required = [
+                MeasureKind::NoLiveRunBlobOrRedo,
+                MeasureKind::MemtablesClean,
+                MeasureKind::KeyProbeAbsent,
+                MeasureKind::LedgerChainValid,
+            ];
+            for req in required {
+                if !receipt
+                    .measures
+                    .iter()
+                    .any(|m| m.kind == req && m.status == MeasureStatus::Complete)
+                {
+                    return Ok(ReceiptVerdict::Invalid {
+                        reason: "missing mandatory measurement for cryptographic receipt",
+                    });
+                }
+            }
         }
     }
 
