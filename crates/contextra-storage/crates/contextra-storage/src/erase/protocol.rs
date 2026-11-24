@@ -153,7 +153,7 @@ impl EraseCoordinator {
         }
 
         for id in &unique {
-            let entry = clusters.get(*id).ok_or(Error::UnknownCluster)?;
+            let _entry = clusters.get(*id).ok_or(Error::UnknownCluster)?;
             if let Some(res) = restrictions.get(id) {
                 res.ensure_erase_allowed(monotone_now)?;
             }
