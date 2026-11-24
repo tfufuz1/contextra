@@ -38,3 +38,7 @@ WP-13.1 atomarer Gate/Visibility (P1) · WP-13.2 Roll-forward ER4/ER6 (P2) · WP
 | WP-13.8 | Receipt-Statuscaps und `MeasureKind`-Bericht | 1.0 | WP-13.5, WP-04.7, WP-01.5 | P6 | Matrix Provider-Zusicherung × Status, `INV-VER-1`-Property, `verify_receipt` ohne Tomb-Schlüssel |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+Gate-Hülle und Restriction-/Scope-Vorbereitung laufen auf dem Aufruferthread; der Sequencer linearisiert Gate anhand von `policy_epoch`. Bei `Cryptographic` beginnt Purge erst nach bestätigtem `Absent`, nie bei `Disabled`. `ClusterLocal` begrenzt Run-/Blob-Survivor-Rewrites, nicht gemeinsames Redo, Pins oder Checkpoints. Sealed-Hygiene darf physisch amortisieren, die Unlesbarkeit beginnt aber nach `KeysDestroyed`; `Done` verlangt die vorgeschriebene Ciphertext-Entfernung und Owner-Atteste.

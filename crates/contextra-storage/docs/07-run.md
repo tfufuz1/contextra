@@ -83,3 +83,7 @@ Keine `unwrap/expect/panic/indexing`; jeder Decoder Fuzz-Ziel; `rawcopy_roundtri
 | WP-07.6 | RAM-Präfixsummen beim SubIndex-Laden + H-4-Messung | 0.5 | WP-07.5 | P4 | `page`-Property gegen Referenzmodell unverändert; Budget-Test; H-4-Bericht trennt Aufbau/Traversierung |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+Der Run-Reader besitzt den branch-bewussten Filter `(branch, user_key)`, `BranchTableBlock` und Chain-Resolve mit Early-Exit; die Standardtiefe ist 4, die harte Grenze 8. `ClusterIndex` bleibt inklusive Admission höchstens 40 B pro Eintrag bei angenommener Füllung ≈ 0,9 (H-25 belegt dies), Directory und Filter sind sparse, und `MiniSection` ersetzt für Kleinstcluster mehrere Rahmen. Sealed-Gewichte und Tokenprofile stehen ausschließlich in versiegelten SubIndex-Blöcken; Präfixsummen entstehen im RAM.

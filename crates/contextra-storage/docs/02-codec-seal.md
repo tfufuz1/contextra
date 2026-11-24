@@ -5,7 +5,7 @@
 | Modul | `contextra-storage/src/codec/` |
 | Besitzt | `varint`, `tags`, `checksums`, `comparator` (`cmp`), `seal` (SealFrame, AAD-Builder, KDF-Labels), Dateikopf, `FORMAT`- und `KEYS`-Codec |
 | Konsumiert | SP-PORTS (`Cipher`, `Kdf`, `Mac`, `Checksum`) |
-| Spec-Bezug | R8 §4.2, §5.2, §5.3, §5.4 (FORMAT/KEYS), INV-FMT-1, INV-SEAL-1, INV-PRIV-1 |
+| Spec-Bezug | R9.1 §4.2, §5.2–§5.4 (FORMAT/KEYS), INV-FMT-1, INV-SEAL-1, INV-PRIV-1 |
 | Phase | P0 (Primitive), P1 (Seal), G-F (Freeze) |
 
 ## 1 Auftrag und Abgrenzung
@@ -49,3 +49,7 @@ Proptest: `varint` Rundreise + Nicht-Kanonizität; `cmp` ≡ Referenz (Tupelordn
 
 ## 8 Abnahme
 Keine `unwrap/expect/panic/indexing`; 100 % der Decoder haben Fuzz-Ziel; alle Formatfehler typisiert.
+
+## R9.1-Synchronisierung
+
+`derive_subkey_fast` darf im SealFrame-Pfad nicht existieren: XChaCha20-Poly1305 erhält den bereits scope-/epoch-spezifischen Schlüssel direkt, `Authenticated` verwendet domain-separiertes HMAC-SHA256 über Modus, Nonce, AAD und Payload. Die G-F-Vektoren müssen diese Byteordnung und Schlüsselwahl unabhängig beweisen. R9.1 ändert kein Format; Referenznamen verwenden `OP*` für Recovery und `RACE-*` für Nebenläufigkeit.

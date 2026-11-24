@@ -1,4 +1,4 @@
-# INDEX — Implementierungsspezifikationen `contextra-storage` (R8.2)
+# INDEX — Implementierungsspezifikationen `contextra-storage` (R9.1)
 
 | | |
 |---|---|
@@ -37,7 +37,7 @@
 | CKPT | 22 | `checkpoint/` | P6 |
 | FACADE | 23 | `lib.rs`, `config`, `spaces`, Metrik-/Observer-Katalog | P1–P8 |
 | CUTOVER | 24 | `tools/migrate`, Umstellungsplan | P8+ |
-| AUDIT | 25 | SPEC.md §12.8 Audit-Remediation, Querschnittsverfolgung | vor G-0/G-F, danach je Besitzer-SP |
+| AUDIT | 25 | SPEC.md §12.8 sowie Anhang B.2/B.3: Audit-Remediation und Revisions-Traceability | vor G-0/G-F, danach je Besitzer-SP |
 
 Regeln: Ein Typ, der ≥ 2 SPs teilen, steht in PORTS. Ein Dateiformat gehört dem SP, dessen Datei es ist; Primitive (varint, Siegel, Tag) immer CODEC. Kein SP ruft einen höheren SP (Layering-Test `layering`, Richtung wie SPEC §3.1).
 
@@ -119,9 +119,9 @@ Kritischer Pfad bis G-F: 01.1 → 01.2 → 02.1 → 03.1 → 03.2 → 05.1 → 0
 ## 5 Aufwand (PW, Summe je SP; Schätzung, keine Zusage)
 01–05 ≈ 39 · 06: 8 · 07: 11 · 08: 7 · 09: 9 · 10: 12 · 11: 12 · 12: 9 · 13: 12 · 14: 8 · 15: 18 · 16: 12 · 17: 8 · 18: 12 · 19: 8 · 20: 6 · 21: 12 · 22: 7 · 23: 8 · 24: 10 ⇒ **≈ 266 PW** (≈ 15 Monate bei 4 Entwicklern + 1 Test; deckt SPEC §14 ± Verifikationsaufwand).
 
-## 3 R8.2-Arbeitspakete (Ergänzung zum Graphen)
+## 3 Revisionsarbeitspakete (Ergänzung zum Graphen)
 
-Normativ: SPEC §12.8 Punkte 27–35 (E-74…E-82), Konfliktregister K-29…K-32. Jeder SP führt seine Pakete in seinem „R8.2-Nachtrag“; Zuordnung und Abnahmen im Audit-Register A-25…A-34.
+Normativ: SPEC §12.8, Anhang B.2 und B.3. Jeder SP führt die ihm zugewiesenen Ergänzungen im Revisionsnachtrag; Zuordnung, Reihenfolge und Abnahmen stehen im Audit-Register. Bei Widerspruch gilt ausdrücklich SPEC §15 vor §12.8 vor dem übrigen Text der SPEC.
 
 | WP | SP | Phase | Voraussetzung | Inhalt |
 |---|---|---|---|---|

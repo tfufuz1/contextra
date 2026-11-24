@@ -37,3 +37,7 @@ WP-15.1 Forbidden API/layering (P0) · WP-15.2 FaultFs/Crash harness (P0) · WP-
 | WP-15.10 | R8.2-Testlücken: Orakel-Messarten, Modelle (Poisoned/Tomb/Lease), Pruner-Property, H-23 | 2.0 | WP-15.3, WP-13.7, WP-20.4, WP-11.6 | P6 | neue INV-IDs von Verhaltenstests zitiert, H-23-Bericht |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+Die Referenzmodelle und Simulation decken `RACE-1` bis `RACE-22` ab, insbesondere Intake/Leader-Wechsel, Pipeline-Credits, Guard-Fenster, Link-, Gate- und Space-Drop-Races. G-F enthält den Branch-Filter-/`BranchTableBlock`-Spike sowie Admission-/MiniSection-Vektoren. H-24 bis H-28 bleiben Hypothesen: sie dürfen nur mit reproduzierbarer Evidenz als erfüllt markiert werden.

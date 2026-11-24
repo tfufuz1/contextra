@@ -22,3 +22,7 @@ Keine Stamp-Vergabe hier. Keine Sperre bei Observer-/Provider-Rückrufen. Locks 
 
 ## 5 Arbeitspakete
 WP-09.1 Memtable-Schnittstelle + Partitionierung (P1) · WP-09.2 Version/Registry Publikationsprotokoll (P1, ENV) · WP-09.3 Graveyard + Arc-Reclamation (P2, RUN/CATALOG) · WP-09.4 Floor/Branch/Hold Integration (P5–P7). Abnahme: kein unlink bei lebender Version; keine Mischsicht.
+
+## R9.1-Synchronisierung
+
+Die Pipeline publiziert ausschließlich nach erfolgreichem Sync in Stamp-Reihenfolge. Gate erhöht die Cluster-Generation, hängt die Clusterpartition aus und verhindert neue Zugriffe; aktive Leser werden epoch-basiert abgewartet oder als Restexposition ausgewiesen. Unkontrollierte Klartext-Clone-Pfade sind verboten; Zeroizing allein ist kein Vollständigkeitsbeweis.

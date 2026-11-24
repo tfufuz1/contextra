@@ -22,3 +22,7 @@ INV-ID-1/2, INV-CLAIM-1, INV-PL-1…5, INV-SEAL-1, INV-ERA-10. Tests: Restart/ID
 
 ## 5 Arbeitspakete
 WP-12.1 Register/ClusterSpec/list (P1) · WP-12.2 Links + transitiver Abschluss (P6) · WP-12.3 Restrictions/LiftPolicy (P6) · WP-12.4 Packgruppenregeln + Claim (P6). Abnahme: Restriction nicht umgehbar; Erase-Abschluss stabil zum Gate-Zeitpunkt.
+
+## R9.1-Synchronisierung
+
+`ClusterSpec` ist vollständig mit `protection`, `tenant_tag`, `due` und Placement-/Admission-Daten definiert. Link-Admission begrenzt für jeden Vorfahren die transitive Löschhülle auf `max_gate_clusters = 4096`; Berechnung erfolgt außerhalb Rang 1, der Sequencer revalidiert die Graph-Generation. Cross-subject-Kaskaden sind unzulässig. `ClusterLocal` ist nach Admission eine Pure-Zusage, ausgenommen von Pure-Demotion; FD-Cache, Verzeichnis-Sharding, Quoten und `max_live_files` schützen vor Datei-/FD-Explosion.

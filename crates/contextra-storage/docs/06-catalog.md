@@ -63,3 +63,7 @@ INV-CAT-1 (Property: Datei lebendig ⇔ `files_add` ohne `files_remove`, Modell 
 
 ## 8 Abnahme
 Crash-Sweep ohne Verstoß; Op-Vollständigkeit gegen §5.8 per Tag-Tabellentest; goldene Vektoren nach G-F; kein `indexing`.
+
+## R9.1-Synchronisierung
+
+Purge bleibt pro Datei/Inkarnation nachvollziehbar: `PurgeBatchEdit` installiert jede Ersetzung, `files_remove` pinnt persistent im Graveyard, `UnlinkAckEdit` folgt erst nach Reader-Drain, Unlink und `sync_dir`; allein `PurgeCompleteEdit` darf den Ticket-Abschluss setzen. Open/Recovery heißt OP1…OP10; keine Catalog-Operation hält Rang 1.

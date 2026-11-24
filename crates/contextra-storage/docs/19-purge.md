@@ -24,3 +24,7 @@ INV-PL-2/4, INV-ERA-2/3/6/11, INV-CLAIM-1, INV-CAT-1/2, INV-GRAVE-1. Crash-Sweep
 
 ## 5 Arbeitspakete
 WP-19.1 Packgruppen-Purge und `PurgeBatchEdit` (P2) · WP-19.2 Graveyard/Reader-Drain/Unlink-Ack und `PurgeCompleteEdit` (P6) · WP-19.3 Plain barrier, bounded scratch und deadline (P6). Abnahme: kein lebender Run/Redo/Memtable enthält purged Cluster; pro-Datei-Zustandsautomat konvergiert bei Crash; Kosten- und Platzgrenzen werden je Lokalitätsmodus sowie separat für Redo, Pins und Extensions belegt.
+
+## R9.1-Synchronisierung
+
+`PurgeBatchEdit` ist je Datei/Inkarnation Pflicht; vollständig tote Dateien werden direkt entfernt, aber erst nach Reader-Drain und `sync_dir` bestätigt. `PurgeCompleteEdit` folgt erst bei leerem Ticket-Graveyard, finalem Verify und allen Extension-Attesten. `punch_hole` ist optional: Blob-Repack wird ab Hole-Ratio-/Fragmentgrenze in neue Inkarnation geschrieben; für Plain signalisiert die Barriere Consumer-Epoch/`Lagged` explizit.

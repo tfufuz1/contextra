@@ -1,7 +1,7 @@
-# R8.1 trace register
+# R9.1 trace register
 
 This is an evidence register, not a normative source.  The normative source is
-`SPEC.md` R8.1.  Status means *implementation plus the specified verification*,
+`SPEC.md` R9.1. Status means *implementation plus the specified verification*,
 never merely that a module compiles.
 
 ## Environment and baseline

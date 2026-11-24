@@ -82,3 +82,7 @@ Kein `std::fs`/`SystemTime`/`rand` im Kern (Lint grün); Konformanzsuite auf all
 | WP-03.9 | `HostProbe` für Linux-`RealFs` und Test-Fs | 1.0 | WP-03.3, WP-01.5 | P5 | Unit-Tests mit `FaultFs`-Reports; `Unknown` bleibt `Unknown`; kein Probe-Aufruf unter Kernsperren (Lock-Rang-Test) |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+Der Notpool ersetzt jede Rang-1/Rang-3-Doppelhaltung. `Fs`-Konformanz und Open-Admission prüfen zusätzlich FD-/Dateigrenzen, vorallokierte Purge-Scratch-Slots sowie CoW-/Quota-Eignung, wenn eine harte DiskFull-Purge-Zusage konfiguriert wird. Recovery- und Race-Bezeichner sind `OP*` beziehungsweise `RACE-*`.

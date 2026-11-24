@@ -118,6 +118,8 @@ pub struct Ticket([u8; 16]);
 
 impl Ticket {
     pub fn from_bytes(raw: [u8; 16]) -> Self { Self(raw) }
+    /// Canonical wire representation for durable internal records.
+    pub fn as_bytes(&self) -> &[u8; 16] { &self.0 }
 }
 
 impl fmt::Debug for Ticket {
@@ -132,6 +134,8 @@ pub struct TombId([u8; 32]);
 
 impl TombId {
     pub fn from_bytes(raw: [u8; 32]) -> Self { Self(raw) }
+    /// Canonical wire representation for the ledger only.
+    pub fn as_bytes(&self) -> &[u8; 32] { &self.0 }
 }
 
 impl fmt::Debug for TombId {

@@ -22,3 +22,7 @@ INV-CAT-1/2, INV-PL-1…5, INV-GRAVE-1/2, INV-BLOB-1. Crash-Sweep für Flush/Com
 
 ## 5 Arbeitspakete
 WP-16.1 Flush und Catalog-Kopplung (P2) · WP-16.2 Compactiongruppen (P5) · WP-16.3 Blob GC (P5) · WP-16.4 Scrub/Integritätsisolierung (P5) · WP-16.5 Scheduler/Reservebudget (P5). Abnahme: lebende Daten erhalten, obsolete Dateien referenzsicher entfernt.
+
+## R9.1-Synchronisierung
+
+Staging nutzt Spill-Schwelle und Altersgrenze statt sofortigem Entmischen; Compaction kann Purge-Arbeit huckepack übernehmen. Sealed-Hygiene hat eine eigene Lane, und `t_crypto` sowie `t_physical` werden getrennt gemessen. Purge-Scratch ist vorallokiert und getrennt geschützt; CoW-/Quota-Nachweise sind Voraussetzung für eine harte DiskFull-Zusage.

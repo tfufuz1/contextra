@@ -35,3 +35,7 @@ WP-22.1 manifest/snapshot capture (P6) · WP-22.2 optional hardlink/reflink (P6)
 | WP-22.4 | `BackupMark` im Manifest, Restore-Floor-Prüfung, Epochen-Matching | 1.0 | WP-22.3, WP-20.4 | P6 | Restore-Test: Kopie unter Floor abgelehnt, ohne Marke abgelehnt bei Retire, zwei Epochen korrekt abgeglichen |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+R9.1 ändert kein Checkpointformat. Restore führt vor Schreiböffnung zusätzlich die R9-Open-Admission aus und verarbeitet unvollständige `PurgeBatchEdit`-/Graveyard-Zustände roll-forward. Fehlende Owner-, Ledger-, Anker- oder Fencing-Nachweise bleiben `RestoreQuarantine`; sie dürfen nicht durch eine lokale Dateiprüfung ersetzt werden.

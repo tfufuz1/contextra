@@ -62,3 +62,7 @@ F-3 (Sync/Write EIO ⇒ Poisoned, alle Changes der Gruppe `Indeterminate`), F-2 
 
 ## 8 Abnahme
 Crash-Sweep ohne Verstoß; kein `unwrap/expect/panic/indexing`; jeder Decoder mit Fuzz-Ziel; Goldene Vektoren nach G-F.
+
+## R9.1-Synchronisierung
+
+Der Syncer ist der einzige Redo-Schreiber und schreibt/synchronisiert Gruppen strikt in Stamp-Reihenfolge; der Sequencer führt keine E/A aus. Control-Frames (`Link`, Restrict/Lift, Gate und Branch-Ops) werden durch den Sequencer total geordnet. Sealed-Redo-Operations sind unter Cluster-Key-Epoche versiegelt, während der RootKey-Redo-Schlüssel ausschließlich die Ketten-MAC schützt.

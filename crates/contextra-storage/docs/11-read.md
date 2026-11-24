@@ -35,3 +35,7 @@ WP-11.1 View-Snapshot und Punktlese (P1) · WP-11.2 Iterator/Merge + Tombstone (
 | WP-11.6 | View-Lease, `renew`, `SnapshotTooOld`; Pruner-Hook in `page`/`Cursor` | 1.5 | WP-11.4, WP-01.5 | P4 | Lease-Ablauf-Test mit Sim-Clock, Graveyard-Freigabe nach Ablauf, Cursor-Abbruch zwischen Blöcken, Property „mit Pruner ≡ ohne Pruner“ (`INV-PRUNE-1`), `INV-VIEW-3` |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+Lesen prüft Gate/Generation vor Payload und erneut vor Ausgabe. Nach einem Gate ist `Shredded` nicht beobachtbar: Ergebnis ist `Erased`, `KeyUnavailable` oder `KeyLost`. Branch-Resolve nutzt den branch-bewussten Run-Index; View-Lease-Ablauf bleibt von `BelowFloor` getrennt und ergibt `SnapshotTooOld`.

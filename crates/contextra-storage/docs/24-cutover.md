@@ -59,3 +59,7 @@ Die übrigen Crates (`contextra-db`, `-agent`, `-engine`, `-graph` u. a.) bauen 
 | WP-24.8 | R8.2-Caller-Matrix: Fehlerpfade, Backup-Marken, Production-Anforderungen, Cache-Konvention | 1.0 | WP-24.1, WP-23.5 | P8 | Matrix ohne ungeklärte Semantik, Runbook-Review |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+Die Caller-Matrix umfasst die R9-Fehler und Rückdruckpfade (`GuardRetry`, `ClusterMetaBudget`, `ClusterRetired`, `EraseFanoutExceeded`, FD-/Scratch-Admission) und die branch-bewusste Lesesemantik. Cutover-Evidenz trennt bestätigte Messungen von H-24…H-28-Designzielen; kein Bericht darf diese Hypothesen als Produktionswerte ausgeben.

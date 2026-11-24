@@ -36,3 +36,7 @@ WP-14.1 Format/Catalog/Redo Open-Reihenfolge (P1) · WP-14.2 Replayfloor/Torn-ta
 | WP-14.4 | R8.2-Open/Restore: `LedgerUnavailable`, Poisoned-Intents in R8, Epochen-Matching, `BackupBeyondHorizon` | 1.5 | WP-14.3, WP-20.4 | P6 | Absturzmatrix um R2a/R8-Fälle erweitert, Restore-Reconcile mit zwei Epochen und einem Retire |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+Recovery-Schritte heißen verbindlich OP1…OP10. Sie lösen vor Sichtbarkeit `Indeterminate`-Gruppen, Ledger-Intents und ausstehende Purge-Batches vorwärts auf; ein Zwischenbatch kann nie `Done` bedeuten. Open führt Cluster-Index-/Datei-Admission aus und bleibt bei Anker-, Ledger-, Schlüssel- oder Owner-Abweichungen in ReadOnly bzw. `RestoreQuarantine`.

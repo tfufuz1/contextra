@@ -5,7 +5,7 @@
 | Crate | `crates/contextra-storage-ports` (keine Logik, `#![forbid(unsafe_code)]`) |
 | Besitzt | alle Werttypen und Traits, die ≥ 2 Komponenten teilen; das `Storage`-Fassadenprofil (Signaturen, nicht Rümpfe) |
 | Konsumiert | nichts (nur `bytes`, `zeroize`, `thiserror`) |
-| Spec-Bezug | R8.2 §3.2, §3.5, §4.7, §9.4, §12, §15–16 |
+| Spec-Bezug | R9.1 §3.2, §3.5, §4, §6, §9.4, §12, §15–16 |
 | Phase | P0, Gate G-0 (API-Review-Freeze) |
 
 ## 1 Auftrag und Abgrenzung
@@ -97,3 +97,10 @@ Besitzer der geteilten R8.2-Typen (E-74, E-76…E-81; Spec R8.2 §3.2, §3.5, §
 | WP-01.5 | R8.2-Typen (`KeyProvider`-Angleichung, `HostProbe`, `BlockPruner`/`PruneContract`, `MeasureKind`, `BackupMark`, neue Fehlerklassen) | 1.0 | WP-01.2 | P0 (vor G-0) | Mock-Impl je Trait, Layering-Test, `trybuild`-Negativtests, Konformanz-Skelett `KeyProviderConformance` für Tomb-Methoden |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+- `BranchId`-Vergabe ist monoton, clusterlokal und endet bei `u32::MAX` mit `Exhausted`; Default-Tiefe ist 4, harte Grenze 8. `Eraser::branch` gehört in `impl Eraser`, nicht in `impl Storage`.
+- `KeyProvider::list` liefert `KeyListEntry { cluster, created_utc }`, damit `orphan_key_grace` berechenbar ist. `ClusterSpec` enthält vollständig `protection`, `tenant_tag`, `due` und die Admission-relevanten Felder aus SPEC §4.3.
+- Die gemeinsamen Fehler-/Statusverträge unterscheiden `Erased`, `KeyUnavailable`, `KeyLost` und Clusterzustand `Shredded`; `Shredded` ist kein lesbarer Fehler. `Disabled` bestätigt keine Schlüsselvernichtung und erlaubt keinen Cryptographic-Purge.
+- Ergänzt werden Pipeline-/Admission-Typen: Intake-Credits, `policy_epoch`, `GuardRetry`, `ClusterMetaBudget`, `ClusterRetired`, `EraseFanoutExceeded` und getrennte Resource-Klassen für Cluster-Metadaten, FD-/Datei-Admission und Purge-Scratch. Alle müssen vor der jeweiligen Allokation/Mutation prüfbar sein.

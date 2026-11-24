@@ -41,3 +41,7 @@ WP-20.1 Ledgerappend + Hashkette (P1) · WP-20.2 Rotation/seg_digest/ColdTier (P
 | WP-20.4 | Tomb-Epochen: Format-Slot, Events, Rotation, Retire-Ablauf, `restore_floor`, Same-Device-/Unavailable-Prüfung | 2.5 | WP-20.1, WP-04.7 | Slot vor G-F, Ablauf P6 | Goldene Vektoren, Crash-Matrix des Retire, `INV-LED-2`, `verify_receipt` ohne Tomb-Schlüssel |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+R9.1 ändert das Ledger-Format nicht. Die Terminologie verwendet OP1…OP10; die Reihenfolge bleibt Ledger-Intent < Gate < `GateApplied`/Anchor < KeyDestroy < Purge. Der Ledger-Writer protokolliert außerdem Owner-Timeouts und hält solche Tickets `Blocked`; ein fehlendes Attest kann nicht als `CompleteWithResidual` maskiert werden, wenn es zum Vertrag gehört.

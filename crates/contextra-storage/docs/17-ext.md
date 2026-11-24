@@ -36,3 +36,7 @@ WP-17.1 durable Feed/Watermarks (P5) · WP-17.2 ExtensionBlock IO/Manifestklasse
 | WP-17.7 | Konformanztest Derivation-Cache-Konvention | 0.5 | WP-17.3 | P6 | Canary-Test nach Cluster-Erase, Cross-Cluster-Nichttreffer |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+Ein `SegmentOwner` deklariert Schutzdomäne, Löschgranularität, RAM-Budget, Rewrite-/Rebuild-Grenze und Attestationsformat zusätzlich zur `SegmentClass`. Owner-Aufrufe haben Deadline und Fencing-Generation; Timeout bleibt `Blocked` mit Ledger-Ereignis und verhindert `Done`. Persistente Derivat-Consumer müssen registriert sein. `watermark` bestätigt ausschließlich `durable_stamp`; die Query-Fassade erzwingt `filter_visible` nach Kandidatenfund und vor Ausgabe.

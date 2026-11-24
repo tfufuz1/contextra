@@ -24,3 +24,7 @@ Blob-Inhalt eines Sealed-Clusters ist mit dessen Clusterschlüssel versiegelt. A
 
 ## 5 Arbeitspakete
 WP-08.1 Format + Frame-Codec (P4, CODEC/ENV) · WP-08.2 Writer/Rotation (P4, WP-08.1) · WP-08.3 Reader + KeyScope (P4, WP-08.1) · WP-08.4 Referenzabgleich/GC-Index (P5, RUN/CATALOG). Abnahme: Referenz kann nicht auf andere Inkarnation zeigen; Bitflips werden erkannt; keine Inhalts-Hashes.
+
+## R9.1-Synchronisierung
+
+Blob-AAD bindet ausschließlich stabile `record_uid`, `instance_id`, `space_id`, `cluster_id` und `key_epoch`, niemals `blob_id` oder Offset. Survivor-Rohkopie in eine neue Blob-Inkarnation bleibt dadurch gültig; neue Positionen erhalten eigene CRC/Directory. Purge nutzt bei zu hohem Hole-Anteil Repack statt verpflichtendem Hole-Punch.

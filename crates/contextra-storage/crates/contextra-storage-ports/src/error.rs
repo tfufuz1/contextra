@@ -62,6 +62,8 @@ pub enum Error {
     Restricted,
     #[error("Guard-Konflikt")]
     Conflict,
+    #[error("Guard-Snapshot ist veraltet; mit frischer Sicht erneut validieren")]
+    GuardRetry,
     #[error("Change überschreitet das zulässige Formatlimit")]
     ChangeTooLarge,
     #[error("Idempotenz-Token wurde mit anderem Inhalt wiederverwendet")]
@@ -112,7 +114,7 @@ impl Error {
             | Self::BranchHasChildren | Self::Lagged | Self::EraseFanoutExceeded | Self::ClockUncertain
             | Self::Erased { .. } => ErrorClass::Usage,
             Self::ReservedSpace | Self::Exhausted => ErrorClass::Usage,
-            Self::CasLost | Self::Conflict | Self::IdemConflict => ErrorClass::Conflict,
+            Self::CasLost | Self::Conflict | Self::IdemConflict | Self::GuardRetry => ErrorClass::Conflict,
             Self::Rollback => ErrorClass::Rollback,
         }
     }
@@ -121,6 +123,7 @@ impl Error {
         match self {
             Self::Transient { .. } | Self::Io { .. } => "Mit Backoff erneut versuchen",
             Self::DiskFull => "Platz schaffen oder Erase-Reserve prüfen",
+            Self::GuardRetry => "Mit einer frischen Sicht erneut validieren",
             Self::Poisoned { .. } => "Speicher neu öffnen; Wiederholung nie auf demselben Handle",
             Self::Indeterminate { .. } => "Store neu öffnen und denselben IdemToken zum Auflösen wiederverwenden",
             Self::Corrupt { .. } => {

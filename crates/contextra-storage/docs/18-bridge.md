@@ -30,3 +30,7 @@ WP-18.1 Blocking executor + idempotent async apply (P6) · WP-18.2 Key/space map
 **Spec-Bezug ergänzt:** R8.2 §9.7, §13.2.1; E-77, E-80.
 
 Der `DeletionProof` (v15) übernimmt aus dem `ErasureReceipt` Status, Statuscaps (`BoundedBackupKeys`, `WeakKeyAssurance`, Host-/Geräterest) und `MeasureKind` je Messung unverändert; die Bridge darf einen Cap weder entfernen noch einen `Declared`-Befund als „verifiziert“ formulieren. Neue Fehlerklassen (`SnapshotTooOld`, `ErasePending`, `BackupBeyondHorizon`, `LedgerUnavailable`, `LedgerSameDevice`, `ProviderAssuranceInsufficient`) werden 1:1 auf Bridge-Fehler abgebildet. Keine neuen Arbeitspakete; die Abbildung wird in WP-18.4 mitgeführt.
+
+## R9.1-Synchronisierung
+
+Die Bridge darf `KeysDestroyed` nicht als physisches oder systemweites `Done` umdeuten: Ciphertext-Entfernung, Rebuildable-Owner und alle Atteste bleiben Voraussetzungen. Alle Leistungswerte sind Designhypothesen; die Pipeline- und Admission-Nachweise werden im Kern geführt und dürfen nicht als gemessene Bridge-Eigenschaft ausgegeben werden.

@@ -22,3 +22,7 @@ INV-STAMP-1/2/3, INV-ATOM-1, INV-COMMIT-2, INV-GUARD-1, INV-VOL-1, INV-LIM-1, IN
 
 ## 5 Arbeitspakete
 WP-10.1 Validierung/Limit-Gate + Guard API (P1) · WP-10.2 Sequencer/Stamp-Reserve (P1, CATALOG) · WP-10.3 Redo-Gruppencommit und Publish (P1, REDO/MEMVER) · WP-10.4 GuardWindow + Intervallguards (P3) · WP-10.5 Idempotenz-Space/Trim/Recovery (P1–P3, CATALOG) · WP-10.6 Volatile-Regeln + durable barrier (P3). Abnahme: Crash-Sweep und atomare Mehr-Space-Referenzmodellgleichheit.
+
+## R9.1-Synchronisierung
+
+Committer bezeichnet Sequencer plus Syncer. Intake wird unter Rang 2 angehängt; der Sequencer übernimmt per Leader-Protokoll unter Rang 1 nur vorbereitete RAM-Arbeit, vergibt Stamps und prüft `policy_epoch` sowie Guard-Deltas. Stufe A prüft Guards exakt auf dem Aufruferthread, Stufe B ausschließlich gegen das Konfliktfenster und liefert nur `GuardRetry`. Idempotenz ist ein impliziter `Absent`-Guard auf SYS_IDEM; Ergebnisse bleiben bis TTL plus durablem `idem_trim` unabhängig vom Replay-Floor erhalten.

@@ -1,6 +1,6 @@
-# Phasenstatus — contextra-storage R8.1
+# Phasenstatus — contextra-storage R9.1
 
-Die Reihenfolge und Gates folgen [00-INDEX.md](00-INDEX.md), `SPEC.md` §14 und dem Audit-Addendum `crates/contextra-storage/SPEC.md` §12.8. Die Anforderungen sind in [25-r8-audit-remediation.md](25-r8-audit-remediation.md) den Besitzer-SPs zugeordnet. Ein Phasenabschnitt wird erst als abgeschlossen markiert, wenn Implementierung, spezifizierte Verifikation und Gate-Evidenz vorliegen. Eine grüne Kompilierung allein schließt keine Phase ab.
+Die Reihenfolge und Gates folgen [00-INDEX.md](00-INDEX.md), `SPEC.md` §14 sowie dem Audit-Register (§12.8, Anhang B.2/B.3). Die Anforderungen sind in [25-r8-audit-remediation.md](25-r8-audit-remediation.md) den Besitzer-SPs zugeordnet. Ein Phasenabschnitt wird erst als abgeschlossen markiert, wenn Implementierung, spezifizierte Verifikation und Gate-Evidenz vorliegen. Eine grüne Kompilierung allein schließt keine Phase ab.
 
 | Phase | Stand | Umfang / offene Abnahme |
 |---|---|---|

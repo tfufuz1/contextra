@@ -37,3 +37,7 @@ WP-23.1 Config/open skeleton (P1) · WP-23.2 komplette Typisierte API (P3–P6) 
 | WP-23.5 | R8.2-Fassade: Config/`OpenProfile`, `erase_epoch`, `backup_mark`, `renew`, Poisoned-Erase-Pfad, Fehler, Metriken | 1.5 | WP-23.2, WP-13.7, WP-20.4 | P6 | Config-Validierungstests, Leakage-/Kardinalitätstest der neuen Metriken, `hint()`-Katalogtest |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+`Config::validate` prüft vor I/O die gemeinsamen RAM-, Cluster-Metadaten-, Datei-/FD- und Purge-Scratch-Budgets, `max_live_files`, ClusterLocal-Admission sowie die konsistenten harten Limits `max_body_bytes = 4 MiB`, `max_change_bytes = 8 MiB` und `max_body_bytes ≤ max_change_bytes / 2`. Metriken unterscheiden Stufe-A-Konflikte, `GuardRetry` und Fensterfuß-Treffer; einen Sequencer-„Slowpath“ gibt es nicht. Alle neuen Leistungswerte bleiben Hypothesen bis zum Gate-Nachweis.

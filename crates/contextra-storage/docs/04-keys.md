@@ -5,7 +5,7 @@
 | Crates | `contextra-storage/src/keys/` (KeyCache, Wrapper), `contextra-crypto-ref`, `contextra-keys-file`, `contextra-keys-cohort` |
 | Besitzt | Referenzimplementierungen von `Cipher/Mac/Kdf/Checksum`; `MemKeyProvider`; `KeyProviderConformance`; Schlüsselcache mit Generationszähler; RootKey-/Space-DEK-Umhüllung; Epochenrotation |
 | Konsumiert | SP-PORTS, SP-CODEC (nur Formate von `KEYS`), SP-ENV (`Entropy`, `Clock`) |
-| Spec-Bezug | R8 §5.2, §9.4, §11.5, §13.1; INV-KEY-1…4, INV-ERA-7 (Schlüsselseite), AN-06/07 |
+| Spec-Bezug | R9.1 §5.2, §9.4, §11.5, §13.1; INV-KEY-1…5, INV-ERA-7 (Schlüsselseite), AN-06/07 |
 | Phase | P0 (Primitive, Mem-Provider, Konformanz), P1 (Cache), P6 (`keys-file`, `keys-cohort`) |
 
 ## 1 Auftrag und Abgrenzung
@@ -78,3 +78,7 @@ Kein Schlüsselmaterial außerhalb `Zeroizing`/Provider (Test mit Canary-Schlüs
 | WP-04.7 | Provider-Angleichung R8.2: `info()` mit `KeysInBackups`/`KeyAssurance`, Tomb-Epochen in `keys-file`, `keys-cohort`, `SimKms`, Konformanz | 2.0 | WP-04.2, WP-01.5 | P6 (Tomb/Assurance-Deklaration schon P0 im `MemKeyProvider`) | Konformanzsuite grün, Canary-Test ohne Tomb-Schlüssel in Dateien, Retire-Crash-Matrix |
 
 PW = Personenwochen, grobe Schätzung ohne Zusage (wie SPEC §14).
+
+## R9.1-Synchronisierung
+
+`destroy_many` wird für Gate-Hüllen in bestätigte Batches von höchstens 256 Clustern geteilt. Nur `probe == Absent` erfüllt Crypto-Erasure: `Unavailable` blockiert, `Lost` quarantänisiert bzw. ergibt `Incomplete`, `Disabled` bleibt `KeyDestroying`/`Blocked` und erlaubt ausschließlich Planung. `list` enthält `created_utc`; Tomb-Schlüssel bleiben außerhalb von KEYS und Backups.
