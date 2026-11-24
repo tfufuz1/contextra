@@ -418,6 +418,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-kvcache"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bincode",
+ "blake3",
+ "bytes",
+ "contextra-crypto",
+ "contextra-ports",
+ "contextra-types",
+ "criterion",
+ "lru",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "contextra-mvcc"
 version = "0.1.0"
 dependencies = [
@@ -546,7 +569,6 @@ dependencies = [
  "ahash",
  "bincode",
  "blake3",
- "contextra-mvcc",
  "contextra-ports",
  "contextra-sys",
  "contextra-types",

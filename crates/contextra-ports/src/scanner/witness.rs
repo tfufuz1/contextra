@@ -94,8 +94,8 @@ impl LayerWitness {
     }
 }
 
-/// Hilfsfunktion zur Witness-Erzeugung ausschließlich für Testzwecke (`testkit`-Feature).
-#[cfg(any(test, feature = "testkit"))]
+/// Hilfsfunktion zur Witness-Erzeugung ausschließlich in Crate-Tests.
+#[cfg(test)]
 pub fn mint_witness_for_testkit(
     layer: WitnessLayer,
     scanned: u64,

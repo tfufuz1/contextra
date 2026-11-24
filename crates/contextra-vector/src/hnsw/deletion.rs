@@ -299,23 +299,6 @@ impl GhostFreeVectorIndex for HnswIndex {
 }
 
 impl HnswIndex {
-    /// Removes a document from the vector index by its 64-bit ID.
-    ///
-    /// Executes tombstone insertion, immediate slot zeroization (`INV-VEC-ZEROIZE-1`),
-    /// and budgeted neighborhood graph repair (`INV-VEC-CONNECTIVITY-1`).
-    ///
-    /// Returns `Ok(true)` if the document was found and removed, or `Ok(false)` if
-    /// it was not found or already deleted.
-    #[allow(deprecated)]
-    pub fn remove(&mut self, id: &u64) -> Result<bool> {
-        let doc_id = DocId::new(*id);
-        match self.remove_with_graph_repair(doc_id) {
-            Ok(_) => Ok(true),
-            Err(ContextraError::GraphRepairFailed(HnswDeletionError::NodeNotFound(_))) => Ok(false),
-            Err(e) => Err(e),
-        }
-    }
-
     /// Internal helper method to perform a verification scan across the 2nd-order neighborhood
     /// bounded by `budget` to ensure zero residual pointers to `target_idx` remain.
     fn verify_no_ghost_pointers(&self, target_idx_u32: u32, budget: usize) -> usize {

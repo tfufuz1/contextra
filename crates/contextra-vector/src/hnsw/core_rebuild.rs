@@ -864,7 +864,7 @@ impl HnswIndexCore {
 
         for change in delta_changes {
             match change {
-                contextra_mvcc::SeqLogChange::Insert { doc_id, seq } => {
+                super::staging::SeqLogChange::Insert { doc_id, seq } => {
                     let vector_opt = {
                         let doc_map = self.hot.doc_to_node.read();
                         let mmap_count = self
@@ -905,7 +905,7 @@ impl HnswIndexCore {
                         new_index.inner.do_insert(doc_id, &f32_vec, seq)?;
                     }
                 }
-                contextra_mvcc::SeqLogChange::Delete { doc_id, .. } => {
+                super::staging::SeqLogChange::Delete { doc_id, .. } => {
                     new_index.inner.do_delete(doc_id)?;
                 }
             }

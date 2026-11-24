@@ -91,7 +91,6 @@ impl<T: Zeroize> std::fmt::Display for Secret<T> {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<const N: usize> serde::Serialize for SecretKey<N> {
     fn serialize<S>(&self, _serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -102,7 +101,6 @@ impl<const N: usize> serde::Serialize for SecretKey<N> {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<T: Zeroize> serde::Serialize for Secret<T> {
     fn serialize<S>(&self, _serializer: S) -> std::result::Result<S::Ok, S::Error>
     where

@@ -276,7 +276,6 @@ pub trait Maintain: Send + Sync {
     fn is_rebuild_required(&self) -> bool;
 }
 
-#[cfg(feature = "ports-compat")]
 mod compat {
     use super::*;
 

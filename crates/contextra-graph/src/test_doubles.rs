@@ -3,9 +3,7 @@
 //! Replaces internal dev-dependency on `contextra-testkit` with self-contained
 //! implementations compatible with `contextra_ports::StorageEngine`.
 
-#[cfg(feature = "types-compat")]
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-#[cfg(feature = "types-compat")]
 use contextra_types::{Result, TxId};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
@@ -95,7 +93,6 @@ impl InMemoryStorageEngine {
     }
 }
 
-#[cfg(feature = "types-compat")]
 impl StorageEngine for InMemoryStorageEngine {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         let key = key.to_vec();

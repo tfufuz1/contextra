@@ -200,7 +200,7 @@ pub struct HnswColdCore {
     pub quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
     pub sq8_bias: RwLock<Sq8Bias>,
     pub mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
-    pub seq_log: RwLock<contextra_mvcc::SequenceLog>,
+    pub seq_log: RwLock<super::staging::SequenceLog>,
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
     pub deleted_nodes: RwLock<RoaringTreemap>,
@@ -276,7 +276,7 @@ impl HnswIndex {
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     mmap_index: RwLock::new(None),
-                    seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
+                    seq_log: RwLock::new(super::staging::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
@@ -378,7 +378,7 @@ impl HnswIndex {
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     mmap_index: RwLock::new(None),
-                    seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
+                    seq_log: RwLock::new(super::staging::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
@@ -591,11 +591,6 @@ impl HnswIndex {
             let ram_idx = node_idx - mmap_count;
             self.inner.hot.arena.get_ram_node_connections(ram_idx, 0, m)
         }
-    }
-
-    /// Führt einen synchronen vollständigen Rebuild aus (`INV-HNSW-SLOT-1`).
-    pub fn rebuild_sync(&self) -> Result<()> {
-        self.inner.rebuild_sync()
     }
 
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {

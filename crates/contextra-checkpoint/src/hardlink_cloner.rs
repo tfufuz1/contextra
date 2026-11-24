@@ -246,10 +246,11 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
                             );
                             if let Err(copy_err) = fs::copy(&path, &target_path).await {
                                 if is_cross_device_error(&io_err) {
-                                    return Err(ContextraError::cross_device_link(
-                                        path.to_string_lossy(),
-                                        target_path.to_string_lossy(),
-                                    ));
+                                    return Err(ContextraError::cross_device_link(format!(
+                                        "{} -> {}",
+                                        path.display(),
+                                        target_path.display()
+                                    )));
                                 } else {
                                     return Err(ContextraError::Io(copy_err));
                                 }

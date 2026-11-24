@@ -14,7 +14,6 @@ ring = "0"
 klasse = "A"
 
 [dependencies]
-contextra-mvcc = { workspace = true, optional = true }
 contextra-ports = { workspace = true }
 contextra-sys = { workspace = true, optional = true }
 contextra-types = { workspace = true }

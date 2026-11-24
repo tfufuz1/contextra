@@ -58,7 +58,6 @@ impl From<std::io::Error> for VectorError {
     }
 }
 
-#[cfg(feature = "ports-compat")]
 impl From<VectorError> for contextra_types::ContextraError {
     fn from(err: VectorError) -> Self {
         match err {
@@ -88,7 +87,6 @@ impl From<VectorError> for contextra_types::ContextraError {
     }
 }
 
-#[cfg(feature = "ports-compat")]
 impl From<contextra_types::ContextraError> for VectorError {
     fn from(err: contextra_types::ContextraError) -> Self {
         match err {

@@ -1,10 +1,10 @@
-# SPEC.md — Contextra Gesamtsystem-Spezifikation (Speicherkern, Retrieval, Engine & Löscharchitektur), Revision R11
+# SPEC.md — Contextra Gesamtsystem-Spezifikation (Speicherkern, Retrieval, Engine & Löscharchitektur), Revision R12
 
 | | |
 |---|---|
-| Status | **Revision R11 (Gesamtsystem-Spezifikation, vollständig), Entwurf zur Freigabe als Gate G-0.** Führt die Gesamtsystemsicht von R10 (§0–§3, K-39…K-47) mit dem vollständigen Speicherkern-Wortlaut von R9.1 (§4–§11) zusammen und schließt die in R10 nie geschriebenen Kapitel §12–§19 samt Anhängen, einschließlich des Vertrags zu `contextra-vector`, `-text`, `-graph`, `-rank`, `-engine`, `-checkpoint`. Konsolidiert R7, Lethe-Architekturentwurf, Lethe-Engine-Spec, Mnemos, „Optimal-LLM-Datenbank“ und Octa-Abgleich. |
+| Status | **Revision R12 (Gesamtsystem-Spezifikation, Repo-abgeglichen), Entwurf zur Freigabe als Gate G-0.** R12 gleicht R11 gegen den geklonten Code ab (HEAD `60ea034`) und löst die dabei gefundenen Widersprüche (K-58…K-63, Anhang B.5). Führt die Gesamtsystemsicht von R10 (§0–§3, K-39…K-47) mit dem vollständigen Speicherkern-Wortlaut von R9.1 (§4–§11) zusammen und schließt die in R10 nie geschriebenen Kapitel §12–§19 samt Anhängen, einschließlich des Vertrags zu `contextra-vector`, `-text`, `-graph`, `-rank`, `-engine`, `-checkpoint`. Konsolidiert R7, Lethe-Architekturentwurf, Lethe-Engine-Spec, Mnemos, „Optimal-LLM-Datenbank“ und Octa-Abgleich. |
 | Gegenstand | Eingebettetes, crash-sicheres Gesamtsystem für europäische Unternehmens-LLM- und Agenten-Workloads: synchroner Speicherkern (`contextra-storage`, ersetzt `contextra-store`) mit atomaren Mehr-Space-Änderungen, MVCC-Sichten, clusterlokalen Branches/Merges; mehrkanaliges Hybrid-Retrieval (Vektor, BM25/WAND, Wissensgraph, kalibrierte Fusion) über löschbare Index-Partitionen; Agenten-Langzeitgedächtnis; **durchgängig nachweisbare Löschung personenbezogener Daten** über Quell- und Indexschichten (logisch, kryptografisch, physisch) mit Trennung personenbezogener und sonstiger Daten. |
-| Verifikation | **Ist-Stand (Repository HEAD `d8b45b8`, 2026-11-24):** Der Kern hat Teilchecks und Strukturtests (`crates/contextra-storage/tests/`), **kompiliert aber nicht**, weil `contextra-storage-ports` fehlt (§18.1 Nr. 1). Die Retrieval-Crates (`vector`, `text`, `graph`, `rank`, `engine`, `checkpoint`, `crypto`, `mvcc`) enthalten Alt-Pfade (`memmap2`, `std::fs`, `bincode`, `blake3`, `aes-gcm-siv`, 4-Wege-2PC) und sind noch nicht auf `contextra-storage` geschnitten (§14.1). Vollständige Release-Gates (TLA+ M1–M6, Fuzzing, Referenzvektoren, Voll-Orakel) sind offen. **Keine Leistungszahl (H-1…H-35) gilt vor Gate-Abnahme als gemessen.** |
+| Verifikation | **Ist-Stand (Repository HEAD `60ea034`, 2026-11-24):** Der Kern hat Teilchecks und Strukturtests (`crates/contextra-storage/tests/`, 114 Quelldateien, ≈ 14 kLOC), **kompiliert aber nicht**, weil `contextra-storage-ports` weder als Crate existiert noch in `crates/contextra-storage/Cargo.toml` eingetragen ist (§18.1 Nr. 1). Die Retrieval-Crates (`vector`, `text`, `graph`, `rank`, `engine`, `checkpoint`, `crypto`, `mvcc`) enthalten Alt-Pfade (`memmap2`, `std::fs`, `bincode`, `blake3`, `aes-gcm-siv`, 4-Wege-2PC) und sind noch nicht auf `contextra-storage` geschnitten; gemessen (Dateien mit Treffer): `memmap2` 17 in `vector`, `bincode` in 5 Crates, `blake3` im Quelltext von 6 Crates, `block_on` in 6 Crates, `DISKANN_INTEGRITY_KEY` 4 Dateien (§14.1, §18.1). Vollständige Release-Gates (TLA+ M1–M6, Fuzzing, Referenzvektoren, Voll-Orakel) sind offen. **Keine Leistungszahl (H-1…H-35) gilt vor Gate-Abnahme als gemessen.** |
 | Rechtlicher Vorbehalt | Das System liefert technische Eigenschaften (atomare Sichtbarkeitsbarriere, Schlüsselvernichtung, physische Dateibereinigung, Löschprotokolle, Trennung personenbezogener Daten), keine Rechtsaussage zu Art. 17 DSGVO, Fristen, Ausnahmen oder zur Einstufung pseudonymisierter Daten als anonym. „Gelöscht“ ist immer an eine nachgewiesene Stufe aus §9.2 und ein konkretes `ErasureReceipt` gebunden. |
 | Normative Quelle | **Diese Datei ist die einzige normative Gesamtsystem-Fassung.** Modul-Specs unter `crates/*/SPEC.md`, `capabilities.toml` und `CLAUDE.md` verweisen hierher oder sind vor G-0 anzugleichen (§18.1). Rangfolge bei Widerspruch: **§15 (Invarianten) vor §12.8 (Audit-Ergänzungen) vor §12 (Erweiterungs-/Retrieval-Integration) vor den übrigen Abschnitten.** |
 | Sprache | Prosa deutsch, Bezeichner englisch. |
@@ -93,7 +93,7 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 | **K-45** | **Agenten-Session-DAG (`SessionBranchTree`) vs. Storage-Branches (`SYS_BRANCH`)** | **Integration nach K-35 („Session ≠ Cluster“):** Knoten des Gesprächsbaums liegen präfix-strukturiert im Eigentümer-Cluster; spekulative Explorationspfade nutzen clusterlokale Storage-Branches (`fork(Head|At(Stamp))`, `ttl`, `branch_drop`, `merge`) statt separater `bincode`-Blobs in `contextra-graph` | Agenten-Verzweigung wird crash-sicher, O(1) ohne Kopien und atomar löschbar | §8, §12.6 |
 | **K-46** | **Agenten-Checkpoints (`contextra-checkpoint`) & Kognitiver Decay (`AdaptiveDecayController`) vs. DB-Backup & DSGVO-Löschung** | **Dreiteilung der Konzepte:** (1) DB-Snapshot/Restore = `contextra-storage::checkpoint` (ohne Schlüssel/Ledger, mit `erase_epoch`); (2) `contextra-checkpoint` (`CheckpointGuard`/`StateCheckpoint`) speichert Agenten-Zustände clusterlokal auf `StorageView` + `View-Lease`/`Hold` (ohne unbegrenztes SSTable-Pinning und ohne `blake3`-Klartext-Manifeste); (3) `AdaptiveDecayController` steuert nur Relevanz-Decay/Konsolidierung, nie DSGVO-Löschung | verhindert GC-/Purge-Blockaden durch vergessene `PinGuard`s und schließt Verwechslung von Vergessen mit rechtlicher Löschung | §10.3, §11.4, §12.6 |
 | **K-47** | **Workspace-/Ring-Inkonsistenz (`Cargo.toml` 12 Crates vs. `capabilities.toml` 30+ Crates, inaktive Root-Checks)** | **Verbindliche Topologie-Synchronisation:** `Cargo.toml`, `capabilities.toml`, `deny.toml` und eingebundene CI-Gates (`layering`, `unsafe_islands`) werden ab P0/P1 synchronisiert; nicht existierende Storage-Ports/Adapter-Crates werden sauber als Subcrates angelegt und verifiziert (§14.1, §18.1) | beendet „tote“ Architektur-Checks und Ghost-Referenzen in Crates | §3.1, §14.1, §18.1 |
-| **K-48** | **Klasse-A-Autarkie der Retrieval-Crates (`vector`/`text`/`graph`/`rank`: „0 interne Abhängigkeiten“, B1) vs. verbindliche `SegmentOwner`-/`ConsumerFeed`-Bindung an den Speicherkern; `storage-ports` (L1) und `storage` (L1) auf derselben Ebene** | **Persistenzneutrale Schnittstellen statt Kernabhängigkeit:** Jedes Retrieval-Crate definiert selbst schmale Traits (`PartitionSink`/`PartitionSource`: blockweises Schreiben/Lesen opaker, bereits adressierter Byte-Blöcke) und kennt weder `contextra-storage` noch `SegmentIo`. Die Bindung (`SegmentOwner`, `ConsumerFeed`, Watermark, Attest) lebt in einem neuen Level-2-Crate **`contextra-index-bridge`**. `contextra-storage-ports` wird **Level 0** (nur Traits/Werttypen, keine Abhängigkeiten). Regel: Abhängigkeiten zeigen auf **strikt niedrigere** Ebenen, innerhalb einer Ebene sind keine internen Kanten erlaubt | Klasse-A-Autarkie (B1/B5) bleibt erhalten, der Kern bleibt ohne Retrieval-Wissen, die Ring-Matrix wird wieder prüfbar. Heute verletzt `vector → mvcc` (L1→L1) die Regel; `mvcc` entfällt als Abhängigkeit (K-40) | §3.1, §12.1, §18.1 |
+| **K-48** | **Klasse-A-Autarkie der Retrieval-Crates (`vector`/`text`/`graph`/`rank`: „0 interne Abhängigkeiten“, B1) vs. verbindliche `SegmentOwner`-/`ConsumerFeed`-Bindung an den Speicherkern; `storage-ports` (L1) und `storage` (L1) auf derselben Ebene** | **Persistenzneutrale Schnittstellen statt Kernabhängigkeit:** Jedes Retrieval-Crate definiert selbst schmale Traits (`PartitionSink`/`PartitionSource`: blockweises Schreiben/Lesen opaker, bereits adressierter Byte-Blöcke) und kennt weder `contextra-storage` noch `SegmentIo`. Die Bindung (`SegmentOwner`, `ConsumerFeed`, Watermark, Attest) lebt in einem neuen Level-2-Crate **`contextra-index-bridge`**. `contextra-storage-ports` wird Vertragsebene (Ebenennummern: K-58) (nur Traits/Werttypen, keine Abhängigkeiten). Regel: Abhängigkeiten zeigen auf **strikt niedrigere** Ebenen, innerhalb einer Ebene sind keine internen Kanten erlaubt | Klasse-A-Autarkie (B1/B5) bleibt erhalten, der Kern bleibt ohne Retrieval-Wissen, die Ring-Matrix wird wieder prüfbar. Heute verletzt `vector → mvcc` (L1→L1) die Regel; `mvcc` entfällt als Abhängigkeit (K-40) | §3.1, §12.1, §18.1 |
 | **K-49** | **Granularität abgeleiteter Indizes:** globaler Index je Mandant (schnell, aber Löschen = Vollrebuild) vs. Index je Cluster (löschbar, aber 10⁷ Mikroindizes, kein clusterübergreifendes Retrieval) | **Zwei Klassen, eine Regel:** (a) clusterlokale Mikroindizes für Cluster ≤ `micro_index_max_vectors` (flacher Scan/Mini-HNSW, aus den Records ableitbar); (b) **Index-Partition = Packgruppe** `(tenant_tag, due_bucket, shard)` mit hartem Größenlimit und **Generationsschlüssel je Partitionsgeneration**. Löschen = Tombstone sofort, Neuaufbau der betroffenen Partition fristgebunden und amortisiert, danach Vernichtung des Generationsschlüssels | Rebuild-Kosten sind nach oben beschränkt (Partitionsgröße), Ablauf einer Packgruppe löscht ihre Index-Partitionen in O(Dateien), Backups alter Generationen werden durch Schlüsselvernichtung unlesbar (Crypto-Erasure auch für geteilte Indexstrukturen) | §12.4.5 |
 | **K-50** | **Trennung personenbezogener und sonstiger Daten:** „Klassifikation ist Sache der oberen Schicht“ ließ offen, wie ein Dokument mit Personenbezug in einem gemeinsamen Korpus löschbar bleibt | **Trennungsprinzip (`INV-SEP-1`):** Personenbezogene Inhalte liegen ausschließlich in `Sealed` Personen-/Fallclustern; im gemeinsamen Korpus stehen nur pseudonymisierte Chunks, die Zuordnung Pseudonym→Person liegt im Cluster der Person (**Pseudonym-Tresor**). Embeddings entstehen **nach** der Pseudonymisierung. Löschung der Person vernichtet den Tresor; ob der Rest danach anonym ist, bleibt eine Einzelfallbewertung (kein Kernversprechen) | Ein Cluster-Löschauftrag genügt für alle Namensbezüge; Vektoren kodieren keine Klarnamen; das Restrisiko (Re-Identifikation über Kontext) wird im Receipt ausgewiesen | §12.4.6 |
 | **K-51** | **Atomarität großer Dokumente:** „ein Change = ein Dokument“ scheitert an `max_change_ops` (4096) / `max_change_bytes` (8 MiB); ein Rückfall auf Pseudo-2PC wäre ein Rückschritt (K-39) | **Publish-Record:** Chunks einer Dokumentversion werden in beliebig vielen Changes unter einem versionierten Präfix gestaged; **ein** abschließender Change setzt `doc/<id>/head` (Guard `Version`). Lesen und Indexprojektion lösen ausschließlich über `head` auf. Kleine Dokumente nutzen den Ein-Change-Pfad. Verwaiste Stagings räumt ein Worker | Dokumentweite Atomarität ohne Zweiphasenprotokoll, ohne Kompensation, crash-sicher, retrybar über `IdemToken` | §12.4.0 |
@@ -104,6 +104,14 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 | **K-56** | **Zu viele Konfigurationsschrauben** (Anker, Ledger-Gerät, Provider, Horizont, Fristen) gefährden Entwicklerfreundlichkeit und Betriebssicherheit | **Compliance-Profile als geprüfte Bündel** (`Development`, `Standard`, `Strict`) mit Zusatzprüfung beim Öffnen; Einzelschrauben bleiben, jede Abweichung vom Profil erscheint im Receipt | Sichere Voreinstellung in einem Wort; Auditoren sehen das Profil | §12.10, §16 |
 | **K-57** | **Auskunft/Portabilität (Art. 15, 20 DSGVO)** waren nicht abgedeckt | Der Cluster als Löschdomäne ist zugleich die **Exportdomäne**: `export_cluster(view)` liefert einen konsistenten, inhaltsvollständigen Strom aller Records einer Sicht (ohne Schlüssel, ohne Indexstrukturen); die Aufbereitung (Format, Rechtsprüfung) liegt oben | Auskunft = ein Scan statt Suche über alle Systeme | §12.10 |
 
+| **K-58** | **Ebenenmodell (ersetzt die Ebenennummern aus K-48):** K-48 setzte `storage-ports` auf Level 0 und ließ Retrieval-Crates „ohne interne Abhängigkeit“. Gemessen importieren `vector` (38×), `text`, `graph` direkt `contextra-types`/`contextra-ports`, und `capabilities.toml` führt `types`/`ports` auf Level 2, also über den Konsumenten | **Fünf Ebenen:** L0 Fundament (`ids`, `env`, `simd`, `sys`, `wire`, `durable-fs`, **`types`**), L1 Verträge (**`ports`**, `storage-ports`), L2 Triebwerke (`storage`, `vector`, `text`, `graph`, `rank`, `mvcc`*, `checkpoint`, `kvcache`, `crypto`), L3 Adapter und Orchestrierung (`engine`, `index-bridge`, `storage-bridge`, `storage-fs`, `crypto-ref`, `keys-*`, `erasure`, `agent`, `cognition`, `router`), L4 Fassade und Apps (`db`, `contextra`, `mcp`, `py`, `testkit`, `bench`). Regel unverändert: nur strikt abwärts. Retrieval-Crates dürfen **nur** `types` und `ports` kennen, nie `storage`, `storage-ports` oder einander. (*`mvcc` entfällt für Kernpfade, K-40) | Die Kanten existieren bereits real; sie zu verbieten hieße 3 Crates umschreiben, sie auf die richtige Ebene zu legen kostet eine Zeile in `capabilities.toml`. Isolation von Storage bleibt voll erhalten | §3.1, §18.1 |
+| **K-59** | **Fünf Kopien von `TxId` und eine zweite `Epoch`:** `TxId(pub u64)` steht in `types`, `mvcc`, `vector`, `graph`, `checkpoint`; `text` führt `contract::Epoch` | **Ein** `Epoch(u64)` in `contextra-types`; `TxId` und alle Kopien entfallen, `text::contract::Epoch` wird Re-Export. `Stamp ↔ Epoch` wird nur in `index-bridge` konvertiert (Identität, zusätzlich `instance_id`) | Ein Versionsbegriff (L23); Kopien driften | §12.4, §14.1 |
+| **K-60** | **Lücke Personenbezug × geteilter Index:** §12.4.6 legt Personenbezug in Einzel-Cluster, §12.4.5 teilt Partitionen über Cluster. Unklar blieb, ob Klartext-Embeddings von Personalakten in einer geteilten Partition liegen dürfen, und wie Suche über viele Personen löschbar bleibt | **Zwei Indexklassen, eine Regel:** `Corpus`-Partitionen und `Personal`-Partitionen. *Geteilte* Partitionen (beider Klassen) enthalten ausschließlich aus **pseudonymisiertem** Text abgeleitete Vektoren, Terme und Kanten (`INV-SEP-2`). Klartext-Embeddings entstehen nur im Cluster-Mikroindex (Modus A) des Personenclusters und sterben mit dem Clusterschlüssel. `Personal`-Partitionen haben kleinere Limits und `Rebuildable{max_age}` kürzer als `purge_deadline` | Suche über Personen bleibt möglich (pseudonymisiert), Löschung einer Person kostet höchstens den Neuaufbau ihrer Personal-Partitionen, kein Klartext im geteilten Index | §12.4.5, §12.4.6 |
+| **K-61** | **`kvcache` bricht Löschvertrag:** Feature `content-addressed-kv-cache` (Inhaltsadressierung), `blake3`, `bincode`, `aes-gcm-siv` über `crypto/kv-encryption` | Feature entfällt vor G-R5 (NZ-11, `INV-PRIV-1`); `kvcache` wird `SegmentOwner` (`MixedPerClusterKey`) auf `storage-ports`-Krypto; `contextra-crypto/kv-encryption` entfällt | Prefix-Dedup über Löschdomänen ist ein Querverweis | §12.9, §14.1 |
+| **K-62** | **Mmap und `block_on` im Bestand:** `memmap2` in `vector` (17 Dateien) und `contextra-sys`; `block_on` in `text`, `graph`, `engine`, `checkpoint`, `kvcache`, `crypto` | `memmap2` nur in `contextra-sys` hinter Feature `mmap`, nur als `Fs`-Implementierung ohne Index-/Sealed-Pfad; `block_on` nur im Engine-Rand (L3+), nie in Level-2-Crates | K-11, Z-19 | §14.1 |
+| **K-63** | **`contextra-ports` trägt Alt-Verträge (`StorageEngine`, `StorageBackend`, `Vfs`, `Purger`, `LedgerSink`, `CommitBarrier`, `ErasureLayer`)** mit 2PC- und Async-Prägung | Bleiben bis G-CUTOVER als Kompatibilitätsschicht, werden durch `storage-bridge` bedient; neue Verträge (`SegmentOwner`, `PartitionSink`) kommen **nicht** in `ports`, sondern je Crate bzw. `storage-ports` | Ein Contract-Test-Satz (`conformance.rs`) existiert bereits und schützt die Migration | §3.2, §14.1 |
+
+
 ### 1.1 Herkunft der übernommenen Elemente
 
 | Quelle | Übernommen | Nicht übernommen / Abgelöst |
@@ -113,7 +121,7 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 | **Mnemos & Engram** | Zoom/Handles/Trust/Derivation als Konventionen oben, Fork-TTL, token-budgetiertes `page()`/`weights`, `Error::hint()`, Evaluationsmethodik `Utility@Budget` | Prolly-Tree, Content-Addressing/Merkle-DAG, KV-Tensor-Layouts im Kern |
 | **CairnDB & AetherStore** | **Index-Watermarks** (`applied_position`) als Pflichtmuster, Guard-Katalog, 3 Benchmark-Gruppen, WiscKey-Wertetrennung, Mandanten-Vorfilterung vor ANN, Typ-Alignment optional | CAS ohne WAL, GPUDirect, `mmap` im Lesepfad, Slab-Allokator |
 | **Octa-Spec & R9/R9.1-Audit** | Tomb-Epochen/Backup-Horizont (A3), `HostProbe`, `MeasureKind`, `View-Lease`, `Poisoned`-Ledger-Intent, Pipeline ohne E/A unter Rang 1, branch-bewusster Filter, `ClusterIndex ≤ 40B`, `MiniSection`, Spill-Policy, `deps-gate`/`deny.toml` | Zeitlanes/Kumulativsummen im SubIndex (A1/A2 → `BlockPruner` & RAM-Präfixsummen) |
-| **Contextra Bestands-Crates (HEAD `d8b45b8`)** | `contextra-simd` (AVX-512/AVX2/NEON Runtime-Dispatch + NaN-Guard), `contextra-vector` (HNSW, DiskANN-Algorithmik, SQ8+Sq8Bias, RaBitQ, ACORN $\gamma$-Augmentierung, Partial-Rebuild `TraversalTracker`, `GhostFreeVectorIndex`), `contextra-text` (BM25/BM25F, `GermanMorphTokenizer`/`GermanCompoundSplitter`, Block-Max WAND), `contextra-graph` (CSR, n-äre Hyperkanten, PPR/APPRH/TL-HFD/`PathRAG`, Community/Percolation, `SessionBranchTree`), `contextra-rank` (4-/5-Signal RRF/mRRF/Resonance, PAVA/Platt/Conformal, Drift, `DiBud`, `explain`), `contextra-engine` (`TenantPolicy`, `Collection`, `HybridQueryBuilder`, `AdaptiveDecayController`), `contextra-ingest`/`privacy`/`prompt-guard`/`sandbox`/`router`/`kvcache` | `contextra-store` (Alt-LSM), `DbTransaction`/`CommitLedger` 4-Wege-2PC, `contextra-durable-fs` als `RealFs`, unversiegeltes DiskANN-`memmap2` mit Literal-Key, `blake3`/`aes-gcm-siv`/`bincode` in Persistenz, doppeltes MVCC in Produktionspfaden |
+| **Contextra Bestands-Crates (HEAD `60ea034`)** | `contextra-simd` (AVX-512/AVX2/NEON Runtime-Dispatch + NaN-Guard), `contextra-vector` (HNSW, DiskANN-Algorithmik, SQ8+Sq8Bias, RaBitQ, ACORN $\gamma$-Augmentierung, Partial-Rebuild `TraversalTracker`, `GhostFreeVectorIndex`), `contextra-text` (BM25/BM25F, `GermanMorphTokenizer`/`GermanCompoundSplitter`, Block-Max WAND), `contextra-graph` (CSR, n-äre Hyperkanten, PPR/APPRH/TL-HFD/`PathRAG`, Community/Percolation, `SessionBranchTree`), `contextra-rank` (4-/5-Signal RRF/mRRF/Resonance, PAVA/Platt/Conformal, Drift, `DiBud`, `explain`), `contextra-engine` (`TenantPolicy`, `Collection`, `HybridQueryBuilder`, `AdaptiveDecayController`), `contextra-ingest`/`privacy`/`prompt-guard`/`sandbox`/`router`/`kvcache` | `contextra-store` (Alt-LSM), `DbTransaction`/`CommitLedger` 4-Wege-2PC, `contextra-durable-fs` als `RealFs`, unversiegeltes DiskANN-`memmap2` mit Literal-Key, `blake3`/`aes-gcm-siv`/`bincode` in Persistenz, doppeltes MVCC in Produktionspfaden |
 
 ---
 
@@ -229,41 +237,29 @@ Kommerzielle Editionen können optionale Adapter/Services bereitstellen (z. B. H
 Abhängigkeiten verlaufen **gerichtet azyklisch und nur auf strikt niedrigere Ebenen** (`Level 3 → Level 2 → Level 1 → Level 0`); innerhalb einer Ebene gibt es keine internen Kanten (K-48, `INV-LAYER-1`). Jede Verletzung bricht das CI-Gate `layering` und `cargo tree`.
 
 ```text
-Level 3 (Apps & Verifikation):
-  contextra-mcp (MCP-Server)  |  contextra-py (PyO3)  |  contextra-testkit  |  contextra-bench
+Level 4 (Fassade & Apps):   contextra (Produkt) | contextra-db | contextra-mcp | contextra-py | contextra-testkit | contextra-bench
         │
-        ▼
-Level 2 (Fassade, Engine, Agentik & Speicher-Adapter):
-  contextra (Produkt-Fassade) ──► contextra-db (DB-Fassade) ──► contextra-engine (Orchestrator)
-  contextra-agent / contextra-cognition / contextra-router / contextra-erasure* (Compliance/Signatur)
-  contextra-types & contextra-ports (System-Verträge, übergangsweise Ring-2-Brücke)
-  Speicher-Adapter (Composition Root): contextra-storage-bridge | contextra-storage-fs |
-                                       contextra-crypto-ref | contextra-keys-file | contextra-keys-cohort
+Level 3 (Orchestrierung & Adapter / Composition Root):
+        contextra-engine | contextra-agent | contextra-cognition | contextra-router | contextra-erasure*
+        contextra-index-bridge (SegmentOwner, ConsumerFeed, Watermark) | contextra-storage-bridge (Async-Fassade, Receipt→Proof)
+        contextra-storage-fs | contextra-crypto-ref | contextra-keys-file | contextra-keys-cohort
         │
-        ▼
-Level 1 (Speicherkern & Domänen-Triebwerke):
-  ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-  │ Retrieval & Persistenz-Triebwerke:                                                              │
-  │   contextra-vector  |  contextra-text  |  contextra-graph  |  contextra-rank  |  contextra-checkpoint
-  │ LLM-Runtime-Bausteine: contextra-kvcache | contextra-infer-ollama | contextra-infer-candle    │
-  │ Übergangs-Altspeicher / MVCC / Krypto (Ablösung bis G-CUTOVER, §14.1):                          │
-  │   contextra-store (legacy)  |  contextra-mvcc (legacy)  |  contextra-crypto (legacy-erasure)    │
-  └───────────────────────────────┬───────────────────────────────────┬─────────────────────────────┘
-                                  │ (Ports & Verträge §12)            │
-                                  ▼                                   ▼
-  contextra-storage  (#![forbid(unsafe_code)], synchroner Kern) ──► contextra-storage-ports (Traits/Werttypen)
+Level 2 (Triebwerke, untereinander ohne Kanten):
+        contextra-storage (synchroner Kern, forbid(unsafe))
+        contextra-vector | contextra-text | contextra-graph | contextra-rank | contextra-checkpoint | contextra-kvcache | contextra-crypto (Übergang)
+        contextra-mvcc (Übergang, entfällt für Kernpfade) | contextra-store (Legacy, bis G-CUTOVER)
         │
-        ▼
-Level 0 (Fundament, Unsafe-Inseln & Sicherheit):
-  Unsafe-Inseln (einzige erlaubte Crates mit `unsafe`):
-    contextra-simd (AVX-512/AVX2/NEON/Scalar) | contextra-sys (OS-Primitives) | contextra-wire (IPC/Framing)
-  Safe Foundation & Safety:
-    contextra-ids | contextra-env | contextra-adapt | contextra-ingest | contextra-privacy
-    contextra-sandbox | contextra-prompt-guard | contextra-infer-onnx
-    (contextra-durable-fs: experimental; nicht für storage-fs RealFs genutzt, SD-70)
+Level 1 (Verträge, nur Traits/Werttypen):   contextra-ports | contextra-storage-ports
+        │
+Level 0 (Fundament):   contextra-types | contextra-ids | contextra-env
+        Unsafe-Inseln: contextra-simd | contextra-sys | contextra-wire      (contextra-durable-fs: experimentell, kein RealFs, SD-70)
+        Safety (stand-alone): contextra-privacy | contextra-sandbox | contextra-prompt-guard | contextra-ingest | contextra-adapt | contextra-infer-*
 ```
+(* `contextra-erasure` ist `frozen`, Änderung nur nach Freigabe, K-55.)
 
-**Ebenenkorrektur (K-48).** `contextra-storage-ports` ist **Level 0** (nur Traits und Werttypen). Neu auf Level 2: **`contextra-index-bridge`** (`SegmentOwner`, `ConsumerFeed`, Watermark, Attest und Partitionsverwaltung für `vector`/`text`/`graph`/Identity-Directory) neben `contextra-storage-bridge` (Async-Fassade, Receipt→Proof). Die Retrieval-Crates (Level 1, Klasse A) hängen weder vom Speicherkern noch voneinander ab; die heutige Kante `vector → mvcc` entfällt (K-40). Zusammenführung von Speicher und Retrieval geschieht ausschließlich in `index-bridge`, `engine` und den Fassaden.
+**Ebenenregel (K-58).** `contextra-storage` kennt nur `storage-ports`. `vector`/`text`/`graph`/`rank` kennen nur `types` und `ports` (so wie heute im Code). Zusammenführung von Speicher und Retrieval geschieht ausschließlich in `index-bridge` und `engine`.
+
+**Bindung statt Abhängigkeit (K-48).** `contextra-index-bridge` (Level 3) implementiert `SegmentOwner`, `ConsumerFeed`, Watermark und Attest für `vector`/`text`/`graph`/Identity-Directory über die je Crate definierten Traits `PartitionSink`/`PartitionSource`; die Retrieval-Crates kennen `SegmentIo` nicht.
 
 **Modulschnitt innerhalb von `contextra-storage`** (Abhängigkeiten nur nach unten, Test `layering`):
 
@@ -275,8 +271,7 @@ recovery · checkpoint (create, restore) · catalog · store (run, blob, redo) �
 env (Fs, Clock, Entropy, Governor, Metrics, Anchor; MemFs, FaultFs, Sim) · sync (Ränge 1–8) · testing (ErasureOracle, cfg(feature="testing"))
 ```
 
-**Ist-vs-Soll-Abgleich Workspace (HEAD `d8b45b8`):**
-Die aktive Wurzel-`Cargo.toml` führt aktuell 12 Workspace-Crates (`checkpoint`, `crypto`, `durable-fs`, `engine`, `graph`, `mvcc`, `rank`, `simd`, `storage`, `sys`, `text`, `vector`), während `capabilities.toml` mehr als 40 Einträge beschreibt (viele ohne Verzeichnis). `contextra-storage-ports`, `contextra-index-bridge`, `contextra-storage-fs`, `contextra-crypto-ref`, `contextra-keys-file`, `contextra-keys-cohort` und `contextra-storage-bridge` fehlen derzeit physisch im Verzeichnisbaum (Verzeichnisse `crates/contextra-*`), obwohl `crates/contextra-storage/src/*.rs` bereits `contextra_storage_ports` importiert. Die in `CLAUDE.md` genannten Root-Prüfungen `tests/layering.rs` und `tests/unsafe_islands.rs` sind im Baum nicht vorhanden bzw. nicht eingebunden. Die Bereinigung ist Pflichtbestandteil von Phase **P0** (§14.1, §18.1).
+**Ist-vs-Soll-Abgleich Workspace (HEAD `60ea034`, per Datei geprüft).** `Cargo.toml` führt 14 Mitglieder; zusätzlich liegt `contextra-kvcache` im Verzeichnis `crates/`, ist aber **nicht** Mitglied. `capabilities.toml` beschreibt 42 Crates, davon existieren 14 (u. a. fehlen `ids`, `env`, `wire`, `store`, `storage-ports`, `storage-bridge`, `storage-fs`, `crypto-ref`, `keys-*`, `index-bridge`, `db`, `privacy`, `sandbox`, `ingest`, `router`, `agent`). Der Kern importiert `contextra_storage_ports` in `catalog/*.rs`, hat aber weder Crate noch Dependency-Eintrag. `contextra-types` und `contextra-ports` stehen in `capabilities.toml` auf Level 2, werden aber von `vector`, `text`, `graph`, `crypto`, `kvcache` genutzt (K-58). Es gibt kein Root-`tests/`-Verzeichnis (`CLAUDE.md` nennt `tests/layering.rs` und `tests/unsafe_islands.rs`); eine eigene `layering.rs` liegt nur in `crates/contextra-storage/tests/`. `docs/agent/` (von `CLAUDE.md` referenziert) fehlt. `scripts/check_forbidden_apis.sh` prüft bereits `storage` und `storage-ports`, aber nicht die Retrieval-Crates. Bereinigung ist Pflichtbestandteil von **P0** (§14.1, §18.1).
 
 `std::fs`, `std::time::SystemTime` und `rand`/`getrandom` sind im Speicherkern sowie in reinen Ring-0/1-Algorithmuskernen über `clippy.toml`/`disallowed_methods` verboten und ausschließlich über injizierbare Ports (`Fs`, `Clock`, `Entropy`, `Rng`) bzw. Adapter erlaubt.
 
@@ -1251,6 +1246,15 @@ Index-Watermarks (Muster aus CairnDB) sind Pflicht für jeden abgeleiteten Index
 
 **Grundregeln (aus dem Löschvertrag).** Jedes Indexelement, jede Kante und jeder Posting-Eintrag ist einer Quell-`ClusterId`/Generation zuordenbar; nicht zuordenbare Strukturen sind für personenbezogene Daten unzulässig. `MixedPerClusterKey` ist nur zulässig, wenn Payload und alle Metadaten genau einem Cluster gehören. Clusterübergreifende HNSW-Kanten, Posting-Listen, Centroids und Routingdaten sind `Rebuildable{max_age, max_rewrite_bytes}`. `on_gate` aktiviert synchron einen generationsgefencten Tombstone-Zustand vor der Rückkehr der Query; das garantiert sofortige API-Unsichtbarkeit, aber keine physische Entfernung. Ein `Rebuildable`-Owner bleibt `Purging`, bis Payload, Kanten, Postings, Routing und gespiegelte Kopien entfernt und attestiert sind; über Obergrenze oder Deadline ⇒ `Blocked/Incomplete`.
 
+**Indexklassen und Personenbezug (K-60).** Jede Partition trägt eine `IndexClass`:
+
+| Klasse | Inhalt | Limits | Lebensdauer |
+|---|---|---|---|
+| `Corpus` | aus `NonPersonal`-Chunks und aus pseudonymisiertem Text abgeleitet | Standardlimits oben | bis Löschung/Neuaufbau |
+| `Personal` | ausschließlich aus **pseudonymisiertem** Text von `Personal`-Chunks abgeleitet (Platzhalter, §12.4.6) | `max_partition_vectors_personal` 100 000, `max_partition_postings_bytes_personal` 64 MiB, `max_partition_edges_personal` 1 Mio. | `Rebuildable{max_age = purge_window_fraction × purge_deadline}`; Packgruppe nach Aufbewahrungsende der Person (`due_bucket`), Ablauf wirft die Partition ab |
+
+`INV-SEP-2`: Eine geteilte Partition enthält keinen aus Personen-Klartext abgeleiteten Vektor, Term oder Graphknoten. Klartext-Embeddings existieren nur im Cluster-Mikroindex (Modus A) des Personenclusters, unter dessen Clusterschlüssel; ihre Löschung ist mit dem Gate und `KeysDestroyed` erledigt. Damit bleibt Suche **über** viele Personen (pseudonymisiert) möglich, und die Löschung einer Person kostet höchstens den Neuaufbau der kleinen `Personal`-Partitionen, in denen ihre Platzhalter vorkamen. Kleinere Limits halten die Rebuild-Kosten je Löschfenster klein (H-36); die Zuordnung Platzhalter → Partition führt der `index-bridge`-Owner als Refcount je Person (nur RAM-Cache, aus `fw`-Records ableitbar).
+
 #### 12.4.6 Trennungsprinzip und Pseudonym-Tresor (K-50)
 
 **Ziel.** Personenbezogene Daten sind von sonstigen Daten so getrennt, dass **ein** Cluster-Löschauftrag alle Namensbezüge entfernt, ohne den Wissenskorpus zu zerstören.
@@ -1489,6 +1493,11 @@ Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur 
 | `commit_lock` + globale `meta:stats`/`pl:` in `text` | partitionsbezogene Statistik, Abfragezeit-`df` | R1/R2 |
 | `bincode` in `graph`/`text`/`vector` | kanonische Codecs | R1 |
 | `pin_checkpoint`/`blake3`-Manifest in `checkpoint` | clusterlokale Records + `View-Lease`/`Hold` | R5 |
+| `TxId` ×5 (`types`, `mvcc`, `vector`, `graph`, `checkpoint`), `text::contract::Epoch` | ein `Epoch(u64)` in `types` (K-59) | R1 |
+| `content-addressed-kv-cache`, `crypto/kv-encryption` (`aes-gcm-siv`) in `kvcache` | `SegmentOwner` `MixedPerClusterKey`, XChaCha20 (K-61) | R5 |
+| `block_on` in `text`, `graph`, `engine`, `checkpoint`, `kvcache`, `crypto` | nur Engine-Rand (L3+), Level-2-Crates synchron (K-62) | R1 |
+| `memmap2` in `contextra-sys` ohne Feature-Gate | Feature `mmap`, nie im Index-/Sealed-Pfad (K-62) | P0 |
+| `StorageEngine`/`StorageBackend`/`CommitBarrier`/`Purger`/`LedgerSink` in `contextra-ports` | `storage-bridge` bedient sie bis G-CUTOVER (K-63) | R3 |
 | `deletion_proof`, `revocation_log`, `kv_shredding` in `crypto` | Bridge-Abbildung Receipt → Proof (K-55) | nach Freigabe |
 
 Jede Zeile hat einen Test, der den Altpfad **verbietet** (Lint, `check_forbidden_apis.sh`, `deny.toml`) und einen, der den Ersatz belegt; ein Altpfad darf erst nach bestandenem Ersatz-Gate entfernt werden.
@@ -1559,7 +1568,9 @@ Jede Zeile hat einen Test, der den Altpfad **verbietet** (Lint, `check_forbidden
 | **INV-SEP-1** | Personenbezogener Klartext liegt nur in `Sealed` Clustern; Korpus-Chunks, Embeddings, Terme und Graph-Entitäten des Korpus entstehen aus pseudonymisiertem Text; Platzhalter sind je Person zufällig und nie aus dem Klartext abgeleitet |
 | **INV-GRAPH-PROV-1** | Jede Kante und Hyperkante des Wissensgraphen trägt `(source_cluster, source_doc, version)`; je Löschdomäne existiert eine eigene Kopie, kein geteilter Besitz |
 | **INV-DECAY-1** | Kognitiver Decay und `Supersedes` löschen nie und erzeugen weder Gate noch Receipt; Compliance-Löschung geschieht ausschließlich über `Eraser` |
-| **INV-LAYER-1** | Abhängigkeiten zeigen nur auf strikt niedrigere Ebenen; Retrieval-Crates (Klasse A) haben keine Abhängigkeit auf `contextra-storage`; Produktivpfade enthalten kein `std::fs`, `memmap2`, `bincode`, keinen festen Schlüssel und keinen unkeyed Inhalts-Hash |
+| **INV-SEP-2** | Geteilte Index-Partitionen enthalten nur aus pseudonymisiertem Text abgeleitete Daten; Klartext-Embeddings liegen nur im Cluster-Mikroindex unter dem Clusterschlüssel |
+| **INV-EPOCH-1** | Es gibt genau einen `Epoch(u64)`-Typ (in `contextra-types`); `Stamp ↔ Epoch` wird nur in `index-bridge` konvertiert und trägt `instance_id` |
+| **INV-LAYER-1** | Abhängigkeiten zeigen nur auf strikt niedrigere Ebenen; Retrieval-Crates (`vector`, `text`, `graph`, `rank`) kennen nur `contextra-types` und `contextra-ports`, nie `storage`, `storage-ports` oder einander (K-58); Produktivpfade enthalten kein `std::fs`, `memmap2`, `bincode`, keinen festen Schlüssel und keinen unkeyed Inhalts-Hash |
 
 **Modul-Invarianten.** Invarianten, die ein Retrieval-/Basis-Crate besitzt (`INV-HNSW-SLOT-1`, `INV-VEC-*`, `INV-SIMD-*`, `INV-TEXT-*`, `INV-DETERMINISM`, `INV-GRAPH-00x`, `INV-RRF-*`, `INV-CAL-*`, `INV-FSYNC-1`, `INV-TENANT-IDX-1`), stehen in der jeweiligen `crates/*/SPEC.md` und sind hier nur zitiert; ihr Test-Zitat prüft das Crate-CI. Bei Widerspruch gilt diese Tabelle. `INV-DB-3` (Kompensation der Alt-Engine) entfällt mit dem 2PC (§14.1).
 
@@ -1621,6 +1632,7 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 | **H-32** | Partitions-Neuaufbau: Rebuild-Bytes je Fenster `w` ≤ Σ betroffener Partitionen, nie proportional zur Zahl der Löschaufträge; Rebuild-Anteil an der Wartungsbandbreite ≤ 25 % bei 0,1 % Löschrate/Tag (Zielwert nach Spike R2 bestätigen oder korrigieren); Commit-p99 ≤ 1,2 × ohne Rebuild | Rebuild-Bench mit verstreuten Löschungen |
 | **H-33** | Graph: Adjazenz über ≤ 64 Segmente ≤ 2 × Einzel-CSR; PPR-Latenz auf gepinntem Segment-Set reproduzierbar | Graphbench |
 | **H-34** | `pii_residual_rate` je Release mit Stichprobe n ≥ 1000 und Konfidenzintervall gemessen und berichtet; kein Zielwert im Kern (Mandantenrichtlinie) | Prüf-Orakel mit Canary-Personen |
+| **H-36** | Löschung einer Person mit 10⁴ Chunks in `Personal`-Partitionen: Rebuild-Bytes je Fenster ≤ Σ betroffener Personal-Partitionen (je ≤ 100 000 Vektoren); `Personal`-Rebuild-Anteil ≤ 25 % der Wartungsbandbreite; Receipt-Status `Incomplete` nur bis Generationswechsel und Schlüsselvernichtung der Altgeneration | Rebuild-Bench mit Canary-Personen (Spike vor G-R2) |
 | **H-35** | Read-your-writes: p99 Zeit vom Receipt bis zur Sichtbarkeit im eigenen Query ≤ `ryw_wait` + Delta-Latenz (≈ 60 ms) | RYW-Bench |
 
 ---
@@ -1651,16 +1663,19 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 
 ### 18.1 Topologie-Synchronisation: Ist-Befunde und Pflichtmaßnahmen (K-47)
 
-Befunde am Repository-Stand (HEAD `d8b45b8`, 2026-11-24), per Dateiprüfung belegt; die Maßnahmen sind Teil von P0:
+Befunde am Repository-Stand (HEAD `60ea034`, 2026-11-24), per Dateiprüfung belegt; die Maßnahmen sind Teil von P0:
 
 | # | Befund | Maßnahme |
 |---|---|---|
 | 1 | `contextra-storage` importiert `contextra_storage_ports` (z. B. `catalog/reserve.rs`), das Crate existiert nicht, und `crates/contextra-storage/Cargo.toml` enthält keine Abhängigkeit darauf; der Kern kompiliert nicht | `crates/contextra-storage-ports` anlegen (Level 0), Workspace-Mitglied, Abhängigkeit eintragen; `cargo check -p contextra-storage --locked` als G-0-Kriterium |
-| 2 | `Cargo.toml` führt 12 Mitglieder, `capabilities.toml` beschreibt mehr als 40 Einträge, darunter nicht vorhandene (`store`, `types`, `ports`, `ids`, `env`, `wire`, `router`, `agent`, …) | Zielzustand je Eintrag festlegen: anlegen, als `planned` markieren oder streichen; `bash tools/ctx.sh gates` muss ohne Abweichung laufen |
+| 2 | `Cargo.toml` führt 14 Mitglieder (`kvcache` liegt unter `crates/`, ist aber nicht Mitglied); `capabilities.toml` beschreibt 42 Crates, 28 davon existieren nicht (u. a. `store`, `ids`, `env`, `wire`, `router`, `agent`) | Zielzustand je Eintrag festlegen: anlegen, als `planned` markieren oder streichen; `bash tools/ctx.sh gates` muss ohne Abweichung laufen |
 | 3 | `contextra-erasure` und `contextra-vault` (laut `CLAUDE.md`) fehlen in Baum und `capabilities.toml` | `CLAUDE.md` und `capabilities.toml` angleichen; Signaturstufe optional (K-55), Änderungen am eingefrorenen Crate nur nach Freigabe |
-| 4 | `tests/layering.rs` und `tests/unsafe_islands.rs` sind nicht eingebunden bzw. im Baum nicht vorhanden; der Cargo-Alias `xtask` zeigt auf ein fehlendes Paket | als Cargo-Tests in einem Mitglied-Crate (`contextra-testkit` oder `storage/tests`) einbinden; `xtask` entfernen oder anlegen |
-| 5 | `contextra-vector → contextra-mvcc` (L1→L1) und `storage-ports`/`storage` beide Level 1 widersprechen der Ebenenregel | K-48: `storage-ports` auf Level 0, `vector → mvcc` entfernen (K-40) |
+| 4 | Es gibt kein Root-`tests/`; `CLAUDE.md` nennt dennoch `tests/layering.rs` und `tests/unsafe_islands.rs`; nur `crates/contextra-storage/tests/layering.rs` existiert (verbietet `contextra_ports` im Kern, richtig); der Cargo-Alias `xtask` zeigt auf ein fehlendes Paket | als Cargo-Tests in einem Mitglied-Crate (`contextra-testkit` oder `storage/tests`) einbinden; `xtask` entfernen oder anlegen |
+| 5 | `vector → mvcc` (optional, gleiche Ebene), `types`/`ports` auf Level 2 statt unterhalb ihrer Konsumenten; `engine`-`allowed_internal` führt das nicht vorhandene `store` | K-58: Ebenen neu zuordnen, `vector → mvcc` entfernen (K-40), `capabilities.toml` angleichen |
 | 6 | `blake3`, `aes-gcm-siv`, `bincode`, `memmap2`, `std::fs` in Retrieval-/Crypto-/Checkpoint-Crates | Bereinigungsplan §14.1; Verbote als `deny.toml`-/Lint-Regeln, damit der Zustand nicht zurückkehrt |
+| 8 | `contextra-kvcache` hat Feature `content-addressed-kv-cache` und hängt an `crypto/kv-encryption` | K-61 |
+| 9 | `Cargo.toml [workspace.dependencies]` enthält `bincode`, `flatbuffers`, `memmap2`, `tokio full`, `parking_lot`, `rand` als Workspace-weite Defaults; jedes Crate kann sie ziehen | Verbote je Ebene in `deny.toml` (`wrappers`), Level-2-Crates ohne `tokio`/`bincode`/`blake3` |
+| 10 | `docs/agent/` (von `CLAUDE.md` referenziert) fehlt | `docs/agent/CRATES.md` aus `capabilities.toml` generieren (P0) |
 | 7 | Ein vollständiger Workspace-Check ist auf der Entwicklungs-VM (1 vCPU, 3,9 GB RAM) nicht abgeschlossen worden | Gates laufen in CI je Crate; das Gesamtergebnis ist erst nach P0 belastbar |
 
 ### 18.2 Offene Entscheidungen mit Freigabebedarf
@@ -1757,6 +1772,12 @@ Befunde am Repository-Stand (HEAD `d8b45b8`, 2026-11-24), per Dateiprüfung bele
 | **SD-76** | **Eingefrorene Compliance-Crates unangetastet; Receipt→Proof im Bridge-Layer (K-55)** |
 | **SD-77** | **Compliance-Profile `Development`/`Standard`/`Strict` (K-56)** |
 | **SD-78** | **`export_cluster` für Auskunft/Portabilität (K-57)** |
+| **SD-80** | Fünf Ebenen L0–L4; `types` L0, `ports`/`storage-ports` L1 (K-58) |
+| **SD-81** | Ein `Epoch(u64)`, `TxId`-Kopien entfallen (K-59) |
+| **SD-82** | Indexklassen `Corpus`/`Personal`; geteilte Indizes nur aus pseudonymisiertem Text (K-60, `INV-SEP-2`) |
+| **SD-83** | `kvcache`: keine Inhaltsadressierung, Owner `MixedPerClusterKey` (K-61) |
+| **SD-84** | `memmap2` nur in `contextra-sys` hinter Feature; `block_on` nur im Engine-Rand (K-62) |
+| **SD-85** | Alt-Verträge in `contextra-ports` bleiben bis G-CUTOVER, Bridge bedient sie (K-63) |
 | **SD-79** | **Ebenenregel strikt: Abhängigkeit nur auf niedrigere Ebene; `storage-ports` ist Level 0** |
 
 ---
@@ -1883,6 +1904,20 @@ R11 ändert kein Dateiformat gegenüber R9.1, ergänzt aber Formatpunkte, die vo
 | R11-12 | Unerklärtes „R9.1+Ö“ im Kopf | entfernt |
 
 
+
+## Anhang B.5 — Änderungen R11 → R12 (Repo-Abgleich, HEAD `60ea034`)
+
+R12 ändert kein Dateiformat. Alle Befunde wurden statisch am Quelltext geprüft (Cargo.toml, `use`-Zeilen, `capabilities.toml`, Verzeichnisbaum).
+
+| ID | R11-Befund | R12-Lösung |
+|---|---|---|
+| R12-01 | R11 setzte `storage-ports` auf Level 0 und beschrieb Retrieval-Crates als „ohne interne Abhängigkeit“; real nutzen `vector`/`text`/`graph` `types` und `ports`, die in `capabilities.toml` auf Level 2 stehen | Fünf-Ebenen-Modell (K-58, §3.1) |
+| R12-02 | Fünf `TxId`-Kopien und eine zweite `Epoch` im Bestand | ein `Epoch(u64)` (K-59, `INV-EPOCH-1`) |
+| R12-03 | Personenbezogene Daten und geteilte Partitionen: Klartext-Embeddings in geteilten Indizes nicht ausgeschlossen | Indexklassen, `INV-SEP-2`, H-36 (K-60) |
+| R12-04 | `kvcache` mit Inhaltsadressierung und `aes-gcm-siv` fehlte in Spec und Bereinigungsplan | K-61, §14.1 |
+| R12-05 | `block_on` und `memmap2` nur teilweise benannt | gemessene Verteilung in §14.1 (K-62) |
+| R12-06 | Alt-Verträge in `contextra-ports` ungeregelt | K-63 |
+| R12-07 | Ist-Zahlen (Mitglieder, `capabilities.toml`, Root-`tests/`, `docs/agent`) falsch bzw. veraltet | §3.1 und §18.1 korrigiert |
 
 ## Anhang C — Verworfene Vorschläge
 

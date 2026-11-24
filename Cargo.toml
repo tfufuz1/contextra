@@ -6,6 +6,7 @@ members = [
     "crates/contextra-durable-fs",
     "crates/contextra-engine",
     "crates/contextra-graph",
+    "crates/contextra-kvcache",
     "crates/contextra-mvcc",
     "crates/contextra-ports",
     "crates/contextra-rank",
@@ -73,6 +74,7 @@ contextra-checkpoint = { path = "crates/contextra-checkpoint" }
 contextra-crypto = { path = "crates/contextra-crypto" }
 contextra-engine = { path = "crates/contextra-engine" }
 contextra-graph = { path = "crates/contextra-graph" }
+contextra-kvcache = { path = "crates/contextra-kvcache" }
 contextra-mvcc = { path = "crates/contextra-mvcc" }
 contextra-ports = { path = "crates/contextra-ports" }
 contextra-rank = { path = "crates/contextra-rank" }

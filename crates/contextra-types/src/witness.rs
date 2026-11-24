@@ -36,10 +36,6 @@ use serde::{Deserialize, Serialize};
 /// Scanner methodology applied during storage residue verification.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 // ANCHOR[contextra-types:WIT-001]
-#[deprecated(
-    since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
-)]
 pub enum ScanMethod {
     /// Direct structural scan of storage files, indices, or tables.
     Structural,
@@ -76,10 +72,6 @@ impl RequestContext {
 /// Saga record containing deletion tracking state and digests.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 // ANCHOR[contextra-types:WIT-003]
-#[deprecated(
-    since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
-)]
 pub struct SagaRecord {
     /// BLAKE3 hash of deleted keys.
     pub deleted_keys_hash: [u8; 32],

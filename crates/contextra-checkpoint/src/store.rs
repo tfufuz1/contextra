@@ -329,7 +329,10 @@ impl<S: crate::contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Synchroner Konstruktor für Umgebungen ohne asynchronen Tokio-Einstiegspunkt.
-    pub fn new(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self> {
+    pub fn new(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self>
+    where
+        S: 'static,
+    {
         let ns = namespace.into();
         let orphan_path = std::path::PathBuf::from(format!("{ns}_orphaned_checkpoints.json"));
         let orphan_registry = Arc::new(InstanceOrphanRegistry::new(&orphan_path));
@@ -341,7 +344,10 @@ impl<S: crate::contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         storage: Arc<S>,
         namespace: impl Into<String>,
         orphan_registry: Arc<InstanceOrphanRegistry>,
-    ) -> Result<Self> {
+    ) -> Result<Self>
+    where
+        S: 'static,
+    {
         let ns = namespace.into();
         let storage_clone = storage.clone();
         let ns_clone = ns.clone();
@@ -760,7 +766,7 @@ impl<S: crate::contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         let meta = self
             .get_checkpoint_internal(name)
             .await?
-            .ok_or(ContextraError::CheckpointNotFound)?;
+            .ok_or_else(|| ContextraError::CheckpointNotFound(name.to_string()))?;
 
         let last_tx = self.storage.last_tx_id().await?;
         if last_tx > meta.tx_id {
