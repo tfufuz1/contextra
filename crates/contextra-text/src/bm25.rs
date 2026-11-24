@@ -17,10 +17,7 @@
 //! $\text{IDF} = \ln\left(1 + \frac{N - \text{df} + 0.5}{\text{df} + 0.5}\right)$.
 //! Dadurch ist garantiert, dass $\text{IDF} \ge 0$ für alle $df \le N$ gilt.
 
-#[cfg(not(feature = "types-compat"))]
 use crate::error::{Result, TextError as ContextraError};
-#[cfg(feature = "types-compat")]
-use contextra_types::{ContextraError, Result};
 
 // ANCHOR[contextra-text:BM25-001]
 /// Standard-k1-Parameter für die Termfrequenz-Sättigung in BM25 (1.5).

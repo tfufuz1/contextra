@@ -42,35 +42,3 @@ pub enum TextError {
 
 /// Einheitlicher Result-Typ für `contextra-text`.
 pub type Result<T> = core::result::Result<T, TextError>;
-
-#[cfg(feature = "types-compat")]
-impl From<TextError> for contextra_types::ContextraError {
-    fn from(err: TextError) -> Self {
-        match err {
-            TextError::InvalidInput(msg) => contextra_types::ContextraError::InvalidInput(msg),
-            TextError::Text(msg) => contextra_types::ContextraError::Text(msg),
-            TextError::CapacityExceeded { requested, maximum } => {
-                contextra_types::ContextraError::InvalidInput(format!(
-                    "Kapazitätsgrenze überschritten: gefordert {requested}, maximal {maximum}"
-                ))
-            }
-            TextError::Storage(msg) => contextra_types::ContextraError::Storage(msg),
-            TextError::Serialization(msg) => contextra_types::ContextraError::Storage(msg),
-            TextError::Io(e) => contextra_types::ContextraError::Io(e),
-            TextError::Internal(msg) => contextra_types::ContextraError::Internal(msg),
-        }
-    }
-}
-
-#[cfg(feature = "types-compat")]
-impl From<contextra_types::ContextraError> for TextError {
-    fn from(err: contextra_types::ContextraError) -> Self {
-        match err {
-            contextra_types::ContextraError::InvalidInput(msg) => TextError::InvalidInput(msg),
-            contextra_types::ContextraError::Text(msg) => TextError::Text(msg),
-            contextra_types::ContextraError::Storage(msg) => TextError::Storage(msg),
-            contextra_types::ContextraError::Io(e) => TextError::Storage(e.to_string()),
-            other => TextError::Internal(other.to_string()),
-        }
-    }
-}

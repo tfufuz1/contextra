@@ -14,20 +14,16 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "types-compat"]
+default = ["std"]
 std = []
 serde = []
 tracing = []
 inspect = []
 experimental = []
-types-compat = ["dep:contextra-types", "dep:contextra-ports"]
-ports-compat = ["types-compat"]
 bm25f = []
 docid-128 = []
 
 [dependencies]
-contextra-types = { workspace = true, optional = true }
-contextra-ports = { workspace = true, optional = true }
 bytes = { workspace = true }
 itoa = "1.0"
 regex = "1.10"

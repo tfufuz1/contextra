@@ -1,90 +1,18 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/acta-storage/crates/acta-storage",
-    "crates/acta-storage/crates/acta-storage-ports",
-    "crates/acta-storage/crates/acta-storage-fs",
-    "crates/acta-storage/crates/acta-crypto-ref",
-    "crates/acta-storage/crates/acta-keys-file",
-    "crates/acta-storage/crates/acta-keys-cohort",
-    "crates/acta-storage/crates/acta-storage-bridge",
-    "crates/acta-ids",
-    "crates/acta-env",
-    "crates/acta-durable-fs",
-    "crates/acta-wire",
-    "crates/acta-sys",
-    "crates/acta-simd",
-    "crates/acta-store",
-    "crates/acta-vector",
-    "crates/acta-db",
-    "crates/acta-text",
-    "crates/acta-checkpoint",
-    "crates/acta-crypto",
-    "crates/acta-privacy",
-    "crates/acta-graph",
-    "crates/acta-infer-onnx",
-    "crates/acta-mcp",
-    "crates/acta-agent",
-    "crates/acta-infer-ollama",
-    "crates/acta-router",
-    "benchmarks/acta-bench",
-    "crates/acta-infer-candle",
-    "crates/acta-sandbox",
-    "crates/acta-py",
-    "crates/acta-testkit",
-    "crates/acta",
-    "crates/acta-types",
-    "crates/acta-ports",
-    "crates/acta-mvcc",
-    "crates/acta-adapt",
-    "crates/acta-kvcache",
-    "crates/acta-engine",
-    "crates/acta-cognition",
-    "crates/acta-rank",
-    "crates/acta-ingest",
-    "crates/acta-prompt-guard",
-]
-exclude = [
-    "crates/acta-vault",
-]
-# Restored archived crates to default-members:
-# acta-graph, acta-cognition, acta-adapt, acta-kvcache, acta-router, acta-agent, acta-infer-onnx, acta-infer-ollama
-default-members = [
-    "crates/acta-storage/crates/acta-storage",
-    "crates/acta-storage/crates/acta-storage-ports",
-    "crates/acta-storage/crates/acta-storage-fs",
-    "crates/acta-storage/crates/acta-crypto-ref",
-    "crates/acta-storage/crates/acta-keys-file",
-    "crates/acta-storage/crates/acta-keys-cohort",
-    "crates/acta-storage/crates/acta-storage-bridge",
-    "crates/acta-ids",
-    "crates/acta-env",
-    "crates/acta-durable-fs",
-    "crates/acta-wire",
-    "crates/acta-sys",
-    "crates/acta-simd",
-    "crates/acta-types",
-    "crates/acta-ports",
-    "crates/acta-mvcc",
-    "crates/acta-crypto",
-    "crates/acta-vector",
-    "crates/acta-text",
-    "crates/acta-rank",
-    "crates/acta-store",
-    "crates/acta-checkpoint",
-    "crates/acta-engine",
-    "crates/acta-db",
-    "crates/acta-mcp",
-    "crates/acta",
-    "crates/acta-testkit",
-    "crates/acta-graph",
-    "crates/acta-cognition",
-    "crates/acta-adapt",
-    "crates/acta-kvcache",
-    "crates/acta-router",
-    "crates/acta-agent",
-    "crates/acta-infer-onnx",
-    "crates/acta-infer-ollama",
+    "crates/contextra-checkpoint",
+    "crates/contextra-crypto",
+    "crates/contextra-durable-fs",
+    "crates/contextra-engine",
+    "crates/contextra-graph",
+    "crates/contextra-mvcc",
+    "crates/contextra-rank",
+    "crates/contextra-simd",
+    "crates/contextra-storage",
+    "crates/contextra-sys",
+    "crates/contextra-text",
+    "crates/contextra-vector",
 ]
 
 [workspace.package]
@@ -95,9 +23,7 @@ rust-version = "1.89"
 publish = false
 
 [workspace.dependencies]
-acta-ids = { path = "crates/acta-ids" }
-acta-env = { path = "crates/acta-env" }
-acta-durable-fs = { path = "crates/acta-durable-fs" }
+contextra-durable-fs = { path = "crates/contextra-durable-fs" }
 # Error handling
 thiserror = "2"
 
@@ -141,41 +67,17 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Workspace crates
-acta-wire = { path = "crates/acta-wire" }
-acta-sys = { path = "crates/acta-sys" }
-acta-simd = { path = "crates/acta-simd" }
-acta-store = { path = "crates/acta-store" }
-acta-storage = { path = "crates/acta-storage/crates/acta-storage" }
-acta-vector = { path = "crates/acta-vector" }
-acta-index = { package = "acta-vector", path = "crates/acta-vector" } # <!-- crate-ref-ignore -->
-acta-db = { path = "crates/acta-db" }
-acta-text = { path = "crates/acta-text" }
-acta-checkpoint = { path = "crates/acta-checkpoint" }
-acta-crypto = { path = "crates/acta-crypto" }
-acta-privacy = { path = "crates/acta-privacy" }
-acta-graph = { path = "crates/acta-graph" }
-acta-infer-onnx = { path = "crates/acta-infer-onnx" }
-acta-embed = { package = "acta-infer-onnx", path = "crates/acta-infer-onnx" } # <!-- crate-ref-ignore -->
-acta-mcp   = { path = "crates/acta-mcp" }
-acta-agent = { path = "crates/acta-agent" }
-acta-infer-ollama = { path = "crates/acta-infer-ollama" }
-acta-ollama = { package = "acta-infer-ollama", path = "crates/acta-infer-ollama" } # <!-- crate-ref-ignore -->
-acta-router = { path = "crates/acta-router" }
-acta-infer-candle = { path = "crates/acta-infer-candle" }
-acta-candle = { package = "acta-infer-candle", path = "crates/acta-infer-candle" } # <!-- crate-ref-ignore -->
-acta-sandbox = { path = "crates/acta-sandbox" }
-acta-py = { path = "crates/acta-py" }
-acta-testkit = { path = "crates/acta-testkit" }
-acta = { path = "crates/acta" }
-acta-types = { path = "crates/acta-types" }
-acta-ports = { path = "crates/acta-ports" }
-acta-mvcc = { path = "crates/acta-mvcc" }
-acta-adapt = { path = "crates/acta-adapt" }
-acta-kvcache = { path = "crates/acta-kvcache" }
-acta-engine = { path = "crates/acta-engine" }
-acta-cognition = { path = "crates/acta-cognition" }
-acta-rank = { path = "crates/acta-rank" }
-acta-ingest = { path = "crates/acta-ingest" }
+contextra-checkpoint = { path = "crates/contextra-checkpoint" }
+contextra-crypto = { path = "crates/contextra-crypto" }
+contextra-engine = { path = "crates/contextra-engine" }
+contextra-graph = { path = "crates/contextra-graph" }
+contextra-mvcc = { path = "crates/contextra-mvcc" }
+contextra-rank = { path = "crates/contextra-rank" }
+contextra-simd = { path = "crates/contextra-simd" }
+contextra-storage = { path = "crates/contextra-storage" }
+contextra-sys = { path = "crates/contextra-sys" }
+contextra-text = { path = "crates/contextra-text" }
+contextra-vector = { path = "crates/contextra-vector" }
 
 # Ingestion dependencies
 unicode-segmentation = "1.12"

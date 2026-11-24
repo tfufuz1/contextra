@@ -17,7 +17,6 @@ klasse = "A"
 default = ["std"]
 std = []
 serde = ["dep:serde"]
-types-compat = ["dep:contextra-types"]
 simd-avx512 = []
 
 [dependencies]
@@ -25,7 +24,6 @@ thiserror = { workspace = true }
 bytemuck = "1.25"
 tracing = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-contextra-types = { workspace = true, optional = true }
 
 [dev-dependencies]
 proptest = "1.4"

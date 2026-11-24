@@ -50,20 +50,6 @@ impl Clock for SystemClock {
     }
 }
 
-#[cfg(feature = "types-compat")]
-struct PortsClockAdapter(Arc<dyn contextra_ports::Clock>);
-
-#[cfg(feature = "types-compat")]
-impl Clock for PortsClockAdapter {
-    fn now_unix_nanos(&self) -> u64 {
-        self.0.now_unix_nanos()
-    }
-
-    fn monotonic_nanos(&self) -> u64 {
-        self.0.monotonic_nanos()
-    }
-}
-
 // ADR-098 (PAVA Block-Präzision: f64 -> f32 Konvertierung)
 #[allow(clippy::cast_possible_truncation)]
 fn f64_to_f32(v: f64) -> f32 {
@@ -156,13 +142,6 @@ impl IsotonicCalibrator {
     /// Sets a custom clock port for deterministic time access.
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
-        self
-    }
-
-    #[cfg(feature = "types-compat")]
-    /// Sets a custom clock port from `contextra-ports` (transitional compat).
-    pub fn with_ports_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
-        self.clock = Arc::new(PortsClockAdapter(clock));
         self
     }
 

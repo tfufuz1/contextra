@@ -14,8 +14,6 @@ ring = "0"
 klasse = "A"
 
 [dependencies]
-contextra-types = { workspace = true, optional = true }
-contextra-ports = { workspace = true, optional = true }
 contextra-mvcc = { workspace = true, optional = true }
 contextra-sys = { workspace = true, optional = true }
 subtle = "2.6"
@@ -31,7 +29,7 @@ thiserror = { workspace = true }
 blake3 = { workspace = true }
 
 [features]
-default = ["std", "ports-compat"]
+default = ["std"]
 std = []
 serde = []
 tracing = []
@@ -40,12 +38,6 @@ experimental = ["experimental-diskann", "experimental-rabitq", "experimental-pre
 mmap = []
 diskann = ["experimental-diskann"]
 quantize-rabitq = ["experimental-rabitq"]
-ports-compat = [
-    "dep:contextra-ports",
-    "dep:contextra-types",
-    "dep:contextra-mvcc",
-    "dep:contextra-sys",
-]
 docid-128 = []
 experimental-diskann = []
 experimental-rabitq = []

@@ -13,8 +13,6 @@ description = "Multi-Version Concurrency Control (MVCC), sequence log, and trans
 ring = "0"
 
 [dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
 parking_lot = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
@@ -29,7 +27,6 @@ loom = "0.7"
 proptest = "1.4"
 criterion = { workspace = true }
 loom = "0.7"
-contextra-testkit = { workspace = true }
 
 [[bench]]
 name = "mvcc_bench"

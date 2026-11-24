@@ -18,12 +18,8 @@
 //! Block-Max-Zusammenfassungen (à 64 Einträge) zur Beschleunigung des WAND-Algorithmus.
 //! Aktualisierungen erfolgen über RCU (Read-Copy-Update) für sperrenfreie Lesezugriffe.
 
-#[cfg(not(feature = "types-compat"))]
 use crate::error::TextError as ContextraError;
-#[cfg(not(feature = "types-compat"))]
 use crate::types::DocId;
-#[cfg(feature = "types-compat")]
-use contextra_types::{ContextraError, DocId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

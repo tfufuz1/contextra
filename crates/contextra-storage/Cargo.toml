@@ -9,7 +9,6 @@ rust-version.workspace = true
 testing = []
 
 [dependencies]
-contextra-storage-ports = { path = "../contextra-storage-ports" }
 bytes = { workspace = true }
 thiserror = { workspace = true }
 zeroize = { workspace = true }
@@ -17,10 +16,6 @@ crossbeam-skiplist = { workspace = true }
 siphasher = "1"
 
 [dev-dependencies]
-contextra-crypto-ref = { path = "../contextra-crypto-ref", features = ["testing"] }
-contextra-storage-fs = { path = "../contextra-storage-fs" }
-contextra-keys-file = { path = "../contextra-keys-file" }
-contextra-keys-cohort = { path = "../contextra-keys-cohort" }
 
 [lints]
 workspace = true

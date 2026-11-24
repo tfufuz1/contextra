@@ -14,59 +14,6 @@ pub fn map_is_empty<K, V, S>(m: &ahash::AHashMap<K, V, S>) -> bool {
     m.is_empty()
 }
 
-// ADR-098 (Token-Schätzung für ContextChunk: f64 -> usize Konvertierung)
-#[cfg(feature = "types-compat")]
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-pub(super) fn estimate_tokens(text: &str) -> usize {
-    if text.is_empty() {
-        return 0;
-    }
-    let words = text.split_whitespace().count();
-    let chars = text.chars().count();
-    let est = (words as f64 * 1.3).max(chars as f64 / 4.0).ceil();
-    if est.is_finite() && est >= 0.0 {
-        usize::try_from(est.clamp(0.0, usize::MAX as f64) as u64).unwrap_or(0)
-    } else {
-        0
-    }
-}
-#[cfg(feature = "types-compat")]
-impl TryFrom<SearchResult> for contextra_types::ContextChunk {
-    type Error = contextra_types::ContextraError;
-
-    fn try_from(r: SearchResult) -> std::result::Result<Self, Self::Error> {
-        let doc_id = contextra_types::DocId::from_key(&r.id).map_err(|e| {
-            contextra_types::ContextraError::InvalidInput(format!(
-                "SearchResult-ID '{}' ungültig: {e}",
-                r.id
-            ))
-        })?;
-        let content = r
-            .metadata
-            .as_ref()
-            .and_then(|m| m.get("text").or_else(|| m.get("content")))
-            .and_then(|t| t.as_str())
-            .unwrap_or("")
-            .to_string();
-        let token_count = estimate_tokens(&content);
-        let links: Vec<contextra_types::MemoryLink> = r
-            .metadata
-            .as_ref()
-            .and_then(|m| m.get("links"))
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
-            .unwrap_or_default();
-        Ok(contextra_types::ContextChunk {
-            doc_id,
-            content,
-            relevance: r.score,
-            token_count,
-            metadata: r.metadata,
-            contextual_prefix: None,
-            links,
-        })
-    }
-}
-
 /// Provenance record for fused search result.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 /// Auditierbarer Herkunftsnachweis (Provenance) über alle beteiligten Retrieval-Kanäle.
@@ -121,13 +68,6 @@ impl ProvenanceRecord {
             signal_ranks,
             ..Default::default()
         }
-    }
-
-    #[cfg(feature = "types-compat")]
-    /// Synthesized from contextra_types::DocId.
-    pub fn synthesized_from_types(source_doc_ids: &[contextra_types::DocId]) -> Self {
-        let local_ids: Vec<DocId> = source_doc_ids.iter().map(|&id| DocId(id.0)).collect();
-        Self::synthesized_from(&local_ids)
     }
 }
 

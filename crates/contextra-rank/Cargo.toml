@@ -14,14 +14,11 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "types-compat"]
+default = ["std"]
 std = []
-types-compat = ["dep:contextra-types", "dep:contextra-ports"]
 dibud = []
 
 [dependencies]
-contextra-types = { workspace = true, optional = true }
-contextra-ports = { workspace = true, optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { workspace = true }
 ahash = { version = "0.8", features = ["serde"] }

@@ -14,10 +14,8 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["types-compat", "ports-compat", "experimental-graph"]
+default = ["experimental-graph"]
 experimental-graph = []
-types-compat = ["dep:contextra-types", "dep:contextra-ports"]
-ports-compat = ["types-compat"]
 docid-128 = []
 graph-connectivity-health = []
 edge-reinforcement-learning = []
@@ -30,8 +28,6 @@ apprh-diffusion = []
 physio-percolation = ["graph-connectivity-health"]
 
 [dependencies]
-contextra-types = { workspace = true, optional = true }
-contextra-ports = { workspace = true, optional = true }
 bytes = { workspace = true }
 parking_lot = { workspace = true }
 tracing = { workspace = true }
