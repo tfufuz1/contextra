@@ -1,42 +1,42 @@
-# SPEC.md — Contextra Gesamtsystem-Spezifikation (Speicherkern, Retrieval, Engine & Löscharchitektur), Revision R12
+# SPEC.md — Contextra Gesamtsystem-Spezifikation (Speicherkern, Retrieval, Engine & Löscharchitektur), Revision R13
 
 | | |
 |---|---|
-| Status | **Revision R12 (Gesamtsystem-Spezifikation, Repo-abgeglichen), Entwurf zur Freigabe als Gate G-0.** R12 gleicht R11 gegen den geklonten Code ab (HEAD `60ea034`) und löst die dabei gefundenen Widersprüche (K-58…K-63, Anhang B.5). Führt die Gesamtsystemsicht von R10 (§0–§3, K-39…K-47) mit dem vollständigen Speicherkern-Wortlaut von R9.1 (§4–§11) zusammen und schließt die in R10 nie geschriebenen Kapitel §12–§19 samt Anhängen, einschließlich des Vertrags zu `contextra-vector`, `-text`, `-graph`, `-rank`, `-engine`, `-checkpoint`. Konsolidiert R7, Lethe-Architekturentwurf, Lethe-Engine-Spec, Mnemos, „Optimal-LLM-Datenbank“ und Octa-Abgleich. |
-| Gegenstand | Eingebettetes, crash-sicheres Gesamtsystem für europäische Unternehmens-LLM- und Agenten-Workloads: synchroner Speicherkern (`contextra-storage`, ersetzt `contextra-store`) mit atomaren Mehr-Space-Änderungen, MVCC-Sichten, clusterlokalen Branches/Merges; mehrkanaliges Hybrid-Retrieval (Vektor, BM25/WAND, Wissensgraph, kalibrierte Fusion) über löschbare Index-Partitionen; Agenten-Langzeitgedächtnis; **durchgängig nachweisbare Löschung personenbezogener Daten** über Quell- und Indexschichten (logisch, kryptografisch, physisch) mit Trennung personenbezogener und sonstiger Daten. |
-| Verifikation | **Ist-Stand (Repository HEAD `60ea034`, 2026-11-24):** Der Kern hat Teilchecks und Strukturtests (`crates/contextra-storage/tests/`, 114 Quelldateien, ≈ 14 kLOC), **kompiliert aber nicht**, weil `contextra-storage-ports` weder als Crate existiert noch in `crates/contextra-storage/Cargo.toml` eingetragen ist (§18.1 Nr. 1). Die Retrieval-Crates (`vector`, `text`, `graph`, `rank`, `engine`, `checkpoint`, `crypto`, `mvcc`) enthalten Alt-Pfade (`memmap2`, `std::fs`, `bincode`, `blake3`, `aes-gcm-siv`, 4-Wege-2PC) und sind noch nicht auf `contextra-storage` geschnitten; gemessen (Dateien mit Treffer): `memmap2` 17 in `vector`, `bincode` in 5 Crates, `blake3` im Quelltext von 6 Crates, `block_on` in 6 Crates, `DISKANN_INTEGRITY_KEY` 4 Dateien (§14.1, §18.1). Vollständige Release-Gates (TLA+ M1–M6, Fuzzing, Referenzvektoren, Voll-Orakel) sind offen. **Keine Leistungszahl (H-1…H-35) gilt vor Gate-Abnahme als gemessen.** |
+| Status | **Revision R13 (Gesamtsystem-Spezifikation auf dem real existierenden Crate-Bestand), Entwurf zur Freigabe als Gate G-0.** R13 gleicht R12 gegen den geklonten Code ab (HEAD `78a1783`, 2026-11-25), schneidet das System auf die **14 tatsächlich vorhandenen Crates** zu und entfernt alles, was dort nicht existiert oder nicht zum fokussierten Produkt gehört: **KV-Cache, Agenten-Orchestrierung, Agenten-Kognition, Router, Session-DAG, kognitiver Decay, Inferenz-Adapter, eigenständige Safety-/Ingest-Crates** (K-64…K-72, Anhang B). Die Gesamtsicht (§0–§3), der Speicherkern (§4–§11), die Retrieval-Verträge (§12) und die Gates (§13–§15) bleiben inhaltlich erhalten, soweit sie nicht von diesen Schnitten berührt sind. |
+| Gegenstand | Eingebettete, crash-sichere **Informations-Engine für europäische Unternehmens-LLM-Anwendungen**: synchroner Speicherkern (`contextra-storage`, ersetzt den Alt-LSM `contextra-store`) mit atomaren Mehr-Space-Änderungen, MVCC-Sichten und clusterlokalen Branches; mehrkanaliges Hybrid-Retrieval (Vektor, BM25/WAND, Wissensgraph, kalibrierte Fusion) über löschbare Index-Partitionen; **durchgängig nachweisbare Löschung personenbezogener Daten** (logisch, kryptografisch, physisch) mit Trennung personenbezogener und sonstiger Daten; token-budgetierte Kontextlieferung. Contextra liefert **Daten und Kontext an LLMs und Agenten**; es betreibt weder Modelle noch Agenten. |
+| Verifikation | **Ist-Stand (HEAD `78a1783`), statisch geprüft, nicht kompiliert:** Der Workspace ist **nicht baubar** (§18.1): (1) `Cargo.toml` listet `crates/contextra-kvcache` als Mitglied, das Verzeichnis fehlt; (2) `contextra-storage` importiert `contextra_storage_ports` in 134 Zeilen, das Crate existiert nicht; (3) `contextra-engine` importiert `contextra_store` in 18 Dateien, das Crate existiert nicht. Alle Leistungszahlen dieser Spezifikation sind **Entwurfsziele** mit Messverfahren (§17), keine Messwerte. Release-Gates (TLA+ M1–M6, Fuzzing, Referenzvektoren, Voll-Orakel) sind offen. |
 | Rechtlicher Vorbehalt | Das System liefert technische Eigenschaften (atomare Sichtbarkeitsbarriere, Schlüsselvernichtung, physische Dateibereinigung, Löschprotokolle, Trennung personenbezogener Daten), keine Rechtsaussage zu Art. 17 DSGVO, Fristen, Ausnahmen oder zur Einstufung pseudonymisierter Daten als anonym. „Gelöscht“ ist immer an eine nachgewiesene Stufe aus §9.2 und ein konkretes `ErasureReceipt` gebunden. |
-| Normative Quelle | **Diese Datei ist die einzige normative Gesamtsystem-Fassung.** Modul-Specs unter `crates/*/SPEC.md`, `capabilities.toml` und `CLAUDE.md` verweisen hierher oder sind vor G-0 anzugleichen (§18.1). Rangfolge bei Widerspruch: **§15 (Invarianten) vor §12.8 (Audit-Ergänzungen) vor §12 (Erweiterungs-/Retrieval-Integration) vor den übrigen Abschnitten.** |
+| Normative Quelle | **Diese Datei ist die einzige normative Gesamtsystem-Fassung.** Modul-Specs unter `crates/*/SPEC.md`, `capabilities.toml` und `CLAUDE.md` verweisen hierher oder sind vor G-0 anzugleichen (§18.1). Rangfolge bei Widerspruch: **§15 (Invarianten) vor §12.8 (Audit-Ergänzungen) vor §12 vor den übrigen Abschnitten.** |
 | Sprache | Prosa deutsch, Bezeichner englisch. |
-| R11-Audit | Anhang B.4: Wiederherstellung der in R10 gekürzten Normtexte, Auflösung der Widersprüche zwischen Klasse-A-Autarkie, Ebenenregel und Index-Bindung, Ingest-Atomarität, löschbare Index-Partitionen, Trennungsprinzip, Query-Plan-Protokoll. Alle neuen Leistungsaussagen sind **Entwurfsziele** (H-29…H-35). |
+| Lesehinweis | Die Entscheidungs-IDs `K-xx` (§1), `SD-xx` (§19), `INV-*` (§15), `H-xx` (§17) bleiben stabil. In R13 neu: `K-64…K-72`, `SD-86…SD-95`, `INV-TOPO-1`, `INV-SCOPE-1`, `INV-PORT-1`. Die Änderungsliste steht in Anhang B. |
 
 ---
 
 ## 0. Kurzfassung
 
-**Contextra ist eine europäische Datenbank- und Gedächtnisplattform für produktive Unternehmens-LLM-Systeme und autonome KI-Agenten, in deren Speicher- und Indexfundament permanenter Datenschutz und belegbare Löschbarkeit (Art. 17 DSGVO) von Anfang an verankert sind.**
+**Contextra ist eine europäische Datenbank- und Informations-Engine für Unternehmens-LLM-Systeme, in deren Speicher- und Indexfundament Datenschutz und belegbare Löschbarkeit (Art. 17 DSGVO) von Anfang an verankert sind.**
 
-Während die Vorgänger-Architektur auf einem generischen LSM-Tree (`contextra-store`) plus lose gekoppelter Zwei-Phasen-Kompensation (`DbTransaction` + `CommitLedger`) über separate Vektor-, Volltext- und Graph-Indizes aufbaute, basiert Contextra ab R11 auf dem vollständig neu entwickelten Speicherkern **`contextra-storage`**:
+Die Vorgänger-Architektur baute auf einem generischen LSM-Tree (`contextra-store`) plus lose gekoppelter Zwei-Phasen-Kompensation (`DbTransaction` + `CommitLedger`) über getrennte Vektor-, Volltext- und Graph-Indizes. Contextra ersetzt das durch den neu entwickelten Speicherkern **`contextra-storage`**:
 
-1. **Ein Fundament für Dokumente, Vektoren, Text-Metadaten, Graph-Fakten und Agenten-Zustände:** Ein fachlicher Schreibvorgang (`Change`) schreibt kanonische Dokumentdaten, quantisierte/kompakte Vektorcodes, Vorwärts-Termdaten, Graph-Fakten und Bitemporalitäts-Kopfdaten **in einem einzigen Redo-Frame mit genau einem Gruppen-Fsync** atomar in die Spaces eines Clusters; Dokumente, die das Change-Limit überschreiten, werden über einen **Publish-Record** (ein abschließender Change setzt `head`) ebenso atomar sichtbar, ohne Zweiphasenprotokoll (§12.4.0). Verteilte Kompensations-Transaktionen zwischen Storage und Indizes entfallen vollständig.
-2. **Ein Cluster ist die universelle Lebens-, Versions-, Schlüssel- und Löschdomäne:** Alles zu einer Person, einem Mandanten-Fall oder einem Arbeitskontext liegt in einem `Cluster` (`ClusterId`, 128-Bit-Zufall). Der Cluster ist zugleich **Löschdomäne, Schlüsseldomäne, Versionsdomäne (`BranchId`), und physische Platzierungseinheit**. Branches für Agenten-Experimente sind clusterlokale O(1)-Forks und sterben automatisch mit ihrem Cluster. **Geteilte Indizes sind in Partitionen entlang der Packgruppen zerlegt**, jede Generation mit eigenem Schlüssel: Löschen kostet höchstens den Neuaufbau betroffener Partitionen, danach macht die Schlüsselvernichtung alte Kopien unlesbar (§12.4.5). **Personenbezogene Inhalte liegen nur in Personen-/Fallclustern; der gemeinsame Korpus enthält pseudonymisierte Chunks, die Zuordnung liegt im Pseudonym-Tresor der Person** (§12.4.6).
-3. **Mehrkanaliges Hybrid-Retrieval ohne Konsistenz- oder Löschlücken:** `contextra-vector` (HNSW, DiskANN, SQ8, RaBitQ, ACORN, Partial-Rebuild), `contextra-text` (BM25/BM25F, deutsche Morphologie & Komposita-Zerlegung, Block-Max WAND), `contextra-graph` (CSR, n-äre Hyperkanten, PPR/APPRH/TL-HFD, PathRAG) und `contextra-rank` (4-/5-Signal-Fusion, Isotonic/Platt/Conformal Kalibrierung, Drift-Erkennung, Streaming-Budget-Fusion `DiBud`) operieren als strikt vertragsgebundene obere Schichten (`SegmentOwner`, `ConsumerFeed`, `Index-Watermark`, `View::filter_visible`).
-4. **Löschung in drei deterministischen, geordneten Schritten:**
-   - **Gate (`ER1`, Millisekunden):** Cluster ab Stamp `S` für jede Sicht – einschließlich künftiger und historischer Sichten – atomar `Erased`; alle Retrieval-Owner maskieren Kandidaten synchron über `on_gate` und `View::filter_visible` vor Scoring und Rückgabe.
-   - **Schlüsselvernichtung (`ER2`, `Cryptographic`):** Alle Epochen des Clusterschlüssels werden über `KeyProvider::destroy_many` vernichtet (`probe == Absent`). Sobald abgeschlossen, sind alle Kerndaten (Redo, Runs, Blobs) sowie cluster-sealed Index-Payloads ohne Schlüssel unlesbar (`INV-ERA-7`).
-   - **Physischer Purge (`ER5–ER6`, fristgebunden & amortisiert):** Lebende Run-/Blob-Dateien und registrierte `Rebuildable`-Indexsegmente (`Hnsw`, `DiskANN`, `InvertedIndex`, `CsrGraph`) werden per Rohkopie bzw. segmentweisem `rewrite_without` bereinigt und mit `verify_absent` + `ErasureReceipt` bis zum `Anchor` und `Ledger` attestiert.
-5. **Klare Open-Core- und Compliance-Grenzen:** Formate, Kernsemantik, Port-Traits, Simulations-/Test-Orakel und Basis-Löschung bleiben offen und verifizierbar (§2.6).
+1. **Ein Fundament für Dokumente, Vektoren, Text-Metadaten und Graph-Fakten:** Ein fachlicher Schreibvorgang (`Change`) schreibt kanonische Dokumentdaten, kompakte Vektorcodes, Vorwärts-Termdaten, Graph-Fakten und Zeit-Kopfdaten **in einem Redo-Frame mit genau einem Gruppen-Fsync** atomar in die Spaces eines Clusters. Große Dokumente werden über einen **Publish-Record** (ein abschließender Change setzt `head`) ebenso atomar sichtbar (§12.4.0). Kompensations-Transaktionen zwischen Storage und Indizes entfallen vollständig.
+2. **Der Cluster ist Lebens-, Versions-, Schlüssel- und Löschdomäne** (`ClusterId`, 128-Bit-Zufall). Branches sind clusterlokale O(1)-Forks und sterben mit ihrem Cluster. **Geteilte Indizes sind in Partitionen entlang der Packgruppen zerlegt**, jede Generation mit eigenem Schlüssel: Löschen kostet höchstens den Neuaufbau betroffener Partitionen, danach macht die Schlüsselvernichtung alte Kopien unlesbar (§12.4.5). **Personenbezogene Inhalte liegen nur in Personen-/Fallclustern; der gemeinsame Korpus enthält pseudonymisierte Chunks, die Zuordnung liegt im Pseudonym-Tresor der Person** (§12.4.6).
+3. **Mehrkanaliges Hybrid-Retrieval ohne Konsistenz- oder Löschlücken:** `contextra-vector` (HNSW, DiskANN, SQ8, RaBitQ, ACORN, Partial-Rebuild), `contextra-text` (BM25/BM25F, deutsche Morphologie und Komposita-Zerlegung, Block-Max WAND), `contextra-graph` (CSR, n-äre Hyperkanten, PPR/APPRH/TL-HFD, PathRAG) und `contextra-rank` (Signal-Fusion, Isotonic/Platt/Conformal-Kalibrierung, Drift-Erkennung, Budget-Fusion `DiBud`) laufen als vertragsgebundene Schichten über dem Kern. Die Bindung geschieht ausschließlich im Engine-Modul `projection` (§3.1).
+4. **Löschung in drei geordneten Schritten:** **Gate** (`ER1`, Millisekunden, logisch sofort in allen Kanälen) < **Schlüsselvernichtung** (`ER2`, kryptografisch, `probe == Absent`) < **physischer Purge** (`ER5–ER6`, fristgebunden, amortisiert, mit `verify_absent` und `ErasureReceipt` bis zum Anker und Ledger).
+5. **Token- und kontextschonende Lieferung:** Der Kern liefert Köpfe, Gewichte und Seiten (`header`/`weights`/`page`) mit Budget; die Engine plant Abfragen so, dass das LLM nur das Nötige in sein Kontextfenster bekommt (§12.4.4, §12.5).
+6. **Klare Open-Core-Grenze:** Formate, Kernsemantik, Ports, Orakel und Basis-Löschung bleiben offen und verifizierbar; Betriebs-, Compliance- und Integrationsfunktionen sind monetarisierbar (§2.6).
 
-| Systemschicht | Verantwortung | Darf **niemals** |
-|---|---|---|
-| **Speicherkern** (`contextra-storage`) | Atomare Multi-Space-Changes, Sequencer+Syncer, Stamp-MVCC, clusterlokale Branches, Three-Step-Erase (`Gate < KeyDestroy < Purge`), Ledger, Anchor-Binding, Budget-Paging (`header`/`weights`/`page`) | Tokenizer, Embeddings, ANN, BM25, PPR, Reranking, UI-/Rechtspolitik oder eigene Krypto-/FS-Syscalls implementieren |
-| **Retrieval-Triebwerke** (`vector`, `text`, `graph`, `rank`, `simd`) | HNSW/DiskANN, SQ8/RaBitQ, ACORN, BM25/WAND, deutsche Komposita, CSR/Hyperkanten, RRF/Kalibrierung/DiBud; **verbindliche `SegmentOwner`- & `ConsumerFeed`-Konformanz** | `memmap2`-Bypässe an Storage/Sealing vorbei auf Platte schreiben, globale Klartext-Wörterbücher ohne Löschbindung halten oder `filter_visible` umgehen |
-| **Orchestrierung & Agenten** (`engine`, `checkpoint`, `agent`, `cognition`, `router`, `kvcache`) | `Collection` → `SpaceId`-Mapping, `TenantPolicy`, Hybrid-Query-Planung (`Index ∪ Delta`), Ingestion- & Privacy-Pipeline, Session-DAG ↔ Branch-Steuerung, kognitiver Decay | Eigenes Pseudo-2PC aufspannen, `AdaptiveDecay` als DSGVO-Löschung ausgeben oder unbegrenzte Snapshot-Pins leaken |
-| **Sicherheit & Compliance** (`privacy`, `prompt-guard`, `sandbox`, `crypto-ref`, `keys-*`, `erasure`) | PII-Erkennung & -Maskierung, `XChaCha20-Poly1305`/`HMAC-SHA256`/`HKDF`/`CRC32C`, Argon2id/HSM/KMS-Keys, Ed25519-signierte `DeletionProof`s aus `ErasureReceipt` + Owner-Attesten | Klartext-ClusterIds ins Ledger schreiben, schwache Schlüssel still als `Complete` attestieren |
+**Bewusst nicht Teil von Contextra** (R13, §2.3): KV-Cache/Prompt-Cache, Agenten-Orchestrierung, Agenten-Kognition („Sleep Cycles“, Decay), Modell-Routing, Modell-Hosting/Inferenz, Parser-Sandbox und Prompt-Guard als eigene Produktteile. Contextra stellt dafür **Ports und Konventionen** bereit (z. B. `EmbeddingProvider`, `EgressPolicy`, `PiiClassifier`), damit Kunden und Plugins sie anbinden können.
 
-**Was weder Speicherkern noch Retrieval-Schicht allein garantieren können:** Prozessspeicher-Reste im Allokator, unverschlüsselter Swap, Core-Dumps, Dateisystem-Journale (ext4/xfs/APFS), SSD-Flash-Wear-Leveling, externe Backups mit Schlüsselkopien oder externe Cloud-LLM-Provider-Logs außerhalb der Contextra-Pipeline. Jedes `ErasureReceipt` weist diese Restexposition explizit nach Befund (§9.9, §13.2.1) aus.
+### 0.1 Schichten und Verantwortung (14 Crates)
 
----
+| Ebene | Crates | Verantwortung | Darf **niemals** |
+|---|---|---|---|
+| **L0 Fundament** | `contextra-types`, `contextra-sys` (Unsafe-Insel), `contextra-simd` (Unsafe-Insel) | Werttypen/IDs/Fehler; FFI und OS-Primitive (fsync-Varianten, `mlock`, ACL, optional `mmap`); SIMD-Distanzkerne | von anderen Contextra-Crates abhängen; `types` darf kein `unsafe` |
+| **L1 Verträge & Plattform** | `contextra-ports`, `contextra-durable-fs` | Kernel-Ports (`Fs`, `KeyProvider`, `Cipher`, `Anchor`, …) und Retrieval-/System-Ports; sichere Dateioperationen mit fsync-Poisoning, Journal, Scrub, Fehlerinjektion | Algorithmen oder Politik enthalten; `durable-fs` nur über `sys` auf OS-Primitive zugreifen |
+| **L2 Triebwerke** (untereinander ohne Kanten) | `contextra-storage`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-mvcc`, `contextra-checkpoint` | Speicherkern mit Three-Step-Erase; Krypto/Schlüssel/Beleg-Signatur; ANN; BM25/WAND; Wissensgraph; Fusion/Kalibrierung; Epoch-Pin-Register; Snapshot-Set- und Restore-Koordination | eigene Dateien am Kern vorbei schreiben, `std::fs`/`memmap2` in Produktivpfaden, globale Klartext-Wörterbücher ohne Löschbindung, `filter_visible` umgehen |
+| **L3 Komposition** | `contextra-engine` | Composition Root: Kernel-Adapter (`platform`, `kernel`), Projektion in Indizes (`projection`), Collections/Tenant-Policy, Query-Plan (`query`), Ingest/Publish/Pseudonymisierung (`ingest`), Compliance-Profile, Receipt→Proof, Auskunft/Export (`compliance`), Hintergrund-Worker | Pseudo-2PC aufspannen; Retention/TTL als „Decay“ mit Löschversprechen vermischen |
+
+**Was weder Speicherkern noch Retrieval-Schicht allein garantieren können:** Prozessspeicher-Reste im Allokator, unverschlüsselter Swap, Core-Dumps, Dateisystem-Journale (ext4/xfs/APFS), SSD-Wear-Leveling, externe Backups mit Schlüsselkopien oder Logs externer Cloud-LLM-Anbieter außerhalb der Contextra-Pipeline. Jedes `ErasureReceipt` weist diese Restexposition nach Befund aus (§9.9, §13.2.1).
 
 ---
 
@@ -49,7 +49,7 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 | K-01 | Löscheinheit heißt „Cluster“ (R7, Lethe-Entwurf) bzw. „EU“ (Lethe-Spec) | **Cluster** | ein Begriff, R7 ist Referenz | §4 |
 | K-02 | ClusterId: Aufrufer-ID / HMAC-`eu_tag` (Lethe-Spec, R6) vs. vom Kern erzeugt (R7) | **Kern erzeugt 128-Bit-Zufall**, kein `eu_tag`, kein `tenant_tag_key` | keine Wiederverwendung, nicht ableitbar, kein zusätzliches Schlüsselmaterial im Klartext-Pfad | §4.3 |
 | K-03 | Ledger speichert ClusterId (R7) vs. pseudonymes `tomb_id` (Lethe-Entwurf) | **domain-separiertes `tomb_id`** | kein Klartext-Identifier im dauerhaften Ledger; HMAC bleibt linkbares Pseudonym und wird als personenbezogenes Metadatum behandelt | §9.7 |
-| K-04 | Schlüssel: Cohort-KEK-Rewrap (Lethe-Spec) vs. Schlüssel je Cluster (R7) | **Port `KeyProvider` (je Cluster adressiert)**; Cohort-Rewrap ist *Strategie* in `contextra-keys-cohort` | Kern bleibt einfach; Skalierung auf Millionen Cluster bleibt möglich | §9.4 |
+| K-04 | Schlüssel: Cohort-KEK-Rewrap (Lethe-Spec) vs. Schlüssel je Cluster (R7) | **Port `KeyProvider` (je Cluster adressiert)**; Cohort-Rewrap ist *Strategie* im Provider (`contextra-crypto`, Modul `keys::cohort`, optional) | Kern bleibt einfach; Skalierung auf Millionen Cluster bleibt möglich | §9.4 |
 | K-05 | Ein globaler Commit-Log (Lethe) vs. Redo mit Committer und Catalog-Edits (R7) | **R7-Modell** | R7 ist bis zur Absturzmatrix durchgearbeitet | §6, §10 |
 | K-06 | Segmentschnitt bei jedem Gate (R6) vs. keiner (R7) | **Kein Schnitt**; Barriere nur beim Purge von `Plain` | Commit-Pfad bleibt frei von Löschkosten | §9.5 |
 | K-07 | Versionierung: Prolly-Tree/Merkle-DAG (Mnemos, Engram, Aether, Cairn) vs. R7 NZ-13 | **Clusterlokale Branches im Kern**, **ohne** Merkle/Inhaltsadressierung | Branches ohne Dedup sind löschlokal; ein globaler DAG über Cluster würde Löschung unmöglich machen | §8 |
@@ -57,8 +57,8 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 | K-09 | „Hold“ als Rechtsfunktion mit Vier-Augen-Release vs. `Restriction` ohne Override (R7) | **`Restriction`** (R7) mit wählbarer `LiftPolicy` (`OwnerOrAdmin` oder `FourEyes` über Port `Authority`); `Hold` bleibt **technisch** | Mechanismus ohne Politik, aber Vier-Augen-Prinzip verfügbar | §9.6 |
 | K-10 | Commit ohne WAL per CAS-Superblock (Aether) | **Verworfen** | Mehr-Space-Atomarität und Index-Deltas brauchen ein sequenziertes Redo-Log | §6 |
 | K-11 | `mmap`, `io_uring`, `O_DIRECT`, GPUDirect (Aether, Engram) | **Nur als `Fs`-Implementierungen**, nie im Speicherkern oder unversiegelt in Indizes | Fehlerinjektion muss jeden Zugriff sehen; `mmap` umgeht AAD/Checksums/Gate-Fencing | §3.1, §12.4 |
-| K-12 | Async-Runtime (Mnemos, Cairn) | **Synchroner Kern (`contextra-storage`)**, Async-Fassade in `contextra-storage-bridge` / `contextra-engine` | Race-Freiheit deterministisch per `loom`/Sim prüfbar | §3.4 |
-| K-13 | Token-IDs, KV-Cache-Blöcke, feste `AlignedContextPage` im Kern | **Verworfen im Kern**; Token-Gewichte als `weights[W]`; KV-Verweise in `contextra-kvcache` / Kopf oben | Formatbruch bei Modellwechsel; Cloud-APIs erlauben keinen KV-Zugriff | §4.5, §12.5 |
+| K-12 | Async-Runtime (Mnemos, Cairn) | **Synchroner Kern (`contextra-storage`)**; Async-Fassade (Blocking-Pool) im Engine-Modul `kernel` | Race-Freiheit deterministisch per `loom`/Sim prüfbar | §3.4 |
+| K-13 | Token-IDs, KV-Cache-Blöcke, feste `AlignedContextPage` im Kern | **Verworfen im Kern und im Produkt (R13, K-65):** Token-Gewichte als `weights[W]`; **KV-Cache ist nicht Teil von Contextra** | Formatbruch bei Modellwechsel; Cloud-APIs erlauben keinen KV-Zugriff; Prefix-Dedup bricht die Löschdomäne | §4.5, §12.5 |
 | K-14 | Zoom-Leiter L0…Ln (Mnemos, Engram) | **Konvention oben**: Zoom-Stufen sind Schlüsselsuffixe im selben Cluster | Kern bleibt bedeutungsfrei; Löschung erfasst alle Stufen automatisch | §12.6 |
 | K-15 | Trust-/Taint-Labels (Mnemos, Engram) | **Konvention oben** (erstes Kopfbyte), Vererbung = Minimum über `DerivedFrom` | Politik, nicht Mechanismus | §12.6 |
 | K-16 | Indizes im Kern (Cairn, Engram, Aether) | **Oben als eigene Crates (`vector`, `text`, `graph`, `rank`)**, über Verträge (`SegmentOwner`, `ConsumerFeed`, **Watermarks**, `filter_visible`) | Löschbarkeit erzwingt Segmentverträge; Indexalgorithmen bleiben modular | §12 |
@@ -85,31 +85,39 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 | K-37 | `ClusterLocal` ohne Admission ⇒ Inode-/FD-Explosion, „nie zurück“ | **Mindestgröße, Quoten, Pure-Demotion, FD-Cache statt FD-Limit, Verzeichnis-Sharding** | Ressourcenschutz ohne stille Herabstufung | §4.3.1, §5.4 |
 | K-38 | Idempotenz-Prüfung als Sonderpfad im kritischen Pfad | **Implizite `Absent`-Guard auf `SYS_IDEM`-Schlüssel** | ein Zwei-Stufen-Mechanismus für Guards & Idempotenz | §6.5 |
 | **K-39** | **Engine-Schreibpfad: `DbTransaction` + `CommitLedger` + 4-Wege-Kompensation (`LsmStorage`, HNSW, BM25, CSR) vs. Single-Source-Atomarität** | **Abschaffung des Pseudo-2PC:** Atomares Schreiben aller kanonischen Quell-, Vektor-, Vorwärts-Text- und Graph-Fakten einer Löschdomäne als **ein** `Change` in `contextra-storage`; abgeleitete globale/partitionierte Indizes aktualisieren asynchron über `ConsumerFeed` + Watermark + Delta-Merge | beseitigt Split-Brain zwischen 4 Stores, Kompensations-Races (`INV-DB-3`), JSON-Intent-Overhead und Lock-Kaskaden | §12.4.0, §12.4.5, §14.1 |
-| **K-40** | **Duale MVCC-Systeme (`contextra-mvcc`: `TxId`/`SequenceLog`/`SsiValidator` vs. `contextra-storage`: `Stamp` + 2-Stufen-Guards)** | **`contextra-storage` liefert die einzige produktive MVCC-Wahrheit (`Stamp ≡ Epoch(u64)`)** und optimistische Punkt-/Range-Guards; Retrieval-Crates nutzen abstraktes `Epoch(u64)`; `contextra-mvcc` wird ab G-CUTOVER für Kernpfade abgelöst (nur optionaler Standalone-In-Memory-Modus verbleibt bis Entfall) | verhindert `TxId`-vs-`Stamp`-Drift, doppelte Snapshot-Pins (`PinGuard` vs `View-Lease`) und konfligierende Lock-Hierarchien | §12.4.0, §14.1 |
-| **K-41** | **Duale Krypto & Erasure (`contextra-crypto`: `aes-gcm-siv`/`blake3`/`deletion_proof`/`kv_shredding` vs. `contextra-crypto-ref`/`XChaCha20-Poly1305` + `contextra-erasure`)** | **Krypto-Vereinheitlichung auf `XChaCha20-Poly1305` + `HMAC-SHA256` + `HKDF-SHA256` + `CRC32C`** für Persistenz & Indizes; `blake3` und `aes-gcm-siv` werden im Speicher-/Index-Pfad entfernt; `DeletionProof` wird durch `contextra-erasure` über `ed25519-dalek` (`verify_strict`) aus `ErasureReceipt` + `EraseAttestation`s gebaut | ein Audit-Pfad, keine inkonsistenten Nonce-/Key-Domänen, saubere Trennung zwischen Storage-Siegel und Compliance-Signatur | §3.7, §9.4, §12.8, §14.1 |
+| **K-40** | **Duale MVCC-Systeme (`contextra-mvcc`: `TxId`/`SequenceLog`/`SsiValidator` vs. `contextra-storage`: `Stamp` + 2-Stufen-Guards)** | **`contextra-storage` liefert die einzige produktive MVCC-Wahrheit (`Stamp ≡ Epoch(u64)`)** und optimistische Punkt-/Range-Guards; Retrieval-Crates nutzen abstraktes `Epoch(u64)`; `contextra-mvcc` wird auf `EpochPinRegistry` reduziert (K-66), `SequenceLog`/SSI/`TxBuffer` entfallen mit G-CUTOVER | verhindert `TxId`-vs-`Stamp`-Drift, doppelte Snapshot-Pins (`PinGuard` vs `View-Lease`) und konfligierende Lock-Hierarchien | §12.4.0, §14.1 |
+| **K-41** | **Duale Krypto & Erasure (`contextra-crypto`: `aes-gcm-siv`/`blake3`/`deletion_proof`/`kv_shredding` vs. Soll-Adapter)** | **Eine Krypto-Crate `contextra-crypto` als Standard-Adapter** (kein separates `crypto-ref`): `XChaCha20-Poly1305` + `HMAC-SHA256` + `HKDF-SHA256` + `CRC32C` für Persistenz und Indizes; `blake3` und `aes-gcm-siv` verlassen Speicher- und Indexpfad (Frist G-CUTOVER); `kv_segment`, `kv_cipher`, `kv_shredding` werden gelöscht (K-65); `deletion_proof` (Ed25519) und `revocation_log` bleiben und werden auf `ErasureReceipt` + Owner-Attestate umgestellt (K-55) | Ein Adapter, eine Versionierung; nur die Signatur-/Beleg-Schicht ist Produktfunktion | §3.7.2, §9.7, §14.1 |
 | **K-42** | **Vektor-Persistenz (`contextra-vector`: direktes `std::fs` + `memmap2` + statisches Literal `DISKANN_INTEGRITY_KEY` vs. versiegelter Speicher ohne `mmap`)** | **Verbot von direktem `std::fs`/`memmap2`/hartcodierten Keys in Produktivpfaden:** Modus A speichert Mikro-HNSW/Vektoren direkt als `ClusterSections`; Modus B betreibt HNSW/DiskANN als partitionierten `SegmentOwner` (`Rebuildable`) über `SegmentIo` + `BlockTransform` (`XChaCha20-Poly1305`); bestehendes `HnswPurger`/`GhostFreeVectorIndex`/`Zeroize`/`INV-HNSW-SLOT-1` bildet die RAM-/Arena-Bereinigung | macht `FaultFs`-Crash-Sweeps, Schlüssel-Rotation, mandantenreine Versiegelung und nachweisbaren Vektor-Purge erst möglich | §12.4.1, §14.1 |
 | **K-43** | **Text-Index (`contextra-text`: globales `commit_lock` um `meta:stats`, `bincode`, globale `pl:`/`plb:`-Keys inkl. seltener Komposita)** | **Aufspaltung:** Forward-Daten (`fw:`/`dl:`) liegen clusterlokal in `ClusterSections`; Inverted/WAND-Postings (`plb`) laufen mandantenpartitioniert im `SegmentOwner` (`Rebuildable`) mit Refcount-Bereinigung verwaister seltener Komposita (`GermanCompoundSplitter`); `meta:stats` werden je Partition eventual-konsistent ohne globalen `commit_lock` fortgeschrieben; `bincode` entfällt zugunsten kanonischer Codecs | verhindert globale Lock-Engpässe bei Multi-Agent-Writes und eliminiert Metadaten-Leaks über seltene deutsche Komposita | §12.4.2, §14.1 |
 | **K-44** | **Graph-Kaskaden: `DerivedFrom` (Storage) vs. `CsrGraph`/`HyperEdge`/`cascade.rs` (`contextra-graph`)** | **Strikte Dual-Graph-Trennung:** (1) `contextra-storage` hält ausschließlich den begrenzten `DerivedFrom`-Lösch-DAG (`max_links=8`, `max_gate_clusters=4096`); (2) `contextra-graph` hält semantische Fakten/Hyperkanten, trägt aber verpflichtend `(source_cluster, source_doc_id)` als Provenienz, trennt inhaltliches `Supersedes` vom DSGVO-Purge, und räumt per `topological_sort_hyperedge_closure` + `sweep_orphans` + Entity-`Zeroize` + Segment-Rewrite auf | schließt „Tombstone-only“-Datenreste in CSR-Arrays/Hyperkanten und verhindert unzulässige fachliche Löschlawinen | §9.6, §12.4.3 |
-| **K-45** | **Agenten-Session-DAG (`SessionBranchTree`) vs. Storage-Branches (`SYS_BRANCH`)** | **Integration nach K-35 („Session ≠ Cluster“):** Knoten des Gesprächsbaums liegen präfix-strukturiert im Eigentümer-Cluster; spekulative Explorationspfade nutzen clusterlokale Storage-Branches (`fork(Head|At(Stamp))`, `ttl`, `branch_drop`, `merge`) statt separater `bincode`-Blobs in `contextra-graph` | Agenten-Verzweigung wird crash-sicher, O(1) ohne Kopien und atomar löschbar | §8, §12.6 |
-| **K-46** | **Agenten-Checkpoints (`contextra-checkpoint`) & Kognitiver Decay (`AdaptiveDecayController`) vs. DB-Backup & DSGVO-Löschung** | **Dreiteilung der Konzepte:** (1) DB-Snapshot/Restore = `contextra-storage::checkpoint` (ohne Schlüssel/Ledger, mit `erase_epoch`); (2) `contextra-checkpoint` (`CheckpointGuard`/`StateCheckpoint`) speichert Agenten-Zustände clusterlokal auf `StorageView` + `View-Lease`/`Hold` (ohne unbegrenztes SSTable-Pinning und ohne `blake3`-Klartext-Manifeste); (3) `AdaptiveDecayController` steuert nur Relevanz-Decay/Konsolidierung, nie DSGVO-Löschung | verhindert GC-/Purge-Blockaden durch vergessene `PinGuard`s und schließt Verwechslung von Vergessen mit rechtlicher Löschung | §10.3, §11.4, §12.6 |
-| **K-47** | **Workspace-/Ring-Inkonsistenz (`Cargo.toml` 12 Crates vs. `capabilities.toml` 30+ Crates, inaktive Root-Checks)** | **Verbindliche Topologie-Synchronisation:** `Cargo.toml`, `capabilities.toml`, `deny.toml` und eingebundene CI-Gates (`layering`, `unsafe_islands`) werden ab P0/P1 synchronisiert; nicht existierende Storage-Ports/Adapter-Crates werden sauber als Subcrates angelegt und verifiziert (§14.1, §18.1) | beendet „tote“ Architektur-Checks und Ghost-Referenzen in Crates | §3.1, §14.1, §18.1 |
-| **K-48** | **Klasse-A-Autarkie der Retrieval-Crates (`vector`/`text`/`graph`/`rank`: „0 interne Abhängigkeiten“, B1) vs. verbindliche `SegmentOwner`-/`ConsumerFeed`-Bindung an den Speicherkern; `storage-ports` (L1) und `storage` (L1) auf derselben Ebene** | **Persistenzneutrale Schnittstellen statt Kernabhängigkeit:** Jedes Retrieval-Crate definiert selbst schmale Traits (`PartitionSink`/`PartitionSource`: blockweises Schreiben/Lesen opaker, bereits adressierter Byte-Blöcke) und kennt weder `contextra-storage` noch `SegmentIo`. Die Bindung (`SegmentOwner`, `ConsumerFeed`, Watermark, Attest) lebt in einem neuen Level-2-Crate **`contextra-index-bridge`**. `contextra-storage-ports` wird Vertragsebene (Ebenennummern: K-58) (nur Traits/Werttypen, keine Abhängigkeiten). Regel: Abhängigkeiten zeigen auf **strikt niedrigere** Ebenen, innerhalb einer Ebene sind keine internen Kanten erlaubt | Klasse-A-Autarkie (B1/B5) bleibt erhalten, der Kern bleibt ohne Retrieval-Wissen, die Ring-Matrix wird wieder prüfbar. Heute verletzt `vector → mvcc` (L1→L1) die Regel; `mvcc` entfällt als Abhängigkeit (K-40) | §3.1, §12.1, §18.1 |
+| **K-45** | **Agenten-Session-DAG (`SessionBranchTree` in `contextra-graph`) vs. Storage-Branches (`SYS_BRANCH`)** | **Session-DAG entfällt aus dem Produkt (K-65).** Storage-Branches bleiben als **Datenbank-Funktion** (clusterlokaler Fork/Diff/Merge, `ttl`, `branch_drop`) für Experimente, Re-Indexierung und Was-wäre-wenn-Läufe beliebiger Clients; die Gesprächs-/Agentenlogik liegt beim Client | Kein Agentenmodell im Datenkern; Branch-Mechanik bleibt löschlokal | §8, §12.9 |
+| **K-46** | **Agenten-Checkpoints (`StateCheckpoint`, `WorkflowState`) und kognitiver Decay (`AdaptiveDecayController`) vs. DB-Backup & DSGVO-Löschung** | **Entfernung der Agenten-Konzepte, Neuzuschnitt von `contextra-checkpoint`:** (1) DB-Snapshot/Restore bleibt `contextra-storage::checkpoint` (ohne Schlüssel/Ledger, mit `erase_epoch`); (2) `contextra-checkpoint` wird **Snapshot-Set-Register und Restore-Koordinator** (benannte `SnapshotSet`s für reproduzierbare Abfragen, Backup-Manifeste über Storage **und** Index-Generationen, Rollback-Schutz); (3) `AdaptiveDecayController` entfällt; **Retention** (Aufbewahrungsfrist → `Eraser`) ist die einzige zeitgesteuerte Löschfunktion und liegt in `engine::compliance` | Compliance-Löschung bleibt eindeutig; kein Agenten-Workflow im Persistenzpfad | §10.3, §12.9, §12.10 |
+| **K-47** | **Workspace-/Ring-Inkonsistenz (`Cargo.toml` 15 Mitglieder, davon eines ohne Verzeichnis, vs. `capabilities.toml` mit 42 Einträgen)** | **Verbindliche Topologie: genau die 14 vorhandenen Crates** (§3.1, `INV-TOPO-1`); `Cargo.toml`, `capabilities.toml`, `deny.toml`, `CLAUDE.md` und CI-Gates (`layering`, `unsafe_islands`) werden in P0 synchronisiert; **keine neuen Crates in v1**; Neuanlage nur über Eintrag in §3.1 und Gate-Freigabe | Ein Bauplan, den Code und Dokumente teilen | §14.1, §18.1 |
+| **K-48** | **Klasse-A-Autarkie der Retrieval-Crates vs. verbindliche `SegmentOwner`-/`ConsumerFeed`-Bindung** | **Persistenzneutrale Schnittstellen statt Kernabhängigkeit:** Jedes Retrieval-Crate definiert selbst schmale Traits (`PartitionSink`/`PartitionSource`: Blöcke schreiben/lesen, Generation sealen/abschließen, Projektions-Batch anwenden). Die Bindung an den Kern (`SegmentOwner`, `ConsumerFeed`, Watermark, Attestat) implementiert **`contextra-engine::projection`** über `contextra-storage`; die Retrieval-Crates kennen `storage` nicht | Retrieval-Crates bleiben einzeln testbar; kein Index kann am Löschvertrag vorbei persistieren | §3.1, §12 |
 | **K-49** | **Granularität abgeleiteter Indizes:** globaler Index je Mandant (schnell, aber Löschen = Vollrebuild) vs. Index je Cluster (löschbar, aber 10⁷ Mikroindizes, kein clusterübergreifendes Retrieval) | **Zwei Klassen, eine Regel:** (a) clusterlokale Mikroindizes für Cluster ≤ `micro_index_max_vectors` (flacher Scan/Mini-HNSW, aus den Records ableitbar); (b) **Index-Partition = Packgruppe** `(tenant_tag, due_bucket, shard)` mit hartem Größenlimit und **Generationsschlüssel je Partitionsgeneration**. Löschen = Tombstone sofort, Neuaufbau der betroffenen Partition fristgebunden und amortisiert, danach Vernichtung des Generationsschlüssels | Rebuild-Kosten sind nach oben beschränkt (Partitionsgröße), Ablauf einer Packgruppe löscht ihre Index-Partitionen in O(Dateien), Backups alter Generationen werden durch Schlüsselvernichtung unlesbar (Crypto-Erasure auch für geteilte Indexstrukturen) | §12.4.5 |
 | **K-50** | **Trennung personenbezogener und sonstiger Daten:** „Klassifikation ist Sache der oberen Schicht“ ließ offen, wie ein Dokument mit Personenbezug in einem gemeinsamen Korpus löschbar bleibt | **Trennungsprinzip (`INV-SEP-1`):** Personenbezogene Inhalte liegen ausschließlich in `Sealed` Personen-/Fallclustern; im gemeinsamen Korpus stehen nur pseudonymisierte Chunks, die Zuordnung Pseudonym→Person liegt im Cluster der Person (**Pseudonym-Tresor**). Embeddings entstehen **nach** der Pseudonymisierung. Löschung der Person vernichtet den Tresor; ob der Rest danach anonym ist, bleibt eine Einzelfallbewertung (kein Kernversprechen) | Ein Cluster-Löschauftrag genügt für alle Namensbezüge; Vektoren kodieren keine Klarnamen; das Restrisiko (Re-Identifikation über Kontext) wird im Receipt ausgewiesen | §12.4.6 |
 | **K-51** | **Atomarität großer Dokumente:** „ein Change = ein Dokument“ scheitert an `max_change_ops` (4096) / `max_change_bytes` (8 MiB); ein Rückfall auf Pseudo-2PC wäre ein Rückschritt (K-39) | **Publish-Record:** Chunks einer Dokumentversion werden in beliebig vielen Changes unter einem versionierten Präfix gestaged; **ein** abschließender Change setzt `doc/<id>/head` (Guard `Version`). Lesen und Indexprojektion lösen ausschließlich über `head` auf. Kleine Dokumente nutzen den Ein-Change-Pfad. Verwaiste Stagings räumt ein Worker | Dokumentweite Atomarität ohne Zweiphasenprotokoll, ohne Kompensation, crash-sicher, retrybar über `IdemToken` | §12.4.0 |
 | **K-52** | **Read-your-writes für Agenten** bei asynchroner Indexprojektion | `Receipt.stamp` + `QueryOptions::min_stamp`: die Abfrage wartet höchstens `ryw_wait` auf `watermark ≥ min_stamp`, sonst deckt der **Delta-Pfad** (Brute-Force über gestagte Records bis `V`) die Lücke; nie ein stilles Auslassen | Agent sieht sein eigenes Write sofort, ohne synchrone Indexpflege im Commit-Pfad | §12.4.4 |
 | **K-53** | **Reproduzierbarkeit/Erklärbarkeit** der Retrieval-Ergebnisse bei wechselnden Indexgenerationen | **Query-Plan-Protokoll mit gepinntem `SnapshotSet`:** `(instance_id, V)` + je Kanal `(partition, generation, applied_stamp)`; jedes Ergebnis trägt dieses Set. Gleiches Set ⇒ bitgleiches Ergebnis (`INV-RAG-4`) | Audit („warum wurde das geliefert?“), Differentialtests, Regressionsanalyse | §12.4.4 |
 | **K-54** | **Lernsignale** (`edge_reinforcement`, Klick-/Feedback-Daten, Kalibratoren, `DriftDetector`) sind Verhaltensdaten und damit potenziell personenbezogen | Nutzerbezogene Signale liegen clusterlokal im Cluster des Nutzers (Löschung inklusive). Globale Kalibratoren und Gewichte werden nur aus **nicht personenbezogenen Score-Aggregaten** trainiert (Rohscore, Kanal, Label ohne Nutzer-/Query-Bezug); Trainingsdaten haben `NonPersonal`-Klasse und eine Mindestgruppengröße `k_min` | Vergessen entfernt auch gelernte Personalisierung; die Fusionsgüte bleibt global lernbar | §12.4.4, §12.9 |
-| **K-55** | **Ist-Drift der Compliance-Crates:** `CLAUDE.md` nennt `contextra-erasure` (`frozen`) und `contextra-vault`; beide fehlen im Baum und in `capabilities.toml`, `vault` steht dort nicht | Die Abbildung `ErasureReceipt` + `EraseAttestation` → signierter `DeletionProof` ist Vertrag (§9.7, §12.8 Nr. 10) und wird im Bridge-Layer spezifiziert, **nicht** durch Änderung eines eingefrorenen Crates. Änderungen an `contextra-erasure` nur nach ausdrücklicher Freigabe; bis dahin ist die Signaturstufe optional und das Receipt als solches gültig | Spec und Repo-Wahrheit stimmen überein; kein stilles Anfassen eingefrorener Compliance-Software | §3.7.4, §18.1 |
+| **K-55** | **Ist-Drift der Compliance-Crates:** `CLAUDE.md` nennt `contextra-erasure` und `contextra-vault`; beide fehlen im Baum | Die Abbildung `ErasureReceipt` + `EraseAttestation` → signierter `DeletionProof` ist Vertrag (§9.7, §12.8 Nr. 10) und liegt in `contextra-crypto::deletion_proof` (Signatur, Ed25519) plus `engine::compliance` (Zusammenstellung, Port `ReportSigner`); `CLAUDE.md` und `capabilities.toml` werden angeglichen. Die Signatur ist optional und nie Voraussetzung für `Done` | Kein Phantom-Crate; Signatur bleibt austauschbar (HSM/Plugin) | §9.7, §12.8 |
 | **K-56** | **Zu viele Konfigurationsschrauben** (Anker, Ledger-Gerät, Provider, Horizont, Fristen) gefährden Entwicklerfreundlichkeit und Betriebssicherheit | **Compliance-Profile als geprüfte Bündel** (`Development`, `Standard`, `Strict`) mit Zusatzprüfung beim Öffnen; Einzelschrauben bleiben, jede Abweichung vom Profil erscheint im Receipt | Sichere Voreinstellung in einem Wort; Auditoren sehen das Profil | §12.10, §16 |
 | **K-57** | **Auskunft/Portabilität (Art. 15, 20 DSGVO)** waren nicht abgedeckt | Der Cluster als Löschdomäne ist zugleich die **Exportdomäne**: `export_cluster(view)` liefert einen konsistenten, inhaltsvollständigen Strom aller Records einer Sicht (ohne Schlüssel, ohne Indexstrukturen); die Aufbereitung (Format, Rechtsprüfung) liegt oben | Auskunft = ein Scan statt Suche über alle Systeme | §12.10 |
-
-| **K-58** | **Ebenenmodell (ersetzt die Ebenennummern aus K-48):** K-48 setzte `storage-ports` auf Level 0 und ließ Retrieval-Crates „ohne interne Abhängigkeit“. Gemessen importieren `vector` (38×), `text`, `graph` direkt `contextra-types`/`contextra-ports`, und `capabilities.toml` führt `types`/`ports` auf Level 2, also über den Konsumenten | **Fünf Ebenen:** L0 Fundament (`ids`, `env`, `simd`, `sys`, `wire`, `durable-fs`, **`types`**), L1 Verträge (**`ports`**, `storage-ports`), L2 Triebwerke (`storage`, `vector`, `text`, `graph`, `rank`, `mvcc`*, `checkpoint`, `kvcache`, `crypto`), L3 Adapter und Orchestrierung (`engine`, `index-bridge`, `storage-bridge`, `storage-fs`, `crypto-ref`, `keys-*`, `erasure`, `agent`, `cognition`, `router`), L4 Fassade und Apps (`db`, `contextra`, `mcp`, `py`, `testkit`, `bench`). Regel unverändert: nur strikt abwärts. Retrieval-Crates dürfen **nur** `types` und `ports` kennen, nie `storage`, `storage-ports` oder einander. (*`mvcc` entfällt für Kernpfade, K-40) | Die Kanten existieren bereits real; sie zu verbieten hieße 3 Crates umschreiben, sie auf die richtige Ebene zu legen kostet eine Zeile in `capabilities.toml`. Isolation von Storage bleibt voll erhalten | §3.1, §18.1 |
-| **K-59** | **Fünf Kopien von `TxId` und eine zweite `Epoch`:** `TxId(pub u64)` steht in `types`, `mvcc`, `vector`, `graph`, `checkpoint`; `text` führt `contract::Epoch` | **Ein** `Epoch(u64)` in `contextra-types`; `TxId` und alle Kopien entfallen, `text::contract::Epoch` wird Re-Export. `Stamp ↔ Epoch` wird nur in `index-bridge` konvertiert (Identität, zusätzlich `instance_id`) | Ein Versionsbegriff (L23); Kopien driften | §12.4, §14.1 |
+| **K-58** | **Ebenenmodell (ersetzt K-48-Nummern):** Gemessen importieren `vector`, `text`, `graph` direkt `contextra-types`/`contextra-ports`; `capabilities.toml` führt `types`/`ports` über ihren Konsumenten | **Vier Ebenen auf 14 Crates:** L0 `types`, `sys`, `simd`; L1 `ports`, `durable-fs` (→ `sys`); L2 `storage`, `crypto`, `vector`, `text`, `graph`, `rank`, `mvcc`, `checkpoint` (nur nach unten, untereinander keine Kanten); L3 `engine` (Composition Root, Async-Rand). Kernel-Ports liegen in `contextra-ports::kernel` (K-64) | Abhängigkeiten zeigen nur nach unten; ein Composition Root | §3.1 |
+| **K-59** | **Fünf Kopien von `TxId` und eine zweite `Epoch`:** `TxId(pub u64)` in `types`, `mvcc`, `vector`, `graph`, `checkpoint`; `text::contract::Epoch`; `mvcc` und `checkpoint` tragen zudem eigene Stub-Module `contextra_types.rs`/`contextra_ports.rs` | **Ein** `Epoch(u64)` in `contextra-types` (`Stamp ≡ Epoch`); `TxId` und alle Kopien sowie die Stub-Module entfallen; `text::contract::Epoch` wird Re-Export. Die Umrechnung `Stamp ↔ Epoch` (Identität plus `instance_id`) geschieht nur in `engine::projection` | Ein Versionsbegriff (L23); keine Konvertierungsfehler | §12.4, `INV-EPOCH-1` |
 | **K-60** | **Lücke Personenbezug × geteilter Index:** §12.4.6 legt Personenbezug in Einzel-Cluster, §12.4.5 teilt Partitionen über Cluster. Unklar blieb, ob Klartext-Embeddings von Personalakten in einer geteilten Partition liegen dürfen, und wie Suche über viele Personen löschbar bleibt | **Zwei Indexklassen, eine Regel:** `Corpus`-Partitionen und `Personal`-Partitionen. *Geteilte* Partitionen (beider Klassen) enthalten ausschließlich aus **pseudonymisiertem** Text abgeleitete Vektoren, Terme und Kanten (`INV-SEP-2`). Klartext-Embeddings entstehen nur im Cluster-Mikroindex (Modus A) des Personenclusters und sterben mit dem Clusterschlüssel. `Personal`-Partitionen haben kleinere Limits und `Rebuildable{max_age}` kürzer als `purge_deadline` | Suche über Personen bleibt möglich (pseudonymisiert), Löschung einer Person kostet höchstens den Neuaufbau ihrer Personal-Partitionen, kein Klartext im geteilten Index | §12.4.5, §12.4.6 |
-| **K-61** | **`kvcache` bricht Löschvertrag:** Feature `content-addressed-kv-cache` (Inhaltsadressierung), `blake3`, `bincode`, `aes-gcm-siv` über `crypto/kv-encryption` | Feature entfällt vor G-R5 (NZ-11, `INV-PRIV-1`); `kvcache` wird `SegmentOwner` (`MixedPerClusterKey`) auf `storage-ports`-Krypto; `contextra-crypto/kv-encryption` entfällt | Prefix-Dedup über Löschdomänen ist ein Querverweis | §12.9, §14.1 |
-| **K-62** | **Mmap und `block_on` im Bestand:** `memmap2` in `vector` (17 Dateien) und `contextra-sys`; `block_on` in `text`, `graph`, `engine`, `checkpoint`, `kvcache`, `crypto` | `memmap2` nur in `contextra-sys` hinter Feature `mmap`, nur als `Fs`-Implementierung ohne Index-/Sealed-Pfad; `block_on` nur im Engine-Rand (L3+), nie in Level-2-Crates | K-11, Z-19 | §14.1 |
-| **K-63** | **`contextra-ports` trägt Alt-Verträge (`StorageEngine`, `StorageBackend`, `Vfs`, `Purger`, `LedgerSink`, `CommitBarrier`, `ErasureLayer`)** mit 2PC- und Async-Prägung | Bleiben bis G-CUTOVER als Kompatibilitätsschicht, werden durch `storage-bridge` bedient; neue Verträge (`SegmentOwner`, `PartitionSink`) kommen **nicht** in `ports`, sondern je Crate bzw. `storage-ports` | Ein Contract-Test-Satz (`conformance.rs`) existiert bereits und schützt die Migration | §3.2, §14.1 |
+| **K-61** | **`kvcache` bricht Löschvertrag** (`content-addressed-kv-cache`, `blake3`, `aes-gcm-siv`) | **Gegenstandslos durch K-65:** `contextra-kvcache` wird aus `Cargo.toml` `[workspace].members` gestrichen, `crypto::{kv_segment, kv_cipher, kv_shredding}` und `ports::{kv, kv_bridge_port, attention}` werden gelöscht | Entfernen statt Absichern | §14.1 |
+| **K-62** | **Mmap und `block_on` im Bestand:** `memmap2` in `vector` (2 Dateien) und `sys` (2); `block_on` in `text`, `graph`, `engine`, `checkpoint`, `crypto` | `memmap2` nur in `contextra-sys` hinter Feature `mmap`, nur für schreibgeschützte, versiegelte Kopien außerhalb der Index-/Sealed-Pfade; `block_on` nur im Engine-Rand, nie in L2-Crates | K-11, Z-19 | §14.1 |
+| **K-63** | **`contextra-ports` trägt Alt-Verträge (`StorageEngine`, `StorageBackend`, `Vfs`, `Purger`, `LedgerSink`, `CommitBarrier`, `ErasureLayer`, `VectorIndex`/`TextIndex`/`GraphIndex` mit `TxId`-Schreibpfad)** mit 2PC- und Async-Prägung | **Zweiteilung von `contextra-ports`:** Modul `kernel` (neu, synchron, ohne `futures`; K-64) und Modul `legacy` (Feature `legacy`, Standard bis G-CUTOVER, dann gelöscht). Die Index-Traits werden zu **reinen Lese-Verträgen** (`search`, `search_at`, `traverse*`, `stats`); ihr Schreibpfad (`insert/delete/commit/rollback/rollback_to_tx`) wird durch `PartitionSink::apply(batch, epoch)` ersetzt | Ein Contract-Test-Satz; Altlast hat ein Ablaufdatum | §3.2, §12.4 |
+| **K-64** | **Wo liegen die Kernel-Ports, wenn `contextra-storage-ports` nicht existiert und keine neuen Crates entstehen?** (Ist: 134 Importe auf ein Phantom-Crate.) Alternativen: (a) Ports im Kern definieren, Adapter hängen am Kern; (b) neues Crate anlegen; (c) in `contextra-ports` ablegen | **(c): `contextra-ports::kernel`** (Modul, synchron, kein `futures`, kein `serde`). Der Kern hängt nur an `ports` und `types`; Adapter (`crypto`, `durable-fs` über `engine::platform`) hängen an `ports`. Der `Fs`-Port wird in `engine::platform` über `durable-fs` implementiert | (a) zwingt Fundament-Crates, vom Kern abzuhängen (Ebenenbruch); (b) widerspricht dem 14-Crate-Beschluss und K-47; (c) nutzt den vorhandenen Vertragsort, die vorhandene Konformanz-Infrastruktur (`conformance.rs`) und hält den Kern frei von Async | §3.1, §3.2, `INV-PORT-1` |
+| **K-65** | **Produktfokus:** KV-Cache, Agenten-Orchestrierung, Agenten-Kognition, Router, Session-DAG, Decay, Inferenz-Adapter standen als Teilsysteme in der Planung, existieren aber nicht (oder nur als Reste) im Repository | **Streichung aus der Planung** (Nicht-Ziele NZ-18, NZ-21…NZ-24). Reste im Code werden entfernt (§14.1): `crypto::{kv_segment,kv_cipher,kv_shredding}`, `ports::{kv,kv_bridge_port,attention,inference}`, `engine::{orchestration,decay_controller,adapters/ollama}`, `engine::collection::kv_lock`, `graph::session_dag`, Workspace-Mitglied `contextra-kvcache`. Agenten und LLM-Anbieter sind **Clients** von Contextra | Ein Produkt, das eine Sache sehr gut kann; weniger Angriffs- und Wartungsfläche; keine Löschlücke durch Caches | §2.3, §12.9, §14.1, `INV-SCOPE-1` |
+| **K-66** | **`contextra-mvcc` vs. Storage-MVCC:** Der Kern besitzt Stamp-MVCC und Guards; `mvcc` bietet `SequenceLog`, `SSI`, `TxBuffer`, `SnapshotRegistry` | `mvcc` wird auf **`EpochPinRegistry`** (aus `SnapshotRegistry`) reduziert: Pins für Index-Generationen und `SnapshotSet`s, `min_pinned_epoch` für Generationsabbau. `SequenceLog`, `SsiValidator`, `TxBuffer`, `ReadSet` entfallen mit G-CUTOVER (SSI-Verhalten über Lese-Guards `Unchanged{since}`, §6.3) | Eine MVCC-Wahrheit (K-40); der nützliche Rest bleibt | §11.4, §12.4.5, §14.1 |
+| **K-67** | **`contextra-checkpoint` ohne Agenten:** Inhalt war Workflow-Zustand (`StateCheckpoint`, `WorkflowState`), Hardlink-Klonen gegen den Alt-LSM, `blake3`-Manifest | Neuer Auftrag (K-46): **Snapshot-Set-Register und Restore-Koordinator.** Manifest wird per `Mac`-Port (HMAC-SHA256) beglaubigt, Persistenz über den Engine-Adapter in einem `NonPersonal`-System-Space; `hardlink_cloner` entfällt (Storage kann das selbst, §10.3); `WorkflowState`/`StateCheckpoint` entfallen | Reproduzierbare Abfragen (`INV-RAG-4`) und konsistentes Backup über Kern **und** Indizes | §10.3, §12.4.4 |
+| **K-68** | **Ingest und Parser:** `contextra-ingest`/`sandbox` existieren nicht; `engine` enthält `chunker/`, `import.rs`, `export.rs` | **Parsen untrusted Formate (PDF, Office, ZIP) ist außerhalb des Workspace** (Client oder Plugin über `PluginManifest`). Contextra nimmt **bereits extrahierten Text mit Metadaten** an (`ingest`: Chunking, Pseudonymisierung, Publish-Record). Der Parser-Isolations-Bedarf wird als Anforderung an Plugins formuliert (§2.4 AT-9) | Kein Parser-Zoo im Kern; Angriffsfläche bleibt beim isolierten Plugin | §2.4, §12.4.6 |
+| **K-69** | **PII-Erkennung ohne `contextra-privacy`:** Das Trennungsprinzip (K-50) braucht eine Erkennung, ein Crate dafür gibt es nicht | **Port `PiiClassifier`** (in `contextra-ports`, Modul `policy`); Open-Core-Standard: regelbasierter Klassifikator in `engine::ingest::pii` (E-Mail, Telefon, IBAN mit Prüfsumme, Steuer-/Ausweisformate, Namenslisten-Hook); NER-/Modell-basierte Erkennung ist Plugin (monetarisierbar). Unsicherheit ⇒ Quarantäne (K-50) | Der Kern erzwingt Struktur (`INV-SEAL-1`), die Erkennungsqualität ist austauschbar und messbar (`pii_residual_rate`) | §12.4.6, §2.6 |
+| **K-70** | **Egress an externe Modelle ohne `contextra-prompt-guard`/`router`:** Die DSGVO-relevante Kante ist der Abfluss personenbezogener Daten an Cloud-LLMs | **Port `EgressPolicy`** (vorhanden) wird Pflicht auf jedem Pfad, der Text an einen `EmbeddingProvider`/`TextGenerator` außerhalb der Vertrauensgrenze sendet; Standard `DenyExternal` für `Personal`-Daten; Entmaskierung nur im Antwortzusammenbau (§12.4.6). `CloudEgressGuard` (`crypto::wal_crypto`) wird in diese Policy überführt. Prompt-Injection-Abwehr ist Client-/Plugin-Sache; Contextra liefert das **Trust-Label** im Kopf (Konvention §12.6) | Datenschutz an der Kante, Modellpolitik beim Kunden | §12.4.6, §12.6 |
+| **K-71** | **Lernsignale ohne Agenten:** `edge_reinforcement`, Klick-/Feedback-Daten | **Nicht in v1.** Feature `edge-reinforcement-learning` bleibt abgeschaltet und wird nicht freigegeben, bis eine Löschbindung je Nutzer spezifiziert ist (K-54 gilt fort für Kalibratoren aus nicht personenbezogenen Aggregaten) | Verhaltensdaten sind personenbezogen; kein Produktbedarf belegt | §12.4.4, §12.10 |
+| **K-72** | **`contextra-durable-fs` und `contextra-sys` überlappen** (`durability`-Modul in `sys`, `platform`/`vfs` in `durable-fs`); SD-70 hatte `durable-fs` als Basis verworfen | **Aufgabenteilung:** `sys` = einziger Ort für OS-FFI (F_FULLFSYNC, FlushFileBuffers, `fdatasync`, `mlock`, ACL, optional `mmap`); `durable-fs` = sichere Politikschicht darüber (Poisoning `INV-FSYNC-1`, atomares Ersetzen `INV-VFS-ATOMIC-1`, Journal, Scrub, `FaultInjector`) und wird in P0 um **positionsbasierte Handles** (`read_at`, `write_at`, `preallocate`, `lock`, `free_space`, `sync_dir`) erweitert, bis der Kernel-`Fs`-Port abbildbar ist. **SD-70 ist damit aufgehoben**; Voraussetzung: Konformanzsuite `fs_ports` besteht | Eine Dateischicht statt zwei; vorhandenes Poisoning wird genutzt | §3.1, §3.7.3 |
 
 
 ### 1.1 Herkunft der übernommenen Elemente
@@ -121,7 +129,7 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 | **Mnemos & Engram** | Zoom/Handles/Trust/Derivation als Konventionen oben, Fork-TTL, token-budgetiertes `page()`/`weights`, `Error::hint()`, Evaluationsmethodik `Utility@Budget` | Prolly-Tree, Content-Addressing/Merkle-DAG, KV-Tensor-Layouts im Kern |
 | **CairnDB & AetherStore** | **Index-Watermarks** (`applied_position`) als Pflichtmuster, Guard-Katalog, 3 Benchmark-Gruppen, WiscKey-Wertetrennung, Mandanten-Vorfilterung vor ANN, Typ-Alignment optional | CAS ohne WAL, GPUDirect, `mmap` im Lesepfad, Slab-Allokator |
 | **Octa-Spec & R9/R9.1-Audit** | Tomb-Epochen/Backup-Horizont (A3), `HostProbe`, `MeasureKind`, `View-Lease`, `Poisoned`-Ledger-Intent, Pipeline ohne E/A unter Rang 1, branch-bewusster Filter, `ClusterIndex ≤ 40B`, `MiniSection`, Spill-Policy, `deps-gate`/`deny.toml` | Zeitlanes/Kumulativsummen im SubIndex (A1/A2 → `BlockPruner` & RAM-Präfixsummen) |
-| **Contextra Bestands-Crates (HEAD `60ea034`)** | `contextra-simd` (AVX-512/AVX2/NEON Runtime-Dispatch + NaN-Guard), `contextra-vector` (HNSW, DiskANN-Algorithmik, SQ8+Sq8Bias, RaBitQ, ACORN $\gamma$-Augmentierung, Partial-Rebuild `TraversalTracker`, `GhostFreeVectorIndex`), `contextra-text` (BM25/BM25F, `GermanMorphTokenizer`/`GermanCompoundSplitter`, Block-Max WAND), `contextra-graph` (CSR, n-äre Hyperkanten, PPR/APPRH/TL-HFD/`PathRAG`, Community/Percolation, `SessionBranchTree`), `contextra-rank` (4-/5-Signal RRF/mRRF/Resonance, PAVA/Platt/Conformal, Drift, `DiBud`, `explain`), `contextra-engine` (`TenantPolicy`, `Collection`, `HybridQueryBuilder`, `AdaptiveDecayController`), `contextra-ingest`/`privacy`/`prompt-guard`/`sandbox`/`router`/`kvcache` | `contextra-store` (Alt-LSM), `DbTransaction`/`CommitLedger` 4-Wege-2PC, `contextra-durable-fs` als `RealFs`, unversiegeltes DiskANN-`memmap2` mit Literal-Key, `blake3`/`aes-gcm-siv`/`bincode` in Persistenz, doppeltes MVCC in Produktionspfaden |
+| **Contextra Bestands-Crates (HEAD `78a1783`)** | `contextra-simd` (AVX-512/AVX2/NEON Runtime-Dispatch + NaN-Guard), `contextra-vector` (HNSW, DiskANN-Algorithmik, SQ8+Sq8Bias, RaBitQ, ACORN γ-Augmentierung, Partial-Rebuild `TraversalTracker`, `GhostFreeVectorIndex`), `contextra-text` (BM25/BM25F, `GermanMorphTokenizer`/`GermanCompoundSplitter`, Block-Max WAND), `contextra-graph` (CSR, n-äre Hyperkanten, PPR/APPRH/TL-HFD/`PathRAG`, Community/Percolation, Provenienz), `contextra-rank` (RRF/mRRF/Resonance, PAVA/Platt/Conformal, Drift, `DiBud`, `explain`), `contextra-engine` (`TenantPolicy`, `Collection`, `HybridQueryBuilder`, Chunker, Import/Export), `contextra-crypto` (AEAD, DEK/KDF, Audit-Chain, Ed25519-`deletion_proof`, `revocation_log`), `contextra-durable-fs` (Vfs, Journal, Health/Poisoning, Scrub, Fault-Injector), `contextra-sys` (FFI-Insel) | `contextra-store` (Alt-LSM), `DbTransaction`/`CommitLedger` 4-Wege-2PC, unversiegeltes DiskANN-`memmap2` mit Literal-Key, `blake3`/`aes-gcm-siv`/`bincode` in Persistenz, doppeltes MVCC in Produktionspfaden, **`kvcache`, `kv_segment`/`kv_cipher`/`kv_shredding`, Session-DAG, `AdaptiveDecayController`, Orchestrierung, Ollama-Adapter** |
 
 ---
 
@@ -156,7 +164,7 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 | **L21** | **Ein-Wahrheits-Commit statt 4-Wege-2PC:** Kanonische RAG-Daten (Dokumente, Vektordaten, Text-Vorwärtsdaten, Graph-Fakten einer Löschdomäne) committen atomar in **einem** Storage-`Change`; abgeleitete Indizes projizieren idempotent aus dem `ConsumerFeed` bis `durable_stamp` (`Index ∪ Delta` + `filter_visible`). |
 | **L22** | **Löschkonforme Index-Klassen:** Abgeleitete Vektor-, Volltext- und Graph-Strukturen mit Personenbezug existieren ausschließlich als `ClusterSections`/`MixedPerClusterKey` oder als mandantenpartitionierte `Rebuildable`-`SegmentOwner` mit synchronem `on_gate`-Filter, dokumentierter Rewrite-Grenze und `verify_absent`-Attest; globale unversiegelte Klartext-Indizes oder `memmap2`-Bypässe sind unzulässig. |
 | **L23** | **Eine Versions-/Zeitachse & ein Budget:** Alle Schichten (Storage, Vector, Text, Graph, Engine, Checkpoint) synchronisieren Sichten auf `(instance_id, Stamp)` (`Epoch(u64)`) und reservieren Arbeitsspeicher sowie Rewrite-Scratch aus dem gemeinsamen `MemoryBudget`/Governor. |
-| **L24** | **Strikte Konzepttrennung oberer Mechanismen:** `DerivedFrom` (DSGVO-Cluster-Kaskade) ≠ `CsrGraph`/`HyperEdge` (Wissensgraph); `Eraser::cluster` ≠ `AdaptiveDecayController` (kognitive Relevanzabwertung); DB-`Checkpoint`/`Restore` ≠ Agenten-Workflow-`CheckpointGuard`; `SessionBranchTree` ↔ Storage-Branches (`SYS_BRANCH`). |
+| **L24** | **Strikte Konzepttrennung oberer Mechanismen:** `DerivedFrom` (DSGVO-Cluster-Kaskade) ≠ `CsrGraph`/`HyperEdge` (Wissensgraph); `Eraser::cluster` ≠ Recency-Prior (`rank`, löscht nie) ≠ Retention (`compliance`, löst `Eraser` aus); DB-`Checkpoint`/`Restore` (Kern) ≠ Snapshot-Set-Register (`contextra-checkpoint`). |
 | **L25** | **Persistenzneutrale Retrieval-Crates, Index-Partition = Packgruppe, Trennungsprinzip, Publish-Record** (K-48…K-51): Retrieval-Crates kennen den Kern nicht; geteilte Indizes sind löschbar partitioniert; personenbezogener Klartext liegt nur in `Sealed` Clustern; große Dokumente werden über einen abschließenden `head`-Change atomar sichtbar. |
 
 ### 2.2 Ziele
@@ -166,7 +174,7 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 - **Z-3** Snapshot-Isolation ohne Lesesperren über Storage und alle abgeleiteten Indizes (`Index ∪ Delta`)
 - **Z-4** Gate/KeyDestroy unabhängig von Storegröße; physischer Purge bounded durch betroffene Datei-/Extension-Partitionen
 - **Z-5** Ablauf einer Packgruppe als O(Dateien)
-- **Z-6** Nachweisbarkeit (Receipt, `verify_receipt`, Orakel, Ledger, Anker, signierte Compliance-Belege in `contextra-erasure`)
+- **Z-6** Nachweisbarkeit (Receipt, `verify_receipt`, Orakel, Ledger, Anker, optional signierte Compliance-Belege in `contextra-crypto`)
 - **Z-7** Kopf ohne Körper-I/O, Budgetseiten (`page()` + `DiBud`) ohne Body-Block-Lesen
 - **Z-8** Race-Freiheit durch Konstruktion, belegt durch Modell, Simulation, Loom
 - **Z-9** Begrenzte Ressourcen über ein gemeinsames Gesamtsystem-`MemoryBudget`
@@ -175,7 +183,7 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 - **Z-12** Idempotenz für Agenten-Retries (`IdemToken` + `SYS_IDEM`)
 - **Z-13** Gate/KeyDestroy bei vollem Datenträger; physischer Purge nutzt vorgehaltene Scratch-Reserve
 - **Z-14** Überwachbare Löschfristen mit Eskalations-Lanes
-- **Z-15** O(1)-Fork, indexierter Diff und konfliktgeprüfter Merge je Cluster (inkl. Agenten-Session-DAG-Branches)
+- **Z-15** O(1)-Fork, indexierter Diff und konfliktgeprüfter Merge je Cluster (für Experimente und Re-Indexierung beliebiger Clients)
 - **Z-16 (Datenklassifikation):** `DataClass` ist ein geschlossenes Enum; ungültige Kombinationen (`Personal` ohne Cluster/Encrypted, bei Durable ohne Cluster-Seal) werden vor dem ersten I/O abgewiesen
 - **Z-17 (Observability):** Gate, KeyDestroy, Purge, Retrieval-Latenzen und Index-Lag haben getrennte Metriken; feste Label-Allowlist ohne IDs, Queries oder Inhalte
 - **Z-18 (Entwicklerdiagnose):** Jeder öffentliche Fehler hat stabilen Typ und sichere `hint()`-Handlung (Fassade ergänzt typisierte `suggested_call`)
@@ -183,12 +191,12 @@ Die Konsolidierung vereint die Speicherkern-Entscheidungen (`K-01`…`K-38`), di
 - **Z-20 (Metadaten-Skalierung):** RAM, Dateien und Dateideskriptoren wachsen kontrolliert mit der Clusterzahl (`Admission` vor Allokation)
 - **Z-21 (Deutsche Unternehmenssuche & Fusionsgüte):** Vollwertige Unterstützung deutscher Morphologie/Komposita-Zerlegung, BM25/BM25F + WAND, HNSW/DiskANN + SQ8/RaBitQ + ACORN sowie kalibrierter 4-/5-Signal-Fusion (`Isotonic`, `Platt`, `Conformal`, `DriftDetector`) bei voller Löschgarantie
 - **Z-22 (Sichere Hardware-Ausnutzung):** Runtime-SIMD-Dispatch (`AVX-512 > AVX2 > NEON > Scalar`) isoliert in `contextra-simd` mit bitidentischen Prüfungen gegenüber Skalar-Referenz und NaN-Ablehnung vor Eintritt
-- **Z-23 (PII- & Prompt-Sicherheit vor Egress):** Automatisierte PII-Maskierung/-Wiederherstellung (`contextra-privacy`), Prompt-Injection-Schutz (`contextra-prompt-guard`), und abgeschottetes Parsing untrusted Formate (`contextra-sandbox` + `contextra-ingest`)
-- **Z-24 (Saubere Migration):** Verifizierte, datenverlustfreie Ablösung von `contextra-store`, `contextra-mvcc`, `contextra-crypto` (Erasure-Teile) und `bincode`/`memmap2` ohne Dual-Write-Split-Brain
+- **Z-23 (PII- und Egress-Schutz):** PII-Erkennung und Pseudonymisierung über Port `PiiClassifier` (K-69), Abflussprüfung über `EgressPolicy` (K-70); Prompt-Injection-Abwehr und Parser-Isolation sind Client-/Plugin-Aufgaben (K-68)
+- **Z-24 (Saubere Migration):** Verifizierte, datenverlustfreie Ablösung von `contextra-store`, des Alt-MVCC (`SequenceLog`/SSI), der KV-/AES-GCM-SIV-Teile in `contextra-crypto` und von `bincode`/`memmap2` ohne Dual-Write-Split-Brain
 
 ### 2.3 Nicht-Ziele
 
-NZ-1 Verteilung/Konsens in v1 · NZ-2 eigene Kryptografie · NZ-3 Schemas, Sekundärindizes, SSI im Speicherkern · NZ-4 benutzerdefinierte Merge-Operatoren im Speicherkern (Tag `6` reserviert) · NZ-5 Schutz von Prozessspeicher/Swap/Core-Dateien · NZ-6 physische Umordnung über Clustergrenzen · NZ-7 Altformat-Kompatibilität zu `contextra-store`-SSTables (Migration via Export/Forward-Ingest) · NZ-8 implizite Windows-Durability ohne bestandene Fs-Konformanz · NZ-9 `mmap`/`O_DIRECT`/`io_uring` im Speicherkern oder unversiegelt in Indizes · NZ-10 Kompression im Speicherkern in v1 (`COMPRESSION=0`) · NZ-11 Inhaltsadressierung/Dedup über Löschdomänen · NZ-12 Embeddings, ANN, BM25, CSR-Graphsuche innerhalb von `contextra-storage` selbst (leben als eigene Crates auf den Verträgen von §12) · NZ-13 clusterübergreifende Commit-DAGs / Merkle-Zustandshashes im Kern · NZ-14 gesetzliche Bewertung / Signatur im Speicherkern (Signatur in `contextra-erasure`) · NZ-15 Schlüsselverwaltung im Kern (`KeyProvider`) · NZ-16 Mandanten-/Rechteprüfung im Kern (`contextra-engine` / Auth-Schicht oben erzwingen `TenantPolicy` vor Kern-/Indexzugriff) · NZ-17 Async-Runtime im Speicherkern · NZ-18 KV-Cache-/Prefix-Store im Speicherkern (`contextra-kvcache` als eigenes Subsystem) · NZ-19 zwei lebende Klone einer Instanz · NZ-20 Multi-Node-Replikation/Failover bis zu einem eigenen Verteilungs-Gate.
+NZ-1 Verteilung/Konsens in v1 · NZ-2 eigene Kryptografie · NZ-3 Schemas, Sekundärindizes, SSI im Speicherkern · NZ-4 benutzerdefinierte Merge-Operatoren im Speicherkern (Tag `6` reserviert) · NZ-5 Schutz von Prozessspeicher/Swap/Core-Dateien · NZ-6 physische Umordnung über Clustergrenzen · NZ-7 Altformat-Kompatibilität zu `contextra-store`-SSTables (Migration via Export/Forward-Ingest) · NZ-8 implizite Windows-Durability ohne bestandene Fs-Konformanz · NZ-9 `mmap`/`O_DIRECT`/`io_uring` im Speicherkern oder unversiegelt in Indizes · NZ-10 Kompression im Speicherkern in v1 (`COMPRESSION=0`) · NZ-11 Inhaltsadressierung/Dedup über Löschdomänen · NZ-12 Embeddings, ANN, BM25, CSR-Graphsuche innerhalb von `contextra-storage` selbst (leben als eigene Crates auf den Verträgen von §12) · NZ-13 clusterübergreifende Commit-DAGs / Merkle-Zustandshashes im Kern · NZ-14 gesetzliche Bewertung / Signatur im Speicherkern (Signatur in `contextra-crypto`) · NZ-15 Schlüsselverwaltung im Kern (`KeyProvider`) · NZ-16 Mandanten-/Rechteprüfung im Kern (`contextra-engine` / Auth-Schicht oben erzwingen `TenantPolicy` vor Kern-/Indexzugriff) · NZ-17 Async-Runtime im Speicherkern · NZ-18 KV-Cache-/Prefix-Store (weder im Kern noch als Produktteil, K-65) · NZ-19 zwei lebende Klone einer Instanz · NZ-20 Multi-Node-Replikation/Failover bis zu einem eigenen Verteilungs-Gate · NZ-21 Agenten-Orchestrierung und Agenten-Laufzeit · NZ-22 kognitive Zustandsverwaltung (Decay, „Sleep Cycles“, Session-DAG) · NZ-23 Modell-Hosting, Inferenz und Modell-Routing · NZ-24 Parser-/Sandbox-Betrieb für untrusted Dokumentformate im Workspace (K-68).
 
 **Verteilbarkeit vorbereiten, nicht vorwegnehmen:** IDs und Stamps sind instanzlokal; jedes externe Ereignis, Watermark (`ConsumerFeed`, Index-Generation) und `ErasureReceipt` muss `(instance_id, stamp)` führen und darf Stamps nie global sortieren. Restore erhält dieselbe `InstanceId` und darf schreibend erst nach extern belegtem Fencing des bisherigen Besitzers starten (`RestoreQuarantine`/ReadOnly).
 
@@ -203,8 +211,8 @@ NZ-1 Verteilung/Konsens in v1 · NZ-2 eigene Kryptografie · NZ-3 Schemas, Sekun
 | AT-5 | **Rollback** auf frühere Backups/Checkpoints, um Gelöschtes zurückzubringen | Ledger (`tomb_id`) + monotoner externer `Anchor` + `RestoreReconcile` (`OP8`, §10.3) + `BackupHorizon` (§10.4) |
 | AT-6 | Betreiber mit Löschwunsch gegen aktive `Restriction` | Prüfung im Sequencer (`policy_epoch`) **und** Purge (`files_remove`/`cluster_state`); `lift` nur nach `LiftPolicy` |
 | AT-7 | Seitenkanal über globale Index-Metadaten (seltene deutsche Komposita, Vorfilterungs-Latenzen) | Mandanten-Partitionierung vor ANN/BM25/Graph; Refcount-Löschung verwaister Terme; keine Klartext-Nutzdaten in Metriken |
-| AT-8 | Prompt-Injection / PII-Abfluss an externe Cloud-LLMs | `contextra-prompt-guard`, `Trust-Label` im Kopf, `contextra-privacy` (Maskierung/Entmaskierung + Audit-Chain) vor Model-Egress |
-| AT-9 | Bösartige Dokument-Uploads (PDF, ZIP, XLSX, HTML) | Ausführung von `contextra-ingest` innerhalb `contextra-sandbox` (Ressourcen-/Tiefenlimits + Parser-Fuzzing) |
+| AT-8 | PII-Abfluss an externe Cloud-LLMs; Prompt-Injection über abgerufene Inhalte | `EgressPolicy` (Standard `DenyExternal` für `Personal`), Pseudonymisierung vor Egress (§12.4.6), `Trust-Label` im Kopf (Konvention §12.6), Audit-Chain; Injection-Filter beim Client/Plugin |
+| AT-9 | Bösartige Dokument-Uploads (PDF, ZIP, XLSX, HTML) | Parsing außerhalb des Workspace (Client/Plugin, K-68) mit Ressourcen-/Tiefenlimits und Parser-Fuzzing; Contextra nimmt nur extrahierten Text mit Größen-/Zeichenprüfung an (`ingest`) |
 | F-1…F-9 | Torn Write, Fsync-EIO, ENOSPC, Bit-Rot, Schlüsselverlust, Crash im Löschprotokoll, Retry-Stürme, Index-Lag | §3.5, §10, §12.4.0 |
 
 **System-Annahmen (`AN-01`…`AN-10`):** `AN-01` `sync_*` macht durabel · `AN-02` Schreibvorgänge können zerreißen · `AN-03` Fsync-Fehler nicht wiederholbar (Handle vergiftet) · `AN-04` `rename` im selben Verzeichnis atomar · `AN-05` Prozessspeicher vertrauenswürdig, OS/Swap-Risiko wird deklariert · `AN-06` `destroy_many` macht Schlüssel bei `Absent` unbenutzbar · `AN-07` starker CSPRNG (`Entropy`) · `AN-08` `Anchor` außerhalb Datenverzeichnis · `AN-09` Stamps nie aus Wanduhr; TTL/Deadline nutzen monotone Laufzeit + UTC + durablen `clock_floor` (`max_clock_skew` ⇒ `ClockUncertain` fail-closed) · `AN-10` Append-Dateien schreiben nur in vorallokierte Bereiche.
@@ -215,14 +223,14 @@ NZ-1 Verteilung/Konsens in v1 · NZ-2 eigene Kryptografie · NZ-3 Schemas, Sekun
 |---|---|---|
 | Erfolgreiches `Durable`-Write überlebt Crash; Timeout ist retrybar | Ein atomarer Multi-Space-`Change` (Rohdaten, Metadaten, Codes); Receipt trägt `(instance_id, stamp)`; `IdemToken`/`SYS_IDEM` verhindert Doppelwirkung; kein 4-Wege-2PC | FaultFs-Crash-Sweep über Write-/Sync-Grenzen, Idempotenzmodell |
 | Hybrid-Suche liefert nur sichtbare, mandantenkonforme Treffer innerhalb des Tokenbudgets | `view_durable()`, `Index(applied_stamp) ∪ Delta(applied_stamp, V]`, Mandanten-/Gate-Vorfilterung vor ANN/WAND/Graph, `View::filter_visible`, kalibrierte Fusion (`rank`), Budget-`page()` + `DiBud` | Differential Retrieval (`Index ∪ Delta ≡ Vollscan`); Recall@Budget; Race `Gate × Query`; `IndexLag` explizit |
-| Löschauftrag wirkt sofort in allen Suchkanälen und ist belegbar entfernt | Durables Ledger-Intent → Gate (`ER1` + synchrones `on_gate` für Vector/Text/Graph) → Anchor → KeyDestroy (`ER2`, `Absent`) → Purge (`ER5` Rohkopie + Index-`rewrite_without`) → `verify_absent` + `ErasureReceipt` (+ Ed25519 in `contextra-erasure`) | Crash/Restore-Reconcile vor/nach jedem Schritt; `ErasureOracle` (`O-Files`, `O-Segments`, `O-Gate`, `O-Ledger`); `verify_receipt` |
-| Agenten-Branching (`SessionBranchTree`) isoliert Experimente ohne Datenleaks nach Löschung | Clusterlokale Storage-Branches (`SYS_BRANCH`, `fork`, TTL, `merge`); Punkt-/Range-Guards; mit Cluster-Löschung sterben alle Branches | Referenzmodell, Race-Simulation (`RACE-15..17`), Branch-Orakel |
+| Löschauftrag wirkt sofort in allen Suchkanälen und ist belegbar entfernt | Durables Ledger-Intent → Gate (`ER1` + synchrones `on_gate` für Vector/Text/Graph) → Anchor → KeyDestroy (`ER2`, `Absent`) → Purge (`ER5` Rohkopie + Index-`rewrite_without`) → `verify_absent` + `ErasureReceipt` (+ optional Ed25519 in `contextra-crypto`) | Crash/Restore-Reconcile vor/nach jedem Schritt; `ErasureOracle` (`O-Files`, `O-Segments`, `O-Gate`, `O-Ledger`); `verify_receipt` |
+| Experimente und Re-Indexierung isolieren ohne Datenleaks nach Löschung | Clusterlokale Storage-Branches (`SYS_BRANCH`, `fork`, TTL, `merge`); Punkt-/Range-Guards; mit Cluster-Löschung sterben alle Branches | Referenzmodell, Race-Simulation (`RACE-15..17`), Branch-Orakel |
 | Lastspitze oder Index-Rebuild verursacht kontrollierten Backpressure statt OOM/Disk-Full | Gemeinsames `MemoryBudget`/Governor (Storage + HNSW + DiskANN + BM25 + CSR + Rerank); Admission vor Allokation; `Backpressure(Retry)` | Combined RAG-Soak mit RSS-Spitzen, Scratch, Lag und p99 |
 | Restore stellt exakt konsistenten Daten- & Index-Stand ohne gelöschte Daten her | `Ledger` + `Anchor` führen Restore in `RestoreQuarantine`; nach `RestoreReconciled` rekonstruieren Indizes ab `(replay_floor / durable_stamp)` ohne Gelöschtes | Restore-Matrix mit alten Backups, Intent-Präfixen, fehlendem KMS, altem Anker und Stale-Index-Rebuild |
 
 ### 2.6 Open-Core-Produktgrenze
 
-Open-Core ist ein Packaging- und Betriebsmodell, keine technische Einschränkung der Datensicherheit oder Löschbarkeit. **Offen bleiben:** alle Speicher-, Index- und Receipt-Formate, Speicherkern, Ports, Retrieval-Triebwerke (`vector`, `text`, `graph`, `rank`), Engine, Referenz-Provider/-Anker (`crypto-ref`, `storage-fs`, `keys-file`, `FileAnchor`), Konformanzvektoren, Simulation, Orakel, Basis-Branching/-Erase sowie Export-/Restore-Werkzeuge.
+Open-Core ist ein Packaging- und Betriebsmodell, keine technische Einschränkung der Datensicherheit oder Löschbarkeit. **Offen bleiben:** alle Speicher-, Index- und Receipt-Formate, Speicherkern, Ports, Retrieval-Triebwerke (`vector`, `text`, `graph`, `rank`), Engine, Referenz-Provider/-Anker (`contextra-crypto`, `contextra-durable-fs`, `FilePassphrase`, `FileAnchor`), Konformanzvektoren, Simulation, Orakel, Basis-Branching/-Erase sowie Export-/Restore-Werkzeuge.
 
 Kommerzielle Editionen können optionale Adapter/Services bereitstellen (z. B. HSM-/Cloud-KMS-Provider, `Strong`-Anker wie TPM/Transparency-Log/Object-Lock, Multi-Node-Replikation nach eigenem Verteilungs-Gate, zentrale Mandanten-Orchestrierung, Audit-/AVV-/Compliance-Portale, spezielle Inference-/Kalt-Tier-Integrationen). Die zugrundeliegenden Schnittstellen, `ErasureReceipt`-Verifikation (`verify_receipt`) und Exportpfade bleiben offen; `LicenseGate`/`FeatureRing` (§18) dürfen keine Kerninvariante (`INV-*`) abschwächen und keine Basislöschung hinter einer Bezahlschranke verweigern.
 
@@ -232,34 +240,50 @@ Kommerzielle Editionen können optionale Adapter/Services bereitstellen (z. B. H
 
 ## 3. Gesamtsystem-Architektur, Crate-Topologie & Abhängigkeits-Governance
 
-### 3.1 Ring-/Ebenenmodell & Crate-DAG
+### 3.1 Ring-/Ebenenmodell & Crate-DAG (14 Crates, `INV-TOPO-1`)
 
-Abhängigkeiten verlaufen **gerichtet azyklisch und nur auf strikt niedrigere Ebenen** (`Level 3 → Level 2 → Level 1 → Level 0`); innerhalb einer Ebene gibt es keine internen Kanten (K-48, `INV-LAYER-1`). Jede Verletzung bricht das CI-Gate `layering` und `cargo tree`.
+Abhängigkeiten verlaufen **gerichtet azyklisch und nur auf strikt niedrigere Ebenen**; innerhalb einer Ebene gibt es keine internen Kanten (K-48, K-58, `INV-LAYER-1`). Jede Verletzung bricht die CI-Gates `layering` und `cargo tree`. **Der Workspace besteht aus genau diesen 14 Crates; neue Crates sind in v1 nicht vorgesehen** (K-47).
 
 ```text
-Level 4 (Fassade & Apps):   contextra (Produkt) | contextra-db | contextra-mcp | contextra-py | contextra-testkit | contextra-bench
+Level 3 (Composition Root, Async-Rand):
+        contextra-engine   Module: platform · kernel · projection · collection · query · ingest · compliance · workers
         │
-Level 3 (Orchestrierung & Adapter / Composition Root):
-        contextra-engine | contextra-agent | contextra-cognition | contextra-router | contextra-erasure*
-        contextra-index-bridge (SegmentOwner, ConsumerFeed, Watermark) | contextra-storage-bridge (Async-Fassade, Receipt→Proof)
-        contextra-storage-fs | contextra-crypto-ref | contextra-keys-file | contextra-keys-cohort
+Level 2 (Triebwerke; untereinander ohne Kanten):
+        contextra-storage     synchroner Speicherkern, forbid(unsafe)          → ports, types
+        contextra-crypto      Cipher/Mac/Kdf/Checksum/KeyProvider, Beleg-Signatur → ports, types
+        contextra-vector      HNSW/DiskANN/SQ8/RaBitQ/ACORN                    → ports, types   (Distanz über Trait; simd injiziert vom Engine-Rand)
+        contextra-text        BM25/WAND, deutsche Morphologie                  → ports, types
+        contextra-graph       CSR, Hyperkanten, PPR/PathRAG                    → ports, types
+        contextra-rank        Fusion, Kalibrierung, Drift, DiBud               → types
+        contextra-mvcc        EpochPinRegistry                                 → types
+        contextra-checkpoint  Snapshot-Set-Register, Restore-Koordination      → ports, types
         │
-Level 2 (Triebwerke, untereinander ohne Kanten):
-        contextra-storage (synchroner Kern, forbid(unsafe))
-        contextra-vector | contextra-text | contextra-graph | contextra-rank | contextra-checkpoint | contextra-kvcache | contextra-crypto (Übergang)
-        contextra-mvcc (Übergang, entfällt für Kernpfade) | contextra-store (Legacy, bis G-CUTOVER)
+Level 1 (Verträge & Plattform):
+        contextra-ports       Module: kernel (neu) · legacy (Feature, bis G-CUTOVER) · retrieval · policy · system
+        contextra-durable-fs  sichere Dateischicht, Poisoning, Journal, Scrub   → sys
         │
-Level 1 (Verträge, nur Traits/Werttypen):   contextra-ports | contextra-storage-ports
-        │
-Level 0 (Fundament):   contextra-types | contextra-ids | contextra-env
-        Unsafe-Inseln: contextra-simd | contextra-sys | contextra-wire      (contextra-durable-fs: experimentell, kein RealFs, SD-70)
-        Safety (stand-alone): contextra-privacy | contextra-sandbox | contextra-prompt-guard | contextra-ingest | contextra-adapt | contextra-infer-*
+Level 0 (Fundament):
+        contextra-types | contextra-sys (Unsafe-Insel) | contextra-simd (Unsafe-Insel)
 ```
-(* `contextra-erasure` ist `frozen`, Änderung nur nach Freigabe, K-55.)
 
-**Ebenenregel (K-58).** `contextra-storage` kennt nur `storage-ports`. `vector`/`text`/`graph`/`rank` kennen nur `types` und `ports` (so wie heute im Code). Zusammenführung von Speicher und Retrieval geschieht ausschließlich in `index-bridge` und `engine`.
+**Eingehende Kanten sind belegt:** `crypto`, `vector`, `text`, `graph`, `engine`, `checkpoint` hängen heute an `types`/`ports` (Cargo-Prüfung HEAD `78a1783`); `storage` hängt (nach Behebung von K-47/§18.1 Nr. 2) nur an `ports` und `types`; **`engine` ist der einzige Crate, der `storage`, `crypto`, `durable-fs`, `simd` und die Retrieval-Crates zugleich kennt.**
 
-**Bindung statt Abhängigkeit (K-48).** `contextra-index-bridge` (Level 3) implementiert `SegmentOwner`, `ConsumerFeed`, Watermark und Attest für `vector`/`text`/`graph`/Identity-Directory über die je Crate definierten Traits `PartitionSink`/`PartitionSource`; die Retrieval-Crates kennen `SegmentIo` nicht.
+**Ebenenregel (K-58).** `contextra-storage` kennt nur `ports::kernel` und `types`. `vector`/`text`/`graph`/`rank` kennen nur `types` und `ports` und weder `storage` noch einander. Die Zusammenführung von Speicher und Retrieval geschieht **ausschließlich** in `engine::projection`.
+
+**Bindung statt Abhängigkeit (K-48).** `engine::projection` implementiert `SegmentOwner`, `ConsumerFeed`, Watermark und Attest für `vector`/`text`/`graph`/Identity-Directory über die je Crate definierten Traits `PartitionSink`/`PartitionSource`; die Retrieval-Crates kennen `SegmentIo` nicht.
+
+**Modulplan `contextra-engine` (Ziel, ersetzt die heutige Struktur `collection/`, `transaction/`, `orchestration/`, `contextra_impl/`, `adapters/`):**
+
+| Modul | Aufgabe | Herkunft im Bestand |
+|---|---|---|
+| `platform` | Adapter `Fs` über `durable-fs`/`sys`, `Clock`, `Entropy`, `HostProbe`, `Anchor` (Datei, `Weak`) | neu |
+| `kernel` | Öffnen des Kerns (Ports verdrahten, Compliance-Profil prüfen), Blocking-Pool (`spawn_blocking`) als Async-Fassade, Fehlerabbildung | neu (ersetzt `storage-bridge`) |
+| `projection` | `SegmentOwner`/`ConsumerFeed`/Watermark/Attest je Index, Partitionen, Generationsschlüssel, `rewrite_without`, `verify_absent`, Delta-Pfad | neu (ersetzt `index-bridge`) |
+| `collection` | `Collection` → `SpaceId`-Abbildung, `TenantPolicy`, CRUD, Relationen | `collection/` (39 Dateien, entkernen: `kv_lock` entfällt) |
+| `query` | Query-Plan-Protokoll QP-1…QP-9, `SnapshotSet`, Fusion, Tokenbudget, `min_stamp` | `query_builder/`, `search/`, `fusion.rs`, `filter.rs`, `temporal_filter.rs` |
+| `ingest` | Chunker, Import, Pseudonymisierung (`PiiClassifier`), Publish-Record, Orphan-Worker; optional `extraction` (Feature, hinter `EgressPolicy`) | `chunker/`, `import.rs`, `extraction/` |
+| `compliance` | Profile (`Development`/`Standard`/`Strict`), Receipt→`DeletionProof`, Auskunft/Export (`export_cluster`), Retention | `export.rs`, neu |
+| `workers` | Wartung, Projektion, Orphan-Aufräumen, Rebuild | `background_workers/` |
 
 **Modulschnitt innerhalb von `contextra-storage`** (Abhängigkeiten nur nach unten, Test `layering`):
 
@@ -268,48 +292,50 @@ lib.rs (Fassade) · engine (committer/sequencer+syncer, memtable, version, views
                            extension, feed, segments, page, cursor, cache, idem, guard_window, graveyard, volatile)
 maint (flush, compaction, blob_gc, purge, scheduler, scrub) · erase (gate, cluster_table, links, protocol, ledger)
 recovery · checkpoint (create, restore) · catalog · store (run, blob, redo) · keys · codec (varint, tags, checksums, comparator, seal, format, header)
-env (Fs, Clock, Entropy, Governor, Metrics, Anchor; MemFs, FaultFs, Sim) · sync (Ränge 1–8) · testing (ErasureOracle, cfg(feature="testing"))
+env (Clock, Entropy, Governor, Metrics, Anchor-Sim; MemFs, FaultFs, Sim) · sync (Ränge 1–8) · testing (ErasureOracle, cfg(feature="testing"))
 ```
 
-**Ist-vs-Soll-Abgleich Workspace (HEAD `60ea034`, per Datei geprüft).** `Cargo.toml` führt 14 Mitglieder; zusätzlich liegt `contextra-kvcache` im Verzeichnis `crates/`, ist aber **nicht** Mitglied. `capabilities.toml` beschreibt 42 Crates, davon existieren 14 (u. a. fehlen `ids`, `env`, `wire`, `store`, `storage-ports`, `storage-bridge`, `storage-fs`, `crypto-ref`, `keys-*`, `index-bridge`, `db`, `privacy`, `sandbox`, `ingest`, `router`, `agent`). Der Kern importiert `contextra_storage_ports` in `catalog/*.rs`, hat aber weder Crate noch Dependency-Eintrag. `contextra-types` und `contextra-ports` stehen in `capabilities.toml` auf Level 2, werden aber von `vector`, `text`, `graph`, `crypto`, `kvcache` genutzt (K-58). Es gibt kein Root-`tests/`-Verzeichnis (`CLAUDE.md` nennt `tests/layering.rs` und `tests/unsafe_islands.rs`); eine eigene `layering.rs` liegt nur in `crates/contextra-storage/tests/`. `docs/agent/` (von `CLAUDE.md` referenziert) fehlt. `scripts/check_forbidden_apis.sh` prüft bereits `storage` und `storage-ports`, aber nicht die Retrieval-Crates. Bereinigung ist Pflichtbestandteil von **P0** (§14.1, §18.1).
+`std::fs`, `std::time::SystemTime` und `rand`/`getrandom` sind im Speicherkern sowie in reinen Algorithmuskernen über `clippy.toml`/`disallowed_methods` verboten und nur über injizierbare Ports (`Fs`, `Clock`, `Entropy`, `Rng`) bzw. Adapter erlaubt.
 
-`std::fs`, `std::time::SystemTime` und `rand`/`getrandom` sind im Speicherkern sowie in reinen Ring-0/1-Algorithmuskernen über `clippy.toml`/`disallowed_methods` verboten und ausschließlich über injizierbare Ports (`Fs`, `Clock`, `Entropy`, `Rng`) bzw. Adapter erlaubt.
+### 3.2 Ports (Kernel-Ports & Retrieval-/System-Ports)
 
-### 3.2 Ports (Speicher-Ports & System-Ports)
+**A) Kernel-Ports (`contextra-ports::kernel`, K-64, `INV-PORT-1`):** synchron, ohne `futures`, ohne `serde`, ohne `std::fs`. Konformanzsuite je Port in `contextra-ports` (Modul `conformance`), von jedem Adapter zu bestehen.
 
-**A) Speicher-Ports (`contextra-storage-ports`):**
+| Port | Aufgabe & Vertrag | Standard-Adapter |
+|---|---|---|
+| `Fs` | Dateien, `read_at`, geordnetes `read_ranges`, `append_prealloc`, `preallocate`, `sync_data/all/dir`, `rename`, `lock`, `list`, `free_space`, optionale `link/reflink/punch_hole`; Rolle je Handle (`FileRole`) und `IoCtx` für Fehlerinjektion; kein `mmap` im Kernpfad | `engine::platform` über `durable-fs` (K-72); Test: `MemFs`/`FaultFs` in `storage::env` |
+| `Clock`, `Entropy` | Injizierbar; Uhr **nie** für Stamps. Monotone Laufzeit, UTC, durabler High-Water-Mark (`clock_floor`), Skew-Status; Fristablauf fail-closed (`ClockUncertain`, §3.5) | `engine::platform` |
+| `Anchor` | `read()`, `advance(expect, next)` (CAS, monoton, durabel), `strength() → Strong\|Weak`; Wert `(erase_epoch, ledger_head, catalog_epoch)` | `FileAnchor` (`Weak`) in `engine::platform`; `Strong` per Plugin (HSM/TPM/Remote) |
+| `KeyProvider` | §9.4 (`kek`, Batch-`create_cluster_keys`/`cluster_keys`/`destroy_many`, `probe`, `list`, Tomb-Epochen) | `contextra-crypto::keys` (`FilePassphrase`, Argon2id; `cohort` optional); KMS/HSM per Plugin |
+| `Cipher` / `Mac` / `Kdf` / `Checksum` | `XChaCha20-Poly1305` (24-Byte-Zufallsnonce), `HMAC-SHA256` (16 B/32 B), `HKDF-SHA256`, `CRC32C` | `contextra-crypto` |
+| `Authority` (optional) | Prüft Signaturen für `LiftPolicy::FourEyes` | Plugin |
+| `Metrics`, `Observer` | Nicht blockierend, **nie** unter Sperren; geschlossener Low-Cardinality-Katalog (§16) | `engine::kernel` |
+| `MemoryBudget` | Gemeinsamer RAM-/Scratch-Admission-Port für Storage **und** Extensions (`try_reserve(class, bytes) -> ResourcePermit`) | `engine::kernel` |
+| `HostProbe` (optional) | `probe() -> HostReport { swap, core_dumps, memlock_limit, fs_kind, device_ids }`; nur Diagnose/Restexposition (§9.9); `Unknown` gilt als `Declared` | `engine::platform` über `sys` |
+| `ColdTier` (optional) | Auslagerung kalter unveränderlicher Dateien unter Erhalt der Purge-Garantien | Plugin |
 
-| Port | Aufgabe & Vertrag |
-|---|---|
-| `Fs` | Dateien, `read_at`, geordnetes `read_ranges`, `append_prealloc`, `preallocate`, `sync_data/all/dir`, `rename`, `lock`, `list`, `free_space`, optionale `link/reflink/punch_hole`; kein `mmap` im Kernpfad |
-| `Clock`, `Entropy` | Injizierbar; Uhr **nie** für Stamps. Liefert monotone Laufzeit, UTC, durablen High-Water-Mark (`clock_floor`) und Skew-Status; Fristablauf fail-closed bei unplausiblen Sprüngen (`ClockUncertain`, §3.5) |
-| `Anchor` | `read()`, `advance(expect, next)` (CAS, monoton, durabel), `strength() → Strong\|Weak`; Wert `(erase_epoch, ledger_head, catalog_epoch)` |
-| `KeyProvider` | §9.4 (`kek`, Batch-`create_cluster_keys`/`cluster_keys`/`destroy_many`, `probe`, `list`, Tomb-Epochen `create/tomb_key/retire_tomb_epoch`) |
-| `Cipher` / `Mac` / `Kdf` / `Checksum` | AEAD (`XChaCha20-Poly1305`, 24-Byte-Zufallsnonce), Ketten-MAC (`HMAC-SHA256`, 16B/32B), `HKDF-SHA256`, `CRC32C` |
-| `Authority` (optional) | Prüft Signaturen für `LiftPolicy::FourEyes` |
-| `Metrics`, `Observer` | Nicht blockierend, **nie** unter Sperren; geschlossener Low-Cardinality-Metrikkatalog (§16) |
-| `MemoryBudget` | Gemeinsamer RAM-/Scratch-Admission-Port für Storage **und** Extensions (`try_reserve(class, bytes) -> ResourcePermit`); RAII-Drop gibt exakt frei |
-| `HostProbe` (optional) | `probe() -> HostReport { swap, core_dumps, memlock_limit, fs_kind, device_ids }`; reiner Adapter-Befund für Diagnose/Restexposition (§9.9); Werte `Unknown` gelten als `Declared` |
-| `ColdTier` (optional) | Auslagerung kalter unveränderlicher Dateien unter Erhalt der Lösch-/Purge-Garantien |
+Die Alt-Traits `ports::vfs::Vfs`/`VfsFile` und `ports::fs` gehen in `legacy` auf (K-63); der Kernel-`Fs` ersetzt sie.
 
-**B) Erweiterungs-, Retrieval- & System-Ports (§12 & `contextra-ports`):**
+**B) Retrieval- und System-Ports (`contextra-ports`, Module `retrieval`, `policy`, `system`):**
 
-| Port / Vertrag | Rolle im Gesamtsystem |
-|---|---|
-| `PartitionSink` / `PartitionSource` | Je Retrieval-Crate definierte, persistenzneutrale Traits (Block-Schreiben/-Lesen einer Partitionsgeneration); implementiert in `contextra-index-bridge` über `SegmentIo` (K-48) |
-| `SegmentOwner` | Verbindlicher Lösch-, Gate-, Watermark-, Rewrite- und `verify_absent`-Vertrag für alle persistierten Indizes (`Vector`, `Text`, `Graph`, `IdentityDirectory`, `KvCache`) (§12.1) |
-| `ExtensionBlock` & `BlockPruner` | Block-Granulare opake Indizes/Zeit-Aggregate am Run mit `PruneContract::ShadowSafe` auf `main` (§12.2) |
-| `Consumer` / `ConsumerFeed` | Durabler Redo-Stream (`(instance_id, stamp) ≤ durable_stamp`) mit expliziter `Redacted`/`Erased`-Maskierung (§12.3) |
-| `StorageBridge` (`contextra-storage-bridge`) | Asynchrone `spawn_blocking`-Fassade + typisierte Projektion zwischen `contextra-storage` (`Change`/`StorageView`/`ErasureReceipt`) und den Engines (`contextra-engine`, `contextra-erasure`) |
-| `VectorIndex` / `Contract::Index` | `HnswIndex`, `DiskAnnIndex` (gebunden an `Epoch(u64) ≡ Stamp` und `BlockTransform`, §12.4.1) |
-| `TextIndex` / `BM25` | `InvertedIndex`, `BM25`/`BM25F`, `GermanMorphTokenizer`, Block-Max WAND (gebunden an `Epoch(u64) ≡ Stamp`, §12.4.2) |
-| `GraphIndex` / `GraphProvider` | `CsrGraph`, `HyperEdge`, PPR/APPRH/TL-HFD/`PathRAG` mit Quell-Provenienz (`source_cluster`, `source_doc_id`, §12.4.3) |
-| `TextEmbeddingEngine` / `Reranker` | Lokale/remote Embedding- und Cross-Encoder-Modelle (`onnx`, `candle`, `ollama`) hinter `Engine`- und `Router`-Orchestrierung |
-| `LicenseGate` | Schnittstelle für Edition/Feature-Checks (`OpenFastGate` u. a.), streng an Open-Core-Grenze (§2.6) gebunden |
+| Port / Vertrag | Rolle im Gesamtsystem | Bestand |
+|---|---|---|
+| `PartitionSink` / `PartitionSource` | je Retrieval-Crate definierte, persistenzneutrale Traits (Block schreiben/lesen, Generation sealen, Projektions-Batch `apply(batch, epoch)`) | neu in `vector`/`text`/`graph` |
+| `SegmentOwner`, `ExtensionBlock`/`BlockPruner`, `Consumer`/`ConsumerFeed` | Lösch-, Gate-, Watermark-, Rewrite-, `verify_absent`-Vertrag (§12.1–§12.3); implementiert in `engine::projection` | Verträge in `contextra-storage` (Kernseite), Owner-Seite in `projection` |
+| `VectorIndex`, `TextIndex`, `GraphIndex` | **reine Lese-Verträge** (`search`, `search_at(epoch)`, `traverse*`, `stats`), gebunden an `Epoch(u64) ≡ Stamp` | `ports::{vector_index,text_index,graph_index}` (Schreibpfad entfällt, K-63) |
+| `EmbeddingProvider` / `TextEmbeddingEngine` | Embedding-Quelle (lokal oder extern) hinter `EgressPolicy`; Modellhosting ist außerhalb | `ports::embedding` |
+| `Reranker` | optionale Cross-Encoder-Stufe (Feature `reranking`) | `ports::reranker` |
+| `TextGenerator` (schmal) | nur für optionale Extraktion/Query-Umschreibung; kein Streaming, keine Agentenschnittstelle | `ports::inference` (zusammengestrichen, `LlmTextGeneratorStreaming` entfällt) |
+| `EgressPolicy`, `PiiClassifier` | Abfluss- und Erkennungsrichtlinie (K-69, K-70) | `ports::policy` |
+| `ContextPreparer`, `GroundingValidator`, `ResponseGroundingValidator` | token-budgetierte Kontextaufbereitung und Quellenprüfung der Antwort (Transparenz) | `ports::scanner`/`policy` (prüfen, ggf. nach `query` verlagern) |
+| `ReportSigner`, `LedgerSink`, `ErasureObserver` | Beleg-Signatur, Ledger-Senke, Beobachtung | `ports::{report_signer,ledger,erasure}` |
+| `LicenseGate`, `PluginManifest` | Edition/Feature-Prüfung und Plugin-Registrierung, streng an Open-Core-Grenze (§2.6) | `ports::{license,plugin}` |
+
+**Entfernt (K-65):** `AttentionExporter`, `KvBridgeStorage`, `KvPrefixStore`, `LlmTextGeneratorStreaming`, `VectorDeleteMode` aus `license.rs` (wird Konfiguration in `vector`).
 
 ### 3.3 Mechanismus, nie Politik (im Speicherkern)
 
-`contextra-storage` entscheidet nie, **ob** gelöscht werden darf, **wer** Zugriff erhält oder **welche** Aufbewahrungsfrist gilt; das verantworten `contextra-engine` (`TenantPolicy`, `RestrictionSpec`), `contextra-privacy` (`DataClass`) und `contextra-erasure` (Compliance-Orchestrierung & Signatur). Der Speicherkern setzt Aufträge atomar, geordnet und nachweisbar um und verweigert nur bei technischem Hindernis oder aktiver `Restriction`.
+`contextra-storage` entscheidet nie, **ob** gelöscht werden darf, **wer** Zugriff erhält oder **welche** Aufbewahrungsfrist gilt; das verantworten `contextra-engine` (`TenantPolicy`, `RestrictionSpec`), die Ingest-Pipeline (`PiiClassifier`, `DataClass`) und `engine::compliance` (Orchestrierung; Signatur über `contextra-crypto`). Der Speicherkern setzt Aufträge atomar, geordnet und nachweisbar um und verweigert nur bei technischem Hindernis oder aktiver `Restriction`.
 
 Der Kern bildet **keine persistierten Inhalts-Hashes über Klartext (`INV-PRIV-1`)**. Der Derivation Cache der oberen Schicht (§12.6, K-32) ist nur als clusterlokaler Keyed-MAC unter einem zufälligen, im selben `Sealed`-Cluster gespeicherten `cache_secret` zulässig.
 
@@ -317,7 +343,7 @@ Der Kern bildet **keine persistierten Inhalts-Hashes über Klartext (`INV-PRIV-1
 
 ```text
 Aufrufer / Async-Welt (tokio in mcp / engine / infer)
-  │  (spawn_blocking via contextra-storage-bridge)
+  │  (spawn_blocking via contextra-engine::kernel)
   ▼
 Synchroner Speicherkern (contextra-storage, ohne Async-Runtime):
   ├─ Schreibpfad:  Aufruferthread (Stufe-A-Guards, Hülle, Krypto, Vorkodierung)
@@ -332,7 +358,7 @@ Retrieval & CPU-Compute (contextra-vector / rank / text):
      KEINE Speicherkern-Sperre darf jemals in CPU- oder .await-Wartezeiten gehalten werden.
 ```
 
-Provider-, Cipher-, KDF-, Graph- und Guard-Arbeit findet ausschließlich **vor** Rang 1 auf Aufruferthreads oder auf Wartungs-Lanes statt, niemals im Sequencer. Async-Runtimes (`tokio`) existieren nur an den oberen Systemrändern (`contextra-engine`, `contextra-mcp`, `contextra-py`, Inferenz-Adapter).
+Provider-, Cipher-, KDF-, Graph- und Guard-Arbeit findet ausschließlich **vor** Rang 1 auf Aufruferthreads oder auf Wartungs-Lanes statt, niemals im Sequencer. Async-Runtimes (`tokio`) existieren nur an den oberen Systemrändern (`contextra-engine`; Server-/Sprachanbindungen und Modell-Adapter liegen außerhalb des Workspace).
 
 ### 3.5 Fehlermodell
 
@@ -354,78 +380,82 @@ Fehlertexte enthalten grundsätzlich **keine** Schlüssel, Nutzerschlüssel, Dok
 
 Arbeitsbereichsweite Lints (`[workspace.lints]`): `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`, `unreachable`, `indexing_slicing`, `await_holding_lock`, `await_holding_refcell_ref`, `exit`, `dbg_macro` auf `"deny"`; `let _ =` auf `sync_*`/`rename`/`unlink` verboten. `Debug` für `ClusterId`, Schlüssel, Nutzdaten und Query-Texte ist redigiert (`Redacted<T>`).
 
-`#![forbid(unsafe_code)]` gilt **ausnahmslos** in `contextra-storage`, `contextra-storage-ports`, `contextra-storage-fs`, `contextra-crypto-ref`, `contextra-keys-*`, `contextra-engine`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-checkpoint`, `contextra-mvcc`, `contextra-crypto`. Die einzigen zulässigen Unsafe-Inseln sind **`contextra-simd`**, **`contextra-sys`** und **`contextra-wire`** (`unsafe_op_in_unsafe_fn = "deny"`, vollständige `SAFETY`-Kommentare).
+`#![forbid(unsafe_code)]` gilt **ausnahmslos** in allen Crates außer den Unsafe-Inseln: `contextra-types`, `contextra-ports`, `contextra-durable-fs`, `contextra-storage`, `contextra-crypto` (Fremd-`unsafe` nur in auditierten RustCrypto-Crates), `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-mvcc`, `contextra-checkpoint`, `contextra-engine`. Die einzigen zulässigen Unsafe-Inseln sind **`contextra-simd`** und **`contextra-sys`** (`unsafe_op_in_unsafe_fn = "deny"`, vollständige `SAFETY`-Kommentare); der Test `unsafe_islands` erzwingt das (§18.1 Nr. 11).
 
 ### 3.7 Ökosystem: Finale Abhängigkeiten (Crates) und Bereinigungsplan
 
-Normativ für alle `Cargo.toml`-Dateien im Workspace. Auswahlkriterien in Rangfolge: (1) `std` genügt ⇒ kein Fremdcrate; (2) `#![forbid(unsafe_code)]`-Kompatibilität (Fremd-`unsafe` nur in auditierten RustCrypto-/Crossbeam-Crates bzw. innerhalb der drei Unsafe-Inseln); (3) kein Async im Speicherkern und in Ring-0/1-Algorithmuskernen; (4) ein Crate je Aufgabe, **eine** Hauptversion je Crate im gesamten Workspace (`cargo tree -d`); (5) keine Abhängigkeit, die unkeyed Inhalts-Hashes über Klartext in persistierte Formate schreibt (`INV-PRIV-1`).
+Normativ für alle `Cargo.toml`-Dateien im Workspace. Auswahlkriterien in Rangfolge: (1) `std` genügt ⇒ kein Fremdcrate; (2) `#![forbid(unsafe_code)]`-Kompatibilität (Fremd-`unsafe` nur in auditierten RustCrypto-/Crossbeam-Crates bzw. innerhalb der Unsafe-Inseln `sys` und `simd`); (3) kein Async im Speicherkern und in L2-Algorithmuskernen; (4) ein Crate je Aufgabe, **eine** Workspace-Version je Abhängigkeit.
 
-#### 3.7.1 Speicherkern `contextra-storage` und `contextra-storage-ports`
+#### 3.7.1 Speicherkern `contextra-storage`
+
+Ist-Stand: `Cargo.toml` führt `bytes`, `thiserror`, `zeroize`, `crossbeam-skiplist`, `siphasher`; es fehlen die Pfadabhängigkeiten auf `contextra-ports` und `contextra-types` (Pflicht in P0).
 
 | Aufgabe | Entscheidung | Begründung |
 |---|---|---|
-| Fehler | `thiserror ^2` | einheitliche Workspace-Version (vorher 1 vs 2 gemischt); redigierte Meldungen |
+| Fehler | `thiserror ^2` | einheitliche Workspace-Version; redigierte Meldungen |
 | Byte-Puffer | `bytes ^1` | Zero-Copy-Slices für Körper/Blöcke |
-| Speicherhygiene | `zeroize ^1` (`derive`) | Schlüsselmaterial, Klartextpuffer, `Redacted<T>` |
-| Memtable-Index | `crossbeam-skiplist ^0.1`, **nur hinter Trait `MemIndex`** | lock-freie sortierte Map ohne eigenes `unsafe`; Fallback: sharded `BTreeMap` unter Rang-Sperre für `loom`-Modelltests; Skiplist selbst unter `shuttle`/`miri` |
-| Guard-Fingerabdruck | `siphasher ^1` | ausschließlich flüchtige Prozess-Fingerabdrücke (`SipHash-1-3`), nie persistiert |
-| Sperren & Threads | `std::sync::{Mutex, RwLock, Condvar}` + `RankedMutex` (§11.2) | futex-basiert, Rangstack + Poison-Abbildung auf F-8 (`parking_lot` bringt kein Poisoning und bleibt im Kern verboten) |
+| Speicherhygiene | `zeroize ^1` | Schlüsselmaterial, Klartextpuffer, `Redacted<T>` |
+| Memtable-Index | `crossbeam-skiplist ^0.1`, **nur hinter Trait `MemIndex`** | lock-freie sortierte Map ohne eigenes `unsafe`; Fallback: sharded `BTreeMap` unter Rang-Sperre für `loom`; Skiplist unter `shuttle`/`miri` |
+| Guard-Fingerabdruck | `siphasher ^1` | nur flüchtige Prozess-Fingerabdrücke, nie persistiert |
+| Sperren & Threads | `std::sync::{Mutex, RwLock, Condvar}` + `RankedMutex` (§11.2) | Rangstack + Poison-Abbildung auf F-8; `parking_lot` ist im Kern verboten |
 | Serialisierung | **keine** (handgeschriebener `codec`, §5) | byte-genaue, begrenzte Formate; `serde`/`bincode`/`flatbuffers` verboten |
 
-**Im Speicherkern explizit verboten:** `tokio`/`async-std`/`futures`, `rayon`, `parking_lot`, `scc`, `dashmap`, `memmap2`, `serde*`, `bincode`, `blake3`, `rand`/`getrandom` (nur Port `Entropy`), `crc32fast`, `anyhow`, `tracing` (Observability ausschließlich über `Metrics`/`Observer`-Ports).
+**Im Speicherkern verboten:** `tokio`/`async-std`/`futures`, `rayon`, `parking_lot`, `scc`, `dashmap`, `memmap2`, `serde*`, `bincode`, `blake3`, `rand`/`getrandom` (nur Port `Entropy`), `crc32fast`, `anyhow`, `tracing` (Beobachtung nur über `Metrics`/`Observer`).
 
-#### 3.7.2 Krypto-Adapter `contextra-crypto-ref` (Standard-Adapter & Composition Root)
+#### 3.7.2 Krypto-Adapter `contextra-crypto` (Standard-Adapter)
 
-Eingebunden durch das Composition Root / `contextra-storage-bridge` (Feature `default-crypto`), nicht vom Speicherkern:
+Eingebunden im Composition Root (`engine::kernel`), nicht vom Speicherkern. **Ist:** `aes-gcm-siv`, `blake3`, `argon2`, `hkdf`, `sha2`, `ed25519-dalek`, `zeroize`. **Soll:**
 
 | Aufgabe | Crate | Anmerkung |
 |---|---|---|
-| AEAD | `chacha20poly1305 ^0.10` (`XChaCha20Poly1305`, 24B Nonce) | Normatives Siegel (§5.2) |
-| Ketten-/Auth-MAC | `hmac ^0.12` + `sha2 ^0.10` | HMAC-SHA256, 16B (Auth) / 32B (Kette/Tomb/Scope) |
-| KDF | `hkdf ^0.12` | Einmalige Schlüsselrollen-Ableitung außerhalb von `SealFrame` |
-| Prüfsumme | **`crc32c ^0.6`** | Zwingend CRC-32**C** (nicht austauschbar mit `crc32fast`) |
-| CT-Vergleich & Zufall | `subtle ^2` · `getrandom ^0.3` (nur `Entropy`-Adapter) | Constant-time MAC-Tag-Vergleich; kein `rand` in neuen Crates |
+| AEAD | `chacha20poly1305 ^0.10` (`XChaCha20Poly1305`, 24-Byte-Nonce) | Normatives Siegel (§5.2); ersetzt `aes-gcm-siv` |
+| MAC | `hmac ^0.12` + `sha2 ^0.10` | HMAC-SHA256, 16 B (Auth) / 32 B (Kette/Tomb/Scope) |
+| KDF | `hkdf ^0.12`; `argon2 ^0.5` (Argon2id, nur Passphrase-Provider) | `derive_dek`, `KdfParams` bleiben |
+| Prüfsumme | **`crc32c ^0.6`** | zwingend CRC-32**C**; nicht austauschbar mit `crc32fast` |
+| CT-Vergleich & Zufall | `subtle ^2`, `getrandom ^0.3` (nur im `Entropy`-Adapter) | kein `rand` in neuen Pfaden |
+| Beleg-Signatur | `ed25519-dalek ^2` (`verify_strict`) | `deletion_proof`, `ed25519_proof`; Signaturbytes handcodiert, nicht über `serde` |
 
-**Bereinigung:** `blake3` wird aus `contextra-crypto-ref` und der `derive_subkey_fast`-Vorstufe restlos entfernt.
+**Bereinigung:** `blake3`, `aes-gcm-siv`, `bincode` und `tokio` verlassen den Crate; `kv_cipher.rs`, `kv_shredding.rs` und `kv_segment/` (zusammen ≈ 2 600 LOC) werden gelöscht (K-65). Zu behalten und anzupassen: `aead`, `dek`, `kdf`, `secret`, `audit_chain`, `revocation_log`, `wal_crypto`/`wal_completeness` (an das Redo-Format R13 angleichen oder entfernen, wenn durch §5.5 ersetzt), `anti_tamper`.
 
-#### 3.7.3 Dateisystem-Adapter `contextra-storage-fs` (`RealFs`)
+#### 3.7.3 Dateisystem: `contextra-durable-fs` und `contextra-sys` (K-72)
 
-Implementiert `Fs` direkt über `std::fs` + `rustix ^1` (`features = ["fs", "std"]`, für `fallocate`/`punch_hole`/`statvfs`/macOS `F_FULLFSYNC`) sowie `std::fs::File::{lock, try_lock}` (stabil ab Rust 1.89) und sichere Win32-Wrapper aus `contextra-sys` unter Windows. **`contextra-durable-fs` ist als Basis für `RealFs` verworfen (SD-70)**; kein `libc`, kein `memmap2`, keine stille Simulation von `preallocate` (muss über `FsCaps` deklariert werden).
+`durable-fs` (Ist: nur `thiserror`, optional `serde`/`tracing`/`crc32fast`; `Vfs` ist dateiweise, ohne `read_at`/`preallocate`/`lock`/`free_space`) wird in P0 erweitert und hängt künftig an `contextra-sys` für alle OS-Primitive. Kein `libc`/`memmap2` in `durable-fs`. `memmap2` bleibt in `sys` hinter Feature `mmap` (Standard aus). Der Kernel-`Fs` wird in `engine::platform` als dünner Adapter (≤ ≈ 400 LOC) implementiert und mit der Konformanzsuite geprüft. Windows ist erst nach bestandener Konformanz freigegeben (NZ-8).
 
 #### 3.7.4 Schlüssel-Provider & Compliance-Schicht
 
-| Crate | Abhängigkeiten & Regeln |
-|---|---|
-| `contextra-keys-file` | `argon2 ^0.5` (Argon2id Pflicht), `zeroize`, `getrandom` |
-| `contextra-keys-cohort` | wie `keys-file`; Cohort-KEK-Rewrap ausschließlich über Ports-AEAD |
-| `contextra-keys-kms` (optional) | Anbieter-SDKs (HTTP/TLS) strikt hinter Features, isoliert vom Standard-Kern-Build |
-| `contextra-erasure` (Tier `frozen`) | `ed25519-dalek ^2` (`verify_strict`, `SigningKey::from_bytes` aus 32B Seed ohne `rand`), `sha2`, `subtle`, `zeroize`, `serde`/`serde_json` (nur Anzeigeberichte), `thiserror`. Kanonische Receipt-Bytes werden **handcodiert**; **`aes-gcm-siv` entfällt**. `contextra-erase-verify` nutzt ausschließlich Ports + `sha2` |
-
-#### 3.7.5 Retrieval-, Engine-, Safety-Crates & Alt-Abhängigkeits-Bereinigung
-
-Die oberen Crates bleiben funktionsreich, müssen aber ihre Speicher-, Serialisierungs- und Abhängigkeits-Schnittstellen an den Gesamtkern anpassen:
-
-| Crate-Gruppe | Erlaubte Spezifika | Normative Bereinigung bis `G-CUTOVER` (§14.1) |
+| Baustein | Ort | Regeln |
 |---|---|---|
-| `contextra-vector` | `thiserror 2`, `ahash`, `roaring`, `subtle`, `zeroize`, `contextra-simd` (über `contract::DistanceFn` / Trait); optional `rayon`/eigener `ComputePool` | **Entfernen aus Persistenz:** `memmap2` (Ablösung durch `SegmentIo` + Block-Cache), direktes `std::fs` in `diskann`/`persistence`, statischer `DISKANN_INTEGRITY_KEY`, `blake3`-Klartext-DocID-Hashing (`hnsw/purge.rs`), `bincode` (Dev). `serde` nur für optionalen In-Memory-Debug-Export, produktive Indexblöcke über `SegmentIo` |
-| `contextra-text` | `bytes`, `itoa`, `regex`, `unicode-segmentation`, `thiserror 2` | **Entfernen aus Persistenz:** `bincode`, unkeyed `blake3`, globales `futures::executor::block_on` in `TextPurger` (`purge.rs`), direktes `parking_lot`-Blocking im Hot-Path (Ersatz durch Storage-`ClusterSections` + `SegmentOwner` mit `Epoch`) |
-| `contextra-graph` | `bytes`, `ahash`, `arc-swap`, `thiserror 2` | **Prüfen & Bereinigen:** `bincode` in `graph_persist.rs`/`hyperedge.rs`/`session_dag.rs` auf kanonische Codecs bzw. Storage-Segmente umstellen; `blake3` entfernen; `scc` (`RUSTSEC-2026-0205`) durch deterministische Strukturen oder gepatchte Map ablösen; `tokio` (`TRANSITION E29`) vollständig aus Graph-Core entfernen |
-| `contextra-rank` | rein synchrones Rechnen (`serde`/`serde_json` nur für Config/Provenance-Reports, `ahash`, `thiserror 2`) | **Bereinigen:** `tokio` aus `TRANSITION E29` entfernen; Kalibrierungs-Persistenz ausschließlich über Engine/Storage (`NonPersonal` System-Space) |
-| `contextra-checkpoint` | Workflow-Guards (`CheckpointGuard`, `StateCheckpoint`), `thiserror 2` | **Umbau:** `blake3`-Manifest-Prüfsumme + unbeschränkte `pin_checkpoint`-Aufrufe an `LsmStorage` ersetzen durch clusterlokale Storage-Records + `View-Lease`/`Hold` und Storage-eigene `checkpoint`-Pipeline (§10.3) |
-| `contextra-crypto` | Übergangsweise für `kv_cipher`/`KvSegmentManager` & `audit_chain` | `deletion_proof`, `revocation_log`, `kv_shredding` (bereits `deprecated`) nach `contextra-erasure` überführen; `aes-gcm-siv` und `blake3` bis `G-CUTOVER` durch `XChaCha20-Poly1305` / `HMAC-SHA256` ablösen |
-| `contextra-engine`, `contextra-db`, `contextra` | `tokio` + `tokio-util` (Async-Orchestrierung an Systemgrenze), `serde`/`serde_json` (API/Metadaten), `contextra-storage-bridge` | `contextra-store` und 2PC (`CommitLedger`) ersetzen; `tokio`-Nutzung streng auf Level ≥ 2 begrenzt (`TRANSITION E29` Frist 2027-04-30 für Level-1-Crates nicht verlängerbar); `parking_lot` über Hauptversion `0.12` vereinheitlichen (außerhalb des Speicherkerns) |
-| `contextra-ingest` / `contextra-sandbox` | Parser: `lopdf`, `calamine`, `mail-parser`, `zip =0.6.6`, `cfb`, `html5ever`, `quick-xml`, `csv`, `encoding_rs`, `yaml-rust2`, `toml` | Jeder Parser ist Angriffsfläche für untrusted Dokumente: Pflicht-Fuzz-Ziele, harte Größen-/Rekursions-/Zip-Bomb-Limits, Ausführung isoliert in `contextra-sandbox` (`wasmtime`); Pin-Grund für `zip =0.6.6` dokumentieren & gegen Advisories prüfen |
+| `FilePassphrase` (Argon2id) | `contextra-crypto::keys::file` | `KeyAssurance::FilePassphrase`; `Complete` ausgeschlossen (§9.4) |
+| Cohort-Strategie | `contextra-crypto::keys::cohort` (Feature `cohort`) | Rewrap nur über Kernel-`Cipher` |
+| KMS/HSM | **Plugin außerhalb des Workspace**, implementiert `KeyProvider` | Anbieter-SDKs nie im Standard-Build |
+| Receipt→`DeletionProof` | `engine::compliance` + `crypto::deletion_proof` | Signatur optional (K-55) |
+| `verify_receipt`, Orakel | `contextra-storage` (`testing`, `erase`) | nutzt nur Ports und `sha2` über `Mac` |
+
+#### 3.7.5 Retrieval-, Rank-, MVCC-, Checkpoint- und Engine-Crates: Bereinigung bis `G-CUTOVER` (§14.1)
+
+Gemessen am HEAD `78a1783` (Dateien mit Treffer): `memmap2` vector 2/sys 2; `bincode` crypto 5, graph 6, text 6, types 3, vector 1; `blake3` im Quelltext von 7 Crates (checkpoint 3, crypto 3, graph 3, ports 2, text 3, types 4, vector 4); `block_on` checkpoint 4, crypto 1, engine 3, graph 4, text 2; `tokio` in 8 Crates (engine 31, graph 17, vector 7, checkpoint 6, ports 4, crypto 3, text 3, types 1); `DISKANN_INTEGRITY_KEY` vector 4; `std::fs` vector 7, checkpoint 1; `scc::` graph 1; `contextra_store` engine 18.
+
+| Crate | Erlaubte Spezifika | Normative Bereinigung |
+|---|---|---|
+| `contextra-types` | `thiserror 2`, `bytes`, `ahash`; `serde`/`bincode`/`blake3`/`sha2` nur hinter Feature `wire-compat` (Alt-DTOs) | **Ein** `Epoch(u64)`, `TxId` entfällt (K-59); `types::saos` und `domain::misc` auf Agentenreste prüfen und streichen; kanonische Fehler ohne Klartext |
+| `contextra-vector` | `thiserror 2`, `ahash`, `roaring`, `subtle`, `zeroize`; Distanz über `contract::DistanceFn` (simd wird im Engine-Rand injiziert) | `memmap2`, direktes `std::fs` in `diskann`/`persistence`, `DISKANN_INTEGRITY_KEY` und `blake3`-DocID-Hashing entfernen; Persistenz über `PartitionSink`; `TxId` → `Epoch`; Schreib-Tx-API durch `apply(batch, epoch)` ersetzen |
+| `contextra-text` | `bytes`, `itoa`, `regex`, `unicode-segmentation`, `thiserror 2` | `bincode`, unkeyed `blake3`, `block_on` in `TextPurger`, `parking_lot`-Hotpath, globales `commit_lock`/`meta:stats` entfernen; Forward-Daten clusterlokal, Postings partitioniert (K-43) |
+| `contextra-graph` | `bytes`, `ahash`, `arc-swap`, `thiserror 2` | `bincode`, `blake3`, `scc`, `tokio` entfernen; **`session_dag.rs` und `edge_reinforcement*` löschen bzw. abschalten (K-65, K-71)**; `purger.rs` (deprecated) in `PartitionSink::rewrite_without` überführen; `provenance` bleibt Pflicht |
+| `contextra-rank` | synchron; `serde`/`serde_json` nur für Config/Reports, `ahash`, `thiserror 2` | `tokio`-Rest entfernen; Kalibrier-Persistenz über Engine/Storage (`NonPersonal`-System-Space) |
+| `contextra-mvcc` | nur `std` | Reduktion auf `EpochPinRegistry` (K-66); `SequenceLog`/`ssi`/`tx_buffer` und Stub-Module `contextra_{ports,types}.rs` entfernen |
+| `contextra-checkpoint` | `thiserror 2` | Neuzuschnitt (K-67); `blake3`, `tokio`, `parking_lot`, `block_on`, `hardlink_cloner`, `WorkflowState`/`StateCheckpoint` entfernen |
+| `contextra-engine` | `tokio` + `tokio-util` (nur Rand), `serde`/`serde_json` (API/Metadaten), alle L2-Crates | `contextra_store`-Importe (18 Dateien) ersetzen; 2PC (`CommitLedger`) entfernen; `orchestration/`, `decay_controller.rs`, `adapters/ollama.rs`, `collection/kv_lock.rs` löschen (K-65); `block_on` nur noch in `kernel` |
+| `contextra-ports` | `contextra-types`, `bytes`, `thiserror`; `futures-util`/`serde`/`serde_json` nur im Feature `legacy` und in `retrieval` | Aufteilung `kernel`/`legacy` (K-63); `kv`, `kv_bridge_port`, `attention` löschen |
 
 #### 3.7.6 Test-, Prüf- und Werkzeug-Ökosystem & Durchsetzung
 
 | Zweck | Werkzeug & Gates |
 |---|---|
 | Interleavings | `loom ^0.7` (`cfg(loom)`) + `shuttle ^0.8` |
-| Property-/Fuzzing/UB | `proptest ^1`, `cargo-fuzz` + `libfuzzer-sys` + `arbitrary` (inkl. Ingest-Parser & Format-Decoder), `miri` (`codec`/Siegel/Skiplist) |
-| Qualität & Formale | `cargo-mutants`, `cargo-llvm-cov`, `cargo-nextest`, TLA+/TLC (M1–M6), `criterion` (nur `contextra-bench`), `tempfile ^3` |
-| Lieferkette & Schichten | **`cargo deny check`** (Positivliste in `deny.toml`; `ignore`-Einträge wie `RUSTSEC-2026-0205` `scc`, `pyo3`, `rustls` nur mit Begründung & Ablaufdatum), `cargo tree -d`, CI-Gate `layering` + `unsafe_islands` (als echte Cargo-Tests eingebunden, §18.1), eine `[workspace.dependencies]`-Version je Crate (`thiserror 2`, `parking_lot 0.12`, `rand` in neuen Crates verboten) |
-
----
+| Property-/Fuzzing/UB | `proptest ^1`, `cargo-fuzz` + `libfuzzer-sys` + `arbitrary` (Format-Decoder, Chunker, Import), `miri` (`codec`/Siegel/Skiplist) |
+| Qualität & Formale | `cargo-mutants`, `cargo-llvm-cov`, `cargo-nextest`, TLA+/TLC (M1–M6), `criterion` (Benches je Crate), `tempfile ^3` |
+| Lieferkette & Schichten | **`cargo deny check`** (Positivliste in `deny.toml`; `ignore`-Einträge nur mit Begründung und Ablaufdatum), `cargo tree -d`; Gates `layering` und `unsafe_islands` als **echte Cargo-Tests** in `contextra-storage/tests/` bzw. einem eingebundenen Test-Modul (heute liegen die Root-Tests nicht im Workspace, §18.1) |
+| Verbotene APIs | `scripts/check_forbidden_apis.sh` erweitert um `kv_cache|KvCache|kvcache|AdaptiveDecay|SessionBranchTree|contextra_store|contextra_storage_ports` (`INV-SCOPE-1`) |
 
 ---
 
@@ -861,12 +891,12 @@ pub enum KeyAssurance { Hardware, Kms, FilePassphrase }
 
 - **`Disabled`** = unbenutzbar, nicht unumkehrbar (KMS-Karenz). ER2 gilt erst bei `Absent` als abgeschlossen; bis dahin `KeyDestroying{eta}` und Ticket/Receipt `Blocked` mit nächstem Prüfzeitpunkt und KMS-Restrisiko. Bei `Cryptographic` beginnt der Purge erst bei `Absent` (`INV-ERA-3`, §9.5); solange der Schlüssel nur `Disabled` ist, sind lediglich Planung und Scratch-Reservierung (ER3) zulässig. `Done` braucht ebenfalls `Absent`.
 - **`KeysInBackups` (E-77):** `No` = kein Schlüsselexport außerhalb des Providers. `Bounded{until}` = Exporte existieren (KMS-Backup, Escrow), werden aber spätestens `until` nach der Vernichtung selbst vernichtet. `Yes` = unbegrenzt. `Cryptographic` ist bei `No` voll zulässig, bei `Bounded` zulässig mit Statuscap `CompleteWithResidual{BoundedBackupKeys{until}}`, bei `Yes` `Err(Unsupported)`. Das Receipt wird aus Ledger und Zeit berechnet: nach Ablauf von `until` entfällt der Cap bei einem neu berechneten Receipt, solange der Provider weiter `Absent` bestätigt. Das Receipt nennt `destroy`, `keys_in_backups` und `assurance`.
-- **`KeyAssurance` (E-77):** `Hardware` (nicht exportierbarer HSM-/TPM-Schlüssel mit Vernichtungsnachweis des Moduls), `Kms` (Remote-KMS mit Destroy-API, Karenz möglich ⇒ `Disabled`), `FilePassphrase` (`keys-file`). `FilePassphrase` kann die Vernichtung auf Journal-, CoW- und Flash-Dateisystemen nicht beweisen: jedes Receipt mit diesem Provider trägt `CompleteWithResidual{WeakKeyAssurance}`, `Complete` ist ausgeschlossen. `open` mit `OpenProfile::Production` (§16) weist Spaces mit `DataClass::Personal` und `Seal::Cluster` bei einem Provider mit nur `FilePassphrase` mit `ProviderAssuranceInsufficient` ab, außer `acknowledged_weak_keys` ist gesetzt.
+- **`KeyAssurance` (E-77):** `Hardware` (nicht exportierbarer HSM-/TPM-Schlüssel mit Vernichtungsnachweis des Moduls), `Kms` (Remote-KMS mit Destroy-API, Karenz möglich ⇒ `Disabled`), `FilePassphrase` (`crypto::keys::file`). `FilePassphrase` kann die Vernichtung auf Journal-, CoW- und Flash-Dateisystemen nicht beweisen: jedes Receipt mit diesem Provider trägt `CompleteWithResidual{WeakKeyAssurance}`, `Complete` ist ausgeschlossen. `open` mit `OpenProfile::Production` (§16) weist Spaces mit `DataClass::Personal` und `Seal::Cluster` bei einem Provider mit nur `FilePassphrase` mit `ProviderAssuranceInsufficient` ab, außer `acknowledged_weak_keys` ist gesetzt.
 - **Tomb-Epochen (K-31, E-74):** `tomb_key(epoch)` leitet ausschließlich `tomb_id`s ab (§9.7). Tomb-Schlüssel liegen im Provider, nie in `KEYS`, Checkpoints oder Backups des Kerns (`INV-KEY-5`). Default: genau eine Epoche `0`, keine Rotation, kein Retire (`tomb_id` bleibt linkbar). Optional rotiert `rotate_tomb_epoch` auf eine neue Epoche für neue Intents (die alte wird `Closed`), und `retire_tomb_epoch` vernichtet den Schlüssel einer geschlossenen Epoche unter den Bedingungen von §10.4. `tomb_key` liefert `None` ausschließlich für retired Epochen; fehlt der Schlüssel einer nicht retired Epoche, ist das `KeyLost` der Tomb-Domäne: Restore bleibt quarantined, neue Erase-Intents liefern `KeyUnavailable`, nie wird ein fehlender Tomb-Schlüssel als Retire gedeutet. Für Tomb-Schlüssel gelten `keys_in_backups` und `assurance` des Providers sinngemäß.
 - **Partitionsgenerationsschlüssel (K-49):** `PartitionTag` ist ein opaker, zufälliger 16-Byte-Bezeichner je Index-Partition (keine ClusterId, kein Klartext-Mandant). Die Schlüssel liegen im Provider, nie in `KEYS`, Checkpoints oder Backups (`INV-KEY-5` gilt sinngemäß); `keys_in_backups` und `assurance` des Providers gelten auch für sie. `Absent` für Generation `g` ist Voraussetzung für `Done` des Index-Owners (`INV-PART-1`); ein fehlender Schlüssel einer nicht vernichteten Generation ist `KeyLost` der Index-Domäne (Partition neu aufbauen, Ticket `Incomplete`), nie still `Absent`.
 - **ER2-Abschluss je Epoche:** `KeysDestroyed` erst, wenn `probe(c, e) == Absent` für jede Epoche `e ≤ key_epoch` des Clusters gilt (`INV-KEY-4`).
 - KEK-Rotation: nur RootKey neu umhüllen (`rotate_kek`), alle anderen Dateien bleiben. Rotation einer Cluster-Epoche: neue `key_epoch` für neue Writes; eine alte Epoche wird erst vernichtet, wenn nichts mehr mit ihr versiegelt ist (`INV-KEY-3`); `destroy_many` vernichtet **immer alle** Epochen (`INV-KEY-4`).
-- **Cohort-Strategie (Provider-intern, K-04):** `keys-cohort` darf Clusterschlüssel in Cohorts (≤ 1024) unter einer Cohort-KEK-Generation führen; `destroy_many` = Rewrap ohne die gelöschten Einträge, dann KMS-Destroy der alten Generation. Voraussetzung: **keine Keyring-Kopie in Backups** (`keys_in_backups = false`), Pflicht-Replikation des aktuellen Keyrings in ≥ 2 Failure Domains. Der Kern sieht davon nichts.
+- **Cohort-Strategie (Provider-intern, K-04):** `crypto::keys::cohort` darf Clusterschlüssel in Cohorts (≤ 1024) unter einer Cohort-KEK-Generation führen; `destroy_many` = Rewrap ohne die gelöschten Einträge, dann KMS-Destroy der alten Generation. Voraussetzung: **keine Keyring-Kopie in Backups** (`keys_in_backups = false`), Pflicht-Replikation des aktuellen Keyrings in ≥ 2 Failure Domains. Der Kern sieht davon nichts.
 - Schlüsselcache mit Generationszähler (§11.5), TTL, `Zeroizing`, Providerausfall: gecachte Schlüssel bis `key_grace` (10 min); Gate und ER2 invalidieren sofort durch `gen`.
 - Konformanzsuite `KeyProviderConformance` (Idempotenz, alle Epochen, `probe`-Semantik je Epoche, Crashverhalten, Tomb-Epochen: `create`/`retire` idempotent, `tomb_key == None` nur nach Retire, Provider-Neustart verliert keine Epoche) ist Gate-Pflicht für jeden Provider.
 
@@ -1113,9 +1143,9 @@ Rang 1 und Rang 3 werden nie gleichzeitig gehalten (Notpool, §5.8). Rang 2 wird
 
 ## 12. Erweiterungsverträge, Retrieval-Integration und Muster für die obere Schicht
 
-Dieses Kapitel ist der Vertrag zwischen Speicherkern und allem, was darauf aufsetzt (`vector`, `text`, `graph`, `rank`, `engine`, `kvcache`, Agenten). Es beantwortet vier Fragen: **Wo liegen die Wahrheit und ihre Ableitungen?** (§12.4.0), **wie bleiben abgeleitete Strukturen löschbar?** (§12.4.1–§12.4.6), **wie entsteht ein reproduzierbares Suchergebnis?** (§12.4.4) und **wie trennt das System personenbezogene von sonstigen Daten?** (§12.4.6).
+Dieses Kapitel ist der Vertrag zwischen Speicherkern und allem, was darauf aufsetzt (`vector`, `text`, `graph`, `rank`, `engine`). Es beantwortet vier Fragen: **Wo liegen die Wahrheit und ihre Ableitungen?** (§12.4.0), **wie bleiben abgeleitete Strukturen löschbar?** (§12.4.1–§12.4.6), **wie entsteht ein reproduzierbares Suchergebnis?** (§12.4.4) und **wie trennt das System personenbezogene von sonstigen Daten?** (§12.4.6).
 
-**Schichtenregel (K-48).** Die Retrieval-Crates kennen den Speicherkern nicht. Sie sprechen mit einem eigenen, schmalen Persistenz-Trait (`PartitionSink`/`PartitionSource`: Blöcke schreiben/lesen, Generation sealen/abschließen). `contextra-index-bridge` (Level 2) implementiert diese Traits über `SegmentIo`, registriert die `SegmentOwner`, speist den `ConsumerFeed` und liefert die Attestationen. So gilt gleichzeitig: Klasse-A-Crates bleiben autark und einzeln testbar, und kein Index kann am Löschvertrag vorbei persistieren, weil ihm der Weg dorthin fehlt (`std::fs`, `memmap2` und feste Schlüssel sind in Produktivpfaden verboten, `check_forbidden_apis.sh`).
+**Schichtenregel (K-48).** Die Retrieval-Crates kennen den Speicherkern nicht. Sie sprechen mit einem eigenen, schmalen Persistenz-Trait (`PartitionSink`/`PartitionSource`: Blöcke schreiben/lesen, Generation sealen/abschließen). `contextra-engine::projection` (Level 3) implementiert diese Traits über `SegmentIo`, registriert die `SegmentOwner`, speist den `ConsumerFeed` und liefert die Attestationen. So gilt gleichzeitig: Klasse-A-Crates bleiben autark und einzeln testbar, und kein Index kann am Löschvertrag vorbei persistieren, weil ihm der Weg dorthin fehlt (`std::fs`, `memmap2` und feste Schlüssel sind in Produktivpfaden verboten, `check_forbidden_apis.sh`).
 
 ### 12.1 Segment-Register
 
@@ -1206,7 +1236,7 @@ Index-Watermarks (Muster aus CairnDB) sind Pflicht für jeden abgeleiteten Index
 | Personen-Entitäten | Knoten vom Typ `Person` sind Eigentum des Personen-Clusters (Pseudonym-Tresor, §12.4.6); das gemeinsame Graphsegment enthält nur `EntityRef(pseudonym)`. Kanten zwischen gemeinsamen Entitäten und Personen-Entitäten sind **nicht kaskadierende Referenzen** |
 | Struktur | CSR-Basis (unveränderlich) + Delta-Puffer; Traversierung = Vereinigung der Adjazenzen über die Segmente des Mandanten (`max_graph_segments_per_tenant` 64, Knoten→Segment-Bloom in RAM); `MAX_TRAVERSAL_HOPS` 16 und Fan-out-Limit 10 000 bleiben |
 | Löschen | Gate ⇒ Maske über `source_cluster` (RAM) vor PPR/Traversierung; physisch Segment-Neuaufbau ohne Kanten der gelöschten Provenienz, anschließend Entitäts-Sweep (Knoten ohne Kanten werden entfernt, Puffer `Zeroize`) |
-| Inhaltliches Ersetzen | `Supersedes`/Decay (kognitiv) ist **kein** Löschen: es setzt Relevanz oder Gültigkeitszeit im Kopf, nie ein Gate (`INV-DECAY-1`, §12.9) |
+| Inhaltliches Ersetzen | `Supersedes`/Recency-Prior ist **kein** Löschen: es setzt Relevanz oder Gültigkeitszeit im Kopf, nie ein Gate (`INV-DECAY-1`, §12.9) |
 | Algorithmen | PPR (Forward-Push), APPRH, TL-HFD, PathRAG, Community/Percolation laufen auf einem gepinnten Segment-Set; Ergebnisse sind deterministisch (`INV-GRAPH-004`) |
 
 #### 12.4.4 Query-Plan-Protokoll, Fusion und Tokenbudget (`contextra-engine`, `contextra-rank`)
@@ -1253,7 +1283,7 @@ Index-Watermarks (Muster aus CairnDB) sind Pflicht für jeden abgeleiteten Index
 | `Corpus` | aus `NonPersonal`-Chunks und aus pseudonymisiertem Text abgeleitet | Standardlimits oben | bis Löschung/Neuaufbau |
 | `Personal` | ausschließlich aus **pseudonymisiertem** Text von `Personal`-Chunks abgeleitet (Platzhalter, §12.4.6) | `max_partition_vectors_personal` 100 000, `max_partition_postings_bytes_personal` 64 MiB, `max_partition_edges_personal` 1 Mio. | `Rebuildable{max_age = purge_window_fraction × purge_deadline}`; Packgruppe nach Aufbewahrungsende der Person (`due_bucket`), Ablauf wirft die Partition ab |
 
-`INV-SEP-2`: Eine geteilte Partition enthält keinen aus Personen-Klartext abgeleiteten Vektor, Term oder Graphknoten. Klartext-Embeddings existieren nur im Cluster-Mikroindex (Modus A) des Personenclusters, unter dessen Clusterschlüssel; ihre Löschung ist mit dem Gate und `KeysDestroyed` erledigt. Damit bleibt Suche **über** viele Personen (pseudonymisiert) möglich, und die Löschung einer Person kostet höchstens den Neuaufbau der kleinen `Personal`-Partitionen, in denen ihre Platzhalter vorkamen. Kleinere Limits halten die Rebuild-Kosten je Löschfenster klein (H-36); die Zuordnung Platzhalter → Partition führt der `index-bridge`-Owner als Refcount je Person (nur RAM-Cache, aus `fw`-Records ableitbar).
+`INV-SEP-2`: Eine geteilte Partition enthält keinen aus Personen-Klartext abgeleiteten Vektor, Term oder Graphknoten. Klartext-Embeddings existieren nur im Cluster-Mikroindex (Modus A) des Personenclusters, unter dessen Clusterschlüssel; ihre Löschung ist mit dem Gate und `KeysDestroyed` erledigt. Damit bleibt Suche **über** viele Personen (pseudonymisiert) möglich, und die Löschung einer Person kostet höchstens den Neuaufbau der kleinen `Personal`-Partitionen, in denen ihre Platzhalter vorkamen. Kleinere Limits halten die Rebuild-Kosten je Löschfenster klein (H-36); die Zuordnung Platzhalter → Partition führt der `engine::projection`-Owner als Refcount je Person (nur RAM-Cache, aus `fw`-Records ableitbar).
 
 #### 12.4.6 Trennungsprinzip und Pseudonym-Tresor (K-50)
 
@@ -1263,11 +1293,11 @@ Index-Watermarks (Muster aus CairnDB) sind Pflicht für jeden abgeleiteten Index
 |---|---|---|
 | `NonPersonal` (Produktdokumentation, Richtlinien, Fachwissen) | Korpus-Cluster des Mandanten (`Plain` oder `Sealed`), Packgruppe `corpus` | normale Indizes |
 | `Personal` (Akten, Mails, HR, Kundendaten mit Klarnamen) | Personen-/Fallcluster, `Sealed`, Space mit `DataClass::Personal` | Wurzelcluster + Links (§12.7) |
-| `Mixed` (Dokument mit beidem) | **Routing durch die Ingest-Pipeline** (`contextra-privacy`, Richtlinie aus `TenantPolicy`): (a) Zerlegung in personenbezogene und sonstige Chunks, (b) Pseudonymisierung der Namensbezüge, (c) ganzer Chunk in den Personencluster, (d) Quarantäne bei Unsicherheit | Fehlklassifikation ist das Kernrisiko, siehe unten |
+| `Mixed` (Dokument mit beidem) | **Routing durch die Ingest-Pipeline** (Port `PiiClassifier`, Richtlinie aus `TenantPolicy`): (a) Zerlegung in personenbezogene und sonstige Chunks, (b) Pseudonymisierung der Namensbezüge, (c) ganzer Chunk in den Personencluster, (d) Quarantäne bei Unsicherheit | Fehlklassifikation ist das Kernrisiko, siehe unten |
 
-**Pseudonym-Tresor.** Bei (b) steht im Korpus-Chunk ein Platzhalter (`[PERSON:7f3a…]`), die Zuordnung Platzhalter → Klartext liegt als Records im `Sealed`-Cluster der Person. **Embeddings, BM25-Terme und Graph-Entitäten des Korpus entstehen aus dem pseudonymisierten Text**; sie enthalten keine Klarnamen. Wiederherstellung der Namen (z. B. für die Antwort an berechtigte Nutzer) passiert erst nach dem Retrieval beim Zusammenbau der Antwort, nur über den Tresor, nur unter Policy, und nur im Egress-Pfad (`contextra-privacy`). **Löschen der Person** gated und vernichtet ihren Cluster und damit den Tresor; der Korpus bleibt mit nicht mehr auflösbaren Platzhaltern bestehen.
+**Pseudonym-Tresor.** Bei (b) steht im Korpus-Chunk ein Platzhalter (`[PERSON:7f3a…]`), die Zuordnung Platzhalter → Klartext liegt als Records im `Sealed`-Cluster der Person. **Embeddings, BM25-Terme und Graph-Entitäten des Korpus entstehen aus dem pseudonymisierten Text**; sie enthalten keine Klarnamen. Wiederherstellung der Namen (z. B. für die Antwort an berechtigte Nutzer) passiert erst nach dem Retrieval beim Zusammenbau der Antwort, nur über den Tresor, nur unter Policy, und nur im Egress-Pfad (`EgressPolicy`). **Löschen der Person** gated und vernichtet ihren Cluster und damit den Tresor; der Korpus bleibt mit nicht mehr auflösbaren Platzhaltern bestehen.
 
-**Ehrliche Grenzen.** (1) Pseudonymisierte Daten sind solange personenbezogen, wie die Zuordnung existiert; nach Vernichtung des Tresors hängt die Einstufung als anonym von der Re-Identifizierbarkeit über Kontext (Funktion, Datum, Ort, seltene Details) ab; das ist eine Einzelfallbewertung und kein Kernversprechen. (2) Die Qualität hängt an der PII-Erkennung (`contextra-privacy`); der Kern kann nur erzwingen, dass `Personal`-Spaces ausschließlich `Sealed`-Cluster aufnehmen (`INV-SEAL-1`). (3) Die Pipeline führt eine Messgröße `pii_residual_rate` (Stichprobe mit Prüf-Orakel, H-34); sie ist Teil der Berichterstattung, nicht Beleg für Fehlerfreiheit. (4) Der Pseudonym-Platzhalter ist je Person zufällig und nie aus dem Klartext abgeleitet (`INV-PRIV-1`).
+**Ehrliche Grenzen.** (1) Pseudonymisierte Daten sind solange personenbezogen, wie die Zuordnung existiert; nach Vernichtung des Tresors hängt die Einstufung als anonym von der Re-Identifizierbarkeit über Kontext (Funktion, Datum, Ort, seltene Details) ab; das ist eine Einzelfallbewertung und kein Kernversprechen. (2) Die Qualität hängt an der PII-Erkennung (`PiiClassifier`); der Kern kann nur erzwingen, dass `Personal`-Spaces ausschließlich `Sealed`-Cluster aufnehmen (`INV-SEAL-1`). (3) Die Pipeline führt eine Messgröße `pii_residual_rate` (Stichprobe mit Prüf-Orakel, H-34); sie ist Teil der Berichterstattung, nicht Beleg für Fehlerfreiheit. (4) Der Pseudonym-Platzhalter ist je Person zufällig und nie aus dem Klartext abgeleitet (`INV-PRIV-1`).
 
 **Sicht auf Backup und Restore.** Der Tresor liegt im Cluster; Restore wendet die Ledger-Intents zuerst an (§10.3), der Tresor wird dadurch nicht wiederbelebt. Index-Partitionen alter Generationen sind nach Vernichtung ihrer Generationsschlüssel unlesbar.
 
@@ -1348,17 +1378,20 @@ Diese Regeln ergänzen die bisherigen Abschnitte und gehen bei Widerspruch den �
 34. **Backup-Horizont und Gerätetrennung (E-81):** `Storage::erase_epoch()`, `BackupMark`, `BackupBeyondHorizon`, `LedgerUnavailable`, `LedgerSameDevice` (§9.7, §10.4).
 35. **Derivation Cache (E-82, K-32):** Konvention der oberen Schicht mit clusterlokalem Zufallssecret, nur in `Sealed`-Clustern (§12.6); `INV-PRIV-1` entsprechend präzisiert.
 
-### 12.9 Agenten, Sitzungen, Checkpoints, Decay, KV-Cache (K-45, K-46)
+### 12.9 Zeit, Retention, Branches, Backup und Abgrenzung zu Agenten (K-45, K-46, K-65, K-71)
+
+Contextra liefert Agenten und LLM-Anwendungen **Daten und Kontext**, keine Agentenlogik. Die folgende Tabelle ordnet die verbleibenden Konzepte zu und grenzt ab, was **nicht** gebaut wird.
 
 | Konzept | Zuordnung | Regel |
 |---|---|---|
-| Sitzungsbaum (`SessionBranchTree`) | Knoten als Records unter `sess/<id>/…` im Cluster des Eigentümers (Konvention „Session ≠ Cluster“, §12.6) | Der Baum ist Anwendungsdaten; Löschung des Eigentümers nimmt ihn mit |
-| Spekulative Pfade | clusterlokale Storage-Branches (`fork(Head|At)`, `ttl`, `merge`, `branch_drop`, §8) | O(1), crash-sicher, atomar; Merge-Auflösung liefert die obere Schicht (LWW, Union, semantisch) |
-| Zustands-Checkpoints (`CheckpointGuard`, `StateCheckpoint`) | clusterlokale Records plus `View-Lease`/`Hold` (≤ 24 h) | kein unbegrenztes Pinning, kein Klartext-Manifest mit `blake3`; ein vergessener Guard gibt nach der Lease frei |
-| DB-Backup/Restore | `contextra-storage::checkpoint` (§10.3) | enthält weder Schlüssel noch Ledger; trägt `BackupMark` |
-| Kognitiver Decay (`AdaptiveDecayController`) | verändert Relevanz/Gültigkeit im Kopf, löscht nie | **kein** Gate, kein Receipt; Compliance-Löschung ist ausschließlich `Eraser` (`INV-DECAY-1`) |
-| Konsolidierung („Sleep Cycles“) | Work-Queue-Records plus Consumer; Ergebnis ist ein normaler `Change` mit Producer im Kopf | Abgeleitete Zusammenfassungen erben das Minimum des Trust-Labels und sind per `DerivedFrom` mit ihren Quellen verbunden, wenn eine Quelllöschung sie mitziehen soll |
-| KV-/Prompt-Cache (`contextra-kvcache`) | `SegmentOwner` der Klasse `MixedPerClusterKey` (Schlüssel je Session-/Personen-Cluster) | Cloud-Provider-Caches liegen außerhalb und stehen als Restexposition im Receipt (§9.9) |
+| Gedächtnisdaten von Clients (Notizen, Fakten, Gesprächsverlauf) | normale Records im Cluster des Eigentümers (Konvention „Session ≠ Cluster“, §12.6) | Löschung des Eigentümers nimmt alles mit; Contextra interpretiert den Inhalt nicht |
+| Experimente, Was-wäre-wenn, Re-Indexierung | clusterlokale Storage-Branches (`fork(Head\|At)`, `ttl`, `merge`, `branch_drop`, §8) | O(1), crash-sicher, atomar; Merge-Auflösung liefert der Client (LWW, Union, semantisch) |
+| Reproduzierbare Abfrage | benanntes `SnapshotSet` im Register von `contextra-checkpoint` (K-67) + `EpochPinRegistry` (`contextra-mvcc`) | Pins sind lease-begrenzt (≤ 24 h Standard); ein vergessener Pin gibt nach der Lease frei, nie unbegrenztes Pinning |
+| DB-Backup/Restore | `contextra-storage::checkpoint` (§10.3), koordiniert von `contextra-checkpoint` über Kern **und** Index-Generationen | enthält weder Schlüssel noch Ledger; trägt `BackupMark`; Restore stellt nie gelöschte Daten wieder her (`erase_epoch`-Schutz) |
+| Relevanz über die Zeit | **Recency-Prior** als zustandslose Funktion der Gültigkeitszeit im Kopf (`rank`/`query`); `Supersedes`-Beziehung im Kopf | verändert nie Daten, löscht nie, erzeugt weder Gate noch Receipt (`INV-DECAY-1`) |
+| Aufbewahrungsfrist (**Retention**) | `engine::compliance`: Richtlinie je Tenant/Datenklasse → Fristablauf erzeugt einen normalen `Eraser`-Auftrag | die einzige zeitgesteuerte Löschung; mit Receipt, fail-closed bei `ClockUncertain` (§3.5) |
+| Konsolidierung/Zusammenfassung | Aufgabe des Clients; Ergebnis ist ein normaler `Change` mit Producer im Kopf | abgeleitete Inhalte erben das Minimum des Trust-Labels und sind per `DerivedFrom` verbunden, wenn eine Quelllöschung sie mitziehen soll |
+| **Nicht gebaut** | KV-/Prompt-Cache, Agenten-Orchestrierung, Session-DAG, kognitiver Decay, Modell-Routing, Modell-Hosting | K-65; Cloud-Provider-Caches liegen außerhalb und stehen als Restexposition im Receipt (§9.9) |
 
 ### 12.10 Produktfunktionen, Compliance-Profile, Auskunft und Export (K-56, K-57)
 
@@ -1452,53 +1485,58 @@ Pflicht: `check`, `fmt`, `clippy -D warnings`, `test`, `layering`, `loom`, `doc`
 
 ## 14. Phasen und Gates
 
-Planungsannahme: 3–4 erfahrene Rust-Entwickler plus 1 Test-/Simulationsingenieur; Dauern sind grobe Schätzungen, keine Zusage. Die Phasen P0–P8 betreffen den Speicherkern; die **Retrieval-Spur R1–R5** läuft parallel auf den freigegebenen Verträgen und ist an dieselben Gates gebunden.
+Planungsannahme: 3–4 erfahrene Rust-Entwickler plus 1 Test-/Simulationsingenieur; Dauern sind grobe Schätzungen, keine Zusage. Die Phasen P0–P8 betreffen den Speicherkern; die **Retrieval-Spur R1–R5** läuft parallel auf den freigegebenen Verträgen und ist an dieselben Gates gebunden. **Erste Priorität ist ein baubarer Workspace (P0-A).**
 
 | Phase | Inhalt | Gate | ca. |
 |---|---|---|---|
-| **P0 Fundament & Topologie** | `contextra-storage-ports` als Level-0-Crate anlegen (heute fehlt es: `contextra-storage` importiert `contextra_storage_ports` ohne Abhängigkeit, der Kern kompiliert nicht), `codec`, `env` (MemFs, RealFs, FaultFs, Sim), `sync`, Anker, `crypto-ref` + Konformanz, Orakel-Skelett, CI, Lint-Gerüst, Referenzcodierer; `Cargo.toml` ⇄ `capabilities.toml` ⇄ `deny.toml` angleichen; `layering`/`unsafe_islands` als echte Cargo-Tests (§18.1) | **G-0:** Spec normativ (zwei Reviewer), CI grün, `cargo check -p contextra-storage` grün | 3 Wo. |
-| **P1 Walking Skeleton** | ein Space, `apply`, Redo + Memtable, `view`, Cluster-Register, Gate, `destroy_many`, Ledger, Recovery aus Redo; Formate provisorisch | Crash-Sweep über alle Fs-Operationen grün; O-Files findet nach `Done` nichts | 4 Wo. |
-| **P2 Runs und Catalog** | Flush, ClusterSection, Staging, Catalog + `CURRENT`, Purge, Plain-Barriere, vollständige Recovery, Absturzmatrix | O-Files für Daten in Runs grün; Modelltest; M1, M2 (ohne Branches); **Spike-Messungen als Freeze-Voraussetzung:** H-21, H-11, H-25, H-26 | 5 Wo. |
-| **G-F Formatfreeze** | alle Formate (§5.9) inkl. reserviertem `branch`-Feld, goldene Vektoren, Rohkopie-Test, ≥ 8 Fuzz-Ziele; zusätzlich **Partitionsformat** der Indizes (§12.4.5) und `PartitionGeneration`-Schlüsselscope | Freeze-Review, Referenzcodierer vollständig | — |
+| **P0-A Baubarkeit** | (1) `contextra-kvcache` aus `[workspace].members` streichen; (2) `contextra-storage/Cargo.toml`: Abhängigkeiten auf `contextra-ports`, `contextra-types`; (3) `contextra_storage_ports::…` → `contextra_ports::kernel::…` (134 Importzeilen, mechanisch); (4) `engine`: `contextra_store`-Importe hinter `legacy-store`-Feature stellen, bis `projection`/`kernel` stehen; (5) `cargo check -p <crate> --locked` je Crate grün | **G-0a:** jedes der 14 Crates baut einzeln; `cargo metadata` fehlerfrei | 1 Wo. |
+| **P0-B Fundament & Topologie** | `ports::kernel` (Traits + Konformanz), `ports::legacy`-Abtrennung; `durable-fs` → `sys`-Abhängigkeit und positionsbasierte Handles (K-72); `engine::platform` (`Fs`-Adapter, `FileAnchor`); `crypto` auf XChaCha20/HMAC/HKDF/CRC32C, Löschung `kv_*`; `types`: `Epoch`, `Stamp`, `ClusterId`, `SpaceId` (`u64`), Kernel-`Error`; `capabilities.toml`, `CLAUDE.md`, `deny.toml` synchronisiert; `layering`/`unsafe_islands` als laufende Tests; Orakel-Gerüst; Spike-Messungen H-21, H-11, H-25, H-26 | **G-0:** Konformanz `Fs`/`Cipher`/`KeyProvider`/`Anchor` grün, `INV-TOPO-1` und `INV-LAYER-1` als Test, Spec-Review durch zweiten Reviewer | 5 Wo. |
+| **P1 Walking Skeleton** | ein Space, `apply`, Redo + Memtable, `view`, Cluster-Register, Gate, `destroy_many`, Ledger, Recovery aus Redo; Formate provisorisch | Crash-Sweep über alle `Fs`-Operationen grün; `O-Files` findet nach `Done` nichts | 4 Wo. |
+| **P2 Runs und Catalog** | Flush, ClusterSection, Staging, Catalog + `CURRENT`, Purge, Plain-Barriere, vollständige Recovery, Absturzmatrix | `O-Files` für Daten in Runs grün; Modelltest; M1, M2 (ohne Branches) | 5 Wo. |
+| **G-F Formatfreeze** | alle Formate (§5.9) inkl. reserviertem `branch`-Feld, goldene Vektoren, Rohkopie-Test, ≥ 8 Fuzz-Ziele; **Partitionsformat** der Indizes (§12.4.5) und `PartitionGeneration`-Schlüsselscope | Freeze-Review, Referenzcodierer vollständig | — |
 | **P3 Schreibpfad** | Gruppen-Commit, Reservierungen, Guards zweistufig, Volatile, `DiskFull`, Idempotenz, Backpressure | **G-W:** Absturzmatrix, Linearisierbarkeit in Sim, H-1, H-18, H-24 | 4 Wo. |
 | **P4 Lesepfad** | Blobs, Cache, Views (Revoke, Lease), `page` mit Gewichten, Block-Skipping, `ResumeToken`, `filter_visible` (inkl. `DocHead`) | **G-R:** Modellgleichheit, Paging-Properties, H-2…H-4, H-25 | 4 Wo. |
-| **P5 Wartung** | Compaction je Wartungsgruppe, Claims, Blob-GC, Governor, Rotation, Consumer-Feed aus Redo | **G-M:** M3, Sim ohne Invariantenbruch, H-5, H-19, H-26, H-27, H-28 | 5 Wo. |
-| **P6 Löschung komplett** | Links, Restrictions, Abwurf, Space-Drop, `range`, Ledger/Anker, Checkpoint/Restore, `keys-file`, `keys-cohort`, `SegmentOwner`/`ExtensionBlock`, Receipt + `verify_receipt`, Tomb-Epochen, Löschauftrag auf `Poisoned`, volle Orakel | **G-E:** M2/M4/M5/M6, Orakel 0 Treffer, INV-ERA-11, H-6…H-11, H-17, Konformanz | 6 Wo. |
+| **P5 Wartung** | Compaction je Wartungsgruppe, Claims, Blob-GC, Governor, Rotation, Consumer-Feed aus Redo | **G-M:** M3, Sim ohne Invariantenbruch, H-5, H-19, H-26…H-28 | 5 Wo. |
+| **P6 Löschung komplett** | Links, Restrictions, Abwurf, Space-Drop, `range`, Ledger/Anker, Checkpoint/Restore, `FilePassphrase`-Provider, `SegmentOwner`/`ExtensionBlock`, Receipt + `verify_receipt`, Tomb-Epochen, Löschauftrag auf `Poisoned`, volle Orakel | **G-E:** M2/M4/M5/M6, Orakel 0 Treffer, Krypto-Review | 6 Wo. |
 | **P7 Versionierung** | `BRANCHES`-Bit, `SYS_BRANCH`, Fork/Drop/TTL, Branch-Lesen, Diff, Merge, `Eraser::branch`, Fork-Floor | **G-V:** Branch-Properties vs. Modell, M2/M3 mit Branches, H-20…H-22 | 5 Wo. |
-| **P8 Härtung** | Soak 72 h, Dauer-Fuzz, Platte voll, Fehlerinjektion, Fassade, Abdeckung, Krypto-Review, Messbericht, Bedrohungsmodell-Review | **G-P:** alle INV getestet (100 %), H-15/H-16, Messbericht §17 | 5 Wo. |
+| **P8 Härtung** | Soak 72 h, Dauer-Fuzz, Platte voll, Fehlerinjektion, Fassade, Abdeckung, Messbericht, Bedrohungsmodell-Review | **G-P:** alle INV getestet (100 %), H-15/H-16, Messbericht §17 | 5 Wo. |
 
 **Retrieval-Spur (parallel, an Verträge gebunden).**
 
 | Schritt | Inhalt | Gate |
 |---|---|---|
-| **R1 Persistenzneutralität** | `vector`/`text`/`graph`: `PartitionSink`/`PartitionSource` einführen, `memmap2`, `std::fs`, festen Integritätsschlüssel, `bincode`, unkeyed `blake3`, `tokio`/`scc` aus Produktivpfaden entfernen; Klasse-A-Build aus leerem Verzeichnis bleibt grün | **G-R1:** `check_forbidden_apis.sh` 0 Treffer, bestehende Invarianten-Tests grün |
-| **R2 Index-Bridge** | `contextra-index-bridge`: `SegmentOwner`/Feed/Watermark/Attest für Vektor, Text, Graph, IdentityDirectory; Partitionen, Generationsschlüssel, `rewrite_without`, `verify_absent` | **G-R2:** Konformanzsuite je Owner, `ErasureOracle` `O-Segments` und `O-Files` ohne Treffer |
-| **R3 Query-Plan** | `contextra-engine`: QP-1…QP-9, `SnapshotSet`, Delta-Pfad, `min_stamp`, Fusion | **G-R3:** Differential `Index ∪ Delta ≡ Vollscan`, Race Gate × Query, Determinismus (`INV-RAG-4`), H-29…H-31 |
-| **R4 Ingest/Publish** | Publish-Record, Privacy-Routing, Pseudonym-Tresor, Idempotenz je Teil-Change, Orphan-Worker | **G-R4:** Crash-Sweep über IG-1…IG-6, `pii_residual_rate`-Messung (H-34), Partial-Ingest nie sichtbar |
-| **R5 Agenten & Migration** | Sitzung/Branch-Mapping, Checkpoint-Umbau, Decay-Trennung, `export_cluster`, Forward-Export aus `contextra-store` (§14.1) | **G-R5:** Branch-/Checkpoint-Properties, Migrations-Rehearsal |
+| **R1 Persistenzneutralität** | `vector`/`text`/`graph`: `PartitionSink`/`PartitionSource` einführen; `memmap2`, `std::fs`, festen Integritätsschlüssel, `bincode`, unkeyed `blake3`, `tokio`, `scc`, `block_on` aus Produktivpfaden entfernen; `TxId` → `Epoch`; Index-Traits auf Lesevertrag reduzieren; `graph::session_dag`/`edge_reinforcement` löschen | **G-R1:** `check_forbidden_apis.sh` ohne Treffer in L2-Crates; jedes Crate baut und testet einzeln |
+| **R2 Projektion** | `engine::projection`: `SegmentOwner`/Feed/Watermark/Attest für Vektor, Text, Graph, IdentityDirectory; Partitionen, Generationsschlüssel, `rewrite_without`, `verify_absent`; `engine::kernel` (Blocking-Pool) | **G-R2:** Konformanzsuite je Owner; `O-Segments` und `O-Files` ohne Treffer |
+| **R3 Query-Plan** | `engine::query`: QP-1…QP-9, `SnapshotSet`, Delta-Pfad, `min_stamp`, Fusion, Tokenbudget; `contextra-mvcc` → `EpochPinRegistry` | **G-R3:** Differential `Index ∪ Delta ≡ Vollscan`, Race Gate × Query, Determinismus (`INV-RAG-4`), H-29…H-31 |
+| **R4 Ingest/Publish** | Publish-Record, `PiiClassifier`-Routing, Pseudonym-Tresor, Idempotenz je Teil-Change, Orphan-Worker, `EgressPolicy` | **G-R4:** Crash-Sweep über IG-1…IG-6, `pii_residual_rate` (H-34), Partial-Ingest nie sichtbar |
+| **R5 Checkpoint, Export, Migration** | `contextra-checkpoint` Neuzuschnitt (K-67), Retention, `export_cluster`, Forward-Export aus `contextra-store` (§14.1) | **G-R5:** Restore-/Rollback-Properties, Migrations-Rehearsal |
 
-**G-CUTOVER (nach G-P, G-R1…G-R5).** Produktfreigabe: erst wenn sämtliche produktiven `contextra-store`-Verbraucher und Datenräume migriert sind, Restore-/Rollback-Rehearsal einschließlich externem Fencing des alten Instanzbesitzers und RAG-Differentialmessung bestanden und das gemeinsame Speicherbudget belegt ist, wird `contextra-storage` alleiniger Produktions-Schreibkern. Nach den ersten Writes in `contextra-storage` ist die Rückkehr nur per geprüftem Forward-Export oder Restore möglich; **kein Dual-Write.** Bis dahin gelten alle Leistungs- und Löschvorteile als unbestätigte Ziele.
+**G-CUTOVER (nach G-P, G-R1…G-R5).** Produktfreigabe: erst wenn sämtliche produktiven `contextra-store`-Verbraucher und Datenräume migriert sind, Restore-/Rollback-Rehearsal einschließlich externem Fencing des alten Instanzbesitzers und RAG-Differentialmessung bestanden und das gemeinsame Speicher-/RSS-Budget (H-35) eingehalten ist. Danach wird `ports::legacy` gelöscht.
 
-Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur per Migration. In jeder Phase wird der Crash-Sweep um die neuen Fs-Operationen **erweitert, nie nachgezogen**.
+Keine Phase beginnt vor dem Gate der vorherigen; Formatänderungen nach G-F nur per Migration. In jeder Phase wird der Crash-Sweep um die neuen `Fs`-Operationen **erweitert, nie nachgezogen**.
 
 ### 14.1 Ablösung der Altpfade (Bereinigungsplan bis G-CUTOVER)
 
 | Altpfad | Ersatz | Wirksam ab |
 |---|---|---|
-| `contextra-store` (LSM + WAL), `LsmStorage` | `contextra-storage`; Daten per Forward-Export/-Ingest (NZ-7), kein Formatimport | G-CUTOVER |
+| Workspace-Mitglied `contextra-kvcache` (Verzeichnis fehlt) | gestrichen (K-65) | P0-A |
+| Phantom-Import `contextra_storage_ports` (134 Zeilen in `storage`) | `contextra_ports::kernel` (K-64) | P0-A |
+| `contextra-store` (LSM + WAL), `LsmStorage`, Importe in 18 `engine`-Dateien | `contextra-storage`; Daten per Forward-Export/-Ingest (NZ-7), kein Formatimport | G-CUTOVER |
 | `DbTransaction` + `CommitLedger` + `CompensatingAction` (4-Wege-2PC) | Ein-Wahrheits-Commit + Publish-Record + Feed-Projektion (§12.4.0) | R3/R4 |
-| `contextra-mvcc` (`TxId`, `SequenceLog`, SSI) | `Stamp`/`Epoch(u64)`, Guards (SSI-Verhalten bei Bedarf über Lese-Guards `Unchanged{since}`, §6.3) | R3; Standalone-In-Memory-Modus bis Entfall |
-| `aes-gcm-siv`, `blake3` in `crypto`/`vector`/`text`/`graph`/`checkpoint` | `XChaCha20-Poly1305`/`HMAC-SHA256`; keine unkeyed Inhalts-Hashes | R1 |
-| `memmap2`, `std::fs`, fester Integritätsschlüssel in `vector` | `PartitionSink` → `SegmentIo`; Integrität = AEAD unter Generationsschlüssel | R1/R2 |
+| `contextra-mvcc`: `TxId`, `SequenceLog`, SSI, `TxBuffer` | `Epoch(u64)`, Guards (§6.3); `EpochPinRegistry` bleibt (K-66) | R3 |
+| `aes-gcm-siv`, `blake3` in `crypto`/`vector`/`text`/`graph`/`checkpoint`/`types`/`ports` | `XChaCha20-Poly1305`/`HMAC-SHA256`; keine unkeyed Inhalts-Hashes | R1 |
+| `memmap2`, `std::fs`, fester Integritätsschlüssel in `vector` | `PartitionSink`; Integrität = AEAD unter Generationsschlüssel | R1/R2 |
 | `commit_lock` + globale `meta:stats`/`pl:` in `text` | partitionsbezogene Statistik, Abfragezeit-`df` | R1/R2 |
-| `bincode` in `graph`/`text`/`vector` | kanonische Codecs | R1 |
-| `pin_checkpoint`/`blake3`-Manifest in `checkpoint` | clusterlokale Records + `View-Lease`/`Hold` | R5 |
-| `TxId` ×5 (`types`, `mvcc`, `vector`, `graph`, `checkpoint`), `text::contract::Epoch` | ein `Epoch(u64)` in `types` (K-59) | R1 |
-| `content-addressed-kv-cache`, `crypto/kv-encryption` (`aes-gcm-siv`) in `kvcache` | `SegmentOwner` `MixedPerClusterKey`, XChaCha20 (K-61) | R5 |
-| `block_on` in `text`, `graph`, `engine`, `checkpoint`, `kvcache`, `crypto` | nur Engine-Rand (L3+), Level-2-Crates synchron (K-62) | R1 |
-| `memmap2` in `contextra-sys` ohne Feature-Gate | Feature `mmap`, nie im Index-/Sealed-Pfad (K-62) | P0 |
-| `StorageEngine`/`StorageBackend`/`CommitBarrier`/`Purger`/`LedgerSink` in `contextra-ports` | `storage-bridge` bedient sie bis G-CUTOVER (K-63) | R3 |
-| `deletion_proof`, `revocation_log`, `kv_shredding` in `crypto` | Bridge-Abbildung Receipt → Proof (K-55) | nach Freigabe |
+| `bincode` in `graph`/`text`/`vector`/`crypto`/`types` | kanonische Codecs; `types` nur hinter `wire-compat` | R1 |
+| `TxId` ×5 (`types`, `mvcc`, `vector`, `graph`, `checkpoint`), `text::contract::Epoch`, Stub-Module `mvcc/checkpoint::contextra_{ports,types}` | ein `Epoch(u64)` in `types` (K-59) | R1 |
+| `crypto::{kv_segment, kv_cipher, kv_shredding}`, `ports::{kv, kv_bridge_port, attention}` | **gelöscht** (K-65) | P0-B |
+| `engine::{orchestration, decay_controller, adapters/ollama}`, `collection/kv_lock.rs` | **gelöscht** (K-65); Retention in `compliance` | R3 |
+| `graph::{session_dag, edge_reinforcement*}`, `GraphPurger` (deprecated) | gelöscht bzw. in `PartitionSink::rewrite_without` überführt (K-65, K-71) | R1 |
+| `checkpoint::{StateCheckpoint, WorkflowState, hardlink_cloner, pin_checkpoint, blake3-Manifest}` | Snapshot-Set-Register + Restore-Koordinator (K-67) | R5 |
+| `block_on` in `text`, `graph`, `engine`, `checkpoint`, `crypto` | nur `engine::kernel`; L2-Crates synchron (K-62) | R1 |
+| `memmap2` in `contextra-sys` ohne Feature-Gate | Feature `mmap`, Standard aus (K-62) | P0-B |
+| `StorageEngine`/`StorageBackend`/`CommitBarrier`/`Purger`/`LedgerSink`/`ErasureLayer`/`Vfs` in `contextra-ports` | `ports::legacy`, bedient von `engine::kernel` bis G-CUTOVER, dann gelöscht (K-63) | R3 |
+| `deletion_proof`, `revocation_log` in `crypto` | Umbau auf `ErasureReceipt`-Eingang (K-55) | R5 |
 
 Jede Zeile hat einen Test, der den Altpfad **verbietet** (Lint, `check_forbidden_apis.sh`, `deny.toml`) und einen, der den Ersatz belegt; ein Altpfad darf erst nach bestandenem Ersatz-Gate entfernt werden.
 
@@ -1567,10 +1605,13 @@ Jede Zeile hat einen Test, der den Altpfad **verbietet** (Lint, `check_forbidden
 | **INV-PART-1** | Jede Index-Partition gehört genau einer Packgruppe und überschreitet ihr Größenlimit nicht; der Generationsschlüssel `g` wird erst vernichtet, nachdem Generation `g+1` veröffentlicht und `verify_absent` für die gelöschten Quellen attestiert ist |
 | **INV-SEP-1** | Personenbezogener Klartext liegt nur in `Sealed` Clustern; Korpus-Chunks, Embeddings, Terme und Graph-Entitäten des Korpus entstehen aus pseudonymisiertem Text; Platzhalter sind je Person zufällig und nie aus dem Klartext abgeleitet |
 | **INV-GRAPH-PROV-1** | Jede Kante und Hyperkante des Wissensgraphen trägt `(source_cluster, source_doc, version)`; je Löschdomäne existiert eine eigene Kopie, kein geteilter Besitz |
-| **INV-DECAY-1** | Kognitiver Decay und `Supersedes` löschen nie und erzeugen weder Gate noch Receipt; Compliance-Löschung geschieht ausschließlich über `Eraser` |
+| **INV-DECAY-1** | Recency-Prior, `Supersedes` und jede Relevanzgewichtung löschen nie und erzeugen weder Gate noch Receipt; zeitgesteuerte Löschung ist ausschließlich Retention (`engine::compliance`) über `Eraser` |
 | **INV-SEP-2** | Geteilte Index-Partitionen enthalten nur aus pseudonymisiertem Text abgeleitete Daten; Klartext-Embeddings liegen nur im Cluster-Mikroindex unter dem Clusterschlüssel |
-| **INV-EPOCH-1** | Es gibt genau einen `Epoch(u64)`-Typ (in `contextra-types`); `Stamp ↔ Epoch` wird nur in `index-bridge` konvertiert und trägt `instance_id` |
-| **INV-LAYER-1** | Abhängigkeiten zeigen nur auf strikt niedrigere Ebenen; Retrieval-Crates (`vector`, `text`, `graph`, `rank`) kennen nur `contextra-types` und `contextra-ports`, nie `storage`, `storage-ports` oder einander (K-58); Produktivpfade enthalten kein `std::fs`, `memmap2`, `bincode`, keinen festen Schlüssel und keinen unkeyed Inhalts-Hash |
+| **INV-EPOCH-1** | Es gibt genau einen `Epoch(u64)`-Typ (in `contextra-types`); `Stamp ↔ Epoch` wird nur in `engine::projection` konvertiert und trägt `instance_id` |
+| **INV-LAYER-1** | Abhängigkeiten zeigen nur auf strikt niedrigere Ebenen (L0 `types`/`sys`/`simd` < L1 `ports`/`durable-fs` < L2 Triebwerke < L3 `engine`); `storage` kennt nur `ports::kernel` und `types`; Retrieval-Crates (`vector`, `text`, `graph`, `rank`) kennen weder `storage` noch einander (K-58); Produktivpfade enthalten kein `std::fs`, `memmap2`, `bincode`, keinen festen Schlüssel und keinen unkeyed Inhalts-Hash |
+| **INV-TOPO-1** | Der Workspace besteht aus genau den 14 Crates aus §3.1; `Cargo.toml` `[workspace].members`, `capabilities.toml` und Verzeichnisse unter `crates/` stimmen überein (Test); jede Neuanlage erfordert Änderung von §3.1 |
+| **INV-SCOPE-1** | Im Workspace existiert kein Code für KV-/Prompt-Cache, Agenten-Orchestrierung, Session-DAG, kognitiven Decay oder Modell-Routing (`check_forbidden_apis.sh`: `kv_cache`, `KvCache`, `kvcache`, `AdaptiveDecay`, `SessionBranchTree`, `contextra_store`, `contextra_storage_ports`) |
+| **INV-PORT-1** | Kernel-Ports liegen ausschließlich in `contextra-ports::kernel`, sind synchron und frei von `futures`/`serde`/`std::fs`; jeder Adapter besteht die Port-Konformanzsuite, bevor er im Composition Root verdrahtet wird |
 
 **Modul-Invarianten.** Invarianten, die ein Retrieval-/Basis-Crate besitzt (`INV-HNSW-SLOT-1`, `INV-VEC-*`, `INV-SIMD-*`, `INV-TEXT-*`, `INV-DETERMINISM`, `INV-GRAPH-00x`, `INV-RRF-*`, `INV-CAL-*`, `INV-FSYNC-1`, `INV-TENANT-IDX-1`), stehen in der jeweiligen `crates/*/SPEC.md` und sind hier nur zitiert; ihr Test-Zitat prüft das Crate-CI. Bei Widerspruch gilt diese Tabelle. `INV-DB-3` (Kompensation der Alt-Engine) entfällt mit dem 2PC (§14.1).
 
@@ -1663,30 +1704,38 @@ Alles **Entwurfsziele**. Freigabe nur mit Messbericht (Hardware, Dateisystem, La
 
 ### 18.1 Topologie-Synchronisation: Ist-Befunde und Pflichtmaßnahmen (K-47)
 
-Befunde am Repository-Stand (HEAD `60ea034`, 2026-11-24), per Dateiprüfung belegt; die Maßnahmen sind Teil von P0:
+Befunde am Repository-Stand **HEAD `78a1783` (2026-11-25)**, per Dateiprüfung belegt (statische Analyse, kein Kompilat; der Entwicklungsrechner hat 1 vCPU/3,9 GB RAM). Die Maßnahmen sind Teil von P0.
+
+**Umfang je Crate (Rust-Dateien / Zeilen):** `types` 38/9 852 · `ports` 42/7 641 · `sys` 11/2 649 · `simd` 17/5 827 · `durable-fs` 21/3 244 · `storage` 164/16 824 · `crypto` 74/18 780 · `mvcc` 26/7 964 · `checkpoint` 29/9 930 · `vector` 127/29 113 · `text` 62/16 906 · `graph` 133/32 725 · `rank` 42/8 455 · `engine` 126/29 467.
 
 | # | Befund | Maßnahme |
 |---|---|---|
-| 1 | `contextra-storage` importiert `contextra_storage_ports` (z. B. `catalog/reserve.rs`), das Crate existiert nicht, und `crates/contextra-storage/Cargo.toml` enthält keine Abhängigkeit darauf; der Kern kompiliert nicht | `crates/contextra-storage-ports` anlegen (Level 0), Workspace-Mitglied, Abhängigkeit eintragen; `cargo check -p contextra-storage --locked` als G-0-Kriterium |
-| 2 | `Cargo.toml` führt 14 Mitglieder (`kvcache` liegt unter `crates/`, ist aber nicht Mitglied); `capabilities.toml` beschreibt 42 Crates, 28 davon existieren nicht (u. a. `store`, `ids`, `env`, `wire`, `router`, `agent`) | Zielzustand je Eintrag festlegen: anlegen, als `planned` markieren oder streichen; `bash tools/ctx.sh gates` muss ohne Abweichung laufen |
-| 3 | `contextra-erasure` und `contextra-vault` (laut `CLAUDE.md`) fehlen in Baum und `capabilities.toml` | `CLAUDE.md` und `capabilities.toml` angleichen; Signaturstufe optional (K-55), Änderungen am eingefrorenen Crate nur nach Freigabe |
-| 4 | Es gibt kein Root-`tests/`; `CLAUDE.md` nennt dennoch `tests/layering.rs` und `tests/unsafe_islands.rs`; nur `crates/contextra-storage/tests/layering.rs` existiert (verbietet `contextra_ports` im Kern, richtig); der Cargo-Alias `xtask` zeigt auf ein fehlendes Paket | als Cargo-Tests in einem Mitglied-Crate (`contextra-testkit` oder `storage/tests`) einbinden; `xtask` entfernen oder anlegen |
-| 5 | `vector → mvcc` (optional, gleiche Ebene), `types`/`ports` auf Level 2 statt unterhalb ihrer Konsumenten; `engine`-`allowed_internal` führt das nicht vorhandene `store` | K-58: Ebenen neu zuordnen, `vector → mvcc` entfernen (K-40), `capabilities.toml` angleichen |
-| 6 | `blake3`, `aes-gcm-siv`, `bincode`, `memmap2`, `std::fs` in Retrieval-/Crypto-/Checkpoint-Crates | Bereinigungsplan §14.1; Verbote als `deny.toml`-/Lint-Regeln, damit der Zustand nicht zurückkehrt |
-| 8 | `contextra-kvcache` hat Feature `content-addressed-kv-cache` und hängt an `crypto/kv-encryption` | K-61 |
-| 9 | `Cargo.toml [workspace.dependencies]` enthält `bincode`, `flatbuffers`, `memmap2`, `tokio full`, `parking_lot`, `rand` als Workspace-weite Defaults; jedes Crate kann sie ziehen | Verbote je Ebene in `deny.toml` (`wrappers`), Level-2-Crates ohne `tokio`/`bincode`/`blake3` |
-| 10 | `docs/agent/` (von `CLAUDE.md` referenziert) fehlt | `docs/agent/CRATES.md` aus `capabilities.toml` generieren (P0) |
-| 7 | Ein vollständiger Workspace-Check ist auf der Entwicklungs-VM (1 vCPU, 3,9 GB RAM) nicht abgeschlossen worden | Gates laufen in CI je Crate; das Gesamtergebnis ist erst nach P0 belastbar |
+| 1 | `Cargo.toml` listet `crates/contextra-kvcache` als Mitglied; das Verzeichnis existiert nicht (14 Verzeichnisse, 15 Mitglieder). Jeder Cargo-Aufruf im Workspace schlägt damit fehl | Mitglied streichen (K-65, P0-A) |
+| 2 | `contextra-storage` importiert `contextra_storage_ports` in 134 Zeilen (`catalog/*`, `store/*`, …) und deklariert `pub use contextra_storage_ports as ports`; weder Crate noch Abhängigkeit existieren; `Cargo.toml` enthält keine Pfadabhängigkeit auf `contextra-ports`/`-types` | K-64: Importe auf `contextra_ports::kernel` umstellen, Abhängigkeiten eintragen (P0-A) |
+| 3 | `contextra-engine` importiert `contextra_store` (`LsmStorage`, `DurabilityMode`) in 18 Dateien; das Crate existiert nicht, `engine/Cargo.toml` hängt nicht daran; `lib.rs` trägt weiterhin `contextra_store::…` | hinter Feature `legacy-store` stellen, dann durch `kernel`/`projection` ersetzen (P0-A, R2/R3) |
+| 4 | `contextra-mvcc` und `contextra-checkpoint` enthalten eigene Stub-Module `contextra_ports.rs`/`contextra_types.rs` und je eine eigene `TxId`; `checkpoint` führt `WorkflowState` (Agenten-Zustand) | K-59, K-66, K-67 |
+| 5 | `contextra-ports` enthält Alt-Verträge (`StorageEngine` mit „Implementor: LsmStorage“, `Vfs`, `CommitBarrier`, `Purger`, …) und KV-/Attention-/Inferenz-Ports (`kv.rs`, `kv_bridge_port.rs`, `attention.rs`, `inference.rs`); Index-Traits tragen `TxId`-Schreibpfade (`insert/commit/rollback_to_tx`) | K-63, K-65 |
+| 6 | `contextra-crypto` führt `kv_segment/` (6 Dateien), `kv_cipher.rs`, `kv_shredding.rs` und nutzt `aes-gcm-siv`/`blake3`; `lib.rs` nennt `contextra-kvcache`, `contextra-store`, `contextra-db` als Konsumenten | K-41, K-65 |
+| 7 | `contextra-engine` enthält `orchestration/`, `decay_controller.rs`, `collection/kv_lock.rs`, `adapters/ollama.rs`; `lib.rs` dokumentiert „Ring 2“ und Lock-Hierarchie `collections → kv_locks → embedder` | K-65; Modulplan §3.1 |
+| 8 | `capabilities.toml` (Schema v3) beschreibt Crates, die es nicht gibt (`ids`, `env`, `wire`, `vault`, `erasure`, …) und enthält nicht alle 14 vorhandenen; `CLAUDE.md` verweist auf nicht vorhandene Root-`tests/layering.rs`, `tests/unsafe_islands.rs`, `docs/agent/CRATES.md`; Cargo-Alias `xtask` zeigt auf ein fehlendes Paket | `capabilities.toml` aus §3.1 neu erzeugen (14 Einträge, Ebenen L0–L3); Tests in ein Mitglied-Crate verschieben; `docs/agent/CRATES.md` generieren; `CLAUDE.md` angleichen |
+| 9 | `contextra-graph/purger.rs` verweist auf ein nicht vorhandenes `contextra-erasure-spi` (Entscheidung D-E1) | Löschschnittstelle ist `PartitionSink::rewrite_without` (§12.1); Verweis streichen |
+| 10 | `[workspace.dependencies]` enthält `bincode`, `flatbuffers`, `memmap2`, `tokio full`, `parking_lot`, `crossbeam-skiplist` als Workspace-Defaults, jedes Crate kann sie ziehen | Verbote je Ebene in `deny.toml` (`wrappers`); L2-Crates ohne `tokio`/`bincode`/`blake3` |
+| 11 | `contextra-simd` und `contextra-sys` tragen kein `forbid(unsafe_code)` (korrekt: Unsafe-Inseln); `durable-fs`, `types`, `text` führen es | `unsafe_islands`-Test: genau `sys` und `simd` dürfen `unsafe` enthalten |
+| 12 | `durable-fs::Vfs` ist dateiweise (`read`, `write_atomic`, `append`, `sync_*`); es fehlen positionsbasierte Zugriffe, `preallocate`, `lock`, `free_space` | K-72 (P0-B) |
+| 13 | Gemessene Alt-Muster: siehe §3.7.5 (`memmap2`, `bincode`, `blake3`, `block_on`, `tokio`, `DISKANN_INTEGRITY_KEY`, `std::fs`, `scc`) | Bereinigungsplan §14.1 |
+| 14 | Ein vollständiger Workspace-Check ist nicht durchgelaufen; die Warnungszahl ist unbekannt | Gates laufen in CI je Crate; belastbar erst nach G-0a |
 
 ### 18.2 Offene Entscheidungen mit Freigabebedarf
 
 | Entscheidung | Wer entscheidet | Standard bis dahin |
 |---|---|---|
-| Änderungen an `contextra-erasure` (Signaturformat, Abhängigkeiten) | Projektinhaber | unverändert (`frozen`); Bridge liefert Receipt, Signatur optional |
+| Signaturformat des `DeletionProof` (Ed25519, Schlüsselverwaltung) | Projektinhaber | `crypto::deletion_proof` unverändert; Signatur optional (K-55) |
 | Windows-Produktionsfreigabe (Fs-Konformanz) | Projektinhaber nach Konformanzlauf | nicht freigegeben (NZ-8) |
 | `Strong`-Anker und HSM/KMS-Provider | Betrieb/Kunde | `Weak`-Anker nur mit Bestätigung; `Standard`-Profil verlangt KMS |
 | Edition/`LicenseGate`-Grenzen | Produktentscheidung | Open-Core-Grenze §2.6, keine Kerninvariante hinter Bezahlschranke |
 | Rechtliche Einstufung „anonym nach Tresorvernichtung“ | Rechtsberatung des Kunden | als Restrisiko im Receipt (K-50) |
+| Aufspaltung von `contextra-engine` in mehrere Crates | Architektur-Review nach G-R3 | **nein** in v1; Trigger: > 40 kLOC oder zyklische Modulabhängigkeit (`INV-TOPO-1` bleibt 14) |
+| Freigabe von `edge-reinforcement-learning` | Projektinhaber | nicht freigegeben (K-71) |
 
 ---
 
@@ -1696,7 +1745,7 @@ Befunde am Repository-Stand (HEAD `60ea034`, 2026-11-24), per Dateiprüfung bele
 |---|---|
 | SD-01 | Catalog als einzige Wahrheit, ein Edit = ein Durabilitätspunkt |
 | SD-02 | Clusterreine Blöcke, ein Abschnitt je Cluster und Datei, abschnittsrelative Offsets |
-| SD-03 | Bewilligte Abhängigkeiten. Kern: `crossbeam-skiplist` (hinter Trait), `bytes`, `zeroize`, `siphasher` (nur Guard-Fingerabdrücke). `contextra-crypto-ref`: `chacha20poly1305`, `hmac`, `sha2`, `hkdf`, `crc32c`. Dev: `loom`, `shuttle`, `proptest`, `cargo-mutants`. Krypto im Kern nur über Ports (`blake3` und `chacha20poly1305` sind keine Kernabhängigkeiten; sie widersprächen §5.2 und dem Portprinzip) |
+| SD-03 | Bewilligte Abhängigkeiten. Kern: `crossbeam-skiplist` (hinter Trait), `bytes`, `zeroize`, `siphasher` (nur Guard-Fingerabdrücke). `contextra-crypto`: `chacha20poly1305`, `hmac`, `sha2`, `hkdf`, `crc32c`. Dev: `loom`, `shuttle`, `proptest`, `cargo-mutants`. Krypto im Kern nur über Ports (`blake3` und `chacha20poly1305` sind keine Kernabhängigkeiten; sie widersprächen §5.2 und dem Portprinzip) |
 | SD-04 | Eine Formatversion je Dateiart, Migration als Werkzeug |
 | SD-05 | Sealed-Cluster umfasst Schlüssel, Kopf, Körper, Index, Filter, Marker, Branch-Metadaten |
 | SD-06 | `purge_deadline` Pflichtparameter |
@@ -1738,7 +1787,7 @@ Befunde am Repository-Stand (HEAD `60ea034`, 2026-11-24), per Dateiprüfung bele
 | SD-42 | Staging-L0 und ein einheitlicher Purge-Algorithmus |
 | SD-43 | Catalog-Gruppen-Commit; Anker-Koaleszenz bis vor Receipt |
 | SD-44 | Append-Dateien nur in Vorallokation; ENOSPC vergiftet nicht |
-| SD-45 | Referenzimplementierungen: `keys-file`, `keys-cohort`, `FileAnchor` (`Weak`) |
+| SD-45 | Referenzimplementierungen: `crypto::keys::file`, `crypto::keys::cohort`, `FileAnchor` (`Weak`) |
 | SD-46 | Kein zweiter lebender Klon (NZ-19) |
 | **SD-47** | **Ledger speichert `tomb_id`, nie ClusterId (K-03)** |
 | **SD-48** | **Clusterlokale Branches mit Merge; kein globaler DAG, keine Inhaltsadressierung (K-07, K-08)** |
@@ -1761,9 +1810,9 @@ Befunde am Repository-Stand (HEAD `60ea034`, 2026-11-24), per Dateiprüfung bele
 | **SD-65** | **Staging-Spill-Policy, Fenster-Amortisierung des Purge, Sealed-Hygiene-Lane (K-36)** |
 | **SD-66** | **`ClusterLocal`-Admission, Pure-Demotion, FD-Cache, Verzeichnis-Sharding (K-37)** |
 | **SD-67** | **Idempotenz als implizite `Absent`-Guard (K-38)** |
-| **SD-68** | **Retrieval-Crates persistenzneutral; Bindung in `contextra-index-bridge` (K-48)** |
+| **SD-68** | **Retrieval-Crates persistenzneutral; Bindung in `contextra-engine::projection` (K-48)** |
 | **SD-69** | **Index-Partition = Packgruppe; Generationsschlüssel je Partitionsgeneration (K-49)** |
-| **SD-70** | **`contextra-durable-fs` ist nicht die Basis von `RealFs`**: der `Fs`-Port verlangt `read_at`, `read_ranges`, `preallocate`, `lock`, `punch_hole`, `free_space`, die das Journal-orientierte Crate nicht abdeckt; seine Poisoning-Semantik (`INV-FSYNC-1`) wird als Anforderung übernommen, nicht der Code |
+| **SD-70** | ~~`durable-fs` ist nicht Basis von `RealFs`~~ **aufgehoben (SD-94, K-72):** `durable-fs` wird über `sys` zur Dateischicht und um positionsbasierte Handles (`read_at`, `preallocate`, `lock`, `free_space`) erweitert; der Kernel-`Fs` wird in `engine::platform` darauf abgebildet; Poisoning (`INV-FSYNC-1`) und atomares Ersetzen (`INV-VFS-ATOMIC-1`) werden übernommen |
 | **SD-71** | **Trennungsprinzip und Pseudonym-Tresor (K-50)** |
 | **SD-72** | **Publish-Record statt Mega-Change und statt 2PC (K-51)** |
 | **SD-73** | **Read-your-writes über `min_stamp` + Delta-Pfad (K-52)** |
@@ -1772,13 +1821,24 @@ Befunde am Repository-Stand (HEAD `60ea034`, 2026-11-24), per Dateiprüfung bele
 | **SD-76** | **Eingefrorene Compliance-Crates unangetastet; Receipt→Proof im Bridge-Layer (K-55)** |
 | **SD-77** | **Compliance-Profile `Development`/`Standard`/`Strict` (K-56)** |
 | **SD-78** | **`export_cluster` für Auskunft/Portabilität (K-57)** |
-| **SD-80** | Fünf Ebenen L0–L4; `types` L0, `ports`/`storage-ports` L1 (K-58) |
+| **SD-80** | Vier Ebenen L0–L3; `types`/`sys`/`simd` L0, `ports`/`durable-fs` L1, Triebwerke L2, `engine` L3 (K-58) |
 | **SD-81** | Ein `Epoch(u64)`, `TxId`-Kopien entfallen (K-59) |
 | **SD-82** | Indexklassen `Corpus`/`Personal`; geteilte Indizes nur aus pseudonymisiertem Text (K-60, `INV-SEP-2`) |
-| **SD-83** | `kvcache`: keine Inhaltsadressierung, Owner `MixedPerClusterKey` (K-61) |
+| **SD-83** | ~~`kvcache`-Owner~~ entfällt ersatzlos (K-65) |
 | **SD-84** | `memmap2` nur in `contextra-sys` hinter Feature; `block_on` nur im Engine-Rand (K-62) |
 | **SD-85** | Alt-Verträge in `contextra-ports` bleiben bis G-CUTOVER, Bridge bedient sie (K-63) |
-| **SD-79** | **Ebenenregel strikt: Abhängigkeit nur auf niedrigere Ebene; `storage-ports` ist Level 0** |
+| **SD-79** | Ebenenregel strikt: Abhängigkeit nur auf niedrigere Ebene; Kernel-Ports liegen in `contextra-ports` (L1) |
+| **SD-86** | **Workspace = 14 Crates; keine Neuanlage in v1** (K-47, `INV-TOPO-1`) |
+| **SD-87** | **Kernel-Ports in `contextra-ports::kernel`**, synchron; `legacy` bis G-CUTOVER (K-63, K-64) |
+| **SD-88** | **Produktfokus: kein KV-Cache, keine Agenten-Orchestrierung, kein Router, kein Decay, keine Session-DAG** (K-65, `INV-SCOPE-1`) |
+| **SD-89** | **`contextra-mvcc` = `EpochPinRegistry`** (K-66) |
+| **SD-90** | **`contextra-checkpoint` = Snapshot-Set-Register + Restore-Koordinator** (K-67) |
+| **SD-91** | **Parsing untrusted Formate außerhalb des Workspace; Contextra nimmt extrahierten Text an** (K-68) |
+| **SD-92** | **PII-Erkennung über Port `PiiClassifier`; Open-Core-Standard regelbasiert, NER als Plugin** (K-69) |
+| **SD-93** | **`EgressPolicy` Pflicht auf jedem Pfad zu externen Modellen; Standard `DenyExternal` für `Personal`** (K-70) |
+| **SD-94** | **`durable-fs` wird Basis der Dateischicht über `sys`; SD-70 aufgehoben** (K-72) |
+| **SD-95** | **Retention ist die einzige zeitgesteuerte Löschung; Recency ist ein zustandsloser Ranking-Prior** (§12.9) |
+
 
 ---
 
@@ -1788,136 +1848,24 @@ Befunde am Repository-Stand (HEAD `60ea034`, 2026-11-24), per Dateiprüfung bele
 
 Je Format mindestens (zusätzlich Partitionsblock und `head`-Record, §12.4): leeres Objekt, ein Eintrag, Eintrag mit versiegeltem Körper (Cluster- und Space-Quelle), Cluster-Abschnitt mit zwei Blöcken, Packed-Run mit drei Clustern, Staging-Run, `MiniSection`, Abschnitt mit `BranchTable` (drei Branches, einer ohne Einträge), Tombstone, Bereichsmarker, Gate-Frame mit `policy_epoch`, Control-Frame `Link`, Blob mit Loch, Catalog-Edit-Kette mit Reservierung, Gruppen-Commit und `anchor_mark`, Ledger-Kette (`tomb_id`, zwei Tomb-Epochen, ein Retire), Redo-Gruppe mit Change-/Gate-/Control-/Branch-Frame, abgeschnittener und beschädigter Frame, nicht-kanonisches `varint`, **Rohkopie-Test** (Abschnitt aus Run A in Run B, Blöcke byte-identisch, Entsiegeln gelingt). Erzeugung durch `tools/reference/generator.py` (unabhängig von Rust), Vergleich im Test `golden`. **Stand: nicht vorhanden.**
 
-## Anhang B — Änderungen gegenüber R7 (R8-01…R8-15), R8 (R8.1-01…R8.1-09) und R8.1 (R8.2-01…R8.2-09)
+## Anhang B — Änderungen R12 → R13 (Repo-Abgleich HEAD `78a1783`, Produktfokus)
 
-| ID | R7-Befund | R8-Lösung |
+Die Änderungsprotokolle R7 … R12 sind Git-Historie und hier nicht wiederholt; alle dort getroffenen Entscheidungen leben in §1 und §19 weiter.
+
+| ID | Änderung | Betroffen |
 |---|---|---|
-| R8-01 | Mission verlangt Versionskontrolle; R7 schloss Branches aus dem Kern aus (NZ-13) | clusterlokale Branches, Diff, Merge (§8), Format-Slot ab G-F |
-| R8-02 | Ledger enthielt ClusterId bzw. Cluster-ID-Listen (überdauert Löschung und Backups) | `tomb_id` (§9.7), Restore per `tomb_id`-Abgleich (§10.3) |
-| R8-03 | Keine Quelle für Extension-Sichtbarkeit trotz Pflicht zur Leckfreiheit | `filter_visible` und Watermark-Muster (§7, §12.4) |
-| R8-04 | `SegmentOwner` ohne `on_gate`/`verify_absent` (Lethe-Entwurf hatte beides) | ergänzt (§12.1) |
-| R8-05 | Lift nur Owner/AdminCap | `LiftPolicy::FourEyes` über `Authority` (Lethe-Spec) |
-| R8-06 | Receipt ohne kanonische Form / Offline-Prüfung | `ErasureReceipt` + `verify_receipt` (§9.7) |
-| R8-07 | Cohort-Rewrap fehlte als Skalierungsweg | Provider-intern (`keys-cohort`), Kern unverändert (§9.4) |
-| R8-08 | Phasenplan begann mit Formatfreeze vor jedem Lauf | vertikaler Durchstich P1, Freeze nach P2 (§14) |
-| R8-09 | Doppelte `SD-38/39/40`, Rang „5 entfällt“ | Neunummerierung (§19, §11.2) |
-| R8-10 | `ResumeToken` ohne Sicherheitsvertrag | AEAD-versiegelt unter Prozessschlüssel (§7) |
-| R8-11 | Person→Cluster-Zuordnung nur als Warnung | normatives Muster §12.7 |
-| R8-12 | Keine Benchmark-Gruppen für Agenten/Retrieval | §17 (aus CairnDB/Mnemos), H-20…H-22 für Branches |
-| R8-13 | Restriction-Zwischenzustand unklar (Lethe: Blocked mit Restricted-Hide) | sofortiger `Err(Restricted)`, Verbergen via `BLOCK_READ` durch die obere Schicht (§9.6) |
-| R8-14 | Lokalitätstest (Lethe-Entwurf INV-22) fehlte in R7-Invarianten | `INV-ERA-11` mit Byte-Zählern |
-| R8-15 | Change-Feed zeigte nur `Erased`; Lethe-Entwurf unterscheidet Gate von Purge | `Redacted` (ab Gate) und `Erased` (§12.3) |
-
-**Änderungen R8 → R8.1:**
-
-| ID | R8-Befund | R8.1-Lösung |
-|---|---|---|
-| R8.1-01 | Kurzfassung transportierte Europa-/Fusions-USP nicht; Risiko, ANN/BM25/Graph dem KV-Kern zuzuschreiben | §0 neu gefasst; Indizes bleiben obere Komponenten (NZ-12) |
-| R8.1-02 | Open-Core-Grenze nicht festgeschrieben | L20 und §2.6: Basis-Durability, Löschung und Verifikation nie hinter Bezahlschranke |
-| R8.1-03 | `personal: bool` erlaubte unklare Kombinationen | `DataClass` (geschlossenes Enum), Validierung vor I/O (Z-16, §4.5, §4.7) |
-| R8.1-04 | Metrikliste ohne Katalog- und Kardinalitätsvertrag | geschlossener Metrikkatalog, Label-Allowlist, Leakage-Gate (Z-17, §16) |
-| R8.1-05 | Fehler ohne Diagnosevertrag | stabile Fehlertypen, `hint()`, Seed-reproduzierbare Simulation (Z-18) |
-| R8.1-06 | F-3 (`EIO`/Fsync) ließ Commit-Status offen | `Indeterminate{first_stamp,last_stamp}`; Idempotenz-Token statt blindem Retry |
-| R8.1-07 | AAD-Definition mit doppeltem `space_id`; RootKey-Redo-Aussage kollidierte mit `INV-ERA-7` | AAD kanonisiert (`instance_id, space_id, cluster_id, key_epoch, …`); Klarstellung §5.2 |
-| R8.1-08 | RAG-Integration (Ingest → Index → Query) nur verteilt beschrieben | §12.4.2 Ende-zu-Ende-Vertrag mit Watermark, `IndexLag`, Gate-Filter |
-| R8.1-09 | Phasenplan blockierte parallele Entwicklung von Indizes/Cache | Entwicklung parallel; Integration P4–P8 unter gemeinsamen Gates (§14) |
-
-**Änderungen R8.1 → R8.2 (Octa-Abgleich und Feinschliff):**
-
-| ID | R8.1-Befund | R8.2-Lösung |
-|---|---|---|
-| R8.2-01 | `tomb_id` blieb bis ans Ledger-Ende linkbar (offenes Restrisiko aus K-03) | `tomb_epoch`, Provider-Tomb-Schlüssel, Backup-Horizont und Retire (K-31, §9.4, §9.7, §10.4) |
-| R8.2-02 | `KeyProvider` kannte nur `keys_in_backups: bool`; keine Aussage zur Vernichtungsgüte; §9.4 und Ports-Code wichen ab | `KeysInBackups`, `KeyAssurance`, Statuscaps, Batch-Trait (E-77, §9.4) |
-| R8.2-03 | Löschung auf vergiftetem Handle nicht spezifiziert | Ledger-Intent, `ErasePending`, Gate beim Neustart (E-75, §9.5.2) |
-| R8.2-04 | Views konnten Dateien und History-Floor unbegrenzt pinnen | View-Lease, `SnapshotTooOld` (E-76, §11.4) |
-| R8.2-05 | Receipt nannte nicht, wie jede Messung gewonnen wurde | `MeasureKind`, Pflichtmessungen (E-80, §13.2.1) |
-| R8.2-06 | Host-Zustand (Swap, Core-Dumps) und Gerätetrennung des Ledgers nicht prüfbar | `HostProbe`, `LedgerSameDevice`, `LedgerUnavailable` (E-78, E-81) |
-| R8.2-07 | Zeitlanes/Kumulativsummen im SubIndex vorgeschlagen (A1/A2) | verworfen im Kernformat; `BlockPruner`, RAM-Präfixsummen (K-29, K-30) |
-| R8.2-08 | Embedding-/Token-Caches kollidierten mit `INV-PRIV-1` | clusterlokaler Keyed-MAC als Konvention (K-32, §12.6) |
-| R8.2-09 | §4.1 zerriss die Vokabeltabelle mit einem Absatz; `create_cluster_key` im Text neben Batch-Trait; Konfliktzahl veraltet | bereinigt |
-
-## Anhang B.2 — Änderungen R8.2 → R9.0 (R9-Audit)
-
-| ID | R8.2-Befund | R9-Lösung |
-|---|---|---|
-| R9-01 | Rang 1 hielt die Sperre über den gesamten Redo-Sync; Tail-Latenz aller Agenten gekoppelt an Sync und Gate-Arbeit | Sequencer (Rang 1, nur RAM) + Syncer (ein Schreiber, kein Lock), Credits, Leader-Protokoll (§6.1, K-33, INV-PIPE-1/2) |
-| R9-02 | Graph-Traversierung der `DerivedFrom`-Hülle (≤ 4096) im kritischen Pfad | Hülle auf dem Aufruferthread, Sequencer prüft nur `policy_epoch`; Selbstberechnung nach 3 Retries gegen Aushungern (§6.1, §9.5, INV-POL-1) |
-| R9-03 | Guard-Langsampfad „exakt gegen Memtable ∪ Version“ unter Rang 1 widersprach K-21 und H-18 (Plattenzugriffe) | Stufe A exakt beim Aufrufer, Stufe B nur Delta im Konfliktfenster, nur `GuardRetry` (§6.3) |
-| R9-04 | `SYS_IDEM`-Prüfung im Committer, Race zweier gleicher Tokens, RAM ∝ aktive Tokens | implizite `Absent`-Guard auf den SYS_IDEM-Schlüssel (§6.5, K-38) |
-| R9-05 | Lock-Reihenfolge: Intake (Rang 2) vor Committer (Rang 1) verletzte `INV-LOCK-1`; Rang 1+3-Doppelhaltung legte den Catalog-Sync unter Rang 1 | Leader-Protokoll (Anhängen unter Rang 2, dann `try_lock` Rang 1, Leader leert Intake aufsteigend); Notpool statt Doppelhaltung (§6.1, §5.8, §11.2) |
-| R9-06 | `Link` war ein Catalog-Edit außerhalb der Stamp-Ordnung: „Quelle gelöscht, Link danach“ verletzte `INV-ERA-12` | Control-Frame `Link` im Sequencer, Quelle `Retiring`/`Retired` ⇒ `ClusterRetired` (§9.6, RACE-22) |
-| R9-07 | Link-Admission prüfte nur die Nachfahren des neuen Kindes; die Hülle jedes Vorfahrens wächst mit | Prüfung für jeden Vorfahren-oder-selbst, Abbruch bei `max_gate_clusters + 1` Knoten (§9.6) |
-| R9-08 | Space-Drop fror die Mitgliedschaft unter Rang 1 ein (O(Cluster)); Restriction-Prüfung über unbekannte Mitgliedschaft unspezifiziert | Gate maskiert die SpaceId; `SpaceScopeFrozen` nachgelagert aus gepinnter Version; Restriction-Menge × Cluster-Dateien beim Aufrufer, `policy_epoch`-Revalidierung (§9.7, §9.8, RACE-21) |
-| R9-09 | Bloom ohne `branch` ⇒ Block-Read je Branch-Ebene; H-21 unerreichbar | branch-bewusster Filter, `BranchTableBlock`, Chain-Resolve mit Early-Exit, Default-Tiefe 4, Spike vor G-F (§5.6, §7.1, §8.3, K-34, INV-BR-5) |
-| R9-10 | Metadaten-RAM ≈ 5 GiB bei 16 Mio. Clustern (48 B je Cluster und Datei + 128 B je Cluster); „keine zugesagte Resident-Kapazität“ ohne Mechanismus | `ClusterIndex` ≤ 40 B (≈ 610 MiB), Sparse-Directory, `ClusterFilter`, `HotRecord`, Admission vor Allokation (§4.3.1, §5.6, H-25, INV-ADM-1) |
-| R9-11 | Kleinstcluster: sechs versiegelte Blöcke je Abschnitt (≥ 240 B Overhead) widersprach H-11 (≤ 5 % ab 1 KiB) | `MiniSection` (ein AEAD-Rahmen), H-11 neu gefasst (R-PL-8) |
-| R9-12 | Entmischen Staging→L1 schrieb für ≈ 16 KiB je Gruppe bis zu 64 MiB L1 um (Faktor ≈ 4000) | Spill-Policy mit Schwelle und Altersgrenze, size-tiered Staging (R-PL-7, H-26) |
-| R9-13 | Purge-Kosten bei verstreuten Einzellöschungen; Sealed-Purge mit Klartext-Dringlichkeit | Compaction-Huckepack, Fenster-Amortisierung, Sealed-Hygiene-Lane, getrennte `t_crypto`/`t_physical` (§9.5, H-28) |
-| R9-14 | `INV-ERA-8(1)` („bei Cryptographic unlesbar“) widersprach `INV-ERA-2` (Bytes entfernt) | präzisiert: Done verlangt Entfernung auch des Ciphertexts; Unlesbarkeit ab `KeysDestroyed` (§9.5, INV-ERA-2) |
-| R9-15 | `ClusterLocal` ohne Admission ⇒ Inode- und FD-Explosion, `max_open_files` als Pseudo-Limit | Mindestgröße, Quoten, `max_live_files`, FD-Cache statt Dateilimit, `RLIMIT_NOFILE`-Prüfung (§4.3.1, §10.1) |
-| R9-16 | R-PL-3 „nie zurück“: schrumpfende Cluster hinterlassen unbegrenzt viele Kleinstdateien | Pure-Demotion mit Hysterese per `rebucket` (R-PL-3) |
-| R9-17 | §4.3 (`ClusterLocal` erzwingt eigene Dateien) widersprach R-PL-1…3 (Packed/Pure automatisch) | `ClusterLocal` = Pure-Zusage nach Admission; ausgenommen von Demotion (§4.3) |
-| R9-18 | §9.2: „`Sealed` ⇒ `Cryptographic`“ widersprach `Logical`, `escalate`, logischer Range-/Space-Löschung | Endstufenregel, `Logical` als Zwischen- bzw. Endziel für range/branch/space, Statuscap `LogicalOnly` (§9.2, §9.7) |
-| R9-19 | SD-03 (`blake3`, Kern-Abhängigkeit `chacha20poly1305`) widersprach §5.2 (HMAC-SHA256) und „Krypto nur über Ports“ | Abhängigkeiten nach Crate getrennt (SD-03) |
-| R9-20 | `destroy_many` ohne Batchgrenze, Hülle bis 4096, Provider-Batches ≤ 256 | Chunking ≤ 256, parallel (§9.4) |
-| R9-21 | Open-Zeit und Admission für Millionen Cluster nicht spezifiziert | OP10-Admission, H-13 um Cluster-Index-Aufbau erweitert (§10.1, §17) |
-| R9-22 | Formatwirksame Branch-Entscheidungen wären nach G-F nur per Migration korrigierbar | Spike-Messungen als Freeze-Voraussetzung (§14, P2) |
-| R9-23 | Zeitplan §14 für P2/P6/P7 optimistisch | als Risiko (9) geführt, Neuschätzung nach P1/P2 (§18) |
-| R9-24 | Race-Nahtstellen deckten Pipeline, Leader-Wechsel, Guard-Fenster, Space-Drop und Link nicht ab | RACE-18…RACE-22 (§11.6), M1/M2 erweitert (§13.1) |
-
-## Anhang B.3 — Änderungen R9.0 → R9.1 (Feinschliff)
-
-R9.1 ändert kein Dateiformat, keine Gate-Reihenfolge und keinen Phasenplan. Alle Änderungen lösen Widersprüche, schließen Lücken oder bereinigen den Text.
-
-| ID | R9.0-Befund | R9.1-Lösung |
-|---|---|---|
-| R9.1-01 | `Shredded` stand in §3.5 (F-6) und §7 (Punkt 5) als Lesefehler, ist aber nach der Gate-Prüfung (§7, Punkt 2) nie erreichbar | `Shredded` ist nur Clusterzustand; Lesen liefert `Erased`, `KeyUnavailable` oder `KeyLost` (§3.5, §7) |
-| R9.1-02 | §9.4 erlaubte den Purge bei `Disabled`; `INV-ERA-3` und §9.5 verlangen `Absent` vor dem Purge | Invariante gewinnt; Purge beginnt bei `Cryptographic` erst bei `Absent`, `Disabled` erlaubt nur Planung (§9.4); allgemeine Rangfolge in der Kopfzeile „Normative Quelle“ und §12.8 |
-| R9.1-03 | `ClusterSpec` war nur teilweise definiert (`protection`, `tenant_tag`, `due` fehlten); `KeyProvider::list` lieferte kein Alter, daher war `orphan_key_grace` nicht berechenbar | Felder ergänzt (§4.3); `list` liefert `KeyListEntry{cluster, created_utc}` (§4.3, §9.4). Port-Änderung, kein Format |
-| R9.1-04 | `ClusterIndex`: 36 B je Eintrag bei Lastfaktor 0,8 ergeben 45 B, nicht ≤ 40 B; „16 Mio. ≈ 640 MiB“ mischte dezimal und binär; „≈ 4,3 GiB“ war ≈ 4,0 GiB | 40 B als Rechenwert mit Annahme „Füllung ≈ 0,9“ (in H-25 zu belegen); 16 Mio. × 40 B ≈ 610 MiB, Gesamtbudget ≈ 4,0 GiB (§4.3.1, §16). **Offen:** trägt H-25 die Füllung nicht, gelten 45 B (≈ 690 MiB, ≈ 4,5 GiB) |
-| R9.1-05 | Die Bezeichner `R1…R10` (Recovery-Schritte) und `R1…R22` (Race-Nahtstellen) kollidierten untereinander und mit den Revisionsnamen R6…R9 | Recovery-Schritte `OP1…OP10` (§10.1), Race-Nahtstellen `RACE-1…RACE-22` (§11.6), alle Verweise angepasst; Revisionsnamen bleiben |
-| R9.1-06 | §13.1 nannte „R1–R17“, obwohl R9-24 die Nahtstellen 18…22 ergänzt hatte; §16 führte einen „Slowpath-Anteil“ der Guards, obwohl es keinen Langsampfad gibt (§6.3) | §13.1: `RACE-1…RACE-22`; §16: Stufe-A-Konflikte, `GuardRetry`-Rate, Fensterfuß-Treffer |
-| R9.1-07 | Rückblicke im Normtext („R8.2 verlangte …“) in §3.5, §4.3.1, §5.8, §6.3, §7.1, §9.2, §9.4, §9.6, §9.7, §10.4, §14, §16, §19 | durch zeitlose Aussagen ersetzt; die Geschichte steht in Anhang B |
-| R9.1-08 | „Committer“ stand an Stellen, an denen der Sequencer entscheidet; §3.4 behalf sich mit einem Sonderhinweis | Sequencer benannt (§2.4, §3.1, §6.5, §8.4, §9.5, §9.6, §11.6, §12.8, §13.1, §15, §19); „Committer“ bleibt Oberbegriff für Sequencer + Syncer (§3.4) |
-| R9.1-09 | `BranchId` (u32) kam aus dem `reserve_ids`-Zähler ohne Überlaufregel; `eraser().branch(…)` stand als unzulässige Signatur in `impl Storage`; §8.4 nannte „maximal 8“ Ebenen neben Default 4 | Überlauf ⇒ `Exhausted`; eigener `impl Eraser`; Default 4, hart 8 (§8.4) |
-| R9.1-10 | Undefinierte Verweise `P-2`, `P-4`, `P-10`; `E-nn` ohne Erklärung | durch `INV-LIM-1` bzw. Klartext ersetzt; `E-nn` in §12.8 als Auditbefund erklärt |
-| R9.1-11 | Keine Rangfolge bei Widerspruch zwischen Invarianten, §12.8 und Fließtext | §15 vor §12.8 vor übrigen Abschnitten (Kopfzeile, §12.8) |
-
-
-## Anhang B.4 — Änderungen R10 → R11 (Gesamtsystem-Abschluss)
-
-R11 ändert kein Dateiformat gegenüber R9.1, ergänzt aber Formatpunkte, die vor G-F festzulegen sind (Partitionsformat, `PartitionGeneration`-Schlüsselscope).
-
-| ID | R10-Befund | R11-Lösung |
-|---|---|---|
-| R11-01 | R10 bricht in §11.6 ab; §12–§19 und alle Anhänge fehlen, Querverweise (§12.4.0…§12.4.5, §14.1, §18.1, SD-70, H-35) laufen ins Leere | Kapitel §12–§19 vollständig, alle Verweise aufgelöst |
-| R11-02 | R10 hat die Kernkapitel gegenüber R9.1 stark gekürzt (z. B. §9.5 9,3 → 3,5 KB, §9.7 8,2 → 1,6 KB, §6.5, §8.4/8.5, §10.4); normative Details (Ledger-Events, Receipt-Felder, Merge-Ablauf, Tomb-Retire) gingen verloren | §4–§11 wieder auf dem vollständigen R9.1-Wortlaut; aus R10 bleiben §0–§3 (Gesamtsystem, Topologie, Abhängigkeiten) und K-39…K-47 |
-| R11-03 | Ein Ingest-Change für Vektor, Text und Graph eines Dokuments passt nicht in `max_change_ops`/`max_change_bytes` | Publish-Record, IG-1…IG-6 (K-51, §12.4.0) |
-| R11-04 | Klasse-A-Autarkie der Retrieval-Crates widerspricht der `SegmentOwner`-Pflicht; Ebenenregel verletzt (`storage-ports` L1, `vector → mvcc`) | persistenzneutrale Traits + `contextra-index-bridge`, `storage-ports` Level 0 (K-48) |
-| R11-05 | Löschen in geteilten Indizes ohne beschränkte Kosten; „Segmentschlüssel reicht nicht“ ohne Lösung | Partition = Packgruppe, Generationsschlüssel, Kostenmodell (K-49, §12.4.5) |
-| R11-06 | „Trennung personenbezogener Daten“ war Zielbild ohne Mechanismus | Trennungsprinzip, Pseudonym-Tresor, `INV-SEP-1` (K-50, §12.4.6) |
-| R11-07 | Read-your-writes, Reproduzierbarkeit und Lernsignale ungeklärt | K-52, K-53, K-54, §12.4.4 |
-| R11-08 | Graph: geteilte Hyperkanten verbanden Löschdomänen; Personen-Entitäten ohne Besitzer | Kopie je Löschdomäne, Personen-Entitäten im Personencluster (§12.4.3, `INV-GRAPH-PROV-1`) |
-| R11-09 | Phasenplan ohne Retrieval-Spur und ohne Migration | R1–R5, §14.1 |
-| R11-10 | Spec nannte Crates, die im Repo fehlen (`erasure`, `vault`, `storage-ports`); „Commit `0dd5cfc41`“ nicht prüfbar; Kern kompiliert nicht | Ist-Befunde §18.1, Stand `d8b45b8`, K-55 |
-| R11-11 | Konfiguration ohne sichere Bündel; Auskunft/Portabilität fehlten | Profile (K-56), `export_cluster` (K-57), §12.10 |
-| R11-12 | Unerklärtes „R9.1+Ö“ im Kopf | entfernt |
-
-
-
-## Anhang B.5 — Änderungen R11 → R12 (Repo-Abgleich, HEAD `60ea034`)
-
-R12 ändert kein Dateiformat. Alle Befunde wurden statisch am Quelltext geprüft (Cargo.toml, `use`-Zeilen, `capabilities.toml`, Verzeichnisbaum).
-
-| ID | R11-Befund | R12-Lösung |
-|---|---|---|
-| R12-01 | R11 setzte `storage-ports` auf Level 0 und beschrieb Retrieval-Crates als „ohne interne Abhängigkeit“; real nutzen `vector`/`text`/`graph` `types` und `ports`, die in `capabilities.toml` auf Level 2 stehen | Fünf-Ebenen-Modell (K-58, §3.1) |
-| R12-02 | Fünf `TxId`-Kopien und eine zweite `Epoch` im Bestand | ein `Epoch(u64)` (K-59, `INV-EPOCH-1`) |
-| R12-03 | Personenbezogene Daten und geteilte Partitionen: Klartext-Embeddings in geteilten Indizes nicht ausgeschlossen | Indexklassen, `INV-SEP-2`, H-36 (K-60) |
-| R12-04 | `kvcache` mit Inhaltsadressierung und `aes-gcm-siv` fehlte in Spec und Bereinigungsplan | K-61, §14.1 |
-| R12-05 | `block_on` und `memmap2` nur teilweise benannt | gemessene Verteilung in §14.1 (K-62) |
-| R12-06 | Alt-Verträge in `contextra-ports` ungeregelt | K-63 |
-| R12-07 | Ist-Zahlen (Mitglieder, `capabilities.toml`, Root-`tests/`, `docs/agent`) falsch bzw. veraltet | §3.1 und §18.1 korrigiert |
+| R13-01 | Topologie auf **14 reale Crates** festgeschrieben; Phantom-Crates `storage-ports`, `storage-fs`, `crypto-ref`, `storage-bridge`, `index-bridge`, `keys-*`, `erasure`, `kvcache`, `agent`, `cognition`, `router`, `privacy`, `prompt-guard`, `sandbox`, `ingest`, `infer-*`, `mcp`, `py`, `db`, `testkit` aus der Planung entfernt | §0, §3.1, §3.7, K-47, K-58 |
+| R13-02 | Kernel-Ports nach `contextra-ports::kernel`; Alt-Verträge nach `legacy`; Index-Traits werden Lese-Verträge | §3.2, K-63, K-64 |
+| R13-03 | Ersatz der Adapter-Crates durch Engine-Module (`platform`, `kernel`, `projection`, `compliance`) | §3.1, K-48 |
+| R13-04 | KV-Cache, Agenten-Orchestrierung, Kognition, Decay, Session-DAG, Router, Inferenz-Adapter gestrichen; Reste im Code zur Löschung geplant | §2.3, §12.9, §14.1, K-13, K-45, K-46, K-61, K-65 |
+| R13-05 | `contextra-mvcc` → `EpochPinRegistry`; `contextra-checkpoint` → Snapshot-Set-Register und Restore-Koordinator | K-66, K-67, §10.3 |
+| R13-06 | `contextra-crypto` wird Standard-Adapter (kein `crypto-ref`); Signatur (`deletion_proof`) bleibt dort | K-41, K-55, §3.7.2 |
+| R13-07 | `durable-fs` über `sys` als Dateischicht; SD-70 aufgehoben | K-72, §3.7.3 |
+| R13-08 | PII-Erkennung, Egress-Policy, Parser-Grenze als Ports bzw. Plugin-Anforderungen | K-68, K-69, K-70, §2.4 |
+| R13-09 | Neue Invarianten `INV-TOPO-1`, `INV-SCOPE-1`, `INV-PORT-1`; `INV-DECAY-1` auf Recency/Supersedes umformuliert | §15 |
+| R13-10 | Ist-Befunde auf HEAD `78a1783` neu gemessen: Workspace nicht baubar (3 Ursachen); Phase P0-A „Baubarkeit“ eingefügt | §14, §18.1 |
+| R13-11 | Retention als einzige zeitgesteuerte Löschfunktion spezifiziert; Recency als zustandsloser Prior | §12.9, SD-95 |
+| R13-12 | Lernsignale (`edge_reinforcement`) nicht in v1 | K-71 |
 
 ## Anhang C — Verworfene Vorschläge
 
@@ -1945,3 +1893,4 @@ Pipeline:   Intake ─Sequencer(Stamp, Retiring)─► Syncer(write+sync) ─►
 Index:      Partition(g) ──Löschung im Fenster──► Neuaufbau g+1 ──verify_absent + Publish──► Schlüssel g vernichtet ──► Partition(g) unlesbar
 Ingest:     Staging(v n) ──Abschluss-Change (head)──► sichtbar + projiziert ;  Crash vor head ⇒ unerreichbar ⇒ Orphan-Worker
 ```
+
