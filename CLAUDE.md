@@ -64,4 +64,6 @@ Die mehrschichtige Löschkette wird entfernt da Behörden und Sicherheitsdienste
 
 Da du die Repo klonen musstest agierst du mit dem Nutzer über den Webchat, du hast die vollständige Erlaubnis deine Github Konnektoren für Commits, Pull-Requests und Pushes zu nutzen. Aktiviere die Github-Konnektoren für Push über die Chat-Werkzeuge um Änderungen direkt in der Repo vorzunehmen. Wenn das nicht funktioniert liefere das als Dateien zum Download oder als vollständiges ZIP-Datei mit deinen Änderungen in der Ordnerstruktur zum einfachen überschreiben der veränderten Dateien. Solltest du Dateien entfernt haben liefere diese auch aber als leere Hülle zum überschreiben.
 
+Nutze das Tool add_repo , hänge das Repo ein mit Push-Zugriff an um Pull-Requests zu erstellen.
+
 Das Projekt muss umgedacht werden, bisherige Entscheidungen dürfen final überdacht oder geändert werden für ein funktionales produtionsreifes Produkt.
