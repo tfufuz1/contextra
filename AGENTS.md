@@ -165,10 +165,10 @@ cargo xtask check-jules-context-freshness # Kontext noch aktuell?
 | P26 | Ring 0 bindet `tokio` nicht als Produktions-Abhängigkeit ein | `cargo xtask check-ring0-async-purity` |
 | P28 | Determinismus via Ports (`Clock`, `Rng`, `IdGenerator`); CSPRNG für Key- und Salt-Material | `cargo xtask determinism-check` |
 | INV-TENANT-1 | `TenantId::try_new(0)` → Err; `0` ist SYSTEM | `cargo test -p contextra-types` |
-| INV-DELETION-1/2 | `DeletionProof::create()` nur nach physischer Bereinigung; kein Zeiger auf gelöschte IDs | `cargo test -p contextra-crypto` |
-| INV-DURABILITY-RING | `MemoryOnly` inkompatibel mit DeletionProof und Sovereign | `cargo test -p contextra` |
-| INV-PERF-PROFILE-1 | `BareMetal` und `Balanced` inkompatibel mit Löschbeweis | `cargo test -p contextra` |
-| INV-COLLECTION-PROFILE-1/2 | Aktiver Proof erfordert `CryptoShred`; Presets konsistent | `cargo test -p contextra` |
+| INV-DELETION-1/2 | _Superseded by ADR-115._ Vormals: `DeletionProof::create()` nur nach physischer Bereinigung; kein Zeiger auf gelöschte IDs. Gültig bis zur Umsetzung in Phase 3 | `cargo test -p contextra-crypto` |
+| INV-DURABILITY-RING | _Superseded by ADR-115 (Beweisbezug)._ Vormals: `MemoryOnly` inkompatibel mit DeletionProof und Sovereign. Die ID bleibt wegen `check-result-dropped-io` bestehen | `cargo test -p contextra` |
+| INV-PERF-PROFILE-1 | _Superseded by ADR-115._ Vormals: `BareMetal` und `Balanced` inkompatibel mit Löschbeweis | `cargo test -p contextra` |
+| INV-COLLECTION-PROFILE-1/2 | _Superseded by ADR-115._ Vormals: Aktiver Proof erfordert `CryptoShred`; Presets konsistent | `cargo test -p contextra` |
 | INV-WAL-LEGACY-KEY-1 | Legacy-HMAC-Fallback nie implizit aktiv | `cargo test -p contextra-store` |
 | INV-WAL-TRUNCATION-1 | WAL-Truncation-Schutz über Manifest-High-Water-Mark | `cargo test -p contextra-store` |
 | INV-MVCC-SSI-1 | SSI Read-Set-Tracking und Write-Skew-Validierung aktiv | `cargo test -p contextra-mvcc` |

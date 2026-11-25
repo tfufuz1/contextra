@@ -1,7 +1,7 @@
 # ADR-112: Status und Architekturanalyse des Sovereign Deletion Proof v3, Audit Chains & Key Shredding Scaffolding-Codes
 
 * **Datum**: 2026-10-04
-* **Status**: ⏳ Proposed / Pending Architectural Decision
+* **Status**: Superseded by ADR-115 (vereinfachte synchrone Löschung ohne kryptografischen Löschnachweis, Freigabe 2026-11-25). Die hier analysierten Beweis- und Shredding-Komponenten werden gemäß ADR-115 entfernt.
 * **Betroffene Komponenten**: `contextra-crypto` (`crypto.rs`, `deletion_proof.rs`, `wal_crypto.rs`, `kv_shredding.rs`, `audit_chain.rs`, `revocation_log.rs`, `kdf.rs`)
 * **Spezifikationsreferenzen**: `CONTEXTRA_VOLLSTAENDIGE_FEATURE_SPEZIFIKATION.md` (§10.1, INV-DELETION-1, INV-DELETION-2), `docs/TYPE_REGISTRY.md`
 

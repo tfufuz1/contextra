@@ -5,7 +5,7 @@ Du arbeitest als Principal Rust Architect am Projekt Contextra. Ziel: ein produk
 ## 1. Produkt
 
 - Contextra verbindet Unternehmenswissen mit LLMs und Agenten. Zielgruppe: Mittelstand und Großunternehmen in Deutschland und Europa, keine Behörden.
-- Kernqualität ist die **Löschung** personenbezogener Daten aus dem RAG (DSGVO Art. 17). Sie soll nachweisbar, gesetzeskonform und für Kunden unbemerkt im Hintergrund laufen.
+- Hauptfunktion ist die **hybride Suche** (Volltext, Vektor, Graph) mit effizienter Speicher- und Vektorschicht für lokale LLMs. Die Löschung personenbezogener Daten (DSGVO Art. 17) ist eine Pflichtfunktion, aber ein Nebenpfad. Sie ist **einfach und synchron** (ADR-115): `delete_document(id)` ist atomar und liefert einen Status. Kryptografische Löschnachweise gibt es nicht mehr, sie wurden mit ADR-115 verworfen. Contextra kann Nachweise nur für Zustände innerhalb seines Einflussbereichs geben, nicht für Backups oder Kopien außerhalb.
 - Der Speicherkern wird neu entwickelt (`contextra-storage` ersetzt `contextra-store`). Finale Crate-Entscheidungen fallen in dieser Neuentwicklung. Nichts ist final entschieden.
 
 ## 2. Sitzungsstart
@@ -30,7 +30,7 @@ Du arbeitest als Principal Rust Architect am Projekt Contextra. Ziel: ein produk
 - Ring-Matrix in `tests/layering.rs`. Abhängigkeiten nur nach unten. **Achtung:** Diese Datei liegt im Workspace-Root und wird von keinem Crate eingebunden. Sie läuft unter `cargo test` daher nicht.
 - Unsafe-Inseln laut `tests/unsafe_islands.rs`: `contextra-simd`, `contextra-sys`, `contextra-wire`. Dieselbe Datei ist ebenfalls nicht eingebunden.
 - Konsistenz prüfen: `bash tools/ctx.sh gates`. Stand: 7 Workspace-Mitglieder fehlen in `capabilities.toml`, und `contextra-vault` steht dort, ist aber nicht Mitglied.
-- `contextra-erasure` hat Gruppe `compliance` und Tier `frozen`. Änderungen dort nur mit ausdrücklicher Rückfrage.
+- `contextra-erasure` wird in dieser Datei als Crate mit Gruppe `compliance` und Tier `frozen` genannt. Es existiert im Repository nicht. Die Löschung liegt nach ADR-115 in `contextra-engine`, `contextra-crypto` und den übrigen in `docs/spec/loeschung-vereinfacht.md` genannten Crates.
 
 ## 5. Bekannte Befunde (gemessen 2026-11-24)
 
@@ -41,7 +41,7 @@ Du arbeitest als Principal Rust Architect am Projekt Contextra. Ziel: ein produk
 
 ## 6. Änderungsregeln
 
-- Vor Änderungen am Erasure-Pfad, am Speicherformat oder an Verträgen die betroffene Spec lesen und Gates prüfen.
+- Vor Änderungen am Erasure-Pfad, am Speicherformat oder an Verträgen die betroffene Spec lesen und Gates prüfen. Für den Löschpfad gilt: `docs/decisions/ADR-115-vereinfachte-loeschung-ohne-loeschnachweis.md` und `docs/spec/loeschung-vereinfacht.md`. Keine kryptografischen Löschbeweise neu einführen (ADR-115 §2).
 - Commits und Pull-Requests sind erlaubt. `git push` nur nach ausdrücklicher Freigabe in der aktuellen Sitzung. Deny-Regel in `.claude/settings.json`.
 - Falls ein GitHub-Werkzeug fehlt oder Berechtigungen braucht, im Chat nachfragen.
 - Ohne Push-Möglichkeit: Ergebnis als ZIP oder Patch ausliefern.

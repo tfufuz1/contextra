@@ -8,3 +8,7 @@ Das Verzeichnis `docs/decisions/` ist die einzige kanonische Quelle (Single Sour
 
 ## Befehle
 - Mit `just adr list` (geplant) können alle vorhandenen ADRs übersichtlich aufgelistet werden.
+
+## Aktuelle Entscheidungen (Auswahl)
+
+- [ADR-115](ADR-115-vereinfachte-loeschung-ohne-loeschnachweis.md): Vereinfachte synchrone Löschung ohne kryptografischen Löschnachweis. Accepted, Umsetzung ausstehend. Ersetzt ADR-112. Spezifikation: `docs/spec/loeschung-vereinfacht.md`.
