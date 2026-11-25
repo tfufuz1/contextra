@@ -23,31 +23,38 @@ Du arbeitest als Principal Rust Architect am Projekt Contextra. Ziel: ein produk
 - Speicher: Bei Platzmangel `bash tools/ctx.sh space`. Der Befehl löscht nur regenerierbare Artefakte.
 - Pro Befehl Ausgabe begrenzen. `tools/ctx.sh` begrenzt sie bereits.
 
-## 4. Architektur (belegt)
 
-- Die Crates gliedern sich in Gruppen, Ebenen und Tiers. Quelle: `capabilities.toml`. Übersicht: `docs/agent/CRATES.md`.
-- Ring-Matrix in `tests/layering.rs`. Abhängigkeiten nur nach unten. **Achtung:** Diese Datei liegt im Workspace-Root und wird von keinem Crate eingebunden. Sie läuft unter `cargo test` daher nicht.
-- Unsafe-Inseln laut `tests/unsafe_islands.rs`: `contextra-simd`, `contextra-sys`, `contextra-wire`. Dieselbe Datei ist ebenfalls nicht eingebunden.
-- Konsistenz prüfen: `bash tools/ctx.sh gates`. Stand: 7 Workspace-Mitglieder fehlen in `capabilities.toml`, und `contextra-vault` steht dort, ist aber nicht Mitglied.
-- `contextra-erasure` wird in dieser Datei als Crate mit Gruppe `compliance` und Tier `frozen` genannt. Es existiert im Repository nicht. Die Löschung liegt nach ADR-115 in `contextra-engine`, `contextra-crypto` und den übrigen in `docs/spec/loeschung-vereinfacht.md` genannten Crates.
-
-## 5. Bekannte Befunde (gemessen 2026-11-24)
-
-- Der Cargo-Alias `xtask` zeigt auf ein nicht existierendes Paket. Deaktiviert in `.cargo/config.toml`.
-- Die Architektur-Tests in `tests/` laufen nicht (siehe oben). Eine Einbindung ist offen.
-- `contextra-ids` (17 Tests) ist grün.
-- Ein vollständiger Workspace-Check ist nicht durchgelaufen. Die Zahl der Warnungen ist daher unbekannt.
-
-## 6. Änderungsregeln
-
-- Vor Änderungen am Erasure-Pfad, am Speicherformat oder an Verträgen die betroffene Spec lesen und Gates prüfen. Für den Löschpfad gilt: `docs/decisions/ADR-115-vereinfachte-loeschung-ohne-loeschnachweis.md` und `docs/spec/loeschung-vereinfacht.md`. Keine kryptografischen Löschbeweise neu einführen (ADR-115 §2).
-- Commits und Pull-Requests sind erlaubt. `git push` nur nach ausdrücklicher Freigabe in der aktuellen Sitzung. Deny-Regel in `.claude/settings.json`.
-- Falls ein GitHub-Werkzeug fehlt oder Berechtigungen braucht, im Chat nachfragen.
-- Ohne Push-Möglichkeit: Ergebnis als ZIP oder Patch ausliefern.
-
-## 7. Agenten
+## 4. Agenten
 
 - Keine Subagenten, wenn du Sonnet oder Opus bist. Skripte und Werkzeuge bevorzugen. Subagenten nur als Haiku (Vorgabe des Projekts).
 
-## 8. Pflege
-Die API.md , PLAN.md und SPEC.md pro Crate müssen synchron gehalten werden.
+---
+
+Aktuelle Ziele:
+- Kompilierbarkeit behalten
+- Komplexe mehrschichtige Löschkette entfernen
+- Repo für Entwickler Claude einrichten
+- Optimierung des Stores
+- Optimierung der Vektoren
+- Komprimierung und Fokussierung der Graphen
+- Windows-Kompatibilität
+- Harte Kryptographische Sicherheitsmechanismen reduzieren oder aufheben
+- Harte Hardware Sicherheitsmechanismen reduzieren oder aufheben
+
+
+
+
+
+
+Der aktuelle Stand ist auf der Kompilierbaren Basis vom 6 Oktober mit Komponenten vom 10. November zusammengestellt.
+
+Das Archiv.zip ist der Stand vom 11. November also einen Monat später, du musst diesen Stand nach nützlichen implementerungen und funktionen durchsuchen.
+In der Zeit vom 6 Oktober bis zum 10. November wurde sehr viel entkoppelt aber auch mehr Löschung eingebaut.
+
+
+ Das Projekt wurde vor wenigen Tagen auf den Kompilierbaren Stand vom 6 Oktober zurückgestellt.In der Commit-Nachricht-Chronik ab dem 6. Oktober bis 10. November dürften viele Informationen zu Fehlern oder Lücken auslesen lassen, jedoch wurde auch viel für die Löschung implementiert was nicht übernommen wird.
+
+Die mehrschichtige Löschkette wird entfernt da Behörden und Sicherheitsdienste nicht die Zielgruppe sind und die Löschung auf diese Weise zu komplex ist.
+
+
+
