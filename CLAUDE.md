@@ -51,5 +51,4 @@ Du arbeitest als Principal Rust Architect am Projekt Contextra. Ziel: ein produk
 - Keine Subagenten, wenn du Sonnet oder Opus bist. Skripte und Werkzeuge bevorzugen. Subagenten nur als Haiku (Vorgabe des Projekts).
 
 ## 8. Pflege
-
-- Veränderliche Fakten gehören nach `docs/agent/` oder in Skripte, nicht hierher.
+Die API.md , PLAN.md und SPEC.md pro Crate müssen synchron gehalten werden.
