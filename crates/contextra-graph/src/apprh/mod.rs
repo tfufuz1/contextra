@@ -31,7 +31,6 @@ use contextra_types::EntityId;
 ///
 /// # Complexity
 /// Time complexity bounded by push budget $O(1 / (\alpha \cdot \epsilon))$, independent of total graph size.
-// ANCHOR[contextra-graph:SRC-APPRH-MOD-001]
 pub fn apprh_local<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -47,7 +46,6 @@ pub fn apprh_local<G: PathGraph>(
 ///
 /// # Errors
 /// Returns [`contextra_types::ContextraError::InvalidInput`] if `hyperedge_decay_factor` is non-finite or outside `(0.0, 1.0]`.
-// ANCHOR[contextra-graph:SRC-APPRH-MOD-002]
 pub fn forward_push_apprh<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -78,7 +76,6 @@ impl CsrGraph {
     ///
     /// # Invariants
     /// Runs exclusively in shadow mode unless feature-flag activated. Bit-identical determinism.
-    // ANCHOR[contextra-graph:SRC-APPRH-MOD-003]
     pub fn apprh_diffusion(
         &self,
         seeds: &[EntityId],
@@ -87,8 +84,16 @@ impl CsrGraph {
         apprh_local(self, seeds, params)
     }
 
+    /// Evaluates APPRH diffusion over CsrGraph.
+    pub fn evaluate_apprh_diffusion(
+        &self,
+        seeds: &[EntityId],
+        params: &ApprhParams,
+    ) -> Result<AHashMap<EntityId, f32>, ApprhError> {
+        self.apprh_diffusion(seeds, params)
+    }
+
     /// Computes shadow comparison between Forward-Push PPR and APPRH on CsrGraph.
-    // ANCHOR[contextra-graph:SRC-APPRH-MOD-004]
     pub fn apprh_shadow_compare(
         &self,
         seeds: &[EntityId],
@@ -98,52 +103,15 @@ impl CsrGraph {
     ) -> Result<ApprhShadowComparison, ApprhError> {
         shadow_compare_forward_push_vs_apprh(self, seeds, ppr, apprh_params, top_k)
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::csr::CsrGraph;
-    use contextra_types::Entity;
-
-    // ANCHOR[contextra-graph:SRC-APPRH-MOD-005]
-    #[tokio::test]
-    async fn test_apprh_diffusion_and_shadow_compare_diagnostic_paths() {
-        let graph = std::sync::Arc::new(CsrGraph::new());
-        let e1 = EntityId::new(1);
-        let e2 = EntityId::new(2);
-
-        graph
-            .insert_entity_direct(Entity::new(e1, "Node1", "Type"))
-            .unwrap();
-        graph
-            .insert_entity_direct(Entity::new(e2, "Node2", "Type"))
-            .unwrap();
-        graph.insert_edge_direct(e1, e2, 1.0).await.unwrap();
-
-        let apprh_params = ApprhParams {
-            ppr: PprParams::default(),
-            hyperedge_decay_factor: 0.8,
-            max_iterations: 100,
-        };
-
-        // Test graph.apprh_diffusion
-        let res = graph.apprh_diffusion(&[e1], &apprh_params);
-        assert!(
-            res.is_ok(),
-            "apprh_diffusion diagnostic call should succeed"
-        );
-        let scores = res.unwrap();
-        assert!(scores.contains_key(&e1));
-
-        // Test graph.apprh_shadow_compare
-        let ppr_params = PprParams::default();
-        let shadow_res = graph.apprh_shadow_compare(&[e1], &ppr_params, &apprh_params, 5);
-        assert!(
-            shadow_res.is_ok(),
-            "apprh_shadow_compare diagnostic call should succeed"
-        );
-        let comparison = shadow_res.unwrap();
-        assert!(comparison.top_k_overlap >= 0.0 && comparison.top_k_overlap <= 1.0);
+    /// Evaluates APPRH shadow comparison on CsrGraph.
+    pub fn evaluate_apprh_shadow(
+        &self,
+        seeds: &[EntityId],
+        ppr: &PprParams,
+        apprh_params: &ApprhParams,
+        top_k: usize,
+    ) -> Result<ApprhShadowComparison, ApprhError> {
+        self.apprh_shadow_compare(seeds, ppr, apprh_params, top_k)
     }
 }

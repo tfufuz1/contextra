@@ -1,17 +1,9 @@
-//! # Modul: orphan_workers.rs
-//!
-//! **Zweck:** Bereinigung verwaister Vektor- und Graphknoten nach unvollständigen Transaktionen.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
-
 // FILE-CONTEXT
 // ZWECK: Worker-Tasks zur Bereinigung verwaister Transaktionen (Orphan Cleanup) und HNSW-Index-Rebuilds.
 // INVARIANTEN: Geordnete Abschaltung via CancellationToken; Beschränkung der pro Tick verarbeiteten Waisen.
 
 use super::config::{calculate_rebuild_cooldown, OrphanCleanupBackoffConfig, OrphanCleanupIndex};
 use contextra_mvcc::tx_buffer::TxBuffer;
-use contextra_ports::Clock;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,14 +11,6 @@ use std::time::Duration;
 /// Maximum number of orphan transactions processed in a single worker tick
 /// to avoid starving foreground operations.
 pub const MAX_ORPHANS_PER_TICK: usize = 100;
-
-/// Performs a single synchronous step of orphan transaction reaping.
-pub fn reap_orphans_step<T: Clone + Send + Sync + 'static>(
-    buffer: &TxBuffer<T>,
-    limit: usize,
-) -> Vec<T> {
-    buffer.reap_orphans_bounded(limit)
-}
 
 /// Starts a background task to periodically clean up orphan transactions and manage HNSW rebuilds with exponential backoff.
 pub fn start_orphan_cleanup_worker_with_config<
@@ -46,8 +30,7 @@ pub fn start_orphan_cleanup_worker_with_config<
         let mut ticker = tokio::time::interval(interval);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-        let clock = contextra_ports::SystemClock::new();
-        let mut last_rebuild_attempt_nanos: Option<u64> = None;
+        let mut last_rebuild_attempt: Option<std::time::Instant> = None;
 
         tracing::info!(
             "Orphan cleanup worker started (timeout: {:?}, interval: {:?}, base_backoff: {:?})",
@@ -60,7 +43,7 @@ pub fn start_orphan_cleanup_worker_with_config<
                 _ = ticker.tick() => {
                     let buf = buffer.clone();
                     let expired = tokio::task::spawn_blocking(move || {
-                        reap_orphans_step(&buf, MAX_ORPHANS_PER_TICK)
+                        buf.reap_orphans_bounded(MAX_ORPHANS_PER_TICK)
                     })
                     .await
                     .unwrap_or_default();
@@ -80,18 +63,15 @@ pub fn start_orphan_cleanup_worker_with_config<
                             backoff_config.max_delay,
                         );
 
-                        let current_nanos = clock.monotonic_nanos();
-                        let is_on_cooldown = if let Some(last_nanos) = last_rebuild_attempt_nanos {
-                            let elapsed_nanos = current_nanos.saturating_sub(last_nanos);
-                            elapsed_nanos < cooldown.as_nanos() as u64
+                        let is_on_cooldown = if let Some(last_attempt) = last_rebuild_attempt {
+                            last_attempt.elapsed() < cooldown
                         } else {
                             false
                         };
 
                         if is_on_cooldown {
-                            if let Some(last_nanos) = last_rebuild_attempt_nanos {
-                                let elapsed = Duration::from_nanos(current_nanos.saturating_sub(last_nanos));
-                                let remaining = cooldown.saturating_sub(elapsed);
+                            if let Some(last_attempt) = last_rebuild_attempt {
+                                let remaining = cooldown.saturating_sub(last_attempt.elapsed());
                                 tracing::debug!(
                                     failures = failures,
                                     cooldown_remaining_ms = remaining.as_millis(),
@@ -105,7 +85,7 @@ pub fn start_orphan_cleanup_worker_with_config<
                                 "HNSW index degraded — triggering automatic rebuild"
                             );
 
-                            last_rebuild_attempt_nanos = Some(clock.monotonic_nanos());
+                            last_rebuild_attempt = Some(std::time::Instant::now());
 
                             let rebuild_res = tokio::time::timeout(
                                 Duration::from_secs(120),
@@ -129,7 +109,7 @@ pub fn start_orphan_cleanup_worker_with_config<
 
                             if connectivity_restored {
                                 consecutive_failed_rebuilds.store(0, Ordering::Relaxed);
-                                last_rebuild_attempt_nanos = None;
+                                last_rebuild_attempt = None;
                                 tracing::info!("HNSW rebuild succeeded and index connectivity restored");
                             } else {
                                 let new_failures = consecutive_failed_rebuilds.fetch_add(1, Ordering::Relaxed) + 1;
@@ -149,7 +129,7 @@ pub fn start_orphan_cleanup_worker_with_config<
                         }
                     } else if consecutive_failed_rebuilds.load(Ordering::Relaxed) > 0 {
                         consecutive_failed_rebuilds.store(0, Ordering::Relaxed);
-                        last_rebuild_attempt_nanos = None;
+                        last_rebuild_attempt = None;
                         tracing::info!("HNSW index connectivity healthy, reset failed rebuild counter");
                     }
                 }
@@ -184,13 +164,3 @@ pub fn start_orphan_cleanup_worker<T: Clone + Send + Sync + 'static>(
     handle
 }
 
-/// Deprecated legacy alias for `start_orphan_cleanup_worker`.
-#[deprecated(note = "use start_orphan_cleanup_worker instead")]
-pub fn start_orphan_reaper<T: Clone + Send + Sync + 'static>(
-    buffer: Arc<TxBuffer<T>>,
-    hnsw_index: Arc<contextra_vector::hnsw::HnswIndex>,
-    interval: Duration,
-    cancel_token: tokio_util::sync::CancellationToken,
-) -> tokio::task::JoinHandle<()> {
-    start_orphan_cleanup_worker(buffer, hnsw_index, interval, cancel_token)
-}

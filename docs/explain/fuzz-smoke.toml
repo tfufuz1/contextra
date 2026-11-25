@@ -1,0 +1,8 @@
+title = "Fuzz-Smoke-Test"
+what = "Der Fuzz-Smoke-Test hat einen Crash, Panic oder Speicherfehler entdeckt."
+why = "Fuzzing findet unerwartete Randfälle und Parsing-Fehler in Datenstrukturen."
+fix = "Analysiere den Fuzzing-Artifact-Crash und fange die fehlerhafte Eingabe sauber ab."
+anti_fix = "Verwende kein `catch_unwind`, um Fuzzing-Panics zu kaschieren."
+adr = ["ADR-014"]
+related = ["wal-replay-verify", "determinism-check"]
+sources = ["CONSTITUTION.md"]

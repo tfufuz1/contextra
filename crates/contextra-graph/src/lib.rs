@@ -52,11 +52,7 @@ pub mod percolation;
 pub mod ppr;
 pub mod ppr_stream;
 pub mod provenance;
-pub mod provider;
-pub mod purger;
-#[cfg(feature = "experimental-graph")]
 pub mod session_dag;
-pub mod test_doubles;
 pub mod tl_hfd;
 
 #[cfg(feature = "apprh-diffusion")]
@@ -68,7 +64,7 @@ pub use apprh::{
 pub use arc_slice::ArcSlice;
 pub use cascade::{
     cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
-    CascadeDeletionRecord, CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket,
+    CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket, DeletionProof,
     GraphGarbageCollection, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
 };
 pub use community::{
@@ -90,8 +86,7 @@ pub use edge_reinforcement_buffer::{CooccurrenceSignal, EdgeReinforcementBuffer,
 pub use entity_extraction::{
     ingest_extracted_relations, EntityExtractor, ExtractedRelation, RuleBasedEntityExtractor,
 };
-pub use error::{GraphError, GraphMutationError, Result};
-pub use error::GraphError as Error;
+pub use error::GraphMutationError;
 pub use hyperedge::{
     sort_dedup_entities, star_weight, ConsolidationNodesGuard, HyperEdge, HyperEdgeId,
     HyperEdgeView, RoleBinding, RoleId, RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
@@ -113,11 +108,6 @@ pub use ppr::compute_ppr_with_apprh_selector;
 pub use ppr::{DeletedView, PprContext};
 pub use ppr_stream::{PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};
-pub use purger::{graph_purger, GraphPurger};
-pub use provider::{
-    compute_pagerank, detect_communities_on_provider, GraphProvider, InMemoryGraphProvider,
-};
-#[cfg(feature = "experimental-graph")]
 pub use session_dag::{
     AgentStateNode, DagEdge, NodeIdx, NodesGuard, NodesWriteGuard, SessionBranchTree,
 };
@@ -128,7 +118,6 @@ pub use tl_hfd::{
 };
 
 /// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.
-// ANCHOR[contextra-graph:SRC-LIB-001]
 pub trait GraphIndexExt: contextra_ports::GraphIndex {
     /// Removes an entity node and all its incident (outgoing and incoming) edges from the graph.
     fn remove_entity<'a>(

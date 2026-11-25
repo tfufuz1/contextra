@@ -1,22 +1,14 @@
 // FILE-CONTEXT
 // ZWECK: 8-Bit Skalare Quantisierung (SQ8) mit pro-Dimension Min/Max Skalierung.
-// INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); Keine Panics bei unpassenden Eingaben; INV-SQ8-ERROR-BOUND-1.
+// INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); Keine Panics bei unpassenden Eingaben.
 // NICHT-OFFENSICHTLICH: try_train prüft Vektor-Dimensionen vor Rekalibrierung der Min/Max-Grenzen.
 // HOTSPOTS: quantize.rs (ScalarQuantizer::try_train, quantize, dequantize)
 // STAND: TS:2026-08-30T21:55:29Z (SESSION: 10569099)
 
 //! Scalar Quantization (SQ8) for HNSW Index.
-//!
-//! # Error Bounds Guarantee (INV-SQ8-ERROR-BOUND-1)
-//! For each dimension $i \in [0, D-1]$, given quantization interval $[\text{min}_i, \text{max}_i]$ with
-//! range $\Delta_i = \text{max}_i - \text{min}_i$:
-//! Rounding into 256 discrete levels ($u8 \in [0, 255]$) guarantees that for any in-distribution value $v_i \in [\text{min}_i, \text{max}_i]$,
-//! the reconstruction error $e_i = |v_i - \hat{v}_i|$ satisfies:
-//! $$e_i \le \frac{\Delta_i}{2 \cdot 255} = \frac{\Delta_i}{510}$$
-//! For normalized vectors ($\|v\|_2 = 1$), the reconstructed Euclidean distance error is strictly bounded.
 
 use crate::distance::euclidean_distance_sq_f32_u8;
-use contextra_types::DistanceMetric;
+use contextra_core::DistanceMetric;
 
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -25,9 +17,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 pub const DEFAULT_P_LOW: f32 = 0.005;
 /// Default high percentile for quantization scaling (99.5%).
 pub const DEFAULT_P_HIGH: f32 = 0.995;
-
-/// Theoretical maximum quantization error bound factor per dimension: $1 / (2 \cdot 255) = 1 / 510$.
-pub const SQ8_MAX_ERROR_FACTOR_PER_DIM: f32 = 1.0 / 510.0;
 
 /// An 8-bit Scalar Quantizer (SQ8) with per-dimension scaling.
 ///
@@ -69,7 +58,7 @@ impl ScalarQuantizer {
     /// leading to degraded quantization accuracy.
     /// Safely creates a new ScalarQuantizer trained on a batch of vectors using default percentile clipping (0.5% / 99.5%).
     /// Returns `ContextraError::InvalidInput` if dimension is 0 or any vector dimension mismatches.
-    pub fn try_train(batch: &[&[f32]], dimension: usize) -> contextra_types::Result<Self> {
+    pub fn try_train(batch: &[&[f32]], dimension: usize) -> contextra_core::Result<Self> {
         Self::try_train_with_percentiles(batch, dimension, DEFAULT_P_LOW, DEFAULT_P_HIGH)
     }
 
@@ -80,9 +69,9 @@ impl ScalarQuantizer {
         dimension: usize,
         p_low: f32,
         p_high: f32,
-    ) -> contextra_types::Result<Self> {
+    ) -> contextra_core::Result<Self> {
         if dimension == 0 {
-            return Err(contextra_types::ContextraError::invalid_input(
+            return Err(contextra_core::ContextraError::invalid_input(
                 "Quantizer dimension must be greater than 0",
             ));
         }
@@ -93,21 +82,21 @@ impl ScalarQuantizer {
             || p_high > 1.0
             || p_low >= p_high
         {
-            return Err(contextra_types::ContextraError::invalid_input(format!(
+            return Err(contextra_core::ContextraError::invalid_input(format!(
                 "Invalid percentiles: p_low ({p_low}) and p_high ({p_high}) must satisfy 0.0 <= p_low < p_high <= 1.0"
             )));
         }
 
         for (idx, vec) in batch.iter().enumerate() {
             if vec.len() != dimension {
-                return Err(contextra_types::ContextraError::invalid_input(format!(
+                return Err(contextra_core::ContextraError::invalid_input(format!(
                     "Vector at index {idx} has dimension {}, expected {dimension}",
                     vec.len()
                 )));
             }
             for &val in *vec {
                 if !val.is_finite() {
-                    return Err(contextra_types::ContextraError::invalid_input(
+                    return Err(contextra_core::ContextraError::invalid_input(
                         "training data contains NaN or infinite values",
                     ));
                 }
@@ -234,19 +223,6 @@ impl ScalarQuantizer {
         &self.inv_scales
     }
 
-    /// Returns the theoretical maximum quantization reconstruction error bound for dimension `dim`.
-    ///
-    /// According to INV-SQ8-ERROR-BOUND-1:
-    /// $$e_i \le \frac{\text{max}_i - \text{min}_i}{2 \cdot 255} = \frac{\Delta_i}{510}$$
-    pub fn max_reconstruction_error_per_dim(&self, dim: usize) -> Option<f32> {
-        if dim < self.dimension {
-            let range = self.maxes.get(dim)? - self.mins.get(dim)?;
-            Some(range * SQ8_MAX_ERROR_FACTOR_PER_DIM)
-        } else {
-            None
-        }
-    }
-
     /// Returns the target dimension of the quantizer.
     pub fn dimension(&self) -> usize {
         self.dimension
@@ -308,18 +284,18 @@ impl ScalarQuantizer {
     }
 
     /// Quantizes an `f32` vector to `u8`.
-    pub fn quantize(&self, vector: &[f32]) -> contextra_types::Result<Vec<u8>> {
+    pub fn quantize(&self, vector: &[f32]) -> contextra_core::Result<Vec<u8>> {
         if self.mins.len() < self.dimension
             || self.maxes.len() < self.dimension
             || self.scales.len() < self.dimension
         {
-            return Err(contextra_types::ContextraError::invalid_input(
+            return Err(contextra_core::ContextraError::invalid_input(
                 "Quantizer internal state is corrupted or inconsistent with dimension",
             ));
         }
 
         if vector.len() != self.dimension {
-            return Err(contextra_types::ContextraError::invalid_input(format!(
+            return Err(contextra_core::ContextraError::invalid_input(format!(
                 "Vector dimension mismatch: expected {}, got {}",
                 self.dimension,
                 vector.len()
@@ -329,12 +305,10 @@ impl ScalarQuantizer {
         let mut is_out = false;
         for (i, &v) in vector.iter().enumerate().take(self.dimension) {
             let min_v = self.mins.get(i).copied().ok_or_else(|| {
-                contextra_types::ContextraError::invalid_input("Quantizer mins index out of bounds")
+                contextra_core::ContextraError::invalid_input("Quantizer mins index out of bounds")
             })?;
             let max_v = self.maxes.get(i).copied().ok_or_else(|| {
-                contextra_types::ContextraError::invalid_input(
-                    "Quantizer maxes index out of bounds",
-                )
+                contextra_core::ContextraError::invalid_input("Quantizer maxes index out of bounds")
             })?;
             if v < min_v || v > max_v {
                 is_out = true;
@@ -361,15 +335,13 @@ impl ScalarQuantizer {
         let mut quantized = Vec::with_capacity(self.dimension);
         for (i, &v) in vector.iter().enumerate().take(self.dimension) {
             let min_v = self.mins.get(i).copied().ok_or_else(|| {
-                contextra_types::ContextraError::invalid_input("Quantizer mins index out of bounds")
+                contextra_core::ContextraError::invalid_input("Quantizer mins index out of bounds")
             })?;
             let max_v = self.maxes.get(i).copied().ok_or_else(|| {
-                contextra_types::ContextraError::invalid_input(
-                    "Quantizer maxes index out of bounds",
-                )
+                contextra_core::ContextraError::invalid_input("Quantizer maxes index out of bounds")
             })?;
             let scale_v = self.scales.get(i).copied().ok_or_else(|| {
-                contextra_types::ContextraError::invalid_input(
+                contextra_core::ContextraError::invalid_input(
                     "Quantizer scales index out of bounds",
                 )
             })?;
@@ -382,15 +354,15 @@ impl ScalarQuantizer {
     }
 
     /// Dequantizes a `u8` vector back to `f32`.
-    pub fn dequantize(&self, vector: &[u8]) -> contextra_types::Result<Vec<f32>> {
+    pub fn dequantize(&self, vector: &[u8]) -> contextra_core::Result<Vec<f32>> {
         if self.inv_scales.len() < self.dimension || self.mins.len() < self.dimension {
-            return Err(contextra_types::ContextraError::invalid_input(
+            return Err(contextra_core::ContextraError::invalid_input(
                 "Quantizer internal state is corrupted or inconsistent with dimension",
             ));
         }
 
         if vector.len() != self.dimension {
-            return Err(contextra_types::ContextraError::invalid_input(format!(
+            return Err(contextra_core::ContextraError::invalid_input(format!(
                 "Vector dimension mismatch: expected {}, got {}",
                 self.dimension,
                 vector.len()
@@ -400,12 +372,12 @@ impl ScalarQuantizer {
         let mut dequantized = Vec::with_capacity(self.dimension);
         for (i, &v) in vector.iter().enumerate().take(self.dimension) {
             let inv_scale_v = self.inv_scales.get(i).copied().ok_or_else(|| {
-                contextra_types::ContextraError::invalid_input(
+                contextra_core::ContextraError::invalid_input(
                     "Quantizer inv_scales index out of bounds",
                 )
             })?;
             let min_v = self.mins.get(i).copied().ok_or_else(|| {
-                contextra_types::ContextraError::invalid_input("Quantizer mins index out of bounds")
+                contextra_core::ContextraError::invalid_input("Quantizer mins index out of bounds")
             })?;
             dequantized.push(f32::from(v) * inv_scale_v + min_v);
         }
@@ -420,9 +392,9 @@ impl ScalarQuantizer {
         query: &[f32],
         quantized: &[u8],
         metric: DistanceMetric,
-    ) -> contextra_types::Result<f32> {
+    ) -> contextra_core::Result<f32> {
         if query.len() != quantized.len() {
-            return Err(contextra_types::ContextraError::invalid_input(
+            return Err(contextra_core::ContextraError::invalid_input(
                 "Vector dimensions must match",
             ));
         }
@@ -464,7 +436,7 @@ impl ScalarQuantizer {
                 -dot
             }
             _ => {
-                return Err(contextra_types::ContextraError::invalid_input(
+                return Err(contextra_core::ContextraError::invalid_input(
                     "Unsupported distance metric",
                 ))
             }
@@ -479,9 +451,9 @@ impl ScalarQuantizer {
         q1: &[u8],
         q2: &[u8],
         metric: DistanceMetric,
-    ) -> contextra_types::Result<f32> {
+    ) -> contextra_core::Result<f32> {
         if q1.len() != q2.len() {
-            return Err(contextra_types::ContextraError::invalid_input(
+            return Err(contextra_core::ContextraError::invalid_input(
                 "Vector dimensions must match",
             ));
         }
@@ -512,7 +484,7 @@ impl ScalarQuantizer {
             DistanceMetric::Euclidean => dist_sq.sqrt(),
             DistanceMetric::DotProduct => -dot,
             _ => {
-                return Err(contextra_types::ContextraError::invalid_input(
+                return Err(contextra_core::ContextraError::invalid_input(
                     "Unsupported distance metric",
                 ))
             }
@@ -522,11 +494,9 @@ impl ScalarQuantizer {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests;
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod quantize_validation_tests {
     use super::*;
 
@@ -559,7 +529,7 @@ mod quantize_validation_tests {
     }
 
     #[test]
-    fn test_drift_ratio_accumulation_and_pure_calculate_vector_drift() -> contextra_types::Result<()>
+    fn test_drift_ratio_accumulation_and_pure_calculate_vector_drift() -> contextra_core::Result<()>
     {
         let vec1 = vec![0.0, 5.0, 10.0];
         let vec2 = vec![10.0, 5.0, 0.0];
@@ -586,30 +556,6 @@ mod quantize_validation_tests {
         let _ = sq.quantize(&out_of_bounds)?;
         assert!((sq.drift_ratio() - 0.5).abs() < f32::EPSILON);
 
-        Ok(())
-    }
-
-    #[test]
-    fn test_sq8_theoretical_error_bound_property() -> contextra_types::Result<()> {
-        let dim = 4;
-        let batch = [
-            [-10.0, 0.0, 50.0, 100.0].as_slice(),
-            [10.0, 100.0, 150.0, 200.0].as_slice(),
-        ];
-        let sq = ScalarQuantizer::try_train(&batch, dim)?;
-
-        let test_vec = [0.0, 50.0, 100.0, 150.0];
-        let q = sq.quantize(&test_vec)?;
-        let deq = sq.dequantize(&q)?;
-
-        for i in 0..dim {
-            let max_bound = sq.max_reconstruction_error_per_dim(i).unwrap();
-            let actual_err = (test_vec[i] - deq[i]).abs();
-            assert!(
-                actual_err <= max_bound + 1e-5,
-                "Dim {i}: error {actual_err} exceeds bound {max_bound}"
-            );
-        }
         Ok(())
     }
 }

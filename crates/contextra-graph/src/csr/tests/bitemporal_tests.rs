@@ -1,8 +1,3 @@
-//! Bitemporale Transaktionstests für den CSR-Graphen.
-//!
-//! # Zweck
-//! Validiert Zeitreise-Abfragen und MVCC-Snapshot-Isolation basierend auf `TxId`.
-
 use super::super::*;
 use crate::csr::inner::GraphInner;
 use crate::csr::types::{CsrGraphConfig, EdgeType};
@@ -11,7 +6,6 @@ use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-001]
 #[tokio::test]
 async fn test_rcu_snapshot_isolation_no_torn_reads() {
     let graph = Arc::new(CsrGraph::new());
@@ -87,7 +81,6 @@ async fn test_rcu_snapshot_isolation_no_torn_reads() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-002]
 #[tokio::test]
 async fn test_rcu_concurrent_readers_never_block_during_compaction() {
     let graph = Arc::new(CsrGraph::with_config(CsrGraphConfig {
@@ -179,7 +172,6 @@ async fn test_rcu_concurrent_readers_never_block_during_compaction() {
 /// CONTRACT STUB: Demonstrates downstream PPR / Graph search access contract.
 /// Follow-up agents updating `ppr.rs` or `search.rs` consume `graph.inner_read()`.
 /// Read-your-own-write consistency requires inspecting both snapshot and uncompacted pending buffers.
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-003]
 #[tokio::test]
 async fn test_ppr_read_contract_stub() {
     let graph = CsrGraph::new();
@@ -219,7 +211,6 @@ async fn test_ppr_read_contract_stub() {
     assert_eq!(consume_ppr_inner(&snapshot), 2);
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-004]
 #[tokio::test]
 async fn test_source_doc_id_provenance_and_compact_isolation() {
     let graph = Arc::new(CsrGraph::new());
@@ -317,7 +308,6 @@ async fn test_source_doc_id_provenance_and_compact_isolation() {
     }
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-005]
 #[test]
 fn test_hyperedge_insertion_and_lookup() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -343,7 +333,6 @@ fn test_hyperedge_insertion_and_lookup() {
     assert_eq!(e2_hes, vec![he_id]);
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-006]
 #[test]
 fn test_hyperedge_multiple_participants() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -372,7 +361,6 @@ fn test_hyperedge_multiple_participants() {
     }
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-007]
 #[test]
 fn test_entity_multiple_hyperedges() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -409,7 +397,6 @@ fn test_entity_multiple_hyperedges() {
     assert!(hes.contains(&HyperEdgeId(2)));
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-008]
 #[test]
 fn test_hyperedge_nonexistent_entity() {
     use crate::hyperedge::HyperEdgeId;
@@ -424,7 +411,6 @@ fn test_hyperedge_nonexistent_entity() {
     assert!(he.is_none());
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-009]
 #[test]
 fn test_hyperedge_memory_estimation() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -454,7 +440,6 @@ fn test_hyperedge_memory_estimation() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-010]
 #[tokio::test]
 async fn test_hyperedge_rcu_concurrent_compaction_consistency() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -511,7 +496,6 @@ async fn test_hyperedge_rcu_concurrent_compaction_consistency() {
     assert!(r2.is_ok());
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-011]
 #[tokio::test]
 async fn test_hyperedge_doc_and_entity_rcu_atomicity() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};

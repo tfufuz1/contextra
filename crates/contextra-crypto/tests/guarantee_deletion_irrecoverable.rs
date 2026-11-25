@@ -1,9 +1,3 @@
-#![cfg(feature = "legacy-erasure")]
-//! # Integrationstest: `guarantee_deletion_irrecoverable.rs`
-//!
-//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `guarantee_deletion_irrecoverable`.
-//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
-
 // FILE-CONTEXT
 // ZWECK: Unabhängiger Funktionsnachweis für Garantie 2b: Löschung ist nicht rückholbar und der Nachweis ist extern prüfbar.
 // INVARIANTEN: INV-DELETION-1 (Proof-Erstellung erst nach physikalischer Bereinigung), AES-256 KEK-Vernichtung, Ed25519 V3 Audit-Verifikation.
@@ -142,7 +136,7 @@ fn test_scenario_1_tenant_shredding_and_isolation() {
     assert!(registry.is_group_active(tenant_b_group));
 
     // "Delete" Tenant A (Schlüsselvernichtung über die öffentliche API)
-    let revoked = registry.revoke_group(tenant_a_group).expect("revoke_group");
+    let revoked = registry.revoke_group(tenant_a_group).unwrap();
     assert!(
         revoked,
         "Public API revoke_group(tenant_a) must return true for active group"
@@ -221,7 +215,7 @@ fn test_scenario_2_key_derivation_boundary_and_reconstruction_check() {
         .expect("Initial get_or_derive must succeed");
 
     // Löschung / Revocation
-    let revoked = registry.revoke_group(tenant_id).expect("revoke_group");
+    let revoked = registry.revoke_group(tenant_id).unwrap();
     assert!(revoked, "Revocation of tenant_id 999 must succeed");
 
     // Versuche Schlüssel nach Löschung neu abzuleiten
@@ -257,8 +251,8 @@ fn test_scenario_3_deletion_proof_v3_creation_and_exhaustive_mutation_test() {
 
     let deleted_keys = vec![b"doc_key_1".to_vec(), b"doc_key_2".to_vec()];
     let cleanup_proofs = vec![
-        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-        LayerCleanupProof::for_test(DeletionLayer::SsTableAllLevels),
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0).unwrap(),
     ];
 
     let proof = DeletionProof::create_full_v3(
@@ -348,8 +342,8 @@ fn test_repro_bug_graph_repair_omitted_from_v3_signature() {
     };
 
     let cleanup_proofs = vec![
-        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-        LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
     ];
 
     let graph_repair = vec![GraphRepairAttestation {
@@ -396,9 +390,13 @@ fn test_scenario_4_independent_external_verification_and_tempfile() {
 
     let deleted_keys = vec![b"tenant_wide_key_a".to_vec(), b"tenant_wide_key_b".to_vec()];
     let cleanup_proofs = vec![
-        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-        LayerCleanupProof::for_test(DeletionLayer::SsTableAllLevels),
-        LayerCleanupProof::for_test(DeletionLayer::WalAllSegments { seq_after: 100 }),
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0).unwrap(),
+        LayerCleanupProof::new_after_verified_empty(
+            DeletionLayer::WalAllSegments { seq_after: 100 },
+            0,
+        )
+        .unwrap(),
     ];
 
     let proof = DeletionProof::create_full_v3(

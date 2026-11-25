@@ -25,7 +25,6 @@ use parking_lot::Mutex;
 /// Ein gepufferter Co-Occurrence-Update: zwei ko-aktivierte Entitäten.
 #[cfg(feature = "edge-reinforcement-learning")]
 #[derive(Debug, Clone)]
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-001]
 pub struct CooccurrenceSignal {
     pub from: EntityId,
     pub to: EntityId,
@@ -35,7 +34,6 @@ pub struct CooccurrenceSignal {
 /// Ein gepufferter Traversal-Update: eine traversierte Kante mit Pfadlänge.
 #[cfg(feature = "edge-reinforcement-learning")]
 #[derive(Debug, Clone)]
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-002]
 pub struct TraversalSignal {
     pub from: EntityId,
     pub to: EntityId,
@@ -49,7 +47,6 @@ pub struct TraversalSignal {
 /// via `flush_to_graph`.
 #[cfg(feature = "edge-reinforcement-learning")]
 #[derive(Debug, Default)]
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-003]
 pub struct EdgeReinforcementBuffer {
     cooccurrence: Mutex<Vec<CooccurrenceSignal>>,
     traversal: Mutex<Vec<TraversalSignal>>,
@@ -57,14 +54,12 @@ pub struct EdgeReinforcementBuffer {
 
 #[cfg(feature = "edge-reinforcement-learning")]
 impl EdgeReinforcementBuffer {
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-004]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Fügt ein Co-Occurrence-Signal hinzu (ko-aktivierte Entitäten in derselben
     /// Retrieval-Session). Kann von mehreren Threads gleichzeitig aufgerufen werden.
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-005]
     pub fn push_cooccurrence(&self, from: EntityId, to: EntityId, co_activation: f32) {
         self.cooccurrence.lock().push(CooccurrenceSignal {
             from,
@@ -74,7 +69,6 @@ impl EdgeReinforcementBuffer {
     }
 
     /// Fügt ein Traversal-Signal hinzu (traversierte Kante mit Pfadlänge).
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-006]
     pub fn push_traversal(&self, from: EntityId, to: EntityId, path_length: usize) {
         self.traversal.lock().push(TraversalSignal {
             from,
@@ -84,13 +78,11 @@ impl EdgeReinforcementBuffer {
     }
 
     /// Gibt die Anzahl der gepufferten Co-Occurrence-Signale zurück (für Monitoring).
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-007]
     pub fn cooccurrence_count(&self) -> usize {
         self.cooccurrence.lock().len()
     }
 
     /// Gibt die Anzahl der gepufferten Traversal-Signale zurück (für Monitoring).
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-008]
     pub fn traversal_count(&self) -> usize {
         self.traversal.lock().len()
     }
@@ -99,7 +91,6 @@ impl EdgeReinforcementBuffer {
     ///
     /// Wird ausschließlich vom `MaintenanceScheduler::run_tick()` aufgerufen.
     /// Nach Abschluss sind `cooccurrence` und `traversal` leer.
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-009]
     pub fn flush_to_graph(&self, graph: &CsrGraph, config: &EdgeReinforcementConfig) {
         use crate::edge_reinforcement::{
             apply_cooccurrence_reinforcement, apply_traversal_reinforcement,
@@ -138,9 +129,14 @@ impl EdgeReinforcementBuffer {
 
         inner.sync_edge_reinforcement_weights(config);
 
+        let remaining_cooccurrence = self.cooccurrence_count();
+        let remaining_traversal = self.traversal_count();
+
         tracing::debug!(
             cooccurrence_applied = cooccurrence_signals.len(),
             traversal_applied = traversal_signals.len(),
+            remaining_cooccurrence = remaining_cooccurrence,
+            remaining_traversal = remaining_traversal,
             "F-03 EdgeReinforcementBuffer: flush_to_graph abgeschlossen"
         );
     }
@@ -151,7 +147,6 @@ mod tests {
     use super::*;
     use contextra_types::EntityId;
 
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-010]
     #[test]
     fn test_push_and_count() {
         let buf = EdgeReinforcementBuffer::new();
@@ -161,7 +156,6 @@ mod tests {
         assert_eq!(buf.traversal_count(), 1);
     }
 
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-011]
     #[test]
     fn test_flush_empties_buffer() {
         // Smoke-Test: flush auf einem leeren CsrGraph darf nicht paniken.
@@ -175,7 +169,6 @@ mod tests {
         assert_eq!(buf.cooccurrence_count(), 0); // Buffer geleert
     }
 
-    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-012]
     #[tokio::test]
     async fn test_flush_with_populated_graph_edges() {
         use crate::csr::CsrGraph;

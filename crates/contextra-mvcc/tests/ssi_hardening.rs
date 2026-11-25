@@ -1,8 +1,4 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-HARDENING-ROOT]
-//! # Härtungs- und Concurrency-Tests für Serializable Snapshot Isolation (SSI)
-//!
-//! Prüft Pruning-Mechanik, atomares Validate-and-Record, Fail-Closed-Verhalten
-//! bei alten Snapshots und Shard-übergreifendes Wasserstand-Tracking.
+//! Hardening and concurrency tests for Serializable Snapshot Isolation (SSI) pruning, limits, and watermarks.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -13,7 +9,6 @@ use contextra_mvcc::types::TxId;
 use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
-// Prüft die strikte Atomarität von validate_and_record unter nebenläufiger Thread-Verschränkung.
 #[test]
 fn test_validate_and_record_atomicity() {
     for _ in 0..500 {
@@ -54,7 +49,6 @@ fn test_validate_and_record_atomicity() {
     }
 }
 
-// Prüft die genaue Funktionsweise von prune_through und das Entfernen historischer Sequenzen.
 #[test]
 fn test_prune_through_mechanics() {
     let validator = SequenceLogSsiValidator::new();
@@ -76,7 +70,6 @@ fn test_prune_through_mechanics() {
     assert_eq!(validator.pruned_through(), 20);
 }
 
-// Prüft das Fail-Closed-Verhalten: Transaktionen mit Snapshots älter als pruned_through werden deterministisch abgewiesen.
 #[test]
 fn test_fail_closed_validation() {
     let validator = SequenceLogSsiValidator::new();
@@ -103,7 +96,6 @@ fn test_fail_closed_validation() {
     assert!(res_valid.is_ok());
 }
 
-// Prüft die Ermittlung des kleinsten Lese-Snapshots über mehrere Shards hinweg.
 #[test]
 fn test_min_read_snapshot_across_shards() {
     let buffer = TxBuffer::<String>::new_with_config(64, Duration::from_secs(30));
@@ -127,7 +119,6 @@ fn test_min_read_snapshot_across_shards() {
     assert_eq!(buffer.min_read_snapshot(), None);
 }
 
-// Prüft die Durchsetzung von max_keys bei try_register_read und das Aktualisieren bestehender Schlüssel.
 #[test]
 fn test_try_register_read_limit_and_updates() {
     let buffer = TxBuffer::<String>::new();
@@ -155,7 +146,6 @@ fn test_try_register_read_limit_and_updates() {
 }
 
 proptest::proptest! {
-    // Eigenschaftstest: Verifiziert, dass Bereinigungen unterhalb des Wasserstands die Validierung oberhalb unberührt lassen.
     #[test]
     fn prop_prune_equivalence_above_watermark(
         commits in proptest::collection::vec((proptest::collection::vec(0..255u8, 1..8), 1..100u64), 1..30),

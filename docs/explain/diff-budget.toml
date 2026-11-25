@@ -1,0 +1,8 @@
+title = "Diff-Größenbudget"
+what = "Der PR überschreitet das maximal zulässige Diff-Budget an Zeilen oder Dateien."
+why = "Große PRs senken die Review-Qualität und erhöhen das Risiko unentdeckter Regressionen massiv."
+fix = "Teile den PR in kleinere, fokussierte Inkremente auf."
+anti_fix = "Füge keine Ausnahmeregeln hinzu, um das Limit für diesen PR hochzusetzen."
+adr = ["ADR-035"]
+related = ["claims-in-pr", "risk"]
+sources = ["CONSTITUTION.md"]

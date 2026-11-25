@@ -1,0 +1,8 @@
+title = "Ratchet-Prinzip (Keine Verschlechterung)"
+what = "Eine Zählermetrik (z. B. Unwraps, technische Schulden) hat sich verschlechtert."
+why = "Das Ratchet-System erlaubt nur Verbesserungen oder Gleichstand der Metrikwerte, um schleichende Degeneration zu verhindern."
+fix = "Reduziere die Anzahl der betroffenen Stellen oder behebe zusätzliche Funde im selben PR."
+anti_fix = "Erhöhe nicht die Maximalschwelle in der Konfigurationsdatei."
+adr = ["ADR-035", "ADR-096"]
+related = ["gate-weakening", "debt-audit"]
+sources = ["docs/gates/unwrap-ratchet-removal-status.md", "AGENTS.md"]

@@ -1,13 +1,7 @@
-//! End-to-End-Integrationstest für den vollständigen CSR-Graphlebenszyklus.
-//!
-//! # Zweck
-//! Deckt den Ablauf aus Knotenregistrierung, Kantenmutation, PageRank und Persistenz ab.
-
 use contextra_graph::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
 
-// ANCHOR[contextra-graph:TESTS-INTEGRATION-GRAPH-001]
 #[tokio::test]
 async fn test_graph_integration_pipeline() {
     let graph = CsrGraph::new();
@@ -50,7 +44,6 @@ async fn test_graph_integration_pipeline() {
     );
 }
 
-// ANCHOR[contextra-graph:TESTS-INTEGRATION-GRAPH-002]
 #[tokio::test]
 async fn test_temporal_graph_time_travel() {
     let graph = CsrGraph::new();
@@ -88,7 +81,6 @@ async fn test_temporal_graph_time_travel() {
     assert!(res2.is_empty(), "Kante muss bei as_of=tx2 abgelaufen sein");
 }
 
-// ANCHOR[contextra-graph:TESTS-INTEGRATION-GRAPH-003]
 #[tokio::test]
 async fn test_bitemporal_graph_time_travel_integration() {
     let graph = CsrGraph::new();

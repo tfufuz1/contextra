@@ -1,21 +1,6 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::disallowed_methods,
-    clippy::disallowed_types,
-    clippy::indexing_slicing,
-    clippy::cast_sign_loss,
-    clippy::cast_possible_truncation,
-    clippy::await_holding_lock
-)]
-//! # Integrationstest: Fehlerpfade und Randwertverhalten
-//!
-//! Prüft das Verhalten bei ungültigen Eingaben, Überläufen und Systemfehlern.
-
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_checkpoint::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_checkpoint::contextra_types::{ContextraError, Result, TxId};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

@@ -1,0 +1,27 @@
+{
+  "generated_at": "20260916T114830Z",
+  "head": "7c282c7d",
+  "mode": "full",
+  "test_backend": "cargo test",
+  "all_passed": false,
+  "crates": [
+    {"name":"contextra-core-ipc-gen","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"contextra-core","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-store","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-index","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-db","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-text","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-checkpoint","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"contextra-crypto","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"contextra-graph","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"contextra-embed","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"contextra-mcp","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"contextra-agent","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-ollama","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-router","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-calibration","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-bench","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-candle","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"contextra-sandbox","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"}
+  ]
+}

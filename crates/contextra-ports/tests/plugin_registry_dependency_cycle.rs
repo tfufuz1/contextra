@@ -1,4 +1,4 @@
-#![allow(clippy::needless_range_loop, clippy::indexing_slicing)]
+#![allow(clippy::needless_range_loop)]
 
 //! Property tests for `PluginRegistry` dependency cycle detection and topological resolution (INV-PLUGIN-DEPENDENCY).
 

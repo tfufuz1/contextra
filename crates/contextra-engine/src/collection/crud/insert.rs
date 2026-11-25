@@ -1,16 +1,8 @@
-//! # Modul: insert.rs
-//!
-//! **Zweck:** Einfügepfad für Dokumente mit automatischer Text-, Vektor- und Graph-Indizierung.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
-
 use super::auto_extraction::auto_extract_and_relate;
 use super::internal::{validate_doc_id, validate_embedding};
 use crate::collection::{
     ensure_importance_metadata, extract_text, Collection, StoredDocument, StoredDocumentMeta,
 };
-use crate::metrics_names::{record_histogram_safe, INSERT_LATENCY};
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, EntityId, Result, TxId, EXPIRY_METADATA_KEY};
 
@@ -24,11 +16,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         mut metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         let embedding = {
-            let embedder = self.embedder().ok_or_else(|| {
-                contextra_types::ContextraError::Internal(
-                    "No embedder configured for this collection".into(),
-                )
-            })?;
+            let embedder = {
+                let guard = self.embedder.read();
+                guard
+                    .as_ref()
+                    .ok_or_else(|| {
+                        contextra_types::ContextraError::Internal(
+                            "No embedder configured for this collection".into(),
+                        )
+                    })?
+                    .clone()
+            };
             embedder.embed(text).await?
         };
 
@@ -66,11 +64,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         mut metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         let embedding = {
-            let embedder = self.embedder().ok_or_else(|| {
-                contextra_types::ContextraError::Internal(
-                    "No embedder configured for this collection".into(),
-                )
-            })?;
+            let embedder = {
+                let guard = self.embedder.read();
+                guard
+                    .as_ref()
+                    .ok_or_else(|| {
+                        contextra_types::ContextraError::Internal(
+                            "No embedder configured for this collection".into(),
+                        )
+                    })?
+                    .clone()
+            };
             embedder.embed(text).await?
         };
 
@@ -194,7 +198,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         embedding: &[f32],
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
-        let start_nanos = self.clock().monotonic_nanos();
         if id.is_empty() {
             return Err(contextra_types::ContextraError::invalid_input(
                 "Document ID cannot be empty",
@@ -220,25 +223,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             Ok(_) => {
                 db_tx.commit().await?;
                 self.check_and_trigger_community_detection(1);
-                let elapsed = (self.clock().monotonic_nanos().saturating_sub(start_nanos)) as f64
-                    / 1_000_000_000.0;
-                record_histogram_safe(
-                    self.metrics_sink().as_ref(),
-                    INSERT_LATENCY,
-                    elapsed,
-                    &[("status", "success")],
-                );
                 Ok(())
             }
             Err(e) => {
-                let elapsed = (self.clock().monotonic_nanos().saturating_sub(start_nanos)) as f64
-                    / 1_000_000_000.0;
-                record_histogram_safe(
-                    self.metrics_sink().as_ref(),
-                    INSERT_LATENCY,
-                    elapsed,
-                    &[("status", "error")],
-                );
                 if let Err(rollback_err) = db_tx.rollback().await {
                     tracing::error!("[INV-DB-3] Failed to rollback insert: {}", rollback_err);
                 }
@@ -271,8 +258,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(())
     }
 
-    // ANCHOR[contextra-engine:COL-CHE-274]
-    /// Dokumentation für `check_doc_id_collision_tracked` im Rahmen der Collection- und Suchabstraktion.
     pub(crate) async fn check_doc_id_collision_tracked(
         &self,
         tx: TxId,
@@ -300,8 +285,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(())
     }
 
-    // ANCHOR[contextra-engine:COL-INS-301]
-    /// Dokumentation für `insert_op` im Rahmen der Collection- und Suchabstraktion.
     pub async fn insert_op(
         &self,
         db_tx: &crate::transaction::DbTransaction<S, V>,

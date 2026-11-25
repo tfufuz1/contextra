@@ -1,9 +1,8 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::await_holding_lock)]
 // FILE-CONTEXT
 // ZWECK: Unit-Tests für HNSW Persistenz-Schicht.
 
 use super::*;
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 
 #[test]
 fn test_hnsw_header_roundtrip_and_errors() -> Result<()> {
@@ -51,10 +50,9 @@ fn test_node_record_roundtrip_and_errors() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_mmap_index_boundary_checks() -> contextra_types::Result<()> {
+async fn test_mmap_index_boundary_checks() -> contextra_core::Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
-    use contextra_ports::VectorIndex;
-    use contextra_types::{DistanceMetric, DocId, TxId};
+    use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
 
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("bounds_test.hnsw");
@@ -71,7 +69,7 @@ async fn test_mmap_index_boundary_checks() -> contextra_types::Result<()> {
         .insert(tx, DocId::new(1), &[1.0, 2.0, 3.0, 4.0])
         .await?;
     index.commit(tx).await?;
-    index.save(&path)?;
+    index.save(&path).await?;
 
     let mmap_index = MmapIndex::open(&path)?;
 
@@ -88,10 +86,9 @@ async fn test_mmap_index_boundary_checks() -> contextra_types::Result<()> {
 }
 
 #[tokio::test]
-async fn test_mmap_open_async() -> contextra_types::Result<()> {
+async fn test_mmap_open_async() -> contextra_core::Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
-    use contextra_ports::VectorIndex;
-    use contextra_types::{DistanceMetric, DocId, TxId};
+    use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
 
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("test_async.hnsw");
@@ -115,10 +112,10 @@ async fn test_mmap_open_async() -> contextra_types::Result<()> {
     }
     index.commit(tx).await?;
 
-    index.save(&path)?;
+    index.save(&path).await?;
 
     let mmap_index = HnswIndex::try_new(config)?;
-    mmap_index.load_mmap(&path)?;
+    mmap_index.load_mmap(&path).await?;
 
     let query = vec![50.1, 100.2, 150.3, 200.4];
     let search_results = mmap_index.search(&query, 5).await?;
@@ -253,7 +250,7 @@ async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
         ..Default::default()
     };
     let index = HnswIndex::try_new(config)?;
-    index.load_mmap(&path)?;
+    index.load_mmap(&path).await?;
 
     let q = index
         .quantizer()
@@ -267,8 +264,7 @@ async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
 #[tokio::test]
 async fn test_v2_save_load_roundtrip_preserves_per_dim_calibration() -> Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
-    use contextra_ports::VectorIndex;
-    use contextra_types::{DocId, TxId};
+    use contextra_core::{DocId, TxId, VectorIndex};
 
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("v2_roundtrip.hnsw");
@@ -288,10 +284,10 @@ async fn test_v2_save_load_roundtrip_preserves_per_dim_calibration() -> Result<(
     }
     index.commit(tx).await?;
 
-    index.save(&path)?;
+    index.save(&path).await?;
 
     let loaded_index = HnswIndex::try_new(config)?;
-    loaded_index.load_mmap(&path)?;
+    loaded_index.load_mmap(&path).await?;
 
     let q = loaded_index
         .quantizer()

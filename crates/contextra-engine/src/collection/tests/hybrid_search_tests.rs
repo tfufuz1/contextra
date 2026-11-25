@@ -1,14 +1,7 @@
-//! # Modul: hybrid_search_tests.rs
-//!
-//! **Zweck:** Tests für kombinierte Text- und Vektorsuchpfade.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
-
 use super::fixtures::*;
 
 #[tokio::test]
-async fn test_hybrid_search_caps_k_at_max_search_k() {
+async fn hybrid_search_caps_k_at_max_search_k() {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;

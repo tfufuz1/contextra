@@ -1,0 +1,33 @@
+[package]
+name = "contextra-adapt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Adaptive controllers, bandits, and PID regulators for Contextra"
+
+[package.metadata.contextra]
+ring = "0"
+
+[dependencies]
+blake3 = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-types = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[features]
+default = ["bandit-routing", "flow-corrected-thompson"]
+bandit-routing = []
+flow-corrected-thompson = ["bandit-routing"]
+sketched-bandit = ["bandit-routing"]
+rie-greedy-personalization = []
+
+[dev-dependencies]
+proptest = "1.4"
+
+[lints]
+workspace = true
+

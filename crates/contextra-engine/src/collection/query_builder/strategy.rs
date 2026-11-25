@@ -1,10 +1,3 @@
-//! # Modul: strategy.rs
-//!
-//! **Zweck:** Suchstrategien (z.B. Exact, Approximate, Hybrid, Rerank).
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
-
 use contextra_types::{FusionStrategy, GraphTraversalStrategy, SignalFusionStrategies};
 
 /// Strategy for hybrid search and graph signal traversal.

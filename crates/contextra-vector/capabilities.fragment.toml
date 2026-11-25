@@ -1,4 +1,0 @@
-[crates.contextra-vector]
-klasse = "A"
-may_depend_on = []          # Autarker Baustein der Klasse A (Soll nach Abschluss von Welle 6)
-transitional = ["ports-compat"]  # Features/Kanten mit internen Deps, Entfernung in Welle 6

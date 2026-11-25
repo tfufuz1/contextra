@@ -2,8 +2,7 @@
 
 #![cfg(feature = "experimental-diskann")]
 
-use contextra_ports::VectorIndex;
-use contextra_types::{ContextraError, DistanceMetric, DocId};
+use contextra_core::{ContextraError, DistanceMetric, DocId, VectorIndex};
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
 
 async fn setup_test_index(num_vectors: usize) -> (DiskAnnIndex, Vec<Vec<f32>>, tempfile::TempDir) {
@@ -135,7 +134,7 @@ async fn test_diskann_search_filtered_highly_selective() {
 
     // Compute expected brute-force post-filter over full search
     let raw_all = index
-        .search(&query, contextra_types::MAX_SEARCH_K)
+        .search(&query, contextra_core::MAX_SEARCH_K)
         .await
         .expect("search all failed");
 

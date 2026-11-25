@@ -6,17 +6,19 @@ name = "contextra-vector"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version = "1.89"
+rust-version.workspace = true
 description = "HNSW vector index with SIMD distance computation for Contextra"
 
 [package.metadata.contextra]
 ring = "0"
-klasse = "A"
 
 [dependencies]
-contextra-ports = { workspace = true }
-contextra-sys = { workspace = true, optional = true }
 contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-core = { workspace = true }
+contextra-crypto = { workspace = true }
+contextra-simd = { workspace = true }
+contextra-sys = { workspace = true }
 subtle = "2.6"
 ahash = { workspace = true }
 parking_lot = { workspace = true }
@@ -25,32 +27,22 @@ roaring = { workspace = true }
 tracing = { workspace = true }
 memmap2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-zeroize = "1.8"
-thiserror = { workspace = true }
-blake3 = { workspace = true }
 
 [features]
-default = ["std"]
-std = []
-serde = []
-tracing = []
-inspect = []
-experimental = ["experimental-diskann", "experimental-rabitq", "experimental-predicate-augmented-search"]
-mmap = []
-diskann = ["experimental-diskann"]
-quantize-rabitq = ["experimental-rabitq"]
-docid-128 = []
+default = []
+docid-128 = ["contextra-types/docid-128"]
 experimental-diskann = []
 experimental-rabitq = []
 experimental-predicate-augmented-search = []
 graph = []
-# ACHTUNG: partial-index-rebuild aktiviert den lokalen Partial-Rebuild-Pfad (F-02).
-# Gemäß VETOES.md (VETO-F02, bestätigt 2026-11-08) und SPEC §11.4 sind Tombstone-Pruning,
-# sofortige Slot-Nullung (INV-VEC-ZEROIZE-1) und inkrementeller Neuaufbau unter Erhalt
-# der Konnektivität (INV-VEC-CONNECTIVITY-1) zulässig. Slots werden erst nach Rebuild
-# wiederverwendet (INV-HNSW-SLOT-1). NICHT als default-Feature aktivieren bis
+# ACHTUNG: partial-index-rebuild aktiviert F-02 (Partial HNSW Rebuild), das gegen ein
+# dokumentiertes Architektur-Veto verstößt (siehe VETOES.md, falls vorhanden, sonst
+# docs/decisions/ nach "Nucleation" durchsuchen). Der aktuelle rebuild_region()
+# implementiert reines Tombstone-Pruning ohne Re-Wiring — Risiko: Grad-Verlust ohne
+# Navigierbarkeits-Wiederherstellung. NICHT als default-Feature aktivieren bis
 # test_partial_rebuild_recall_regression() in crates/contextra-vector/tests/partial_rebuild_recall_regression.rs
-# für > 30 Tage stabil grün ist UND ein ADR die Freigabe als Standard-Pfad bestätigt.
+# für > 30 Tage stabil grün ist UND ein ADR das ursprüngliche Veto explizit revidiert oder
+# bestätigt einschränkt.
 partial-index-rebuild = []
 
 [dev-dependencies]

@@ -6,19 +6,17 @@ name = "contextra-sys"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version = "1.89"
+rust-version.workspace = true
 description = "Low-level unsafe system abstractions and FFI island for Contextra (Ring 0)"
 
 [package.metadata.contextra]
 ring = "0"
-klasse = "A"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_Security_Authorization",
-    "Win32_Storage_FileSystem",
     "Win32_System_Memory",
     "Win32_System_Threading",
 ] }
@@ -28,13 +26,4 @@ libc = "0.2"
 
 [dependencies]
 memmap2 = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }
-
-[dev-dependencies]
-criterion = { version = "0.5", features = ["async_tokio"] }
-tempfile = "3"
-
-[[bench]]
-name = "sys_bench"
-harness = false

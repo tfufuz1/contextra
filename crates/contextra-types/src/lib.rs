@@ -1,75 +1,28 @@
 #![deny(dead_code)]
-//! `Contextra` Types — Kanonische Domänenmodelle, Identifikatoren, Budgets, Filter und Fehlertypen.
+//! `Contextra` Types — Canonical domain models, IDs, budgets, filters, and error types.
 //!
-//! # Architektur-Rolle: Ring 0 (Typen-Kern)
+//! # Architecture Role (Ring 0)
 //!
-//! Dieses Crate definiert das fundamentale Typfundament für das gesamte Contextra-System.
-//! Gemäß der Ring-0-Architektur (reiner Rechenkern):
-//! - Keine asynchronen Laufzeiten (kein `tokio`).
-//! - Keine direkten I/O- oder Dateisystemabhängigkeiten.
-//! - Kein `unsafe` (`#![forbid(unsafe_code)]`).
-//! - Vollständig deterministische Datenstrukturen und fehlerresistente DTO-Konvertierungen.
-//!
-//! # Einbindung im Workspace
-//!
-//! `contextra-types` ist ein fundamentales Ring-0-Workspace-Mitglied.
-//!
-//! **Abhängigkeiten (ausgehend):**
-//! - Reines Rust mit Basis-Bibliotheken: `serde`, `serde_json`, `bincode`, `ahash`, `blake3`, `sha2`, `bytes`, `thiserror`.
-//! - Keine Abhängigkeiten zu anderen Contextra-Crates.
-//!
-//! **Wird eingebunden von (eingehend, 30 Crates):**
-//! - `contextra`, `contextra-adapt`, `contextra-agent`, `contextra-audit-export`, `contextra-agreement-generator`,
-//!   `contextra-checkpoint`, `contextra-cognition`, `contextra-crypto`, `contextra-db`,
-//!   `contextra-engine`, `contextra-graph`, `contextra-infer-candle`, `contextra-infer-ollama`,
-//!   `contextra-infer-onnx`, `contextra-ingest`, `contextra-kvcache`, `contextra-license`, `contextra-mcp`,
-//!   `contextra-mvcc`, `contextra-ports`, `contextra-privacy`, `contextra-py`, `contextra-rank`,
-//!   `contextra-router`, `contextra-simd`, `contextra-store`, `contextra-testkit`, `contextra-text`,
-//!   `contextra-vector`.
+//! This crate defines the foundational types and errors for the entire `Contextra` system.
+//! In accordance with the Ring-0 architecture, this crate has NO asynchronous runtimes
+//! and NO I/O dependencies.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![allow(ambiguous_glob_reexports)]
 
-// ANCHOR[contextra-types:MOD-ERR]
-/// Fehlertypen und Fehler-Hierarchie für Contextra.
 pub mod error;
-// ANCHOR[contextra-types:MOD-DTO]
-/// Serialisierbare Data-Transfer-Objects (DTO) für fehlerresistente Schnittstellenübertragung.
 pub mod error_dto;
-// ANCHOR[contextra-types:MOD-FP]
-/// Kryptografische Modell-Fingerabdrücke zur Validierung von Embedding- und Inferenz-Konfigurationen.
 pub mod model_fingerprint;
-// ANCHOR[contextra-types:MOD-RET]
-/// Retrieval-Strategien und Routing-Optionen für die hybride Suche.
 pub mod retrieval_strategy;
-// ANCHOR[contextra-types:MOD-SCH]
-/// Manifest-Schemaversionen und Dokument-ID-Breitenkonfigurationen.
 pub mod schema;
-// ANCHOR[contextra-types:MOD-TS]
-/// Mandantenspezifische Wrapper-Typen zur Durchsetzung strikter Mandantenisolation.
 pub mod tenant_scope;
-// ANCHOR[contextra-types:MOD-TOMB]
-/// Bitmaskenbasierte Tombstones (Löschmarker) für Multi-Version-Concurrency-Control (MVCC).
 pub mod tombstone;
-// ANCHOR[contextra-types:MOD-TYP]
-/// Zentrale Domänentypen, Filter, Budgets, Scoring-Funktionen und SAOS-Suchstrukturen.
 pub mod types;
-// ANCHOR[contextra-types:MOD-WIT]
-/// Audit-Trails, Zeugnisse (Witnesses) und Saga-Transaktionsaufzeichnungen.
-pub mod erasure;
-pub mod ids;
-pub mod refs;
-pub mod witness;
 
-#[allow(deprecated)]
-pub use erasure::*;
-#[allow(deprecated)]
-pub use ids::{ErasureId, FileId, GateId, Seq, StoreId, Timestamp};
-pub use refs::{CollectionRef, DocKey, OperatorRef, SubjectRef, TenantRef, MAX_REF_LEN};
+pub use types::math;
 
-#[allow(deprecated)]
-pub use error::{ContextraError, HnswDeletionError, Result};
+pub use error::{ContextraError, Result};
 pub use error_dto::ContextraErrorDto;
 pub use model_fingerprint::ModelFingerprint;
 pub use retrieval_strategy::RetrievalStrategy;
@@ -77,5 +30,3 @@ pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use types::*;
-#[allow(deprecated)]
-pub use witness::{RequestContext, SagaRecord, ScanMethod};

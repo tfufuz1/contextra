@@ -1,4 +1,3 @@
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-PERSIST-001]
 //! Persistenz-Hilfsmethoden für CsrGraph.
 //!
 //! # Ring-0 Reinheit (R-03)

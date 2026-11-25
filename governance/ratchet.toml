@@ -1,0 +1,12 @@
+unwrap_legacy_grep = 1175
+unwrap_exact = 502
+expect_exact = 242
+allow_attrs = 214
+ignore_attrs = 1
+forbid_unsafe_crates = 30
+
+[unsafe_blocks]
+contextra-crypto = 0
+contextra-simd = 285
+contextra-sys = 30
+contextra-wire = 27

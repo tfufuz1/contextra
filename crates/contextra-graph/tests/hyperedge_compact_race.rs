@@ -1,8 +1,3 @@
-//! Nebenläufigkeitstest für Hyperkantenkompaktierung unter parallelen Schreibzugriffen.
-//!
-//! # Zweck
-//! Beweist Race-Condition-Freiheit zwischen Hintergrundkompaktierern und aktiven Graphmutanten.
-
 #![expect(clippy::unwrap_used)]
 
 use contextra_graph::csr::{CsrGraph, EdgeType};
@@ -14,7 +9,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::thread;
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-COMPACT-RACE-001]
 #[test]
 fn test_hyperedge_compact_race() {
     let graph = Arc::new(CsrGraph::new());

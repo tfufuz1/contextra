@@ -1,22 +1,8 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::disallowed_methods,
-    clippy::disallowed_types,
-    clippy::indexing_slicing,
-    clippy::cast_sign_loss,
-    clippy::cast_possible_truncation,
-    clippy::await_holding_lock,
-    clippy::type_complexity
-)]
-//! # Integrationstest: Korrektheit von Time-Travel-Wiederherstellungen
-//!
-//! Verifiziert das Zurücksetzen von Speicherzuständen auf historische Checkpoint-Stände.
+#![allow(clippy::type_complexity)]
 
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_checkpoint::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_checkpoint::contextra_types::{Result, TxId};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
@@ -693,17 +679,17 @@ async fn test_concurrent_two_session_rollback_race_stress_100_iterations() {
 
             // Verify checksum matches
             if storage_a.user_state_checksum() != checksum_a_base {
-                return Err(contextra_checkpoint::contextra_types::ContextraError::Internal(format!(
+                return Err(contextra_types::ContextraError::Internal(format!(
                     "Alpha checksum mismatch in stress iteration {iter}"
                 )));
             }
             if storage_b.user_state_checksum() != checksum_b_base {
-                return Err(contextra_checkpoint::contextra_types::ContextraError::Internal(format!(
+                return Err(contextra_types::ContextraError::Internal(format!(
                     "Beta checksum mismatch in stress iteration {iter}"
                 )));
             }
 
-            Ok::<(), contextra_checkpoint::contextra_types::ContextraError>(())
+            Ok::<(), contextra_types::ContextraError>(())
         });
     }
 

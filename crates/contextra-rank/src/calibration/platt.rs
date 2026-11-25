@@ -1,15 +1,9 @@
-//! # Platt-Scaling / Logistische Kalibrierung (`platt`)
-//!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
-//!
-//! Implementiert das parametrische Platt-Scaling (`sigmoid(A * logit + B)`).
-//! Dient der Umrechnung von Logits in Wahrscheinlichkeiten via Kreuzentropie-Minimierung.
+//! Platt-Scaling (Logistic Calibration): `sigmoid(A * logit + B)`.
 
-use crate::local_types::ConfigFingerprint;
+use contextra_types::ConfigFingerprint;
 
 /// Platt Scaler for parametric logit/score calibration.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-/// Parametrischer Kalibrierer nach Platt (1999).
 pub struct PlattScaler {
     a: f32,
     b: f32,
@@ -23,11 +17,8 @@ impl Default for PlattScaler {
 }
 
 impl PlattScaler {
-    /// Creates a new `PlattScaler` with specified parameters `a` and `b`. Falls back to identity if non-finite.
+    /// Creates a new `PlattScaler` with specified parameters `a` and `b`.
     pub fn new(a: f32, b: f32) -> Self {
-        if !a.is_finite() || !b.is_finite() {
-            return Self::identity();
-        }
         Self {
             a,
             b,
@@ -54,6 +45,15 @@ impl PlattScaler {
         !self.is_identity()
     }
 
+    /// Constructs a `SignalCalibrationContext` for this scaler.
+    pub fn calibration_context(
+        &self,
+        signal_name: impl Into<String>,
+        drift_status: crate::drift::DriftStatus,
+    ) -> crate::fusion::SignalCalibrationContext {
+        crate::fusion::SignalCalibrationContext::new(signal_name, self.is_fitted(), drift_status)
+    }
+
     /// Returns current parameters `(a, b)`.
     pub fn params(&self) -> (f32, f32) {
         (self.a, self.b)
@@ -70,21 +70,20 @@ impl PlattScaler {
     }
 
     /// Applies Platt Scaling `sigmoid(A * logit + B)`.
-    /// Führt die logistische Transformation `sigmoid(A * logit + B)` aus.
     pub fn transform(&self, logit: f32) -> f32 {
-        if !logit.is_finite() {
+        if logit.is_nan() {
             return 0.5;
+        }
+        if !self.is_fitted() {
+            let z = logit;
+            return 1.0 / (1.0 + (-z).exp());
         }
         let z = self.a * logit + self.b;
-        if !z.is_finite() {
-            return 0.5;
-        }
         1.0 / (1.0 + (-z).exp())
     }
 
     /// Resets scaler to identity if ConfigFingerprint changes (P8 Compliance).
-    pub fn invalidate_on_config_change(&mut self, new_fingerprint: impl Into<ConfigFingerprint>) {
-        let new_fingerprint = new_fingerprint.into();
+    pub fn invalidate_on_config_change(&mut self, new_fingerprint: ConfigFingerprint) {
         if self.fingerprint.as_ref() != Some(&new_fingerprint) {
             tracing::warn!(
                 old_fp = ?self.fingerprint,
@@ -99,7 +98,6 @@ impl PlattScaler {
 
     /// Fits parameters `A` and `B` via Negative Log-Likelihood minimization with L2 regularization
     /// and target smoothing (Platt, 1999).
-    /// Trainiert die Parameter A und B anhand von Beobachtungen mittels Gradientenabstieg.
     pub fn fit(observations: &[(f32, bool)]) -> Self {
         let valid_obs: Vec<(f32, bool)> = observations
             .iter()

@@ -1,14 +1,3 @@
-//! # Haupt-Verschlüsselungs- und Schlüsselverwaltungskomponente (`crypto.rs`)
-//!
-//! Stellt den zentralen [`KeyManager`] bereit, der Master-Schlüssel verwaltet,
-//! dateispezifische Unterschlüssel ableitet und AEAD-Operationen durchführt.
-//!
-//! ## Invarianten
-//! - Pro Datei/Segment wird via HKDF-Expand ein isolierter Teilschlüssel generiert.
-//! - Nonces bestehen aus Präfix und Zufalls-Suffix, um Nonce-Reuse auszuschließen.
-//! - Bei Speicherfreigabe (`Drop`) werden alle Schlüsselmaterialien genullt (`Zeroize`).
-//! - Strikte Panic-Freiheit in allen Produktionspfaden.
-
 // FILE-CONTEXT
 // ZWECK: Key Management and AES-256-GCM-SIV authenticated encryption for Contextra data structures.
 // INVARIANTEN: Nonce prefix (4 bytes) + monotonic counter suffix (8 bytes) per encrypt_auto_nonce call. HKDF-Expand per file_id.
@@ -54,14 +43,8 @@ use rand::RngCore;
 use sha2::Sha256;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
-use zeroize::Zeroizing;
 
 /// Manager for encryption keys and block encryption.
-// ANCHOR[contextra-crypto:CRY-002]
-/// Zentraler kryptographischer Schlüsselmanager für symmetrische Verschlüsselung.
-///
-/// Hält den Master-Key im RAM, leitet per HKDF-Expand datei- und mandantenspezifische
-/// Teilschlüssel ab und kapselt symmetrische AEAD-Ver- und Entschlüsselung.
 pub struct KeyManager {
     key: VolatileEncryptionKey,
     cipher_cache: OnceLock<Aes256GcmSiv>,
@@ -147,11 +130,22 @@ impl KeyManager {
         })
     }
 
+    /// Creates a new [`KeyManager`] using Argon2id password-based key derivation with default OWASP parameters.
+    ///
+    /// Generates a default [`KdfHeader`] with a fresh 32-byte salt and derives the master key via Argon2id.
+    /// Returns both the initialized `KeyManager` instance and the generated header for serialization/persistence.
+    pub fn try_new_argon2id(passphrase: &str) -> Result<(Self, KdfHeader)> {
+        let header = KdfHeader::generate_default()?;
+        let km = Self::try_new_with_kdf(passphrase, &header)?;
+        Ok((km, header))
+    }
+
     /// Creates a new KeyManager with a cryptographically secure random salt.
     pub fn try_new_random_salt(passphrase: &str) -> Result<(Self, [u8; 32])> {
+        let (km, header) = Self::try_new_argon2id(passphrase)?;
         let mut salt = [0u8; 32];
-        rand::rngs::OsRng.fill_bytes(&mut salt);
-        let km = Self::try_new(passphrase, &salt)?;
+        let copy_len = header.salt.len().min(32);
+        salt[..copy_len].copy_from_slice(&header.salt[..copy_len]);
         Ok((km, salt))
     }
 
@@ -169,46 +163,43 @@ impl KeyManager {
                 file_id.len()
             )));
         }
-        // Since self.key is already derived via HKDF in try_new, it is a high-entropy PRK.
-        // We use HKDF-Expand with a domain-separating prefix to derive a per-file key.
-        let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
-            .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
-
-        let mut sub_key = [0u8; 32];
-        // S-2 (präventiv): Einheitliche Längenpräfixierung aller variablen Felder.
-        // Aktuell nur file_id als variables Feld — Präfix jetzt schon, um zukünftige
-        // Erweiterungen (z.B. zweites Feld) ohne diese Falle zu schreiben.
         let mut info = Vec::with_capacity(b"contextra-file-key-v1:".len() + 4 + file_id.len());
         info.extend_from_slice(b"contextra-file-key-v1:");
-        info.extend_from_slice(&(file_id.len() as u32).to_le_bytes());
+        let file_id_len = u32::try_from(file_id.len()).unwrap_or(u32::MAX);
+        info.extend_from_slice(&file_id_len.to_le_bytes());
         info.extend_from_slice(file_id);
 
-        hk.expand(&info, &mut sub_key)
-            .map_err(|e| CryptoError::Crypto(format!("HKDF sub-key expansion failed: {}", e)))?;
+        self.derive_segment_key_bytes(&info)
+    }
 
-        let cipher = Aes256GcmSiv::new_from_slice(&sub_key)
-            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
-        let cipher_cache = OnceLock::new();
-        let _ = cipher_cache.set(cipher);
-
-        let mut nonce_prefix = [0u8; 4];
-        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
-
-        Ok(Self {
-            key: VolatileEncryptionKey::new(sub_key),
-            cipher_cache,
-            nonce_prefix,
-            nonce_counter: AtomicU64::new(1),
-        })
+    /// Derives a sub-key specifically for a KV-cache segment identified by tenant ID and segment ID.
+    ///
+    /// Formats the versioned segment descriptor string and delegates to [`Self::derive_segment_key`].
+    pub fn derive_segment_key_for_id(
+        &self,
+        tenant_id: contextra_types::TenantId,
+        segment_id: u64,
+    ) -> Result<Self> {
+        let info = format!(
+            "contextra-kv-v1-segment-{}-{}",
+            tenant_id.inner(),
+            segment_id
+        );
+        self.derive_segment_key(&info)
     }
 
     /// Derives a sub-key specifically for a KV-cache segment based on a versioned info string.
     pub fn derive_segment_key(&self, info: &str) -> Result<Self> {
+        self.derive_segment_key_bytes(info.as_bytes())
+    }
+
+    /// Derives a sub-key specifically for a KV-cache segment based on raw info bytes.
+    pub fn derive_segment_key_bytes(&self, info_bytes: &[u8]) -> Result<Self> {
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
 
         let mut sub_key = [0u8; 32];
-        hk.expand(info.as_bytes(), &mut sub_key).map_err(|e| {
+        hk.expand(info_bytes, &mut sub_key).map_err(|e| {
             CryptoError::Crypto(format!("HKDF segment key expansion failed: {}", e))
         })?;
 
@@ -240,6 +231,23 @@ impl KeyManager {
         tenant_id: contextra_types::TenantId,
         model_fingerprint: &crate::kv_cipher::ModelFingerprint,
     ) -> Result<Self> {
+        let scoped_fp = contextra_types::TenantScoped::new(tenant_id, model_fingerprint);
+        self.derive_kv_key_scoped(scoped_fp, &tenant_id)
+    }
+
+    /// Derives a sub-key for KV-cache segment encryption with strict compile-time tenant scope enforcement.
+    ///
+    /// Unpacks `scoped_fingerprint` only if the inner bound `TenantId` matches `expected_tenant_id`.
+    /// Returns [`CryptoError::InvalidInput`] if a tenant scope violation occurs.
+    pub fn derive_kv_key_scoped(
+        &self,
+        scoped_fingerprint: contextra_types::TenantScoped<&crate::kv_cipher::ModelFingerprint>,
+        expected_tenant_id: &contextra_types::TenantId,
+    ) -> Result<Self> {
+        let fingerprint = scoped_fingerprint
+            .into_inner_checked(expected_tenant_id)
+            .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
 
@@ -248,8 +256,8 @@ impl KeyManager {
         // RFC 5869 best practice: variable-length fields without separators are ambiguous.
         // Without length prefixes, ("abc", "def") and ("ab", "cdef") produce identical info strings.
         // Encoding: 4-byte LE u32 length prefix for each variable-length field.
-        let model_id_bytes = model_fingerprint.model_id.as_bytes();
-        let quantization_bytes = model_fingerprint.quantization.as_bytes();
+        let model_id_bytes = fingerprint.model_id.as_bytes();
+        let quantization_bytes = fingerprint.quantization.as_bytes();
 
         let mut info = Vec::with_capacity(
             b"contextra-kv-layer-v2:".len()
@@ -259,12 +267,14 @@ impl KeyManager {
                 + 4 + quantization_bytes.len(), // u32 len prefix + data
         );
         info.extend_from_slice(b"contextra-kv-layer-v2:");
-        info.extend_from_slice(&tenant_id.inner().to_le_bytes());
-        info.extend_from_slice(&model_fingerprint.hash);
+        info.extend_from_slice(&expected_tenant_id.inner().to_le_bytes());
+        info.extend_from_slice(&fingerprint.hash);
         // Length-prefixed fields (S-2 fix): u32 LE prefix prevents concatenation ambiguity
-        info.extend_from_slice(&(model_id_bytes.len() as u32).to_le_bytes());
+        let model_id_len = u32::try_from(model_id_bytes.len()).unwrap_or(u32::MAX);
+        let quantization_len = u32::try_from(quantization_bytes.len()).unwrap_or(u32::MAX);
+        info.extend_from_slice(&model_id_len.to_le_bytes());
         info.extend_from_slice(model_id_bytes);
-        info.extend_from_slice(&(quantization_bytes.len() as u32).to_le_bytes());
+        info.extend_from_slice(&quantization_len.to_le_bytes());
         info.extend_from_slice(quantization_bytes);
 
         hk.expand(&info, &mut sub_key)
@@ -286,29 +296,10 @@ impl KeyManager {
         })
     }
 
-    /// Derives a sub-key for KV-cache segment encryption with strict compile-time tenant scope enforcement.
-    ///
-    /// Unpacks `scoped_fingerprint` only if the inner bound `TenantId` matches `expected_tenant_id`.
-    /// Returns [`CryptoError::InvalidInput`] if a tenant scope violation occurs.
-    pub fn derive_kv_key_scoped(
-        &self,
-        scoped_fingerprint: contextra_types::TenantScoped<&crate::kv_cipher::ModelFingerprint>,
-        expected_tenant_id: &contextra_types::TenantId,
-    ) -> Result<Self> {
-        let fingerprint = scoped_fingerprint
-            .into_inner_checked(expected_tenant_id)
-            .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        self.derive_kv_key(*expected_tenant_id, fingerprint)
-    }
-
     /// Derives a tenant-isolated `KeyManager` instance for a specific `TenantId`.
     pub fn cipher_for(&self, tenant_id: contextra_types::TenantId) -> Result<Self> {
-        let dummy_fp = crate::kv_cipher::ModelFingerprint {
-            hash: [0u8; 32],
-            model_id: "default_tenant_cipher".to_string(),
-            quantization: "raw".to_string(),
-        };
-        self.derive_kv_key(tenant_id, &dummy_fp)
+        let scoped = contextra_types::TenantScoped::new(tenant_id, ());
+        self.cipher_for_scoped(scoped, &tenant_id)
     }
 
     /// Derives a tenant-isolated `KeyManager` instance enforcing compile-time `TenantScoped` verification.
@@ -321,7 +312,12 @@ impl KeyManager {
         let _unpacked = scoped_key
             .into_inner_checked(expected_tenant_id)
             .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        self.cipher_for(*expected_tenant_id)
+        let dummy_fp = crate::kv_cipher::ModelFingerprint {
+            hash: [0u8; 32],
+            model_id: "default_tenant_cipher".to_string(),
+            quantization: "raw".to_string(),
+        };
+        self.derive_kv_key(*expected_tenant_id, &dummy_fp)
     }
 
     /// Derives an integrity key for HMAC-SHA256.
@@ -335,7 +331,6 @@ impl KeyManager {
     }
 
     /// Derives a deletion proof signing key for cryptographic deletion verification.
-    #[deprecated(note = "Use contextra-erasure for deletion proofs and attestation signing")]
     pub fn derive_deletion_proof_key(&self) -> Result<[u8; 32]> {
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
@@ -344,6 +339,28 @@ impl KeyManager {
             CryptoError::Crypto(format!("HKDF deletion proof key expansion failed: {}", e))
         })?;
         Ok(key)
+    }
+
+    /// Creates and signs a v2 [`DeletionProof`][crate::deletion_proof::DeletionProof] using a sub-key
+    /// derived specifically for cryptographic deletion proofs via [`Self::derive_deletion_proof_key`].
+    pub fn create_deletion_proof(
+        &self,
+        scope: crate::deletion_proof::DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: contextra_types::TxId,
+        covered_layers: Vec<crate::deletion_proof::LayerCleanupProof>,
+        excluded_scopes: Vec<crate::deletion_proof::ExcludedScope>,
+    ) -> Result<crate::deletion_proof::DeletionProof> {
+        let proof_key = self.derive_deletion_proof_key()?;
+        crate::deletion_proof::DeletionProof::create(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            &proof_key,
+        )
+        .map_err(|e| CryptoError::Crypto(e.to_string()))
     }
 
     /// Internal accessor for instance-bound cached AES-256-GCM-SIV cipher.
@@ -405,11 +422,6 @@ impl KeyManager {
         self.key.emergency_wipe();
         self.cipher_cache.take();
         self.nonce_counter.store(0, Ordering::SeqCst);
-    }
-
-    /// Exports the 32-byte raw Data Encryption Key (DEK) wrapped in [`Zeroizing<Vec<u8>>`].
-    pub fn export_dek(&self) -> Zeroizing<Vec<u8>> {
-        Zeroizing::new(self.key.as_bytes().to_vec())
     }
 
     /// Provides access to the key bytes ONLY during testing.
@@ -521,7 +533,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_keys_are_distinct_per_path() {
+    fn file_keys_are_distinct_per_path() {
         let km = KeyManager::try_new("secret", b"salt").expect("init"); // expect
         let key1 = km.derive_file_key(b"segment_001.sst").expect("k1"); // expect
         let key2 = km.derive_file_key(b"segment_002.sst").expect("k2"); // expect
@@ -533,7 +545,7 @@ mod tests {
     }
 
     #[test]
-    fn test_same_path_same_passphrase_same_key() {
+    fn same_path_same_passphrase_same_key() {
         let km1 = KeyManager::try_new("secret", b"salt").expect("km1"); // expect
         let km2 = KeyManager::try_new("secret", b"salt").expect("km2"); // expect
         let k1 = km1.derive_file_key(b"data.sst").expect("k1"); // expect
@@ -546,7 +558,7 @@ mod tests {
     }
 
     #[test]
-    fn test_same_passphrase_salt_path_gives_same_key() {
+    fn same_passphrase_salt_path_gives_same_key() {
         let km1 = KeyManager::try_new("secret", b"salt").expect("km1"); // expect
         let km2 = KeyManager::try_new("secret", b"salt").expect("km2"); // expect
         assert_eq!(
@@ -561,7 +573,7 @@ mod tests {
     }
 
     #[test]
-    fn test_key_manager_field_zeroizes_on_drop() {
+    fn key_manager_field_zeroizes_on_drop() {
         use zeroize::Zeroize;
         let mut raw: [u8; 32] = [0xFF; 32];
         raw.zeroize();
@@ -569,7 +581,7 @@ mod tests {
     }
 
     #[test]
-    fn test_key_manager_debug_redacts_key() {
+    fn key_manager_debug_redacts_key() {
         let (km, _) = KeyManager::try_new_random_salt("test-passphrase").unwrap(); // unwrap
         let debug_str = format!("{km:?}");
         assert!(!debug_str.contains("test-passphrase"));

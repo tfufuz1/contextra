@@ -5,33 +5,20 @@
 // HOTSPOTS: score_term, score_term_with_params
 // STAND: TS:2026-08-30T22:01:55Z (SESSION: cf1f75c6)
 
-//! Mathematische BM25- und BM25F-Scoring-Funktionen sowie Parametrisierung.
-//!
-//! # Ring-Zuordnung
-//! Ring 0 (Kern).
-//!
-//! # Mathematische Grundlagen
-//! Implementiert das Okapi-BM25-Modell zur Bewertung der Dokumentrelevanz bzgl. Suchtermen.
-//! Die inverse Dokumenthäufigkeit (IDF = Inverse Document Frequency) wird mit der
-//! Robertson-Spärck-Jones-Glättung berechnet:
-//! $\text{IDF} = \ln\left(1 + \frac{N - \text{df} + 0.5}{\text{df} + 0.5}\right)$.
-//! Dadurch ist garantiert, dass $\text{IDF} \ge 0$ für alle $df \le N$ gilt.
+//! Pure BM25 scoring functions and parameter structure.
 
-use crate::error::{Result, TextError as ContextraError};
+use contextra_types::{ContextraError, Result};
 
-// ANCHOR[contextra-text:BM25-001]
-/// Standard-k1-Parameter für die Termfrequenz-Sättigung in BM25 (1.5).
+/// Default k1 parameter for BM25 term frequency saturation scaling.
 pub const BM25_K1: f32 = 1.5;
-
-// ANCHOR[contextra-text:BM25-002]
-/// Standard-b-Parameter für die Dokumentlängen-Normalisierung in BM25 (0.75).
+/// Default b parameter for BM25 document length normalization penalty tuning.
 pub const BM25_B: f32 = 0.75;
 
-// ANCHOR[contextra-text:BM25-003]
-/// Konfigurationsparameter für das BM25-Scoring-Modell.
+/// BM25 scoring model parameters.
 ///
-/// - `k1`: Steuert die Sättigung der Termhäufigkeit (TF). Standardwert: 1.5.
-/// - `b`: Steuert den Einfluss der Dokumentlänge auf die Bewertung. Standardwert: 0.75.
+/// Recommendations (Robertson-Walker defaults):
+/// - `k1`: Term frequency saturation control parameter. Recommended default value is `1.5` (well-studied range `1.2..2.0`). Must be non-negative (`k1 >= 0.0`).
+/// - `b`: Document length normalization penalty parameter. Recommended default value is `0.75` (range `0.0..1.0`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BM25 {
     pub k1: f32,
@@ -39,12 +26,11 @@ pub struct BM25 {
 }
 
 impl BM25 {
-    // ANCHOR[contextra-text:BM25-004]
-    /// Erzeugt eine neue `BM25`-Instanz mit validierten Hyperparametern.
+    /// Creates a new `BM25` configuration after validating `k1` and `b`.
     ///
-    /// # Fehler
-    /// Liefert [`ContextraError::InvalidInput`], falls `k1 < 0.0` bzw. NaN ist,
-    /// oder `b` außerhalb des Intervalls `[0.0, 1.0]` bzw. NaN ist.
+    /// # Errors
+    /// Returns `ContextraError::InvalidInput` if `k1 < 0.0` or `k1` is NaN,
+    /// or if `b` is outside `[0.0, 1.0]` or is NaN.
     pub fn new(k1: f32, b: f32) -> Result<Self> {
         if k1 < 0.0 || k1.is_nan() {
             return Err(ContextraError::InvalidInput("k1 must be >= 0.0".into()));
@@ -57,8 +43,7 @@ impl BM25 {
         Ok(Self { k1, b })
     }
 
-    // ANCHOR[contextra-text:BM25-005]
-    /// Berechnet den BM25-Score für einen Begriff mit den Parametern dieser Instanz.
+    /// Calculates the BM25 score for a single term using this instance's `k1` and `b`.
     pub fn score_term(&self, tf: u32, doc_len: u32, avg_doc_len: f32, df: u32, n: u32) -> f32 {
         score_term_with_params(tf, doc_len, avg_doc_len, df, n, self.k1, self.b)
     }
@@ -74,27 +59,19 @@ impl Default for BM25 {
     }
 }
 
-// ANCHOR[contextra-text:BM25-006]
-/// Berechnet den BM25-Score für einen Begriff mit den Standardparametern (`k1 = 1.5`, `b = 0.75`).
+/// Calculates the BM25 score for a single term in a document using default `BM25_K1` and `BM25_B`.
 ///
-/// # Parameter
-/// * `tf` - Termhäufigkeit (Term Frequency) im Dokument
-/// * `doc_len` - Dokumentlänge in Token
-/// * `avg_doc_len` - Durchschnittliche Dokumentlänge im gesamten Index
-/// * `df` - Dokumenthäufigkeit (Document Frequency, Anzahl Dokumente mit diesem Term)
-/// * `n` - Gesamtzahl der Dokumente im Index
+/// # Arguments
+/// * `tf` - Term frequency in the document
+/// * `doc_len` - Length of the document (number of tokens)
+/// * `avg_doc_len` - Average document length in the collection
+/// * `df` - Document frequency (number of documents containing the term)
+/// * `n` - Total number of documents in the collection
 pub fn score_term(tf: u32, doc_len: u32, avg_doc_len: f32, df: u32, n: u32) -> f32 {
     score_term_with_params(tf, doc_len, avg_doc_len, df, n, BM25_K1, BM25_B)
 }
 
-// ANCHOR[contextra-text:BM25-007]
-/// Berechnet den BM25-Score mit frei konfigurierbaren Parametern `k1` und `b`.
-///
-/// # Ablauf
-/// 1. Schnellausstieg mit 0.0, wenn $N = 0$, $df = 0$ oder $tf = 0$.
-/// 2. Glatte IDF-Berechnung nach Robertson-Spärck-Jones.
-/// 3. Längennormalisierung von $tf$ anhand von $b$ und dem Verhältnis zur Durchschnittslänge.
-/// 4. Sättigung mit $k1$ und Multiplikation von IDF und TF-Term.
+/// Calculates the BM25 score for a single term in a document using custom `k1` and `b` parameters.
 pub fn score_term_with_params(
     tf: u32,
     doc_len: u32,
@@ -130,12 +107,10 @@ pub fn score_term_with_params(
     idf * (tf_numerator / tf_denominator)
 }
 
-// ANCHOR[contextra-text:BM25-008]
-/// Eindeutige Kennung für Dokumentenfelder im feldgewichteten BM25F-Scoring.
+/// Field identifier for field-weighted BM25F scoring.
 pub type FieldId = u32;
 
-// ANCHOR[contextra-text:BM25-009]
-/// Feldgewichtungskonfiguration für ein bestimmtes Feld in BM25F.
+/// Field weighting configuration for BM25F scoring.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FieldWeight {
     pub field_id: FieldId,
@@ -144,8 +119,11 @@ pub struct FieldWeight {
 }
 
 impl FieldWeight {
-    // ANCHOR[contextra-text:BM25-010]
-    /// Erzeugt eine neue `FieldWeight`-Konfiguration nach Validierung von `weight` und `b`.
+    /// Creates a new `FieldWeight` validation configuration.
+    ///
+    /// # Errors
+    /// Returns `ContextraError::InvalidInput` if `weight < 0.0` or `weight` is NaN,
+    /// or if `b` is outside `[0.0, 1.0]` or is NaN.
     pub fn new(field_id: FieldId, weight: f32, b: f32) -> Result<Self> {
         if weight < 0.0 || weight.is_nan() {
             return Err(ContextraError::InvalidInput(
@@ -165,8 +143,10 @@ impl FieldWeight {
     }
 }
 
-// ANCHOR[contextra-text:BM25-011]
-/// Konfiguration für feldgewichtetes BM25F-Scoring (§11.3).
+/// BM25F field-weighted scoring model configuration (§11.3).
+///
+/// **Opt-in Feature Note**: BM25F field-weighted scoring requires the explicit Cargo feature
+/// `bm25f` and is strictly an opt-in model. It is not part of the default execution path or default features.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BM25F {
     pub k1: f32,
@@ -175,8 +155,10 @@ pub struct BM25F {
 }
 
 impl BM25F {
-    // ANCHOR[contextra-text:BM25-012]
-    /// Erzeugt ein neues BM25F-Modell mit Feldgewichtungen.
+    /// Creates a new `BM25F` scoring configuration.
+    ///
+    /// # Errors
+    /// Returns `ContextraError::InvalidInput` if `k1 < 0.0` or `k1` is NaN.
     pub fn new(k1: f32, field_weights: Vec<FieldWeight>) -> Result<Self> {
         if k1 < 0.0 || k1.is_nan() {
             return Err(ContextraError::InvalidInput("k1 must be >= 0.0".into()));
@@ -192,8 +174,7 @@ impl BM25F {
         })
     }
 
-    // ANCHOR[contextra-text:BM25-013]
-    /// Berechnet den BM25F-Score über mehrere Felder hinweg.
+    /// Calculates the BM25F score for a single term across multiple fields.
     pub fn score_term(
         &self,
         field_term_frequencies: &[(FieldId, u32, u32, f32)],
@@ -204,18 +185,18 @@ impl BM25F {
     }
 }
 
-// ANCHOR[contextra-text:BM25-014]
-/// Berechnet den feldgewichteten BM25F-Score nach Robertson & Zaragoza (2004).
+/// Calculates the field-weighted BM25F score for a single term across document fields.
 ///
-/// Berechnet zunächst die gewichtete Pseudo-Termfrequenz über alle Felder und wendet
-/// anschließend die BM25-Sättigungsfunktion an.
+/// Implements the Robertson & Zaragoza (2004) field-weighted BM25 formula:
+/// - Computes pseudo-term frequency $\tilde{tf} = \sum_f w_f \cdot \frac{tf_f}{1 - b_f + b_f \cdot \frac{len_f}{avglen_f}}$
+/// - Evaluates single-saturation BM25 score with global parameter `k1`.
 ///
-/// # Parameter
-/// * `field_term_frequencies` - Tupel aus `(field_id, tf_f, len_f, avg_len_f)` pro Feld
-/// * `field_weights` - Konfigurierte Feldgewichte
-/// * `k1` - Globaler Sättigungsparameter
-/// * `df` - Dokumentfrequenz im Gesamtkorpus
-/// * `n` - Dokumentenanzahl im Gesamtkorpus
+/// # Arguments
+/// * `field_term_frequencies` - Slice of tuples `(field_id, tf_f, len_f, avg_len_f)` per field
+/// * `field_weights` - Slice of tuples `(field_id, weight_f, b_f)` per field configuration
+/// * `k1` - Term frequency saturation control parameter
+/// * `df` - Document frequency across corpus
+/// * `n` - Total document count in corpus
 pub fn score_term_bm25f(
     field_term_frequencies: &[(FieldId, u32, u32, f32)],
     field_weights: &[(FieldId, f32, f32)],
@@ -305,10 +286,8 @@ pub fn score_term_bm25f(
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-text:TEST-BM25-001]
-    // Prüft, dass BM25 bei allen Grenzfällen niemals NaN oder Unendlich liefert.
     #[test]
-    fn test_bm25_no_nan_or_infinity() {
+    fn bm25_no_nan_or_infinity() {
         // Alle Grenzfall-Kombinationen
         let cases = [
             (0, 0, 0.0, 0, 0),               // alles null
@@ -371,7 +350,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_prop_bm25_idf_non_negative_for_high_df(
+        fn prop_bm25_idf_non_negative_for_high_df(
             n in 0..100_000u32,
             df_fraction in 0.0..1.0f64,
         ) {
@@ -388,7 +367,7 @@ mod tests {
         }
 
         #[test]
-        fn test_prop_bm25_score_term_finite_and_non_negative(
+        fn prop_bm25_score_term_finite_and_non_negative(
             tf in 0..10_000u32,
             doc_len in 0..10_000u32,
             avg_doc_len in 0.0..10_000.0f32,
@@ -401,7 +380,7 @@ mod tests {
         }
 
         #[test]
-        fn test_prop_bm25_score_term_bounded_across_df_relative_to_n(
+        fn prop_bm25_score_term_bounded_across_df_relative_to_n(
             tf in 0..100_000u32,
             doc_len in 0..100_000u32,
             avg_doc_len in 0.0..100_000.0f32,
@@ -448,7 +427,7 @@ mod tests {
     }
 
     #[test]
-    fn test_score_term_case_exact_anti_mirroring_value() {
+    fn score_term_case_exact_anti_mirroring_value() {
         // Independent mathematical calculation:
         // tf = 1, doc_len = 10, avg_doc_len = 10.0, df = 1, n = 10, k1 = 1.5, b = 0.75
         // idf_arg = 1.0 + (10 - 1 + 0.5) / (1 + 0.5) = 1.0 + 9.5 / 1.5 = 22 / 3 = 7.3333333...
@@ -490,7 +469,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bm25_struct_score_term_case_matches_standalone_function() {
+    fn bm25_struct_score_term_case_matches_standalone_function() {
         let bm25 = BM25::default();
         let struct_score = bm25.score_term(2, 50, 50.0, 5, 100);
         let fn_score = score_term(2, 50, 50.0, 5, 100);
@@ -558,7 +537,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bm25_handles_extreme_tf() {
+    fn bm25_handles_extreme_tf() {
         // tf = u32::MAX (4 billion occurrences)
         let score = score_term(u32::MAX, 1000, 500.0, 1, 1_000_000);
         assert!(

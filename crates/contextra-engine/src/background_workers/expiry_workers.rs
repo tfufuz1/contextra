@@ -1,12 +1,5 @@
-//! # Modul: expiry_workers.rs
-//!
-//! **Zweck:** Worker zur automatischen Bereinigung abgelaufener TTL-Dokumente.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
-
 // FILE-CONTEXT
-// ZWECK: Worker-Tasks zur TTL-Bereinigung abgelaufener Dokumente und Entropie-Pruning/Decay-Eviction.
+// ZWECK: Worker-Tasks zur TTL-Löschung abgelaufener Dokumente und Entropie-Pruning/Decay-Eviction.
 // INVARIANTEN: Intervallsteuerung und geordnete Task-Beendigung über CancellationToken.
 
 use crate::collection::Collection;
@@ -30,7 +23,6 @@ pub fn start_expiry_cleanup_worker<S: StorageEngine>(
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(interval);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        ticker.tick().await;
 
         tracing::info!(
             collection = %collection.name(),
@@ -70,16 +62,6 @@ pub fn start_expiry_cleanup_worker<S: StorageEngine>(
     })
 }
 
-/// Deprecated legacy alias for `start_expiry_cleanup_worker`.
-#[deprecated(note = "use start_expiry_cleanup_worker instead")]
-pub fn start_expiry_reaper<S: StorageEngine>(
-    collection: Arc<Collection<S>>,
-    interval: Duration,
-    cancel_token: tokio_util::sync::CancellationToken,
-) -> tokio::task::JoinHandle<()> {
-    start_expiry_cleanup_worker(collection, interval, cancel_token)
-}
-
 /// Starts a background task for decay-controller-driven importance-score eviction.
 /// Nur aktiv wenn `background-maintenance` Feature-Flag gesetzt.
 #[cfg(feature = "background-maintenance")]
@@ -108,14 +90,3 @@ pub fn start_decay_cleanup_worker<S: StorageEngine, V: VectorIndex>(
     })
 }
 
-/// Deprecated legacy alias for `start_decay_cleanup_worker`.
-#[cfg(feature = "background-maintenance")]
-#[deprecated(note = "use start_decay_cleanup_worker instead")]
-pub fn start_thermostat_reaper<S: StorageEngine, V: VectorIndex>(
-    collection: Arc<Collection<S, V>>,
-    decay_config: DecayControllerConfig,
-    interval: Duration,
-    cancel_token: tokio_util::sync::CancellationToken,
-) -> tokio::task::JoinHandle<()> {
-    start_decay_cleanup_worker(collection, decay_config, interval, cancel_token)
-}

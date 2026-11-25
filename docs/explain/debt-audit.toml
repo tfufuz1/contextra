@@ -1,0 +1,8 @@
+title = "Technische Schulden Audit"
+what = "Das Limit für zugelassene TODOs, FIXMEs oder temporäre Hacks wurde überschritten."
+why = "Verhindert die ungebremste Ansammlung technischer Schulden im Quellcode."
+fix = "Behebe die offenen TODOs oder erstelle dafür reguläre Task-Karten."
+anti_fix = "Lösche keine TODO-Kommentare, ohne die Ursache zu beheben."
+adr = ["ADR-035"]
+related = ["ratchet", "gate-weakening"]
+sources = ["CONSTITUTION.md"]

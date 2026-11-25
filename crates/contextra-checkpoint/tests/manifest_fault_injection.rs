@@ -1,20 +1,5 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::disallowed_methods,
-    clippy::disallowed_types,
-    clippy::indexing_slicing,
-    clippy::cast_sign_loss,
-    clippy::cast_possible_truncation,
-    clippy::await_holding_lock
-)]
-//! # Integrationstest: Fehlereinschleusung in Manifeste
-//!
-//! Simuliert Dateibeschädigung und unvollständige Schreibvorgänge in Checkpoint-Manifesten.
-
 use contextra_checkpoint::{CheckpointManifest, CheckpointMeta};
-use contextra_checkpoint::contextra_types::TxId;
+use contextra_types::TxId;
 
 fn sample_meta() -> CheckpointMeta {
     CheckpointMeta {

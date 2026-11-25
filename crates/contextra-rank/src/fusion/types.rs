@@ -1,22 +1,51 @@
-//! # Typdefinitionen der Signal-Fusion (`types`)
-//!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
-//!
-//! Enthält grundlegende Datenstrukturen für Retrieval-Ergebnisse, aggregierte Fusionsergebnisse,
-//! Herkunftsnachweise (Provenance) und Fehlerrichtlinien bei Signalausfällen.
-
-use crate::local_types::DocId;
-pub use crate::local_types::SignalFailurePolicy;
 use ahash::AHashMap;
+use contextra_types::{ContextChunk, ContextraError, DocId, MemoryLink};
 use serde::{Deserialize, Serialize};
 
-pub fn map_is_empty<K, V, S>(m: &ahash::AHashMap<K, V, S>) -> bool {
-    m.is_empty()
+pub(super) fn estimate_tokens(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+    let words = text.split_whitespace().count();
+    let chars = text.chars().count();
+    ((words as f64 * 1.3).max(chars as f64 / 4.0)).ceil() as usize
+}
+
+impl TryFrom<SearchResult> for ContextChunk {
+    type Error = ContextraError;
+
+    fn try_from(r: SearchResult) -> std::result::Result<Self, Self::Error> {
+        let doc_id = DocId::from_key(&r.id).map_err(|e| {
+            ContextraError::InvalidInput(format!("SearchResult-ID '{}' ungültig: {e}", r.id))
+        })?;
+        let content = r
+            .metadata
+            .as_ref()
+            .and_then(|m| m.get("text").or_else(|| m.get("content")))
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string();
+        let token_count = estimate_tokens(&content);
+        let links: Vec<MemoryLink> = r
+            .metadata
+            .as_ref()
+            .and_then(|m| m.get("links"))
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+        Ok(ContextChunk {
+            doc_id,
+            content,
+            relevance: r.score,
+            token_count,
+            metadata: r.metadata,
+            contextual_prefix: None,
+            links,
+        })
+    }
 }
 
 /// Provenance record for fused search result.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-/// Auditierbarer Herkunftsnachweis (Provenance) über alle beteiligten Retrieval-Kanäle.
 pub struct ProvenanceRecord {
     /// Distance score from vector search signal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -35,7 +64,7 @@ pub struct ProvenanceRecord {
     pub rerank_score: Option<f32>,
 
     /// Per-signal rank map.
-    #[serde(default, skip_serializing_if = "map_is_empty")]
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub signal_ranks: AHashMap<String, u32>,
 
     /// Source collection name.
@@ -47,7 +76,7 @@ pub struct ProvenanceRecord {
     pub index_type: Option<String>,
 
     /// Per-signal contribution details.
-    #[serde(default, skip_serializing_if = "map_is_empty")]
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub signal_contributions: AHashMap<String, SignalContribution>,
 
     /// Resonance coherence bonus value.
@@ -57,11 +86,10 @@ pub struct ProvenanceRecord {
 
 impl ProvenanceRecord {
     /// Constructs a `ProvenanceRecord` synthesized from source document IDs.
-    pub fn synthesized_from(source_doc_ids: &[DocId]) -> Self {
+    pub fn synthesized_from(source_doc_ids: &[contextra_types::DocId]) -> Self {
         let mut signal_ranks = AHashMap::new();
         for (idx, id) in source_doc_ids.iter().enumerate() {
-            let rank_u32 = u32::try_from(idx.saturating_add(1)).unwrap_or(u32::MAX);
-            signal_ranks.insert(id.0.to_string(), rank_u32);
+            signal_ranks.insert(id.0.to_string(), (idx + 1) as u32);
         }
         ProvenanceRecord {
             index_type: Some("consolidated".to_string()),
@@ -73,7 +101,6 @@ impl ProvenanceRecord {
 
 /// Signal contribution details.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-/// Beitrag eines einzelnen Signals zum aggregierten RRF-Score.
 pub struct SignalContribution {
     /// Raw score before normalization/fusion.
     pub raw_score: f32,
@@ -83,60 +110,8 @@ pub struct SignalContribution {
     pub rrf_contribution: f32,
 }
 
-/// Crate-lokaler Typ für gerankte/fusionierte Elemente.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ScoredItem {
-    /// Eindeutiger Dokument- oder Elementbezeichner.
-    pub id: String,
-    /// Punktwert / Ähnlichkeitswert / Fusionswert.
-    pub score: f32,
-    /// Optionaler strukturierter Herkunftsnachweis.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub provenance: Option<ProvenanceRecord>,
-}
-
-impl ScoredItem {
-    /// Erzeugt ein neues `ScoredItem` ohne Provenienz.
-    pub fn new(id: impl Into<String>, score: f32) -> Self {
-        Self {
-            id: id.into(),
-            score,
-            provenance: None,
-        }
-    }
-
-    /// Fügt dem Element Provenienzinformationen hinzu.
-    pub fn with_provenance(mut self, provenance: ProvenanceRecord) -> Self {
-        self.provenance = Some(provenance);
-        self
-    }
-}
-
-impl From<SearchResult> for ScoredItem {
-    fn from(r: SearchResult) -> Self {
-        Self {
-            id: r.id,
-            score: r.score,
-            provenance: r.provenance,
-        }
-    }
-}
-
-impl From<ScoredItem> for SearchResult {
-    fn from(item: ScoredItem) -> Self {
-        Self {
-            id: item.id,
-            score: item.score,
-            metadata: None,
-            matched_signals: Vec::new(),
-            provenance: item.provenance,
-        }
-    }
-}
-
 /// Individual search result candidate for fusion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-/// Standard-Suchergebnis eines einzelnen Retrieval-Signals oder einer Fusionsstufe.
 pub struct SearchResult {
     /// Document or memory entry identifier.
     pub id: String,
@@ -153,16 +128,10 @@ pub struct SearchResult {
 }
 
 /// Type alias for fused score output item.
-/// Aggregierter Fusionswert eines Dokuments (Typ-Alias auf SearchResult).
 pub type FusedScore = SearchResult;
 
 /// Query retrieval signal identifier.
-///
-/// # Abgrenzung
-/// Dieser Typ (`contextra_rank::fusion::Signal`) bezeichnet die spezifische Suchsignal-Art
-/// (z. B. `Vector`, `Text`, `Graph`) innerhalb von Suchberichten (`SearchReport`) der Fusion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-/// Kennzeichnung der Signalherkunft.
 pub enum Signal {
     /// Dense vector similarity signal.
     Vector,
@@ -182,9 +151,11 @@ impl std::fmt::Display for Signal {
     }
 }
 
+/// Policy governing multi-signal retrieval error handling semantics.
+pub use contextra_types::OnSignalFailure as SignalFailurePolicy;
+
 /// Execution report for search query execution.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-/// Detaillierter Audit-Report über den Fusions- und Suchablauf.
 pub struct SearchReport {
     /// List of signals that failed during query execution when using Degrade policy.
     pub degraded_signals: Vec<Signal>,

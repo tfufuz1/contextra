@@ -1,0 +1,67 @@
+[[phase.start]]
+cmd = ["cargo", "xtask", "env-attest"]
+required = false
+
+[[phase.start]]
+cmd = ["cargo", "xtask", "task-card", "lint"]
+required = true
+
+[[phase.start]]
+cmd = ["cargo", "xtask", "claim"]
+required = true
+
+[[phase.start]]
+cmd = ["cargo", "xtask", "context-pack"]
+required = true
+
+[[phase.check]]
+cmd = ["cargo", "fmt", "--check"]
+required = true
+parallel_group = "static"
+
+[[phase.check]]
+cmd = ["cargo", "clippy", "--workspace", "--", "-D", "warnings"]
+required = true
+parallel_group = "static"
+
+[[phase.check]]
+cmd = ["cargo", "xtask", "gate-guard"]
+required = true
+parallel_group = "static"
+
+[[phase.check]]
+cmd = ["cargo", "xtask", "symbol-exists"]
+required = true
+parallel_group = "static"
+
+[[phase.verify]]
+cmd = ["cargo", "test"]
+required = true
+
+[[phase.verify]]
+cmd = ["cargo", "xtask", "gate-arch"]
+required = true
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "gate-guard"]
+required = true
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "gate-integrity"]
+required = true
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "session-report"]
+required = true
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "claims-in-pr"]
+required = false
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "ledger"]
+required = false
+
+[[phase.stop]]
+cmd = ["cargo", "xtask", "loop-guard", "stop"]
+required = false

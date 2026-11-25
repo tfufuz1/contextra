@@ -1,8 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_range_loop)]
 
+use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_ports::SeededRng;
-use contextra_ports::VectorIndex;
-use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::acorn::FilteredIndex;
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
 use std::sync::Arc;
@@ -109,7 +108,8 @@ async fn test_filtered_search_selectivity_recall() {
     println!("(Hinweis: Messung beinhaltet nur Index-/Speicherlatenz, ohne Embedding-Inferenz)");
 
     for (label, modulus, target_rem) in selectivities {
-        let predicate = Arc::new(move |id: DocId| (id.inner() as u64) % modulus == target_rem);
+        let predicate =
+            Arc::new(move |id: DocId| id.inner() % (modulus as u128) == target_rem as u128);
 
         let mut query_rng = SimpleRng::new(54321);
         let mut std_hits = 0;

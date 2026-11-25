@@ -1,0 +1,8 @@
+title = "Schutz geschützter Pfade"
+what = "Änderungen an sicherheitskritischen Infrastrukturdateien oder Kernel-Pfaden wurden erkannt."
+why = "Geschützte Pfade wie CI-Workflows, Sicherheitskonfigurationen oder Kern-Lizenzen dürfen nicht ohne gesonderte Freigabe verändert werden."
+fix = "Reverte die Änderungen an geschützten Dateien oder fordere eine explizite Ausnahmegenehmigung an."
+anti_fix = "Versuche nicht, die Pfadprüfung im Gate-Code auszukommentieren oder zu umgehen."
+adr = ["ADR-035"]
+related = ["scope-guard", "gate-weakening"]
+sources = ["CONSTITUTION.md", "docs/decisions/ADR-035-governance-system-haertung-prozessregeln.md"]

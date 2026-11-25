@@ -1,0 +1,19 @@
+verified = false
+
+[endpoints]
+base_url = "https://jules.googleapis.com/v1alpha"
+sessions = "/sessions"
+sources = "/sources"
+activities = "/activities"
+
+[actions]
+approve_plan = "/sessions/{session_id}:approvePlan"
+send_message = "/sessions/{session_id}:sendMessage"
+
+[headers]
+authorization = "X-Goog-Api-Key"
+content_type = "application/json"
+
+[defaults]
+require_plan_approval = true
+automation_mode = "MANUAL"

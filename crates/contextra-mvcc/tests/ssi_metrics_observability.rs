@@ -1,76 +1,13 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-METRICS-OBSERVABILITY-ROOT]
-//! # Observability- und Metrik-Tests für SSI
-//!
-//! Verifiziert die Aufzeichnung von Kennzahlen an den MetricsSink-Port:
-//! - Füllstand des Commit-Registers und Auslösen von Coarsening-Metriken.
-//! - Meldung der Haltedauer langlaufender Snapshot-Pins.
-//! - Hot-Swap-Fähigkeit des MetricsSink-Containers ohne Datenverlust oder Panics.
-
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_mvcc::contextra_ports::{ManualClock, MetricsSink};
 use contextra_mvcc::SequenceLogSsiValidator;
 use contextra_mvcc::SnapshotRegistry;
-use parking_lot::{Mutex, RwLock};
+use contextra_ports::metrics::{MetricEvent, TestMetricsSink};
+use contextra_ports::MetricsSink;
+use parking_lot::RwLock;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
-#[derive(Debug, Clone)]
-enum MetricEvent {
-    #[allow(dead_code)]
-    Counter {
-        name: String,
-        value: u64,
-        labels: Vec<(String, String)>,
-    },
-    Gauge {
-        name: String,
-        value: f64,
-        #[allow(dead_code)]
-        labels: Vec<(String, String)>,
-    },
-}
-
-struct TestMetricsSink {
-    events: Mutex<Vec<MetricEvent>>,
-}
-
-impl TestMetricsSink {
-    fn new() -> Self {
-        Self {
-            events: Mutex::new(Vec::new()),
-        }
-    }
-
-    fn events(&self) -> Vec<MetricEvent> {
-        self.events.lock().clone()
-    }
-}
-
-impl MetricsSink for TestMetricsSink {
-    fn increment_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
-        self.events.lock().push(MetricEvent::Counter {
-            name: name.to_string(),
-            value,
-            labels: labels
-                .iter()
-                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                .collect(),
-        });
-    }
-
-    fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
-        self.events.lock().push(MetricEvent::Gauge {
-            name: name.to_string(),
-            value,
-            labels: labels
-                .iter()
-                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                .collect(),
-        });
-    }
-}
-
-// Prüft die Emission von Füllstands- und Coarsening-Gauges beim Überschreiten der 80 %-Schwelle.
 #[test]
 fn test_ssi_metrics_observability_threshold_and_coarsening() {
     let test_sink = Arc::new(TestMetricsSink::new());
@@ -84,7 +21,7 @@ fn test_ssi_metrics_observability_threshold_and_coarsening() {
     // Commit 17 distinct keys to exceed the 80% threshold (17 / 20 = 85%)
     for i in 1..=17 {
         let key = format!("user_key_{i:02}");
-        validator.record_commit_key(key.as_bytes(), u64::try_from(i).expect("valid u64"));
+        validator.record_commit_key(key.as_bytes(), i as u64);
     }
 
     let events = test_sink.events();
@@ -117,30 +54,26 @@ fn test_ssi_metrics_observability_threshold_and_coarsening() {
     );
 }
 
-// Prüft die metrische Erfassung der Haltedauer überalterter Snapshot-Pins.
 #[test]
 fn test_ssi_metrics_observability_long_pin_duration() {
     let test_sink = Arc::new(TestMetricsSink::new());
     let sink_container: Arc<RwLock<Arc<dyn MetricsSink>>> =
         Arc::new(RwLock::new(test_sink.clone() as Arc<dyn MetricsSink>));
 
-    let clock = Arc::new(ManualClock::new(500_000_000_000));
-    let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
-
-    let now_nanos = clock.now_nanos();
-    let past_350s_nanos = now_nanos.saturating_sub(350_000_000_000);
-    let _guard = registry.register_at(42, past_350s_nanos);
+    let registry = Arc::new(SnapshotRegistry::new());
+    let now = Instant::now();
+    let past_350s = now.checked_sub(Duration::from_secs(350)).unwrap_or(now);
+    let _guard = registry.register_at(42, past_350s);
 
     let max_keys = 20;
     let validator = SequenceLogSsiValidator::new_with_bounds(max_keys)
-        .with_clock(clock.clone())
         .with_snapshot_registry(registry)
         .with_metrics_sink(sink_container);
 
     // Commit 17 distinct keys to exceed threshold
     for i in 1..=17 {
         let key = format!("data_key_{i:02}");
-        validator.record_commit_key(key.as_bytes(), u64::try_from(i).expect("valid u64"));
+        validator.record_commit_key(key.as_bytes(), i as u64);
     }
 
     let events = test_sink.events();
@@ -158,7 +91,6 @@ fn test_ssi_metrics_observability_long_pin_duration() {
     );
 }
 
-// Prüft das unterbrechungsfreie Austauschen (Hot-Swap) des MetricsSink während des Betriebs.
 #[test]
 fn test_ssi_metrics_observability_hot_swap_consistency() {
     let sink1 = Arc::new(TestMetricsSink::new());
@@ -201,7 +133,7 @@ fn test_ssi_metrics_observability_hot_swap_consistency() {
         "sink2 must receive metric events recorded after hot-swap"
     );
     assert!(matches!(
-        events_sink2.first().unwrap(),
+        &events_sink2[0],
         MetricEvent::Gauge { name, .. } if name == "mvcc_ssi_commit_register_utilization_ratio"
     ));
 }

@@ -1,8 +1,3 @@
-//! Validierungstest für LLM-gestützte Filterung von Hyperkanten-Vorschlägen.
-//!
-//! # Zweck
-//! Mockt LLM-Antworten und stellt sicher, dass unplausible Kantenkandidaten verworfen werden.
-
 use contextra_graph::{validate_candidates_with_llm, GraphMutationError, HyperEdgeCandidate};
 use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::{DocId, EntityId};
@@ -34,7 +29,6 @@ impl LlmTextGenerator for MockLlmTextGenerator {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-LLM-TEST-001]
 #[tokio::test]
 async fn test_validate_candidates_llm_budget_guard() {
     let doc = DocId::from_key("doc-1").unwrap();
@@ -70,7 +64,6 @@ async fn test_validate_candidates_llm_budget_guard() {
     );
 }
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-LLM-TEST-002]
 #[tokio::test]
 async fn test_validate_candidates_llm_success() {
     let doc = DocId::from_key("doc-1").unwrap();
@@ -108,7 +101,6 @@ async fn test_validate_candidates_llm_success() {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-SUGGEST-LLM-TEST-003]
 #[tokio::test]
 async fn test_validate_candidates_llm_rejection() {
     let doc = DocId::from_key("doc-1").unwrap();

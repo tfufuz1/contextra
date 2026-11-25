@@ -1,8 +1,3 @@
-//! Unit-Tests für Pfadsuche und Heuristiken in der Path-RAG-Engine.
-//!
-//! # Zweck
-//! Testet Hinlänglichkeitsschwellen (`sufficiency_threshold`) und Hop-Begrenzungen.
-
 use super::*;
 
 // Einfacher Test-Graph
@@ -43,7 +38,6 @@ impl PathGraph for TestGraph {
     }
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-001]
 #[test]
 fn test_find_path_direct_edge() {
     let a = EntityId::new(1);
@@ -55,7 +49,6 @@ fn test_find_path_direct_edge() {
     assert!((path.confidence - 0.9).abs() < 1e-6);
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-002]
 #[test]
 fn test_find_path_multi_hop() {
     let a = EntityId::new(1);
@@ -72,7 +65,6 @@ fn test_find_path_multi_hop() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-003]
 #[test]
 fn test_find_path_same_node() {
     let a = EntityId::new(1);
@@ -83,7 +75,6 @@ fn test_find_path_same_node() {
     assert_eq!(path.edge_weights.len(), 0);
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-004]
 #[test]
 fn test_find_path_unreachable_returns_none() {
     let a = EntityId::new(1);
@@ -93,7 +84,6 @@ fn test_find_path_unreachable_returns_none() {
     assert!(engine.find_path(a, b).is_none());
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-005]
 #[test]
 fn test_sufficiency_gate_filters_low_confidence() {
     let engine = PathRAGEngine::new(TestGraph::new(vec![]), 4, 0.5);
@@ -111,7 +101,6 @@ fn test_sufficiency_gate_filters_low_confidence() {
     assert!(engine.sufficiency_check(&high_conf));
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-006]
 #[test]
 fn test_find_all_paths_multi_hop() {
     let a = EntityId::new(1);
@@ -123,7 +112,6 @@ fn test_find_all_paths_multi_hop() {
     assert_eq!(paths.len(), 2);
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-007]
 #[test]
 fn test_rrf_signal_filters_by_sufficiency() {
     let engine = PathRAGEngine::new(TestGraph::new(vec![]), 4, 0.5);
@@ -146,7 +134,6 @@ fn test_rrf_signal_filters_by_sufficiency() {
     assert_eq!(signal[0].0, DocId(2));
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-008]
 #[test]
 fn test_default_sufficiency_threshold_meets_minimum_bound() {
     // REGRESSION TEST (ADR-067 / arXiv:2506.00610):
@@ -167,7 +154,6 @@ fn test_default_sufficiency_threshold_meets_minimum_bound() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-009]
 #[test]
 fn test_find_path_zero_max_hops() {
     let a = EntityId::new(1);
@@ -181,7 +167,6 @@ fn test_find_path_zero_max_hops() {
     assert!(same_path.is_some());
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-010]
 #[test]
 fn test_to_rrf_signal_empty_paths() {
     let engine = PathRAGEngine::with_defaults(TestGraph::new(vec![]));
@@ -248,7 +233,6 @@ impl PathGraph for TestGraphWithHyperedges {
     }
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-011]
 #[test]
 fn test_hyperedge_expansion_disabled_by_default() {
     let a = EntityId::new(1);
@@ -272,7 +256,6 @@ fn test_hyperedge_expansion_disabled_by_default() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-012]
 #[test]
 fn test_hyperedge_expansion_enabled_finds_path_via_hyperedge_only() {
     // AK-2 test: Path exclusively over hyperedge
@@ -309,7 +292,6 @@ fn test_hyperedge_expansion_enabled_finds_path_via_hyperedge_only() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-013]
 #[test]
 fn test_hyperedge_weight_discount_applied_correctly() {
     let a = EntityId::new(1);
@@ -351,7 +333,6 @@ fn test_hyperedge_weight_discount_applied_correctly() {
     assert!((path2.confidence - 0.50).abs() < 1e-5);
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-014]
 #[test]
 fn test_sufficiency_gate_filters_low_confidence_virtual_neighbors() {
     let a = EntityId::new(1);
@@ -384,7 +365,6 @@ fn test_sufficiency_gate_filters_low_confidence_virtual_neighbors() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-015]
 #[test]
 fn test_self_referencing_hyperedge_no_infinite_loop() {
     let a = EntityId::new(1);
@@ -415,7 +395,6 @@ fn test_self_referencing_hyperedge_no_infinite_loop() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-016]
 #[test]
 fn test_fusion_and_signalkind_non_modification_contract() {
     // Contract test ensuring no modification to fusion.rs or SignalKind enum
@@ -432,7 +411,6 @@ fn test_fusion_and_signalkind_non_modification_contract() {
     assert_eq!(rrf[0].0, DocId(42));
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-017]
 #[test]
 fn test_path_rag_engine_with_real_csr_graph_hyperedges() {
     use crate::csr::CsrGraph;
@@ -468,7 +446,6 @@ fn test_path_rag_engine_with_real_csr_graph_hyperedges() {
     assert!((path.confidence - 0.85).abs() < 1e-5);
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-018]
 #[test]
 fn test_ppr_params_defaults() {
     let params = PprParams::default();
@@ -477,7 +454,6 @@ fn test_ppr_params_defaults() {
     assert_eq!(params.hyperedge_decay, 0.85);
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-019]
 #[test]
 fn test_forward_push_ppr_empty_seeds() {
     let graph = TestGraph::new(vec![]);
@@ -486,7 +462,6 @@ fn test_forward_push_ppr_empty_seeds() {
     assert!(res.is_empty());
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-020]
 #[test]
 fn test_forward_push_ppr_binary_graph() {
     let a = EntityId::new(1);
@@ -499,7 +474,6 @@ fn test_forward_push_ppr_binary_graph() {
     assert!(*scores.get(&a).unwrap() > 0.0);
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-021]
 #[test]
 fn test_forward_push_ppr_hyperedge_expansion_and_decay() {
     let a = EntityId::new(1);
@@ -553,7 +527,6 @@ fn test_forward_push_ppr_hyperedge_expansion_and_decay() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-PATH-RAG-TESTS-022]
 #[test]
 fn test_forward_push_ppr_self_participant_filtered() {
     let a = EntityId::new(1);

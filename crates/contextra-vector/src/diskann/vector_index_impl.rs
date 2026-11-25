@@ -6,9 +6,10 @@
 
 use super::format::compute_adaptive_flush_threshold;
 use super::types::DiskAnnIndex;
-use crate::distance::validate_vector;
-use contextra_ports::{VectorIndex, VectorIndexStats};
-use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId};
+use contextra_core::{
+    ContextraError, DocId, Result, ScoredDocument, TxId, VectorIndex, VectorIndexStats,
+};
+use contextra_simd::validate_vector;
 use std::sync::atomic::Ordering;
 
 impl VectorIndex for DiskAnnIndex {

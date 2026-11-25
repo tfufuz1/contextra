@@ -1,0 +1,8 @@
+title = "DAG-Abhängigkeitsprüfer"
+what = "Unzulässige oder zyklische Crate-Abhängigkeiten in `Cargo.toml` entdeckt."
+why = "Die Architektur erzwingt einen kreisfreien gerichteten Graph (DAG) zwischen allen Crates."
+fix = "Entferne unzulässige Abhängigkeiten aus `Cargo.toml` gemäß `capabilities.toml`."
+anti_fix = "Verschiebe Abhängigkeiten nicht in `[dev-dependencies]`, um Gates zu täuschen."
+adr = ["ADR-N01", "ADR-N09"]
+related = ["check-ring-layering", "registry-check"]
+sources = ["capabilities.toml", "ARCHITECTURE.md"]

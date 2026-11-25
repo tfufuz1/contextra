@@ -1,11 +1,7 @@
-// ANCHOR[contextra-mvcc:TEST-LOOM-ROOT]
-//! # Loom-Modell- und Nebenläufigkeitstests für `SnapshotRegistry`
-//!
-//! Verifiziert die atomare Mindestwert-Berechnung und Lock-Freiheit der SnapshotRegistry:
-//! - Unter Loom: Exhaustive Permutation aller Thread-Interleavings.
-//! - Unter Standard-Cargo: Paralleler Multi-Thread-Stresstest über 16 Worker-Threads.
-
 #![allow(unexpected_cfgs)]
+
+//! Loom concurrency model test for `SnapshotRegistry` in `contextra-mvcc`.
+//! Execution: `RUSTFLAGS="--cfg loom" cargo test -p contextra-mvcc --test loom_snapshot_registry -- --nocapture`
 
 #[cfg(loom)]
 mod loom_tests {
@@ -61,7 +57,6 @@ mod loom_tests {
         }
     }
 
-    // Loom-Test: Modelliert nebenläufige Registrierung und Freigabe über 2 Threads.
     #[test]
     fn test_loom_snapshot_registry_concurrent_register_release() {
         loom::model(|| {
@@ -91,7 +86,6 @@ mod loom_tests {
         });
     }
 
-    // Loom-Test: Modelliert verschränktes Pinnen und Entpinnen über mehrere Threads.
     #[test]
     fn test_loom_snapshot_registry_interleaved_pin_unpin() {
         loom::model(|| {
@@ -131,7 +125,6 @@ mod normal_tests {
     use std::sync::Arc;
     use std::thread;
 
-    // Multi-Threaded Stresstest der SnapshotRegistry unter Standard-Laufzeit (ohne Loom-Flag).
     #[test]
     fn test_concurrent_snapshot_registry_stress() {
         let registry = Arc::new(SnapshotRegistry::new());
@@ -143,7 +136,7 @@ mod normal_tests {
         for i in 0..num_threads {
             let reg = Arc::clone(&registry);
             let run = Arc::clone(&running);
-            let seq_base = u64::try_from(i + 1).expect("valid u64") * 100;
+            let seq_base = (i + 1) as u64 * 100;
 
             handles.push(thread::spawn(move || {
                 let mut count = 0;

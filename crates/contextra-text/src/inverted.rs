@@ -1,4 +1,3 @@
-#![allow(deprecated)]
 // FILE-CONTEXT: LSM-backed Inverted Index & Transactional Storage.
 // ZWECK: Speichert Postings-Listen, Dokumentlängen und BM25-Statistiken transaktional im StorageEngine.
 // INVARIANTEN: upsert_document und search_bm25_at beachten MAX_TEXT_BYTES; Lock-Hierarchie: commit_lock (parking_lot::Mutex) > staged_stats (parking_lot::Mutex); k <= MAX_SEARCH_K.
@@ -14,20 +13,8 @@
 // BOTTLENECK: Heap-Allokationen (format!, Vec::new)
 // OPTIMIERUNG: itoa::Buffer + Vec::with_capacity + doc_len_cache
 
-//! Persistenter, LSM-basierter invertierter Volltextindex mit MVCC-Snapshot-Isolation.
-//!
-//! # Ring-Zuordnung
-//! Ring 0 (Kern).
-//!
-//! # Funktionsweise
-//! Verwaltet Dokumente, Posting-Listen, Vorwärtsindex und BM25-Statistiken über dem
-//! [`contextra_ports::StorageEngine`]-Port. Unterstützt Transaktionen (Staging, Commit, Rollback),
-//! physische Bereinigung (Purge) und Verifikations-Scans.
-
 mod index_struct;
 mod morph_index;
-pub mod purge;
-pub mod scanner;
 mod types;
 
 #[cfg(test)]
@@ -35,6 +22,4 @@ mod tests;
 
 pub use index_struct::InvertedIndex;
 pub use morph_index::BM25MorphIndex;
-pub use purge::{text_purger, PurgeReport, TextPurger};
-pub use scanner::{text_scanner, ParsedTextTarget, TextScanner};
 pub use types::{Language, TextIndexMetadata};

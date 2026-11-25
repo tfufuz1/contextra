@@ -1,10 +1,3 @@
-//! # Modul: compensating_actions.rs
-//!
-//! **Zweck:** Kompensierende Aktionen bei partiellen Schreibfehlern im Commit-Pfad.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
-
 use super::intent::{CommitIntent, StagedKeyOp};
 use crate::Collection;
 use contextra_ports::{BoxFuture, GraphIndex, StorageEngine, TextIndex, VectorIndex};
@@ -23,22 +16,16 @@ pub struct CommitLedger {
 }
 
 impl CommitLedger {
-    // ANCHOR[contextra-engine:CMP-001]
-    /// Initialisiert eine leere Aktionsliste.
     pub fn new() -> Self {
         Self {
             actions: Vec::with_capacity(8),
         }
     }
 
-    // ANCHOR[contextra-engine:PUS-034]
-    /// Dokumentation für `push` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn push<A: CompensatingAction + 'static>(&mut self, action: A) {
         self.actions.push(Box::new(action));
     }
 
-    // ANCHOR[contextra-engine:EXE-038]
-    /// Dokumentation für `execute_rollback` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub async fn execute_rollback(&mut self) {
         while let Some(action) = self.actions.pop() {
             if let Err(e) = action.execute().await {
@@ -48,8 +35,6 @@ impl CommitLedger {
     }
 }
 
-// ANCHOR[contextra-engine:COM-047]
-/// Dokumentation für `CompensateLsmAction` im Rahmen der Transaktions- und Facade-Orchestrierung.
 pub struct CompensateLsmAction<S: StorageEngine, V: VectorIndex> {
     pub(super) collection: Collection<S, V>,
     pub(super) intent_key: Vec<u8>,
@@ -59,8 +44,6 @@ pub struct CompensateLsmAction<S: StorageEngine, V: VectorIndex> {
 }
 
 impl<S: StorageEngine, V: VectorIndex> CompensateLsmAction<S, V> {
-    // ANCHOR[contextra-engine:NEW-056]
-    /// Dokumentation für `new` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn new(
         collection: Collection<S, V>,
         intent_key: Vec<u8>,
@@ -192,16 +175,26 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateLsmActio
     }
 }
 
-// ANCHOR[contextra-engine:COM-187]
-/// Dokumentation für `CompensateGraphAction` im Rahmen der Transaktions- und Facade-Orchestrierung.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_docid_u64_overflow_handling() {
+        let max_u64_doc = DocId::new(u64::MAX as _);
+        assert_eq!(u64::try_from(max_u64_doc.inner()), Ok(u64::MAX));
+
+        let overflow_raw: u128 = (u64::MAX as u128) + 1;
+        assert!(u64::try_from(overflow_raw).is_err());
+    }
+}
+
 pub struct CompensateGraphAction<S: StorageEngine, V: VectorIndex> {
     pub(super) collection: Collection<S, V>,
     pub(super) doc_ids: Arc<Vec<DocId>>,
 }
 
 impl<S: StorageEngine, V: VectorIndex> CompensateGraphAction<S, V> {
-    // ANCHOR[contextra-engine:NEW-194]
-    /// Dokumentation für `new` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[allow(dead_code)]
     pub fn new(collection: Collection<S, V>, doc_ids: Arc<Vec<DocId>>) -> Self {
         Self {
@@ -220,7 +213,13 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAct
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
             );
             for &doc_id in self.doc_ids.iter() {
-                let eid = EntityId::new(doc_id.inner());
+                let eid_val = u64::try_from(doc_id.inner()).map_err(|_| {
+                    ContextraError::InvalidInput(format!(
+                        "DocId {} exceeds u64::MAX for EntityId conversion",
+                        doc_id.inner()
+                    ))
+                })?;
+                let eid = EntityId::new(eid_val);
                 let _ = self
                     .collection
                     .graph_index
@@ -236,8 +235,6 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAct
     }
 }
 
-// ANCHOR[contextra-engine:COM-227]
-/// Dokumentation für `CompensateHnswAction` im Rahmen der Transaktions- und Facade-Orchestrierung.
 pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {
     pub(super) collection: Collection<S, V>,
     pub(super) tenant_id: TenantId,
@@ -245,8 +242,6 @@ pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {
 }
 
 impl<S: StorageEngine, V: VectorIndex> CompensateHnswAction<S, V> {
-    // ANCHOR[contextra-engine:NEW-234]
-    /// Dokumentation für `new` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn new(
         collection: Collection<S, V>,
         tenant_id: TenantId,
@@ -263,12 +258,21 @@ impl<S: StorageEngine, V: VectorIndex> CompensateHnswAction<S, V> {
 impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswAction<S, V> {
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            let tenant = self.tenant_id;
-            tracing::debug!(
-                tenant_id = ?tenant,
-                doc_count = self.doc_ids.len(),
-                "Executing CompensateHnswAction with tenant boundary validation"
-            );
+            if let Some(kv_hooks) = self.collection.kv_hooks() {
+                let chunk_ids: Vec<u64> = self
+                    .doc_ids
+                    .iter()
+                    .map(|d| {
+                        u64::try_from(d.inner()).map_err(|_| {
+                            ContextraError::InvalidInput(format!(
+                                "DocId {} exceeds u64::MAX for chunk_id conversion",
+                                d.inner()
+                            ))
+                        })
+                    })
+                    .collect::<Result<Vec<u64>>>()?;
+                kv_hooks.on_rollback(self.tenant_id, &chunk_ids);
+            }
             let comp_tx = TxId::new(
                 self.collection
                     .next_tx
@@ -277,7 +281,6 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
             for &doc_id in self.doc_ids.iter() {
                 if let Err(e) = self.collection.index.delete(comp_tx, doc_id).await {
                     tracing::error!(
-                        tenant_id = ?tenant,
                         "[INV-DB-3] Compensating HNSW delete failed for doc_id {:?}: {}",
                         doc_id,
                         e
@@ -285,11 +288,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
                 }
             }
             if let Err(e) = self.collection.index.commit(comp_tx).await {
-                tracing::error!(
-                    tenant_id = ?tenant,
-                    "[INV-DB-3] Compensating HNSW commit failed: {}",
-                    e
-                );
+                tracing::error!("[INV-DB-3] Compensating HNSW commit failed: {}", e);
                 return Err(e);
             }
             Ok(())
@@ -297,36 +296,12 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
     }
 }
 
-#[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing
-)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_docid_u64_overflow_handling() {
-        let max_u64_doc = DocId::new(u64::MAX as _);
-        assert_eq!(max_u64_doc.inner(), u64::MAX);
-
-        let overflow_raw: u128 = (u64::MAX as u128) + 1;
-        assert!(u64::try_from(overflow_raw).is_err());
-    }
-}
-
-// ANCHOR[contextra-engine:COM-304]
-/// Dokumentation für `CompensateTextAction` im Rahmen der Transaktions- und Facade-Orchestrierung.
 pub struct CompensateTextAction<S: StorageEngine, V: VectorIndex> {
     pub(super) collection: Collection<S, V>,
     pub(super) doc_ids: Arc<Vec<DocId>>,
 }
 
 impl<S: StorageEngine, V: VectorIndex> CompensateTextAction<S, V> {
-    // ANCHOR[contextra-engine:NEW-310]
-    /// Dokumentation für `new` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn new(collection: Collection<S, V>, doc_ids: Arc<Vec<DocId>>) -> Self {
         Self {
             collection,
@@ -366,16 +341,12 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateTextActi
     }
 }
 
-// ANCHOR[contextra-engine:ROL-349]
-/// Dokumentation für `RollbackStagedAction` im Rahmen der Transaktions- und Facade-Orchestrierung.
 pub struct RollbackStagedAction<S: StorageEngine, V: VectorIndex> {
     pub(super) collection: Collection<S, V>,
     pub(super) tx_id: TxId,
 }
 
 impl<S: StorageEngine, V: VectorIndex> RollbackStagedAction<S, V> {
-    // ANCHOR[contextra-engine:NEW-355]
-    /// Dokumentation für `new` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn new(collection: Collection<S, V>, tx_id: TxId) -> Self {
         Self { collection, tx_id }
     }

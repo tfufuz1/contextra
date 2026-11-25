@@ -76,7 +76,6 @@ impl GraphIndex for MockNoPprGraph {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-PPR-CANDIDATE-STREAM-001]
 #[tokio::test]
 async fn test_chain_graph_batches_and_ordering() {
     let graph = CsrGraph::new();
@@ -158,7 +157,6 @@ async fn test_chain_graph_batches_and_ordering() {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-PPR-CANDIDATE-STREAM-002]
 #[tokio::test]
 async fn test_snapshot_behavior_isolated_from_subsequent_mutations() {
     let graph = CsrGraph::new();
@@ -208,7 +206,6 @@ async fn test_snapshot_behavior_isolated_from_subsequent_mutations() {
     assert_eq!(stream.yielded(), 20);
 }
 
-// ANCHOR[contextra-graph:TESTS-PPR-CANDIDATE-STREAM-003]
 #[tokio::test]
 async fn test_exclude_seeds_option() {
     let graph = CsrGraph::new();
@@ -244,7 +241,6 @@ async fn test_exclude_seeds_option() {
     assert_eq!(yielded.len(), 4);
 }
 
-// ANCHOR[contextra-graph:TESTS-PPR-CANDIDATE-STREAM-004]
 #[tokio::test]
 async fn test_empty_seeds_exhausted_immediately() {
     let graph = CsrGraph::new();
@@ -261,7 +257,6 @@ async fn test_empty_seeds_exhausted_immediately() {
     assert!(single.is_none());
 }
 
-// ANCHOR[contextra-graph:TESTS-PPR-CANDIDATE-STREAM-005]
 #[tokio::test]
 async fn test_unsupported_ppr_capability_propagated() {
     let mock_graph = MockNoPprGraph;
@@ -277,7 +272,6 @@ async fn test_unsupported_ppr_capability_propagated() {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-PPR-CANDIDATE-STREAM-006]
 #[tokio::test]
 async fn test_next_batch_docs_skips_unresolvable_entities() {
     let graph = CsrGraph::new();
@@ -319,7 +313,6 @@ async fn test_next_batch_docs_skips_unresolvable_entities() {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-PPR-CANDIDATE-STREAM-007]
 #[tokio::test]
 async fn test_determinism_across_multiple_streams() {
     let graph = CsrGraph::new();

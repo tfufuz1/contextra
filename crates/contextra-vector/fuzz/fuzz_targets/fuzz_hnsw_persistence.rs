@@ -2,8 +2,7 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use contextra_types::{DistanceMetric, DocId, TxId};
-use contextra_ports::VectorIndex;
+use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom, Write};
@@ -98,7 +97,7 @@ fuzz_target!(|input: HnswPersistInput| {
         let path = temp_dir.join(format!("fuzz_hnsw_{}_{}.hnsw", std::process::id(), id));
 
         // 5. Save index
-        if index.save(&path).is_err() {
+        if index.save(&path).await.is_err() {
             let _ = std::fs::remove_file(&path);
             return;
         }
@@ -127,7 +126,7 @@ fuzz_target!(|input: HnswPersistInput| {
         };
 
         // 8. Search on reloaded index if load succeeded - must not panic
-        if reloaded.load_mmap(&path).is_ok() {
+        if reloaded.load_mmap(&path).await.is_ok() {
             let query = vec![0.0f32; dim];
             let _ = reloaded.search(&query, 5).await;
         }

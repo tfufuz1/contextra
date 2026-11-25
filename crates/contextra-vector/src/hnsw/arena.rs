@@ -4,9 +4,9 @@
 
 //! Arena Allocator for HNSW neighbor lists and O(1) Backlink management.
 
-use contextra_types::{ContextraError, Result};
+use ahash::AHashMap;
+use contextra_core::{ContextraError, Result};
 use parking_lot::RwLock;
-use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Slot alignment in bytes (64-byte alignment = 16 u32 elements for SIMD cache-line compatibility).
@@ -17,17 +17,17 @@ pub const ARENA_ALIGNMENT_U32: usize = ARENA_ALIGNMENT_BYTES / std::mem::size_of
 /// Composite key (neighbor_ram_idx, layer) for backlink lookups.
 pub type BacklinkKey = (usize, usize);
 
-/// Deterministic backlink connection table using `BTreeMap`.
+/// Thread-safe $O(1)$ backlink connection table using `AHashMap`.
 #[derive(Debug, Default, Clone)]
 pub struct BacklinkTable {
-    pub map: BTreeMap<BacklinkKey, Vec<u32>>,
+    pub map: AHashMap<BacklinkKey, Vec<u32>>,
 }
 
 impl BacklinkTable {
     /// Creates a new `BacklinkTable`.
     pub fn new() -> Self {
         Self {
-            map: BTreeMap::new(),
+            map: AHashMap::new(),
         }
     }
 
@@ -291,44 +291,6 @@ impl HnswArena {
             }
         }
         false
-    }
-
-    /// Zeroizes connection memory for a node slot across all layers and clears counts,
-    /// without releasing to `free_list` (`INV-VEC-ZEROIZE-1`, `INV-HNSW-SLOT-1`).
-    pub fn zeroize_node_connections(&self, ram_idx: usize, max_layer: usize, m: usize) {
-        let offsets = self.offsets.read();
-        let count_offsets = self.count_offsets.read();
-        let mut counts = self.counts.write();
-        let mut arena = self.arena.write();
-
-        if ram_idx < offsets.len() && ram_idx < count_offsets.len() {
-            let node_offset = offsets[ram_idx];
-            let count_start = count_offsets[ram_idx];
-            let count_end = if ram_idx + 1 < count_offsets.len() {
-                count_offsets[ram_idx + 1]
-            } else {
-                counts.len()
-            };
-
-            for layer in 0..=max_layer {
-                if count_start + layer < count_end {
-                    let l_offset = Self::layer_offset(node_offset, layer, m);
-                    let layer_cap = if layer == 0 { m * 2 } else { m };
-                    if l_offset + layer_cap <= arena.len() {
-                        use zeroize::Zeroize;
-                        arena[l_offset..l_offset + layer_cap].zeroize();
-                    }
-                    counts[count_start + layer] = 0;
-                }
-            }
-        }
-    }
-
-    /// Zeroizes connection memory for a node slot across all layers, clears counts,
-    /// and then marks the node's slot as free in the free_list.
-    pub fn zeroize_and_free_node(&self, ram_idx: usize, max_layer: usize, m: usize) {
-        self.zeroize_node_connections(ram_idx, max_layer, m);
-        self.free_node(ram_idx);
     }
 
     /// Marks a node's slot as free for future slot reuse.

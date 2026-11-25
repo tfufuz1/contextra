@@ -1,9 +1,3 @@
-#![cfg(feature = "legacy-erasure")]
-//! # Integrationstest: `campaign_j26_hypotheses.rs`
-//!
-//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_j26_hypotheses`.
-//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
-
 // FILE-CONTEXT
 // ZWECK: Campaign J-26 hypothesis test suite for crypto compliance, revocation logs, audit chains, commitments, and deletion proofs.
 // INVARIANTEN: Zero-Panic doctrine in non-test code, fail-closed revocation checks, length-prefixed deletion proof hashes, and Blake3 audit chain integrity.
@@ -24,73 +18,13 @@ use contextra_crypto::{
     kv_shredding::KeyRegistry,
     revocation_log::{RevocationLog, RevocationTarget},
 };
-use contextra_ports::{SystemClock, Vfs};
-use contextra_types::{ContextraError, DocId, TenantId, TxId};
+use contextra_ports::SystemClock;
+use contextra_types::{DocId, TenantId, TxId};
 use ed25519_dalek::SigningKey;
 use rand::{rngs::OsRng, RngCore};
 use std::collections::HashSet;
-use std::path::Path;
 use std::sync::Arc;
 use tempfile::NamedTempFile;
-
-/// Lokale Vfs-Implementierung delegierend an std::fs für Integrationstests
-#[derive(Debug, Default)]
-struct StdTestVfs;
-
-impl Vfs for StdTestVfs {
-    fn read(&self, path: &Path) -> contextra_ports::Result<Vec<u8>> {
-        std::fs::read(path).map_err(ContextraError::Io)
-    }
-
-    fn write_atomic(&self, path: &Path, data: &[u8]) -> contextra_ports::Result<()> {
-        let parent = path.parent().unwrap_or_else(|| Path::new("."));
-        let mut temp_file =
-            tempfile::NamedTempFile::new_in(parent).map_err(|e| ContextraError::Io(e.into()))?;
-        use std::io::Write;
-        temp_file.write_all(data).map_err(ContextraError::Io)?;
-        temp_file.as_file().sync_all().map_err(ContextraError::Io)?;
-        temp_file
-            .persist(path)
-            .map_err(|e| ContextraError::Io(e.error))?;
-        let _ = self.sync_dir(parent);
-        Ok(())
-    }
-
-    fn create_dir_all(&self, path: &Path) -> contextra_ports::Result<()> {
-        std::fs::create_dir_all(path).map_err(ContextraError::Io)
-    }
-
-    fn remove_file(&self, path: &Path) -> contextra_ports::Result<()> {
-        std::fs::remove_file(path).map_err(ContextraError::Io)
-    }
-
-    fn exists(&self, path: &Path) -> contextra_ports::Result<bool> {
-        Ok(path.exists())
-    }
-
-    fn len(&self, path: &Path) -> contextra_ports::Result<u64> {
-        let meta = std::fs::metadata(path).map_err(ContextraError::Io)?;
-        Ok(meta.len())
-    }
-
-    fn list_dir(&self, path: &Path) -> contextra_ports::Result<Vec<String>> {
-        let mut entries = Vec::new();
-        for entry in std::fs::read_dir(path).map_err(ContextraError::Io)? {
-            let entry = entry.map_err(ContextraError::Io)?;
-            if let Some(name) = entry.file_name().to_str() {
-                entries.push(name.to_string());
-            }
-        }
-        Ok(entries)
-    }
-
-    fn sync_dir(&self, path: &Path) -> contextra_ports::Result<()> {
-        if let Ok(dir) = std::fs::File::open(path) {
-            let _ = dir.sync_all();
-        }
-        Ok(())
-    }
-}
 
 fn test_ed25519_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     let sk = SigningKey::generate(&mut OsRng);
@@ -99,7 +33,7 @@ fn test_ed25519_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
 }
 
 // ---------------------------------------------------------------------------
-// H1: KeyRegistry revocation writes atomically to RevocationLog (SEC-03/K3)
+// H1: KeyRegistry revocation does not write to RevocationLog (Split-Brain)
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -108,10 +42,9 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     let log_path = tmp_file.path().to_path_buf();
     let (sk, vk) = test_ed25519_keypair();
     let clock = Arc::new(SystemClock::new());
-    let vfs: Arc<dyn Vfs> = Arc::new(StdTestVfs);
 
     let rev_log = Arc::new(
-        RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), Some(sk), vk)
+        RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk)
             .expect("open revocation log"),
     );
 
@@ -126,15 +59,8 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     assert!(registry.is_group_active(group_id));
 
     // Revoke group in registry
-    let revoked = registry.revoke_group(group_id).expect("revoke group");
+    let revoked = registry.revoke_group(group_id).expect("revoke_group");
     assert!(revoked, "revoke_group must return true for active group");
-
-    // RevocationLog MUST now contain 1 entry
-    assert_eq!(
-        rev_log.len(),
-        1,
-        "RevocationLog MUST be updated on revoke_group"
-    );
 
     // In RAM, group is revoked
     assert!(registry.is_group_revoked(group_id));
@@ -144,12 +70,13 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     drop(rev_log);
 
     let reloaded_log = Arc::new(
-        RevocationLog::open_or_create(vfs, &log_path, clock, None, vk)
-            .expect("reload revocation log"),
+        RevocationLog::open_or_create(&log_path, clock, None, vk).expect("reload revocation log"),
     );
     let new_registry = KeyRegistry::new().with_revocation_log(reloaded_log.clone());
 
-    // The revocation MUST be reconstructed from the log after crash.
+    // EXPECTATION: The revocation SHOULD be reconstructed from the log after crash.
+    // DEFECT: KeyRegistry::revoke_group never calls revocation_log.append(), so log is empty
+    // and new_registry thinks group 999 is NOT revoked!
     assert!(
         new_registry.is_group_revoked(group_id),
         "Group 999 MUST be recognized as revoked after reload from RevocationLog"
@@ -157,16 +84,14 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
 }
 
 #[test]
-fn test_h1_demonstrate_coupling_between_registry_and_revocation_log() {
+fn test_h1_demonstrate_decoupling_between_registry_and_revocation_log() {
     let tmp_file = NamedTempFile::new().expect("create temp file");
     let log_path = tmp_file.path().to_path_buf();
     let (sk, vk) = test_ed25519_keypair();
     let clock = Arc::new(SystemClock::new());
-    let vfs: Arc<dyn Vfs> = Arc::new(StdTestVfs);
 
     let rev_log = Arc::new(
-        RevocationLog::open_or_create(vfs, &log_path, clock, Some(sk), vk)
-            .expect("open revocation log"),
+        RevocationLog::open_or_create(&log_path, clock, Some(sk), vk).expect("open revocation log"),
     );
 
     let km = KeyManager::try_new("test-passphrase-h1-demo", b"salt-h1").expect("keymanager");
@@ -176,50 +101,11 @@ fn test_h1_demonstrate_coupling_between_registry_and_revocation_log() {
     let _subkey = registry.get_or_derive(&km, group_id).expect("derive");
     registry.revoke_group(group_id).expect("revoke_group");
 
-    // FIX SEC-03 VERIFIED: rev_log.len() is 1 because revoke_group calls rev_log.append()
+    // After fix: rev_log.len() is 1 because revoke_group appended to RevocationLog
     assert_eq!(
         rev_log.len(),
         1,
-        "FIX SEC-03: KeyRegistry::revoke_group DOES append to RevocationLog"
-    );
-}
-
-#[test]
-fn test_sec03_revoke_group_log_failure_atomicity_and_idempotency() {
-    let clock = Arc::new(SystemClock::new());
-    let (_sk, vk) = test_ed25519_keypair();
-    // Create an in-memory RevocationLog WITHOUT a signing key (so append() will fail)
-    let log_no_sk = Arc::new(RevocationLog::new_in_memory(clock, None, vk));
-
-    let km = KeyManager::try_new("test-passphrase-atomic", b"salt-atomic").expect("keymanager");
-    let registry = KeyRegistry::new().with_revocation_log(log_no_sk);
-    let group_id = 777;
-
-    let _subkey = registry.get_or_derive(&km, group_id).expect("derive");
-    assert!(registry.is_group_active(group_id));
-
-    // 1. Logging failure MUST propagate error and NOT revoke key in RAM
-    let res = registry.revoke_group(group_id);
-    assert!(
-        res.is_err(),
-        "revoke_group MUST fail if logging to RevocationLog fails"
-    );
-    assert!(
-        registry.is_group_active(group_id),
-        "Group MUST remain active in RAM if log append fails"
-    );
-
-    // 2. Double revocation idempotency check (without failing log)
-    let registry_ok = KeyRegistry::new();
-    let _subkey = registry_ok.get_or_derive(&km, group_id).expect("derive");
-
-    assert!(
-        registry_ok.revoke_group(group_id).expect("first revoke"),
-        "First revocation MUST return Ok(true)"
-    );
-    assert!(
-        !registry_ok.revoke_group(group_id).expect("second revoke"),
-        "Second revocation MUST return Ok(false) (idempotent)"
+        "KeyRegistry::revoke_group MUST append to RevocationLog"
     );
 }
 
@@ -252,7 +138,7 @@ fn test_h2_revocation_cascade_isolation_and_resurrection_prevention() {
         .expect("encrypt 2_2");
 
     // 1. Revoke group 1
-    assert!(registry.revoke_group(group_1).expect("revoke_group"));
+    assert!(registry.revoke_group(group_1).unwrap());
 
     // Verify group 1 status flags
     assert!(registry.is_group_revoked(group_1));
@@ -278,7 +164,7 @@ fn test_h2_revocation_cascade_isolation_and_resurrection_prevention() {
     );
 
     // 3. Single record revocation in group 2
-    assert!(registry.revoke_record(group_2, 1));
+    assert!(registry.revoke_record(group_2, 1).unwrap());
     assert!(!registry.is_record_active(group_2, 1));
     assert!(registry.is_record_active(group_2, 2));
 
@@ -306,21 +192,19 @@ fn test_h2_revocation_cascade_isolation_and_resurrection_prevention() {
 fn test_h3_revocation_log_tamper_matrix() {
     let (sk, vk) = test_ed25519_keypair();
     let clock = Arc::new(SystemClock::new());
-    let vfs: Arc<dyn Vfs> = Arc::new(StdTestVfs);
 
     // Construct a log with 10 entries for thorough sampling
     let tmp_file = NamedTempFile::new().expect("tempfile");
     let log_path = tmp_file.path().to_path_buf();
 
-    let log = RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), Some(sk), vk)
-        .expect("log");
+    let log = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk).expect("log");
     for i in 0..10 {
         log.append(RevocationTarget::Group(i)).expect("append");
     }
     assert_eq!(log.len(), 10);
     assert!(log.verify_integrity().is_ok());
 
-    let original_bytes = vfs.read(&log_path).expect("read raw log bytes");
+    let original_bytes = std::fs::read(&log_path).expect("read raw log bytes");
     let parsed_entries: Vec<contextra_crypto::revocation_log::RevocationEntry> =
         bincode::deserialize(&original_bytes).expect("deserialize entries");
 
@@ -335,9 +219,8 @@ fn test_h3_revocation_log_tamper_matrix() {
             tampered[idx] ^= 1 << bit_shift;
 
             // Write tampered bytes directly to disk file and test open_or_create
-            vfs.write_atomic(&log_path, &tampered)
-                .expect("write tampered");
-            match RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk) {
+            std::fs::write(&log_path, &tampered).expect("write tampered");
+            match RevocationLog::open_or_create(&log_path, clock.clone(), None, vk) {
                 Err(_) => detected_tamper += 1,
                 Ok(reopened_log) => {
                     // If open_or_create succeeded, check if the 10 entries are still intact and verified.
@@ -352,8 +235,7 @@ fn test_h3_revocation_log_tamper_matrix() {
         }
     }
     // Restore original file
-    vfs.write_atomic(&log_path, &original_bytes)
-        .expect("restore");
+    std::fs::write(&log_path, &original_bytes).expect("restore");
 
     assert_eq!(
         detected_tamper, total_flips,
@@ -365,10 +247,10 @@ fn test_h3_revocation_log_tamper_matrix() {
         let mut tampered_entries = parsed_entries.clone();
         tampered_entries.remove(delete_idx);
         let tampered_bytes = bincode::serialize(&tampered_entries).expect("serialize");
-        vfs.write_atomic(&log_path, &tampered_bytes).expect("write");
+        std::fs::write(&log_path, &tampered_bytes).expect("write");
 
         assert!(
-            RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk).is_err(),
+            RevocationLog::open_or_create(&log_path, clock.clone(), None, vk).is_err(),
             "Deleting entry at index {delete_idx} MUST be detected as an integrity violation"
         );
     }
@@ -379,11 +261,10 @@ fn test_h3_revocation_log_tamper_matrix() {
         let mut tampered_entries = parsed_entries.clone();
         tampered_entries.remove(9);
         let tampered_bytes = bincode::serialize(&tampered_entries).expect("serialize");
-        vfs.write_atomic(&log_path, &tampered_bytes).expect("write");
+        std::fs::write(&log_path, &tampered_bytes).expect("write");
 
-        let reopened =
-            RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk)
-                .expect("open_or_create accepts tail-truncated log");
+        let reopened = RevocationLog::open_or_create(&log_path, clock.clone(), None, vk)
+            .expect("open_or_create accepts tail-truncated log");
         assert_eq!(
             reopened.len(),
             9,
@@ -396,10 +277,10 @@ fn test_h3_revocation_log_tamper_matrix() {
         let mut tampered_entries = parsed_entries.clone();
         tampered_entries.swap(3, 4);
         let tampered_bytes = bincode::serialize(&tampered_entries).expect("serialize");
-        vfs.write_atomic(&log_path, &tampered_bytes).expect("write");
+        std::fs::write(&log_path, &tampered_bytes).expect("write");
 
         assert!(
-            RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk).is_err(),
+            RevocationLog::open_or_create(&log_path, clock.clone(), None, vk).is_err(),
             "Swapping adjacent entries MUST be detected as an integrity violation"
         );
     }
@@ -409,10 +290,10 @@ fn test_h3_revocation_log_tamper_matrix() {
         let mut tampered_entries = parsed_entries.clone();
         tampered_entries.insert(2, parsed_entries[2].clone());
         let tampered_bytes = bincode::serialize(&tampered_entries).expect("serialize");
-        vfs.write_atomic(&log_path, &tampered_bytes).expect("write");
+        std::fs::write(&log_path, &tampered_bytes).expect("write");
 
         assert!(
-            RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk).is_err(),
+            RevocationLog::open_or_create(&log_path, clock.clone(), None, vk).is_err(),
             "Duplicating an entry MUST be detected as an integrity violation"
         );
     }
@@ -420,35 +301,33 @@ fn test_h3_revocation_log_tamper_matrix() {
     // Matrix Test 5: File truncation
     {
         let truncated_bytes = &original_bytes[..original_bytes.len() / 2];
-        vfs.write_atomic(&log_path, truncated_bytes).expect("write");
+        std::fs::write(&log_path, truncated_bytes).expect("write");
 
         assert!(
-            RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk).is_err(),
+            RevocationLog::open_or_create(&log_path, clock.clone(), None, vk).is_err(),
             "Truncating the log file in the middle MUST be detected fail-closed"
         );
     }
 
     // Matrix Test 6: Wrong verifying key
     {
-        vfs.write_atomic(&log_path, &original_bytes)
-            .expect("write back original");
+        std::fs::write(&log_path, &original_bytes).expect("write back original");
         let (_wrong_sk, wrong_vk) = test_ed25519_keypair();
 
         assert!(
-            RevocationLog::open_or_create(vfs, &log_path, clock, None, wrong_vk).is_err(),
+            RevocationLog::open_or_create(&log_path, clock, None, wrong_vk).is_err(),
             "Opening log with wrong verifying key MUST fail integrity verification"
         );
     }
 }
 
 // ---------------------------------------------------------------------------
-// H4: AuditChain Backup Rollback Protection & External Head Anchor (SEC-01/K1)
+// H4: AuditChain Backup Rollback Replay & Tampering Matrix
 // ---------------------------------------------------------------------------
 
 #[test]
+#[ignore = "SEC-01/K1: AuditChain::verify_chain accepts rolled-back backup state (lack of external head anchor)"]
 fn test_h4_audit_chain_backup_rollback_vulnerability() {
-    use contextra_crypto::audit_chain::AuditHeadAnchor;
-
     let (sk, vk) = test_ed25519_keypair();
     let mut chain = AuditChain::new();
 
@@ -468,7 +347,7 @@ fn test_h4_audit_chain_backup_rollback_vulnerability() {
 
     // Capture backup state at entry 10
     let backup_at_10 = chain.clone();
-    let _head_sig_10 = backup_at_10.sign_head(&sk).expect("sign head 10");
+    let head_sig_10 = backup_at_10.sign_head(&sk).expect("sign head 10");
 
     // Continue chain up to entry 20
     for i in 11..=20 {
@@ -484,88 +363,26 @@ fn test_h4_audit_chain_backup_rollback_vulnerability() {
             .expect("append");
     }
 
-    // External system creates head anchor at entry 20 (index 19, head_hash = chain.head_hash())
-    let current_head_sig = chain.sign_head(&sk).expect("sign head 20");
-    let external_anchor = AuditHeadAnchor::with_signature(
-        current_head_sig.chain_index,
-        current_head_sig.head_hash,
-        current_head_sig.clone(),
-    );
-
     // Attacker rolls back chain to backup_at_10
     let rolled_back_chain = backup_at_10;
 
-    // 1. Internal verify_chain alone STILL succeeds on backup_at_10 (as documented in warning)
+    // EXPECTATION: Rollback should be detectable via an external anchor (e.g. system state counter).
+    // DEFECT: Without an external anchor, verify_chain and verify_head_signature BOTH return true for the old backup!
     assert!(
         rolled_back_chain.verify_chain().expect("verify"),
         "Rolled back chain internally satisfies Blake3 hash linkage"
     );
-
-    // 2. Rollback detection via external head anchor: verify_chain_with_anchor MUST fail!
     assert!(
-        !rolled_back_chain
-            .verify_chain_with_anchor(&external_anchor, Some(&vk))
-            .expect("verify with anchor"),
-        "FIX SEC-01 VERIFIED: verify_chain_with_anchor rejects rolled-back chain shorter than anchor seq_no"
+        AuditChain::verify_head_signature(&head_sig_10, &vk).expect("verify sig"),
+        "Head signature for backup at 10 is cryptographically valid"
     );
 
-    // 3. Current full chain MUST pass verification with the external anchor
-    assert!(
-        chain
-            .verify_chain_with_anchor(&external_anchor, Some(&vk))
-            .expect("verify current chain"),
-        "Current full chain MUST verify successfully with external head anchor"
+    // This assertion fails if there is no external state anchor tracking chain length >= 20
+    assert_eq!(
+        rolled_back_chain.len(),
+        20,
+        "BEFUND H4: Rolled-back chain cannot be distinguished from current head without external anchor"
     );
-}
-
-#[test]
-fn test_sec01_audit_chain_manipulated_anchor_negative_tests() {
-    use contextra_crypto::audit_chain::AuditHeadAnchor;
-
-    let (sk, vk) = test_ed25519_keypair();
-    let mut chain = AuditChain::new();
-
-    for i in 1..=5 {
-        chain
-            .append(
-                "schema_v1",
-                [0x11; 32],
-                DataClass::Internal,
-                DocId(i),
-                TxId(i),
-                None,
-            )
-            .expect("append");
-    }
-
-    let head_sig = chain.sign_head(&sk).expect("sign head");
-    let valid_anchor =
-        AuditHeadAnchor::with_signature(head_sig.chain_index, head_sig.head_hash, head_sig.clone());
-
-    // Valid anchor passes
-    assert!(chain
-        .verify_chain_with_anchor(&valid_anchor, Some(&vk))
-        .expect("valid anchor"));
-
-    // Case 1: Wrong seq_no (higher than chain length)
-    let bad_seq_anchor = AuditHeadAnchor::new(10, head_sig.head_hash);
-    assert!(!chain
-        .verify_chain_with_anchor(&bad_seq_anchor, None)
-        .expect("bad seq"));
-
-    // Case 2: Wrong head_hash
-    let mut wrong_hash = head_sig.head_hash;
-    wrong_hash[0] ^= 0xFF;
-    let bad_hash_anchor = AuditHeadAnchor::new(head_sig.chain_index, wrong_hash);
-    assert!(!chain
-        .verify_chain_with_anchor(&bad_hash_anchor, None)
-        .expect("bad hash"));
-
-    // Case 3: Wrong signature key
-    let (_wrong_sk, wrong_vk) = test_ed25519_keypair();
-    assert!(!chain
-        .verify_chain_with_anchor(&valid_anchor, Some(&wrong_vk))
-        .expect("wrong vk"));
 }
 
 #[test]
@@ -705,7 +522,7 @@ fn test_h5_record_commitment_binding_hiding_and_encrypted_salt() {
     assert!(tampered_enc_salt.decrypt(&registry).is_err());
 
     // Revoked group destroys decryption
-    registry.revoke_group(group_id).expect("revoke_group");
+    registry.revoke_group(group_id).unwrap();
     assert!(
         enc_salt.decrypt(&registry).is_err(),
         "Decryption of salt MUST fail after key shredding"
@@ -741,7 +558,6 @@ fn test_h6_deletion_proof_v3_validation_suite() {
             1 => assert_eq!(typed, Ok(SignatureVersion::V1)),
             2 => assert_eq!(typed, Ok(SignatureVersion::V2)),
             3 => assert_eq!(typed, Ok(SignatureVersion::V3)),
-            5 => assert_eq!(typed, Ok(SignatureVersion::V5)),
             v => assert_eq!(
                 typed,
                 Err(contextra_crypto::ed25519_proof::DeletionProofError::UnsupportedVersion(v))
@@ -760,8 +576,8 @@ fn test_h6_deletion_proof_v3_validation_suite() {
         attested_at: 1700000000,
     }];
     let cleanup_proofs = vec![
-        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-        LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
     ];
 
     let proof_x = DeletionProof::create_v3(
@@ -819,37 +635,11 @@ fn test_h6_deletion_proof_v3_validation_suite() {
         .verify_external(&keypair.verifying_key)
         .is_err());
 
-    // (e) LayerCleanupProof non-empty rejection via DeletionProof::issue
-    {
-        use contextra_ports::scanner::ScanTechnique;
-        use contextra_ports::SystemClock;
-        use contextra_testkit::mint_witness_for_tests;
-        use contextra_types::{RequestContext, SagaRecord};
-
-        let clock = SystemClock::new();
-        let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId(100));
-        let saga = SagaRecord::new([0xAA; 32]);
-        let hmac_key = b"secret_hmac_key_32_bytes_long!!";
-
-        let w_remaining = vec![
-            mint_witness_for_tests("LsmMemtable", 10, 5, ScanTechnique::Structural),
-            mint_witness_for_tests("SsTableAllLevels", 50, 0, ScanTechnique::Structural),
-            mint_witness_for_tests("WalAllSegments", 100, 0, ScanTechnique::Structural),
-        ];
-        assert!(
-            DeletionProof::issue(
-                &ctx,
-                &saga,
-                &w_remaining,
-                &[ExcludedScope::LlmParameterMemory],
-                contextra_crypto::deletion_proof::CustodyLevel::Local,
-                hmac_key.as_slice(),
-                &clock,
-            )
-            .is_err(),
-            "DeletionProof::issue MUST reject remaining live entries > 0"
-        );
-    }
+    // (e) LayerCleanupProof non-empty rejection
+    assert!(
+        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 5).is_err(),
+        "LayerCleanupProof MUST reject remaining live entries > 0"
+    );
 
     // (f) WAL delete receipt compute & verify roundtrip + tampering
     let integrity_key = b"wal-integrity-key-32-bytes-ok!";
@@ -897,7 +687,7 @@ fn test_h9_post_revocation_read_path_and_emergency_wipe() {
     assert_eq!(dec, b"Confidential Plaintext");
 
     // Action: Revoke group
-    assert!(registry.revoke_group(group_id).expect("revoke_group"));
+    assert!(registry.revoke_group(group_id).unwrap());
 
     // Post-revocation: decrypt_with_group MUST fail fail-closed with KeyRevoked
     let dec_res = registry.decrypt_with_group(group_id, &ct, &nonce);

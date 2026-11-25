@@ -1,16 +1,3 @@
-//! Identifikatoren: `DocId`, `EntityId`, `TxId`, `TenantId`, `CollectionId`.
-//!
-//! # Architektur-Rolle: Ring 0 (Typensichere Newtypes)
-//!
-//! Alle Primärschlüssel und logischen Referenzen sind als Newtypes modelliert.
-//! Dies verhindert das versehentliche Verwechseln von Roh-Ganzzahlen (z. B. Übergabe einer `TxId`
-//! an eine Funktion, die eine `DocId` erwartet).
-//!
-//! # Invarianten
-//! - INV-TENANT-1: `TenantId(0)` ist zwingend für das System reserviert (`TenantId::SYSTEM`).
-//! - AGT-GRAPH-001: `TxId` unterscheidet strikt zwischen regulären Collection-Transaktionen
-//!   (`[1, MAX_COLLECTION_SEQUENCE]`) und internen System-Transaktionen (`[INTERNAL_BASE, u64::MAX]`).
-
 use crate::error::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
@@ -20,15 +7,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// INVARIANTE INV-TENANT-1: TenantId(0) ist SYSTEM-reserviert.
 /// `TenantId::try_new(0)` → Err. Keine Ausnahmen.
-///
-/// # Abgrenzung
-/// Dieser Typ `contextra_types::TenantId` ist der kanonische 64-Bit-Ganzzahl-Mandantenidentifikator
-/// in Ring 0 zur Durchsetzung der Mandantenisolation über Speicher, WAL und Indexe (INV-TENANT-1).
-/// Im Gegensatz dazu ist `contextra_privacy::processing_registry::TenantId` ein lokaler `String`-Alias
-/// für PII-Policy-Keying im Egress/Filter-Gateway.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
-// ANCHOR[contextra-types:ID-TENANT]
 pub struct TenantId(pub u64);
 
 impl TenantId {
@@ -42,13 +22,6 @@ impl TenantId {
     pub const INVALID: Self = Self(0);
 
     /// Const-Konstruktor.
-    ///
-    /// # Invariante INV-TENANT-1 & Deprecation
-    /// `TenantId::new` erlaubt die Erstellung von `TenantId(0)` ohne Laufzeit-Validierung.
-    /// Da `TenantId(0)` zwingend für den System-Kontext ([`TenantId::SYSTEM`]) reserviert ist,
-    /// umgeht `new()` die Invariante INV-TENANT-1.
-    /// Verwende stattdessen [`TenantId::try_new`] für Benutzermandanten oder [`TenantId::SYSTEM`]
-    /// für Systemtransaktionen.
     #[deprecated(
         since = "0.1.0",
         note = "Nutze TenantId::try_new() oder TenantId::SYSTEM — new() umgeht INV-TENANT-1 und wird in einer künftigen Version entfernt."
@@ -111,7 +84,6 @@ impl std::fmt::Display for TenantId {
 /// Internal collection identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
-// ANCHOR[contextra-types:ID-COLLECTION]
 pub struct CollectionId(pub u64);
 
 impl CollectionId {
@@ -169,14 +141,12 @@ impl std::fmt::Display for CollectionId {
 #[cfg(not(feature = "docid-128"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
-// ANCHOR[contextra-types:ID-DOC]
 pub struct DocId(pub u64);
 
 #[cfg(feature = "docid-128")]
 /// Internal document identifier (128-bit variant).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(C, align(16))]
-// ANCHOR[contextra-types:ID-DOC-128]
 pub struct DocId(pub u128);
 
 #[cfg(not(feature = "docid-128"))]
@@ -296,7 +266,6 @@ impl std::fmt::Display for DocId {
 /// Internal entity identifier for graph nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
-// ANCHOR[contextra-types:ID-ENTITY]
 pub struct EntityId(pub u64);
 
 impl EntityId {
@@ -325,15 +294,9 @@ impl EntityId {
     }
 
     /// Creates an `EntityId` directly from a `DocId`.
-    #[cfg(not(feature = "docid-128"))]
+    #[allow(clippy::unnecessary_cast, clippy::cast_possible_truncation)]
     pub fn from_doc_id(doc_id: DocId) -> Self {
-        Self(doc_id.inner())
-    }
-
-    /// Creates an `EntityId` directly from a `DocId`.
-    #[cfg(feature = "docid-128")]
-    pub fn from_doc_id(doc_id: DocId) -> Self {
-        Self(doc_id.as_u64())
+        Self(doc_id.inner() as u64)
     }
 
     /// Derives an `EntityId` from a string key using the first 8 bytes of its BLAKE3 hash.
@@ -344,22 +307,9 @@ impl EntityId {
     /// # Infallible Fallback
     /// If you need the old infallible behaviour (parse-as-u64 or hash), use `EntityId::from(key)` directly.
     /// Prefer this fallible variant for consistency with `DocId` at API boundaries.
-    #[cfg(not(feature = "docid-128"))]
+    #[allow(clippy::unnecessary_cast, clippy::cast_possible_truncation)]
     pub fn from_key(key: &str) -> Result<Self> {
-        DocId::from_key(key).map(|d| Self(d.inner()))
-    }
-
-    /// Derives an `EntityId` from a string key using the first 8 bytes of its BLAKE3 hash.
-    ///
-    /// # Errors
-    /// Returns `ContextraError::InvalidInput` if `key` is empty, mirroring `DocId::from_key`.
-    ///
-    /// # Infallible Fallback
-    /// If you need the old infallible behaviour (parse-as-u64 or hash), use `EntityId::from(key)` directly.
-    /// Prefer this fallible variant for consistency with `DocId` at API boundaries.
-    #[cfg(feature = "docid-128")]
-    pub fn from_key(key: &str) -> Result<Self> {
-        DocId::from_key(key).map(|d| Self(d.as_u64()))
+        DocId::from_key(key).map(|d| Self(d.inner() as u64))
     }
 }
 
@@ -413,7 +363,6 @@ impl std::fmt::Display for EntityId {
 /// Transaction identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
-// ANCHOR[contextra-types:ID-TX]
 pub struct TxId(pub u64);
 
 impl TxId {
@@ -471,6 +420,12 @@ impl TxId {
         Self(Self::INTERNAL_BASE)
     }
 
+    /// Returns a new internal/system transaction ID with the given offset from INTERNAL_BASE.
+    #[inline]
+    pub fn internal_with_offset(offset: u64) -> Result<Self> {
+        Self::try_from_internal_offset(offset)
+    }
+
     /// Safely constructs an internal system TxId from an offset relative to `TxId::INTERNAL_BASE`.
     ///
     /// # Domain Range Separation (ADR-028)
@@ -503,9 +458,11 @@ impl TxId {
     }
 }
 
-// Compile-time invariant validations without assert! macro (Zero-Panic AST audit clean)
-const _: [(); 0 - !(TxId::INTERNAL_BASE > TxId::MAX_COLLECTION_SEQUENCE) as usize] = [];
-const _: [(); 0 - !(TxId::INTERNAL_BASE < u64::MAX) as usize] = [];
+const _: () = assert!(
+    TxId::INTERNAL_BASE > TxId::MAX_COLLECTION_SEQUENCE,
+    "INTERNAL_BASE must be above the collection-sequence range"
+);
+const _: () = assert!(TxId::INTERNAL_BASE < u64::MAX);
 
 impl std::fmt::Display for TxId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

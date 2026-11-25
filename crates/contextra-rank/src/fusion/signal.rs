@@ -1,20 +1,9 @@
-//! # Signaldefinitionen & Metadaten-Handling (`signal`)
-//!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
-//!
-//! Behandelt Klassifikationen von Suchsignalen (`SignalKind`), Kontextinformationen
-//! über Modellreife und Drift sowie Prioritätsregeln für Metadaten-Merges.
-
-use std::fmt;
-
 use super::types::SignalContribution;
 use crate::drift::DriftStatus;
 use ahash::AHashMap;
-use serde::{Deserialize, Serialize};
 
 /// Calibration and drift context for a search signal during mRRF weight modulation.
 #[derive(Debug, Clone)]
-/// Kontext zu Modellkalibrierung und Driftzustand eines Signals für die mRRF-Gewichtsmodulation.
 pub struct SignalCalibrationContext {
     /// Signal identifier matching the result set signal name (e.g., "vector", "text", "graph").
     pub signal_name: String,
@@ -88,9 +77,7 @@ pub(super) struct FusedEntry<'a> {
 }
 
 /// Identifies the kind of search signal used during fusion.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-/// Klassifikation der unterschiedlichen Retrieval-Signalarten im Contextra-System.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SignalKind {
     /// Vector (semantic k-NN) search signal.
     Vector,
@@ -124,7 +111,6 @@ impl SignalKind {
             || name.eq_ignore_ascii_case("hebbian")
             || name.eq_ignore_ascii_case("recency")
             || name.eq_ignore_ascii_case("bandit")
-            || name.eq_ignore_ascii_case("rerank")
         {
             return Some(SignalKind::EdgeReinforcement);
         }
@@ -140,27 +126,10 @@ impl SignalKind {
             SignalKind::EdgeReinforcement => "edge-reinforcement",
         }
     }
-
-    /// Returns the German display name for the signal.
-    pub fn name_de(&self) -> &'static str {
-        match self {
-            SignalKind::Vector => "Vektor-Ähnlichkeit",
-            SignalKind::Text => "BM25-Textsuche",
-            SignalKind::Graph => "Graph-Traversierung",
-            SignalKind::EdgeReinforcement => "Rerank-Bewertung",
-        }
-    }
-}
-
-impl fmt::Display for SignalKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name_de())
-    }
 }
 
 /// Configures signal priority order for metadata merging during Reciprocal Rank Fusion.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-/// Prioritätsstrategie bei der Zusammenführung kollidierender Metadatenschlüssel.
 pub enum MetadataMergePriority {
     /// Vector metadata is processed first (default behavior). Order: Vector, Text, Graph.
     #[default]

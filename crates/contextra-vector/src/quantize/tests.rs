@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use super::*;
 
 #[test]
@@ -30,9 +29,9 @@ fn test_percentile_clipping_in_try_train() {
         q.maxes()[0]
     );
 
-    // Outlier vectors should be flagged by calculate_vector_drift
+    // Outlier vectors should be flagged by check_drift
     let outlier_vec = vec![500.0, 0.5];
-    let drift = q.calculate_vector_drift(&outlier_vec);
+    let drift = q.check_drift(&outlier_vec);
     assert_eq!(drift, 0.5, "Outlier dimension 0 should register drift");
 }
 
@@ -68,7 +67,7 @@ fn test_corrupted_quantizer_returns_err_no_panic() {
     let res_quant = q.quantize(&vec_4d);
     assert!(matches!(
         res_quant,
-        Err(contextra_types::ContextraError::InvalidInput(_))
+        Err(contextra_core::ContextraError::InvalidInput(_))
     ));
 
     let q_corrupt_dequant = ScalarQuantizer {
@@ -85,7 +84,7 @@ fn test_corrupted_quantizer_returns_err_no_panic() {
     let res_dequant = q_corrupt_dequant.dequantize(&u8_4d);
     assert!(matches!(
         res_dequant,
-        Err(contextra_types::ContextraError::InvalidInput(_))
+        Err(contextra_core::ContextraError::InvalidInput(_))
     ));
 }
 
@@ -102,7 +101,7 @@ fn test_dist_dimension_mismatch_returns_error() {
     let res_quant = q.quantize(&query_3d);
     assert!(matches!(
         res_quant,
-        Err(contextra_types::ContextraError::InvalidInput(_))
+        Err(contextra_core::ContextraError::InvalidInput(_))
     ));
 
     // dequantize dimension mismatch
@@ -110,21 +109,21 @@ fn test_dist_dimension_mismatch_returns_error() {
     let res_dequant = q.dequantize(&quant_3d);
     assert!(matches!(
         res_dequant,
-        Err(contextra_types::ContextraError::InvalidInput(_))
+        Err(contextra_core::ContextraError::InvalidInput(_))
     ));
 
     // asymmetric_dist length mismatch
     let res_asym = q.asymmetric_dist(&query_3d, &quant_2d, DistanceMetric::Cosine);
     assert!(matches!(
         res_asym,
-        Err(contextra_types::ContextraError::InvalidInput(_))
+        Err(contextra_core::ContextraError::InvalidInput(_))
     ));
 
     // symmetric_dist length mismatch
     let res_sym = q.symmetric_dist(&quant_2d, &quant_3d, DistanceMetric::Euclidean);
     assert!(matches!(
         res_sym,
-        Err(contextra_types::ContextraError::InvalidInput(_))
+        Err(contextra_core::ContextraError::InvalidInput(_))
     ));
 }
 
@@ -136,11 +135,11 @@ fn test_check_drift() {
 
     // Vector within range [0, 10] -> 0 drift
     let in_range = vec![0.5, 5.0, 2.0, 9.9];
-    assert_eq!(q.calculate_vector_drift(&in_range), 0.0);
+    assert_eq!(q.check_drift(&in_range), 0.0);
 
     // 2 out of 4 dimensions out of range -> 0.5 drift
     let out_range = vec![-1.0, 5.0, 15.0, 3.0];
-    assert_eq!(q.calculate_vector_drift(&out_range), 0.5);
+    assert_eq!(q.check_drift(&out_range), 0.5);
 }
 
 #[test]
@@ -312,7 +311,7 @@ proptest::proptest! {
     /// # Anti-Mirroring: global quantizer reference is independently computed inline.
     /// # FIND-IND-002
     #[test]
-    fn test_prop_per_dim_mse_le_global_mse(
+    fn prop_per_dim_mse_le_global_mse(
         // dim0 values in [0, 1], dim1 values in [100, 1000] — heterogeneous ranges guaranteed
         dim0_vals in proptest::collection::vec(0.0f32..1.0f32, 2..10),
         dim1_vals in proptest::collection::vec(100.0f32..1000.0f32, 2..10),
@@ -478,7 +477,7 @@ fn test_percentile_clipping_outlier_recall_improvement() {
 }
 
 #[test]
-fn test_quantize_clamping_and_drift_counting() -> contextra_types::Result<()> {
+fn test_quantize_clamping_and_drift_counting() -> contextra_core::Result<()> {
     let v1 = vec![0.0, 0.0];
     let v2 = vec![1.0, 1.0];
     let q = ScalarQuantizer::train(&[&v1, &v2], 2);

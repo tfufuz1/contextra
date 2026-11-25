@@ -1,14 +1,8 @@
-//! Budgetierungs- und Speichergrenzentests für Hyperkanten.
-//!
-//! # Zweck
-//! Überprüft die Einhaltung konfigurierter RAM-Limits und das Auslösen von Speicherwarnungen.
-
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::EntityId;
 use std::sync::Arc;
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-MEMORY-BUDGET-001]
 #[test]
 fn test_capacity_based_memory_budgeting() {
     let graph = CsrGraph::new();
@@ -60,7 +54,6 @@ fn test_capacity_based_memory_budgeting() {
     );
 }
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-MEMORY-BUDGET-002]
 #[test]
 fn test_hyperedge_role_bindings_payload_sharing() {
     let graph = CsrGraph::new();

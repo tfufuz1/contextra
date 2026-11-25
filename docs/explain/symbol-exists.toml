@@ -1,0 +1,8 @@
+title = "Symbol-Existenzprüfung"
+what = "In Dokumentation oder Task-Karten referenzierte Symbole existieren im Codebase nicht."
+why = "Referenzen auf gelöschte oder erfundene Symbole verwirren Entwickler und KI-Modelle."
+fix = "Passe die Dokumentation an das reale Symbol an oder implementiere das fehlende Symbol."
+anti_fix = "Erstelle keine leeren Dummy-Typen nur zur Beruhigung der Symbolprüfung."
+adr = ["ADR-065"]
+related = ["check-duplicate-symbols", "doc-truth"]
+sources = ["docs/gates/gov-d-cross-file-duplicates.md"]

@@ -1,4 +1,2 @@
-# Stand 2026-11-24: Der frühere Alias `xtask` zeigte auf ein Paket `xtask`, das es im Repo nicht gibt
-# (`cargo xtask` schlug fehl). Alias deaktiviert. Neu aktivieren, sobald das Paket existiert:
-# [alias]
-# xtask = "run --package xtask --"
+[alias]
+xtask = "run --manifest-path xtask/Cargo.toml --"

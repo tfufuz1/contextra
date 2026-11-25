@@ -41,7 +41,7 @@ impl Sq8Bias {
     pub fn calibrate(
         batch: &[&[f32]],
         quantizer: &crate::quantize::ScalarQuantizer,
-        metric: contextra_types::DistanceMetric,
+        metric: contextra_core::DistanceMetric,
     ) -> Self {
         if batch.len() < 2 {
             return Self::default();
@@ -89,7 +89,7 @@ impl Sq8Bias {
 mod tests {
     use super::*;
     use crate::quantize::ScalarQuantizer;
-    use contextra_types::DistanceMetric;
+    use contextra_core::DistanceMetric;
 
     #[test]
     fn test_sq8_bias_calibration() {

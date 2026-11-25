@@ -1,10 +1,5 @@
-//! # Erklärbarkeitsmodul (`explain`)
-//!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
-//!
-//! Dieses Modul transformiert maschinenlesbare Herkunftsnachweise (`ProvenanceRecord`)
-//! in strukturierte Erklärungen (`RetrievalExplanation`) sowie in verständliche,
-//! standardisierte deutsche Beschreibungstexte.
+//! Provenance explanation module converting machine-readable search provenance
+//! into structured explanation objects and German human-readable text.
 
 use std::fmt;
 
@@ -12,11 +7,39 @@ use serde::{Deserialize, Serialize};
 
 use crate::fusion::ProvenanceRecord;
 
-pub use crate::fusion::SignalKind;
+/// Search signal kind used during multi-signal fusion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SignalKind {
+    /// Vector (semantic k-NN) search signal.
+    Vector,
+    /// Text (BM25 keyword) search signal.
+    Bm25,
+    /// Graph (traversal / PageRank) search signal.
+    Graph,
+    /// Cross-encoder reranking signal.
+    Rerank,
+}
+
+impl SignalKind {
+    /// Returns the German display name for the signal.
+    pub fn name_de(&self) -> &'static str {
+        match self {
+            SignalKind::Vector => "Vektor-Ähnlichkeit",
+            SignalKind::Bm25 => "BM25-Textsuche",
+            SignalKind::Graph => "Graph-Traversierung",
+            SignalKind::Rerank => "Rerank-Bewertung",
+        }
+    }
+}
+
+impl fmt::Display for SignalKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name_de())
+    }
+}
 
 /// Breakdown entry representing the contribution of a single search signal.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-/// Einzelner Beitrags-Eintrag für eine spezifische Signalquelle innerhalb der Erklärung.
 pub struct ExplanationEntry {
     /// Identified search signal type.
     pub signal: SignalKind,
@@ -32,7 +55,6 @@ pub struct ExplanationEntry {
 
 /// Structured explanation detailing why a document was retrieved with its given rank.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-/// Strukturierte Gesamterklärung zur Nachvollziehbarkeit eines Retrieval-Ergebnisses.
 pub struct RetrievalExplanation {
     /// Individual signal contribution entries, sorted descending by `contribution_share`.
     pub entries: Vec<ExplanationEntry>,
@@ -44,25 +66,11 @@ pub struct RetrievalExplanation {
     pub source_collection: Option<String>,
 }
 
-// ADR-098 (Prozentwert-Anzeige: f32 -> u32 Konvertierung)
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn round_share_to_pct(share: f32) -> u32 {
-    let scaled = (share * 100.0).round();
-    if !scaled.is_finite() || scaled <= 0.0 {
-        return 0;
-    }
-    if scaled >= 100.0 {
-        return 100;
-    }
-    scaled as u32
-}
-
 impl RetrievalExplanation {
     /// Generates a human-readable German explanation string for audit logging or CLI output.
     ///
     /// Formats all signal contributions using exact ranks and normalized percentage shares,
     /// along with any resonance coherence bonus or collection source.
-    /// Erzeugt eine verständliche deutsche Textzusammenfassung für Audit-Logs oder UIs.
     pub fn to_human_readable_de(&self) -> String {
         if self.entries.is_empty() {
             return "Keine Treffersignale für dieses Dokument vorhanden.".to_string();
@@ -70,7 +78,7 @@ impl RetrievalExplanation {
 
         let mut signal_texts = Vec::with_capacity(self.entries.len());
         for (idx, entry) in self.entries.iter().enumerate() {
-            let pct = round_share_to_pct(entry.contribution_share);
+            let pct = (entry.contribution_share * 100.0).round() as u32;
             let rank_str = entry
                 .rank
                 .map(|r| format!("Rang {r}"))
@@ -119,9 +127,7 @@ impl fmt::Display for RetrievalExplanation {
 /// Computes per-signal `contribution_share` normalized such that all present signals sum to `1.0`
 /// (or `0.0` if no signals are present). Prefers using `signal_contributions` (`rrf_contribution`)
 /// if present and consistent; otherwise falls back to normalizing raw positive scores.
-type RawSignalEntry = (SignalKind, f32, Option<u32>, Option<f32>);
-
-fn extract_raw_signal_entries(record: &ProvenanceRecord) -> Vec<RawSignalEntry> {
+pub fn explain(record: &ProvenanceRecord) -> RetrievalExplanation {
     let mut raw_entries = Vec::new();
 
     let signal_configs: &[(SignalKind, Option<f32>, &[&str])] = &[
@@ -131,16 +137,12 @@ fn extract_raw_signal_entries(record: &ProvenanceRecord) -> Vec<RawSignalEntry> 
             &["vector", "vec"],
         ),
         (
-            SignalKind::Text,
+            SignalKind::Bm25,
             record.bm25_score,
             &["text", "bm25", "keyword"],
         ),
         (SignalKind::Graph, record.graph_score, &["graph"]),
-        (
-            SignalKind::EdgeReinforcement,
-            record.rerank_score,
-            &["rerank", "edge-reinforcement"],
-        ),
+        (SignalKind::Rerank, record.rerank_score, &["rerank"]),
     ];
 
     for &(kind, raw_score_opt, keys) in signal_configs {
@@ -164,12 +166,13 @@ fn extract_raw_signal_entries(record: &ProvenanceRecord) -> Vec<RawSignalEntry> 
         }
     }
 
-    raw_entries
-}
-
-fn compute_contribution_shares(raw_entries: &[RawSignalEntry]) -> Vec<f32> {
-    if raw_entries.len() == 1 {
-        return vec![1.0];
+    if raw_entries.is_empty() {
+        return RetrievalExplanation {
+            entries: Vec::new(),
+            dominant_signal: None,
+            coherence_bonus: record.coherence_bonus,
+            source_collection: record.source_collection.clone(),
+        };
     }
 
     let all_have_rrf = raw_entries
@@ -180,7 +183,9 @@ fn compute_contribution_shares(raw_entries: &[RawSignalEntry]) -> Vec<f32> {
         .map(|(_, _, _, rrf)| rrf.unwrap_or(0.0))
         .sum();
 
-    if all_have_rrf && sum_rrf > 0.0 && sum_rrf.is_finite() {
+    let shares: Vec<f32> = if raw_entries.len() == 1 {
+        vec![1.0]
+    } else if all_have_rrf && sum_rrf > 0.0 && sum_rrf.is_finite() {
         raw_entries
             .iter()
             .map(|(_, _, _, rrf)| rrf.unwrap_or(0.0) / sum_rrf)
@@ -196,27 +201,7 @@ fn compute_contribution_shares(raw_entries: &[RawSignalEntry]) -> Vec<f32> {
             let equal_share = 1.0 / (raw_entries.len() as f32);
             vec![equal_share; raw_entries.len()]
         }
-    }
-}
-
-/// Generates a structured `RetrievalExplanation` from a `ProvenanceRecord`.
-///
-/// Computes per-signal `contribution_share` normalized such that all present signals sum to `1.0`
-/// (or `0.0` if no signals are present).
-/// Erzeugt aus einem maschinenlesbaren `ProvenanceRecord` eine strukturierte `RetrievalExplanation`.
-pub fn explain(record: &ProvenanceRecord) -> RetrievalExplanation {
-    let raw_entries = extract_raw_signal_entries(record);
-
-    if raw_entries.is_empty() {
-        return RetrievalExplanation {
-            entries: Vec::new(),
-            dominant_signal: None,
-            coherence_bonus: record.coherence_bonus,
-            source_collection: record.source_collection.clone(),
-        };
-    }
-
-    let shares = compute_contribution_shares(&raw_entries);
+    };
 
     let mut entries: Vec<ExplanationEntry> = raw_entries
         .into_iter()
@@ -268,11 +253,9 @@ mod tests {
         };
         let explanation = explain(&record);
         assert_eq!(explanation.entries.len(), 1);
-        if let Some(entry) = explanation.entries.first() {
-            assert_eq!(entry.signal, SignalKind::Text);
-            assert_eq!(entry.contribution_share, 1.0);
-        }
-        assert_eq!(explanation.dominant_signal, Some(SignalKind::Text));
+        assert_eq!(explanation.entries[0].signal, SignalKind::Bm25);
+        assert_eq!(explanation.entries[0].contribution_share, 1.0);
+        assert_eq!(explanation.dominant_signal, Some(SignalKind::Bm25));
     }
 
     #[test]
@@ -323,22 +306,22 @@ mod tests {
         let explanation = explain(&record);
         assert_eq!(explanation.entries.len(), 4);
 
-        if let Some(e) = explanation.entries.first() {
-            assert_eq!(e.signal, SignalKind::Vector);
-            assert_eq!(e.contribution_share, 0.40);
-        }
-        if let Some(e) = explanation.entries.get(1) {
-            assert_eq!(e.signal, SignalKind::Text);
-            assert_eq!(e.contribution_share, 0.30);
-        }
-        if let Some(e) = explanation.entries.get(2) {
-            assert_eq!(e.signal, SignalKind::Graph);
-            assert_eq!(e.contribution_share, 0.20);
-        }
-        if let Some(e) = explanation.entries.get(3) {
-            assert_eq!(e.signal, SignalKind::EdgeReinforcement);
-            assert_eq!(e.contribution_share, 0.10);
-        }
+        // Sum of rrf_contributions = 0.40 + 0.30 + 0.20 + 0.10 = 1.00
+        // Vector share = 0.40 / 1.00 = 0.40
+        // Bm25 share = 0.30 / 1.00 = 0.30
+        // Graph share = 0.20 / 1.00 = 0.20
+        // Rerank share = 0.10 / 1.00 = 0.10
+        assert_eq!(explanation.entries[0].signal, SignalKind::Vector);
+        assert_eq!(explanation.entries[0].contribution_share, 0.40);
+
+        assert_eq!(explanation.entries[1].signal, SignalKind::Bm25);
+        assert_eq!(explanation.entries[1].contribution_share, 0.30);
+
+        assert_eq!(explanation.entries[2].signal, SignalKind::Graph);
+        assert_eq!(explanation.entries[2].contribution_share, 0.20);
+
+        assert_eq!(explanation.entries[3].signal, SignalKind::Rerank);
+        assert_eq!(explanation.entries[3].contribution_share, 0.10);
 
         assert_eq!(explanation.dominant_signal, Some(SignalKind::Vector));
     }
@@ -381,44 +364,16 @@ mod tests {
 
         let explanation = explain(&record);
         assert_eq!(explanation.entries.len(), 3);
-        if let (Some(e0), Some(e1), Some(e2)) = (
-            explanation.entries.first(),
-            explanation.entries.get(1),
-            explanation.entries.get(2),
-        ) {
-            assert_eq!(e0.signal, SignalKind::Graph);
-            assert_eq!(e1.signal, SignalKind::Text);
-            assert_eq!(e2.signal, SignalKind::Vector);
-            assert!(e0.contribution_share >= e1.contribution_share);
-            assert!(e1.contribution_share >= e2.contribution_share);
-        }
-    }
+        assert_eq!(explanation.entries[0].signal, SignalKind::Graph);
+        assert_eq!(explanation.entries[1].signal, SignalKind::Bm25);
+        assert_eq!(explanation.entries[2].signal, SignalKind::Vector);
 
-    #[test]
-    fn test_signal_kind_golden_serde_and_display() {
-        let kinds = [
-            (SignalKind::Vector, "vector", "Vektor-Ähnlichkeit"),
-            (SignalKind::Text, "text", "BM25-Textsuche"),
-            (SignalKind::Graph, "graph", "Graph-Traversierung"),
-            (
-                SignalKind::EdgeReinforcement,
-                "edge-reinforcement",
-                "Rerank-Bewertung",
-            ),
-        ];
-
-        for (kind, expected_json_str, expected_de) in kinds {
-            assert_eq!(kind.as_str(), expected_json_str);
-            assert_eq!(kind.name_de(), expected_de);
-            assert_eq!(format!("{kind}"), expected_de);
-
-            if let Ok(json) = serde_json::to_string(&kind) {
-                assert_eq!(json, format!("\"{expected_json_str}\""));
-                if let Ok(de_kind) = serde_json::from_str::<SignalKind>(&json) {
-                    assert_eq!(de_kind, kind);
-                }
-            }
-        }
+        assert!(
+            explanation.entries[0].contribution_share >= explanation.entries[1].contribution_share
+        );
+        assert!(
+            explanation.entries[1].contribution_share >= explanation.entries[2].contribution_share
+        );
     }
 
     #[test]

@@ -1,8 +1,8 @@
 //! Graph ports and collection mutation trait definitions (Anhang B §B.5.1.3).
 
 pub use crate::graph_index::{GraphIndex, GraphIndexStats};
-use crate::types::domain::{DocId, EntityId};
-use crate::ContextraError;
+use contextra_types::types::domain::{DocId, EntityId};
+use contextra_types::ContextraError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -95,10 +95,6 @@ pub enum GraphMutationError {
     #[error("Lock acquisition timed out: {0}")]
     LockAcquisitionTimeout(String),
 
-    /// Duplicate hyperedge ID provided.
-    #[error("Duplicate hyperedge ID: {0}")]
-    DuplicateHyperEdgeId(HyperEdgeId),
-
     /// Provided role binding is invalid.
     #[error("Invalid role binding: {0}")]
     RoleBindingInvalid(String),
@@ -157,7 +153,6 @@ pub trait GraphCollectionMutation: Send + Sync + 'static {
 }
 
 #[cfg(test)]
-#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};

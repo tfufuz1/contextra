@@ -1,498 +1,403 @@
-# capabilities.toml — Schema v3 (SPEC §8.3 / S-03 / WP-F0.5)
-# Single Source of Truth for Crate Groups, Architecture Levels, Maturity Tiers, and Allowed Dependencies.
+# capabilities.toml — Contextra Capabilities & Feature Maturity Manifest (ADR-N08 / P12)
+# Single Source of Truth for Crate Maturity Levels, Architecture Rings, and Capability Guarantees.
 
 [version]
-schema = "3"
-
-[crates.contextra-ids]
-group = "foundation"
-level = 0
-tier = "stable"
-path = "crates/contextra-ids"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-ids.feature_closure_allowed]
-docid-128 = []
-[crates.contextra-ids.dev_allowed]
-test = "cargo test -p contextra-ids --locked"
-
-[crates.contextra-env]
-group = "foundation"
-level = 0
-tier = "stable"
-path = "crates/contextra-env"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-env.feature_closure_allowed]
-test-utils = []
-[crates.contextra-env.dev_allowed]
-test = "cargo test -p contextra-env --locked"
-
-[crates.contextra-sys]
-group = "foundation"
-level = 0
-tier = "stable"
-path = "crates/contextra-sys"
-unsafe_island = true
-allowed_internal = []
-[crates.contextra-sys.feature_closure_allowed]
-[crates.contextra-sys.dev_allowed]
-test = "cargo test -p contextra-sys --locked"
-
-[crates.contextra-durable-fs]
-group = "foundation"
-level = 0
-tier = "experimental"
-path = "crates/contextra-durable-fs"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-durable-fs.feature_closure_allowed]
-[crates.contextra-durable-fs.dev_allowed]
-test = "cargo test -p contextra-durable-fs --locked"
-
-[crates.contextra-simd]
-group = "foundation"
-level = 0
-tier = "beta"
-path = "crates/contextra-simd"
-unsafe_island = true
-allowed_internal = []
-[crates.contextra-simd.feature_closure_allowed]
-workspace = ["contextra-types"]
-[crates.contextra-simd.dev_allowed]
-test = "cargo test -p contextra-simd --locked"
-
-[crates.contextra-wire]
-group = "foundation"
-level = 0
-tier = "stable"
-path = "crates/contextra-wire"
-unsafe_island = true
-allowed_internal = []
-[crates.contextra-wire.feature_closure_allowed]
-[crates.contextra-wire.dev_allowed]
-test = "cargo test -p contextra-wire --locked"
-
-[crates.contextra-mvcc]
-group = "foundation"
-level = 1
-tier = "stable"
-path = "crates/contextra-mvcc"
-unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-mvcc.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-mvcc.dev_allowed]
-test = "cargo test -p contextra-mvcc --locked"
-
-[crates.contextra-crypto]
-group = "foundation"
-level = 1
-tier = "beta"
-path = "crates/contextra-crypto"
-unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-crypto.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-crypto.dev_allowed]
-test = "cargo test -p contextra-crypto --locked"
-
-[crates.contextra-types]
-group = "contracts"
-level = 2
-tier = "stable"
-path = "crates/contextra-types"
-unsafe_island = false
-allowed_internal = ["contextra-ids"]
-[crates.contextra-types.feature_closure_allowed]
-docid-128 = ["contextra-ids"]
-[crates.contextra-types.dev_allowed]
-test = "cargo test -p contextra-types --locked"
-
-[crates.contextra-ports]
-group = "contracts"
-level = 2
-tier = "stable"
-path = "crates/contextra-ports"
-unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ids", "contextra-env"]
-[crates.contextra-ports.feature_closure_allowed]
-[crates.contextra-ports.dev_allowed]
-test = "cargo test -p contextra-ports --locked"
-
-[crates.contextra-store]
-group = "storage"
-level = 1
-tier = "beta"
-path = "crates/contextra-store"
-unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env", "contextra-sys", "contextra-mvcc", "contextra-crypto"]
-[crates.contextra-store.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-store.dev_allowed]
-testkit = ["contextra-testkit"]
-test = "cargo test -p contextra-store --locked"
-
-[crates.contextra-vector]
-group = "retrieval"
-level = 1
-tier = "beta"
-path = "crates/contextra-vector"
-unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env", "contextra-mvcc"]
-[crates.contextra-vector.feature_closure_allowed]
-mmap = ["contextra-sys"]
-simd = ["contextra-simd"]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-vector.dev_allowed]
-testkit = ["contextra-testkit"]
-test = "cargo test -p contextra-vector --locked"
-
-[crates.contextra-text]
-group = "retrieval"
-level = 1
-tier = "beta"
-path = "crates/contextra-text"
-unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-text.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-text.dev_allowed]
-testkit = ["contextra-testkit"]
-test = "cargo test -p contextra-text --locked"
-
-[crates.contextra-graph]
-group = "retrieval"
-level = 1
-tier = "experimental"
-path = "crates/contextra-graph"
-unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-graph.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-graph.dev_allowed]
-testkit = ["contextra-testkit"]
-test = "cargo test -p contextra-graph --locked"
-
-[crates.contextra-rank]
-group = "retrieval"
-level = 1
-tier = "stable"
-path = "crates/contextra-rank"
-unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-rank.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-rank.dev_allowed]
-test = "cargo test -p contextra-rank --locked"
-
-[crates.contextra-checkpoint]
-group = "retrieval"
-level = 1
-tier = "beta"
-path = "crates/contextra-checkpoint"
-unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env"]
-[crates.contextra-checkpoint.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-checkpoint.dev_allowed]
-testkit = ["contextra-testkit"]
-test = "cargo test -p contextra-checkpoint --locked"
-
-[crates.contextra-kvcache]
-group = "llm"
-level = 1
-tier = "beta"
-path = "crates/contextra-kvcache"
-unsafe_island = false
-allowed_internal = ["contextra-env", "contextra-crypto"]
-[crates.contextra-kvcache.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-kvcache.dev_allowed]
-test = "cargo test -p contextra-kvcache --locked"
-
-[crates.contextra-router]
-group = "llm"
-level = 2
-tier = "stable"
-path = "crates/contextra-router"
-unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports", "contextra-adapt"]
-[crates.contextra-router.feature_closure_allowed]
-subprocess-dispatch = ["contextra-wire"]
-[crates.contextra-router.dev_allowed]
-test = "cargo test -p contextra-router --locked"
-
-[crates.contextra-adapt]
-group = "llm"
-level = 0
-tier = "beta"
-path = "crates/contextra-adapt"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-adapt.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-adapt.dev_allowed]
-test = "cargo test -p contextra-adapt --locked"
-
-[crates.contextra-infer-ollama]
-group = "llm"
-level = 1
-tier = "experimental"
-path = "crates/contextra-infer-ollama"
-unsafe_island = false
-allowed_internal = ["contextra-env"]
-[crates.contextra-infer-ollama.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-infer-ollama.dev_allowed]
-test = "cargo test -p contextra-infer-ollama --locked"
-
-[crates.contextra-infer-candle]
-group = "llm"
-level = 1
-tier = "experimental"
-path = "crates/contextra-infer-candle"
-unsafe_island = false
-allowed_internal = ["contextra-env"]
-[crates.contextra-infer-candle.feature_closure_allowed]
-kv-bridge = ["contextra-kvcache"]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-infer-candle.dev_allowed]
-test = "cargo test -p contextra-infer-candle --locked"
-
-[crates.contextra-infer-onnx]
-group = "llm"
-level = 0
-tier = "experimental"
-path = "crates/contextra-infer-onnx"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-infer-onnx.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-infer-onnx.dev_allowed]
-test = "cargo test -p contextra-infer-onnx --locked"
-
-[crates.contextra-ingest]
-group = "data"
-level = 0
-tier = "experimental"
-path = "crates/contextra-ingest"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-ingest.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ids"]
-[crates.contextra-ingest.dev_allowed]
-test = "cargo test -p contextra-ingest --locked"
-
-[crates.contextra-privacy]
-group = "safety"
-level = 0
-tier = "stable"
-path = "crates/contextra-privacy"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-privacy.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-privacy.dev_allowed]
-test = "cargo test -p contextra-privacy --locked"
-
-[crates.contextra-sandbox]
-group = "safety"
-level = 0
-tier = "stable"
-path = "crates/contextra-sandbox"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-sandbox.feature_closure_allowed]
-[crates.contextra-sandbox.dev_allowed]
-test = "cargo test -p contextra-sandbox --locked"
-
-[crates.contextra-prompt-guard]
-group = "safety"
-level = 0
-tier = "experimental"
-path = "crates/contextra-prompt-guard"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-prompt-guard.feature_closure_allowed]
-[crates.contextra-prompt-guard.dev_allowed]
-test = "cargo test -p contextra-prompt-guard --locked"
-
-[crates.contextra-storage-ports]
-group = "storage"
-level = 1
-tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-storage-ports"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-storage-ports.feature_closure_allowed]
-[crates.contextra-storage-ports.dev_allowed]
-test = "cargo test -p contextra-storage-ports --locked"
-
-[crates.contextra-storage]
-group = "storage"
-level = 1
-tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-storage"
-unsafe_island = false
-allowed_internal = ["contextra-storage-ports"]
-[crates.contextra-storage.feature_closure_allowed]
-[crates.contextra-storage.dev_allowed]
-test = "cargo test -p contextra-storage --locked"
-
-[crates.contextra-storage-fs]
-group = "storage"
-level = 2
-tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-storage-fs"
-unsafe_island = false
-allowed_internal = ["contextra-storage-ports"]
-[crates.contextra-storage-fs.feature_closure_allowed]
-[crates.contextra-storage-fs.dev_allowed]
-test = "cargo test -p contextra-storage-fs --locked"
-
-[crates.contextra-crypto-ref]
-group = "storage"
-level = 2
-tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-crypto-ref"
-unsafe_island = false
-allowed_internal = ["contextra-storage-ports"]
-[crates.contextra-crypto-ref.feature_closure_allowed]
-[crates.contextra-crypto-ref.dev_allowed]
-test = "cargo test -p contextra-crypto-ref --locked"
-
-[crates.contextra-keys-file]
-group = "storage"
-level = 2
-tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-keys-file"
-unsafe_island = false
-allowed_internal = ["contextra-storage-ports"]
-[crates.contextra-keys-file.feature_closure_allowed]
-[crates.contextra-keys-file.dev_allowed]
-test = "cargo test -p contextra-keys-file --locked"
-
-[crates.contextra-keys-cohort]
-group = "storage"
-level = 2
-tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-keys-cohort"
-unsafe_island = false
-allowed_internal = ["contextra-storage-ports"]
-[crates.contextra-keys-cohort.feature_closure_allowed]
-[crates.contextra-keys-cohort.dev_allowed]
-test = "cargo test -p contextra-keys-cohort --locked"
-
-[crates.contextra-storage-bridge]
-group = "storage"
-level = 2
-tier = "experimental"
-path = "crates/contextra-storage/crates/contextra-storage-bridge"
-unsafe_island = false
-allowed_internal = ["contextra-storage", "contextra-storage-ports"]
-[crates.contextra-storage-bridge.feature_closure_allowed]
-[crates.contextra-storage-bridge.dev_allowed]
-test = "cargo test -p contextra-storage-bridge --locked"
-
-[crates.contextra-agent]
-group = "agentic"
-level = 2
-tier = "beta"
-path = "crates/contextra-agent"
-unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports"]
-[crates.contextra-agent.feature_closure_allowed]
-storage-bindings = ["contextra-db", "contextra-graph", "contextra-checkpoint", "contextra-router"]
-[crates.contextra-agent.dev_allowed]
-test = "cargo test -p contextra-agent --locked"
-
-[crates.contextra-cognition]
-group = "agentic"
-level = 2
-tier = "beta"
-path = "crates/contextra-cognition"
-unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports"]
-[crates.contextra-cognition.feature_closure_allowed]
-exp-hyperedge = ["contextra-graph"]
-[crates.contextra-cognition.dev_allowed]
-test = "cargo test -p contextra-cognition --locked"
-
-[crates.contextra-engine]
-group = "integration"
-level = 2
-tier = "stable"
-path = "crates/contextra-engine"
-unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports", "contextra-store", "contextra-vector", "contextra-text", "contextra-graph", "contextra-mvcc", "contextra-rank", "contextra-checkpoint", "contextra-adapt", "contextra-kvcache"]
-[crates.contextra-engine.feature_closure_allowed]
-[crates.contextra-engine.dev_allowed]
-test = "cargo test -p contextra-engine --locked"
-
-[crates.contextra-db]
-group = "integration"
-level = 2
-tier = "stable"
-path = "crates/contextra-db"
-unsafe_island = false
-allowed_internal = ["contextra-engine", "contextra-types", "contextra-ports"]
-[crates.contextra-db.feature_closure_allowed]
-[crates.contextra-db.dev_allowed]
-test = "cargo test -p contextra-db --locked"
+schema = "2"
+spec = "v4"
 
 [crates.contextra]
-group = "integration"
-level = 2
-tier = "stable"
+ring = 'Ring 4'
+maturity = 'stable'
+description = 'Haupt-Library Facade für Endanwender'
+capabilities = ['public-api', 'facade']
 path = "crates/contextra"
 unsafe_island = false
-allowed_internal = ["contextra-db", "contextra-types", "contextra-ports"]
-[crates.contextra.feature_closure_allowed]
-infer-candle = ["contextra-infer-candle"]
-[crates.contextra.dev_allowed]
+may_depend_on = ['contextra-core', 'contextra-db', 'contextra-infer-candle', 'contextra-infer-ollama', 'contextra-infer-onnx', 'contextra-rank', 'contextra-router']
+ci_class = 'pr'
+spec = ['A2', 'A3', 'A4', '0', '2', '3', '4', '5', '6', '7', '8', '9', '12', '13', '15', '16', '17', '18', '19', '20', '21', 'B', 'D']
 test = "cargo test -p contextra --locked"
 
+[crates.contextra-adapt]
+ring = 'Ring 0'
+maturity = 'experimental'
+description = 'Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller)'
+capabilities = ['model-adaption', 'pid-latency-controller']
+path = "crates/contextra-adapt"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr'
+spec = ['A2', 'A4', '0', '3', '4', '17', '21']
+test = "cargo test -p contextra-adapt --locked"
+
+[crates.contextra-agent]
+ring = 'Ring 3'
+maturity = 'stable'
+description = 'Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline'
+capabilities = ['in-memory-audit', 'agent-pipeline']
+path = "crates/contextra-agent"
+unsafe_island = false
+may_depend_on = ['contextra-checkpoint', 'contextra-core', 'contextra-db', 'contextra-graph', 'contextra-router', 'contextra-store']
+ci_class = 'pr'
+spec = ['A2', '0', '4', '9']
+test = "cargo test -p contextra-agent --locked"
+
+[crates.contextra-audit-export]
+ring = 'Ring 0'
+maturity = 'experimental'
+description = 'Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export'
+capabilities = ['gdpr-art30-export']
+path = "crates/contextra-audit-export"
+unsafe_island = false
+may_depend_on = ['contextra-types']
+ci_class = 'pr'
+spec = ['16']
+test = "cargo test -p contextra-audit-export --locked"
+
+[crates.contextra-avv-generator]
+ring = 'Ring 0'
+maturity = 'experimental'
+description = 'AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO'
+capabilities = ['avv-generation']
+path = "crates/contextra-avv-generator"
+unsafe_island = false
+may_depend_on = ['contextra-types']
+ci_class = 'pr'
+spec = ['2', '15']
+test = "cargo test -p contextra-avv-generator --locked"
+
+[crates.contextra-checkpoint]
+ring = 'Ring 1'
+maturity = 'stable'
+description = 'Persistent Checkpoint Engine und Blake3 Manifest-Verifikation'
+capabilities = ['blake3-checkpoints', 'orphan-recovery']
+path = "crates/contextra-checkpoint"
+unsafe_island = false
+may_depend_on = ['contextra-core']
+ci_class = 'pr'
+spec = ['A2', '0', '4', '20']
+test = "cargo test -p contextra-checkpoint --locked"
+
+[crates.contextra-cognition]
+ring = 'Ring 3'
+maturity = 'stable'
+description = 'Konsolidierungs- und Background Sleep Passes'
+capabilities = ['sleep-cycle-consolidation', 'session-grouping']
+path = "crates/contextra-cognition"
+unsafe_island = false
+may_depend_on = ['contextra-core', 'contextra-engine', 'contextra-graph', 'contextra-store', 'contextra-vector']
+ci_class = 'pr'
+spec = ['A2', 'A4', '0', '4', '17', '21']
+test = "cargo test -p contextra-cognition --locked"
+
+[crates.contextra-core]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer'
+capabilities = ['tombstone-semantics', 'tx-buffer']
+path = "crates/contextra-core"
+unsafe_island = false
+may_depend_on = ['contextra-mvcc', 'contextra-ports', 'contextra-types', 'contextra-wire']
+ci_class = 'pr'
+spec = ['A2', 'A3', '0', '4', '13', '20']
+test = "cargo test -p contextra-core --locked"
+
+[crates.contextra-crypto]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC'
+capabilities = ['aes-256-gcm-siv', 'hmac-sha256', 'zeroize-on-drop']
+path = "crates/contextra-crypto"
+unsafe_island = false
+may_depend_on = ['contextra-core', 'contextra-ports']
+ci_class = 'pr'
+spec = ['A2', '0', '4', '9', '13']
+test = "cargo test -p contextra-crypto --locked"
+
+[crates.contextra-db]
+ring = 'Ring 3'
+maturity = 'stable'
+description = 'Contextra Main Database Abstraction, Hybrid Search & Collections'
+capabilities = ['hybrid-search', 'collection-manager', 'volatile-vault']
+path = "crates/contextra-db"
+unsafe_island = false
+may_depend_on = ['contextra-adapt', 'contextra-checkpoint', 'contextra-cognition', 'contextra-core', 'contextra-crypto', 'contextra-engine', 'contextra-graph', 'contextra-vector', 'contextra-rank', 'contextra-store', 'contextra-sys', 'contextra-text']
+ci_class = 'pr'
+spec = ['A2', 'A3', '0', '2', '3', '4', '13', '15', '20']
+test = "cargo test -p contextra-db --locked"
+
+[crates.contextra-engine]
+ring = 'Ring 3'
+maturity = 'stable'
+description = 'Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02)'
+capabilities = ['bounded-compute-pool', 'ring0-async-wrapper']
+path = "crates/contextra-engine"
+unsafe_island = false
+may_depend_on = ['contextra-adapt', 'contextra-checkpoint', 'contextra-core', 'contextra-crypto', 'contextra-graph', 'contextra-rank', 'contextra-store', 'contextra-sys', 'contextra-text', 'contextra-vector']
+ci_class = 'pr'
+spec = ['A2', 'A3', '0', '4', '20']
+test = "cargo test -p contextra-engine --locked"
+
+[crates.contextra-graph]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'CSR Graph-Engine, Path Graphing und GraphRAG Community Detection'
+capabilities = ['csr-traversal', 'label-propagation', 'deadlock-free-dag']
+path = "crates/contextra-graph"
+unsafe_island = false
+may_depend_on = ['contextra-core']
+ci_class = 'pr'
+spec = ['A2', 'A3', 'A4', '0', '4', '6', '13', '15', '17', '21', 'B', 'D']
+test = "cargo test -p contextra-graph --locked"
+
+[crates.contextra-infer-candle]
+ring = 'Ring 2'
+maturity = 'stable'
+description = 'Candle LLM Inference Client und KV-Bridge Adapter'
+capabilities = ['candle-llm', 'kv-cache-bridge']
+path = "crates/contextra-infer-candle"
+unsafe_island = false
+may_depend_on = ['contextra-core', 'contextra-crypto', 'contextra-ports', 'contextra-rank', 'contextra-store']
+ci_class = 'pr-check-only'
+spec = ['A2', '0', '4', '9']
+test = "cargo test -p contextra-infer-candle --locked"
+
+[crates.contextra-infer-ollama]
+ring = 'Ring 2'
+maturity = 'stable'
+description = 'Ollama External Provider Client und Embeddings Integration'
+capabilities = ['ollama-client', 'remote-embeddings']
+path = "crates/contextra-infer-ollama"
+unsafe_island = false
+may_depend_on = ['contextra-core', 'contextra-rank']
+ci_class = 'pr-check-only'
+spec = ['0', '4', '9']
+test = "cargo test -p contextra-infer-ollama --locked"
+
+[crates.contextra-infer-onnx]
+ring = 'Ring 2'
+maturity = 'experimental'
+description = 'ONNX Embeddings und Cross-Encoder Reranking Execution Provider'
+capabilities = ['onnx-embeddings', 'cross-encoder-reranking']
+path = "crates/contextra-infer-onnx"
+unsafe_island = false
+may_depend_on = ['contextra-infer-candle', 'contextra-core', 'contextra-rank']
+ci_class = 'pr-check-only'
+spec = ['A3', '0', '4', '9']
+test = "cargo test -p contextra-infer-onnx --locked"
+
+[crates.contextra-kvcache]
+ring = 'Ring 1'
+maturity = 'stable'
+description = 'Stufenmodell KV-Cache Storage & Offloading'
+capabilities = ['kv-tiered-cache', 'kv-bridge-storage']
+path = "crates/contextra-kvcache"
+unsafe_island = false
+may_depend_on = ['contextra-core', 'contextra-crypto']
+ci_class = 'pr'
+spec = ['A2', '0', '4', '9']
+test = "cargo test -p contextra-kvcache --locked"
+
+[crates.contextra-license]
+ring = 'Ring 4'
+maturity = 'experimental'
+description = 'Lizenz- und Aktivierungsprüfung für Contextra Feature-Ringe'
+capabilities = ['license-gate']
+path = "crates/contextra-license"
+unsafe_island = false
+may_depend_on = ['contextra-types', 'contextra-ports']
+ci_class = 'pr'
+spec = ['14', '15']
+test = "cargo test -p contextra-license --locked"
+
 [crates.contextra-mcp]
-group = "apps"
-level = 3
-tier = "beta"
+ring = 'Ring 4'
+maturity = 'stable'
+description = 'Model Context Protocol Server & Cloud Egress Gateway'
+capabilities = ['mcp-protocol', 'cloud-egress-gateway']
 path = "crates/contextra-mcp"
 unsafe_island = false
-allowed_internal = ["contextra", "contextra-types", "contextra-ports", "contextra-wire", "contextra-rank", "contextra-crypto", "contextra-privacy", "contextra-router", "contextra-prompt-guard"]
-[crates.contextra-mcp.feature_closure_allowed]
-[crates.contextra-mcp.dev_allowed]
+may_depend_on = ['contextra', 'contextra-adapt', 'contextra-agent', 'contextra-core', 'contextra-crypto', 'contextra-infer-candle', 'contextra-infer-onnx', 'contextra-privacy', 'contextra-rank']
+ci_class = 'pr'
+spec = ['A2', '0', '2', '4', '13']
 test = "cargo test -p contextra-mcp --locked"
 
+[crates.contextra-mvcc]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'Multi-Version Concurrency Control und Isolation-Mechanismen'
+capabilities = ['snapshot-isolation', 'lockless-read']
+path = "crates/contextra-mvcc"
+unsafe_island = false
+may_depend_on = ['contextra-types']
+ci_class = 'pr'
+spec = ['A2', '0', '4', '20']
+test = "cargo test -p contextra-mvcc --locked"
+
+[crates.contextra-ports]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung'
+capabilities = ['trait-interfaces', 'ring0-decoupling']
+path = "crates/contextra-ports"
+unsafe_island = false
+may_depend_on = ['contextra-types']
+ci_class = 'pr'
+spec = ['A2', '0', '3', '4', '9', '20']
+test = "cargo test -p contextra-ports --locked"
+
+[crates.contextra-privacy]
+ring = 'Ring 3'
+maturity = 'stable'
+description = 'Egress Filtering, Anonymisierung und Privacy Compliance Rules'
+capabilities = ['egress-vault', 'regex-classification']
+path = "crates/contextra-privacy"
+unsafe_island = false
+may_depend_on = ['contextra-core', 'contextra-ports']
+ci_class = 'pr'
+spec = ['A2', 'A3', '0', '4']
+test = "cargo test -p contextra-privacy --locked"
+
 [crates.contextra-py]
-group = "apps"
-level = 3
-tier = "stable"
+ring = 'Ring 4'
+maturity = 'stable'
+description = 'PyO3 Python Bindings'
+capabilities = ['python-bindings', 'ffi-safe']
 path = "crates/contextra-py"
 unsafe_island = false
-allowed_internal = ["contextra-types", "contextra", "contextra-wire"]
-[crates.contextra-py.feature_closure_allowed]
-[crates.contextra-py.dev_allowed]
+may_depend_on = ['contextra-adapt', 'contextra-core', 'contextra-db', 'contextra-rank', 'contextra-router', 'contextra-store']
+ci_class = 'pr-check-only'
+spec = ['A2', '0', '4', '9', '17', '18', '19', '20']
 test = "cargo test -p contextra-py --locked"
 
+[crates.contextra-rank]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers)'
+capabilities = ['rrf-fusion', 'coherence-bonus', 'platt-scaler', 'isotonic-calibrator']
+path = "crates/contextra-rank"
+unsafe_island = false
+may_depend_on = ['contextra-ports', 'contextra-types']
+ci_class = 'pr'
+spec = ['A2', 'A3', 'A4', '0', '4', '7', '17', '21', 'D']
+test = "cargo test -p contextra-rank --locked"
+
+[crates.contextra-router]
+ring = 'Ring 3'
+maturity = 'stable'
+description = 'Lyapunov Drift Control und Multi-Candidate Search Routing Engine'
+capabilities = ['lyapunov-drift-watcher', 'cascade-routing']
+path = "crates/contextra-router"
+unsafe_island = false
+may_depend_on = ['contextra-adapt', 'contextra-core', 'contextra-ports', 'contextra-privacy']
+ci_class = 'pr'
+spec = ['A2', '0', '4', '8', '13', '15', 'B']
+test = "cargo test -p contextra-router --locked"
+
+[crates.contextra-sandbox]
+ring = 'Ring 2'
+maturity = 'stable'
+description = 'WASM Execution Boundary und Isolations-Sandbox'
+capabilities = ['wasmtime-isolation', 'cpu-fuel-budget', 'wall-clock-timeout']
+path = "crates/contextra-sandbox"
+unsafe_island = false
+may_depend_on = ['contextra-core']
+ci_class = 'pr-check-only'
+spec = ['A2', '0', '4']
+test = "cargo test -p contextra-sandbox --locked"
+
+[crates.contextra-simd]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen'
+capabilities = ['simd-distance', 'zero-panic-simd']
+path = "crates/contextra-simd"
+unsafe_island = true
+may_depend_on = ['contextra-core']
+ci_class = 'pr'
+spec = ['A2', '0', '4', '8', '20', 'B']
+test = "cargo test -p contextra-simd --locked"
+
+[crates.contextra-store]
+ring = 'Ring 1'
+maturity = 'stable'
+description = 'LSM-Tree Storage Engine, WAL Durability und Compaction Engine'
+capabilities = ['wal-v3-hmac', 'lsm-compaction', 'crash-consistency']
+path = "crates/contextra-store"
+unsafe_island = false
+may_depend_on = ['contextra-core', 'contextra-crypto', 'contextra-sys']
+ci_class = 'pr'
+spec = ['A2', '0', '4', '5', '9', '13', '15', '20', 'B']
+test = "cargo test -p contextra-store --locked"
+
+[crates.contextra-sys]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'Systemnahe Bindings, Low-Level I/O und Memory-Mapping'
+capabilities = ['mmap-io', 'direct-file-access']
+path = "crates/contextra-sys"
+unsafe_island = true
+may_depend_on = []
+ci_class = 'pr'
+spec = ['A2', 'A3', '0', '4', '20']
+test = "cargo test -p contextra-sys --locked"
+
 [crates.contextra-testkit]
-group = "testing"
-level = 3
-tier = "stable"
+ring = 'Tooling'
+maturity = 'stable'
+description = 'Test Fixtures, Mock Engines und Chaos Matrix Harness'
+capabilities = ['chaos-testing', 'mock-storage']
 path = "crates/contextra-testkit"
 unsafe_island = false
-allowed_internal = ["contextra-ports", "contextra-types", "contextra-env"]
-[crates.contextra-testkit.feature_closure_allowed]
-[crates.contextra-testkit.dev_allowed]
+may_depend_on = ['contextra-core']
+ci_class = 'pr'
+spec = ['0', '3', '4', '20']
 test = "cargo test -p contextra-testkit --locked"
 
-[crates.contextra-bench]
-group = "testing"
-level = 3
-tier = "stable"
-path = "benchmarks/contextra-bench"
+[crates.contextra-text]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'Volltextsuche und Inverted-Index (BM25 Engine)'
+capabilities = ['bm25-search', 'inverted-index']
+path = "crates/contextra-text"
 unsafe_island = false
-allowed_internal = ["contextra-store", "contextra-vector", "contextra-text", "contextra-db"]
-[crates.contextra-bench.feature_closure_allowed]
-[crates.contextra-bench.dev_allowed]
-test = "cargo test -p contextra-bench --locked"
+may_depend_on = ['contextra-core']
+ci_class = 'pr'
+spec = ['A2', 'A3', 'A4', '0', '4', '16', '17', '18', '21', 'D']
+test = "cargo test -p contextra-text --locked"
+
+[crates.contextra-types]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen)'
+capabilities = ['zero-copy-types', 'type-safety']
+path = "crates/contextra-types"
+unsafe_island = false
+may_depend_on = []
+ci_class = 'pr'
+spec = ['A2', '0', '3', '4', '20', 'D']
+test = "cargo test -p contextra-types --locked"
+
+[crates.contextra-vector]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung)'
+capabilities = ['hnsw-index', 'diskann-index', 'scalar-quantization']
+path = "crates/contextra-vector"
+# Hinweis: contextra-vector (inkl. distance.rs) ist KEINE Unsafe-Insel (0% unsafe, Delegierung an contextra-simd)
+unsafe_island = false
+may_depend_on = ['contextra-core', 'contextra-crypto', 'contextra-simd', 'contextra-sys']
+ci_class = 'pr'
+spec = ['A2', 'A3', 'A4', '0', '4', '16', '17', '18', '20', '21', 'D']
+test = "cargo test -p contextra-vector --locked"
+
+[crates.contextra-wire]
+ring = 'Ring 0'
+maturity = 'stable'
+description = 'FlatBuffers Wire-Protokolle und Serialisierungs-Formate'
+capabilities = ['flatbuffers-wire', 'zero-copy-deserialization']
+path = "crates/contextra-wire"
+unsafe_island = true
+may_depend_on = []
+ci_class = 'pr'
+spec = ['A2', '0', '4', '20']
+test = "cargo test -p contextra-wire --locked"

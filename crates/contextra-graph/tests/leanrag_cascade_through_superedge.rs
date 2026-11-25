@@ -1,8 +1,3 @@
-//! Kaskadierungsprüfung über hierarchische Superedges im LeanRAG-Modus.
-//!
-//! # Zweck
-//! Stellt die korrekte Weiterleitung von Invalidierungen über Abstraktionsebenen sicher.
-
 #![allow(clippy::unwrap_used)]
 
 use contextra_graph::cascade::cascade_invalidate_hyperedges_for_superseded_doc;
@@ -10,7 +5,6 @@ use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::{DocId, EntityId, TxId};
 
-// ANCHOR[contextra-graph:TESTS-LEANRAG-CASCADE-THROUGH-SUPEREDGE-001]
 #[tokio::test]
 async fn test_leanrag_cascade_recursive_through_superedges() {
     let graph = CsrGraph::new();
@@ -97,9 +91,8 @@ async fn test_leanrag_cascade_recursive_through_superedges() {
     assert!(report2.deferred.is_empty());
 }
 
-// ANCHOR[contextra-graph:TESTS-LEANRAG-CASCADE-THROUGH-SUPEREDGE-002]
 #[tokio::test]
-async fn test_leanrag_cascade_conservative_multidoc_superedge() {
+async fn test_leanrag_cascade_conservative_gdpr_multidoc_superedge() {
     let graph = CsrGraph::new();
     let doc_a = DocId::from_key("doc-a").unwrap();
     let doc_b = DocId::from_key("doc-b").unwrap();
@@ -158,7 +151,6 @@ async fn test_leanrag_cascade_conservative_multidoc_superedge() {
     assert!(report.invalidated.contains(&HyperEdgeId::new(100)));
 }
 
-// ANCHOR[contextra-graph:TESTS-LEANRAG-CASCADE-THROUGH-SUPEREDGE-003]
 #[tokio::test]
 async fn test_leanrag_cascade_fanout_limit_and_background_queue() {
     let graph = CsrGraph::new();
@@ -216,7 +208,6 @@ async fn test_leanrag_cascade_fanout_limit_and_background_queue() {
     assert_eq!(graph.pending_cascade_queue_len(), 0);
 }
 
-// ANCHOR[contextra-graph:TESTS-LEANRAG-CASCADE-THROUGH-SUPEREDGE-004]
 #[tokio::test]
 async fn test_leanrag_cascade_cycle_termination() {
     let graph = CsrGraph::new();
@@ -263,7 +254,6 @@ async fn test_leanrag_cascade_cycle_termination() {
     assert!(graph.get_hyperedge(s2_id).is_none());
 }
 
-// ANCHOR[contextra-graph:TESTS-LEANRAG-CASCADE-THROUGH-SUPEREDGE-005]
 #[tokio::test]
 async fn test_leanrag_cascade_topological_ancestor_before_child_order() {
     let graph = CsrGraph::new();
@@ -324,7 +314,6 @@ async fn test_leanrag_cascade_topological_ancestor_before_child_order() {
     );
 }
 
-// ANCHOR[contextra-graph:TESTS-LEANRAG-CASCADE-THROUGH-SUPEREDGE-006]
 #[test]
 fn test_leanrag_legacy_bincode_deserialization() {
     let edge_id = HyperEdgeId::new(42);

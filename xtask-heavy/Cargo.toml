@@ -1,0 +1,12 @@
+[package]
+name = "xtask-heavy"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[package.metadata.contextra]
+ring = "tooling"
+
+[dependencies]
+contextra-bench = { path = "../benchmarks/contextra-bench" }
+contextra-router = { path = "../crates/contextra-router", features = ["bandit-routing"] }

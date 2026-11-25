@@ -1,10 +1,3 @@
-//! # Modul: tests.rs
-//!
-//! **Zweck:** Unit-Tests für Transaktionsisolation und Commit/Rollback-Pfade.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
-
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use crate::Collection;
@@ -95,6 +88,39 @@ async fn test_db_transaction_drop_triggers_cleanup() {
     let results = col.text_index.search_bm25("uncommitted", 1, None).await;
     assert!(results.is_ok());
     assert!(results.unwrap().is_empty());
+}
+
+#[tokio::test]
+#[cfg(feature = "encryption-at-rest")]
+async fn test_db_transaction_rollback_cleans_kv_store_segments() {
+    use contextra_crypto::kv_segment::KvSegment;
+    use contextra_crypto::TenantIsolatedKvStore;
+
+    let kv_store = Arc::new(TenantIsolatedKvStore::new());
+    let tenant = contextra_types::TenantId::try_new(1).unwrap();
+    let doc_id = DocId::new(500);
+
+    kv_store.insert_segment(
+        tenant,
+        KvSegment::new(tenant, doc_id.inner(), vec![0xAA; 16]),
+    );
+    assert_eq!(kv_store.get_tenant_segment_len(tenant), 1);
+
+    let mut col = create_test_collection().await;
+    col.set_kv_store(kv_store.clone());
+
+    let tx_id = col.allocate_tx().unwrap();
+    let tx = DbTransaction::new(col, tx_id);
+    tx.record_keys(vec![1], vec![2], doc_id);
+
+    let rollback_res = tx.rollback().await;
+    assert!(rollback_res.is_ok());
+
+    assert_eq!(
+        kv_store.get_tenant_segment_len(tenant),
+        0,
+        "Rollback must purge KV store segment"
+    );
 }
 
 #[test]

@@ -1,21 +1,16 @@
-//! Morphologisch optimierter Invertierter Index (`BM25MorphIndex`).
-
 use super::index_struct::InvertedIndex;
 use crate::morphology::MorphologicalTokenizer;
 use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
 use contextra_types::{DocId, Result, ScoredDocument, TxId};
 use std::sync::Arc;
 
-// ANCHOR[contextra-text:INV-005]
-/// Invertierter Index mit morphologischer Zerlegung für deutsche Volltextsuche.
+/// An inverted index with morphological optimization.
 pub struct BM25MorphIndex<S: StorageEngine> {
     inner: InvertedIndex<S>,
     tokenizer: Arc<dyn MorphologicalTokenizer>,
 }
 
 impl<S: StorageEngine> BM25MorphIndex<S> {
-    // ANCHOR[contextra-text:INV-006]
-    /// Erzeugt einen neuen morphologischen Index mit deutschem Standard-Tokenizer.
     pub fn new(
         storage: Arc<S>,
         namespace: &str,
@@ -31,8 +26,6 @@ impl<S: StorageEngine> BM25MorphIndex<S> {
         }
     }
 
-    // ANCHOR[contextra-text:INV-007]
-    /// Liefert eine Referenz auf den konfigurierten morphologischen Tokenizer.
     pub fn tokenizer(&self) -> &dyn MorphologicalTokenizer {
         self.tokenizer.as_ref()
     }

@@ -24,7 +24,6 @@ struct ActiveEdge {
 ///
 /// # Complexity
 /// Time complexity $O(\text{max\_iterations} \cdot k \cdot |\text{Seeds}| \cdot \text{max\_edge\_size})$.
-// ANCHOR[contextra-graph:SRC-TL-HFD-DIFFUSION-001]
 pub fn run_diffusion<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],

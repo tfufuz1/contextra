@@ -1,6 +1,7 @@
 //! Grounding validator traits and context preparer contracts.
 
 // FILE-CONTEXT
+// STAND: 2026-09-15T00:00:00Z
 // ZWECK: GroundingValidator, ResponseGroundingValidator & ContextPreparer Trait-Definitionen.
 // INVARIANTEN: Zero-panic doctrine, BoxFuture dyn-safety for async validators.
 
@@ -38,11 +39,6 @@ pub trait GroundingValidator: Send + Sync {
 pub trait ResponseGroundingValidator: Send + Sync {
     /// Evaluates the grounding score for an LLM-generated response against source text slices.
     /// Returns a float score in [0.0, 1.0].
-    ///
-    /// # Fehler
-    /// Liefert `ContextraError` bei Evaluierungsfehlern oder ungültigen Eingaben.
-    /// # Crash
-    /// Reiner Rechenvorgang im Arbeitsspeicher; keine Seiteneffekte oder I/O.
     fn score_grounding(&self, response: &str, sources: &[&str]) -> Result<f32>;
 }
 

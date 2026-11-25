@@ -1,8 +1,7 @@
 //! Campaign J-10 Test: HNSW Rebuild Backoff Cooldown Invariant Verification
 //! Demonstrates deterministic exponential backoff cooldown behavior under rapid rebuild requests.
 
-use contextra_ports::VectorIndex;
-use contextra_types::{DocId, TxId};
+use contextra_core::{DocId, TxId, VectorIndex};
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
 use std::time::Duration;
 
@@ -17,9 +16,7 @@ async fn test_campaign_hnsw_backoff_cooldown_exact_bounds() {
         .build()
         .expect("valid config");
 
-    let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(100));
-    let clock = std::sync::Arc::new(contextra_vector::hnsw::MonotonicCounterClock::default());
-    let index = HnswIndex::try_new_with_rng_and_clock(config, rng, clock.clone()).expect("valid index");
+    let index = HnswIndex::try_new(config).expect("valid index");
 
     let tx = TxId::new(1);
     index
@@ -40,20 +37,21 @@ async fn test_campaign_hnsw_backoff_cooldown_exact_bounds() {
     index.commit(tx2).await.expect("commit 2");
 
     // Initial rebuild succeeds
-    index.rebuild().expect("initial rebuild succeeds");
+    index.rebuild().await.expect("initial rebuild succeeds");
 
     // Immediate second rebuild fails due to backoff
-    let res_immediate = index.rebuild();
+    let res_immediate = index.rebuild().await;
     assert!(
         res_immediate.is_err(),
         "immediate rebuild must fail due to backoff rate limit"
     );
 
-    // Advance clock past base_delay (100ms) deterministically
-    clock.advance_nanos(250_000_000);
+    // Sleep for base_delay (100ms) + buffer
+    tokio::time::sleep(Duration::from_millis(250)).await;
 
     // Subsequent rebuild after full cooldown expires must succeed
     index
         .rebuild()
+        .await
         .expect("rebuild after backoff cooldown expiry must succeed");
 }

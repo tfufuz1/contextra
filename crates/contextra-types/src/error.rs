@@ -1,17 +1,4 @@
-#![allow(deprecated)]
-//! Fehlertypen für `Contextra`.
-//!
-//! # Architektur-Rolle: Ring 0 (Kanonische Fehlerdefinition)
-//!
-//! Dieses Modul stellt das zentrale `ContextraError`-Enum bereit.
-//! In Übereinstimmung mit dem Zero-Panic-Prinzip werden Fehler strukturiert modelliert
-//! und über den `?`-Operator im System propagiert.
-//!
-//! # Invarianten
-//! - Einzige Fehler-Enum: Im gesamten Workspace dient `ContextraError` als systemweiter Fehlertyp.
-//! - Abwärtskompatibilität: Durch `#[non_exhaustive]` können neue Varianten ergänzt werden,
-//!   ohne Downstream-Gleichheitsprüfungen (`match`) zu brechen.
-//! - Keine Panics: Alle Hilfs- und Konvertierungsmethoden sind panic-frei.
+//! Error types for `Contextra`.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T21:51:46Z (SESSION: a43b7682)
@@ -30,11 +17,6 @@ use thiserror::Error;
 
 /// Errors that can occur during HNSW graph deletion and repair operations.
 #[derive(Error, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-// ANCHOR[contextra-types:ERR-001]
-#[deprecated(
-    since = "0.1.0",
-    note = "Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
-)]
 pub enum HnswDeletionError {
     /// Target node with doc_id not found in graph.
     #[error("Node for doc_id {0:?} not found in HNSW index")]
@@ -57,7 +39,6 @@ pub enum HnswDeletionError {
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 #[repr(transparent)]
-// ANCHOR[contextra-types:ERR-002]
 pub struct StepId(pub u64);
 
 impl StepId {
@@ -86,7 +67,6 @@ impl From<u64> for StepId {
 
 /// Declarative agent directive controlling segment caching, pinning, and eviction lifecycle.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-// ANCHOR[contextra-types:ERR-003]
 pub enum CacheDirective {
     /// Segment is explicitly pinned in memory until TTL expiration or explicit release.
     Pin {
@@ -111,7 +91,6 @@ impl Default for CacheDirective {
 }
 
 /// Convenience alias for `Result<T, ContextraError>`.
-// ANCHOR[contextra-types:ERR-004]
 pub type Result<T> = std::result::Result<T, ContextraError>;
 
 /// Unified error type for all `Contextra` operations across the entire workspace.
@@ -125,7 +104,6 @@ pub type Result<T> = std::result::Result<T, ContextraError>;
 /// New variants are appended strictly to the bottom of the enum to preserve binary and FFI compatibility.
 #[derive(Error, Debug)]
 #[non_exhaustive]
-// ANCHOR[contextra-types:ERR-005]
 pub enum ContextraError {
     // ═══ Core & Logic ═══
     /// Internal engine logic error.
@@ -210,10 +188,6 @@ pub enum ContextraError {
     },
 
     /// HNSW graph degradation warning threshold reached.
-    #[deprecated(
-        since = "0.1.0",
-        note = "Indexspezifische Fehler gehören in das Crate contextra-vector"
-    )]
     #[error("HNSW graph connectivity degraded: {deleted_ratio:.1}% deleted nodes")]
     HnswConnectivityDegraded {
         /// Ratio of deleted tombstone nodes in graph.
@@ -339,7 +313,7 @@ pub enum ContextraError {
         tx_id: u64,
     },
 
-    /// KV-seitige `KvDeleteMode`-Konfiguration inkonsistent mit aktiven Invarianten.
+    /// KV-seitige `KvDeleteMode`-Konfiguration inkonsistent mit `deletion_proof_active`.
     #[error("KV delete mode configuration error: {0}")]
     KvDeleteModeConfig(&'static str),
 
@@ -360,10 +334,6 @@ pub enum ContextraError {
     PinBudgetExceeded(String),
 
     /// HNSW graph repair failure.
-    #[deprecated(
-        since = "0.1.0",
-        note = "Indexspezifische Fehler gehören in das Crate contextra-vector"
-    )]
     #[error("graph repair failed: {0}")]
     GraphRepairFailed(#[from] HnswDeletionError),
 
@@ -388,7 +358,6 @@ pub enum ContextraError {
 
 impl ContextraError {
     /// Creates a `LimitExceeded` error.
-    // ANCHOR[contextra-types:ERR-FN-LIMIT_EXCEEDED]
     pub fn limit_exceeded(limit: usize, context: impl Into<String>) -> Self {
         Self::LimitExceeded {
             limit,
@@ -397,7 +366,6 @@ impl ContextraError {
     }
 
     /// Creates a `ModelLoad` error.
-    // ANCHOR[contextra-types:ERR-FN-MODEL_LOAD]
     pub fn model_load(path: impl Into<String>, reason: impl Into<String>) -> Self {
         Self::ModelLoad {
             path: path.into(),
@@ -406,13 +374,11 @@ impl ContextraError {
     }
 
     /// Creates a `SnapshotUnsupportedForSignal` error.
-    // ANCHOR[contextra-types:ERR-FN-SNAPSHOT_UNSUPPORTED_FOR_SIGNAL]
     pub fn snapshot_unsupported_for_signal(strategy: impl Into<String>) -> Self {
         Self::SnapshotUnsupportedForSignal(strategy.into())
     }
 
     /// Creates an `OrphanedVectorReference` error.
-    // ANCHOR[contextra-types:ERR-FN-ORPHANED_VECTOR_REFERENCE]
     pub fn orphaned_vector_reference(
         doc_id: impl Into<String>,
         index_id: impl Into<String>,
@@ -424,7 +390,6 @@ impl ContextraError {
     }
 
     /// Creates a `CapabilityUnsupported` error.
-    // ANCHOR[contextra-types:ERR-FN-CAPABILITY_UNSUPPORTED]
     pub fn capability_unsupported(
         capability: impl Into<String>,
         reason: impl Into<String>,
@@ -435,13 +400,11 @@ impl ContextraError {
         }
     }
     /// Creates an `InvalidInput` error from any displayable value.
-    // ANCHOR[contextra-types:ERR-FN-INVALID_INPUT]
     pub fn invalid_input(msg: impl Into<String>) -> Self {
         Self::InvalidInput(msg.into())
     }
 
     /// Creates a `WalCorruption` error.
-    // ANCHOR[contextra-types:ERR-FN-WAL_CORRUPTION]
     pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self {
         Self::WalCorruption {
             offset,
@@ -450,7 +413,6 @@ impl ContextraError {
     }
 
     /// Creates a `ChecksumMismatch` error.
-    // ANCHOR[contextra-types:ERR-FN-CHECKSUM_MISMATCH]
     pub fn checksum_mismatch(path: impl Into<String>, block_id: u64) -> Self {
         Self::ChecksumMismatch {
             path: path.into(),
@@ -459,25 +421,63 @@ impl ContextraError {
     }
 
     /// Creates a `KvQuantization` error.
-    // ANCHOR[contextra-types:ERR-FN-KV_QUANTIZATION]
     pub fn kv_quantization(msg: impl Into<String>) -> Self {
         Self::KvQuantization(msg.into())
     }
 
+    /// Constructs a `ContextraError` from an error kind identifier and detail message.
+    pub fn from_kind_and_message(kind: &str, msg: impl Into<String>) -> Self {
+        let msg = msg.into();
+        match kind {
+            "DurabilityConfig" => Self::durability_config(msg),
+            "OrphanedVectorReference" => {
+                let parts: Vec<&str> = msg.split("->").collect();
+                if parts.len() == 2 {
+                    Self::orphaned_vector_reference(parts[0].trim(), parts[1].trim())
+                } else {
+                    Self::orphaned_vector_reference("unknown", msg)
+                }
+            }
+            "InvalidInput" => Self::invalid_input(msg),
+            "KvQuantization" => Self::kv_quantization(msg),
+            "PinBudgetExceeded" => Self::pin_budget_exceeded(msg),
+            _ => Self::Internal(msg),
+        }
+    }
+
     /// Creates a `DurabilityConfig` error.
-    // ANCHOR[contextra-types:ERR-FN-DURABILITY_CONFIG]
     pub fn durability_config(msg: impl Into<String>) -> Self {
         Self::DurabilityConfig(msg.into())
     }
 
+    /// Helper to validate durability configuration, producing `DurabilityConfig` on failure.
+    pub fn check_durability(condition: bool, msg: impl Into<String>) -> Result<()> {
+        if condition {
+            Ok(())
+        } else {
+            Err(Self::durability_config(msg))
+        }
+    }
+
+    /// Helper to validate vector reference existence, producing `OrphanedVectorReference` on failure.
+    pub fn check_vector_reference(
+        found: bool,
+        doc_id: impl Into<String>,
+        index_id: impl Into<String>,
+    ) -> Result<()> {
+        if found {
+            Ok(())
+        } else {
+            Err(Self::orphaned_vector_reference(doc_id, index_id))
+        }
+    }
+
     /// Creates a `PinBudgetExceeded` error.
-    // ANCHOR[contextra-types:ERR-FN-PIN_BUDGET_EXCEEDED]
     pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self {
         Self::PinBudgetExceeded(msg.into())
     }
 
     /// Creates a `CrossDeviceLink` error.
-    // ANCHOR[contextra-types:ERR-FN-CROSS_DEVICE_LINK]
     pub fn cross_device_link(
         source_path: impl Into<String>,
         target_path: impl Into<String>,
@@ -489,7 +489,6 @@ impl ContextraError {
     }
 
     /// Creates a `WalTruncationDetected` error.
-    // ANCHOR[contextra-types:ERR-FN-WAL_TRUNCATION_DETECTED]
     pub fn wal_truncation_detected(expected_hmac: [u8; 32], actual_hmac: [u8; 32]) -> Self {
         Self::WalTruncationDetected {
             expected_hmac,
@@ -498,7 +497,6 @@ impl ContextraError {
     }
 
     /// Returns `true` if this error represents an optimistic concurrency control (OCC) conflict or stale read.
-    // ANCHOR[contextra-types:ERR-FN-IS_OCC_CONFLICT]
     pub fn is_occ_conflict(&self) -> bool {
         matches!(self, Self::StaleRead(_) | Self::Conflict(_))
     }
@@ -1063,10 +1061,7 @@ mod tests {
         );
         assert_eq!(dto.kind, "CustomKind");
         assert_eq!(dto.message, "Custom message");
-        assert_eq!(
-            dto.details.expect("details present").get("trace_id"),
-            Some(&serde_json::json!("12345"))
-        );
+        assert_eq!(dto.details.expect("details present")["trace_id"], "12345"); // expect
     }
 
     #[test]

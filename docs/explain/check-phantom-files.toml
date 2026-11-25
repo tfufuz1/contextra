@@ -1,0 +1,8 @@
+title = "Phantom-Dateien Prüfer"
+what = "Referenzierte Dateien existieren im Dateisystem nicht."
+why = "Tote Dateireferenzen in Moduldeklarationen oder Dokumenten führen zu Baufehlern."
+fix = "Erstelle die fehlende Datei oder entferne die ungültige `mod`-Deklaration."
+anti_fix = "Erstelle keine leeren Platzhalter-Dateien ohne Inhalt und Tests."
+adr = ["ADR-035"]
+related = ["symbol-exists", "doc-truth"]
+sources = ["CONSTITUTION.md"]

@@ -13,8 +13,6 @@ description = "Encryption at Rest and KV-Cache Security utilities for Contextra"
 ring = "0"
 
 [dependencies]
-contextra-ports = { workspace = true }
-contextra-types = { workspace = true }
 thiserror = { workspace = true }
 sha2 = "0.10"
 hmac = "0.12"
@@ -26,6 +24,8 @@ blake3 = { workspace = true }
 bincode = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 rand = { workspace = true }
 tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
@@ -36,13 +36,12 @@ regex = { workspace = true }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [features]
-default = ["legacy-erasure", "kv-encryption", "test-utils"]
-legacy-erasure = []
 test-utils = []
-kv-encryption = ["legacy-erasure"]
+kv-encryption = []
 cloud-egress-guard = []
 
 [dev-dependencies]
+contextra-crypto = { path = ".", features = ["test-utils"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
@@ -56,4 +55,3 @@ harness = false
 [[bench]]
 name = "deletion_proof_latency_bench"
 harness = false
-required-features = ["legacy-erasure"]

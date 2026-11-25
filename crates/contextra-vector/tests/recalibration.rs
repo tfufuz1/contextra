@@ -1,5 +1,4 @@
-use contextra_ports::VectorIndex;
-use contextra_types::{DocId, TxId};
+use contextra_core::{DocId, TxId, VectorIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use rand::{Rng, SeedableRng};
 use std::sync::Arc;
@@ -13,7 +12,7 @@ async fn test_quantizer_recalibration() {
         ef_construction: 100,
         ef_search: 50,
         rebuild_threshold: 0.8,
-        distance_metric: contextra_types::DistanceMetric::Euclidean,
+        distance_metric: contextra_core::DistanceMetric::Euclidean,
         quantize: true,
         quantizer_recalibration_sample_size: 1000,
         ..Default::default()
@@ -51,7 +50,7 @@ async fn test_quantizer_recalibration() {
     index.commit(TxId(2)).await.unwrap();
 
     // Trigger rebuild to recalibrate
-    index.rebuild().unwrap();
+    index.rebuild().await.unwrap();
 
     // Verify new quantizer state (codebook stability preserved; drift counters reset)
     let q_after = index.quantizer().expect("Quantizer must be trained");

@@ -1,0 +1,8 @@
+title = "Gesamturteil aller Qualitätsgates"
+what = "Mindestens ein untergeordnetes Gate hat einen Fehler gemeldet."
+why = "Ein PR darf erst gemergt werden, wenn alle relevanten Gates den Status `pass` erreichen."
+fix = "Führe `cargo xtask can-merge` aus und behebe alle dort gelisteten Fehler ursächlich."
+anti_fix = "Erzwinge keinen Merge gegen gescheiterte Gates."
+adr = ["ADR-035"]
+related = ["can-merge", "ledger"]
+sources = ["CONSTITUTION.md", "docs/gates/gate-orchestrator.md"]

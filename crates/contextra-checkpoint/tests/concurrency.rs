@@ -1,21 +1,6 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::disallowed_methods,
-    clippy::disallowed_types,
-    clippy::indexing_slicing,
-    clippy::cast_sign_loss,
-    clippy::cast_possible_truncation,
-    clippy::await_holding_lock
-)]
-//! # Integrationstest: Nebenläufige Transaktionen und Guard-Sicherheit
-//!
-//! Prüft die Isolation und Konfliktfreiheit paralleler Transaktionen und CheckpointGuards.
-
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_checkpoint::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_checkpoint::contextra_types::{Result, TxId};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -132,7 +117,6 @@ impl StorageEngine for MockStorage {
     }
 }
 
-// Testet: test concurrent checkpoint creation same name.
 #[tokio::test]
 async fn test_concurrent_checkpoint_creation_same_name() {
     let storage = Arc::new(MockStorage::new());
@@ -170,7 +154,6 @@ async fn test_concurrent_checkpoint_creation_same_name() {
     );
 }
 
-// Testet: test concurrent drop checkpoints.
 #[tokio::test]
 async fn test_concurrent_drop_checkpoints() {
     let storage = Arc::new(MockStorage::new());

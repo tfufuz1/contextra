@@ -4,9 +4,9 @@
 
 #![cfg(feature = "experimental-diskann")]
 
-use contextra_ports::VectorIndex;
-use contextra_types::ContextraError;
-use contextra_types::{DistanceMetric, DocId, TxId};
+use contextra_core::traits::VectorIndex;
+use contextra_core::types::{DistanceMetric, DocId, TxId};
+use contextra_core::ContextraError;
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::MmapIndex;
@@ -219,9 +219,9 @@ async fn test_hnsw_and_diskann_persistence_roundtrip() {
     let hnsw_pre_results = hnsw_index.search(query, 5).await.unwrap();
 
     // Save and Reload
-    hnsw_index.save(&hnsw_path).unwrap();
+    hnsw_index.save(&hnsw_path).await.unwrap();
     let hnsw_reloaded = HnswIndex::try_new(hnsw_config).unwrap();
-    hnsw_reloaded.load_mmap(&hnsw_path).unwrap();
+    hnsw_reloaded.load_mmap(&hnsw_path).await.unwrap();
 
     let hnsw_post_results = hnsw_reloaded.search(query, 5).await.unwrap();
 

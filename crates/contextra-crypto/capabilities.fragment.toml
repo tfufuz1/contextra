@@ -1,4 +1,0 @@
-[crates.contextra-crypto]
-klasse = "A"
-may_depend_on = []
-transitional = ["legacy-erasure", "contextra-types", "contextra-ports"]

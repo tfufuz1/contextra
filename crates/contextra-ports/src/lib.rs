@@ -5,7 +5,6 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-#![allow(deprecated)]
 #![cfg_attr(
     test,
     allow(
@@ -19,15 +18,8 @@
 use std::future::Future;
 use std::pin::Pin;
 
-/// Re-export canonical `contextra-types` submodules explicitly per Contract M3 / AR-10.
-pub use contextra_types::{
-    error, ids, model_fingerprint, refs, tenant_scope, types, witness, CollectionRef,
-    ConfigFingerprint, ContextChunk, ContextWindow, ContextraError, DocId, DocKey, EntityId,
-    ErasureId, FileId, GateId, ModelFingerprint, OperatorRef, QueryRewriteOutput, RequestContext,
-    RerankResult, ResourceBudget, ResourceTracker, Result, RetrievalStrategy, SagaRecord,
-    ScanMethod, ScoredEntry, Seq, StoreId, SubjectRef, TenantId, TenantRef, TenantScopeViolation,
-    TenantScoped, Timestamp, TokenBudget, TxId, WorkflowState, MAX_REF_LEN,
-};
+pub use contextra_types::*;
+pub use contextra_types::{error, error_dto, model_fingerprint, schema, tombstone, types};
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -41,8 +33,6 @@ pub mod attention;
 pub mod checkpoint;
 /// Clock port trait and system time implementation.
 pub mod clock;
-/// Trait conformance assertions and wiring verification matrix.
-pub mod conformance;
 /// Embedding provider and LLM generation traits.
 pub mod embedding;
 /// Graph mutation and CSR traversal port traits.
@@ -71,32 +61,16 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
-/// Storage layer scanners and physical purgers (Vertrag V1, SPEC §12.7.4).
-pub mod scanner;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
 pub mod text_index;
 /// Vector retrieval and HNSW indexing traits.
 pub mod vector_index;
-/// Virtual File System (VFS) port interface and contracts.
-pub mod vfs;
-
-/// Environment abstractions (Clock, Rng, IdGen, MetricsSink) with sub-prelude.
-pub mod env;
-/// Filesystem abstractions (Vfs, VfsFile) with sub-prelude.
-pub mod fs;
-/// Indexing subsystem abstractions (VectorIndex, TextIndex, GraphIndex) with sub-prelude.
-pub mod index;
-/// Inference subsystem abstractions (Embedding, Reranker, QueryRewriter) with sub-prelude.
-pub mod inference;
-/// Policy subsystem abstractions (LicenseGate, EgressPolicy) with sub-prelude.
-pub mod policy;
 
 pub use attention::*;
 pub use checkpoint::*;
 pub use clock::*;
-pub use conformance::*;
 pub use embedding::*;
 pub use graph::*;
 pub use graph_index::*;
@@ -111,29 +85,9 @@ pub use plugin::*;
 pub use query_rewriter::*;
 pub use reranker::*;
 pub use rng::*;
-pub use scanner::{
-    LayerScanner, LayerWitness, PurgeStats, Purger, ScanSession, ScanTarget, ScanTechnique,
-    WitnessLayer,
-};
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
-pub use vfs::*;
-
-/// Generic contract tests for port implementers.
-#[cfg(any(feature = "contract-tests", feature = "conformance"))]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::type_complexity,
-    clippy::io_other_error
-)]
-pub mod contract_tests;
-
-pub use metrics::{
-    HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricSnapshot, NoopMetricsSink,
-};
 
 #[cfg(test)]
 mod dyn_safety {
@@ -143,6 +97,7 @@ mod dyn_safety {
     fn _assert_dyn_metrics_sink(_: Option<&dyn MetricsSink>) {}
     fn _assert_dyn_kv_bridge_storage(_: Option<&dyn KvBridgeStorage>) {}
     fn _assert_dyn_kv_prefix_store(_: Option<&dyn KvPrefixStore>) {}
+    fn _assert_dyn_kv_lifecycle_hooks(_: Option<&dyn KvLifecycleHooks>) {}
     fn _assert_dyn_graph_mutation(_: Option<&dyn GraphCollectionMutation>) {}
     fn _assert_dyn_graph(_: Option<&dyn GraphIndex>) {}
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
@@ -154,10 +109,6 @@ mod dyn_safety {
     fn _assert_dyn_attention_exporter(_: Option<&dyn AttentionExporter>) {}
     fn _assert_dyn_reranker(_: Option<&dyn Reranker>) {}
     fn _assert_dyn_query_rewriter(_: Option<&dyn QueryRewriter>) {}
-    fn _assert_dyn_layer_scanner(_: Option<&dyn LayerScanner>) {}
-    fn _assert_dyn_purger(_: Option<&dyn Purger>) {}
-    fn _assert_dyn_vfs(_: Option<&dyn Vfs>) {}
-    fn _assert_dyn_egress_policy(_: Option<&dyn crate::policy::EgressPolicy>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -165,6 +116,7 @@ mod dyn_safety {
         _assert_dyn_metrics_sink(None);
         _assert_dyn_kv_bridge_storage(None);
         _assert_dyn_kv_prefix_store(None);
+        _assert_dyn_kv_lifecycle_hooks(None);
         _assert_dyn_graph_mutation(None);
         _assert_dyn_graph(None);
         _assert_dyn_embedding(None);
@@ -175,30 +127,15 @@ mod dyn_safety {
         _assert_dyn_attention_exporter(None);
         _assert_dyn_reranker(None);
         _assert_dyn_query_rewriter(None);
-        _assert_dyn_layer_scanner(None);
-        _assert_dyn_purger(None);
-        _assert_dyn_vfs(None);
-        _assert_dyn_egress_policy(None);
     }
 }
 
-pub mod barrier;
-pub mod erasure;
-pub mod gate;
-pub mod keys;
-pub mod ledger;
-pub mod observer;
-pub mod report_signer;
-
-pub use barrier::{
-    BarrierExclusive, BarrierShared, CommitBarrier, CompactionPermit, PurgeBarrier, PurgePermit,
-};
-pub use erasure::{
-    EraseTarget as PortEraseTarget, ErasureLayer, ErasureTarget, LayerScope, PurgeCx, PurgeOutcome,
-    StorageBackend,
-};
-pub use gate::{GateDecision, KeyBound, KeyRange, RangeGate, ReadGate};
-pub use keys::{Envelope, FileKey, FileKeyring, FileKind, RecordSealer, SealCtx};
-pub use ledger::{LedgerEntry, LedgerSink, RangeSet};
-pub use observer::{ErasureEvent, ErasureObserver, ObservedPhase, TargetKind};
-pub use report_signer::ReportSigner;
+// =============================================================================
+// ÄNDERUNGSNOTIZ / CHANGELOG (v17 Teil 2.2 Cleanup)
+// =============================================================================
+// Bereinigung verwaister und überholter Port-Definitionen gemäß Spec v17 Teil 2.2:
+// - `DistanceCalculator`: Verwaister Trait, ersetzt durch `DistanceMetric::compute` in `contextra-types`.
+// - `MemoryLifecycleManager`: Verwaister Trait ohne Implementierung im Workspace.
+// - `StorageRead`: Überholt und konsolidiert im umfassenden `StorageEngine`-Trait in `storage.rs`.
+// - `StorageWrite`: Überholt und konsolidiert im umfassenden `StorageEngine`-Trait in `storage.rs`.
+// =============================================================================

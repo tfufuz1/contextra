@@ -8,29 +8,15 @@
 // 5. MVCC-Sichtbarkeit und Tombstones werden weiterhin dynamisch pro Anfrage evaluiert.
 // INVARIANTEN: Zero-Panic Doctrine, repr(C, align(8)) Layout für Postings, RCU-Locking ohne globale Exklusivlocks.
 
-//! Kompakte, speicherresidente Posting-Listen und Block-Max-Metadaten.
-//!
-//! # Ring-Zuordnung
-//! Ring 0 (Kern).
-//!
-//! # Funktionsweise
-//! Verwaltet Invertierte Listen pro Term mit Delta-Varint-Kompression und
-//! Block-Max-Zusammenfassungen (à 64 Einträge) zur Beschleunigung des WAND-Algorithmus.
-//! Aktualisierungen erfolgen über RCU (Read-Copy-Update) für sperrenfreie Lesezugriffe.
-
-use crate::error::TextError as ContextraError;
-use crate::types::DocId;
+use contextra_types::{ContextraError, DocId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::sync::Arc;
 
-// ANCHOR[contextra-text:POST-001]
-/// Magische Bytes für das kompakte V2-Posting-Listen-Format (`PL\x02\x00`).
 pub const POSTING_LIST_V2_MAGIC: &[u8; 4] = b"PL\x02\x00";
 
-// ANCHOR[contextra-text:POST-002]
-/// Blockgröße für die Block-Max-WAND-Zerlegung (64 Postings pro Block).
+/// Block size for Block-Max WAND decomposition.
 pub const BLOCK_SIZE: usize = 64;
 
 #[cfg(not(feature = "docid-128"))]
@@ -39,31 +25,25 @@ pub type DocIdRaw = u64;
 #[cfg(feature = "docid-128")]
 pub type DocIdRaw = u128;
 
-// ANCHOR[contextra-text:POST-003]
-/// Metadaten eines 64er-Posting-Blocks zur Berechnung oberer BM25-Schranken in Block-Max WAND.
+/// Block-Max metadata for a chunk of postings (typically 64 postings).
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct PostingBlockInfo {
-    /// Höchste Dokument-ID in diesem Block (ermöglicht schnelles Überspringen).
+    /// Upper bound doc_id in this block (for fast skip).
     pub max_doc_id: DocIdRaw,
-    /// Maximale Termfrequenz innerhalb dieses Blocks.
+    /// Maximum term frequency in this block.
     pub max_tf: u32,
-    /// Minimale Dokumentlänge innerhalb dieses Blocks (maximiert die BM25-Obergrenze).
+    /// Minimum document length in this block (maximizing BM25 score upper bound).
     pub min_doc_len: u32,
 }
 
-// ANCHOR[contextra-text:POST-004]
-/// Kompakte Repräsentation eines einzelnen Vorkommens (Posting) im Index.
-///
-/// 8-Byte ausgerichtet (`repr(C, align(8))`) für optimale CPU-Cacheline-Ausnutzung (16 Bytes Gesamtgröße).
+/// Compact representation of a single posting in a posting list.
+/// Packed with 8-byte alignment (16 bytes total) for optimal CPU cache alignment.
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Posting {
-    /// Dokument-ID des Eintrags.
     pub doc_id: DocIdRaw,
-    /// Termfrequenz (Häufigkeit des Terms in diesem Dokument).
     pub tf: u32,
-    /// Gesamtlänge des Dokuments in Token.
     pub doc_len: u32,
 }
 
@@ -71,7 +51,7 @@ impl Posting {
     #[inline]
     pub fn new(doc_id: DocId, tf: u32, doc_len: u32) -> Self {
         Self {
-            doc_id: doc_id.inner() as _,
+            doc_id: doc_id.inner(),
             tf,
             doc_len,
         }
@@ -79,7 +59,7 @@ impl Posting {
 
     #[inline]
     pub fn doc_id(&self) -> DocId {
-        DocId::new(self.doc_id as _)
+        DocId::new(self.doc_id)
     }
 }
 
@@ -113,8 +93,7 @@ fn compute_blocks(postings: &[Posting]) -> Vec<PostingBlockInfo> {
     blocks
 }
 
-// ANCHOR[contextra-text:POST-005]
-/// Zusammenhängende, nach DocId sortierte Posting-Liste für einen Begriff.
+/// A contiguous, sorted sequence of postings for a specific term.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PostingList {
     postings: Vec<Posting>,
@@ -122,8 +101,7 @@ pub struct PostingList {
 }
 
 impl PostingList {
-    // ANCHOR[contextra-text:POST-006]
-    /// Erzeugt eine sortierte und deduplizierte Posting-Liste und berechnet die Block-Metadaten.
+    /// Creates a new `PostingList` from a vector of postings, ensuring sorted order by DocId.
     pub fn new(mut postings: Vec<Posting>) -> Self {
         postings.sort_unstable_by_key(|p| p.doc_id);
         postings.dedup_by_key(|p| p.doc_id);
@@ -131,8 +109,7 @@ impl PostingList {
         Self { postings, blocks }
     }
 
-    // ANCHOR[contextra-text:POST-007]
-    /// Erzeugt eine leere Posting-Liste.
+    /// Creates an empty `PostingList`.
     pub fn empty() -> Self {
         Self {
             postings: Vec::new(),
@@ -140,43 +117,36 @@ impl PostingList {
         }
     }
 
-    // ANCHOR[contextra-text:POST-008]
-    /// Liefert die Postings als Slice.
+    /// Returns a slice of postings.
     #[inline]
     pub fn as_slice(&self) -> &[Posting] {
         &self.postings
     }
 
-    // ANCHOR[contextra-text:POST-009]
-    /// Liefert die Block-Max-Metadaten.
+    /// Returns the block-max metadata blocks.
     #[inline]
     pub fn blocks(&self) -> &[PostingBlockInfo] {
         &self.blocks
     }
 
-    // ANCHOR[contextra-text:POST-010]
-    /// Liefert die Anzahl der Einträge in der Liste.
+    /// Returns the number of postings.
     #[inline]
     pub fn len(&self) -> usize {
         self.postings.len()
     }
 
-    // ANCHOR[contextra-text:POST-011]
-    /// Prüft, ob die Liste leer ist.
+    /// Returns true if the posting list is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.postings.is_empty()
     }
 
-    // ANCHOR[contextra-text:POST-012]
-    /// Fügt ein Posting per Copy-On-Write (RCU) ein oder aktualisiert einen bestehenden Eintrag.
+    /// Inserts or updates a posting for a doc_id using RCU/copy-on-write semantics.
     pub fn upsert(&self, posting: Posting) -> Self {
         let mut new_postings = self.postings.clone();
         match new_postings.binary_search_by_key(&posting.doc_id, |p| p.doc_id) {
             Ok(idx) => {
-                if let Some(target) = new_postings.get_mut(idx) {
-                    *target = posting;
-                }
+                new_postings[idx] = posting;
             }
             Err(idx) => {
                 new_postings.insert(idx, posting);
@@ -189,11 +159,10 @@ impl PostingList {
         }
     }
 
-    // ANCHOR[contextra-text:POST-013]
-    /// Entfernt ein Posting per Copy-On-Write (RCU).
+    /// Removes a posting for a doc_id using RCU/copy-on-write semantics.
     pub fn remove(&self, doc_id: DocId) -> Self {
         let mut new_postings = self.postings.clone();
-        if let Ok(idx) = new_postings.binary_search_by_key(&(doc_id.inner() as _), |p| p.doc_id) {
+        if let Ok(idx) = new_postings.binary_search_by_key(&doc_id.inner(), |p| p.doc_id) {
             new_postings.remove(idx);
         }
         let blocks = compute_blocks(&new_postings);
@@ -203,8 +172,7 @@ impl PostingList {
         }
     }
 
-    // ANCHOR[contextra-text:POST-014]
-    /// Kodiert die Posting-Liste in das kompakte Binärformat mit Delta-Varint-Kompression.
+    /// Encodes the posting list into a compact binary format with Delta-Varint encoding.
     pub fn encode_compact(&self) -> Result<Vec<u8>, ContextraError> {
         let mut buf = Vec::with_capacity(4 + 8 + self.postings.len() * 8);
         buf.extend_from_slice(POSTING_LIST_V2_MAGIC);
@@ -212,65 +180,52 @@ impl PostingList {
 
         let mut prev_doc_id = 0u64;
         for p in &self.postings {
-            let p_doc_raw = p.doc_id as u64;
-            let delta = p_doc_raw.checked_sub(prev_doc_id).ok_or_else(|| {
-                ContextraError::Storage("Unsorted or overflow doc_id in posting list".to_string())
-            })?;
+            let delta = (p.doc_id as u128)
+                .checked_sub(prev_doc_id as u128)
+                .ok_or_else(|| {
+                    ContextraError::Storage(
+                        "Unsorted or overflow doc_id in posting list".to_string(),
+                    )
+                })? as u64;
             encode_varint(delta, &mut buf);
             encode_varint(p.tf as u64, &mut buf);
             encode_varint(p.doc_len as u64, &mut buf);
-            prev_doc_id = p_doc_raw;
+            #[allow(clippy::unnecessary_cast)]
+            {
+                prev_doc_id = p.doc_id as u64;
+            }
         }
 
         Ok(buf)
     }
 
-    // ANCHOR[contextra-text:POST-015]
-    /// Dekodiert eine Posting-Liste aus dem Delta-Varint-Format mit Fallback auf Legacy-Bincode.
-    ///
-    /// # Defensives Verhalten
-    /// Weist unvollständige, abgeschnittene, überlange, nicht-monotone oder überlaufende Daten
-    /// strikt ab und liefert einen Fehler statt Panics oder Endlosschleifen.
+    /// Decodes a posting list from compact Delta-Varint binary format,
+    /// with legacy bincode V1 fallback.
     pub fn decode_compact(bytes: &[u8]) -> Result<Self, ContextraError> {
         if bytes.starts_with(POSTING_LIST_V2_MAGIC) {
             let mut offset = POSTING_LIST_V2_MAGIC.len();
-            let count_u64 = decode_varint(bytes, &mut offset)?;
-            let count = usize::try_from(count_u64).map_err(|_| {
-                ContextraError::Storage("Posting list count exceeds usize capacity".to_string())
-            })?;
+            let count = decode_varint(bytes, &mut offset)?;
             if count > 100_000_000 {
                 return Err(ContextraError::Storage(format!(
-                    "Oversized posting list count: {count}",
+                    "Oversized posting list count: {}",
+                    count
                 )));
             }
-            let remaining_bytes = bytes.len().saturating_sub(offset);
-            if count > remaining_bytes {
-                return Err(ContextraError::Storage(
-                    "Declared posting count exceeds available byte buffer".to_string(),
-                ));
-            }
-
-            let mut postings = Vec::with_capacity(count);
+            let mut postings = Vec::with_capacity(count as usize);
             let mut prev_doc_id = 0u64;
-            let mut is_first = true;
 
             for _ in 0..count {
                 let delta = decode_varint(bytes, &mut offset)?;
                 let tf_u64 = decode_varint(bytes, &mut offset)?;
                 let doc_len_u64 = decode_varint(bytes, &mut offset)?;
 
-                if !is_first && delta == 0 {
-                    return Err(ContextraError::Storage(
-                        "Non-monotonic delta: subsequent doc_id delta must be > 0".to_string(),
-                    ));
-                }
-
                 let doc_id = prev_doc_id.checked_add(delta).ok_or_else(|| {
                     ContextraError::Storage("DocId overflow during delta decoding".to_string())
                 })?;
-                let tf: u32 = u32::try_from(tf_u64)
+                let tf: u32 = tf_u64
+                    .try_into()
                     .map_err(|_| ContextraError::Storage("TF overflow in varint".to_string()))?;
-                let doc_len: u32 = u32::try_from(doc_len_u64).map_err(|_| {
+                let doc_len: u32 = doc_len_u64.try_into().map_err(|_| {
                     ContextraError::Storage("DocLen overflow in varint".to_string())
                 })?;
 
@@ -280,13 +235,12 @@ impl PostingList {
                     doc_len,
                 });
                 prev_doc_id = doc_id;
-                is_first = false;
             }
 
             if offset != bytes.len() {
                 return Err(ContextraError::Storage(format!(
                     "Extra trailing bytes after posting list decoding: {} remaining",
-                    bytes.len().saturating_sub(offset)
+                    bytes.len() - offset
                 )));
             }
 
@@ -302,43 +256,23 @@ impl PostingList {
 
 fn encode_varint(mut val: u64, buf: &mut Vec<u8>) {
     while val >= 0x80 {
-        let low_7 = (val & 0x7f) as u8;
-        buf.push(low_7 | 0x80);
+        buf.push((val as u8 & 0x7f) | 0x80);
         val >>= 7;
     }
-    buf.push((val & 0x7f) as u8);
+    buf.push(val as u8);
 }
 
 fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, ContextraError> {
     let mut result = 0u64;
     let mut shift = 0u32;
     while *offset < bytes.len() {
-        let byte = match bytes.get(*offset) {
-            Some(&b) => b,
-            None => break,
-        };
-        *offset = offset.saturating_add(1);
-
-        let payload = (byte & 0x7f) as u64;
-        if shift > 63 || (shift == 63 && payload > 1) {
-            return Err(ContextraError::Storage(
-                "Varint overflow beyond 64-bit".to_string(),
-            ));
-        }
-
-        result = match result.checked_add(payload << shift) {
-            Some(res) => res,
-            None => {
-                return Err(ContextraError::Storage(
-                    "Varint result integer overflow".to_string(),
-                ))
-            }
-        };
-
+        let byte = bytes[*offset];
+        *offset += 1;
+        result |= ((byte & 0x7f) as u64) << shift;
         if (byte & 0x80) == 0 {
             return Ok(result);
         }
-        shift = shift.saturating_add(7);
+        shift += 7;
         if shift >= 64 {
             return Err(ContextraError::Storage("Varint overflow".to_string()));
         }
@@ -348,36 +282,31 @@ fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, ContextraError
     ))
 }
 
-// ANCHOR[contextra-text:POST-016]
-/// Speicherresidenter Lese-Cache für Posting-Listen mit RCU-Verwaltung.
+/// In-Memory resident index mapping terms to their posting lists.
+/// Uses RCU (Read-Copy-Update) via `Arc<PostingList>` for lock-free read access under `RwLock`.
 #[derive(Default)]
 pub struct ResidentPostingIndex {
-    index: RwLock<BTreeMap<String, Arc<PostingList>>>,
+    index: RwLock<HashMap<String, Arc<PostingList>>>,
 }
 
 impl ResidentPostingIndex {
-    // ANCHOR[contextra-text:POST-017]
-    /// Erzeugt einen leeren residenten Posting-Index.
     pub fn new() -> Self {
         Self {
-            index: RwLock::new(BTreeMap::new()),
+            index: RwLock::new(HashMap::new()),
         }
     }
 
-    // ANCHOR[contextra-text:POST-018]
-    /// Liefert eine referenzgezählte Posting-Liste für den Begriff, falls im Cache vorhanden.
+    /// Retrieves an Arc to the PostingList for a given term if cached.
     pub fn get(&self, term: &str) -> Option<Arc<PostingList>> {
         self.index.read().get(term).cloned()
     }
 
-    // ANCHOR[contextra-text:POST-019]
-    /// Fügt eine Posting-Liste in den Index ein oder ersetzt sie.
+    /// Inserts or replaces a PostingList for a given term.
     pub fn insert_list(&self, term: String, list: PostingList) {
         self.index.write().insert(term, Arc::new(list));
     }
 
-    // ANCHOR[contextra-text:POST-020]
-    /// Fügt ein einzelnes Posting per RCU (Copy-On-Write) in die Posting-Liste des Begriffs ein.
+    /// Upserts a single posting for a term using RCU (Copy-On-Write).
     pub fn upsert_posting(&self, term: &str, posting: Posting) {
         let mut guard = self.index.write();
         let existing = guard.get(term).cloned();
@@ -388,9 +317,13 @@ impl ResidentPostingIndex {
         guard.insert(term.to_string(), Arc::new(updated));
     }
 
-    // ANCHOR[contextra-text:POST-021]
-    /// Entfernt eine Dokument-ID aus den Posting-Listen mehrerer Begriffe per RCU.
+    /// Removes a posting for a doc_id across a list of terms using RCU.
     pub fn remove_posting_from_terms(&self, terms: &[String], doc_id: DocId) {
+        self.remove_terms(doc_id, terms);
+    }
+
+    /// Removes postings for a given doc_id across specified terms from the in-memory cache (e.g., on transaction rollback).
+    pub fn remove_terms(&self, doc_id: DocId, terms: &[String]) {
         let mut guard = self.index.write();
         for term in terms {
             if let Some(list) = guard.get(term).cloned() {
@@ -404,17 +337,7 @@ impl ResidentPostingIndex {
         }
     }
 
-    // ANCHOR[contextra-text:POST-022]
-    /// Entfernt die angegebenen Begriffe aus dem Cache (z. B. bei Rollback).
-    pub fn remove_terms(&self, terms: &[String]) {
-        let mut guard = self.index.write();
-        for term in terms {
-            guard.remove(term);
-        }
-    }
-
-    // ANCHOR[contextra-text:POST-023]
-    /// Leert den gesamten Cache (z. B. bei vollständigem Index-Neuladen).
+    /// Clears the in-memory cache (e.g., on full re-sync).
     pub fn clear(&self) {
         self.index.write().clear();
     }
@@ -424,8 +347,6 @@ impl ResidentPostingIndex {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-text:TEST-POST-001]
-    // Prüft, dass PostingList Eingaben automatisch nach DocId sortiert und Duplikate dedupliziert.
     #[test]
     fn test_posting_list_sorted_and_dedup() {
         let p1 = Posting::new(DocId::new(10), 2, 100);
@@ -474,12 +395,12 @@ mod tests {
         assert_eq!(plist.as_slice()[0].doc_id(), DocId::new(50));
         assert_eq!(plist.as_slice()[1].doc_id(), DocId::new(100));
 
-        index.remove_posting_from_terms(std::slice::from_ref(&term), DocId::new(50));
+        index.remove_terms(DocId::new(50), std::slice::from_ref(&term));
         let plist_after = index.get(&term).unwrap();
         assert_eq!(plist_after.len(), 1);
         assert_eq!(plist_after.as_slice()[0].doc_id(), DocId::new(100));
 
-        index.remove_posting_from_terms(std::slice::from_ref(&term), DocId::new(100));
+        index.remove_terms(DocId::new(100), std::slice::from_ref(&term));
         assert!(index.get(&term).is_none());
     }
 
@@ -577,5 +498,28 @@ mod tests {
         let invalid_bytes = b"PL\x02\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
         let res = PostingList::decode_compact(invalid_bytes);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_remove_terms_per_document() {
+        let index = ResidentPostingIndex::new();
+        let term = "alpha".to_string();
+
+        let doc1 = DocId::new(1);
+        let doc2 = DocId::new(2);
+
+        index.upsert_posting(&term, Posting::new(doc1, 1, 10));
+        index.upsert_posting(&term, Posting::new(doc2, 2, 20));
+
+        let list_before = index.get(&term).expect("term alpha should exist");
+        assert_eq!(list_before.len(), 2);
+
+        index.remove_terms(doc1, &[term.clone()]);
+
+        let list_after = index
+            .get(&term)
+            .expect("term alpha should still exist for doc2");
+        assert_eq!(list_after.len(), 1);
+        assert_eq!(list_after.as_slice()[0].doc_id(), doc2);
     }
 }

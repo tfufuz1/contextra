@@ -1,40 +1,36 @@
-//! # Konforme Prädiktion & Adaptive Kalibrierung (`conformal`)
+//! Conformal Calibration and Adaptive Conformal Prediction with Propensity Weighting.
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
-//!
-//! Bietet quantilbasierte Online-Schwellenwertschätzung mit mathematischen
-//! Finite-Sample-Abdeckungsgarantien (Coverage Guarantees).
+//! Provides quantile-based online threshold estimation for target coverage guarantees
+//! under covariate shift via propensity weighting.
 
-use crate::local_types::ConfigFingerprint;
+use contextra_types::ConfigFingerprint;
 use thiserror::Error;
 
 /// Error type for conformal calibration and threshold updates.
 #[derive(Debug, Clone, PartialEq, Error)]
-/// Fehlertypen für die konforme Kalibrierung.
 pub enum ConformalError {
     /// Target miscoverage level `alpha` is not finite or outside (0.0, 1.0).
     #[error("Invalid target miscoverage alpha: {0} (must be finite and in (0.0, 1.0))")]
-    Alpha(f32),
+    InvalidAlpha(f32),
 
     /// Propensity weight is not finite or not strictly positive (> 0.0).
     #[error("Invalid propensity weight: {0} (must be finite and strictly positive > 0.0)")]
-    PropensityWeight(f32),
+    InvalidPropensityWeight(f32),
 
     /// Non-conformity score is not finite (NaN or Infinity).
     #[error("Invalid non-conformity score: {0} (must be finite)")]
-    NonConformityScore(f32),
+    InvalidNonConformityScore(f32),
 
     /// Threshold value is not finite (NaN or Infinity).
     #[error("Invalid threshold: {0} (must be finite)")]
-    Threshold(f32),
+    InvalidThreshold(f32),
 
     /// Learning rate is not finite or not strictly positive (> 0.0).
     #[error("Invalid learning rate: {0} (must be finite and strictly positive > 0.0)")]
-    LearningRate(f32),
+    InvalidLearningRate(f32),
 }
 
 /// Trait for deterministic, online conformal calibration and threshold estimation.
-/// Trait für deterministische konforme Schwellenwertschätzung.
 pub trait ConformalCalibrator {
     /// Deterministically updates the threshold given a non-conformity score and propensity weight.
     ///
@@ -46,13 +42,6 @@ pub trait ConformalCalibrator {
     /// - `Ok(true)` if the update altered the threshold value.
     /// - `Ok(false)` if the threshold value remained unchanged.
     /// - `Err(ConformalError)` if any input parameter is non-finite or non-positive.
-    // Ablauf des Online-Pinball-Updates:
-    // 1. Validierung: Prüfen, ob propensity_weight > 0.0 und non_conformity_score endlich sind.
-    // 2. Schrittweite berechnen:
-    //    - Bei Überschreitung (S_t > threshold): Delta = +gamma * w_t * (1 - alpha)
-    //    - Bei Unterschreitung (S_t <= threshold): Delta = -gamma * w_t * alpha
-    // 3. Klemmen: Neuer Schwellenwert wird auf [min_threshold, max_threshold] beschränkt.
-    // 4. Inkrementieren: Zähler der Beobachtungen erhöhen und Änderungsstatus zurückgeben.
     fn update(
         &mut self,
         non_conformity_score: f32,
@@ -70,7 +59,6 @@ pub trait ConformalCalibrator {
 /// the threshold increases by $\gamma \cdot w_t \cdot (1 - \alpha)$. Otherwise, it decreases by
 /// $\gamma \cdot w_t \cdot \alpha$.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-/// Adaptiver konformer Kalibrierer für Online-Schwellenwerte unter Covariate Shift.
 pub struct AdaptiveConformalCalibrator {
     alpha: f32,
     threshold: f32,
@@ -105,6 +93,16 @@ impl AdaptiveConformalCalibrator {
         )
     }
 
+    /// Creates a bounded `AdaptiveConformalCalibrator` with custom miscoverage level `alpha` and explicit threshold bounds.
+    pub fn bounded(
+        alpha: f32,
+        min_threshold: f32,
+        max_threshold: f32,
+    ) -> Result<Self, ConformalError> {
+        let calibrator = Self::new(alpha)?;
+        calibrator.with_bounds(min_threshold, max_threshold)
+    }
+
     /// Creates an `AdaptiveConformalCalibrator` with custom parameters.
     pub fn with_params(
         alpha: f32,
@@ -112,16 +110,16 @@ impl AdaptiveConformalCalibrator {
         learning_rate: f32,
     ) -> Result<Self, ConformalError> {
         if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
-            return Err(ConformalError::Alpha(alpha));
+            return Err(ConformalError::InvalidAlpha(alpha));
         }
         if !initial_threshold.is_finite() {
-            return Err(ConformalError::Threshold(initial_threshold));
+            return Err(ConformalError::InvalidThreshold(initial_threshold));
         }
         if !learning_rate.is_finite() || learning_rate <= 0.0 {
-            return Err(ConformalError::LearningRate(learning_rate));
+            return Err(ConformalError::InvalidLearningRate(learning_rate));
         }
 
-        Ok(Self {
+        let calibrator = Self {
             alpha,
             threshold: initial_threshold,
             learning_rate,
@@ -129,7 +127,8 @@ impl AdaptiveConformalCalibrator {
             max_threshold: Self::DEFAULT_MAX_THRESHOLD,
             observation_count: 0,
             fingerprint: None,
-        })
+        };
+        calibrator.with_bounds(Self::DEFAULT_MIN_THRESHOLD, Self::DEFAULT_MAX_THRESHOLD)
     }
 
     /// Sets bounding constraints `[min_threshold, max_threshold]` for the estimated threshold.
@@ -139,13 +138,13 @@ impl AdaptiveConformalCalibrator {
         max_threshold: f32,
     ) -> Result<Self, ConformalError> {
         if !min_threshold.is_finite() {
-            return Err(ConformalError::Threshold(min_threshold));
+            return Err(ConformalError::InvalidThreshold(min_threshold));
         }
         if !max_threshold.is_finite() {
-            return Err(ConformalError::Threshold(max_threshold));
+            return Err(ConformalError::InvalidThreshold(max_threshold));
         }
         if min_threshold > max_threshold {
-            return Err(ConformalError::Threshold(min_threshold));
+            return Err(ConformalError::InvalidThreshold(min_threshold));
         }
         self.min_threshold = min_threshold;
         self.max_threshold = max_threshold;
@@ -169,8 +168,7 @@ impl AdaptiveConformalCalibrator {
     }
 
     /// Resets state if ConfigFingerprint changes (P8 Compliance).
-    pub fn invalidate_on_config_change(&mut self, new_fingerprint: impl Into<ConfigFingerprint>) {
-        let new_fingerprint = new_fingerprint.into();
+    pub fn invalidate_on_config_change(&mut self, new_fingerprint: ConfigFingerprint) {
         if self.fingerprint.as_ref() != Some(&new_fingerprint) {
             tracing::warn!(
                 old_fp = ?self.fingerprint,
@@ -194,10 +192,12 @@ impl ConformalCalibrator for AdaptiveConformalCalibrator {
     ) -> Result<bool, ConformalError> {
         // Zero-Panic Invariants: Validate all inputs before touching state
         if !propensity_weight.is_finite() || propensity_weight <= 0.0 {
-            return Err(ConformalError::PropensityWeight(propensity_weight));
+            return Err(ConformalError::InvalidPropensityWeight(propensity_weight));
         }
         if !non_conformity_score.is_finite() {
-            return Err(ConformalError::NonConformityScore(non_conformity_score));
+            return Err(ConformalError::InvalidNonConformityScore(
+                non_conformity_score,
+            ));
         }
 
         let step = if non_conformity_score > self.threshold {
@@ -207,7 +207,7 @@ impl ConformalCalibrator for AdaptiveConformalCalibrator {
         };
 
         if !step.is_finite() {
-            return Err(ConformalError::PropensityWeight(propensity_weight));
+            return Err(ConformalError::InvalidPropensityWeight(propensity_weight));
         }
 
         let raw_next = self.threshold + step;

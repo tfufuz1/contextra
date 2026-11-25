@@ -2,26 +2,13 @@
 // ZWECK: Multi-Term Query-Traversierung mit Block-Maximalwert-Pruning und dynamic thresholding.
 // INVARIANTEN: Zero-Panic Doctrine, Safe Optimization (Ergebnisse identisch zu Full-Scan), MVCC & Tombstone Isolation.
 
-//! Block-Max WAND (Weak AND) Algorithmus für performante Multi-Term BM25-Suchen.
-//!
-//! # Ring-Zuordnung
-//! Ring 0 (Kern).
-//!
-//! # Funktionsweise
-//! WAND vermeidet das vollständige Berechnen von BM25-Scores für alle Dokumente,
-//! indem anhand vorberechneter Obergrenzen (`term_max_score` und `block_max_scores`)
-//! Terme und Dokumentblöcke dynamisch übersprungen werden, deren potentieller
-//! Maximalscore den aktuellen Schwellenwert der Top-K-Treffer nicht übersteigen kann.
-
 use crate::bm25::score_term;
 use crate::posting_list::{DocIdRaw, Posting, PostingList, BLOCK_SIZE};
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, DocId, Result, MAX_SEARCH_K};
-use std::collections::{BTreeMap, BinaryHeap};
+use std::collections::{BinaryHeap, HashMap};
 use std::sync::Arc;
 
-// ANCHOR[contextra-text:WAND-001]
-/// Interner BM25-Kandidat für die Top-K-Min-Heap-Verwaltung.
 struct Bm25Candidate {
     doc_id: DocId,
     score: f32,
@@ -52,16 +39,12 @@ impl PartialOrd for Bm25Candidate {
     }
 }
 
-// ANCHOR[contextra-text:WAND-002]
-/// Begrenzter Min-Heap zur effizienten Verwaltung der K besten Treffer.
 pub struct BoundedTopK {
     heap: BinaryHeap<Bm25Candidate>,
     capacity: usize,
 }
 
 impl BoundedTopK {
-    // ANCHOR[contextra-text:WAND-003]
-    /// Erzeugt einen neuen `BoundedTopK`-Puffer mit maximaler Kapazität (`MAX_SEARCH_K`).
     pub fn new(capacity: usize) -> Self {
         let capacity = capacity.min(MAX_SEARCH_K);
         Self {
@@ -70,8 +53,6 @@ impl BoundedTopK {
         }
     }
 
-    // ANCHOR[contextra-text:WAND-004]
-    /// Fügt einen neuen Kandidaten ein, wenn er besser als der schlechteste bisherige Treffer ist.
     pub fn push(&mut self, doc_id: DocId, score: f32) {
         if self.capacity == 0 {
             return;
@@ -87,8 +68,6 @@ impl BoundedTopK {
         }
     }
 
-    // ANCHOR[contextra-text:WAND-005]
-    /// Liefert den aktuellen Minimal-Score (Schwelle), den ein Kandidat übertreffen muss.
     pub fn min_threshold(&self) -> f32 {
         if self.heap.len() < self.capacity {
             0.0
@@ -97,8 +76,6 @@ impl BoundedTopK {
         }
     }
 
-    // ANCHOR[contextra-text:WAND-006]
-    /// Konvertiert den Heap in einen nach Relevanz absteigend sortierten Ergebnisvektor.
     pub fn into_sorted_vec(self) -> Vec<(DocId, f32)> {
         self.heap
             .into_sorted_vec()
@@ -210,11 +187,7 @@ impl TermCursor {
         let blocks = self.posting_list.blocks();
         let mut block_idx = self.cursor / BLOCK_SIZE;
 
-        while block_idx < blocks.len()
-            && blocks
-                .get(block_idx)
-                .is_some_and(|b| b.max_doc_id < target_doc_id)
-        {
+        while block_idx < blocks.len() && blocks[block_idx].max_doc_id < target_doc_id {
             block_idx += 1;
         }
 
@@ -227,37 +200,22 @@ impl TermCursor {
         self.cursor = new_cursor_start.max(self.cursor);
 
         // Binary search within current block / remaining postings
-        if let Some(slice) = postings.get(self.cursor..) {
-            match slice.binary_search_by_key(&target_doc_id, |p| p.doc_id) {
-                Ok(offset) => self.cursor += offset,
-                Err(offset) => self.cursor += offset,
-            }
+        let slice = &postings[self.cursor..];
+        match slice.binary_search_by_key(&target_doc_id, |p| p.doc_id) {
+            Ok(offset) => self.cursor += offset,
+            Err(offset) => self.cursor += offset,
         }
     }
 }
 
-// ANCHOR[contextra-text:WAND-007]
-/// Ergebnis einer Block-Max-WAND-Suche inklusive Top-K-Treffern und Metadaten über evaluierte Dokumente.
+/// Result from Block-Max WAND search containing top-k items and execution metrics.
 #[derive(Debug)]
 pub struct WandSearchResult {
-    /// Gefundene Trefferdokumente mit Relevanzwert.
     pub results: Vec<(DocId, f32)>,
-    /// Anzahl tatsächlich voll berechneter Dokumente (Pruning-Effektivitätsmetrik).
     pub evaluated_docs_count: usize,
 }
 
-// ANCHOR[contextra-text:WAND-008]
-/// Führt den Block-Max WAND-Algorithmus über speicherresidenten Posting-Listen aus.
-///
-/// # Ablauf
-/// 1. Snapshot-Sequenznummer auflösen und aktive Tombstones vorladen.
-/// 2. Cursors für alle Abfrageterme initialisieren und obere Schranken vorberechnen.
-/// 3. In einer Schleife:
-///    a) Cursors nach aktueller DocId sortieren.
-///    b) Pivot-Term auswählen, dessen kumulierter Max-Score die aktuelle Top-K-Schwelle übersteigt.
-///    c) Falls Min-DocId == Pivot-DocId: Block-Max-Schranke prüfen, exakten BM25-Score berechnen und in Top-K aufnehmen.
-///    d) Andernfalls Cursors zur Pivot-DocId vorspringen lassen (Skip).
-// ADR-0015: Block-Max WAND query search signature requires storage, index, and query parameters.
+/// Executes Block-Max WAND traversal over resident posting lists.
 #[allow(clippy::too_many_arguments)]
 pub async fn block_max_wand_search<S: StorageEngine>(
     storage: &S,
@@ -285,10 +243,10 @@ pub async fn block_max_wand_search<S: StorageEngine>(
     };
 
     let is_latest = max_seq.is_none() || max_seq == Some(u64::MAX);
-    let total_docs_u32 = u32::try_from(total_docs).unwrap_or(u32::MAX).max(1);
+    let total_docs_u32 = (total_docs as u32).max(1);
 
-    let mut doc_len_cache: BTreeMap<DocId, Option<u32>> = BTreeMap::new();
-    let mut tbs_cache: BTreeMap<Vec<u8>, bool> = BTreeMap::new();
+    let mut doc_len_cache: HashMap<DocId, Option<u32>> = HashMap::new();
+    let mut tbs_cache: HashMap<Vec<u8>, bool> = HashMap::new();
 
     // Prefetch active tombstones globally at snapshot `seq` in a single prefix scan
     let tbs_global_prefix = tombstone_key_helper(DocId::new(0), "")
@@ -311,15 +269,11 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 // Construct batch posting list key by replacing "pl:" with "plb:" and stripping trailing ":"
                 let mut batch_key = Vec::with_capacity(prefix.len() + 1);
                 if let Some(pos) = prefix.windows(3).position(|w| w == b"pl:") {
-                    if let Some(prefix_sub) = prefix.get(..pos) {
-                        batch_key.extend_from_slice(prefix_sub);
-                    }
+                    batch_key.extend_from_slice(&prefix[..pos]);
                     batch_key.extend_from_slice(b"plb:");
-                    let remaining = prefix.get(pos.saturating_add(3)..).unwrap_or(&[]);
+                    let remaining = &prefix[pos + 3..];
                     if remaining.ends_with(b":") {
-                        if let Some(rem_sub) = remaining.get(..remaining.len().saturating_sub(1)) {
-                            batch_key.extend_from_slice(rem_sub);
-                        }
+                        batch_key.extend_from_slice(&remaining[..remaining.len() - 1]);
                     } else {
                         batch_key.extend_from_slice(remaining);
                     }
@@ -339,7 +293,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                         let raw_entries = storage.scan_prefix_at(&prefix, u64::MAX).await?;
                         let mut postings = Vec::with_capacity(raw_entries.len());
                         for (key, val_bytes) in raw_entries {
-                            let suffix_bytes = key.get(prefix.len()..).unwrap_or(&[]);
+                            let suffix_bytes = &key[prefix.len()..];
                             if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
                                 #[cfg(not(feature = "docid-128"))]
                                 let parsed_doc_id = suffix.parse::<u64>().ok();
@@ -348,19 +302,14 @@ pub async fn block_max_wand_search<S: StorageEngine>(
 
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if val_bytes.len() == 4 {
-                                        let doc_id = DocId::new(doc_id_raw as _);
-                                        let tf_bytes = val_bytes.get(..4).ok_or_else(|| {
-                                            ContextraError::Storage(
-                                                "Invalid val_bytes length".into(),
-                                            )
-                                        })?;
-                                        let tf = u32::from_le_bytes(tf_bytes.try_into().map_err(
-                                            |_| {
+                                        let doc_id = DocId::new(doc_id_raw);
+                                        let tf = u32::from_le_bytes(
+                                            (&val_bytes[..4]).try_into().map_err(|_| {
                                                 ContextraError::Storage(
                                                     "Invalid posting tf length".into(),
                                                 )
-                                            },
-                                        )?);
+                                            })?,
+                                        );
                                         let dl_key = doc_len_key_helper(doc_id.inner().into());
                                         let doc_len = match storage.get(&dl_key).await? {
                                             Some(dl_bytes) if dl_bytes.len() == 4 => {
@@ -399,23 +348,21 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 if let Ok(key_str) = std::str::from_utf8(tbs_key) {
                     if key_str.ends_with(&term_suffix) {
                         // Extract doc_id from tombstone key: {prefix}tbs:{doc_id}:{term}
-                        let suffix = tbs_key.get(tbs_global_prefix.len()..).unwrap_or(&[]);
+                        let suffix = &tbs_key[tbs_global_prefix.len()..];
                         if let Some(colon_pos) = suffix.iter().position(|&b| b == b':') {
-                            if let Some(doc_bytes) = suffix.get(..colon_pos) {
-                                if let Ok(doc_id_str) = std::str::from_utf8(doc_bytes) {
-                                    #[cfg(not(feature = "docid-128"))]
-                                    let parsed_doc_id = doc_id_str.parse::<u64>().ok();
-                                    #[cfg(feature = "docid-128")]
-                                    let parsed_doc_id = doc_id_str.parse::<u128>().ok();
+                            if let Ok(doc_id_str) = std::str::from_utf8(&suffix[..colon_pos]) {
+                                #[cfg(not(feature = "docid-128"))]
+                                let parsed_doc_id = doc_id_str.parse::<u64>().ok();
+                                #[cfg(feature = "docid-128")]
+                                let parsed_doc_id = doc_id_str.parse::<u128>().ok();
 
-                                    if let Some(doc_id_raw) = parsed_doc_id {
-                                        if list
-                                            .as_slice()
-                                            .binary_search_by_key(&doc_id_raw, |p| p.doc_id)
-                                            .is_ok()
-                                        {
-                                            term_tbs_count += 1;
-                                        }
+                                if let Some(doc_id_raw) = parsed_doc_id {
+                                    if list
+                                        .as_slice()
+                                        .binary_search_by_key(&doc_id_raw, |p| p.doc_id)
+                                        .is_ok()
+                                    {
+                                        term_tbs_count += 1;
                                     }
                                 }
                             }
@@ -424,9 +371,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 }
             }
 
-            let effective_df = u32::try_from(list.len())
-                .unwrap_or(u32::MAX)
-                .saturating_sub(term_tbs_count);
+            let effective_df = (list.len() as u32).saturating_sub(term_tbs_count);
 
             if effective_df > 0 {
                 cursors.push(TermCursor::new(
@@ -458,12 +403,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         }
 
         // Sort active cursors by current_doc_id ascending
-        cursors.sort_by(|a, b| {
-            a.current_doc_id()
-                .unwrap_or(DocIdRaw::MAX)
-                .cmp(&b.current_doc_id().unwrap_or(DocIdRaw::MAX))
-                .then_with(|| a.term.cmp(&b.term))
-        });
+        cursors.sort_by_key(|c| c.current_doc_id().unwrap_or(DocIdRaw::MAX));
 
         let threshold = top_k.min_threshold();
 
@@ -498,7 +438,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         };
 
         if min_doc_id == pivot_doc_id {
-            let doc_id = DocId::new(pivot_doc_id as _);
+            let doc_id = DocId::new(pivot_doc_id);
 
             // Check if block max scores at pivot_doc_id still exceed threshold
             let block_max_sum: f32 = cursors
@@ -626,19 +566,19 @@ mod tests {
     use contextra_ports::BoxFuture;
     use parking_lot::RwLock;
 
-    type MockStoreMap = RwLock<BTreeMap<Vec<u8>, Vec<(Vec<u8>, u64)>>>;
+    type MockStoreMap = RwLock<HashMap<Vec<u8>, Vec<(Vec<u8>, u64)>>>;
 
     struct MockStorage {
         store: MockStoreMap,
-        staged: RwLock<BTreeMap<contextra_types::TxId, Vec<Vec<u8>>>>,
+        staged: RwLock<HashMap<contextra_types::TxId, Vec<Vec<u8>>>>,
         next_seq: std::sync::atomic::AtomicU64,
     }
 
     impl MockStorage {
         fn new() -> Self {
             Self {
-                store: MockStoreMap::new(BTreeMap::new()),
-                staged: RwLock::new(BTreeMap::new()),
+                store: MockStoreMap::new(HashMap::new()),
+                staged: RwLock::new(HashMap::new()),
                 next_seq: std::sync::atomic::AtomicU64::new(1),
             }
         }
@@ -814,8 +754,6 @@ mod tests {
         }
     }
 
-    // ANCHOR[contextra-text:TEST-WAND-001]
-    // Prüft Ergebnis-Äquivalenz und Auswertungs-Pruning von Block-Max WAND im Vergleich zum Vollscan.
     #[tokio::test]
     async fn test_block_max_wand_equivalence_and_pruning_performance() -> Result<()> {
         let storage = Arc::new(MockStorage::new());
@@ -825,12 +763,12 @@ mod tests {
         // Index 500 documents:
         // "common" occurs in all 500 documents.
         // "rare" occurs in only 5 documents (DocId 100, 200, 300, 400, 500) with high frequency.
-        for i in 1u64..=500u64 {
-            let doc_id = DocId::new(i);
+        for i in 1..=500 {
+            let doc_id = DocId::new(i as u64);
             let text = if i % 100 == 0 {
-                format!("common rare rare rare rare rare doc {i}")
+                format!("common rare rare rare rare rare doc {}", i)
             } else {
-                format!("common doc {i}")
+                format!("common doc {}", i)
             };
             index.upsert_document(tx, doc_id, &text).await?;
         }

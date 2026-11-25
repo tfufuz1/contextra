@@ -1,21 +1,17 @@
-//! Dauerhaftigkeitsprüfung für Hyperkanten nach simuliertem Systemneustart.
-//!
-//! # Zweck
-//! Sichert die verlustfreie Wiederherstellung aller n-ären Relationen und Rollenbindungen ab.
-
 #![expect(clippy::unwrap_used)]
 
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId, HYPEREDGE_PREFIX};
-use contextra_graph::test_doubles::InMemoryStorageEngine;
 use contextra_ports::StorageEngine;
+use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{DocId, EntityId, TxId};
 use std::sync::Arc;
+use tempfile::tempdir;
 
-// ANCHOR[contextra-graph:TESTS-HYPEREDGE-PERSISTENCE-SURVIVES-RESTART-001]
 #[tokio::test]
 async fn test_hyperedge_persistence_survives_restart() {
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().to_path_buf();
 
     let doc_oracle = DocId::from_key("doc-persistence-oracle").unwrap();
     const ROLE_SUBJ: RoleId = RoleId::new(1);
@@ -50,32 +46,25 @@ async fn test_hyperedge_persistence_survives_restart() {
 
     // Phase 1: Initialize Storage & Graph, persist hyperedges to LSM
     {
-        let storage = storage.clone();
+        let storage = Arc::new(
+            LsmStorage::new(LsmConfig {
+                path: db_path.clone(),
+                ..Default::default()
+            })
+            .await
+            .unwrap(),
+        );
 
-        let graph = Arc::new(CsrGraph::with_storage(storage.clone()));
+        let graph = CsrGraph::with_storage(storage.clone());
         graph.insert_hyperedge(he1.clone());
         graph.insert_hyperedge(he2.clone());
 
         let tx = TxId::new(1);
         for edge in [&he1, &he2] {
-            graph.persist_hyperedge(tx, edge).await.unwrap();
+            let key = format!("{}{}", HYPEREDGE_PREFIX, edge.id.inner());
+            let bytes = edge.serialize().unwrap();
+            storage.put(tx, key.as_bytes(), &bytes).await.unwrap();
         }
-
-        let e1 = EntityId::new(3001);
-        let e2 = EntityId::new(3002);
-        graph
-            .insert_edge_direct_with_bitemporal_validity(
-                e1,
-                e2,
-                1.0,
-                Some(tx),
-                None,
-                Some(100),
-                Some(200),
-                Some(doc_oracle),
-            )
-            .await
-            .unwrap();
 
         storage.commit(tx).await.unwrap();
 
@@ -87,7 +76,14 @@ async fn test_hyperedge_persistence_survives_restart() {
 
     // Phase 2: Simulate process restart — reopen LSM Storage and load persisted hyperedges
     {
-        let storage = storage.clone();
+        let storage = Arc::new(
+            LsmStorage::new(LsmConfig {
+                path: db_path,
+                ..Default::default()
+            })
+            .await
+            .unwrap(),
+        );
 
         let recovered_graph = CsrGraph::with_storage(storage.clone());
 

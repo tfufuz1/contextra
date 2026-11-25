@@ -1,13 +1,3 @@
-//! # Kryptographisches Fehlersystem (`error.rs`)
-//!
-//! Dieses Modul definiert den kanonischen Fehlertyp [`CryptoError`] für alle kryptographischen
-//! Operationen in Contextra (Ring 0).
-//!
-//! ## Invarianten
-//! - Keine Panics in Fehlertyp-Konvertierungen.
-//! - Fehler enthalten keine sensiblen Klartextdaten oder Schlüsselmaterialien.
-//! - Nahtlose Integration in `ContextraError` (Ring 0/Types).
-
 //! Error types for `contextra-crypto`.
 
 use thiserror::Error;
@@ -27,9 +17,6 @@ pub enum CryptoError {
 
     #[error("decryption failed: {0}")]
     Decryption(String),
-
-    #[error("AEAD operation failed: {0}")]
-    Aead(String),
 
     #[error("invalid nonce or key length: {0}")]
     InvalidLength(String),
@@ -70,9 +57,6 @@ pub enum CryptoError {
 
     #[error("key or group has been revoked: {0}")]
     KeyRevoked(String),
-
-    #[error("storage or I/O error: {0}")]
-    Storage(#[from] contextra_types::ContextraError),
 }
 
 impl CryptoError {

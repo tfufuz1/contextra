@@ -2,7 +2,7 @@
 // ZWECK: Criterion Benchmark für ACORN Naive-Reference Search vs. Post-Filtering Baseline.
 // INVARIANTEN: O(n) Reference Benchmark für Recall & Latency Baselines.
 
-use contextra_types::DocId;
+use contextra_core::DocId;
 use contextra_vector::acorn::{compute_gamma_edge_budget, FilteredIndex, NaiveReferenceIndex};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 

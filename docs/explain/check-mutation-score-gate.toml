@@ -1,0 +1,8 @@
+title = "Mutations-Score Prüfer"
+what = "Der Mutations-Test-Score unterschreitet den definierten Schwellenwert."
+why = "Sichert ab, dass der Code gründlich und scharf getestet ist."
+fix = "Ergänze Tests für unbedeckte Zweige und Mutanten."
+anti_fix = "Senke nicht den Mindest-Score in der Konfiguration."
+adr = ["ADR-035"]
+related = ["mutants-diff", "test-integrity"]
+sources = ["docs/gates/mutation-score-enforcement.md"]

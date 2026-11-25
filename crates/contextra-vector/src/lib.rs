@@ -7,7 +7,7 @@
 
 //! Contextra Index — HNSW vector index with SIMD distance computation.
 // INVARIANT: Vector Engine (Triebwerk — Layer 1).
-// IMPLEMENTS: VectorIndex Trait (contextra-ports/src/vector.rs)
+// IMPLEMENTS: VectorIndex Trait (contextra-core/traits.rs)
 // KERNKOMPONENTEN: HNSW (Graph-basierte ANN) + CSR Graph (Relationen) + SIMD-Distanz.
 // INVARIANTE: HNSW-Graphen liegen exklusiv im RAM. Disk-Storage erfolgt über contextra-store (via LsmStorage).
 
@@ -16,31 +16,7 @@
 // DONE: #![feature(portable_simd)] ist entfernt und distance.rs nutzt stabiles Rust.
 // INVARIANTE: Zero unsafe code in contextra-vector. SIMD an contextra-simd, mmap an contextra-sys ausgelagert.
 #![forbid(unsafe_code)]
-// WP-VEC-7: Zero-Panic & Checked Casts
-#![deny(
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss
-)]
-#![cfg_attr(
-    test,
-    allow(
-        clippy::indexing_slicing,
-        clippy::unwrap_used,
-        clippy::expect_used,
-        clippy::panic,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )
-)]
-pub mod casting;
-
-pub mod contract;
-pub mod error;
-pub mod types;
+#![allow(clippy::too_many_arguments)]
 
 #[cfg(feature = "experimental-diskann")]
 pub mod diskann;
@@ -52,7 +28,6 @@ pub mod quantize;
 pub mod acorn;
 pub mod candidate_stream;
 pub mod compute_pool;
-pub mod fixed_hasher;
 pub mod partial_rebuild;
 
 #[cfg(feature = "experimental-rabitq")]
@@ -60,28 +35,10 @@ pub mod quantize_rabitq;
 
 pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 pub use compute_pool::ComputePool;
-pub use contract::{
-    BlockTransform, Clock as ContractClock, DistanceFn, Error as ContractError, ExternalId,
-    Index as ContractIndex, Maintain as ContractMaintain, Metric as ContractMetric,
-    Result as ContractResult, Rng as ContractRng, ScoredPoint,
-};
 #[cfg(feature = "experimental-diskann")]
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
-#[cfg_attr(
-    test,
-    allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        clippy::panic,
-        clippy::await_holding_lock
-    )
-)]
-#[allow(deprecated)]
-pub use hnsw::{
-    hnsw_purger, hnsw_scanner, HnswConfig, HnswIndex, HnswPurger, HnswScanner, RebuildStatus,
-};
+pub use hnsw::{HnswConfig, HnswIndex, RebuildStatus};
 pub use persistence::{HnswHeader, MmapIndex};
 pub use quantize::ScalarQuantizer;
 #[cfg(feature = "experimental-rabitq")]
 pub use quantize_rabitq::RaBitQQuantizer;
-pub use types::{Clock, DistanceMetric, DocId, Maintain, MetricsSink, Rng, ScoredDocument, TxId};

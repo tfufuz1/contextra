@@ -1,22 +1,22 @@
-//! Persistenztest für den gesamten CSR-Graphzustand.
-//!
-//! # Zweck
-//! Prüft Serialisierung, Deserialisierung und Integritätsvalidierung nach Wiederanlauf.
-
-use contextra_graph::test_doubles::InMemoryStorageEngine;
 use contextra_graph::CsrGraph;
 use contextra_ports::{GraphIndex, StorageEngine};
+use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
+use tempfile::tempdir;
 
-// ANCHOR[contextra-graph:TESTS-PERSISTENCE-TEST-001]
 #[tokio::test]
 async fn test_graph_survives_restart() {
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let dir = tempdir().unwrap();
+    let storage_path = dir.path().to_path_buf();
 
     // Phase 1: Graph öffnen, Daten einfügen, committen
     {
-        let storage = storage.clone();
+        let config = LsmConfig {
+            path: storage_path.clone(),
+            ..Default::default()
+        };
+        let storage = Arc::new(LsmStorage::new(config).await.unwrap());
         let graph = CsrGraph::with_storage(storage.clone());
         let tx = TxId::new(1);
         graph
@@ -51,7 +51,11 @@ async fn test_graph_survives_restart() {
 
     // Phase 2: Neuer Storage/Graph-Handle auf gleichem Pfad → muss Daten wiederfinden
     {
-        let storage = storage.clone();
+        let config = LsmConfig {
+            path: storage_path,
+            ..Default::default()
+        };
+        let storage = Arc::new(LsmStorage::new(config).await.unwrap());
         let loaded_graph = CsrGraph::load_from_storage(storage.as_ref()).await.unwrap();
         assert_eq!(loaded_graph.entity_count(), 2);
 
@@ -64,12 +68,16 @@ async fn test_graph_survives_restart() {
     }
 }
 
-// ANCHOR[contextra-graph:TESTS-PERSISTENCE-TEST-002]
 #[tokio::test]
 async fn test_graph_survives_reload() {
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let dir = tempdir().unwrap();
+    let storage_path = dir.path().to_path_buf();
 
-    let storage = storage.clone();
+    let config = LsmConfig {
+        path: storage_path.clone(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(config).await.unwrap());
 
     // Entitäten und Kanten einfügen
     let tx = TxId::new(1);
@@ -118,10 +126,14 @@ async fn test_graph_survives_reload() {
     );
 }
 
-// ANCHOR[contextra-graph:TESTS-PERSISTENCE-TEST-003]
 #[tokio::test]
 async fn edges_survive_restart() {
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let dir = tempdir().unwrap();
+    let config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(config).await.unwrap());
     let graph = CsrGraph::with_storage(storage.clone());
     let tx = TxId::new(1);
     let id_a = EntityId::from("id_a");

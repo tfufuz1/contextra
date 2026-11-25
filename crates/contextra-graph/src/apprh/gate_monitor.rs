@@ -1,9 +1,3 @@
-//! Überwachungskomponente (`ApprhGateMonitor`) zur Serienbewertung von APPRH-Shadow-Vergleichen.
-//!
-//! # Zweck
-//! Verfolgt ein gleitendes Beobachtungsfenster von Hypergraph-Diffusionsergebnissen
-//! und schaltet bei stabiler Konvergenz automatisiert auf den Produktivmodus um.
-
 // FILE-CONTEXT
 // ZWECK: ApprhGateMonitor zur Serienbewertung von APPRH-Shadow-Vergleichen fuer Produktionsfreigabe (P1.3)
 // INVARIANTEN: Thread-sicheres gleitendes Fenster; Hysterese-Reset bei Ausreissern.
@@ -16,7 +10,6 @@ use std::collections::VecDeque;
 
 /// Configuration for [`ApprhGateMonitor`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-// ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-001]
 pub struct ApprhGateMonitorConfig {
     /// Maximum capacity of the sliding window for historical observations.
     pub window_size: usize,
@@ -38,7 +31,6 @@ impl ApprhGateMonitorConfig {
     ///
     /// # Errors
     /// Returns [`ApprhError::InvalidParameter`] if any parameter is invalid.
-    // ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-002]
     pub fn validate(&self) -> Result<(), ApprhError> {
         if self.window_size == 0 {
             return Err(ApprhError::InvalidParameter(
@@ -61,7 +53,6 @@ impl ApprhGateMonitorConfig {
 
 /// Historical observation record stored within the sliding window of [`ApprhGateMonitor`].
 #[derive(Debug, Clone, PartialEq)]
-// ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-003]
 pub struct ApprhObservationRecord {
     /// Maximum absolute diff from report.
     pub max_abs_diff: f32,
@@ -75,7 +66,6 @@ pub struct ApprhObservationRecord {
 
 /// Telemetry snapshot from [`ApprhGateMonitor`].
 #[derive(Debug, Clone, PartialEq)]
-// ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-004]
 pub struct ApprhGateMonitorSnapshot {
     /// Total number of observations received since creation or last reset.
     pub total_observations: u64,
@@ -106,7 +96,6 @@ struct MonitorState {
 /// - Ring 0 (pure sync, no tokio dependencies).
 /// - An outlier (gate failure or discrepancy flag) resets the pass streak to 0 (hysteresis against flickering).
 /// - Thread-safe operations via internal `parking_lot::Mutex`.
-// ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-005]
 pub struct ApprhGateMonitor {
     config: ApprhGateMonitorConfig,
     gate: Box<dyn ApprhFlipGate + Send + Sync>,
@@ -118,7 +107,6 @@ impl ApprhGateMonitor {
     ///
     /// # Errors
     /// Returns [`ApprhError::InvalidParameter`] if `config` validation fails.
-    // ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-006]
     pub fn new(config: ApprhGateMonitorConfig) -> Result<Self, ApprhError> {
         Self::with_gate(config, DefaultApprhFlipGate)
     }
@@ -127,7 +115,6 @@ impl ApprhGateMonitor {
     ///
     /// # Errors
     /// Returns [`ApprhError::InvalidParameter`] if `config` validation fails.
-    // ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-007]
     pub fn with_gate<G>(config: ApprhGateMonitorConfig, gate: G) -> Result<Self, ApprhError>
     where
         G: ApprhFlipGate + Send + Sync + 'static,
@@ -149,7 +136,6 @@ impl ApprhGateMonitor {
     ///
     /// An observation is considered a pass if the gate returns `true` AND `report.discrepancy` is `false`.
     /// Any outlier resets `current_streak` to 0 (hysteresis).
-    // ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-008]
     pub fn observe(&self, report: &ApprhShadowComparison) {
         let gate_passed = self.gate.should_flip(report);
         let passed = gate_passed && !report.discrepancy;
@@ -180,14 +166,12 @@ impl ApprhGateMonitor {
     ///
     /// Production readiness is declared when the streak of consecutive clean passes
     /// meets or exceeds `required_consecutive_passes`.
-    // ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-009]
     pub fn production_ready(&self) -> bool {
         let state = self.state.lock();
         state.current_streak >= self.config.required_consecutive_passes
     }
 
     /// Captures a telemetry snapshot of the current monitor state and sliding window.
-    // ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-010]
     pub fn snapshot(&self) -> ApprhGateMonitorSnapshot {
         let state = self.state.lock();
         let production_ready = state.current_streak >= self.config.required_consecutive_passes;
@@ -229,7 +213,6 @@ impl ApprhGateMonitor {
     }
 
     /// Resets the monitor state, clearing the sliding window, total observations counter, and pass streak.
-    // ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-011]
     pub fn reset(&self) {
         let mut state = self.state.lock();
         state.total_observations = 0;
@@ -238,7 +221,6 @@ impl ApprhGateMonitor {
     }
 
     /// Returns a reference to the monitor's configuration.
-    // ANCHOR[contextra-graph:SRC-APPRH-GATE-MONITOR-012]
     pub fn config(&self) -> &ApprhGateMonitorConfig {
         &self.config
     }

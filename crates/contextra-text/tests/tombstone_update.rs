@@ -1,4 +1,3 @@
-#![cfg(feature = "types-compat")]
 //! SD-05-TEXT-001 — Tombstone update path integration tests.
 //!
 //! Verifies that `upsert_document` no longer eagerly deletes old posting-list

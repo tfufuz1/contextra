@@ -1,9 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-CAMPAIGN-COV-SSI-ROOT]
-//! # Kampagnen-Test für SSI-Coarsening und Pruning-Blocker-Diagnose
-//!
-//! Prüft die gezielte Testabdeckung des Schwellenwerts (80 % Kapazität) im
-//! `SequenceLogSsiValidator` und verifiziert die Diagnose aktiver Snapshot-Blocker.
-
 // FILE-CONTEXT
 // ZWECK: Campaign coverage test for SequenceLogSsiValidator coarsening and pruning blocker diagnostics.
 // INVARIANTEN: Coarsening occurs at 80% capacity limit without false negatives for write-skew detection.
@@ -14,10 +8,10 @@
 use contextra_mvcc::snapshot::SnapshotRegistry;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator};
 use contextra_mvcc::SsiValidator;
-use contextra_mvcc::TxId;
+use contextra_types::TxId;
 use std::sync::Arc;
+use std::time::Instant;
 
-// Prüft das Auslösen der Vergröberung (Coarsening) bei 80 % Füllstand und die Diagnose des blockierenden Snapshots.
 #[test]
 fn test_ssi_coarsening_trigger_and_diagnose_pruning_blocker() {
     let registry = Arc::new(SnapshotRegistry::new());
@@ -30,7 +24,7 @@ fn test_ssi_coarsening_trigger_and_diagnose_pruning_blocker() {
     // Record keys up to 80% threshold (8 keys)
     for i in 0..10 {
         let key = format!("key_{i}").into_bytes();
-        validator.record_commit_key(&key, u64::try_from(i + 1).expect("valid u64"));
+        validator.record_commit_key(&key, (i + 1) as u64);
     }
 
     // 1. Verify diagnose_pruning_blocker returns active blocker info
@@ -43,7 +37,7 @@ fn test_ssi_coarsening_trigger_and_diagnose_pruning_blocker() {
     assert!(info.tracked_commit_keys > 0);
     assert!(info.min_unpruned_seq > 0);
 
-    let blocker_at = validator.diagnose_pruning_blocker();
+    let blocker_at = validator.diagnose_pruning_blocker_at(Instant::now());
     assert!(blocker_at.is_some());
 
     // 2. Oracle Check (R4): Verify write-skew conflict detection works fail-closed

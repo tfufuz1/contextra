@@ -1,11 +1,3 @@
-//! # Eviction Worker (`kv_segment/eviction_worker.rs`)
-//!
-//! Asynchroner Hintergrund-Task, der bei Speicherdruck Segmente nach LRU-Strategie freigibt.
-//!
-//! ## Invarianten
-//! - Blockiert niemals den Tokio-Executor bei CPU-intensiven Operationen.
-//! - Reagiert unmittelbar auf Notfall-Löschsignale.
-
 // FILE-CONTEXT
 // ZWECK: Eviction-Worker (nicht-blockierender Hot-Path LRU) und emergency_wipe (synchroner Notfall).
 // STAND: TS:2026-09-09T16:10:00Z (SESSION: dafac391)
@@ -16,11 +8,11 @@
 //!
 //! 1. **`EvictionWorker`**: Für den regelmäßigen Hot-Path (z.B. VRAM > 80%-Trigger).
 //!    Arbeitet auf einem **dedizierten OS-Thread** via `std::sync::mpsc`. Reicht
-//!    Bereinigungsbefehle asynchron ein, damit synchrone `Zeroize`-Operationen NIEMALS
+//!    Löschbefehle asynchron ein, damit synchrone `Zeroize`-Operationen NIEMALS
 //!    den Tokio-Async-Executor blockieren.
 //!
-//! 2. **`emergency_wipe()`**: Für seltene Notfall-Bereinigungen (z.B. Prozess-Shutdown,
-//!    Sicherheits-Alarm). Synchron, blockierend, vor Rückkehr
+//! 2. **`emergency_wipe()`**: Für seltene Notfall-Löschungen (z.B. Prozess-Shutdown,
+//!    Sicherheits-Alarm). Synchron, blockierend, garantiert vor Rückkehr
 //!    vollständig abgeschlossen — bewusst anders als der reguläre Worker-Pfad.
 
 use super::store::TenantIsolatedKvStore;
@@ -35,8 +27,6 @@ enum EvictionCommand {
 /// Regelmäßiger Eviction-Pfad (VRAM > 80%-Trigger). NICHT im Async-Executor,
 /// da regelmäßige Zeroize-Operationen den Tokio-Scheduler blockieren würden.
 // AI-TAG[CONCURRENCY][MAJOR][RESOLVED] EvictionWorker is Sync via Mutex protection of sender and handle (ID: AGT-CRYPTO-edaee52e) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598)
-// ANCHOR[contextra-crypto:KV-005]
-/// Hintergrund-Worker für die Speicherfreigabe nach dem Least-Recently-Used-Prinzip (LRU).
 pub struct EvictionWorker {
     sender: parking_lot::Mutex<mpsc::Sender<EvictionCommand>>,
     handle: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>,
@@ -97,8 +87,8 @@ impl Drop for EvictionWorker {
     }
 }
 
-/// SEPARATER Pfad für Notfall-Bereinigung (z.B. Prozess-Shutdown, expliziter
-/// Sicherheits-Trigger). Synchron, blockierend, vor Rückkehr abgeschlossen --
+/// SEPARATER Pfad für Notfall-Löschung (z.B. Prozess-Shutdown, expliziter
+/// Sicherheits-Trigger). Synchron, blockierend, garantiert vor Rückkehr abgeschlossen --
 /// bewusst ANDERS als der reguläre Worker-Pfad.
 pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
     store.clear_all();

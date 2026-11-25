@@ -1,21 +1,35 @@
-//! # Modul: db_transaction_rollback.rs
-//!
-//! **Zweck:** Rollback-Logik für abgebrochene oder fehlerhafte Transaktionen.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
-
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, DocId, Result, TxId};
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 #[allow(dead_code)]
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
-    // ANCHOR[contextra-engine:COM-016]
-    /// Dokumentation für `compensate_hnsw` im Rahmen der Transaktions- und Facade-Orchestrierung.
+    pub(super) fn trigger_kv_store_rollback(&self, doc_ids: &[DocId]) -> Result<()> {
+        if let Some(kv_hooks) = self.collection.kv_hooks() {
+            let chunk_ids: Vec<u64> = doc_ids
+                .iter()
+                .map(|d| {
+                    u64::try_from(d.inner()).map_err(|_| {
+                        ContextraError::InvalidInput(format!(
+                            "DocId {} exceeds u64::MAX for chunk_id conversion",
+                            d.inner()
+                        ))
+                    })
+                })
+                .collect::<Result<Vec<u64>>>()?;
+            let tenant = contextra_types::TenantId::try_new(1).unwrap_or_default();
+            kv_hooks.on_rollback(tenant, &chunk_ids);
+        }
+        Ok(())
+    }
+
     pub(super) async fn compensate_hnsw(&self, doc_ids: &[DocId]) {
+        if let Err(e) = self.trigger_kv_store_rollback(doc_ids) {
+            tracing::error!("[INV-DB-3] Trigger KV store rollback failed: {}", e);
+        }
         let comp_tx = TxId::new(
             self.collection
                 .next_tx
@@ -35,8 +49,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
     }
 
-    // ANCHOR[contextra-engine:COM-036]
-    /// Dokumentation für `compensate_text` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub(super) async fn compensate_text(&self, doc_ids: &[DocId]) {
         let comp_tx = TxId::new(
             self.collection
@@ -62,8 +74,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
     }
 
-    // ANCHOR[contextra-engine:COM-061]
-    /// Dokumentation für `compensate_lsm` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub(super) async fn compensate_lsm(&self, intent_key: &[u8], doc_ids: &[DocId]) {
         let f_keys = {
             let mut guard = match self.staged_forward_keys.lock() {
@@ -178,9 +188,18 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
     }
 
-    // ANCHOR[contextra-engine:ROL-175]
-    /// Dokumentation für `rollback_internal` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub(super) async fn rollback_internal(&self) {
+        let doc_ids = {
+            let guard = match self.staged_doc_ids.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            Arc::clone(&guard)
+        };
+        if let Err(e) = self.trigger_kv_store_rollback(&doc_ids) {
+            tracing::error!("[INV-DB-3] Trigger KV store rollback failed: {}", e);
+        }
+
         if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
             tracing::error!("[INV-DB-3] Graph index rollback failed: {}", e);
         }
@@ -198,6 +217,17 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     /// Rolls back any uncommitted changes applied to all 4 sub-systems in reverse commit order.
     pub async fn rollback(self) -> Result<()> {
         self.committed.store(true, Ordering::Release);
+        let doc_ids = {
+            let guard = match self.staged_doc_ids.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            Arc::clone(&guard)
+        };
+        let kv_res = self.trigger_kv_store_rollback(&doc_ids);
+        if let Err(ref e) = kv_res {
+            tracing::error!("[INV-DB-3] KV store rollback failed: {}", e);
+        }
 
         let graph_res = self.collection.graph_index.rollback(self.tx_id).await;
         let text_res = self.collection.text_index.rollback(self.tx_id).await;
@@ -218,6 +248,9 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         let mut errors = Vec::new();
+        if let Err(e) = kv_res {
+            errors.push(format!("KV Store: {}", e));
+        }
         if let Err(e) = graph_res {
             errors.push(format!("Graph: {}", e));
         }

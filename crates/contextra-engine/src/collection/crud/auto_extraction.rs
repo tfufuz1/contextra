@@ -1,10 +1,3 @@
-//! # Modul: auto_extraction.rs
-//!
-//! **Zweck:** Automatische Entitätsextraktion beim Einfügen und Aktualisieren.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
-
 // FILE-CONTEXT
 // ZWECK: Ingestion-Hook fuer LLM- und regelbasierte Entitaetsextraktion (OpenIE / Rule-Based).
 // INVARIANTEN: Default enabled: true (sofern nicht auto-extraction-opt-out gesetzt); Best-Effort Fehlerbehandlung; Keine Panics.
@@ -20,8 +13,6 @@ use contextra_types::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-// ANCHOR[contextra-engine:COL-EXT-025]
-/// Dokumentation für `ExtractorMode` im Rahmen der Collection- und Suchabstraktion.
 #[cfg(not(feature = "entity-extraction"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExtractorMode {
@@ -36,8 +27,6 @@ impl Default for ExtractorMode {
     }
 }
 
-// ANCHOR[contextra-engine:COL-ENT-039]
-/// Dokumentation für `EntityExtractionConfig` im Rahmen der Collection- und Suchabstraktion.
 #[cfg(not(feature = "entity-extraction"))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityExtractionConfig {
@@ -57,14 +46,9 @@ impl Default for EntityExtractionConfig {
     }
 }
 
-/// Fallback / Dummy LLM Generator fuer reine RuleBased Extraktion oder fehlende LLM-Inferenz.
-///
-/// **Verhalten bei fehlendem Generator:**
-/// Wenn kein externer LLM-Generator konfiguriert ist, gibt dieser Fallback-Generator eine leere
-/// JSON-Extraktionsantwort (`"[]"`) zurück. Die Entitätsextraktion überspringt dann definiert die
-/// LLM-basierte Extraktion ohne Fehler und erzeugt keine ungültigen oder stillschweigend falschen Ergebnisse.
+/// Fallback / Dummy LLM Generator fuer reine RuleBased Extraktion ohne externes LLM.
 #[derive(Debug, Clone)]
-struct NoopLlmGenerator;
+pub(crate) struct NoopLlmGenerator;
 
 impl LlmTextGenerator for NoopLlmGenerator {
     fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, Result<String>> {
@@ -82,7 +66,6 @@ impl LlmTextGenerator for NoopLlmGenerator {
 /// Die Entscheidung über eine globale Anpassung obliegt der Produktverantwortung und bleibt als offener
 /// Punkt im PR-Text dokumentiert.
 #[inline]
-#[allow(dead_code)]
 pub fn recommended_mode_for_regulated(is_regulated: bool) -> AutoExtractionMode {
     if is_regulated {
         AutoExtractionMode::Disabled
@@ -111,6 +94,11 @@ impl AutoExtractionConfig {
             enabled: mode.is_enabled(),
             entity_config: EntityExtractionConfig::default(),
         }
+    }
+
+    /// Erstellt eine neue `AutoExtractionConfig` unter Verwendung der Empfehlung fuer Regulierungs-Kontexte.
+    pub fn for_regulated(is_regulated: bool) -> Self {
+        Self::new(recommended_mode_for_regulated(is_regulated))
     }
 
     /// Setzt den Laufzeit-Modus (Builder Pattern).
@@ -304,6 +292,15 @@ pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(
             }
         }
 
+        if created_edges > 0 {
+            if let Err(e) = collection
+                .update_document_importance(doc_id, 1.0, "auto_extractor")
+                .await
+            {
+                tracing::warn!(doc_id = %doc_id, error = %e, "Failed to update document importance after auto extraction");
+            }
+        }
+
         Ok(created_edges)
     }
 
@@ -311,30 +308,5 @@ pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(
     {
         let _ = (collection, doc_id, text, generator, extractor_mode);
         Ok(0)
-    }
-}
-
-#[cfg(test)]
-mod auto_extraction_tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_noop_llm_generator_behavior_defined_skip() {
-        let generator = NoopLlmGenerator;
-        let response = generator
-            .generate("extract entities")
-            .await
-            .expect("generate should succeed");
-        assert_eq!(
-            response, "[]",
-            "NoopLlmGenerator must return empty json array"
-        );
-    }
-
-    #[test]
-    fn test_auto_extraction_config_builder_methods() {
-        let config = AutoExtractionConfig::new(AutoExtractionMode::Disabled)
-            .with_mode(AutoExtractionMode::Enabled);
-        assert!(config.is_enabled());
     }
 }

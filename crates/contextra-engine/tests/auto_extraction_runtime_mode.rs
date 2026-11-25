@@ -1,9 +1,3 @@
-//! # Integrationstest: auto extraction runtime mode
-//!
-//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
-//!
-//! Gehört zur Testsuite von `contextra-engine`.
-
 // FILE-CONTEXT
 // ZWECK: Integrationstests fuer AutoExtractionMode Laufzeit-Verhalten und Profil-Wechsel.
 
@@ -53,8 +47,6 @@ impl LlmTextGenerator for MockLlmGenerator {
     }
 }
 
-// ANCHOR[contextra-engine:TST02-001]
-/// Testblock zur Überprüfung von `test_auto_extraction_disabled_mode_creates_no_triples_and_provenance_empty`.
 /// Test 1: Disabled schreibt keine Triples/Entities (Provenance leer)
 #[tokio::test]
 async fn test_auto_extraction_disabled_mode_creates_no_triples_and_provenance_empty() {
@@ -119,8 +111,6 @@ async fn test_auto_extraction_disabled_mode_creates_no_triples_and_provenance_em
     }
 }
 
-// ANCHOR[contextra-engine:TST02-002]
-/// Testblock zur Überprüfung von `test_auto_extraction_enabled_mode_creates_triples`.
 /// Test 2: Enabled mode extracts triples and sets provenance
 #[tokio::test]
 async fn test_auto_extraction_enabled_mode_creates_triples() {
@@ -183,8 +173,6 @@ async fn test_auto_extraction_enabled_mode_creates_triples() {
     }
 }
 
-// ANCHOR[contextra-engine:TST02-003]
-/// Testblock zur Überprüfung von `test_auto_extraction_profile_switch_affects_only_new_inserts`.
 /// Test 3: Profil-Wechsel wirkt nur auf neue Inserts
 #[tokio::test]
 async fn test_auto_extraction_profile_switch_affects_only_new_inserts() {

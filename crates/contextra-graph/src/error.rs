@@ -1,92 +1,110 @@
-//! Error taxonomy and Result types for `contextra-graph` (Klasse A, B4).
+//! Graph mutation error taxonomy for Contextra Graph.
 
+use contextra_types::ContextraError;
 use thiserror::Error;
 
-/// Crate-level Result type.
-pub type Result<T, E = GraphError> = std::result::Result<T, E>;
-
-/// Canonical error taxonomy for `contextra-graph`.
-#[derive(Debug, Error)]
-#[non_exhaustive]
-pub enum GraphError {
-    /// Invalid input parameter or argument.
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
-
-    /// Requested node, edge, or hyperedge not found.
-    #[error("Not found: {0}")]
-    NotFound(String),
-
-    /// Graph mutation conflict or policy violation.
-    #[error("Policy violation: {0}")]
-    PolicyViolation(String),
-
-    /// Serialization or deserialization failure.
-    #[error("Serialization error: {0}")]
-    Serialization(String),
-
-    /// Storage or persistence I/O failure.
-    #[error("Storage error: {0}")]
-    Storage(String),
-
-    /// Resource budget exhausted (e.g. node traversal limit or memory).
-    #[error("Budget exhausted: {0}")]
-    BudgetExhausted(String),
-
-    /// Specific graph mutation error.
-    #[error("Mutation error: {0}")]
-    Mutation(#[from] GraphMutationError),
-
-    /// Internal unexpected error.
-    #[error("Internal graph error: {0}")]
-    Internal(String),
-}
-
-/// Detailed errors occurring during graph mutations.
-#[derive(Debug, Clone, PartialEq, Error)]
-#[non_exhaustive]
+/// Error variants for graph mutation operations.
+#[derive(Debug, Error, Clone, PartialEq)]
 pub enum GraphMutationError {
-    /// Lock acquisition timed out.
+    /// Lock acquisition timed out during concurrent mutation.
     #[error("Lock acquisition timed out: {0}")]
     LockAcquisitionTimeout(String),
 
-    /// Invalid role binding for hyperedge.
+    /// Provided role binding is invalid.
     #[error("Invalid role binding: {0}")]
     RoleBindingInvalid(String),
 
-    /// Epoch reclamation pending.
+    /// Epoch reclamation is pending for the specified epoch.
     #[error("Epoch reclamation pending for epoch: {0}")]
     EpochReclamationPending(u64),
 
-    /// Insufficient participants for hyperedge creation.
+    /// Hyperedge does not meet minimum participant count requirements.
     #[error(
         "Insufficient participants for hyperedge: expected at least {expected}, found {found}"
     )]
     InsufficientParticipants {
-        /// Expected minimum participants.
+        /// Expected minimum participant count.
         expected: usize,
-        /// Actual found participants.
+        /// Actual participant count provided.
         found: usize,
     },
 
-    /// Hyperedge was not found.
+    /// Specified hyperedge ID was not found.
     #[error("Hyperedge not found: {0}")]
     HyperedgeNotFound(u64),
+
+    /// Hyperedge ID collision detected during batch commit.
+    #[error("Duplicate hyperedge ID detected during batch commit: {0}")]
+    DuplicateHyperEdgeId(crate::hyperedge::HyperEdgeId),
 
     /// Invalid hyperedge weight.
     #[error("Invalid hyperedge weight {weight}: {reason}")]
     InvalidWeight {
-        /// Weight value provided.
+        /// The invalid weight value.
         weight: f32,
-        /// Reason why weight is invalid.
+        /// Reason describing why the weight is invalid.
         reason: String,
     },
 
-    /// Duplicate hyperedge ID.
-    #[error("Duplicate hyperedge ID: {0}")]
-    DuplicateHyperEdgeId(u64),
-
-    /// Internal mutation failure.
+    /// Internal error during graph mutation.
     #[error("Internal graph mutation error: {0}")]
     Internal(String),
+}
+
+impl From<GraphMutationError> for ContextraError {
+    fn from(err: GraphMutationError) -> Self {
+        ContextraError::InvalidInput(err.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_graph_mutation_error_display_and_conversion() {
+        let err1 = GraphMutationError::InsufficientParticipants {
+            expected: 2,
+            found: 1,
+        };
+        assert_eq!(
+            err1.to_string(),
+            "Insufficient participants for hyperedge: expected at least 2, found 1"
+        );
+
+        let contextra_err: ContextraError = err1.into();
+        assert!(
+            matches!(contextra_err, ContextraError::InvalidInput(msg) if msg.contains("Insufficient participants"))
+        );
+
+        let err2 = GraphMutationError::LockAcquisitionTimeout("test_lock".into());
+        assert_eq!(err2.to_string(), "Lock acquisition timed out: test_lock");
+
+        let err4 = GraphMutationError::RoleBindingInvalid("invalid_role".into());
+        assert_eq!(err4.to_string(), "Invalid role binding: invalid_role");
+
+        let err5 = GraphMutationError::EpochReclamationPending(7);
+        assert_eq!(err5.to_string(), "Epoch reclamation pending for epoch: 7");
+
+        let err6 = GraphMutationError::HyperedgeNotFound(100);
+        assert_eq!(err6.to_string(), "Hyperedge not found: 100");
+
+        let err7 = GraphMutationError::InvalidWeight {
+            weight: -1.0,
+            reason: "must be non-negative".into(),
+        };
+        assert_eq!(
+            err7.to_string(),
+            "Invalid hyperedge weight -1: must be non-negative"
+        );
+
+        let err8 = GraphMutationError::Internal("db panic".into());
+        assert_eq!(err8.to_string(), "Internal graph mutation error: db panic");
+
+        let err9 = GraphMutationError::DuplicateHyperEdgeId(crate::hyperedge::HyperEdgeId::new(42));
+        assert_eq!(
+            err9.to_string(),
+            "Duplicate hyperedge ID detected during batch commit: HyperEdgeId(42)"
+        );
+    }
 }

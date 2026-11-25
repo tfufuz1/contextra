@@ -3,9 +3,8 @@
 // FILE-CONTEXT: Integration test verifying K-02 SSI search_at(seq) determinism under concurrent HNSW rebuild.
 // Spec v17 (Part 4.3, K-02; Part 6.5 "Pin-first").
 
-use contextra_ports::VectorIndex;
+use contextra_core::{DocId, TxId, VectorIndex};
 use contextra_ports::{Rng, SeededRng};
-use contextra_types::{DocId, TxId};
 use contextra_vector::{HnswConfig, HnswIndex, RebuildStatus};
 use std::sync::Arc;
 
@@ -37,7 +36,7 @@ async fn run_snapshot_rebuild_determinism_for_seed(seed: u64) {
         ef_construction: 64,
         ef_search: 64,
         rebuild_threshold: 0.50,
-        distance_metric: contextra_types::DistanceMetric::Euclidean,
+        distance_metric: contextra_core::DistanceMetric::Euclidean,
         ..Default::default()
     };
 
@@ -149,7 +148,7 @@ async fn run_snapshot_rebuild_determinism_for_seed(seed: u64) {
     });
 
     // Trigger rebuild
-    index.rebuild().expect("rebuild must succeed");
+    index.rebuild().await.expect("rebuild must succeed");
 
     // Wait for concurrent task to finish
     let concurrent_runs = concurrent_search_task

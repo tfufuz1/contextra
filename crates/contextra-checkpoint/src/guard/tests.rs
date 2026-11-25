@@ -1,9 +1,5 @@
-//! # Tests für das Guard-Subsystem
-//!
-//! Dieses Modul enthält Unit-Tests für `PinGuard` und `CheckpointGuard`.
-
 use super::*;
-use crate::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 
@@ -117,7 +113,6 @@ impl StorageEngine for MockStorage {
 }
 
 #[test]
-// Prüft, dass ein PinGuard beim unkontrollierten Drop zuverlässig als Orphan-Pin registriert wird.
 fn test_orphan_registry_persists_across_drop() {
     let registry = Arc::new(InstanceOrphanRegistry::new(""));
     let storage = Arc::new(MockStorage::new());
@@ -148,7 +143,6 @@ fn test_orphan_registry_persists_across_drop() {
 }
 
 #[test]
-// Prüft die synchrone Ausführung von rollback_blocking außerhalb von Tokio-Runtimes.
 fn test_rollback_blocking_in_sync_context() {
     let storage = Arc::new(MockStorage::new());
     let cp = StateCheckpoint {
@@ -168,7 +162,6 @@ fn test_rollback_blocking_in_sync_context() {
 }
 
 #[tokio::test]
-// Prüft, dass rollback_blocking in aktivem asynchronem Kontext sofort mit Fehler abbricht (Deadlock-Schutz).
 async fn test_rollback_blocking_in_async_context_returns_error() {
     let storage = Arc::new(MockStorage::new());
     let cp = StateCheckpoint {
@@ -200,7 +193,6 @@ async fn test_rollback_blocking_in_async_context_returns_error() {
 }
 
 #[tokio::test]
-// Prüft die Erstellung und den erfolgreichen Commit eines Guards für einen Agenten-Schritt.
 async fn test_checkpoint_guard_for_agent_step() {
     let storage = Arc::new(MockStorage::new());
     let guard = CheckpointGuard::for_agent_step(storage.clone(), TxId::new(55))
@@ -217,7 +209,6 @@ async fn test_checkpoint_guard_for_agent_step() {
 
 #[allow(non_snake_case)]
 #[tokio::test]
-// Prüft, dass ein uncommitteter Guard seinen Zustand behält und Zugriff auf den Checkpoint gewährt.
 async fn checkpoint_guard_CASE_uncommitted_guard_holds_state() {
     let storage = Arc::new(MockStorage::new());
     let cp = StateCheckpoint {
@@ -236,7 +227,6 @@ async fn checkpoint_guard_CASE_uncommitted_guard_holds_state() {
 
 #[allow(non_snake_case)]
 #[tokio::test]
-// Prüft, dass commit() das Eigentum am Checkpoint übernimmt und den internen Zustand konsumiert.
 async fn checkpoint_guard_CASE_commit_moves_ownership() {
     let storage = Arc::new(MockStorage::new());
     let guard = CheckpointGuard::new(
@@ -258,7 +248,6 @@ async fn checkpoint_guard_CASE_commit_moves_ownership() {
 
 #[allow(non_snake_case)]
 #[tokio::test]
-// Prüft, dass nachfolgende Zugriffe auf einen bereits konsumierten CheckpointGuard als Fehler abgewiesen werden.
 async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
     let dummy_storage = Arc::new(MockStorage::new());
     let consumed_guard = CheckpointGuard::<MockStorage> {

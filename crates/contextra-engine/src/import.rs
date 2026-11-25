@@ -1,10 +1,3 @@
-//! # Modul: import.rs
-//!
-//! **Zweck:** Import-Pipeline zur Wiederherstellung von Snapshots und Bestandsdaten.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
-
 // FILE-CONTEXT
 // ZWECK: Import-Funktionalität & Zusammenfassung für Memory-Export-Format v1 (Schema Version "1.0").
 // INVARIANTEN: Schema-Versionsprüfung (Pflicht); Idempotenz bezüglich ID (Upsert); Transaktionale Verlässlichkeit.
@@ -107,9 +100,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 }
 
-/// Maximum allowable collections in an import document (bounded resource principle).
-pub const MAX_IMPORT_COLLECTIONS: usize = 10_000;
-
 impl Contextra {
     /// Importiert ein ExportDocumentV1 in die Contextra-Datenbank mit Schema-Versionsprüfung und Idempotenz.
     pub async fn import_memories(&self, doc: ExportDocumentV1) -> Result<ImportSummary> {
@@ -117,14 +107,6 @@ impl Contextra {
             return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Incompatible export schema version '{}', expected '{}'",
                 doc.schema_version, SCHEMA_VERSION_V1
-            )));
-        }
-
-        if doc.collections.len() > MAX_IMPORT_COLLECTIONS {
-            return Err(contextra_types::ContextraError::invalid_input(format!(
-                "Collection count exceeds limit: {} > {}",
-                doc.collections.len(),
-                MAX_IMPORT_COLLECTIONS
             )));
         }
 

@@ -10,7 +10,6 @@ use std::cmp::Ordering;
 ///
 /// # Complexity
 /// Time complexity $O(|P| \log |P|)$, where $|P|$ is the number of hyperedge participants.
-// ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-001]
 pub fn truncate_participants(
     participants: &[EntityId],
     get_x: impl Fn(EntityId) -> f32,
@@ -52,7 +51,6 @@ pub fn truncate_participants(
 ///
 /// # Complexity
 /// Time complexity $O(|e|)$, where $|e|$ is the number of evaluated participants.
-// ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-002]
 pub fn compute_lovasz_extension(
     participants: &[EntityId],
     get_x: impl Fn(EntityId) -> f32,
@@ -116,7 +114,6 @@ pub fn compute_lovasz_extension(
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-003]
     #[test]
     fn test_lovasz_extension_basic() {
         let e1 = EntityId::new(1);
@@ -137,7 +134,6 @@ mod tests {
         assert_eq!(u_min, Some(e3));
     }
 
-    // ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-004]
     #[test]
     fn test_lovasz_extension_equal_x() {
         let e1 = EntityId::new(1);
@@ -152,7 +148,6 @@ mod tests {
         assert_eq!(u_min, None);
     }
 
-    // ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-005]
     #[test]
     fn test_lovasz_tie_breaker() {
         let e1 = EntityId::new(1);
@@ -175,7 +170,6 @@ mod tests {
         assert_eq!(u_min, Some(e3));
     }
 
-    // ANCHOR[contextra-graph:SRC-TL-HFD-LOVASZ-006]
     #[test]
     fn test_truncation() {
         let p: Vec<EntityId> = (1..=10).map(EntityId::new).collect();

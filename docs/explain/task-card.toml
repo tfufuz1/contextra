@@ -1,0 +1,8 @@
+title = "Task-Karten-Konformität"
+what = "Die Struktur oder Pflichtfelder der Task-Karte sind ungültig."
+why = "Strukturierte Task-Karten gewährleisten die korrekte Ausführung und Verifizierbarkeit von Aufgaben."
+fix = "Ergänze fehlende Felder wie Akzeptanzkriterien, Scope und Invarianten in der Task-Karte."
+anti_fix = "Lösche keine Pflichtabschnitte aus der Task-Karte."
+adr = ["ADR-035"]
+related = ["plan-lint", "claims-in-pr"]
+sources = ["CONSTITUTION.md"]

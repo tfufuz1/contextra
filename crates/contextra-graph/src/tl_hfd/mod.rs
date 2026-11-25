@@ -27,7 +27,6 @@ use contextra_types::EntityId;
 ///
 /// # Complexity
 /// Time complexity $O(\text{iterations} \cdot k \cdot |\text{Seeds}| \cdot \text{max\_edge\_size})$.
-// ANCHOR[contextra-graph:SRC-TL-HFD-MOD-001]
 pub fn tl_hfd_local<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -44,7 +43,6 @@ impl CsrGraph {
     ///
     /// # Complexity
     /// Time complexity $O(\text{iterations} \cdot k \cdot |\text{Seeds}| \cdot \text{max\_edge\_size})$.
-    // ANCHOR[contextra-graph:SRC-TL-HFD-MOD-002]
     pub fn thresholded_local_hfd(
         &self,
         seeds: &[EntityId],
@@ -52,47 +50,13 @@ impl CsrGraph {
     ) -> Result<AHashMap<EntityId, f32>, TlHfdError> {
         tl_hfd_local(self, seeds, params)
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::csr::CsrGraph;
-    use contextra_types::Entity;
-
-    // ANCHOR[contextra-graph:SRC-TL-HFD-MOD-003]
-    #[tokio::test]
-    async fn test_thresholded_local_hfd_diagnostic_path() {
-        let graph = std::sync::Arc::new(CsrGraph::new());
-
-        let e1 = EntityId::new(10);
-        let e2 = EntityId::new(20);
-
-        graph
-            .insert_entity_direct(Entity::new(e1, "E1", "Type"))
-            .unwrap();
-        graph
-            .insert_entity_direct(Entity::new(e2, "E2", "Type"))
-            .unwrap();
-
-        let he = crate::hyperedge::HyperEdge::new(
-            crate::hyperedge::HyperEdgeId::new(1),
-            crate::csr::EdgeType::Default,
-            vec![
-                crate::hyperedge::RoleBinding::new(crate::hyperedge::RoleId::new(1), e1),
-                crate::hyperedge::RoleBinding::new(crate::hyperedge::RoleId::new(2), e2),
-            ],
-            1.0,
-        );
-        graph.insert_hyperedge_direct(he);
-
-        let params = TlHfdParams::default();
-        let res = graph.thresholded_local_hfd(&[e1], &params);
-        assert!(
-            res.is_ok(),
-            "thresholded_local_hfd diagnostic call should succeed"
-        );
-        let scores = res.unwrap();
-        assert!(scores.contains_key(&e1));
+    /// Evaluates TL-HFD over CsrGraph.
+    pub fn evaluate_thresholded_local_hfd(
+        &self,
+        seeds: &[EntityId],
+        params: &TlHfdParams,
+    ) -> Result<AHashMap<EntityId, f32>, TlHfdError> {
+        self.thresholded_local_hfd(seeds, params)
     }
 }

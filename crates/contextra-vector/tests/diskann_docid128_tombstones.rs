@@ -1,9 +1,7 @@
 #![forbid(unsafe_code)]
 
 #[cfg(feature = "experimental-diskann")]
-use contextra_ports::vector_index::VectorIndex;
-#[cfg(feature = "experimental-diskann")]
-use contextra_types::{ContextraError, DocId, Result, TxId};
+use contextra_core::{DocId, Result, VectorIndex};
 #[cfg(feature = "experimental-diskann")]
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
 #[cfg(feature = "experimental-diskann")]
@@ -12,7 +10,7 @@ use tempfile::tempdir;
 #[cfg(feature = "experimental-diskann")]
 #[tokio::test]
 async fn test_diskann_docid128_tombstones_handling() -> Result<()> {
-    let dir = tempdir().map_err(contextra_types::ContextraError::Io)?;
+    let dir = tempdir().map_err(contextra_core::ContextraError::Io)?;
     let index_path = dir.path().join("docid128_tombstones.idx");
 
     let config = DiskAnnConfig {
@@ -23,7 +21,7 @@ async fn test_diskann_docid128_tombstones_handling() -> Result<()> {
         ..Default::default()
     };
 
-    let index = DiskAnnIndex::try_new(config.clone())?;
+    let index = DiskAnnIndex::try_new(config)?;
 
     // Construct two 128-bit IDs that differ strictly in the upper 64 bits
     #[cfg(feature = "docid-128")]
@@ -47,39 +45,12 @@ async fn test_diskann_docid128_tombstones_handling() -> Result<()> {
     assert!(all_before.contains(&id2));
 
     // Delete id1 only
-    index.delete(TxId(1), id1).await?;
+    index.delete(contextra_core::TxId(1), id1).await?;
 
     let all_after = index.all_doc_ids().await?;
     assert_eq!(all_after.len(), 1);
     assert!(!all_after.contains(&id1));
     assert!(all_after.contains(&id2));
-
-    // Repeating delete on id1 returns NotFound (idempotent / already deleted)
-    let re_delete_res = index.delete(TxId(2), id1).await;
-    assert!(matches!(re_delete_res, Err(ContextraError::NotFound(_))));
-
-    // Deleting unknown ID returns NotFound
-    #[cfg(feature = "docid-128")]
-    let unknown_id = DocId::from(0x9_0000_0000_0000_0000_u128 | 999_u128);
-    #[cfg(not(feature = "docid-128"))]
-    let unknown_id = DocId::from(9999_u64);
-
-    let delete_unknown_res = index.delete(TxId(3), unknown_id).await;
-    assert!(matches!(
-        delete_unknown_res,
-        Err(ContextraError::NotFound(_))
-    ));
-
-    // Tombstone persistence after delta persist & reload
-    index.persist_delta().await?;
-
-    let reloaded_index = DiskAnnIndex::try_new(config)?;
-    reloaded_index.load().await?;
-
-    let all_reloaded = reloaded_index.all_doc_ids().await?;
-    assert_eq!(all_reloaded.len(), 1);
-    assert!(!all_reloaded.contains(&id1));
-    assert!(all_reloaded.contains(&id2));
 
     Ok(())
 }

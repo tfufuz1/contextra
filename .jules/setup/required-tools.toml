@@ -1,0 +1,36 @@
+# Required and optional tools configuration for env-attest
+
+[[tool]]
+name = "git"
+version_cmd = ["git", "--version"]
+required = true
+
+[[tool]]
+name = "rg"
+version_cmd = ["rg", "--version"]
+required = true
+
+[[tool]]
+name = "jq"
+version_cmd = ["jq", "--version"]
+required = true
+
+[[tool]]
+name = "flatc"
+version_cmd = ["flatc", "--version"]
+required = false
+
+[[tool]]
+name = "ast-grep"
+version_cmd = ["ast-grep", "--version"]
+required = false
+
+[[tool]]
+name = "cargo-nextest"
+version_cmd = ["cargo", "nextest", "--version"]
+required = false
+
+[[tool]]
+name = "cargo-deny"
+version_cmd = ["cargo", "deny", "--version"]
+required = false

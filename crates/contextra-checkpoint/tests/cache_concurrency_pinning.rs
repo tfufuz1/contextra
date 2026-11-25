@@ -1,18 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::disallowed_methods,
-    clippy::disallowed_types,
-    clippy::indexing_slicing,
-    clippy::cast_sign_loss,
-    clippy::cast_possible_truncation,
-    clippy::await_holding_lock
-)]
-//! # Integrationstest: Cache-Nebenläufigkeit und Snapshot-Pinning
-//!
-//! Prüft das Pinning und Entpinnen unter starker nebenläufiger Last sowie Cache-Treffer.
-
 // ANCHOR[TEST:CKPT-001] STATUS:DONE (TS:2026-09-02T23:18:12Z) (SESSION: 358e3b0a)
 // AUFGABE : Verify Concurrent Checkpoint Pinning & GC Exclusions
 // GATE    : cargo test -p contextra-checkpoint --test cache_concurrency_pinning
@@ -20,8 +5,8 @@
 // REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:CKPT-001) (TS:2026-09-02T23:18:12Z) (SESSION: 2155aaa2) PRÜFER-KONTEXT: FRESH - Confirmed concurrent stress test, cache hit/miss reloading, and unpinning lifecycle.
 
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_checkpoint::contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_checkpoint::contextra_types::{Result, TxId};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

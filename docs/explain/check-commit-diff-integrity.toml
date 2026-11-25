@@ -1,0 +1,8 @@
+title = "Commit-Diff Integritätsprüfung"
+what = "Die Commit-Message behauptet Änderungen, die im tatsächlichen Git Diff fehlen (Phantom Commit)."
+why = "Verhindert gefälschte Commit-Messages und Audit-Trail-Verfälschungen."
+fix = "Passe die Commit-Message an die real geänderten Dateien an."
+anti_fix = "Füge keine leeren Commits mit `git commit --allow-empty` hinzu."
+adr = ["ADR-035"]
+related = ["claims-in-pr", "task-card"]
+sources = ["docs/gates/phantom-commit-gate.md"]

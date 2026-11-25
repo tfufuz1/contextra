@@ -1,10 +1,3 @@
-//! # Modul: lifecycle.rs
-//!
-//! **Zweck:** Start-, Shutdown- und Wiederherstellungsroutinen der Engine.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
-
 use crate::*;
 use contextra_ports::license::{AuthorizedRing, FeatureRing, LicenseGate, OpenFastGate};
 use contextra_store::LsmStorage;
@@ -77,7 +70,18 @@ impl Contextra {
             ..Default::default()
         };
 
-        let storage = Arc::new(LsmStorage::new(lsm_config).await?);
+        let clock = Arc::new(contextra_ports::SystemClock::new());
+        if LsmStorage::has_pending_legacy_wal_migration_path(&lsm_config.path).await? {
+            LsmStorage::migrate_legacy_wal_keys(&lsm_config, clock).await?;
+        }
+
+        let storage = if let Some(passphrase) = lsm_config.encryption_passphrase.clone() {
+            let _ = passphrase;
+            Arc::new(LsmStorage::open(lsm_config).await?)
+        } else {
+            Arc::new(LsmStorage::open(lsm_config).await?)
+        };
+        let _ = storage.has_pending_legacy_wal_migration().await;
         if !storage.supports_ssi_tracking() {
             tracing::warn!(
                 "Storage engine does not support SSI tracking; serializable isolation may be degraded"
@@ -120,6 +124,9 @@ impl Contextra {
             &orphan_path,
         ));
 
+        let kv_store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
+        let eviction_worker = crate::kv_cache_integration::build_eviction_worker(kv_store.clone());
+
         let metrics_sink: Arc<dyn contextra_ports::MetricsSink> = config
             .metrics_sink
             .clone()
@@ -141,7 +148,12 @@ impl Contextra {
             orphan_registry,
             router: parking_lot::RwLock::new(None),
             calibrator: parking_lot::RwLock::new(None),
+            pid_controller: parking_lot::RwLock::new(None),
+            kv_eviction_worker: parking_lot::RwLock::new(Some(eviction_worker)),
             metrics_sink: parking_lot::RwLock::new(metrics_sink),
+            kv_hooks: parking_lot::RwLock::new(Some(
+                kv_store as Arc<dyn contextra_ports::KvLifecycleHooks>,
+            )),
         };
 
         db.initialize_collections().await?;
@@ -151,11 +163,19 @@ impl Contextra {
                 .await?;
         tracing::debug!(cleaned_intents, "Orphaned consolidation cleanup on startup");
 
-        let recovered_intents =
-            transaction::recover_pending_intents(db.storage.as_ref(), &db.next_tx).await?;
-        tracing::debug!(recovered_intents, "Recovered pending intents on startup");
+        if let Err(e) = db.orphan_registry.recover_and_clean(db.storage.as_ref()).await {
+            tracing::warn!(error = %e, "Orphan pin recovery warning during DB startup");
+        }
+        let drained_orphans = db.orphan_registry.drain_orphaned_checkpoints();
+        if !drained_orphans.is_empty() {
+            tracing::info!(
+                count = drained_orphans.len(),
+                "Drained orphaned checkpoints during DB startup"
+            );
+        }
 
         db.repair_on_open().await?;
+
 
         db.init_embedding_backend(&config.embedding_backend).await?;
 
@@ -188,10 +208,25 @@ impl Contextra {
                 model_name,
                 cache_dir,
             } => {
-                let _ = (model_name, cache_dir);
-                tracing::debug!(
-                    "EmbeddingBackend::Onnx requested, but ONNX inference support is not enabled in this build."
-                );
+                #[cfg(feature = "onnx")]
+                {
+                    let model_dir = contextra_infer_onnx::ensure_onnx_model_download(
+                        model_name,
+                        cache_dir.as_deref(),
+                    )
+                    .await?;
+                    let embedder = contextra_infer_onnx::OnnxEmbedder::load(model_dir)?;
+                    let embedder_arc: Arc<dyn TextEmbeddingEngine> = Arc::new(embedder);
+                    self.set_embedder(embedder_arc).await?;
+                }
+                #[cfg(not(feature = "onnx"))]
+                {
+                    let _ = (model_name, cache_dir);
+                    tracing::debug!(
+                        "EmbeddingBackend::Onnx requested, but 'onnx' feature is disabled in this build. \
+                         Recompile with feature 'onnx' to enable local ONNX embeddings."
+                    );
+                }
             }
             EmbeddingBackend::None => {}
         }
@@ -215,8 +250,6 @@ impl Contextra {
         Ok(())
     }
 
-    // ANCHOR[contextra-engine:REP-236]
-    /// Dokumentation für `repair_on_open` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn repair_on_open(&self) -> Result<()> {
         let timeout_duration = std::time::Duration::from_secs(30);
@@ -436,14 +469,10 @@ impl Contextra {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    // ANCHOR[contextra-engine:LFC-002]
-    /// Signalisiert den Shutdown aller Hintergrunddienste.
     pub fn shutdown(&self) {
         self.cancel_token.cancel();
     }
 
-    // ANCHOR[contextra-engine:LFC-003]
-    /// Wartet asynchron auf den geordneten Stopp aller Worker.
     pub async fn wait_shutdown(&self) {
         self.shutdown();
         self.task_tracker.close();
@@ -460,8 +489,6 @@ impl Drop for Contextra {
 }
 
 impl Contextra {
-    // ANCHOR[contextra-engine:CLO-479]
-    /// Dokumentation für `close` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn close(self) -> Result<()> {
         self.wait_shutdown().await;
@@ -470,8 +497,6 @@ impl Contextra {
         Ok(())
     }
 
-    // ANCHOR[contextra-engine:WIT-487]
-    /// Dokumentation für `with_embedder` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self, embedder))]
     pub async fn with_embedder(self, embedder: Arc<dyn TextEmbeddingEngine>) -> Self {
         {
@@ -487,8 +512,6 @@ impl Contextra {
         self
     }
 
-    // ANCHOR[contextra-engine:SET-502]
-    /// Dokumentation für `set_embedder` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self, embedder))]
     pub async fn set_embedder(&self, embedder: Arc<dyn TextEmbeddingEngine>) -> Result<()> {
         {

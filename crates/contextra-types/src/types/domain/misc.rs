@@ -1,14 +1,3 @@
-//! Wissensgraphen-Elemente (`Entity`, `Edge`), `MemoryType`, `WorkflowState` und Verfallskonstanten.
-//!
-//! # Architektur-Rolle: Ring 0 (Wissensgraph & Gedächtnismodelle)
-//!
-//! Dieses Modul enthält Strukturen für:
-//! - `WorkflowState`: Eingefrorener Workflow-Zustand mit Transaktions- und Graph-Hash als Savepoint.
-//! - `Entity`, `Edge`, `LinkRelation`: Wissensgraphen- und Zettelkasten-Primitive (A-MEM).
-//! - `MemoryType`: Kognitive Einteilung (episodisch, semantisch, prozedural, working) mit Verfallsraten.
-//! - `PprConfig`, `TlHfdParams`: Konfigurationsparameter für Graph-Diffusionsalgorithmen (Personalized PageRank).
-//! - `ConfigFingerprint`: Bit-exakte Konfigurations-Fingerabdrücke zur Vermeidung von Score-Kalibrierungs-Drift.
-
 use crate::error::{ContextraError, Result};
 use crate::types::domain::{DocId, EntityId, TxId};
 use serde::{Deserialize, Serialize};
@@ -43,13 +32,9 @@ mod hex {
             )));
         }
         let mut bytes = [0u8; 32];
-        for (i, slot) in bytes.iter_mut().enumerate() {
-            let start = i * 2;
-            let end = start + 2;
-            let slice = s
-                .get(start..end)
-                .ok_or_else(|| serde::de::Error::custom("invalid hex slice"))?;
-            *slot = u8::from_str_radix(slice, 16).map_err(serde::de::Error::custom)?;
+        for i in 0..32 {
+            bytes[i] =
+                u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).map_err(serde::de::Error::custom)?;
         }
         Ok(bytes)
     }
@@ -57,7 +42,6 @@ mod hex {
 
 /// Defines a frozen workflow state acting as a savepoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-WORKFLOW]
 pub struct WorkflowState {
     /// Associated transaction.
     pub tx: TxId,
@@ -68,30 +52,26 @@ pub struct WorkflowState {
 
 // INVARIANT: Bit 63 der SeqNo markiert Tombstones.
 /// Bit mask for identifying tombstones in sequence numbers.
-// ANCHOR[contextra-types:MISC-TOMBSTONE-BIT]
 pub const TOMBSTONE_BIT: u64 = 1 << 63;
 
 /// Reserved metadata key for sequence-based document TTL expiration.
-// ANCHOR[contextra-types:MISC-EXPIRY-KEY]
 pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 
 /// Maximum number of search results that any hybrid/vector/text search may return.
 ///
-/// Callers in contextra-mcp and contextra-db both enforce this limit before forwarding k to index sub-searches.
+/// Callers in contextra-mcp and contextra-db both enforce this limit before forwarding k to HNSW/BM25.
 /// Duplicating the literal 1000 anywhere else in the workspace is prohibited — always import this constant.
 ///
 /// This cap is applied at the orchestration layer (contextra-db) before forwarding `k`
-/// to vector and lexical sub-searches. All upstream layers (contextra-mcp, contextra-py)
-/// MUST reference this constant — never duplicate the literal `1000`.
+/// to HNSW and BM25 sub-searches. All upstream layers (contextra-mcp, contextra-py,
+/// contextra-py) MUST reference this constant — never duplicate the literal `1000`.
 ///
 /// # DECISION-REF
 /// AGT-DB-003 — Boundary defence at Layer 2 against unbounded `k` from untrusted JSON-RPC.
-// ANCHOR[contextra-types:MISC-MAX-SEARCH-K]
 pub const MAX_SEARCH_K: usize = 1_000;
 
 /// Relationship types between Zettelkasten memory chunks (A-MEM).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-LINK]
 pub enum LinkRelation {
     /// Target memory provides more detail or context.
     Elaborates,
@@ -105,7 +85,6 @@ pub enum LinkRelation {
 
 /// A directional link to another memory chunk in the Zettelkasten.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-MEMLINK]
 pub struct MemoryLink {
     /// The target document ID.
     pub target: DocId,
@@ -117,7 +96,6 @@ pub struct MemoryLink {
 
 /// Represents a canonical node in the knowledge graph.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-ENTITY]
 pub struct Entity {
     /// Unique entity ID.
     pub id: EntityId,
@@ -172,15 +150,7 @@ impl Entity {
 }
 
 /// Graph directed edge representation with explicit bitemporal axis separation.
-///
-/// # Abgrenzung
-/// Dieser Typ `contextra_types::Edge` ist die domänenzentrierte Hyperedge-Repräsentation in Ring 0
-/// mit Entitäts-IDs, Beziehungslabel, Quell-Dokumenten-ID und bitemporalen Gültigkeitsachsen
-/// (`tx_valid_from`/`tx_valid_to`, `business_valid_from`/`business_valid_to`).
-/// Im Gegensatz dazu ist `contextra_graph::csr::types::Edge` (bzw. `CsrEdge`) ein speicherkompakter
-/// Adjazenz-Eintrag der CSR-Graphengine für hochperformante SIMD-Traversierungen.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-EDGE]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Edge {
     /// Source entity identifier.
     pub from: EntityId,
@@ -250,17 +220,7 @@ impl Edge {
                 "Edge weight must be finite and non-negative".to_string(),
             ));
         }
-        Ok(Self {
-            from,
-            to,
-            label: label_str.into(),
-            weight,
-            tx_valid_from: None,
-            tx_valid_to: None,
-            business_valid_from: None,
-            business_valid_to: None,
-            source_doc_id: None,
-        })
+        Ok(Self::new(from, to, label_str).with_weight(weight))
     }
 
     /// Sets a custom weight on the edge.
@@ -270,10 +230,8 @@ impl Edge {
     }
 
     /// Sets transaction validity window (system time / MVCC) on the edge.
-    pub fn with_tx_validity(mut self, from: Option<TxId>, to: Option<TxId>) -> Self {
-        self.tx_valid_from = from;
-        self.tx_valid_to = to;
-        self
+    pub fn with_tx_validity(self, from: Option<TxId>, to: Option<TxId>) -> Self {
+        self.with_validity(from, to)
     }
 
     /// Sets business validity window (business time in Unix ms) on the edge.
@@ -284,8 +242,10 @@ impl Edge {
     }
 
     /// Sets transaction validity window on the edge (alias for `with_tx_validity` for backward compatibility).
-    pub fn with_validity(self, from: Option<TxId>, to: Option<TxId>) -> Self {
-        self.with_tx_validity(from, to)
+    pub fn with_validity(mut self, from: Option<TxId>, to: Option<TxId>) -> Self {
+        self.tx_valid_from = from;
+        self.tx_valid_to = to;
+        self
     }
 }
 
@@ -303,7 +263,6 @@ impl Edge {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
-// ANCHOR[contextra-types:MISC-MEMTYPE]
 pub enum MemoryType {
     /// Episodisches Gedächtnis: Erlebnisse, Unterhaltungen, zeitlich verankerte Ereignisse.
     /// Retrieval: Zeitliche Nähe und Relevanz zur aktuellen Session.
@@ -312,7 +271,7 @@ pub enum MemoryType {
     Episodic,
 
     /// Semantisches Gedächtnis: Fakten, Konzepte, dauerhaftes Wissen.
-    /// Retrieval: Inhaltliche Ähnlichkeit (Vektor + lexikalischer Text).
+    /// Retrieval: Inhaltliche Ähnlichkeit (Vektor + BM25).
     /// Decay: Keine automatische Decay (Fakten bleiben gültig bis Widerspruch).
     #[default]
     #[serde(alias = "Semantic")]
@@ -357,6 +316,11 @@ impl MemoryType {
         }
     }
 
+    /// Returns the canonical metadata key string.
+    pub fn as_str(&self) -> &'static str {
+        self.as_metadata_key()
+    }
+
     /// Gibt den kanonischen Metadaten-Key zurück (für JSON-Serialisierung).
     pub fn as_metadata_key(&self) -> &'static str {
         match self {
@@ -368,20 +332,18 @@ impl MemoryType {
     }
 }
 
+impl std::fmt::Display for MemoryType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_metadata_key())
+    }
+}
+
 /// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 ///
 /// # Ring Architecture
 /// Defined in `contextra-types` (Ring 0) to avoid dependency on `contextra-graph` (Ring 1).
 /// Graph algorithms in `contextra-graph` map this configuration to `contextra_graph::TlHfdParams`.
-///
-/// # Abgrenzung
-/// Dieser Typ `contextra_types::TlHfdParams` ist die Ring-0-Konfigurationsstruktur
-/// (`sigma`, `delta`, `gamma`, `max_iterations`, `max_top_k_expansion`, `max_hyperedge_sort_size`),
-/// die über API-Parameter und JSON-Optionen übergeben wird.
-/// Im Gegensatz dazu ist `contextra_graph::tl_hfd::params::TlHfdParams` die Graph-Engine-Spezifische
-/// Parameterstruktur in Ring 1 mit Ausführungs- und Diffusionsmatrix-Validierungen.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-TLHFD]
 pub struct TlHfdParams {
     /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
     #[serde(default = "default_tl_hfd_sigma")]
@@ -438,7 +400,6 @@ impl Default for TlHfdParams {
 /// Selection of algorithm strategy for Personalized PageRank (PPR).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-// ANCHOR[contextra-types:MISC-PPRALG]
 pub enum PprAlgorithm {
     /// Auto heuristic dispatch based on seed count (ForwardPush for <= 100 seeds, DensePowerIteration otherwise).
     #[default]
@@ -459,7 +420,6 @@ pub enum PprAlgorithm {
 
 /// Configuration parameters for Personalized PageRank (PPR).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-PPRCFG]
 pub struct PprConfig {
     /// Damping factor (probability of continuing random walk vs restarting). Default: 0.85.
     pub damping_factor: f32,
@@ -503,7 +463,6 @@ impl Default for PprConfig {
 /// BEGRÜNDUNG: arXiv:2608.01460 — Coverage-Kollaps unter Konfigurations-Drift.
 /// Q4 und Q8 bei identischem model_id erzeugen unterschiedliche Score-Verteilungen.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-FINGERPRINT]
 pub struct ConfigFingerprint {
     /// LLM-Modell-ID (z.B. "llama-3.2-3b-instruct")
     pub model_id: String,
@@ -572,7 +531,6 @@ impl Default for ConfigFingerprint {
 /// Mode for automatic OpenIE entity extraction during document ingestion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-// ANCHOR[contextra-types:MISC-EXTRACTMODE]
 pub enum AutoExtractionMode {
     /// Automatic entity extraction is enabled.
     Enabled,

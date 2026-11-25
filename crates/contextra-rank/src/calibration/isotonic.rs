@@ -1,75 +1,21 @@
-//! # Isotonische Kalibrierung via PAVA (`isotonic`)
-//!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
-//!
-//! Implementiert die nicht-parametrische isotonische Regression über den
-//! Pool-Adjacent Violators Algorithm (PAVA) sowie die ECE-Berechnung.
+//! Isotonic Calibration via PAVA (Pool-Adjacent Violators Algorithm).
 
-use crate::local_types::ConfigFingerprint;
+use contextra_ports::{Clock, SystemClock};
+use contextra_types::ConfigFingerprint;
 use std::collections::VecDeque;
 use std::fmt;
 use std::sync::Arc;
-
-/// Lokaler Clock-Port für deterministische Zeitstempel (B11-Konformität).
-pub trait Clock: Send + Sync {
-    /// Gibt den aktuellen UNIX-Zeitstempel in Nanosekunden zurück.
-    fn now_unix_nanos(&self) -> u64;
-
-    /// Gibt eine monotone Zeit in Nanosekunden zurück.
-    fn monotonic_nanos(&self) -> u64 {
-        self.now_unix_nanos()
-    }
-}
-
-/// Standard SystemClock basierend auf std::time::SystemTime.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct SystemClock;
-
-impl SystemClock {
-    /// Erzeugt eine neue `SystemClock`.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Clock for SystemClock {
-    #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
-    fn now_unix_nanos(&self) -> u64 {
-        std::time::SystemTime::now() // ALLOW-DETERMINISM: Wall clock baseline in standalone SystemClock (P28)
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0)
-    }
-
-    #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
-    fn monotonic_nanos(&self) -> u64 {
-        std::time::SystemTime::now() // ALLOW-DETERMINISM: Wall clock baseline in standalone SystemClock (P28)
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0)
-    }
-}
-
-// ADR-098 (PAVA Block-Präzision: f64 -> f32 Konvertierung)
-#[allow(clippy::cast_possible_truncation)]
-fn f64_to_f32(v: f64) -> f32 {
-    if !v.is_finite() {
-        0.0
-    } else {
-        v.clamp(f32::MIN as f64, f32::MAX as f64) as f32
-    }
-}
 
 const ECE_BINS: usize = 10;
 const DEFAULT_WARMUP_REQUIRED: u32 = 50;
 const DEFAULT_MAX_OBSERVATIONS: usize = 2000;
 const REBUILD_THRESHOLD_NEW_OBS: usize = 10;
 
-use serde::{Deserialize, Serialize};
+/// Default Expected Calibration Error (ECE) threshold for triggering a rebuild.
+pub const DEFAULT_ECE_REBUILD_THRESHOLD: f32 = 0.10;
 
 /// Isotonic Calibrator using Pool-Adjacent Violators Algorithm.
-#[derive(Clone, Serialize, Deserialize)]
-/// Nicht-parametrischer Kalibrierer auf Basis von PAVA.
+#[derive(Clone)]
 pub struct IsotonicCalibrator {
     observations: VecDeque<(f32, bool)>,
     warmup_required: u32,
@@ -80,26 +26,7 @@ pub struct IsotonicCalibrator {
     fingerprint: Option<ConfigFingerprint>,
     last_calibration_at: Option<u64>,
     cached_ece: Option<f32>,
-    #[serde(skip, default = "_default_clock")]
     clock: Arc<dyn Clock>,
-}
-
-fn _default_clock() -> Arc<dyn Clock> {
-    Arc::new(SystemClock::new())
-}
-
-impl PartialEq for IsotonicCalibrator {
-    fn eq(&self, other: &Self) -> bool {
-        self.observations == other.observations
-            && self.warmup_required == other.warmup_required
-            && self.max_observations == other.max_observations
-            && self.cached_model == other.cached_model
-            && self.model_dirty == other.model_dirty
-            && self.observations_since_rebuild == other.observations_since_rebuild
-            && self.fingerprint == other.fingerprint
-            && self.last_calibration_at == other.last_calibration_at
-            && self.cached_ece == other.cached_ece
-    }
 }
 
 impl fmt::Debug for IsotonicCalibrator {
@@ -150,16 +77,8 @@ impl IsotonicCalibrator {
         Self::new(DEFAULT_WARMUP_REQUIRED, DEFAULT_MAX_OBSERVATIONS)
     }
 
-    /// Records a new observation `(raw_score, outcome)`. Non-finite `raw_score` values are safely ignored.
-    /// Nimmt eine neue Beobachtung `(raw_score, outcome)` auf.
+    /// Records a new observation `(raw_score, outcome)`.
     pub fn record_outcome(&mut self, raw_score: f32, outcome: bool) {
-        if !raw_score.is_finite() {
-            tracing::warn!(
-                raw_score,
-                "IsotonicCalibrator: non-finite raw_score ignored"
-            );
-            return;
-        }
         if self.observations.len() >= self.max_observations {
             self.observations.pop_front();
         }
@@ -175,7 +94,7 @@ impl IsotonicCalibrator {
 
     /// Checks if warmup observations threshold has been reached.
     pub fn is_calibrated(&self) -> bool {
-        u32::try_from(self.observations.len()).unwrap_or(u32::MAX) >= self.warmup_required
+        self.observations.len() as u32 >= self.warmup_required
     }
 
     /// Returns timestamp (UNIX epoch in seconds) of last model rebuild.
@@ -189,7 +108,6 @@ impl IsotonicCalibrator {
     }
 
     /// Returns calibrated probability if warm, or `None` if below warmup requirement.
-    /// Liefert die kalibrierte Wahrscheinlichkeit für einen Roh-Score.
     pub fn calibrated_probability(&mut self, raw_score: f32) -> Option<f32> {
         if !self.is_calibrated() {
             return None;
@@ -210,9 +128,26 @@ impl IsotonicCalibrator {
         }
     }
 
+    /// Checks the Expected Calibration Error (ECE) against `threshold`.
+    ///
+    /// Calls `expected_calibration_error()`. If the result is `Some(ece)` with `ece > threshold`
+    /// (and `threshold` is finite), calls `force_rebuild()` and returns `true`.
+    /// Returns `false` otherwise (including when ECE is `None` due to insufficient data or when `threshold` is NaN).
+    pub fn maybe_rebuild_on_ece(&mut self, threshold: f32) -> bool {
+        if !threshold.is_finite() {
+            return false;
+        }
+        if let Some(ece) = self.expected_calibration_error() {
+            if ece > threshold {
+                self.force_rebuild();
+                return true;
+            }
+        }
+        false
+    }
+
     /// Resets observations if ConfigFingerprint changes (P8 Compliance).
-    pub fn invalidate_on_config_change(&mut self, new_fingerprint: impl Into<ConfigFingerprint>) {
-        let new_fingerprint = new_fingerprint.into();
+    pub fn invalidate_on_config_change(&mut self, new_fingerprint: ConfigFingerprint) {
         if self.fingerprint.as_ref() != Some(&new_fingerprint) {
             tracing::warn!(
                 old_fp = ?self.fingerprint,
@@ -228,13 +163,7 @@ impl IsotonicCalibrator {
             self.cached_ece = None;
         }
     }
-    // Ablauf des PAVA-Rebuilds (Pool-Adjacent Violators Algorithm):
-    // 1. Sortieren: Beobachtungen aufsteigend nach raw_score ordnen.
-    // 2. Pooling: Identische Scores zusammenfassen und Labels akkumulieren.
-    // 3. Block-Merging: Rückwärts iterieren; verletzt ein Block die Monotonie (last <= prev),
-    //    werden beide verschmolzen und deren gewichtetes Mittel gebildet.
-    // 4. Stützstellen bilden: Blöcke in f32 konvertieren und im Cache hinterlegen.
-    // 5. Zeitstempel über Clock-Port abfragen und ECE für Modellgüte aktualisieren.
+
     fn rebuild_model(&mut self) {
         let mut sorted: Vec<(f32, f32)> = self
             .observations
@@ -246,7 +175,7 @@ impl IsotonicCalibrator {
         let mut aggregated: Vec<(f64, f64, usize)> = Vec::with_capacity(sorted.len());
         for (score, label) in sorted {
             if let Some(last) = aggregated.last_mut() {
-                if last.0.total_cmp(&(score as f64)) == std::cmp::Ordering::Equal {
+                if (last.0 as f32).total_cmp(&score) == std::cmp::Ordering::Equal {
                     last.1 += label as f64;
                     last.2 += 1;
                     continue;
@@ -262,15 +191,8 @@ impl IsotonicCalibrator {
 
             while blocks.len() >= 2 {
                 let n = blocks.len();
-                let (last_avg, prev_avg) = match (
-                    blocks.get(n.saturating_sub(1)),
-                    blocks.get(n.saturating_sub(2)),
-                ) {
-                    (Some(l), Some(p)) if l.2 > 0 && p.2 > 0 => {
-                        (l.1 / l.2 as f64, p.1 / p.2 as f64)
-                    }
-                    _ => break,
-                };
+                let last_avg = blocks[n - 1].1 / blocks[n - 1].2 as f64;
+                let prev_avg = blocks[n - 2].1 / blocks[n - 2].2 as f64;
                 if last_avg <= prev_avg {
                     if let Some(last) = blocks.pop() {
                         if let Some(prev) = blocks.last_mut() {
@@ -288,13 +210,8 @@ impl IsotonicCalibrator {
         self.cached_model = Some(
             blocks
                 .iter()
-                .map(|&(score, label_sum, count)| {
-                    let avg_prob = if count > 0 {
-                        label_sum / count as f64
-                    } else {
-                        0.0
-                    };
-                    (f64_to_f32(score), f64_to_f32(avg_prob))
+                .map(|(score, label_sum, count)| {
+                    (*score as f32, (label_sum / *count as f64) as f32)
                 })
                 .collect(),
         );
@@ -311,16 +228,16 @@ impl IsotonicCalibrator {
         }
 
         if model.len() == 1 {
-            return model.first().map(|(_, p)| *p);
+            return Some(model[0].1);
         }
 
         match model.binary_search_by(|(threshold, _)| threshold.total_cmp(&raw_score)) {
-            Ok(idx) => model.get(idx).map(|(_, p)| *p),
+            Ok(idx) => Some(model[idx].1),
             Err(idx) => {
                 if idx >= model.len() {
                     model.last().map(|(_, p)| *p)
                 } else {
-                    model.get(idx).map(|(_, p)| *p)
+                    Some(model[idx].1)
                 }
             }
         }
@@ -401,14 +318,13 @@ mod tests {
     fn test_isotonic_calibrator_deterministic_clock() {
         let clock = Arc::new(FixedTestClock(1_700_000_000_000_000_000));
         let mut cal1 = IsotonicCalibrator::new(2, 100).with_clock(clock.clone());
-        let mut cal2 = IsotonicCalibrator::new(2, 100).with_clock(clock.clone());
+        let mut cal2 = IsotonicCalibrator::new(2, 100).with_clock(clock);
 
         cal1.record_outcome(0.1, false);
         cal1.record_outcome(0.9, true);
 
         cal2.record_outcome(0.1, false);
         cal2.record_outcome(0.9, true);
-        let _ = clock.monotonic_nanos();
 
         cal1.force_rebuild();
         cal2.force_rebuild();

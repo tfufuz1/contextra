@@ -1,10 +1,3 @@
-//! # Modul: delete.rs
-//!
-//! **Zweck:** Logische und physische Löschpfade für Einzeldokumente.
-//!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
-
 use crate::collection::Collection;
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, EntityId, Result};
@@ -14,27 +7,30 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn delete(&self, id: &str) -> Result<()> {
         let _guard = self.kv_locks.lock_for(id).await;
+        drop(_guard);
         let mut db_tx = self.begin_transaction()?;
+
+        let doc_id = DocId::from_key(id)?;
 
         match self.delete_op(&mut db_tx, id).await {
             Ok(_) => {
                 db_tx.commit().await?;
-                drop(_guard);
                 self.check_and_trigger_community_detection(1);
+                if let Some(kv_hooks) = self.kv_hooks() {
+                    let tenant = self.tenant_id();
+                    kv_hooks.remove_doc_segments(tenant, doc_id);
+                }
                 Ok(())
             }
             Err(e) => {
                 if let Err(rollback_err) = db_tx.rollback().await {
                     tracing::error!("[INV-DB-3] Failed to rollback delete: {}", rollback_err);
                 }
-                drop(_guard);
                 Err(e)
             }
         }
     }
 
-    // ANCHOR[contextra-engine:COL-DEL-035]
-    /// Dokumentation für `delete_op` im Rahmen der Collection- und Suchabstraktion.
     pub async fn delete_op(
         &self,
         db_tx: &mut crate::transaction::DbTransaction<S, V>,

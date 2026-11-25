@@ -1,9 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-CAMPAIGN-COV-TX-REAP-ROOT]
-//! # Kampagnen-Test für TxBuffer Orphan-Reaping und Obergrenzen
-//!
-//! Prüft die gezielte Testabdeckung von `reap_orphans_bounded` unter deterministischer
-//! Zeiteinspeisung über `ManualClock`.
-
 // FILE-CONTEXT
 // ZWECK: Campaign coverage test for TxBuffer reap_orphans_bounded and deterministic time injection.
 // INVARIANTEN: reap_orphans_bounded caps reaped orphan count to max and leaves remaining unexpired/unreaped transactions intact.
@@ -11,36 +5,28 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_mvcc::tx_buffer::{TxBuffer, TxBufferConfig};
-use contextra_mvcc::contextra_ports::ManualClock;
-use contextra_mvcc::TxId;
-use std::sync::Arc;
-use std::time::Duration;
+use contextra_mvcc::tx_buffer::TxBuffer;
+use contextra_types::TxId;
+use std::time::{Duration, Instant};
 
-// Prüft die exakte Begrenzung der abgeräumten verwaisten Transaktionen auf die vorgegebene Obergrenze.
 #[test]
 fn test_tx_buffer_reap_orphans_bounded_exact_capping_and_time_injection() {
-    let clock = Arc::new(ManualClock::new(100_000_000_000));
     let timeout = Duration::from_secs(10);
-    let config = TxBufferConfig {
-        tx_timeout: timeout,
-        ..Default::default()
-    };
-    let buffer = TxBuffer::<Vec<u8>>::new_with_clock_and_config(clock.clone(), 4, config);
+    let buffer = TxBuffer::<Vec<u8>>::new_with_config(4, timeout);
 
-    let start_nanos = clock.now_nanos();
-    let past_nanos = start_nanos.saturating_sub(20_000_000_000);
+    let now = Instant::now();
+    let past = now.checked_sub(Duration::from_secs(20)).unwrap();
 
     // Stage 10 orphan transactions in the past
     let staged_txs: Vec<TxId> = (1..=10).map(TxId::new).collect();
     for &tx in &staged_txs {
-        buffer.begin_at(tx, past_nanos);
+        buffer.begin_at(tx, past);
     }
 
     assert_eq!(buffer.len(), 10);
 
     // 1. Reap bounded to max = 4
-    let reaped_batch_1 = buffer.reap_orphans_bounded_at(4, start_nanos);
+    let reaped_batch_1 = buffer.reap_orphans_bounded_at(4, now);
     assert_eq!(
         reaped_batch_1.len(),
         4,

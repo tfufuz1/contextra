@@ -1,9 +1,6 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::await_holding_lock)]
 use super::*;
-use contextra_ports::MetricsSink;
+use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_ports::Rng;
-use contextra_ports::VectorIndex;
-use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
 use parking_lot::Mutex;
 
 fn test_config(dim: usize) -> HnswConfig {
@@ -72,12 +69,8 @@ async fn test_hnsw_topology_and_search_determinism() {
 
     // 2. Verify search results are bitwise/identical
     let query: Vec<f32> = (0..dim).map(|_| sm.next_unit_f64() as f32).collect();
-    let res1 = VectorIndex::search(&idx1, &query, 10)
-        .await
-        .expect("idx1 search");
-    let res2 = VectorIndex::search(&idx2, &query, 10)
-        .await
-        .expect("idx2 search");
+    let res1 = idx1.search(&query, 10).await.expect("idx1 search");
+    let res2 = idx2.search(&query, 10).await.expect("idx2 search");
 
     assert_eq!(res1.len(), res2.len());
     for (r1, r2) in res1.iter().zip(res2.iter()) {
@@ -203,7 +196,8 @@ async fn test_insert_and_search() {
         .expect("insert 3");
     index.commit(tx).await.expect("commit");
 
-    let results = VectorIndex::search(&index, &[1.0, 0.0, 0.0, 0.0], 2)
+    let results = index
+        .search(&[1.0, 0.0, 0.0, 0.0], 2)
         .await
         .expect("search");
     assert!(!results.is_empty());
@@ -247,9 +241,7 @@ impl contextra_ports::MetricsSink for TestMetricsSink {
             .push((name.to_string(), value, label_vec));
     }
 
-    fn record_gauge(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {
-        let _ = &self.counters;
-    }
+    fn record_gauge(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {}
 
     fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
         let label_vec = labels
@@ -265,7 +257,6 @@ impl contextra_ports::MetricsSink for TestMetricsSink {
 #[tokio::test]
 async fn test_hnsw_rebuild_metrics_duration() {
     let sink = std::sync::Arc::new(TestMetricsSink::default());
-    sink.record_gauge("test_init", 1.0, &[]);
     let config = test_config(4);
     let index = HnswIndex::try_new(config)
         .expect("valid config")
@@ -278,7 +269,7 @@ async fn test_hnsw_rebuild_metrics_duration() {
         .expect("insert");
     index.commit(tx).await.expect("commit");
 
-    index.rebuild().expect("rebuild must succeed");
+    index.rebuild().await.expect("rebuild must succeed");
 
     let hists = sink.histograms.lock();
     assert!(
@@ -301,7 +292,6 @@ async fn test_hnsw_rebuild_metrics_duration() {
 #[tokio::test]
 async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
     let sink = std::sync::Arc::new(TestMetricsSink::default());
-    sink.record_gauge("test_init", 1.0, &[]);
     let config = HnswConfigBuilder::new(4)
         .rebuild_threshold(0.9)
         .backoff_base_delay(std::time::Duration::from_millis(200))
@@ -310,11 +300,9 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
         .build()
         .expect("valid config");
 
-    let clock = std::sync::Arc::new(crate::hnsw::MonotonicCounterClock::default());
     let index = HnswIndex::try_new(config)
         .expect("valid index")
-        .with_metrics_sink(sink.clone())
-        .with_clock(clock.clone());
+        .with_metrics_sink(sink.clone());
 
     let tx1 = TxId::new(1);
     index
@@ -341,16 +329,16 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
     );
 
     // First rebuild attempt -> succeeds
-    index.rebuild().expect("first rebuild must succeed");
+    index.rebuild().await.expect("first rebuild must succeed");
 
     // Second rapid rebuild attempt -> suppressed by backoff cooldown
-    let res2 = index.rebuild();
+    let res2 = index.rebuild().await;
     assert!(res2.is_err(), "rapid rebuild must fail due to backoff");
     let err_msg2 = format!("{}", res2.unwrap_err());
     assert!(err_msg2.contains("Rebuild rate limited by backoff cooldown"));
 
     // Third rapid rebuild attempt -> suppressed and triggers alert threshold alarm
-    let res3 = index.rebuild();
+    let res3 = index.rebuild().await;
     assert!(
         res3.is_err(),
         "subsequent rapid rebuild must fail due to backoff"
@@ -372,63 +360,12 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
 
     drop(cnts);
 
-    // Advance clock past exponential backoff cooldown (200ms base * 2 = 400ms)
-    clock.advance_nanos(1_000_000_000);
+    // Wait for exponential backoff cooldown (400ms) to expire
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     // Rebuild after cooldown expires -> succeeds
     index
         .rebuild()
+        .await
         .expect("rebuild after cooldown must succeed");
-}
-
-#[test]
-fn test_hnsw_klasse_a_index_and_maintain_trait() {
-    use crate::contract::ExternalId;
-    use crate::hnsw::{Index, Maintain};
-
-    let config = HnswConfig {
-        dimension: 4,
-        max_elements: 100,
-        m: 8,
-        ef_construction: 16,
-        ef_search: 16,
-        distance_metric: DistanceMetric::Euclidean,
-        ..Default::default()
-    };
-    let mut index = HnswIndex::try_new(config).unwrap();
-
-    let id1 = ExternalId(1);
-    let id2 = ExternalId(2);
-
-    let v1 = [1.0f32, 0.0, 0.0, 0.0];
-    let v2 = [0.0f32, 1.0, 0.0, 0.0];
-
-    let mut p1 = Vec::new();
-    for &x in &v1 {
-        p1.extend_from_slice(&x.to_le_bytes());
-    }
-    let mut p2 = Vec::new();
-    for &x in &v2 {
-        p2.extend_from_slice(&x.to_le_bytes());
-    }
-
-    Index::insert(&mut index, id1, &p1).unwrap();
-    Index::insert(&mut index, id2, &p2).unwrap();
-
-    let q = [1.0f32, 0.0, 0.0, 0.0];
-    let hits = Index::search(&index, &q, 2).unwrap();
-    assert_eq!(hits.len(), 2);
-    assert_eq!(hits[0].id, id1);
-
-    // Remove
-    let removed = Index::remove(&mut index, &id1).unwrap();
-    assert!(removed);
-
-    let hits_after = Index::search(&index, &q, 2).unwrap();
-    assert_eq!(hits_after.len(), 1);
-    assert_eq!(hits_after[0].id, id2);
-
-    // Maintain compact
-    let stats = Maintain::compact(&mut index).unwrap();
-    assert_eq!(stats.purged_docs, 1);
 }

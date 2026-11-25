@@ -1,11 +1,3 @@
-//! # Audit-Kette (`audit_chain.rs`)
-//!
-//! Unveränderliches, kryptographisch verkettetes Audit-Protokoll für sicherheitsrelevante Aktionen.
-//!
-//! ## Invarianten
-//! - Jeder Eintrag enthält den Hash seines Vorgängers (Hash-Chain).
-//! - Rollback-Schutz durch externe Anker-Validierung (Anchor Verification).
-
 // FILE-CONTEXT
 // ZWECK: Cryptographic Blake3 audit hash chain with periodic Ed25519 signatures and encrypted commitments.
 // INVARIANTEN: Audit chain entries strictly exclude personal data. Chain links are linked via Blake3 hashes.
@@ -16,21 +8,18 @@
 
 //! Audit-Log als Blake3-Hash-Kette mit periodischer Ed25519-Signatur.
 //!
-//! Revisions- und Integritätsnachweis:
+//! DSGVO Art. 17 / Art. 30 Compliance:
 //! - Jeder Schreibvorgang erzeugt einen AuditChainEntry ohne Personenbezug.
 //! - Optionale Commitments Blake3(salt || attr), wobei salt unter einem Shredding-Schlüssel
 //!   verschlüsselt gespeichert ist. Nach dem Schreddern des Schlüssels ist das salt unöffenbar,
 //!   womit das Commitment nicht mehr auf Originalattribute zurückführbar ist (Wörterbuchangriff
 //!   unmöglich, da salt unbekannt).
 
-#[cfg(feature = "legacy-erasure")]
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
-#[cfg(feature = "legacy-erasure")]
 use crate::kv_shredding::KeyRegistry;
 use contextra_types::{DocId, TxId};
 use serde::{Deserialize, Serialize};
-use subtle::ConstantTimeEq;
 
 /// Datenklassifikation für Audit-Einträge (keine Freitext-Strings).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,14 +34,12 @@ pub enum DataClass {
     Restricted,
     /// Personenbezogene Daten (im Audit-Log nur pseudonymisiert/entkoppelt).
     Personal,
-    /// Besondere Kategorien personenbezogener Daten mit erhöhtem Schutzbedarf.
+    /// Besondere Kategorien personenbezogener Daten (Art. 9 DSGVO).
     SpecialCategoryPersonal,
 }
 
 /// Einzelner Eintrag in der Audit-Hash-Kette.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[contextra-crypto:AUDIT-001]
-/// Einzelner Eintrag in der manipulationssicheren BLAKE3-Audit-Hash-Kette.
 pub struct AuditChainEntry {
     /// Fortlaufender Index in der Audit-Kette (0-basiert).
     pub index: u64,
@@ -89,13 +76,17 @@ impl AuditChainEntry {
     ) -> Result<[u8; 32]> {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&index.to_le_bytes());
-        hasher.update(&(schema_id.len() as u32).to_le_bytes());
+        let schema_len = u32::try_from(schema_id.len())
+            .map_err(|e| CryptoError::Crypto(format!("schema_id length overflow: {e}")))?;
+        hasher.update(&schema_len.to_le_bytes());
         hasher.update(schema_id.as_bytes());
         hasher.update(rules_hash);
 
         let class_bytes = bincode::serialize(&data_class)
             .map_err(|e| CryptoError::Crypto(format!("DataClass serialization failed: {e}")))?;
-        hasher.update(&(class_bytes.len() as u32).to_le_bytes());
+        let class_len = u32::try_from(class_bytes.len())
+            .map_err(|e| CryptoError::Crypto(format!("class_bytes length overflow: {e}")))?;
+        hasher.update(&class_len.to_le_bytes());
         hasher.update(&class_bytes);
 
         hasher.update(&doc_id.0.to_le_bytes());
@@ -113,10 +104,17 @@ impl AuditChainEntry {
     }
 }
 
+/// Anker für die Verifizierung einer Audit-Kette gegen extern gespeicherte Zustände.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuditChainAnchor {
+    /// Index des geankerten Eintrags.
+    pub index: u64,
+    /// Blake3-Hash des geankerten Eintrags.
+    pub entry_hash: [u8; 32],
+}
+
 /// Periodisch erzeugte Ed25519-Signatur über den aktuellen Kettenkopf.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[contextra-crypto:AUDIT-004]
-/// Periodisch erzeugte Ed25519-Signatur über den aktuellen Kettenkopf.
 pub struct AuditChainHeadSignature {
     /// Index des signierten Kettenkopfs.
     pub chain_index: u64,
@@ -124,41 +122,6 @@ pub struct AuditChainHeadSignature {
     pub head_hash: [u8; 32],
     /// Ed25519-Signatur (64 Bytes).
     pub signature: Vec<u8>,
-}
-
-/// Externer Kopf-Anker zur Rollback-Erkennung für die Audit-Hash-Kette.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AuditHeadAnchor {
-    /// Sequenznummer / Kettenindex des extern verankerten Kettenkopfs.
-    pub seq_no: u64,
-    /// Blake3-Hash des Kettenkopfs an der Position `seq_no`.
-    pub head_hash: [u8; 32],
-    /// Optionale Ed25519-Signatur über (seq_no || head_hash).
-    pub head_signature: Option<AuditChainHeadSignature>,
-}
-
-impl AuditHeadAnchor {
-    /// Erstellt einen neuen nicht signierten `AuditHeadAnchor`.
-    pub fn new(seq_no: u64, head_hash: [u8; 32]) -> Self {
-        Self {
-            seq_no,
-            head_hash,
-            head_signature: None,
-        }
-    }
-
-    /// Erstellt einen neuen signierten `AuditHeadAnchor`.
-    pub fn with_signature(
-        seq_no: u64,
-        head_hash: [u8; 32],
-        head_signature: AuditChainHeadSignature,
-    ) -> Self {
-        Self {
-            seq_no,
-            head_hash,
-            head_signature: Some(head_signature),
-        }
-    }
 }
 
 /// Verschlüsselter Salt-Wert für ein Record-Commitment.
@@ -172,7 +135,6 @@ pub struct EncryptedCommitmentSalt {
     pub nonce: [u8; 12],
 }
 
-#[cfg(feature = "legacy-erasure")]
 impl EncryptedCommitmentSalt {
     /// Verschlüsselt ein Salt-Byte-Array über den `KeyRegistry`-Shredding-Mechanismus.
     pub fn encrypt(
@@ -205,8 +167,6 @@ pub fn compute_record_commitment(salt: &[u8], attr: &[u8]) -> [u8; 32] {
 
 /// Manipulationssichere Blake3-Hash-Kette für Audit-Einträge.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[contextra-crypto:AUDIT-002]
-/// Manipulationssichere Audit-Kette mit BLAKE3-Hash-Verkettung.
 pub struct AuditChain {
     /// Öffentlicher Zugriff auf die Liste der Ketten-Einträge für Prüfungen/Tests.
     pub entries: Vec<AuditChainEntry>,
@@ -337,14 +297,8 @@ impl AuditChain {
     }
 
     /// Verifiziert die vollständige Kette auf Integrität.
-    ///
-    /// # Warnhinweis / Security Warning
-    /// Diese Methode prüft lediglich die **interne kryptographische Hash-Verkettung**
-    /// der vorliegenden Kette. Sie bietet **keinen Schutz gegen Rollback-Angriffe**
-    /// (Replay alter Backup-Zustände), da ein Angreifer eine früher signierte oder valide
-    /// Teilkette vorlegen kann. Für echten Rollback-Schutz (SEC-01/K1) muss
-    /// [`AuditChain::verify_chain_with_anchor`] mit einem externen `AuditHeadAnchor`
-    /// verwendet werden.
+    /// Prüft für jeden Eintrag, ob `prev_hash` dem `entry_hash` des Vorgängers entspricht
+    /// und ob `entry_hash` korrekt berechnet wurde.
     pub fn verify_chain(&self) -> Result<bool> {
         let mut expected_prev = [0u8; 32];
 
@@ -386,45 +340,59 @@ impl AuditChain {
         Ok(true)
     }
 
-    /// Verifiziert die Kette gegen einen externen Kopf-Anker ([`AuditHeadAnchor`]).
+    /// Liefert den Anker des letzten Eintrags der Kette, oder `None` bei leerer Kette.
+    pub fn anchor(&self) -> Option<AuditChainAnchor> {
+        self.entries.last().map(|entry| AuditChainAnchor {
+            index: entry.index,
+            entry_hash: entry.entry_hash,
+        })
+    }
+
+    /// Verifiziert die Kette gegen einen externen Anker.
     ///
-    /// Schlägt fehl (`Ok(false)`), wenn:
-    /// 1. Die Kette kürzer ist als vom Anker gefordert (`len() < anchor.seq_no + 1`).
-    /// 2. Der Hash an der Ankerposition `anchor.seq_no` nicht konstant-zeitlich mit `anchor.head_hash` übereinstimmt.
-    /// 3. Eine optionale Anker-Signatur nicht gegen den bereitgestellten `verifying_key` verifiziert werden kann.
-    /// 4. Die interne Hash-Ketten-Struktur bis zum Ankerpunkt ungültig ist.
-    pub fn verify_chain_with_anchor(
+    /// Ruft zuerst [`Self::verify_chain`] zur Prüfung der internen Integrität auf.
+    /// Anschließend wird geprüft, ob an `anchor.index` ein Eintrag mit identischem `entry_hash` existiert.
+    /// Eine seit dem Anker gewachsene Kette ist gültig; eine kürzer gewordene Kette (Backup-Rollback)
+    /// oder eine abweichende Alternativhistorie (Fork) liefert `Ok(false)`.
+    pub fn verify_chain_against_anchor(&self, anchor: &AuditChainAnchor) -> Result<bool> {
+        if !self.verify_chain()? {
+            return Ok(false);
+        }
+
+        let idx = match usize::try_from(anchor.index) {
+            Ok(i) => i,
+            Err(_) => return Ok(false),
+        };
+
+        if let Some(entry) = self.entries.get(idx) {
+            Ok(entry.entry_hash == anchor.entry_hash)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Erzeugt einen Anker des aktuellen Kettenkopfs zusammen mit einer Ed25519-Kettenkopf-Signatur.
+    pub fn create_signed_anchor(
         &self,
-        anchor: &AuditHeadAnchor,
-        verifying_key: Option<&ed25519_dalek::VerifyingKey>,
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> Result<(AuditChainAnchor, AuditChainHeadSignature)> {
+        let anchor = self.anchor().ok_or_else(|| {
+            CryptoError::Crypto("Cannot create anchor for an empty AuditChain".to_string())
+        })?;
+        let head_sig = self.sign_head(signing_key)?;
+        Ok((anchor, head_sig))
+    }
+
+    /// Verifiziert die Kette gegen einen Anker und prüft zusätzlich die Kettenkopf-Signatur.
+    pub fn verify_signed_anchor(
+        &self,
+        anchor: &AuditChainAnchor,
+        head_sig: &AuditChainHeadSignature,
+        verifying_key: &ed25519_dalek::VerifyingKey,
     ) -> Result<bool> {
-        // Rollback-Prüfung: Kette muss mindestens bis zum Anker-Index gefüllt sein
-        let anchor_idx = anchor.seq_no as usize;
-        if self.entries.len() <= anchor_idx {
+        if !self.verify_chain_against_anchor(anchor)? {
             return Ok(false);
         }
-
-        // Konstant-zeitlicher Hash-Vergleich des Eintrags an der Anker-Position
-        let target_entry = &self.entries[anchor_idx];
-        if target_entry.entry_hash.ct_eq(&anchor.head_hash).unwrap_u8() != 1 {
-            return Ok(false);
-        }
-
-        // Falls Anker eine Signatur enthält, verifiziere diese
-        if let Some(ref sig) = anchor.head_signature {
-            if sig.chain_index != anchor.seq_no
-                || sig.head_hash.ct_eq(&anchor.head_hash).unwrap_u8() != 1
-            {
-                return Ok(false);
-            }
-            if let Some(vk) = verifying_key {
-                if !Self::verify_head_signature(sig, vk)? {
-                    return Ok(false);
-                }
-            }
-        }
-
-        // Verifiziere die Kette selbst
-        self.verify_chain()
+        Self::verify_head_signature(head_sig, verifying_key)
     }
 }

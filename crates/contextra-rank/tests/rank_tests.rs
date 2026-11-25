@@ -1,9 +1,3 @@
-//! # Integrationstest: Basis-Ranking-Tests für mRRF, RRF, ECE und Drift
-//!
-//! **Crate:** `contextra-rank`
-//!
-//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
-
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Comprehensive unit test suite for `contextra-rank` crate modules.
 
@@ -14,7 +8,8 @@ mod tests {
     use contextra_rank::fusion::{
         reciprocal_rank_fusion, BoundedTopK, ProvenanceBuilder, SearchResult,
     };
-    use contextra_rank::ConfigFingerprint;
+    use contextra_types::ConfigFingerprint;
+
     #[test]
     fn test_rrf_k_zero_boundary() {
         let prov = ProvenanceBuilder::new(0.0)
@@ -30,7 +25,6 @@ mod tests {
         assert_eq!(contrib.rrf_contribution, 1.0);
     }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_rrf_dual_signal_higher_than_single_signal() {
         let set1 = vec![SearchResult {
@@ -59,14 +53,11 @@ mod tests {
 
         let fused = reciprocal_rank_fusion(vec![set1, set2], 10);
         assert_eq!(fused.len(), 2);
-        if let (Some(f0), Some(f1)) = (fused.first(), fused.get(1)) {
-            assert_eq!(f0.id, "doc_both");
-            assert_eq!(f1.id, "doc_single");
-            assert!(f0.score > f1.score);
-        }
+        assert_eq!(fused[0].id, "doc_both");
+        assert_eq!(fused[1].id, "doc_single");
+        assert!(fused[0].score > fused[1].score);
     }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_bounded_top_k() {
         let mut top_k = BoundedTopK::new(2);
@@ -77,7 +68,6 @@ mod tests {
         assert_eq!(sorted, vec![5, 10]);
     }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_isotonic_calibrator_warmup() {
         let mut cal = IsotonicCalibrator::new(10, 100);
@@ -90,7 +80,6 @@ mod tests {
         assert!(cal.calibrated_probability(0.5).is_some());
     }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_isotonic_p8_invalidation() {
         let mut cal = IsotonicCalibrator::new(5, 100);
@@ -106,7 +95,6 @@ mod tests {
         assert_eq!(cal.observation_count(), 1);
     }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_platt_scaler_fit_and_predict() {
         let mut obs = Vec::new();
@@ -121,7 +109,6 @@ mod tests {
         assert!(scaler.predict(-1.0) < 0.3);
     }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_drift_detector() {
         let mut detector = DriftDetector::new(10, 0.1);
@@ -138,7 +125,6 @@ mod tests {
         assert_eq!(detector.overall_drift_status(), "kritisch");
     }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_g_function_standalone_properties() {
         use contextra_rank::g;
@@ -160,7 +146,6 @@ mod tests {
         assert_eq!(g(f32::NEG_INFINITY), 0.0);
     }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_mrrf_determinism_baseline() {
         use contextra_rank::drift::DriftStatus;
@@ -257,7 +242,6 @@ mod tests {
         assert_eq!(standard_fused, mrrf_fused_uncalibrated);
     }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_mrrf_margin_modulation_relative_weight_effect() {
         use contextra_rank::drift::DriftStatus;
@@ -322,17 +306,20 @@ mod tests {
         let beta = 1.0;
         let modulated_weights = modulate_and_renormalize_weights(&sets, Some(&contexts), beta);
 
-        if let (Some(&w_a), Some(&w_b)) = (modulated_weights.first(), modulated_weights.get(1)) {
-            let total_weight = w_a + w_b;
-            assert!(
-                (total_weight - 2.0).abs() < 0.001,
-                "Weight sum invariant violated: {total_weight}"
-            );
+        let w_a = modulated_weights[0];
+        let w_b = modulated_weights[1];
 
-            assert!(
-                w_b > w_a,
-                "Expected Signal B weight ({w_b}) to be strictly greater than Signal A weight ({w_a})"
-            );
-        }
+        // Verify total weight sum is preserved (sum = 2.0, within [0.999, 1.001] factor)
+        let total_weight = w_a + w_b;
+        assert!(
+            (total_weight - 2.0).abs() < 0.001,
+            "Weight sum invariant violated: {total_weight}"
+        );
+
+        // Signal B has a much larger margin, so after modulation and renormalization, w_B > w_A
+        assert!(
+            w_b > w_a,
+            "Expected Signal B weight ({w_b}) to be strictly greater than Signal A weight ({w_a})"
+        );
     }
 }

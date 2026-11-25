@@ -1,9 +1,3 @@
-//! # Integrationstest: Diskrepanz-Logging-Tests für Shadow-Mode bei globaler Fusion
-//!
-//! **Crate:** `contextra-rank`
-//!
-//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
-
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use contextra_rank::{
     weighted_reciprocal_rank_fusion, GlobalFusionConfig, GlobalFusionStrategy, SearchResult,

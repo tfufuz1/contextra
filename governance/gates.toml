@@ -1,0 +1,327 @@
+# governance/gates.toml
+# Gate-Katalog für Contextra Qualitäts-Gates.
+# Definiert name, phase, required_local, required_ci, risk_class, owner, fixture, tier und covered_by für alle Gates.
+
+[[gate]]
+name = "claim"
+phase = "start"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "agent-ops"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "context-pack"
+phase = "start"
+required_local = true
+required_ci = true
+risk_class = "medium"
+owner = "agent-ops"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "gate-guard"
+phase = "check"
+required_local = true
+required_ci = false
+risk_class = "high"
+owner = "governance"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "gate-arch"
+phase = "verify"
+required_local = true
+required_ci = false
+risk_class = "high"
+owner = "architecture"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "gate-integrity"
+phase = "submit"
+required_local = true
+required_ci = false
+risk_class = "high"
+owner = "quality"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "scope-guard"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "governance"
+fixture = "none"
+tier = "agent"
+covered_by = "gate-guard"
+
+[[gate]]
+name = "protected-paths"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "critical"
+owner = "governance"
+fixture = "none"
+tier = "agent"
+covered_by = "gate-guard"
+
+[[gate]]
+name = "check-duplicate-symbols"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "architecture"
+fixture = "none"
+tier = "agent"
+covered_by = "gate-arch"
+
+[[gate]]
+name = "symbol-exists"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "medium"
+owner = "architecture"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "check-dag"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "architecture"
+fixture = "none"
+tier = "agent"
+covered_by = "gate-arch"
+
+[[gate]]
+name = "check-ring-layering"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "architecture"
+fixture = "none"
+tier = "agent"
+covered_by = "gate-arch"
+
+[[gate]]
+name = "check-vetoes"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "critical"
+owner = "governance"
+fixture = "none"
+tier = "agent"
+covered_by = "gate-arch"
+
+[[gate]]
+name = "ratchet"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "governance"
+fixture = "none"
+tier = "agent"
+covered_by = "gate-integrity"
+
+[[gate]]
+name = "gate-weakening"
+phase = "submit"
+required_local = true
+required_ci = true
+risk_class = "critical"
+owner = "governance"
+fixture = "none"
+tier = "agent"
+covered_by = "gate-guard"
+
+[[gate]]
+name = "test-integrity"
+phase = "submit"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "quality"
+fixture = "none"
+tier = "agent"
+covered_by = "gate-integrity"
+
+[[gate]]
+name = "session-report"
+phase = "submit"
+required_local = true
+required_ci = true
+risk_class = "low"
+owner = "agent-ops"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "doc-truth"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "medium"
+owner = "architecture"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "registry-check"
+phase = "verify"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "governance"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "diff-budget"
+phase = "submit"
+required_local = false
+required_ci = true
+risk_class = "medium"
+owner = "agent-ops"
+fixture = "none"
+tier = "agent"
+covered_by = "gate-guard"
+
+[[gate]]
+name = "claims-in-pr"
+phase = "submit"
+required_local = false
+required_ci = true
+risk_class = "medium"
+owner = "agent-ops"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "task-card"
+phase = "start"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "agent-ops"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "ledger"
+phase = "submit"
+required_local = false
+required_ci = true
+risk_class = "high"
+owner = "governance"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "can-merge"
+phase = "submit"
+required_local = false
+required_ci = true
+risk_class = "critical"
+owner = "governance"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "gate-determinism-check"
+phase = "verify"
+required_local = false
+required_ci = true
+risk_class = "high"
+owner = "core"
+fixture = "none"
+tier = "ci"
+covered_by = "gate-integrity"
+
+[[gate]]
+name = "gate-unsafe-audit"
+phase = "verify"
+required_local = false
+required_ci = true
+risk_class = "critical"
+owner = "security"
+fixture = "none"
+tier = "ci"
+covered_by = "gate-integrity"
+
+[[gate]]
+name = "gate-lock-audit"
+phase = "verify"
+required_local = false
+required_ci = true
+risk_class = "high"
+owner = "core"
+fixture = "none"
+tier = "ci"
+covered_by = "gate-integrity"
+
+[[gate]]
+name = "gate-wal-replay-verify"
+phase = "verify"
+required_local = false
+required_ci = true
+risk_class = "critical"
+owner = "storage"
+fixture = "none"
+tier = "ci"
+covered_by = "gate-integrity"
+
+[[gate]]
+name = "fuzz-smoke"
+phase = "verify"
+required_local = false
+required_ci = false
+risk_class = "low"
+owner = "security"
+fixture = "none"
+tier = "nightly"
+
+[[gate]]
+name = "mutants-diff"
+phase = "verify"
+required_local = false
+required_ci = false
+risk_class = "low"
+owner = "quality"
+fixture = "none"
+tier = "nightly"
+
+[[gate]]
+name = "gates-catalog-sync"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "critical"
+owner = "governance"
+fixture = "none"
+tier = "agent"
+
+[[gate]]
+name = "codeowners-coverage"
+phase = "check"
+required_local = true
+required_ci = true
+risk_class = "high"
+owner = "governance"
+fixture = "none"
+tier = "agent"

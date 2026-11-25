@@ -13,6 +13,9 @@ description = "Backup and snapshot management for Contextra storage"
 ring = "1"
 
 [dependencies]
+contextra-types = { version = "0.1.0", path = "../contextra-types" }
+contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
+contextra-core = { version = "0.1.0", path = "../contextra-core" }
 bytes = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
@@ -20,12 +23,16 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 parking_lot = { workspace = true }
 blake3 = { workspace = true }
+futures-executor = "0.3"
+dirs = "6.0.0"
 
 [dev-dependencies]
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 proptest = "1.4"
 criterion = { version = "0.5", features = ["async_tokio"] }
+contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
+contextra-store = { version = "0.1.0", path = "../contextra-store" }
 
 [[bench]]
 name = "checkpoint_bench"
