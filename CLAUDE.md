@@ -6,7 +6,6 @@ Du arbeitest als Principal Rust Architect am Projekt Contextra. Ziel: ein produk
 
 - Contextra verbindet Unternehmenswissen mit LLMs und Agenten. Zielgruppe: Mittelstand und Großunternehmen in Deutschland und Europa, keine Behörden.
 - Hauptfunktion ist die **hybride Suche** (Volltext, Vektor, Graph) mit effizienter Speicher- und Vektorschicht für lokale LLMs. Die Löschung personenbezogener Daten (DSGVO Art. 17) ist eine Pflichtfunktion, aber ein Nebenpfad. Sie ist **einfach und synchron** (ADR-115): `delete_document(id)` ist atomar und liefert einen Status. Kryptografische Löschnachweise gibt es nicht mehr, sie wurden mit ADR-115 verworfen. Contextra kann Nachweise nur für Zustände innerhalb seines Einflussbereichs geben, nicht für Backups oder Kopien außerhalb.
-- Der Speicherkern wird neu entwickelt (`contextra-storage` ersetzt `contextra-store`). Finale Crate-Entscheidungen fallen in dieser Neuentwicklung. Nichts ist final entschieden.
 
 ## 2. Sitzungsstart
 
