@@ -254,7 +254,7 @@ Inventory line 1.
     #[test]
     fn test_duplicate_section_detection_fixture() {
         let markdown_with_duplicate = r#"
-## 11. Tier 1 Deep Audit & Verification (2026-09-09 — Task JULES-20260909-DEEP)
+## 11. Tier 1 Deep Audit & Verification (2026-09-09 — Task AUDIT-20260909-DEEP)
 
 - Property-Based Tests (`proptest`): 11/11 proptests green in test harness.
 - Concurrency Stress Runs: 10/10 iterations with test-threads=8 passed without panics.
@@ -262,7 +262,7 @@ Inventory line 1.
 - SnapshotRegistry GC Race Stress: verified zero race conditions under concurrent access.
 - Quality Gate Stack: 156 unit + 2 integration + 5 robustness tests passing green.
 
-## 14. Tier 1 Deep Audit & Verification Pass (2026-09-09 — SESSION 4b5ed819 / Task JULES-20260909-DEEP)
+## 14. Tier 1 Deep Audit & Verification Pass (2026-09-09 — SESSION 4b5ed819 / Task AUDIT-20260909-DEEP)
 
 - Property-Based Tests (`proptest`): 11/11 proptests green in test harness.
 - Concurrency Stress Runs: 10/10 iterations with test-threads=8 passed without panics.
@@ -275,11 +275,11 @@ Inventory line 1.
         assert_eq!(matches.len(), 1);
         assert_eq!(
             matches[0].section_a_title,
-            "11. Tier 1 Deep Audit & Verification (2026-09-09 — Task JULES-20260909-DEEP)"
+            "11. Tier 1 Deep Audit & Verification (2026-09-09 — Task AUDIT-20260909-DEEP)"
         );
         assert_eq!(
             matches[0].section_b_title,
-            "14. Tier 1 Deep Audit & Verification Pass (2026-09-09 — SESSION 4b5ed819 / Task JULES-20260909-DEEP)"
+            "14. Tier 1 Deep Audit & Verification Pass (2026-09-09 — SESSION 4b5ed819 / Task AUDIT-20260909-DEEP)"
         );
         assert!(matches[0].similarity >= 0.85);
     }

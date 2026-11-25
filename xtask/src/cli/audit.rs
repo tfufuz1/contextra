@@ -11,15 +11,6 @@ pub fn run_debt_audit(args: &[String]) -> i32 {
     0
 }
 
-pub fn run_init_audit_fix(args: &[String]) -> i32 {
-    let hash = args.get(2).map(|s| s.as_str()).unwrap_or("HEAD");
-    if let Err(e) = init_audit_fix::run_init_audit_fix(hash) {
-        eprintln!("❌ init-audit-fix failed: {}", e);
-        return 1;
-    }
-    0
-}
-
 pub fn run_shell_commit_audit(args: &[String]) -> i32 {
     let since_days = args
         .iter()

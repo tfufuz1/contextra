@@ -130,7 +130,7 @@ pub fn check_commit_messages() -> Result<(), String> {
         eprintln!();
         eprintln!("WARUM GENERISCHE MESSAGES VERBOTEN SIND:");
         eprintln!(
-            "  Bei agentengesteuerter Entwicklung (Google Jules als alleiniger Committer ohne"
+            "  Bei agentengesteuerter Entwicklung (ein Agent als alleiniger Committer ohne"
         );
         eprintln!(
             "  menschlichen Reviewer im Loop) ist eine präzise Audit-Trail-Integrität essenziell,"

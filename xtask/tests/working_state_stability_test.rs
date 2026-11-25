@@ -48,28 +48,4 @@ fn test_working_state_has_no_volatile_fields() {
     );
 }
 
-#[path = "../src/claim.rs"]
-mod claim;
 
-#[path = "../src/session_init.rs"]
-mod session_init;
-
-use session_init::run_session_init;
-
-#[test]
-fn test_session_init_has_continuity_fields() {
-    let res = run_session_init(None, None, false).expect("session_init should succeed");
-
-    assert!(
-        !res.last_commit.is_empty(),
-        "SessionInitResult should contain last_commit"
-    );
-    assert!(
-        !res.last_merge.is_empty(),
-        "SessionInitResult should contain last_merge"
-    );
-    assert!(
-        !res.prompter_distance.is_empty(),
-        "SessionInitResult should contain prompter_distance"
-    );
-}

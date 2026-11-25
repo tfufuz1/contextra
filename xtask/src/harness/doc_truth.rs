@@ -64,7 +64,6 @@ pub fn run_doc_truth(args: &[String]) -> i32 {
     doc_truth_check_crates_pub(&root, &mut findings);
     doc_truth_check_commands_pub(&root, &mut findings);
     doc_truth_check_unsafe_islands_pub(&root, &mut findings);
-    doc_truth_check_crate_table_pub(&root, &mut findings);
 
     // Sort findings deterministically
     findings.sort();
@@ -134,12 +133,6 @@ fn doc_truth_target_files(root: &Path) -> Vec<(String, PathBuf, bool)> {
 
     let docs = [
         "AGENTS.md",
-        ".jules/SESSION_BOOTSTRAP.md",
-        ".jules/JULES_CONTEXT.md",
-        ".jules/COMMON_LLM_ERRORS.md",
-        ".jules/SCHEDULED_AUDIT.md",
-        ".jules/AUDIT_INTAKE_PROTOCOL.md",
-        ".jules/ISSUE_AUTOMATION_POLICY.md",
     ];
 
     for doc in docs {
@@ -657,68 +650,3 @@ fn doc_truth_is_cfg_test(attr: &syn::Attribute) -> bool {
     false
 }
 
-/// Check 1e: Crate table in .jules/JULES_CONTEXT.md matches workspace members.
-pub fn doc_truth_check_crate_table_pub(root: &Path, findings: &mut Vec<DocTruthFinding>) {
-    let context_path = root.join(".jules/JULES_CONTEXT.md");
-    if !context_path.exists() {
-        return;
-    }
-
-    let content = match fs::read_to_string(&context_path) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-
-    let active_crates = doc_truth_get_workspace_crates(root);
-    let mut table_crates = HashSet::new();
-
-    let row_re = Regex::new(r"\|\s*`([a-z0-9-]+)`\s*\|").unwrap();
-
-    for line in content.lines() {
-        if line.contains("<!-- crate-ref-ignore -->") {
-            continue;
-        }
-        if line.starts_with('|') {
-            for cap in row_re.captures_iter(line) {
-                let name = cap.get(1).unwrap().as_str();
-                table_crates.insert(name.to_string());
-            }
-        }
-    }
-
-    // Compare table_crates vs active_crates (excluding xtask)
-    for active in &active_crates {
-        if active == "xtask" {
-            continue;
-        }
-        if !table_crates.contains(active) {
-            findings.push(DocTruthFinding {
-                file: ".jules/JULES_CONTEXT.md".to_string(),
-                line: 1,
-                id: "DOC-TRUTH-CRATE-TABLE-MISSING".to_string(),
-                severity: "error".to_string(),
-                message: format!(
-                    "Fehlender Crate '{}' in Crate-Tabelle in JULES_CONTEXT.md.",
-                    active
-                ),
-                fix: format!(
-                    "Crate '{}' in Crate-Tabelle von JULES_CONTEXT.md aufnehmen.",
-                    active
-                ),
-            });
-        }
-    }
-
-    for table_c in &table_crates {
-        if !active_crates.contains(table_c) {
-            findings.push(DocTruthFinding {
-                file: ".jules/JULES_CONTEXT.md".to_string(),
-                line: 1,
-                id: "DOC-TRUTH-CRATE-TABLE-EXTRA".to_string(),
-                severity: "error".to_string(),
-                message: format!("Invalider/überzähliger Crate '{}' in Crate-Tabelle in JULES_CONTEXT.md.", table_c),
-                fix: format!("Crate '{}' aus Crate-Tabelle in JULES_CONTEXT.md entfernen oder '<!-- crate-ref-ignore -->' anhängen.", table_c),
-            });
-        }
-    }
-}

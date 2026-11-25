@@ -13,7 +13,6 @@ pub const DEFAULT_CHECK_DOCS: &[&str] = &[
     "docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md",
     "AGENTS.md",
     "docs/decisions/README.md",
-    ".jules/JULES_CONTEXT.md",
 ];
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -79,7 +78,7 @@ pub fn extract_path_candidates(line: &str) -> Vec<String> {
                     || (trimmed.starts_with('.')
                         && !trimmed.starts_with("./")
                         && !trimmed.starts_with("../")
-                        && !trimmed.starts_with(".jules/"))
+                       )
                 {
                     continue;
                 }

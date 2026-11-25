@@ -11,13 +11,6 @@ pub fn run_reproducible_build(args: &[String]) -> i32 {
     0
 }
 
-pub fn run_check_branch_overlap(args: &[String]) -> i32 {
-    if !agent_lifecycle::branch_overlap::run_check_branch_overlap() {
-        return 1;
-    }
-    0
-}
-
 pub fn run_prune_branches(args: &[String]) -> i32 {
     if !agent_lifecycle::prune_branches::run_prune_branches() {
         return 1;
@@ -49,14 +42,6 @@ pub fn run_run_community_detection(args: &[String]) -> i32 {
     println!("Periodic batch process for GraphRAG community detection via Label Propagation.");
     println!("Note: Community detection triggers should be invoked via collection.run_community_detection().await or embedded engine instances.");
     println!("=== xtask run-community-detection PASSED ===");
-    0
-}
-
-pub fn run_gen_prompter_data(args: &[String]) -> i32 {
-    let success = gen_prompter_data::run();
-    if !success {
-        return 1;
-    }
     0
 }
 

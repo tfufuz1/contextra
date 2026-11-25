@@ -277,7 +277,7 @@ pub fn run_session_report(args: &[String]) -> i32 {
         findings_path.as_deref(),
     );
 
-    let local_dir = root_path.join(".jules/local");
+    let local_dir = root_path.join("target/xtask-local");
     let _ = fs::create_dir_all(&local_dir);
     let out_file = local_dir.join("PR_BODY.md");
 
@@ -291,7 +291,7 @@ pub fn run_session_report(args: &[String]) -> i32 {
             });
             println!("{}", out);
         } else {
-            eprintln!("WAS: Schreiben von PR_BODY.md fehlgeschlagen.\nWARUM: {e}\nFIX: Prüfe Schreibrechte in .jules/local/.");
+            eprintln!("WAS: Schreiben von PR_BODY.md fehlgeschlagen.\nWARUM: {e}\nFIX: Prüfe Schreibrechte in target/xtask-local/.");
         }
         return 2;
     }

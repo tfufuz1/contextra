@@ -20,9 +20,6 @@ mod workspace_verify;
 #[path = "../src/env_validate.rs"]
 mod env_validate;
 
-#[path = "../src/claim.rs"]
-mod claim;
-
 #[path = "../src/agent_lifecycle/mod.rs"]
 mod agent_lifecycle;
 

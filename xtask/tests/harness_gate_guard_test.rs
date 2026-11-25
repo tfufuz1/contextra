@@ -23,7 +23,7 @@ fn create_temp_repo() -> TempDir {
     run_git(&["config", "user.name", "Tester"]);
     run_git(&["config", "user.email", "tester@example.com"]);
 
-    fs::create_dir_all(p.join(".jules/tasks")).expect("failed to create tasks dir");
+    fs::create_dir_all(p.join("task-cards")).expect("failed to create tasks dir");
     fs::create_dir_all(p.join("governance")).expect("failed to create governance dir");
     fs::create_dir_all(p.join("docs/decisions")).expect("failed to create docs/decisions dir");
     fs::create_dir_all(p.join("src")).expect("failed to create src dir");
@@ -43,7 +43,7 @@ reason = "Self protection"
     .expect("failed to write protected paths");
 
     fs::write(
-        p.join(".jules/tasks/task-001.toml"),
+        p.join("task-cards/task-001.toml"),
         r#"
 id = "task-001"
 scope = ["src/**"]
@@ -87,7 +87,7 @@ fn test_gate_guard_clean_repo_passes() {
     commit_changes(root, "feat: clean in-scope change");
 
     let root_str = root.to_string_lossy().to_string();
-    let card_path = root.join(".jules/tasks/task-001.toml");
+    let card_path = root.join("task-cards/task-001.toml");
     let card_str = card_path.to_string_lossy().to_string();
 
     let args = vec![
@@ -106,36 +106,6 @@ fn test_gate_guard_clean_repo_passes() {
 }
 
 #[test]
-fn test_gate_guard_canary_scope_guard_defect() {
-    let temp_dir = create_temp_repo();
-    let root = temp_dir.path();
-
-    // Defect: out-of-scope file
-    fs::create_dir_all(root.join("xtask")).expect("failed to create xtask dir");
-    fs::write(root.join("xtask/forbidden.rs"), "fn forbidden() {}\n")
-        .expect("failed to write forbidden.rs");
-    commit_changes(root, "feat: forbidden edit");
-
-    let root_str = root.to_string_lossy().to_string();
-    let card_path = root.join(".jules/tasks/task-001.toml");
-    let card_str = card_path.to_string_lossy().to_string();
-
-    let args = vec![
-        "--root".to_string(),
-        root_str,
-        "--base".to_string(),
-        "HEAD~1".to_string(),
-        "--head".to_string(),
-        "HEAD".to_string(),
-        "--card".to_string(),
-        card_str,
-    ];
-
-    let code = gate_guard::run_gate_guard(&args);
-    assert_ne!(code, 0, "gate-guard MUST fail on scope-guard defect");
-}
-
-#[test]
 fn test_gate_guard_canary_protected_paths_defect() {
     let temp_dir = create_temp_repo();
     let root = temp_dir.path();
@@ -146,7 +116,7 @@ fn test_gate_guard_canary_protected_paths_defect() {
     commit_changes(root, "chore: modify protected paths");
 
     let root_str = root.to_string_lossy().to_string();
-    let card_path = root.join(".jules/tasks/task-001.toml");
+    let card_path = root.join("task-cards/task-001.toml");
     let card_str = card_path.to_string_lossy().to_string();
 
     let args = vec![
@@ -178,7 +148,7 @@ fn test_gate_guard_canary_gate_weakening_defect() {
     commit_changes(root, "chore: introduce allow attribute");
 
     let root_str = root.to_string_lossy().to_string();
-    let card_path = root.join(".jules/tasks/task-001.toml");
+    let card_path = root.join("task-cards/task-001.toml");
     let card_str = card_path.to_string_lossy().to_string();
 
     let args = vec![
@@ -210,7 +180,7 @@ fn test_gate_guard_canary_diff_budget_defect() {
     commit_changes(root, "feat: huge diff exceeding budget");
 
     let root_str = root.to_string_lossy().to_string();
-    let card_path = root.join(".jules/tasks/task-001.toml");
+    let card_path = root.join("task-cards/task-001.toml");
     let card_str = card_path.to_string_lossy().to_string();
 
     let args = vec![

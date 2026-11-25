@@ -43,7 +43,6 @@ pub mod check_duplicate_symbols;
 pub mod check_duplicate_symbols_cross_file;
 pub mod check_ffi_panic_boundary;
 pub mod check_flatbuffers_drift;
-pub mod check_jules_context_freshness;
 pub mod check_manifest_completeness;
 pub mod check_max_results_unbound;
 pub mod check_module_reachability;
@@ -64,10 +63,8 @@ pub mod check_type_registry;
 pub mod check_unsafe_islands;
 pub mod check_vetoes;
 pub mod check_workflow_commands;
-pub mod claim;
 pub mod cli;
 pub mod commit_health;
-pub mod context_pack;
 pub mod crate_context;
 pub mod env_validate;
 pub mod feature_matrix;
@@ -75,16 +72,12 @@ pub mod gate_check;
 pub mod gates;
 pub mod gen_arch_docs;
 pub mod gen_feature_catalog;
-pub mod gen_prompter_data;
 pub mod generate_adr;
 pub mod generate_diagnostics;
 pub mod generate_markers;
 pub mod generators;
 pub mod harness;
 pub mod hotspot_report;
-pub mod init_audit_fix;
-pub mod jules_preflight;
-pub mod jules_submit_gate;
 pub mod lint_unsafe_slice_bounds;
 pub mod loom_run;
 pub mod migrate_docid_128;
@@ -95,8 +88,6 @@ pub mod py_test;
 pub mod record_mutation_score;
 pub mod reproducible_build;
 pub mod security_scan;
-pub mod session_history;
-pub mod session_init;
 pub mod shell_commit_audit;
 pub mod tag_health;
 pub mod validate_pr_checklist;
@@ -105,7 +96,6 @@ pub mod workspace_index;
 pub mod workspace_verify;
 pub mod ws_cache;
 
-pub use check_jules_context_freshness::run_check_jules_context_freshness;
 
 static ROOT_DIR_CACHE: Mutex<Option<HashMap<PathBuf, PathBuf>>> = Mutex::new(None);
 static WORKSPACE_CRATES_CACHE: Mutex<Option<HashMap<PathBuf, Vec<CrateInfo>>>> = Mutex::new(None);
@@ -737,12 +727,6 @@ pub fn generate_session_continuity_section(tags: &[TagItem]) -> String {
 
 pub fn generate_session_continuity_section_from_root(root_path: &Path, tags: &[TagItem]) -> String {
     let mut section = String::new();
-    let current_session_id =
-        env::var("JULES_SESSION_ID").unwrap_or_else(|_| "2c814094".to_string());
-    section.push_str(&format!(
-        "- **Standard-Session-ID:** `{}` (automatische Kontinuität, falls kein Override per Flag)\n",
-        current_session_id
-    ));
 
     let active_tags: Vec<&TagItem> = tags
         .iter()
@@ -757,22 +741,7 @@ pub fn generate_session_continuity_section_from_root(root_path: &Path, tags: &[T
         active_tags.len()
     ));
 
-    let claims_path = root_path.join(".jules/claims.toml");
-    if claims_path.exists() {
-        if let Ok(content) = fs::read_to_string(&claims_path) {
-            let claim_count = content
-                .lines()
-                .filter(|l| l.trim().starts_with("[[claim]]"))
-                .count();
-            section.push_str(&format!(
-                "- **Aktive Task-Claims (.jules/claims.toml):** {}\n",
-                claim_count
-            ));
-        }
-    } else {
-        section.push_str("- **Aktive Task-Claims (.jules/claims.toml):** 0\n");
-    }
-
+    let _ = root_path;
     section
 }
 
@@ -1235,9 +1204,9 @@ pub fn sentences_are_similar(s1: &SentenceItem, s2: &SentenceItem) -> bool {
     (dist as f64 / max_len as f64) < 0.2
 }
 
-pub fn check_sentence_overlap(agents_content: &str, jules_content: &str) -> bool {
+pub fn check_sentence_overlap(agents_content: &str, other_content: &str) -> bool {
     let s1 = split_into_sentences(agents_content);
-    let s2 = split_into_sentences(jules_content);
+    let s2 = split_into_sentences(other_content);
 
     for item1 in &s1 {
         for item2 in &s2 {

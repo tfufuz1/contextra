@@ -428,14 +428,6 @@ pub fn run_validate_tags(args: &[String]) -> i32 {
     }
 }
 
-pub fn run_check_jules_context_freshness(args: &[String]) -> i32 {
-    let success = crate::run_check_jules_context_freshness();
-    if !success {
-        return 1;
-    }
-    0
-}
-
 pub fn run_check_review_coverage(args: &[String]) -> i32 {
     let tags = crate::scan_tags("crates");
     let success = crate::run_check_review_coverage(&tags);

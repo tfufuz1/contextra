@@ -58,7 +58,6 @@ pub fn run_repo_doctor(args: &[String]) -> i32 {
 
     if !quick {
         // 4. Branch-Überschneidung
-        run_branch_overlap_check(&root_dir, &mut findings);
 
         // 5. Commit-Health
         run_commit_health_check(&root_dir, &mut findings);
@@ -328,27 +327,6 @@ fn run_env_check(findings: &mut Vec<RepoDoctorFinding>) {
                 "Umgebungstools geprüft ok: {} Tool(s) bereit.",
                 ok_tools.len()
             ),
-        });
-    }
-}
-
-fn run_branch_overlap_check(root: &Path, findings: &mut Vec<RepoDoctorFinding>) {
-    let branch_args = vec!["--root".to_string(), root.display().to_string()];
-    let overlap_ok =
-        crate::agent_lifecycle::branch_overlap::run_check_branch_overlap_with_args(&branch_args);
-
-    if overlap_ok {
-        findings.push(RepoDoctorFinding {
-            severity: "info".to_string(),
-            source: "branch_overlap".to_string(),
-            message: "Branch-Überschneidung ok: Keine Konflikte mit claim/* Remote-Branches."
-                .to_string(),
-        });
-    } else {
-        findings.push(RepoDoctorFinding {
-            severity: "warnung".to_string(),
-            source: "branch_overlap".to_string(),
-            message: "Branch-Überschneidungs-Check ergab Scope-Überlappung oder Remote-Branch konnte nicht verifiziert werden.".to_string(),
         });
     }
 }

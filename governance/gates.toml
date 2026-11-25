@@ -52,16 +52,6 @@ owner = "quality"
 fixture = "none"
 tier = "agent"
 
-[[gate]]
-name = "scope-guard"
-phase = "check"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "governance"
-fixture = "none"
-tier = "agent"
-covered_by = "gate-guard"
 
 [[gate]]
 name = "protected-paths"

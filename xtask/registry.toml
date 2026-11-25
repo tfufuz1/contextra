@@ -125,13 +125,6 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
-name = "check-branch-overlap"
-owner_tier = "ci-gate"
-summary = "Subcommand check-branch-overlap"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
 name = "check-commit-diff-integrity"
 owner_tier = "ci-gate"
 summary = "Subcommand check-commit-diff-integrity"
@@ -233,13 +226,6 @@ phase = "Phase 0"
 name = "check-flatbuffers-drift"
 owner_tier = "tool"
 summary = "Subcommand check-flatbuffers-drift"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "check-jules-context-freshness"
-owner_tier = "report"
-summary = "Subcommand check-jules-context-freshness"
 blocking = true
 phase = "Phase 0"
 
@@ -412,13 +398,6 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
-name = "claim"
-owner_tier = "agent-gate"
-summary = "Subcommand claim"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
 name = "commit-health"
 owner_tier = "ci-gate"
 summary = "Subcommand commit-health"
@@ -429,13 +408,6 @@ phase = "Phase 0"
 name = "consolidate-adrs"
 owner_tier = "generator"
 summary = "Subcommand consolidate-adrs"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "context-pack"
-owner_tier = "agent-gate"
-summary = "Subcommand context-pack"
 blocking = true
 phase = "Phase 0"
 
@@ -524,13 +496,6 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
-name = "gen-prompter-data"
-owner_tier = "generator"
-summary = "Subcommand gen-prompter-data"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
 name = "gen-sbom"
 owner_tier = "generator"
 summary = "Subcommand gen-sbom"
@@ -573,30 +538,9 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
-name = "init-audit-fix"
-owner_tier = "legacy"
-summary = "Subcommand init-audit-fix"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
 name = "json"
 owner_tier = "tool"
 summary = "Subcommand json"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "jules-preflight"
-owner_tier = "tool"
-summary = "Subcommand jules-preflight"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "jules-submit-gate"
-owner_tier = "ci-gate"
-summary = "Subcommand jules-submit-gate"
 blocking = true
 phase = "Phase 0"
 
@@ -657,13 +601,6 @@ blocking = true
 phase = "Phase 0"
 
 [[commands]]
-name = "pre-push"
-owner_tier = "legacy"
-summary = "Subcommand pre-push"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
 name = "prune-branches"
 owner_tier = "tool"
 summary = "Subcommand prune-branches"
@@ -709,13 +646,6 @@ phase = "Phase 0"
 name = "security-scan"
 owner_tier = "ci-gate"
 summary = "Subcommand security-scan"
-blocking = true
-phase = "Phase 0"
-
-[[commands]]
-name = "session-init"
-owner_tier = "tool"
-summary = "Subcommand session-init"
 blocking = true
 phase = "Phase 0"
 

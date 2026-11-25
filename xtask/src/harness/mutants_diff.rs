@@ -28,7 +28,7 @@ pub fn mutants_diff_get_tier1_touched_crates(
     base: &str,
     head: &str,
 ) -> Result<BTreeSet<String>, String> {
-    let prompter_path = root.join(".jules/prompter-tiers.toml");
+    let prompter_path = root.join("governance/crate-tiers.toml");
     let mut tier1_crates = BTreeSet::new();
 
     if prompter_path.exists() {

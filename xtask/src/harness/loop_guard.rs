@@ -83,7 +83,7 @@ pub fn loop_guard_hash_error(normalized_text: &str) -> String {
 }
 
 pub fn loop_guard_get_state_path(root: &Path) -> PathBuf {
-    root.join(".jules/local/loop-guard.json")
+    root.join("target/xtask-local/loop-guard.json")
 }
 
 pub fn loop_guard_load_state(root: &Path) -> LoopGuardState {
@@ -220,7 +220,7 @@ pub fn loop_guard_stop(root: &Path, reason: &str) -> Result<(), String> {
         reason, last_hash, last_log, file_str
     );
 
-    let local_dir = root.join(".jules/local");
+    let local_dir = root.join("target/xtask-local");
     let _ = fs::create_dir_all(&local_dir);
     let escalate_file = local_dir.join("ESCALATE.md");
 
@@ -405,7 +405,7 @@ pub fn run_loop_guard(args: &[String]) -> i32 {
                             {
                                 "id": "loop_detected",
                                 "severity": "error",
-                                "file": ".jules/local/loop-guard.json",
+                                "file": "target/xtask-local/loop-guard.json",
                                 "line": 0,
                                 "message": e,
                                 "fix": "Stoppe automatische Versuche, analysiere den Fehlerursprung und passe den Ansatz an."
@@ -428,7 +428,7 @@ pub fn run_loop_guard(args: &[String]) -> i32 {
                         let out = serde_json::json!({
                             "gate": "loop-guard",
                             "status": "fail",
-                            "summary": format!("Eskalationsbericht geschrieben unter .jules/local/ESCALATE.md: {}", reason),
+                            "summary": format!("Eskalationsbericht geschrieben unter target/xtask-local/ESCALATE.md: {}", reason),
                             "findings": []
                         });
                         println!("{}", out);
@@ -447,7 +447,7 @@ pub fn run_loop_guard(args: &[String]) -> i32 {
                         });
                         println!("{}", out);
                     } else {
-                        eprintln!("WAS: Schreiben von ESCALATE.md fehlgeschlagen.\nWARUM: {e}\nFIX: Prüfe Schreibrechte in .jules/local/.");
+                        eprintln!("WAS: Schreiben von ESCALATE.md fehlgeschlagen.\nWARUM: {e}\nFIX: Prüfe Schreibrechte in target/xtask-local/.");
                     }
                     2
                 }
@@ -478,7 +478,7 @@ pub fn run_loop_guard(args: &[String]) -> i32 {
                     });
                     println!("{}", out);
                 } else {
-                    eprintln!("WAS: Zurücksetzen fehlgeschlagen.\nWARUM: {e}\nFIX: Lösche .jules/local/loop-guard.json manuell.");
+                    eprintln!("WAS: Zurücksetzen fehlgeschlagen.\nWARUM: {e}\nFIX: Lösche target/xtask-local/loop-guard.json manuell.");
                 }
                 2
             }

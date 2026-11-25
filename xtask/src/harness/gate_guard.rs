@@ -1,4 +1,4 @@
-//! Aggregate Gate Guard (scope-guard, protected-paths, gate-weakening, diff-budget).
+//! Aggregate Gate Guard (protected-paths, gate-weakening, diff-budget).
 
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -86,7 +86,6 @@ pub fn run_gate_guard(args: &[String]) -> i32 {
     }
 
     let constituents = vec![
-        "scope-guard",
         "protected-paths",
         "gate-weakening",
         "diff-budget",

@@ -67,61 +67,11 @@ unsafe_island = true
 Stand: 2026-09-28
 
 ## Start
-- `cargo run --manifest-path xtask/Cargo.toml -- jules-preflight`
+- `cargo run --manifest-path xtask/Cargo.toml -- sync-docs`
 
 ## Invarianten
 - Unsafe-Isolierung: vier Unsafe-Inseln laut `capabilities.toml` (`contextra-simd`).
 ",
-    )
-    .unwrap();
-
-    // 4. .jules directory
-    fs::create_dir_all(root.join(".jules")).unwrap();
-
-    // 5. .jules/JULES_CONTEXT.md
-    fs::write(
-        root.join(".jules/JULES_CONTEXT.md"),
-        r"# JULES_CONTEXT.md
-
-| Crate | Pfad |
-|---|---|
-| `contextra-types` | `crates/contextra-types/AGENTS.md` |
-| `contextra-simd` | `crates/contextra-simd/AGENTS.md` |
-",
-    )
-    .unwrap();
-
-    // 6. .jules/SESSION_BOOTSTRAP.md
-    fs::write(
-        root.join(".jules/SESSION_BOOTSTRAP.md"),
-        r"# SESSION_BOOTSTRAP.md
-See `crates/contextra-types/src/lib.rs`
-",
-    )
-    .unwrap();
-
-    // 7. .jules/COMMON_LLM_ERRORS.md
-    fs::write(
-        root.join(".jules/COMMON_LLM_ERRORS.md"),
-        "# Common Errors\n",
-    )
-    .unwrap();
-    // 8. .jules/SCHEDULED_AUDIT.md
-    fs::write(
-        root.join(".jules/SCHEDULED_AUDIT.md"),
-        "# Scheduled Audit\n",
-    )
-    .unwrap();
-    // 9. .jules/AUDIT_INTAKE_PROTOCOL.md
-    fs::write(
-        root.join(".jules/AUDIT_INTAKE_PROTOCOL.md"),
-        "# Audit Intake\n",
-    )
-    .unwrap();
-    // 10. .jules/ISSUE_AUTOMATION_POLICY.md
-    fs::write(
-        root.join(".jules/ISSUE_AUTOMATION_POLICY.md"),
-        "# Automation Policy\n",
     )
     .unwrap();
 
@@ -172,7 +122,7 @@ edition = "2021"
         r#"fn main() {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(|s| s.as_str()) {
-        Some("jules-preflight") => {},
+        Some("sync-docs") => {},
         _ => {}
     }
 }"#,
@@ -247,29 +197,6 @@ Run `cargo xtask future-command` <!-- harness:planned -->
 }
 
 #[test]
-fn test_doc_truth_unknown_crate_fails() {
-    let temp_repo = create_temp_git_repo();
-    let root = temp_repo.path();
-    setup_valid_workspace(root);
-
-    // Add unknown crate reference in JULES_CONTEXT.md
-    fs::write(
-        root.join(".jules/JULES_CONTEXT.md"),
-        r"# JULES_CONTEXT.md
-See `contextra-nonexistent-crate`.
-",
-    )
-    .unwrap();
-
-    let code = doc_truth::run_doc_truth(&[
-        "--root".to_string(),
-        root.to_str().unwrap().to_string(),
-        "--strict".to_string(),
-    ]);
-    assert_eq!(code, 1, "Unknown crate reference must fail doc-truth");
-}
-
-#[test]
 fn test_doc_truth_unsafe_mismatch_fails() {
     let temp_repo = create_temp_git_repo();
     let root = temp_repo.path();
@@ -294,56 +221,6 @@ fn test_doc_truth_unsafe_mismatch_fails() {
 }
 
 #[test]
-fn test_doc_truth_crate_table_mismatch_fails() {
-    let temp_repo = create_temp_git_repo();
-    let root = temp_repo.path();
-    setup_valid_workspace(root);
-
-    // Remove contextra-simd from JULES_CONTEXT.md crate table
-    fs::write(
-        root.join(".jules/JULES_CONTEXT.md"),
-        r"# JULES_CONTEXT.md
-
-| Crate | Pfad |
-|---|---|
-| `contextra-types` | `crates/contextra-types/AGENTS.md` |
-",
-    )
-    .unwrap();
-
-    let code = doc_truth::run_doc_truth(&[
-        "--root".to_string(),
-        root.to_str().unwrap().to_string(),
-        "--strict".to_string(),
-    ]);
-    assert_eq!(
-        code, 1,
-        "Missing crate in JULES_CONTEXT.md crate table must fail doc-truth"
-    );
-}
-
-#[test]
-fn test_doc_truth_ignores_log_files() {
-    let temp_repo = create_temp_git_repo();
-    let root = temp_repo.path();
-    setup_valid_workspace(root);
-
-    // Create .jules/JULES_LOG.md with invalid references
-    fs::write(
-        root.join(".jules/JULES_LOG.md"),
-        "Historical log referencing `invalid_file_123.rs` and `contextra-fake-crate`.\n",
-    )
-    .unwrap();
-
-    let code = doc_truth::run_doc_truth(&[
-        "--root".to_string(),
-        root.to_str().unwrap().to_string(),
-        "--strict".to_string(),
-    ]);
-    assert_eq!(code, 0, "JULES_LOG.md must be ignored by doc-truth");
-}
-
-#[test]
 fn test_doc_truth_json_output() {
     let temp_repo = create_temp_git_repo();
     let root = temp_repo.path();
@@ -365,7 +242,6 @@ fn test_doc_truth_real_repo_standalone() {
     doc_truth::doc_truth_check_crates_pub(&root, &mut findings);
     doc_truth::doc_truth_check_commands_pub(&root, &mut findings);
     doc_truth::doc_truth_check_unsafe_islands_pub(&root, &mut findings);
-    doc_truth::doc_truth_check_crate_table_pub(&root, &mut findings);
 
     for f in &findings {
         if f.severity == "error" {

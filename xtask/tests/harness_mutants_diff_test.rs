@@ -14,14 +14,14 @@ fn test_mutants_diff_harness() {
         .current_dir(root)
         .output();
 
-    let prompter_dir = root.join(".jules");
+    let prompter_dir = root.join("governance");
     fs::create_dir_all(&prompter_dir).unwrap();
 
     let prompter_toml = r#"
 [crate_overrides.contextra-core]
 tier = "1"
 "#;
-    fs::write(prompter_dir.join("prompter-tiers.toml"), prompter_toml).unwrap();
+    fs::write(prompter_dir.join("crate-tiers.toml"), prompter_toml).unwrap();
 
     let score = mutants_diff::mutants_diff_get_expected_score(root, "contextra-core");
     assert!((score - 0.60).abs() < f64::EPSILON);

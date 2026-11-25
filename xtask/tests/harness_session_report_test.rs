@@ -116,7 +116,7 @@ fn test_session_report_run_command() {
 
     assert_eq!(code, 0);
 
-    let pr_body_file = root.join(".jules/local/PR_BODY.md");
+    let pr_body_file = root.join("target/xtask-local/PR_BODY.md");
     assert!(pr_body_file.exists());
 
     let content = fs::read_to_string(&pr_body_file).unwrap();

@@ -103,7 +103,7 @@ pub fn run_flake_report(args: &[String]) -> i32 {
         }
     }
 
-    let local_dir = root_dir.join(".jules/local");
+    let local_dir = root_dir.join("target/xtask-local");
     let _ = fs::create_dir_all(&local_dir);
     let report_file = local_dir.join("flake-report.json");
 

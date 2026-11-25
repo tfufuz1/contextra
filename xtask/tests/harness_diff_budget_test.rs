@@ -121,9 +121,9 @@ fn test_diff_budget_card_override() {
     let dir = setup_temp_repo();
     let p = dir.path();
 
-    fs::create_dir_all(p.join(".jules/tasks")).unwrap();
+    fs::create_dir_all(p.join("task-cards")).unwrap();
     fs::write(
-        p.join(".jules/tasks/task-budget.toml"),
+        p.join("task-cards/task-budget.toml"),
         r#"
 id = "task-budget"
 [budget]
@@ -144,7 +144,7 @@ lines = 50
         .unwrap();
 
     let root_arg = format!("{}", p.display());
-    let card_arg = format!("{}/.jules/tasks/task-budget.toml", p.display());
+    let card_arg = format!("{}/task-cards/task-budget.toml", p.display());
     let args = vec![
         "--root".to_string(),
         root_arg,

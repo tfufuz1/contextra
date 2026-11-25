@@ -23,9 +23,6 @@ blocking = true
 name = "registry-check"
 blocking = true
 
-[[gate]]
-name = "scope-guard"
-blocking = true
 
 [[gate]]
 name = "symbol-exists"

@@ -23,7 +23,7 @@ fn setup_temp_repo() -> tempfile::TempDir {
     run_git(&["config", "user.name", "Test User"]);
     run_git(&["config", "user.email", "test@example.com"]);
 
-    fs::write(path.join(".gitignore"), "/.jules/local/\n").unwrap();
+    fs::write(path.join(".gitignore"), "/target/xtask-local/\n").unwrap();
     fs::write(path.join("file1.txt"), "hello world\n").unwrap();
     run_git(&["add", ".gitignore", "file1.txt"]);
     run_git(&["commit", "-m", "initial commit"]);

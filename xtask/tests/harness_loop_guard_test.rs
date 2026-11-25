@@ -11,7 +11,7 @@ fn setup_temp_root() -> tempfile::TempDir {
 
 #[test]
 fn test_loop_guard_normalization_and_hashing() {
-    let err1 = "error at /home/jules/repo/crates/contextra-core/src/lib.rs:142:15 on 2026-09-28T12:00:00Z with ptr 0x7fff1234abcd [1/8]";
+    let err1 = "error at /home/dev/repo/crates/contextra-core/src/lib.rs:142:15 on 2026-09-28T12:00:00Z with ptr 0x7fff1234abcd [1/8]";
     let err2 = "error at /tmp/workspace/crates/contextra-core/src/lib.rs:99:1 on 2026-09-29T14:30:00Z with ptr 0x12345678 [2/8]";
 
     let norm1 = loop_guard::loop_guard_normalize_error(err1);
@@ -118,7 +118,7 @@ fn test_loop_guard_stop_and_escalate_report() {
     ]);
     assert_eq!(stop_code, 1);
 
-    let escalate_md = root.join(".jules/local/ESCALATE.md");
+    let escalate_md = root.join("target/xtask-local/ESCALATE.md");
     assert!(escalate_md.exists());
 
     let content = fs::read_to_string(&escalate_md).unwrap();

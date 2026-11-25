@@ -26,9 +26,6 @@ mod determinism_check;
 #[path = "../../src/check_unsafe_islands.rs"]
 mod check_unsafe_islands;
 
-#[path = "../../src/harness/scope_guard.rs"]
-mod scope_guard;
-
 #[path = "../../src/harness/test_integrity.rs"]
 mod test_integrity;
 
@@ -345,83 +342,6 @@ fn test_canary_check_unsafe_islands() {
     );
 }
 
-// 5. Gate: scope-guard
-#[test]
-fn test_canary_scope_guard() {
-    let temp_dir = create_temp_repo();
-    let root = temp_dir.path();
-
-    fs::create_dir_all(root.join(".jules/tasks")).unwrap();
-    fs::create_dir_all(root.join("src")).unwrap();
-
-    fs::write(
-        root.join(".jules/tasks/task-001.toml"),
-        "scope = [\"src/in_scope.rs\"]\nforbidden = [\"xtask/**\"]\n",
-    )
-    .unwrap();
-
-    fs::write(root.join("src/in_scope.rs"), "pub fn ok() {}\n").unwrap();
-    let base_rev = git_add_commit(root, "Initial commit");
-
-    // Defect Fixture: Modify out-of-scope file
-    fs::write(root.join("src/out_of_scope.rs"), "pub fn bad() {}\n").unwrap();
-    let _ = git_add_commit(root, "feat: out of scope file");
-
-    let root_str = root.to_str().unwrap().to_string();
-    let code_defect = scope_guard::run_scope_guard(&[
-        "--root".to_string(),
-        root_str,
-        "--base".to_string(),
-        base_rev,
-        "--head".to_string(),
-        "HEAD".to_string(),
-        "--card".to_string(),
-        ".jules/tasks/task-001.toml".to_string(),
-    ]);
-    assert_ne!(
-        code_defect, 0,
-        "scope-guard canary MUST fail when an out-of-scope file is touched"
-    );
-
-    // Counter Fixture: Modify only in-scope file
-    let temp_dir_clean = create_temp_repo();
-    let root_clean = temp_dir_clean.path();
-    fs::create_dir_all(root_clean.join(".jules/tasks")).unwrap();
-    fs::create_dir_all(root_clean.join("src")).unwrap();
-
-    fs::write(
-        root_clean.join(".jules/tasks/task-001.toml"),
-        "scope = [\"src/in_scope.rs\"]\nforbidden = [\"xtask/**\"]\n",
-    )
-    .unwrap();
-    fs::write(root_clean.join("src/in_scope.rs"), "pub fn ok() {}\n").unwrap();
-    let base_clean = git_add_commit(root_clean, "Initial commit");
-
-    fs::write(
-        root_clean.join("src/in_scope.rs"),
-        "pub fn ok() { println!(\"ok\"); }\n",
-    )
-    .unwrap();
-    let _ = git_add_commit(root_clean, "feat: in scope edit");
-
-    let clean_str = root_clean.to_str().unwrap().to_string();
-    let code_clean = scope_guard::run_scope_guard(&[
-        "--root".to_string(),
-        clean_str,
-        "--base".to_string(),
-        base_clean,
-        "--head".to_string(),
-        "HEAD".to_string(),
-        "--card".to_string(),
-        ".jules/tasks/task-001.toml".to_string(),
-    ]);
-    assert_eq!(
-        code_clean, 0,
-        "scope-guard canary MUST pass when changes are within scope"
-    );
-}
-
-// 6. Gate: test-integrity
 #[test]
 fn test_canary_test_integrity() {
     let temp_dir = create_temp_repo();
