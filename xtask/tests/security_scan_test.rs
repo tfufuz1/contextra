@@ -1,7 +1,6 @@
 //! Tests for security_scan module.
 
-#[path = "../src/security_scan.rs"]
-mod security_scan;
+use xtask::security_scan;
 
 use security_scan::{run_security_scan_in_root, SecurityPattern};
 use std::fs;

@@ -1,5 +1,4 @@
-#[path = "../src/harness/stub_impls.rs"]
-mod stub_impls;
+use xtask::harness::stub_impls;
 
 use std::fs;
 use stub_impls::{run_stub_impls, run_stub_impls_with_writer, StubGateResult};

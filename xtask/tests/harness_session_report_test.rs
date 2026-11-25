@@ -1,7 +1,6 @@
 // Test for harness module session-report
 
-#[path = "../src/harness/session_report.rs"]
-mod session_report;
+use xtask::harness::session_report;
 
 use std::fs;
 use std::process::Command;

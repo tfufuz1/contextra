@@ -1,7 +1,6 @@
 // xtask/tests/harness_fast_diff_lint_test.rs
 
-#[path = "../src/harness/fast_diff_lint.rs"]
-mod fast_diff_lint;
+use xtask::harness::fast_diff_lint;
 
 use fast_diff_lint::{parse_unified_diff, run_fast_diff_lint};
 

@@ -1,8 +1,7 @@
 use std::fs;
 use tempfile::TempDir;
 
-#[path = "../src/harness/plan_lint.rs"]
-mod plan_lint;
+use xtask::harness::plan_lint;
 
 struct MockPlanLintTransport {
     pub response: Result<String, String>,

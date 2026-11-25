@@ -1,5 +1,4 @@
-#[path = "../src/bench_download.rs"]
-mod bench_download;
+use xtask::bench_download;
 
 use std::path::Path;
 

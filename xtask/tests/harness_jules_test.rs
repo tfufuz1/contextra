@@ -1,8 +1,7 @@
 use std::fs;
 use tempfile::TempDir;
 
-#[path = "../src/harness/jules.rs"]
-mod jules;
+use xtask::harness::jules;
 
 fn jules_facade_test_setup_repo() -> (TempDir, std::path::PathBuf) {
     let temp_dir = TempDir::new().unwrap();

@@ -1,5 +1,4 @@
-#[path = "../src/check_duplicate_symbols_cross_file.rs"]
-mod check_duplicate_symbols_cross_file;
+use xtask::check_duplicate_symbols_cross_file;
 
 use check_duplicate_symbols_cross_file::{
     scan_directory_for_cross_file_duplicates, scan_workspace_for_cross_file_duplicates,

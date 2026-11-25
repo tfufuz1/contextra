@@ -1,7 +1,6 @@
 // Test for harness module ledger
 
-#[path = "../src/harness/ledger.rs"]
-mod ledger;
+use xtask::harness::ledger;
 
 use std::fs;
 use std::process::Command;

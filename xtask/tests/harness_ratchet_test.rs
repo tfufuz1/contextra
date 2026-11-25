@@ -1,7 +1,6 @@
 //! Integration test for ratchet harness module.
 
-#[path = "../src/harness/ratchet.rs"]
-mod ratchet;
+use xtask::harness::ratchet;
 
 use std::fs;
 use std::process::Command;

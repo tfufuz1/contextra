@@ -1,5 +1,4 @@
-#[path = "../src/harness/fuzz_smoke.rs"]
-mod fuzz_smoke;
+use xtask::harness::fuzz_smoke;
 
 use std::fs;
 use tempfile::TempDir;

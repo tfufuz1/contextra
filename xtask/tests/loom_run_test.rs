@@ -1,5 +1,4 @@
-#[path = "../src/loom_run.rs"]
-mod loom_run;
+use xtask::loom_run;
 
 use std::fs;
 use tempfile::TempDir;

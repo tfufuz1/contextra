@@ -1,5 +1,4 @@
-#[path = "../src/generate_markers.rs"]
-mod generate_markers;
+use xtask::generate_markers;
 
 use generate_markers::{
     load_capabilities_from_file, render_marker_table, run_check_marker_drift, run_generate_markers,

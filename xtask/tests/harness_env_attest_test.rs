@@ -1,7 +1,6 @@
 // Test for harness module env-attest
 
-#[path = "../src/harness/env_attest.rs"]
-mod env_attest;
+use xtask::harness::env_attest;
 
 use std::env;
 use std::fs;

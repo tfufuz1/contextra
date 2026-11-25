@@ -1,5 +1,4 @@
-#[path = "../src/harness/diff_budget.rs"]
-mod diff_budget;
+use xtask::harness::diff_budget;
 
 use std::fs;
 use std::process::Command;

@@ -1,8 +1,5 @@
-#[path = "../src/check_ring_layering.rs"]
-mod check_ring_layering;
 
-#[path = "../src/harness/unwired_ports.rs"]
-mod unwired_ports;
+use xtask::harness::unwired_ports;
 
 use std::fs;
 use tempfile::TempDir;

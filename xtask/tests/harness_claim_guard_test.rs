@@ -2,32 +2,7 @@
 
 use std::path::PathBuf;
 
-#[path = "../src/shell_commit_audit.rs"]
-mod shell_commit_audit;
-
-#[path = "../src/audit_integrity_check.rs"]
-mod audit_integrity_check;
-
-#[path = "../src/hotspot_report.rs"]
-mod hotspot_report;
-
-#[path = "../src/commit_health.rs"]
-mod commit_health;
-
-#[path = "../src/workspace_verify.rs"]
-mod workspace_verify;
-
-#[path = "../src/env_validate.rs"]
-mod env_validate;
-
-#[path = "../src/claim.rs"]
-mod claim;
-
-#[path = "../src/agent_lifecycle/mod.rs"]
-mod agent_lifecycle;
-
-#[path = "../src/harness/claim_guard.rs"]
-mod claim_guard;
+use xtask::harness::claim_guard;
 
 fn find_root_dir() -> PathBuf {
     if let Ok(output) = std::process::Command::new("git")

@@ -15,11 +15,7 @@ pub fn get_workspace_crates() -> Vec<CrateInfo> {
     Vec::new()
 }
 
-#[path = "../src/check_ring_layering.rs"]
-mod check_ring_layering;
-
-#[path = "../src/check_ring0_async_purity.rs"]
-mod check_ring0_async_purity;
+use xtask::check_ring0_async_purity;
 
 use check_ring0_async_purity::load_allowlist;
 use std::fs;

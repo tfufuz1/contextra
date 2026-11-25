@@ -333,7 +333,7 @@ pub fn run_unwired_ports(args: &[String]) -> i32 {
     let mut all_type_defs: Vec<TypeDecl> = Vec::new();
 
     // 1. & 2. Trait and Impl scanning using WorkspaceIndex
-    let index = match crate::workspace_index::WorkspaceIndex::build() {
+    let index = match xtask::workspace_index::WorkspaceIndex::build() {
         Ok(idx) => idx,
         Err(err) => {
             eprintln!("Failed to build workspace index: {err}");
@@ -360,7 +360,7 @@ pub fn run_unwired_ports(args: &[String]) -> i32 {
     for imp in &index.impls {
 
         if let Some(trait_path) = &imp.trait_path {
-            if !imp.cfg_test && imp.file_class == crate::harness::scan_common::FileClass::Production {
+            if !imp.cfg_test && imp.file_class == xtask::harness::scan_common::FileClass::Production {
                 let trait_name = trait_path.split("::").last().unwrap_or(trait_path).to_string();
                 all_impls.push(ImplDecl {
                     trait_name,

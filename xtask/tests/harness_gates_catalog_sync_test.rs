@@ -1,7 +1,6 @@
 //! Integration tests for gates-catalog-sync harness command.
 
-#[path = "../src/harness/gates_catalog_sync.rs"]
-mod gates_catalog_sync;
+use xtask::harness::gates_catalog_sync;
 
 use std::fs;
 use tempfile::tempdir;

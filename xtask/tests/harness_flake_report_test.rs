@@ -1,7 +1,6 @@
 // xtask/tests/harness_flake_report_test.rs
 
-#[path = "../src/harness/flake_report.rs"]
-mod flake_report;
+use xtask::harness::flake_report;
 
 #[test]
 fn test_flake_report_missing_nextest() {

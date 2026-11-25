@@ -1,11 +1,9 @@
 use std::fs;
 use tempfile::TempDir;
 
-#[path = "../src/harness/jules.rs"]
-mod jules;
+use xtask::harness::jules;
 
-#[path = "../src/harness/loop_guard.rs"]
-mod loop_guard;
+use xtask::harness::loop_guard;
 
 fn setup_wiring_test_repo() -> (TempDir, std::path::PathBuf) {
     let temp_dir = TempDir::new().unwrap();

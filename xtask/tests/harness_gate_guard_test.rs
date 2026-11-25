@@ -1,5 +1,4 @@
-#[path = "../src/harness/gate_guard.rs"]
-mod gate_guard;
+use xtask::harness::gate_guard;
 
 use std::fs;
 use std::path::Path;

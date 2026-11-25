@@ -10,8 +10,7 @@ pub fn find_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
-#[path = "../src/veto_deadline_gate.rs"]
-mod veto_deadline_gate;
+use xtask::veto_deadline_gate;
 
 use veto_deadline_gate::check_veto_deadlines_from_content_scoped;
 
