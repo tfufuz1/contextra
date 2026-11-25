@@ -1,5 +1,4 @@
-#[path = "../src/py_test.rs"]
-mod py_test;
+use xtask::py_test;
 
 use std::path::Path;
 

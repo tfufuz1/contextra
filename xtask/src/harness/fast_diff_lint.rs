@@ -35,7 +35,7 @@ pub struct DiffFile {
     pub added_lines: Vec<DiffAddedLine>,
 }
 
-pub(crate) fn parse_unified_diff(diff_text: &str) -> Vec<DiffFile> {
+pub fn parse_unified_diff(diff_text: &str) -> Vec<DiffFile> {
     let mut files = Vec::new();
     let mut current_file: Option<String> = None;
     let mut current_added_lines = Vec::new();

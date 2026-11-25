@@ -1,5 +1,4 @@
-#[path = "../src/harness/wal_replay_verify.rs"]
-mod wal_replay_verify;
+use xtask::harness::wal_replay_verify;
 
 use std::fs;
 use tempfile::TempDir;

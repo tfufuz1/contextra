@@ -1,5 +1,4 @@
-#[path = "../src/harness/claims_in_pr.rs"]
-mod claims_in_pr;
+use xtask::harness::claims_in_pr;
 
 use std::fs;
 use std::process::Command;

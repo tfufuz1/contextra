@@ -1,7 +1,6 @@
 // Test for harness module loop-guard
 
-#[path = "../src/harness/loop_guard.rs"]
-mod loop_guard;
+use xtask::harness::loop_guard;
 
 use std::fs;
 

@@ -1,5 +1,4 @@
-#[path = "../src/agent_lifecycle/branch_overlap.rs"]
-mod branch_overlap;
+use xtask::agent_lifecycle::branch_overlap;
 
 use std::fs;
 use std::process::Command;

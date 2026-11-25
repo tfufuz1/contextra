@@ -1,7 +1,6 @@
 //! Integration Tests for `check-commit-diff-integrity`
 
-#[path = "../src/check_commit_diff_integrity.rs"]
-mod check_commit_diff_integrity;
+use xtask::check_commit_diff_integrity;
 
 use check_commit_diff_integrity::{check_single_commit, count_claim_points, parse_git_stat_output};
 use std::fs;

@@ -1,5 +1,4 @@
-#[path = "../src/harness/gate_arch.rs"]
-mod gate_arch;
+use xtask::harness::gate_arch;
 
 use std::fs;
 use std::path::Path;

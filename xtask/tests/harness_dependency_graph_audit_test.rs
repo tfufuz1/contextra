@@ -1,5 +1,4 @@
-#[path = "../src/harness/dependency_graph_audit.rs"]
-mod dependency_graph_audit;
+use xtask::harness::dependency_graph_audit;
 
 use dependency_graph_audit::{detect_cycles, detect_ring_jumps, Finding};
 use std::collections::{BTreeMap, HashMap};

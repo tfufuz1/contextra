@@ -1,5 +1,4 @@
-#[path = "../src/harness/unsafe_audit.rs"]
-mod unsafe_audit;
+use xtask::harness::unsafe_audit;
 
 use std::collections::BTreeMap;
 use std::fs;

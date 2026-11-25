@@ -1,5 +1,4 @@
-#[path = "../src/harness/symbol_exists.rs"]
-mod symbol_exists;
+use xtask::harness::symbol_exists;
 
 use std::fs;
 use std::process::Command;

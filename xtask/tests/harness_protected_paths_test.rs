@@ -1,7 +1,6 @@
 //! Integration test for protected_paths harness module.
 
-#[path = "../src/harness/protected_paths.rs"]
-mod protected_paths;
+use xtask::harness::protected_paths;
 
 use std::fs;
 use std::process::Command;

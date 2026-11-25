@@ -1,5 +1,4 @@
-#[path = "../src/harness/test_integrity.rs"]
-mod test_integrity;
+use xtask::harness::test_integrity;
 
 use std::fs;
 use std::process::Command;

@@ -6,11 +6,10 @@ pub fn find_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
-#[path = "../src/veto_deadline_gate.rs"]
-mod veto_deadline_gate;
+use xtask::veto_deadline_gate;
 
 use veto_deadline_gate::{
-    check_veto_deadlines_from_content, parse_veto_deadlines, VetoDeadlineEntry,
+    check_veto_deadlines_from_content, parse_veto_deadlines,
 };
 
 const TEST_VETOES_FIXTURE: &str = r#"# Contextra — Feature-Veto-Register (VETOES.md)

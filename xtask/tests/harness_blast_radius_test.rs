@@ -1,7 +1,6 @@
 // xtask/tests/harness_blast_radius_test.rs
 
-#[path = "../src/harness/blast_radius.rs"]
-mod blast_radius;
+use xtask::harness::blast_radius;
 
 fn get_repo_root() -> std::path::PathBuf {
     if let Ok(output) = std::process::Command::new("git")

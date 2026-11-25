@@ -1,7 +1,6 @@
 // xtask/tests/harness_dependency_gate_test.rs
 
-#[path = "../src/harness/dependency_gate.rs"]
-mod dependency_gate;
+use xtask::harness::dependency_gate;
 
 fn get_repo_root() -> std::path::PathBuf {
     if let Ok(output) = std::process::Command::new("git")

@@ -1,7 +1,6 @@
 // xtask/tests/harness_can_merge_test.rs
 
-#[path = "../src/harness/can_merge.rs"]
-mod can_merge;
+use xtask::harness::can_merge;
 
 #[test]
 fn test_can_merge_pass() {

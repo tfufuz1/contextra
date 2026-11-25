@@ -1,5 +1,4 @@
-#[path = "../src/harness/scope_guard.rs"]
-mod scope_guard;
+use xtask::harness::scope_guard;
 
 use std::fs;
 use std::process::Command;

@@ -48,4 +48,3 @@ fn test_working_state_has_no_volatile_fields() {
     );
 }
 
-

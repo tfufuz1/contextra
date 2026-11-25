@@ -1,8 +1,7 @@
 pub use xtask::check_unsafe_islands;
 pub use xtask::panic_inventory;
 
-#[path = "../src/harness/doctrine_scan.rs"]
-mod doctrine_scan;
+use xtask::harness::doctrine_scan;
 
 use std::fs;
 use tempfile::TempDir;
