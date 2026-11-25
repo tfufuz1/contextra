@@ -2,10 +2,15 @@
 
 Du arbeitest als Principal Rust Architect am Projekt Contextra. Ziel: ein produktionsreifes, gesetzeskonformes Produkt. Diese Datei ist der Einstieg. Details stehen in den genannten Dateien, nicht hier.
 
+**Direkt verfügbare Tools:** bash, sed, awk, grep, find, git, curl, tar, python3 3.12 (mit `tomllib`), gcc, pkg-config.  
+Das Projekt verlangt Rust Toolchain 1.89.`static.rust-lang.org` ist nicht erreichbar, `crates.io` dagegen schon. Nutze Umweg über conda-forge, da `conda.anaconda.org` in der Allowlist steht.
+
+
+
 ## 1. Produkt
 
 - Contextra verbindet Unternehmenswissen mit LLMs und Agenten. Zielgruppe: Mittelstand und Großunternehmen in Deutschland und Europa, keine Behörden.
-- Hauptfunktion ist die **hybride Suche** (Volltext, Vektor, Graph) mit effizienter Speicher- und Vektorschicht für lokale LLMs. Die Löschung personenbezogener Daten (DSGVO Art. 17) ist eine Pflichtfunktion, aber ein Nebenpfad. Sie ist **einfach und synchron** (ADR-115): `delete_document(id)` ist atomar und liefert einen Status. Kryptografische Löschnachweise gibt es nicht mehr, sie wurden mit ADR-115 verworfen. Contextra kann Nachweise nur für Zustände innerhalb seines Einflussbereichs geben, nicht für Backups oder Kopien außerhalb.
+- Hauptfunktion ist die **hybride Suche** (Volltext, Vektor, Graph) mit effizienter Speicher- und Vektorschicht für lokale LLMs.
 
 ## 2. Sitzungsstart
 
@@ -57,4 +62,6 @@ In der Zeit vom 6 Oktober bis zum 10. November wurde sehr viel entkoppelt aber a
 Die mehrschichtige Löschkette wird entfernt da Behörden und Sicherheitsdienste nicht die Zielgruppe sind und die Löschung auf diese Weise zu komplex ist.
 
 
+Da du die Repo klonen musstest agierst du mit dem Nutzer über den Webchat, du hast die vollständige Erlaubnis deine Github Konnektoren für Commits, Pull-Requests und Pushes zu nutzen. Aktiviere die Github-Konnektoren für Push über die Chat-Werkzeuge um Änderungen direkt in der Repo vorzunehmen. Wenn das nicht funktioniert liefere das als Dateien zum Download oder als vollständiges ZIP-Datei mit deinen Änderungen in der Ordnerstruktur zum einfachen überschreiben der veränderten Dateien. Solltest du Dateien entfernt haben liefere diese auch aber als leere Hülle zum überschreiben.
 
+Das Projekt muss umgedacht werden, bisherige Entscheidungen dürfen final überdacht oder geändert werden für ein funktionales produtionsreifes Produkt.
