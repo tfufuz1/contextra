@@ -1,8 +1,7 @@
 use std::fs;
 use tempfile::TempDir;
 
-#[path = "../src/harness/jules_dispatch.rs"]
-mod jules_dispatch;
+use xtask::harness::jules_dispatch;
 
 struct MockHttpTransport {
     pub response: Result<String, String>,

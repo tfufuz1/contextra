@@ -1,8 +1,7 @@
 use std::fs;
 use tempfile::TempDir;
 
-#[path = "../src/harness/task_card.rs"]
-mod task_card;
+use xtask::harness::task_card;
 
 fn task_card_test_setup_repo() -> (TempDir, std::path::PathBuf) {
     let temp_dir = TempDir::new().unwrap();

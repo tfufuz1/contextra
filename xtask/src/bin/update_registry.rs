@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::PathBuf;
 
 fn main() {
     let mod_rs = fs::read_to_string("src/cli/mod.rs").unwrap();

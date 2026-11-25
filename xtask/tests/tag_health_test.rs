@@ -1,10 +1,6 @@
 //! Integration test for `tag_health`
 
-#[path = "../src/check_stale_tags.rs"]
-mod check_stale_tags;
-
-#[path = "../src/tag_health.rs"]
-mod tag_health;
+use xtask::tag_health;
 
 use std::fs;
 use std::path::Path;

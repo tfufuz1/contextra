@@ -1,7 +1,6 @@
 //! Tests for feature_matrix module.
 
-#[path = "../src/feature_matrix.rs"]
-mod feature_matrix;
+use xtask::feature_matrix;
 
 use feature_matrix::{scan_crate_features, FeatureDefault};
 use std::fs;

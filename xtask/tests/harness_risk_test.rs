@@ -1,7 +1,6 @@
 // xtask/tests/harness_risk_test.rs
 
-#[path = "../src/harness/risk.rs"]
-mod risk;
+use xtask::harness::risk;
 
 fn get_repo_root() -> std::path::PathBuf {
     if let Ok(output) = std::process::Command::new("git")

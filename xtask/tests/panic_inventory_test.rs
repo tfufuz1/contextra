@@ -1,7 +1,6 @@
 //! Tests for panic_inventory module.
 
-#[path = "../src/panic_inventory.rs"]
-mod panic_inventory;
+use xtask::panic_inventory;
 
 use panic_inventory::{run_panic_inventory_in_root, PanicKind};
 use std::fs;
