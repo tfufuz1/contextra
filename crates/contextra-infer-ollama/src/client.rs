@@ -5,6 +5,7 @@
 // NICHT-OFFENSICHTLICH: Client-Fehler 4xx (400, 404) niemals retrien; Automatischer Fallback auf sequentielles Embedding falls /api/embed fehlt
 // HOTSPOTS: embed, try_embed_batch, generate_text, chat_with_rag_streaming
 
+pub mod circuit_breaker;
 mod config;
 mod core;
 mod errors;
