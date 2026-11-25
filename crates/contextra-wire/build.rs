@@ -1,6 +1,28 @@
+//! # Build-Skript für `contextra-wire`
+//!
+//! **Ring & Klasse:** Ring 0 (Build-Phase)
+//!
+//! ## Zweck
+//! Dieses Build-Skript prüft zur Compile-Zeit, ob das FlatBuffers-Schema `schemas/contextra.fbs`
+//! vorhanden ist und ob der FlatBuffers-Compiler `flatc` auf dem Host-System verfügbar ist.
+//! Falls ja, wird der Rust-Code neu generiert und mittels Post-Processing nachbearbeitet,
+//! um Compiler-Warnungen bezüglich fehlender `unsafe`-Blöcke bei `_tab.get`-Aufrufen zu beheben.
+//! Ist `flatc` nicht installiert, wird auf die bereits committete generierte Datei zurückgegriffen.
+
 use std::path::Path;
 use std::process::Command;
 
+// ANCHOR[contextra-wire:BLD-001]
+/// Hauptfunktion des Build-Skripts.
+///
+/// # Ablauf von `main`:
+/// 1. Überprüfen, ob die FlatBuffers-Schemadatei `../../schemas/contextra.fbs` existiert.
+/// 2. Falls vorhanden: Registrierung von `cargo:rerun-if-changed` für die Schemadatei.
+/// 3. Prüfen, ob `flatc` auf dem System ausführbar ist.
+/// 4. Wenn `flatc` verfügbar: Aufruf von `flatc --rust -o src ../../schemas/contextra.fbs`.
+/// 5. Nach erfolgreicher Generierung: Post-Processing via `post_process_generated_code`.
+/// 6. Falls `flatc` fehlt, aber generierter Code existiert: Warnung ausgeben und existierenden Code nutzen.
+/// 7. Falls weder `flatc` noch die Datei existieren: Abbruch mit Fehlermeldung.
 fn main() {
     let schema_path = "../../schemas/contextra.fbs";
     let out_dir = "src";
@@ -33,6 +55,16 @@ fn main() {
     }
 }
 
+// ANCHOR[contextra-wire:BLD-002]
+/// Kapselt Aufrufe von `self._tab.get` in `unsafe { ... }`, falls sie nicht bereits gewrappt sind.
+///
+/// Ältere FlatBuffers-Compilerversionen generierten Rust-Code, in dem `_tab.get` innerhalb von
+/// sicheren Methoden ohne `unsafe`-Block aufgerufen wurde, was zu Fehlern unter neueren Rust-Toolchains führt.
+///
+/// # Ablauf
+/// 1. Prüfen, ob das Muster `self._tab.get` in der Zeile vorkommt.
+/// 2. Suchen der öffnenden und passenden schließenden Klammer des Methodenaufrufs.
+/// 3. Voranstellen von `unsafe { ` und Anhängen von ` }`.
 fn wrap_tab_get_calls_in_unsafe(line: &str) -> String {
     let pattern = "self._tab.get";
     if !line.contains(pattern) {
@@ -91,19 +123,11 @@ fn wrap_tab_get_calls_in_unsafe(line: &str) -> String {
     result
 }
 
-fn replace_unwrap_with_unwrap_or_default(line: &str, prev_line: &str) -> String {
-    if !line.contains(".unwrap()") {
-        return line.to_string();
-    }
-
-    let is_get_some = |s: &str| s.contains("get") && s.contains("Some(");
-    if is_get_some(line) || is_get_some(prev_line) {
-        return line.replace(".unwrap()", ".unwrap_or_default()");
-    }
-
-    line.to_string()
-}
-
+// ANCHOR[contextra-wire:BLD-003]
+/// Liest die erzeugte FlatBuffers-Datei ein und wendet `wrap_tab_get_calls_in_unsafe` zeilenweise an.
+///
+/// # Parameter
+/// - `output_file`: Pfad zur Zieldatei `contextra_generated.rs`.
 fn post_process_generated_code(output_file: &Path) {
     let content = match std::fs::read_to_string(output_file) {
         Ok(c) => c,
@@ -111,17 +135,14 @@ fn post_process_generated_code(output_file: &Path) {
     };
 
     let mut modified = false;
-    let mut prev_line = String::new();
     let new_lines: Vec<String> = content
         .lines()
         .map(|line| {
-            let step1 = wrap_tab_get_calls_in_unsafe(line);
-            let step2 = replace_unwrap_with_unwrap_or_default(&step1, &prev_line);
-            if step2 != line {
+            let processed = wrap_tab_get_calls_in_unsafe(line);
+            if processed != line {
                 modified = true;
             }
-            prev_line = step1;
-            step2
+            processed
         })
         .collect();
 
@@ -130,7 +151,9 @@ fn post_process_generated_code(output_file: &Path) {
         if content.ends_with('\n') {
             new_content.push('\n');
         }
-        let _ = std::fs::write(output_file, new_content);
+        if let Err(e) = std::fs::write(output_file, new_content) {
+            eprintln!("Failed to write post-processed FlatBuffers code: {e}");
+        }
     }
 }
 
@@ -138,6 +161,7 @@ fn post_process_generated_code(output_file: &Path) {
 mod tests {
     use super::*;
 
+    // Prüft, dass wrap_tab_get_calls_in_unsafe ungeschützte tab.get-Aufrufe korrekt in unsafe Blöcke packt.
     #[test]
     fn test_wrap_tab_get_calls() {
         let input1 = "    self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap()";
@@ -151,27 +175,5 @@ mod tests {
 
         let input3 = "    unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap()}";
         assert_eq!(wrap_tab_get_calls_in_unsafe(input3), input3);
-    }
-
-    #[test]
-    fn test_replace_unwrap_with_unwrap_or_default() {
-        let single_line = "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }";
-        let single_line_exp =
-            "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap_or_default() }";
-        assert_eq!(
-            replace_unwrap_with_unwrap_or_default(single_line, ""),
-            single_line_exp
-        );
-
-        let prev = "            self._tab.get::<f32>(ScoredDocument::VT_SCORE, Some(0.0))";
-        let curr = "            .unwrap()";
-        let curr_exp = "            .unwrap_or_default()";
-        assert_eq!(replace_unwrap_with_unwrap_or_default(curr, prev), curr_exp);
-
-        let non_get_line = "    Some(val).unwrap()";
-        assert_eq!(
-            replace_unwrap_with_unwrap_or_default(non_get_line, ""),
-            non_get_line
-        );
     }
 }
