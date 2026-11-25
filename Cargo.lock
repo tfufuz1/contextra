@@ -1364,6 +1364,7 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "memmap2",
+ "thiserror 2.0.20",
  "tracing",
  "windows-sys 0.61.2",
 ]

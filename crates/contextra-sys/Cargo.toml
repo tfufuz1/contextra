@@ -26,4 +26,5 @@ libc = "0.2"
 
 [dependencies]
 memmap2 = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
