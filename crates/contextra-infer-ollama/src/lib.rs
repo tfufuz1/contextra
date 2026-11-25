@@ -12,6 +12,9 @@ mod embedding;
 pub mod importance;
 pub mod model_info;
 
+pub use client::circuit_breaker::{
+    BreakerStatus, CircuitBreaker, CircuitOpenError, MonotonicClock, SystemMonotonicClock,
+};
 pub use client::{
     build_rag_prompt, xml_escape, OllamaClient, OllamaConfig, DEFAULT_BASE_URL, DEFAULT_EMBED_MODEL,
 };
