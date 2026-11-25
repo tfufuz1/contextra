@@ -63,6 +63,7 @@ pub mod check_type_registry;
 pub mod check_unsafe_islands;
 pub mod check_vetoes;
 pub mod check_workflow_commands;
+pub mod claim;
 pub mod cli;
 pub mod commit_health;
 pub mod crate_context;
