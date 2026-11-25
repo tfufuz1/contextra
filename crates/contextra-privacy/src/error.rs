@@ -8,6 +8,8 @@ pub enum EgressError {
     PolicyViolation(String),
     #[error("Internal egress error: {0}")]
     InternalError(String),
+    #[error("Capacity exceeded: {0}")]
+    CapacityExceeded(String),
     #[error("Surrogate token collision detected for token '{surrogate}': existing plaintext '{existing_plaintext}' != new plaintext '{new_plaintext}'")]
     SurrogateCollision {
         surrogate: String,
@@ -52,5 +54,12 @@ impl EgressError {
 
     pub fn internal_error(msg: impl Into<String>) -> Self {
         Self::InternalError(msg.into())
+    }
+}
+
+impl EgressError {
+    /// Konstruiert einen `EgressError::CapacityExceeded` (fail-closed bei Längenüberschreitung).
+    pub fn capacity_exceeded(msg: impl Into<String>) -> Self {
+        Self::CapacityExceeded(msg.into())
     }
 }

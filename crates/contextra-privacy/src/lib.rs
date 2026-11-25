@@ -9,6 +9,7 @@ pub mod egress_gateway;
 pub mod egress_guard;
 pub mod egress_vault;
 pub mod error;
+pub mod entity_recognizer;
 pub mod guarded_payload;
 pub mod processing_registry;
 
