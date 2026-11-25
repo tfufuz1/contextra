@@ -29,7 +29,8 @@
     clippy::doc_markdown,
     clippy::derivable_impls,
     clippy::missing_safety_doc,
-    clippy::wrong_self_convention
+    clippy::wrong_self_convention,
+    mismatched_lifetime_syntaxes
 )]
 
 // ANCHOR[contextra-wire:GEN-002]

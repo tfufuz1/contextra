@@ -16,7 +16,7 @@
 )]
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 /// Berechnet den SHA-256 Hash eines Byte-Slices gemäß FIPS 180-4 ohne externe Abhängigkeiten.
@@ -175,86 +175,11 @@ fn test_schema_hash_matches_pin() {
 }
 
 // Hilfsfunktion: Führt dasselbe Post-Processing durch wie build.rs
-fn wrap_tab_get_calls_in_unsafe(line: &str) -> String {
-    let pattern = "self._tab.get";
-    if !line.contains(pattern) {
-        return line.to_string();
-    }
+// Post-Processing wird aus `build.rs` übernommen, damit Build und Drift-Test identisch arbeiten.
+#[path = "../build.rs"]
+#[allow(dead_code)]
+mod build_script;
 
-    let mut result = String::with_capacity(line.len() + 32);
-    let mut search_from = 0;
-
-    while let Some(rel_idx) = line[search_from..].find(pattern) {
-        let idx = search_from + rel_idx;
-
-        let prefix = &line[..idx];
-        if prefix.trim_end().ends_with("unsafe {") || prefix.contains("unsafe") {
-            result.push_str(&line[search_from..idx + pattern.len()]);
-            search_from = idx + pattern.len();
-            continue;
-        }
-
-        if let Some(rel_paren_open) = line[idx + pattern.len()..].find('(') {
-            let paren_open = idx + pattern.len() + rel_paren_open;
-
-            let mut depth = 0;
-            let mut close_paren = None;
-            for (i, ch) in line[paren_open..].char_indices() {
-                if ch == '(' {
-                    depth += 1;
-                } else if ch == ')' {
-                    depth -= 1;
-                    if depth == 0 {
-                        close_paren = Some(paren_open + i);
-                        break;
-                    }
-                }
-            }
-
-            if let Some(end_idx) = close_paren {
-                result.push_str(&line[search_from..idx]);
-                result.push_str("unsafe { ");
-                result.push_str(&line[idx..=end_idx]);
-                result.push_str(" }");
-                search_from = end_idx + 1;
-                continue;
-            }
-        }
-
-        result.push_str(&line[search_from..idx + pattern.len()]);
-        search_from = idx + pattern.len();
-    }
-
-    result.push_str(&line[search_from..]);
-    result
-}
-
-fn post_process_generated_code(output_file: &Path) {
-    let content = match fs::read_to_string(output_file) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-
-    let mut modified = false;
-    let new_lines: Vec<String> = content
-        .lines()
-        .map(|line| {
-            let processed = wrap_tab_get_calls_in_unsafe(line);
-            if processed != line {
-                modified = true;
-            }
-            processed
-        })
-        .collect();
-
-    if modified {
-        let mut new_content = new_lines.join("\n");
-        if content.ends_with('\n') {
-            new_content.push('\n');
-        }
-        let _ = fs::write(output_file, new_content);
-    }
-}
 
 #[test]
 fn test_generated_code_matches_flatc_output_if_available() {
@@ -321,7 +246,7 @@ fn test_generated_code_matches_flatc_output_if_available() {
     let gen_file = temp_dir.join("contextra_generated.rs");
     if let Ok(st) = status {
         assert!(st.success(), "flatc Aufruf ist fehlgeschlagen");
-        post_process_generated_code(&gen_file);
+        build_script::post_process_generated_code(&gen_file);
 
         let generated_content = fs::read(&gen_file)
             .unwrap_or_else(|e| panic!("Fehler beim Lesen der neu generierten Datei: {e}"));

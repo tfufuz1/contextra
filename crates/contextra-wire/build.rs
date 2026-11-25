@@ -56,17 +56,25 @@ fn main() {
 }
 
 // ANCHOR[contextra-wire:BLD-002]
-/// Kapselt Aufrufe von `self._tab.get` in `unsafe { ... }`, falls sie nicht bereits gewrappt sind.
+/// Unsafe-Aufrufmuster des FlatBuffers-Generators, die `unsafe`-Blöcke benötigen.
 ///
-/// Ältere FlatBuffers-Compilerversionen generierten Rust-Code, in dem `_tab.get` innerhalb von
-/// sicheren Methoden ohne `unsafe`-Block aufgerufen wurde, was zu Fehlern unter neueren Rust-Toolchains führt.
+/// Der Generator (`flatc 24.12.23`) erzeugt diese Aufrufe in Funktionen, die ohne `unsafe`-Block
+/// geschrieben sind. `unsafe_op_in_unsafe_fn` ist im Crate als `deny` gesetzt und wird bewusst
+/// nicht über Allow-Attribute umgangen, sondern durch explizite `unsafe`-Blöcke erfüllt.
+const UNSAFE_CALL_PATTERNS: [&str; 4] = [
+    "self._tab.get",
+    "flatbuffers::Table::new",
+    "flatbuffers::root_unchecked",
+    "flatbuffers::size_prefixed_root_unchecked",
+];
+
+/// Kapselt Aufrufe eines Musters in `unsafe { ... }`, falls sie nicht bereits gewrappt sind.
 ///
 /// # Ablauf
-/// 1. Prüfen, ob das Muster `self._tab.get` in der Zeile vorkommt.
-/// 2. Suchen der öffnenden und passenden schließenden Klammer des Methodenaufrufs.
+/// 1. Prüfen, ob das Muster in der Zeile vorkommt.
+/// 2. Suchen der öffnenden und passenden schließenden Klammer des Aufrufs.
 /// 3. Voranstellen von `unsafe { ` und Anhängen von ` }`.
-fn wrap_tab_get_calls_in_unsafe(line: &str) -> String {
-    let pattern = "self._tab.get";
+fn wrap_unsafe_calls(line: &str, pattern: &str) -> String {
     if !line.contains(pattern) {
         return line.to_string();
     }
@@ -123,12 +131,27 @@ fn wrap_tab_get_calls_in_unsafe(line: &str) -> String {
     result
 }
 
+/// Liefert den `// SAFETY:`-Kommentar für eine Zeile, die einen `unsafe`-Block erhält.
+///
+/// Das Workspace-Lint `undocumented_unsafe_blocks` verlangt eine Begründung direkt vor jedem
+/// `unsafe`-Block. Der Generator liefert keine, daher wird sie hier mit dem Vertrag des jeweiligen
+/// Aufrufs ergänzt.
+fn safety_comment_for(line: &str) -> &'static str {
+    if line.contains("flatbuffers::Table::new") {
+        "// SAFETY: Der Aufrufer von `follow` garantiert, dass `buf` ein gültiger FlatBuffers-Puffer ist und `loc` auf eine Tabelle darin zeigt."
+    } else if line.contains("root_unchecked") {
+        "// SAFETY: Der Aufrufer von `root_as_*_unchecked` garantiert, dass `buf` ein verifizierter FlatBuffers-Puffer ist."
+    } else {
+        "// SAFETY: `self._tab` referenziert einen geprüften Tabellenpuffer; die VTable-Offsets stammen aus dem Generator-Layout."
+    }
+}
+
 // ANCHOR[contextra-wire:BLD-003]
-/// Liest die erzeugte FlatBuffers-Datei ein und wendet `wrap_tab_get_calls_in_unsafe` zeilenweise an.
+/// Liest die erzeugte FlatBuffers-Datei ein und wendet alle `UNSAFE_CALL_PATTERNS` zeilenweise an.
 ///
 /// # Parameter
 /// - `output_file`: Pfad zur Zieldatei `contextra_generated.rs`.
-fn post_process_generated_code(output_file: &Path) {
+pub fn post_process_generated_code(output_file: &std::path::Path) {
     let content = match std::fs::read_to_string(output_file) {
         Ok(c) => c,
         Err(_) => return,
@@ -138,11 +161,16 @@ fn post_process_generated_code(output_file: &Path) {
     let new_lines: Vec<String> = content
         .lines()
         .map(|line| {
-            let processed = wrap_tab_get_calls_in_unsafe(line);
+            let processed = UNSAFE_CALL_PATTERNS
+                .iter()
+                .fold(line.to_string(), |acc, pattern| wrap_unsafe_calls(&acc, pattern));
             if processed != line {
                 modified = true;
+                let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
+                format!("{indent}{}\n{processed}", safety_comment_for(line))
+            } else {
+                processed
             }
-            processed
         })
         .collect();
 
@@ -161,19 +189,41 @@ fn post_process_generated_code(output_file: &Path) {
 mod tests {
     use super::*;
 
-    // Prüft, dass wrap_tab_get_calls_in_unsafe ungeschützte tab.get-Aufrufe korrekt in unsafe Blöcke packt.
+    // Prüft, dass wrap_unsafe_calls ungeschützte tab.get-Aufrufe korrekt in unsafe Blöcke packt.
     #[test]
     fn test_wrap_tab_get_calls() {
+        let p = "self._tab.get";
         let input1 = "    self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap()";
         let expected1 = "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)) }.unwrap()";
-        assert_eq!(wrap_tab_get_calls_in_unsafe(input1), expected1);
+        assert_eq!(wrap_unsafe_calls(input1, p), expected1);
 
         let input2 =
             "    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None)";
         let expected2 = "    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None) }";
-        assert_eq!(wrap_tab_get_calls_in_unsafe(input2), expected2);
+        assert_eq!(wrap_unsafe_calls(input2, p), expected2);
 
         let input3 = "    unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap()}";
-        assert_eq!(wrap_tab_get_calls_in_unsafe(input3), input3);
+        assert_eq!(wrap_unsafe_calls(input3, p), input3);
+    }
+
+    // Prüft das Wrappen der Table- und Root-Aufrufe, die flatc 24.12.23 ungeschützt erzeugt.
+    #[test]
+    fn test_wrap_table_and_root_calls() {
+        let input1 = "    Self { _tab: flatbuffers::Table::new(buf, loc) }";
+        let expected1 = "    Self { _tab: unsafe { flatbuffers::Table::new(buf, loc) } }";
+        assert_eq!(wrap_unsafe_calls(input1, "flatbuffers::Table::new"), expected1);
+
+        let input2 = "  flatbuffers::root_unchecked::<SearchResponse>(buf)";
+        let expected2 = "  unsafe { flatbuffers::root_unchecked::<SearchResponse>(buf) }";
+        assert_eq!(wrap_unsafe_calls(input2, "flatbuffers::root_unchecked"), expected2);
+
+        let input3 = "  flatbuffers::size_prefixed_root_unchecked::<SearchResponse>(buf)";
+        let expected3 = "  unsafe { flatbuffers::size_prefixed_root_unchecked::<SearchResponse>(buf) }";
+        assert_eq!(
+            wrap_unsafe_calls(input3, "flatbuffers::size_prefixed_root_unchecked"),
+            expected3
+        );
+        // Muster darf nicht über das Präfix des anderen greifen.
+        assert_eq!(wrap_unsafe_calls(input3, "flatbuffers::root_unchecked"), input3);
     }
 }
