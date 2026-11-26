@@ -40,3 +40,5 @@ Nutze das Tool add_repo , hänge das Repo ein mit Push-Zugriff an um Pull-Reques
 
 In docs/SPEC.md ist die normative SOLL-Spezifikation , der Ist-Zustand weicht also bewusst von der Spezifikation ab und spezifiziert die Ziele.
 In docs/spec/ ist diese Spezifikation in Teile zerlegt zum besseren durchsuchen.
+
+Die IMPL Dokumente in docs/ sind konkrete Implementierungsspezifikationen zur Umsetzung der SPEC.md
