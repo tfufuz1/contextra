@@ -314,19 +314,12 @@ impl Contextra {
         Ok(sorted_names)
     }
 
-    /// Drops a collection and issues a [`DeletionProof`] attesting to logical LSM key space deletion.
+    /// Drops a collection as a tombstone commit (`retire` for all its records).
     ///
-    /// # Limitations / Non-Guarantees
-    /// - Does NOT guarantee immediate physical purge or removal of SSTable files, WAL segments, HNSW index files, or CSR graph data files from disk storage.
-    /// - Does NOT guarantee hardware physical SSD flash controller level sanitization (wear leveling / TRIM depend on OS & hardware).
-    /// - Attests strictly to logical deletion (tombstones committed and verified empty in active MemTable/LSM key space scans).
-    #[tracing::instrument(level = "trace", skip(self, proof_key))]
-    pub async fn drop_collection(
-        &self,
-        name: &str,
-        tenant_id: TenantId,
-        proof_key: &[u8],
-    ) -> Result<DeletionProof> {
+    /// Gemäß SPEC §7.4 / C-15: Löschung = Tombstone-Commit. Es wird kein Löschnachweis
+    /// ausgestellt und keine Signatur erzeugt; physische Entfernung erfolgt über Retention + Compaction.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn drop_collection(&self, name: &str, tenant_id: TenantId) -> Result<()> {
         if name == "default" {
             return Err(contextra_types::ContextraError::invalid_input(
                 "Cannot drop default collection",
@@ -342,24 +335,6 @@ impl Contextra {
         let txt_data_prefix = format!("__txt:{}:", name);
         let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
 
-        let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
-
-        let col_entries = tenant_storage
-            .scan_prefix(col_data_prefix.as_bytes())
-            .await?;
-        for (k, _) in col_entries {
-            deleted_keys.push(k);
-        }
-
-        let txt_entries = tenant_storage
-            .scan_prefix(txt_data_prefix.as_bytes())
-            .await?;
-        for (k, _) in txt_entries {
-            deleted_keys.push(k);
-        }
-
-        deleted_keys.push(col_idx_key.clone());
-
         let tx = self.allocate_tx()?;
 
         tenant_storage
@@ -374,66 +349,13 @@ impl Contextra {
 
         tenant_storage.commit(tx).await?;
 
-        let remaining_col_data = tenant_storage
-            .scan_prefix(col_data_prefix.as_bytes())
-            .await?;
-        let remaining_txt_data = tenant_storage
-            .scan_prefix(txt_data_prefix.as_bytes())
-            .await?;
-
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(name.as_bytes());
-        let hash_bytes = hasher.finalize();
-        let col_id_u64 =
-            u64::from_le_bytes(hash_bytes.as_bytes()[0..8].try_into().unwrap_or([1; 8]));
-        let collection_id = CollectionId::try_new(col_id_u64).unwrap_or(CollectionId::new(1));
-
-        let scope = DeletionScope::Collection {
-            collection_id,
-            tenant_id,
-        };
-
-        // LSM deletion via `delete_prefix` is tombstone-only.
-        // Post-commit prefix scans verify logical key space emptiness in active MemTable / LSM state.
-        // SSTable compaction and WAL truncation are asynchronous background operations; existing SSTable files
-        // and WAL segments may still contain physical bytes until full compaction/truncation occurs.
-        // Therefore, drop_collection claims ONLY `DeletionLayer::LsmMemtable`.
-        // `SsTableAllLevels` or `WalAllSegments` may only be re-added together with a real physical verifier that inspects disk storage.
-        let layer_proofs = vec![LayerCleanupProof::new_after_verified_empty(
-            DeletionLayer::LsmMemtable,
-            remaining_col_data.len() + remaining_txt_data.len(),
-        )]
-        .into_iter()
-        .collect::<Result<Vec<_>>>()
-        .map_err(|e| {
-            contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was tombstoned and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
-                tx.inner()
-            ))
-        })?;
-
-        let proof = DeletionProof::create(
-            scope,
-            deleted_keys,
-            tx,
-            layer_proofs,
-            vec![],
-            proof_key,
-        )
-        .map_err(|e| {
-            contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was tombstoned and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
-                tx.inner()
-            ))
-        })?;
-
         self.collections.write().await.remove(name);
         self.tenant_collections
             .write()
             .await
             .remove(&(tenant_id, name.to_string()));
 
-        Ok(proof)
+        Ok(())
     }
 
     /// Purges all cached KV segments and stored collection data for the given tenant across the engine.

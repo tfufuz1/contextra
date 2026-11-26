@@ -68,7 +68,6 @@ async fn test_tenant_drop_collection_invalidates_cache_and_clears_data(
     let db = Contextra::open_with_config(dir.path(), ContextraConfig::default()).await?;
 
     let tenant_1 = TenantId::try_new(303).unwrap();
-    let proof_key = b"test_hmac_proof_key_123456789012";
 
     // 1. Create collection & insert document
     let col1 = db.collection_for_tenant("drop_col", tenant_1).await?;
@@ -81,8 +80,7 @@ async fn test_tenant_drop_collection_invalidates_cache_and_clears_data(
     .await?;
 
     // 2. Drop collection for tenant
-    let proof = db.drop_collection("drop_col", tenant_1, proof_key).await?;
-    assert_eq!(proof.tenant_id(), tenant_1);
+    db.drop_collection("drop_col", tenant_1).await?;
 
     // 3. Requesting collection again returns a fresh, empty handle
     let col2 = db.collection_for_tenant("drop_col", tenant_1).await?;

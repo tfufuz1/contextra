@@ -605,7 +605,7 @@ mod tests {
             .await
             .expect("ins"); // expect
 
-        db.drop_collection("drop-me", tenant_id, &[0u8; 32])
+        db.drop_collection("drop-me", tenant_id)
             .await
             .expect("drop"); // expect
 
