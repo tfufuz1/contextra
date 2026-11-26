@@ -12,12 +12,18 @@
 #![allow(ambiguous_glob_reexports)]
 
 pub mod error;
+pub mod error_codes;
 pub mod error_dto;
+pub mod file_header;
+pub mod handle;
+pub mod hlc;
+pub mod ids2;
 pub mod model_fingerprint;
 pub mod retrieval_strategy;
 pub mod schema;
 pub mod tenant_scope;
 pub mod tombstone;
+pub mod trust;
 pub mod types;
 
 pub use types::math;
