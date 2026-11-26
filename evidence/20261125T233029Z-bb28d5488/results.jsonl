@@ -1,0 +1,2 @@
+{"step": "cargo_fmt", "command": "cargo fmt --check", "exit_code": 1, "duration_s": 5.162, "log_file": "step_01_cargo_fmt.log", "passed": false, "skipped": false, "missing": false, "passed_tests": 0, "failed_tests": 0, "ignored_tests": 0, "skipped_tests": 0}
+{"step": "cargo_clippy", "command": "cargo clippy --workspace --all-targets --locked -- -D warnings", "exit_code": 101, "duration_s": 6.543, "log_file": "step_02_cargo_clippy.log", "passed": false, "skipped": false, "missing": false, "passed_tests": 0, "failed_tests": 0, "ignored_tests": 0, "skipped_tests": 0}
