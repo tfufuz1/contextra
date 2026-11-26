@@ -1,3 +1,5 @@
+#![cfg(feature = "rie-greedy-personalization")]
+
 use contextra_adapt::rie_greedy::RieGreedyProfile;
 
 #[test]
