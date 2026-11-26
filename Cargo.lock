@@ -689,8 +689,6 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 name = "contextra"
 version = "0.1.0"
 dependencies = [
- "contextra-audit-export",
- "contextra-avv-generator",
  "contextra-core",
  "contextra-crypto",
  "contextra-db",
@@ -747,27 +745,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "contextra-audit-export"
-version = "0.1.0"
-dependencies = [
- "contextra-ports",
- "contextra-types",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "contextra-avv-generator"
-version = "0.1.0"
-dependencies = [
- "contextra-types",
- "serde",
- "thiserror 2.0.20",
 ]
 
 [[package]]
