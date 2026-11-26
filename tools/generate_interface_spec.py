@@ -50,7 +50,6 @@ RING_META: dict[str, tuple[int, str, str]] = {
     "contextra-types": (0, "Fertig", "Kanonische Domänenmodelle, IDs, Budgets, Filter-AST und Fehlertypen."),
     "contextra-ports": (0, "Fertig", "dyn-kompatible Trait-Definitionen (Ports) für Storage, Indizes, Embedder und System-Uhren."),
     "contextra-mvcc": (0, "Fertig", "SeqLog, SnapshotRegistry und transaktionaler TxBuffer (MVCC-Isolation)."),
-    "contextra-wire": (0, "Fertig", "FlatBuffers-IPC-Generat und Zero-Copy-Adapter (Unsafe-Insel)."),
     "contextra-sys": (0, "Fertig", "System-Abstraktionen für mmap, mlock und Win32-ACLs (Unsafe-Insel)."),
     "contextra-simd": (0, "Fertig", "AVX2/AVX-512/NEON SIMD-Distanzberechnungskerne mit Laufzeit-Dispatch (Unsafe-Insel)."),
     "contextra-crypto": (0, "In Migration", "AES-256-GCM-SIV, WAL-HMAC-Integritätsketten, Zeroize und Deletion-Proofs."),
@@ -58,27 +57,13 @@ RING_META: dict[str, tuple[int, str, str]] = {
     "contextra-text": (0, "Fertig", "BM25/BM25F-Volltextindexierung und deutsche Kompositazerlegung."),
     "contextra-graph": (0, "Fertig", "Compressed Sparse Row (CSR) Graph, Forward-Push PPR, Leiden und Hyperkanten."),
     "contextra-rank": (0, "In Migration", "4-Signal-Retrieval-Fusion, Score-Kalibrierung und Drift-Messung."),
-    "contextra-adapt": (0, "Fertig", "LinUCB-Bandit-Mathematik, Lyapunov-Drift-Wächter und PID-Regler."),
     "contextra-core": (0, "Fertig (Strangler Facade)", "Re-Export-Fassade über types, ports, mvcc und wire zur Abwärtskompatibilität."),
-    "contextra-audit-export": (0, "Fertig", "Generator für Verarbeitungsverzeichnisse gemäß DSGVO Art. 30."),
-    "contextra-avv-generator": (0, "Fertig", "Template-Generator für Auftragsverarbeitungsverträge (AVV)."),
-    "contextra-license": (0, "Fertig", "Lizenzierungs- und Aktivierungsprüfung für Feature-Ringe."),
     "contextra-store": (1, "Fertig", "LSM-Tree Storage Engine mit WAL-Group-Commit und HMAC-Integritätsprüfung."),
-    "contextra-kvcache": (1, "Fertig", "Verschlüsselter Prefix-Radix-Baum und KV-Cache-Segment-Verwaltung."),
     "contextra-checkpoint": (1, "Fertig", "Time-Travel-Registry und Checkpoint-Verwaltung ohne globalen Zustand."),
-    "contextra-infer-candle": (2, "In Migration", "Native GGUF-Modell-Inferenz via Candle."),
-    "contextra-infer-ollama": (2, "In Migration", "HTTP-Inferenz-Client für Ollama mit Contextual-Chunk-Prefixing."),
-    "contextra-infer-onnx": (2, "In Migration", "ONNX-Embeddings und Reranking via ort."),
-    "contextra-sandbox": (2, "Fertig", "WASM-Ausführungs-Isolation mit Fuel- und Wall-Clock-Limits via Wasmtime."),
     "contextra-engine": (3, "In Migration", "Collection-LSM-Anbindung, Multi-Index-Pläne und Schreibtransaktionen."),
-    "contextra-cognition": (3, "In Migration", "Hintergrund-Kompaktierung, Synthese und Konsolidierungs-Scheduler."),
-    "contextra-privacy": (3, "In Migration", "Cloud-Egress Privacy Gateway, PII-Vault, Surrogat-Tokenisierung und DLP."),
-    "contextra-router": (3, "In Migration", "SLM-Profil-Routing und MCP-Dispatch."),
-    "contextra-agent": (3, "Fertig", "Agenten-Workflow-Engine mit auditierbarer State-Machine und DLQ."),
     "contextra-db": (3, "In Migration (Legacy-Fassade)", "Monolithische Übergangsfassade für Speicher-, Such- und Indexzugriffe."),
     "contextra": (4, "Fertig", "Öffentliche Haupt-Fassade und Composition Root für Rust-Anwendungen."),
     "contextra-mcp": (4, "In Migration", "Stdio-JSON-RPC MCP-Server-Protokoll-Adapter."),
-    "contextra-py": (4, "In Migration", "PyO3 Python-FFI-Bindings."),
     "contextra-testkit": (99, "Fertig (Tooling)", "Deterministische Test-Utilities (ManualClock, InMemoryStorageEngine, FaultVfs)."),
 }
 
@@ -93,19 +78,16 @@ RING_NAMES = {
 
 # Reihenfolge der Darstellung im Dokument (Ring-für-Ring, dependency-nah sortiert)
 ORDER = [
-    "contextra-types", "contextra-ports", "contextra-mvcc", "contextra-wire", "contextra-sys",
+    "contextra-types", "contextra-ports", "contextra-mvcc", "contextra-sys",
     "contextra-simd", "contextra-crypto", "contextra-vector", "contextra-text", "contextra-graph",
-    "contextra-rank", "contextra-adapt", "contextra-core", "contextra-audit-export",
-    "contextra-avv-generator", "contextra-license",
-    "contextra-store", "contextra-kvcache", "contextra-checkpoint",
-    "contextra-infer-candle", "contextra-infer-ollama", "contextra-infer-onnx", "contextra-sandbox",
-    "contextra-engine", "contextra-cognition", "contextra-privacy", "contextra-router",
-    "contextra-agent", "contextra-db",
-    "contextra", "contextra-mcp", "contextra-py",
+    "contextra-rank", "contextra-core",
+    "contextra-store", "contextra-checkpoint",
+    "contextra-engine", "contextra-db",
+    "contextra", "contextra-mcp",
     "contextra-testkit",
 ]
 
-UNSAFE_ISLANDS = {"contextra-simd", "contextra-sys", "contextra-wire"}
+UNSAFE_ISLANDS = {"contextra-simd", "contextra-sys"}
 
 
 # --------------------------------------------------------------------------- #
@@ -477,7 +459,7 @@ Contextra erzwingt ein striktes 5-Ring-Schichtenmodell. Abhängigkeiten dürfen 
 | **3** | Orchestration & Cognition | Transaktions-Engine, Collection-Engine, Kompaktierung, Privacy-Gateway, Routing, Agent-Workflows | Geschäfts-/Orchestrierungslogik |
 | **4** | Boundary & Composition Roots | Öffentliche Fassade (`contextra`), MCP-Server, Python-Bindings | Einzige Composition Root |
 
-**Unsafe-Inseln:** `contextra-sys`, `contextra-simd`, `contextra-wire` (einzige Crates ohne `#![forbid(unsafe_code)]`).
+**Unsafe-Inseln:** `contextra-sys`, `contextra-simd` (einzige Crates ohne `#![forbid(unsafe_code)]`).
 
 **Locking-Disziplin:** `collections (RwLock) → kv_locks (KvKeyLocks) → embedder (RwLock)`, Shard-Indizes strikt aufsteigend akquirieren, kein `.await` unter gehaltenem Sync-Lock.
 
@@ -519,9 +501,9 @@ def render_closing(f) -> None:
 ## Anhang A — Querschnittliche Invarianten (gelten crateübergreifend)
 
 * **Zero-Panic-Doktrin:** `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`, `unreachable` sind workspace-weit als Clippy-Lint verboten.
-* **`unsafe_code = "deny"`** ist Workspace-Default; nur `contextra-sys`, `contextra-simd`, `contextra-wire` heben dies explizit auf.
+* **`unsafe_code = "deny"`** ist Workspace-Default; nur `contextra-sys`, `contextra-simd` heben dies explizit auf.
 * **Sync-Kern, Async-Schale (P26):** Ring-0-Crates verwenden kein `tokio`.
-* **DAG-Integrität (P5):** Aufwärtskanten sind verboten; einzige dokumentierte Restausnahme: `contextra-router → contextra-db` (Migrationsartefakt).
+* **DAG-Integrität (P5):** Aufwärtskanten sind verboten.
 * **`#[non_exhaustive]`-Disziplin** bei zentralen Fehler-Enums (u. a. `ContextraError`).
 * **Deletion-Proof-Kette:** kryptographisch extern verifizierbare Löschbeweise (`contextra-crypto`).
 * **Feature-Ring-Trennung:** `fast` / `sovereign` / `compliance` (Crate `contextra`) trennen Lizenzstufen auf Kompilierungsebene.

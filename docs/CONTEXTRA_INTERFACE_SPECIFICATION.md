@@ -1,6 +1,6 @@
 # Contextra — Globale Mikrofeingranulare Schnittstellenspezifikation
 
-**Repository:** `contextra` (Workspace-Root) · **Generiert am:** 2026-11-26
+**Repository:** `contextra` (Workspace-Root) · **Generiert am:** 2026-11-27
 **Erzeugt durch:** `scripts/generate_interface_spec.py` (automatisierte, reproduzierbare Vollanalyse aller Workspace-Crates)
 **Methodik:** Statische Extraktion aller `pub`-Symbole (Traits, Structs, Enums, Funktionen, Typ-Aliase, Konstanten) aus jedem `src/**/*.rs` je Crate, angereichert mit den Original-Doc-Kommentaren (`///`, `//!`), den `Cargo.toml`-Metadaten (Abhängigkeiten, Feature-Flags) und der `lib.rs`-Re-Export-Oberfläche. Test-Module (`#[cfg(test)] mod tests`) sind ausgeschlossen.
 
@@ -11,11 +11,11 @@
 | Kennzahl | Wert |
 |---|---|
 | Analysierte Fach-Crates (`crates/*`) | 17 |
-| Extrahierte öffentliche Symbole gesamt | **3324** |
+| Extrahierte öffentliche Symbole gesamt | **3325** |
 | — davon Public Traits (Schnittstellen im engeren Sinn) | 110 |
 | — davon Public Structs | 543 |
 | — davon Public Enums | 145 |
-| — davon Public Funktionen | 2312 |
+| — davon Public Funktionen | 2313 |
 | — davon Typ-Aliase | 45 |
 | — davon Konstanten | 169 |
 
@@ -33,7 +33,7 @@ Contextra erzwingt ein striktes 5-Ring-Schichtenmodell. Abhängigkeiten dürfen 
 | **3** | Orchestration & Cognition | Transaktions-Engine, Collection-Engine, Kompaktierung, Privacy-Gateway, Routing, Agent-Workflows | Geschäfts-/Orchestrierungslogik |
 | **4** | Boundary & Composition Roots | Öffentliche Fassade (`contextra`), MCP-Server, Python-Bindings | Einzige Composition Root |
 
-**Unsafe-Inseln:** `contextra-sys`, `contextra-simd`, `contextra-wire` (einzige Crates ohne `#![forbid(unsafe_code)]`).
+**Unsafe-Inseln:** `contextra-sys`, `contextra-simd` (einzige Crates ohne `#![forbid(unsafe_code)]`).
 
 **Locking-Disziplin:** `collections (RwLock) → kv_locks (KvKeyLocks) → embedder (RwLock)`, Shard-Indizes strikt aufsteigend akquirieren, kein `.await` unter gehaltenem Sync-Lock.
 
@@ -41,15 +41,15 @@ Contextra erzwingt ein striktes 5-Ring-Schichtenmodell. Abhängigkeiten dürfen 
 
 ## 2. Crate-Inventar nach Ring (Navigationsübersicht)
 
-**Ring 0 — Foundation:** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-wire`, `contextra-sys`, `contextra-simd`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-adapt`, `contextra-core`, `contextra-audit-export`, `contextra-avv-generator`, `contextra-license`
+**Ring 0 — Foundation:** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-sys`, `contextra-simd`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-core`
 
-**Ring 1 — Persistence & Cache:** `contextra-store`, `contextra-kvcache`, `contextra-checkpoint`
+**Ring 1 — Persistence & Cache:** `contextra-store`, `contextra-checkpoint`
 
-**Ring 2 — External Adapters & Sandboxing:** `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-infer-onnx`, `contextra-sandbox`
+**Ring 2 — External Adapters & Sandboxing:** 
 
-**Ring 3 — Orchestration & Cognition:** `contextra-engine`, `contextra-cognition`, `contextra-privacy`, `contextra-router`, `contextra-agent`, `contextra-db`
+**Ring 3 — Orchestration & Cognition:** `contextra-engine`, `contextra-db`
 
-**Ring 4 — Boundary & Composition Roots:** `contextra`, `contextra-mcp`, `contextra-py`
+**Ring 4 — Boundary & Composition Roots:** `contextra`, `contextra-mcp`
 
 **Tooling:** `contextra-testkit`
 
@@ -6135,7 +6135,7 @@ pub trait WalObserver : Send + Sync {
 | `WAL_V2_HEADER` | `[u8` | Magic header for V2 batch-encrypted WAL files (`b"MFW2"`). |
 | `WAL_V3_HEADER` | `[u8` | Magic header for V3 WAL files (`b"MFW3"`). |
 
-### Öffentliche Funktionen (298)
+### Öffentliche Funktionen (299)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
@@ -6424,6 +6424,7 @@ pub trait WalObserver : Send + Sync {
 | `pub async fn enqueue_append_batch_locked( &self, batch: PreparedBatch, _guard: &tokio::sync::MutexGuard<'_, ()>, ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>>` | — | `src/wal/io.rs` |
 | `pub async fn find_tx_offset(&self, target_tx_id: TxId) -> Result<(u64, [u8` | — | `src/wal/io.rs` |
 | `pub async fn last_hmac_snapshot(&self) -> [u8` | Returns a snapshot of the last HMAC written to the log. | `src/wal/io.rs` |
+| `pub async fn rewrite_as_v3_with_integrity_key( &self, replayed_entries: &[(u64, WalEntry, u64)], integrity_key: [u8; 32], ) -> Result<()>` | Rewrites legacy V1 or V2 WAL files as V3 using an explicit integrity key. | `src/wal/io.rs` |
 | `pub async fn rotate_and_seal(&self) -> Result<PathBuf>` | — | `src/wal/io.rs` |
 | `pub async fn scan_entries_with_callback<F>( &self, file_size: u64, mut callback: F, ) -> Result<WalVersion> where F: FnMut(u64, WalEntry, u64) -> bool,` | Scans the WAL entry by entry, executing full HMAC chain validation, CRC checks, and key manager decryption. Invokes `callback(seq_no, entry… | `src/wal/io.rs` |
 | `pub async fn truncate(&self, offset: u64, new_last_hmac: [u8; 32]) -> Result<()>` | — | `src/wal/io.rs` |
@@ -7832,9 +7833,9 @@ pub use reference_model::{RefOp, ReferenceModel};
 ## Anhang A — Querschnittliche Invarianten (gelten crateübergreifend)
 
 * **Zero-Panic-Doktrin:** `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`, `unreachable` sind workspace-weit als Clippy-Lint verboten.
-* **`unsafe_code = "deny"`** ist Workspace-Default; nur `contextra-sys`, `contextra-simd`, `contextra-wire` heben dies explizit auf.
+* **`unsafe_code = "deny"`** ist Workspace-Default; nur `contextra-sys`, `contextra-simd` heben dies explizit auf.
 * **Sync-Kern, Async-Schale (P26):** Ring-0-Crates verwenden kein `tokio`.
-* **DAG-Integrität (P5):** Aufwärtskanten sind verboten; einzige dokumentierte Restausnahme: `contextra-router → contextra-db` (Migrationsartefakt).
+* **DAG-Integrität (P5):** Aufwärtskanten sind verboten.
 * **`#[non_exhaustive]`-Disziplin** bei zentralen Fehler-Enums (u. a. `ContextraError`).
 * **Deletion-Proof-Kette:** kryptographisch extern verifizierbare Löschbeweise (`contextra-crypto`).
 * **Feature-Ring-Trennung:** `fast` / `sovereign` / `compliance` (Crate `contextra`) trennen Lizenzstufen auf Kompilierungsebene.

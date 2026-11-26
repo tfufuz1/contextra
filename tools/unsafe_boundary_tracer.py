@@ -7,7 +7,7 @@ Detailed diagnostic of unsafe boundaries across the Rust workspace:
 - Checks whether an explicit `// SAFETY:` explanation accompanies each `unsafe` usage.
 - Traces raw pointer operations (`*const`, `*mut`, `as_ptr`, `from_raw_parts`).
 - Traces foreign function interface (FFI) bindings (`extern "C"`, libc calls).
-- Enforces Unsafe Island governance (only `contextra-simd`, `contextra-sys`, `contextra-wire`
+- Enforces Unsafe Island governance (only `contextra-simd`, `contextra-sys`
   may contain unsafe; all other crates must enforce `#![forbid(unsafe_code)]`).
 """
 
@@ -28,7 +28,7 @@ from agent_tooling_common import (
     strip_comments_and_strings,
 )
 
-ALLOWED_UNSAFE_CRATES = {"contextra-simd", "contextra-sys", "contextra-wire"}
+ALLOWED_UNSAFE_CRATES = {"contextra-simd", "contextra-sys"}
 
 
 def audit_file_unsafe(file_path: Path, crate_name: str, repo_root: Path) -> Tuple[List[Dict], bool]:

@@ -5,7 +5,7 @@ unsafe_boundary_auditor.py - Audit aller Unsafe-Blöcke und Funktionen in Rust-C
 Prüfungen:
 - Vorkommen von `unsafe fn`, `unsafe trait`, `unsafe impl`, `unsafe {`
 - Vorhandensein des vorgeschriebenen `// SAFETY:`-Nachweiskommentars gemäß M9
-- Abgleich mit Unsafe-Inseln in capabilities.toml (nur contextra-simd, contextra-sys, contextra-wire dürfen unsafe enthalten)
+- Abgleich mit Unsafe-Inseln in capabilities.toml (nur contextra-simd, contextra-sys dürfen unsafe enthalten)
 - Erkennung von `#![forbid(unsafe_code)]` vs `#![allow(unsafe_code)]`
 
 Erzeugt Markdown- und JSON-Berichte in docs/diagnostics/.
@@ -18,7 +18,7 @@ import json
 import argparse
 from pathlib import Path
 
-ALLOWED_UNSAFE_CRATES = {"contextra-simd", "contextra-sys", "contextra-wire"}
+ALLOWED_UNSAFE_CRATES = {"contextra-simd", "contextra-sys"}
 
 UNSAFE_PATTERNS = {
     "unsafe_block": re.compile(r'\bunsafe\s*\{'),
