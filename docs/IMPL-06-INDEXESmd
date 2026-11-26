@@ -1,0 +1,38 @@
+# IMPL-06 — Index-Segmente, `Gid↔DocId`, Watermarks, FTS/Vektor/CSR
+
+**Phase:** P2 · **SOLL:** SPEC §5, C-06, INV-1, INV-4, INV-8 · **Abhängig von:** IMPL-04, IMPL-05 · **Crates:** `contextra-vector`, `contextra-text`, `contextra-graph` (alle L4, ohne `tokio`)
+
+## 1. Ziel
+
+Alle Suchindizes sind **abgeleitete, wiederaufbaubare Segmente** über dem Truth-Layer. Jedes Segment ist unveränderlich, trägt `source_truth_hash` und `watermark_seq` und wird über ein `IndexManifest` (referenziert durch `IndexManifestRef`) atomar ausgetauscht. Verlust eines Index ist nie Datenverlust (INV-1).
+
+## 2. Adressraum
+
+- Global: `Gid(u64)`, dicht je Repository, nie wiederverwendet.
+- Pro Segment: `DocId(u32)` lokal, dicht `0..n`. Abbildung im Segment: `docid_to_gid: [u64; n]` (bitpacked delta) und `gid_to_docid` (sortierte Gid-Liste + Binärsuche, bei n > 64 Ki zusätzlich Eytzinger- oder Bloom-Vorstufe).
+- Treffermengen intern als **Roaring-Bitmaps** über `DocId`; Zusammenführung zwischen Segmenten erst nach Übersetzung nach `Gid`.
+- Retire/Tombstone-Filter: Roaring-Bitmap `live` pro Segment aus `primary`-Tree-Flags; wird zur Abfragezeit angewendet (kein Segment-Rewrite für Retire).
+- IST-Bruch: `DocId` ist heute `u64/u128` aus Key-Hash (`types/domain/ids.rs`). Migration: neuer Typ `SegDocId(u32)` in `types` (IMPL-01), Alt-`DocId` bleibt im Altpfad; Bridge `fn gid_of(DocId)` über `aliases`-Tree.
+
+## 3. Segment-Container (gemeinsam)
+
+Datei `idx-<kind>-<seg_id>.cxi`: Header (Magic `CXI1`, `format_version`, `compat/incompat_flags`, `kind`, `seg_id`, `source_truth_hash`, `watermark_seq`, `doc_count`), Sektionsverzeichnis (`{tag, offset, len, crc32c}`), Sektionen, Footer-CRC. Verschlüsselung wie Packs (Segment-DEK, IMPL-08). Zugriff über `pread` (kein `mmap`; Lese-Cache über Buffer Pool IMPL-04).
+
+`IndexManifest`: Liste `{kind, seg_id, watermark_seq, source_truth_hash, doc_count, crc}`; Publish analog zum Pack-Manifest-Log. Segmentabdeckung: Union der `watermark_seq`-Intervalle muss lückenlos bis `manifest.watermark_seq` reichen, sonst `IndexStale`.
+
+## 4. Textindex (`contextra-text`)
+
+- Inverted Index je Feld (BM25F: Titel/Tags/Body, Gewichte konfigurierbar `w_f`, `b_f`, `k1`).
+- Term-Wörterbuch als **FST** (`fst`-Crate, Cargo.lock-Prüfung vorab) → `(postings_offset, df)`.
+- Postings: Blöcke à 128 DocIds, delta + bitpacked (`contextra-simd`), je Block `max_tf_norm` für **Block-Max-WAND**.
+- Tokenisierung: Unicode-Segmentierung + Lowercasing + optional Stemmer je Sprache (DE/EN), Sprachwahl pro Namespace.
+- Query: `Top-k` mit Block-Max-WAND; Phrase/Proximity nur über Positionslisten, falls Feld mit `positions=true`.
+- Zusammenführen: Segmentweise Top-k, dann globaler Merge mit **globalen** IDF-Statistiken (aus Manifest-Summen, nicht pro Segment).
+
+## 5. Vektorindex (`contextra-vector`)
+
+- Index-Arten: `Flat` (≤ 10⁴ Vektoren oder auf Wunsch), `HNSW`, `Vamana`/DiskANN-Stil (große Bestände, Graph + Vektoren per `pread`). Auswahl je Namespace nach Größe: Flat < 10 k, HNSW bis ~10 M, Vamana darüber (Konfigurationsschwellen, nicht hartkodiert).
+- Quantisierung: `f32`, `f16`, `int8` (SQ), optional PQ; Rescoring der Top-`k·r` mit Vollpräzision.
+- Distanzen: Cosine/Dot/L2 über `contextra-simd` (Fallback skalar, Laufzeit-Dispatch).
+- Segmente immutable; Delta-Vektoren in kleinem `Flat`-Segment (MemSegment) bis Flush; Merge-Policy: tiered (Größenverhältnis 4:1).
+- Retire: Filter über `live`-Bitmap **im** Suchlauf (Traversal darf tote Knoten durchlaufen, nie ausgeben).
