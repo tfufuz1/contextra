@@ -1,308 +1,266 @@
-# SPEC-01 — Architektur und Designprinzipien
+# SPEC-01 — Architektur, Invarianten und Systemgrenzen
 
-**Version 2.1 · November 2026 · Status: Final**
+**Version 3.0 · 26. November 2026 · Status: Final**
 **Querverweise:** [Index](SPEC-00-INDEX.md) · [Datenmodell](SPEC-02-DATA-MODEL.md) · [Storage](SPEC-03-STORAGE-ENGINE.md) · [Versionierung](SPEC-04-VERSIONING.md)
 
-> Alle Performance-Zahlen sind **Designziele (Hypothesen)**, keine Messwerte. Validierung durch Prototypen und Benchmarks auf Referenzhardware (siehe [SPEC-09](SPEC-09-OPERATIONS.md), Abschnitt 3). Schlüsselwörter **MUSS**, **SOLL**, **KANN** folgen RFC 2119.
+> **Normsprache** (RFC 2119): MUSS / MUSS NICHT = zwingend. SOLL = Regelfall, Abweichung nur per Entscheidungsregister. KANN = optional. Alle Latenz-, Durchsatz- und Kapazitätswerte sind **Hypothesen**; die einzige verbindliche Zielwerttabelle steht in [SPEC-09](SPEC-09-OPERATIONS.md) §3.
 
 ---
 
-## 1. Produktvision
+## 1. Vision und Scope
 
-Contextra ist ein **LLM-natives, versioniertes Storage-System und hybrider RAG-Speicherkern** in Rust. Es macht die Besonderheiten von LLM- und Agenten-Workloads — Token-Budgets, hybride Suche über denselben Snapshot, spekulative Verzweigungen, Mehrfachauflösungen (Zoom-Leiter), Provenienz, Trust/Taint und unzuverlässige Clients — zu **Primitiven der Speicherschicht**, statt sie als zerbrechliche Anwendungsschicht über generischen Datenbanken neu zu bauen.
+Contextra ist eine **eingebettete, versionierte Datenbank und hybride Context Engine in Rust** für LLM- und Agenten-Workloads. Token-Budgets, Zoom-Stufen, spekulative Branches mit Merge-Gates, bitemporale Fakten, Provenienz und Trust/Taint sind Primitiven der Speicherschicht.
 
-Unterhalb der Versionierungsschicht ist Contextra ein **Git-artiger content-addressed Objektspeicher mit spaltenorientierten Hot-Head/Cold-Tail-Extents und gelerntem physischen Layout**. Oberhalb ist es eine **kontextbewusste Wissensdatenbank** mit deterministischem Truth-Layer, reproduzierbaren Index-Segmenten (mit Watermarks) und budgetoptimierender Context Engine. Der Übergangspunkt ist der **Commit** — ein Hash über das deterministische **`RootSet` (Truth Layer)**, begleitet von einem separaten **`IndexManifest`** für abgeleitete Suchstrukturen.
+Unterhalb der Versionierung ist Contextra ein content-addressed Objektspeicher mit PAX-Extents (Hot-Head/Cold-Tail). Oberhalb ist es eine Wissensdatenbank mit deterministischem Truth-Layer (`RootSet`), verwerfbaren Index-Segmenten (`IndexManifest`) und budgetoptimierendem Packer.
 
-### 1.1 Kernaussage in einem Satz
+### 1.1 Deployment-Modell
 
-> Contextra ist eine eingebettete, versionierte Datenbank und hybride Context Engine in Rust, die Token-Budgets, Zoom-Stufen, spekulative Agent-Branches mit Merge-Gates, bitemporale Fakten und Trust-/Provenienz-Propagierung als Speicherprimitiven bereitstellt.
-
-### 1.2 Deployment-Modell
-
-| Aspekt | Entscheidung |
+| Aspekt | Festlegung |
 |---|---|
-| **Primärmodus** | Eingebettete Library (`contextra`), vergleichbar mit SQLite/RocksDB |
-| **Server-Modus** | Dünner MCP-/gRPC-/Arrow-Flight-/HTTP-Daemon (`contextra-server` + `contextra-mcp`) für Multi-Prozess- und Netzwerkzugriff |
-| **Instanz-Modell** | Ein Repository/Store = eine Writer-Instanz (`flock`/`LockFileEx`), Single-Process. Mehrprozesszugriff ausschließlich über den Server |
-| **Tiering** | RAM (Buffer Pool + MemDelta) ↔ NVMe (Packs/Segmente) ↔ Objektspeicher (S3-kompatibel, ab Phase 4) |
-| **Priorität** | Embedded-first. Server ab Phase 2 als dünner Wrapper |
-| **Plattformen** | Linux x86-64/aarch64 (primär; `pread`/`pwrite` als portabler Baseline-Standard, `io_uring` + `O_DIRECT` optional hinter `IoBackend`-Trait), macOS/Windows (`DurableFs` + `pread`/`pwrite` Threadpool). **Kein `mmap` im Produktionspfad.** |
+| Primärmodus | Eingebettete Library (`contextra`) |
+| Server-Modus | Dünner Daemon (`contextra-server`, `contextra-mcp`) |
+| Instanzmodell | Ein Store = ein schreibender Prozess (exklusiver `LOCK`); Mehrprozesszugriff nur über den Server |
+| Isolationsgrenze | Der Store ist die **harte Mandantengrenze** (eigener `repo_seed`, Schlüssel, WAL, Derivation Cache) |
+| Plattformen | Linux x86-64/aarch64 primär; macOS/Windows mit `pread`/`pwrite`-Threadpool und plattformeigenem `DurableFs` |
+| I/O | `pread`/`pwrite` Baseline, `io_uring` + `O_DIRECT` opt-in; **kein `mmap` im Produktpfad** |
 
-### 1.3 Ressourcenprofile
+### 1.2 Ressourcenprofile
 
-Profile sind **reine Parametersätze** (Speicherbudgets, Segment-Schwellen). Sie schalten keine Kernfunktionen ab.
+Profile sind reine Parametersätze und schalten keine Funktion ab. Die Vektorstrategie folgt aus der RAM-Rechnung in [SPEC-09](SPEC-09-OPERATIONS.md) §4, nicht aus dem Profilnamen: Jedes Segment wählt die genaueste Quantisierung, die in das `fixed`-Budget passt.
 
-| Profil | Zielhardware | Zielbestand [Designziel] | Primäre Vektorstrategie |
-|---|---|---|---|
-| `lite` | Laptop/Edge: 4 Kerne, ≤ 8 GiB RAM | bis 2·10⁶ Cells | Flat + HNSW im RAM (SQ8) |
-| `standard` | Server: 16 Kerne, 64 GiB RAM, NVMe | bis 5·10⁷ Cells | HNSW (SQ8) + Vamana-Segmente |
-| `scale` | Server: 32+ Kerne, 256 GiB RAM, NVMe-RAID | bis 10⁸ Cells, 10⁹ Kanten | Vamana/DiskANN mit PQ/RaBitQ im RAM, SSD-Graph |
+| Profil | Referenzhardware | Zielbestand [Hypothese] | Default-`memory_budget` | Vektorstrategie |
+|---|---|---|---|---|
+| `lite` | 4 Kerne, 8 GiB | ≤ 2·10⁶ Cells | 4 GiB | Flat + HNSW (SQ8) |
+| `standard` | 16 Kerne, 64 GiB, NVMe | ≤ 5·10⁷ Cells | 48 GiB | HNSW (SQ8) für kleine, Vamana (PQ/RaBitQ) für große Bestände |
+| `scale` | ≥ 32 Kerne, 256 GiB, NVMe-RAID | ≤ 10⁸ Cells, 10⁹ Kanten | 192 GiB | Vamana (PQ/RaBitQ), Graph und Vollvektoren auf SSD |
 
-### 1.4 Nicht-Ziele (finale Liste)
+### 1.3 Nicht-Ziele
 
-| Nicht-Ziel | Begründung |
+| Nicht-Ziel | Konsequenz |
 |---|---|
-| **Verteilter Multi-Writer-Konsens in v1** | Single-Node-Kern; asynchrone Objekt-/Log-Replikation ab Phase 4 (Raft frühestens v2) |
-| **Eigene vollständige SQL-Engine** | Typisierte Rust-API, JSON-Plan, MCP und optional SQLite Virtual Tables (`contextra-sqlite`) |
-| **Git-Wire-Protokoll-Kompatibilität** | Export/Import möglich, kein Protokollziel |
-| **Einzeldatei-Format** | Verzeichnislayout nötig für crash-sicheres WAL, immutable Packs, Manifest und Sidecars |
-| **Trigger / Stored Procedures in v1** | Ereignisgesteuerte Logik läuft über Commit-Subscriptions und die Work Queue |
-| **DSGVO-Löschkette & kryptographische Löschnachweise** | **Vollständig ausgeschlossen:** Kein Crypto-Shredding pro Subjekt, keine Löschbeweise, keine `DeletionProof`-/`AuditChain`-/`AVV`-Generatoren. Löschung erfolgt über versionierte Tombstones (`retire`), konfigurierbare Retention und Best-Effort-`purge` |
-| **Eigene LLM-/Embedding-Inferenz im Speicherkern** | Inferenz erfolgt über Port-Traits (`Embedder`, `Reranker`, `Llm`, `Judge`) und externe Worker; Adapter liegen in separaten Satelliten-Crates |
-| **Forschungs-Heuristiken im Kern** | Bandit-Routing, Thompson-Sampling, PID-/Lyapunov-Regler, Hyperkanten-Kaskaden, 6 parallele PPR-Varianten entfallen zugunsten je eines validierten Standardalgorithmus |
+| Verteilter Multi-Writer-Konsens | Single-Node; Replikation, Objekt-Tier und Read-Replicas erst v2 |
+| Eigene SQL-Engine | Rust-API, JSON-Plan, MCP; optional SQLite-vtab |
+| Git-Wire-Kompatibilität | Nur Export/Import |
+| Einzeldateiformat | Verzeichnislayout |
+| DSGVO-Löschkette, Löschnachweise, Crypto-Shredding pro Subjekt | `retire` + Retention + Best-Effort-`purge`; **keine Zusicherung** physischer Unwiederbringlichkeit |
+| LLM-Inferenz im Kern | Ports und externe Worker |
+| Trigger / Stored Procedures | Commit-Subscriptions und Work Queue |
+| Forschungs-Heuristiken im Kern | Je Modalität genau ein Standardalgorithmus |
+| Seitenkanalfreiheit (Timing) | INV-5 deckt Ergebnisse, Zähler, Scores im definierten Umfang und Fehlermeldungen ab, nicht Laufzeitmessung |
 
----
+### 1.4 Zugriffsmuster (Auslegungsannahme)
 
-## 2. Die zehn Kernideen
-
-| # | Idee | Beschreibung |
-|---|------|-------------|
-| 1 | **Cell (entkoppelt in Content + Versioned Meta) statt Key-Value** | Jede Wissenseinheit trennt den unveränderlichen `CellContent` (`content_hash`, woran alle teuren Derivate hängen) von leichtgewichtigen versionierten `CellMeta` (Attribute, Trust, Taint, Belief, Gültigkeitszeit) und `Edge`-Bäumen. Tagging oder Fakt-Supersession schreibt nie den Rohinhalt neu. |
-| 2 | **Truth ≠ Index (Deterministischer Zustand + Index-Manifest)** | Der Prolly-Tree-Commit-Hash (`RootSet`) deckt ausschließlich die deterministische, history-unabhängige Wahrheitsschicht ab. Physische Index-Segmente (Vamana, FTS, CSR) hängen an einem separaten `IndexManifest`-Zeiger mit Watermarks und exaktem Flat-Fallback. |
-| 3 | **Token-native Speicherung & Zoom-Knapsack** | Token-Zählungen pro Tokenizer-Familie und Zoom-Stufen (L0…Ln) sind persistiert und in Sequenzbäumen als Summen eingebettet. Der Context Packer maximiert Nutzen unter hartem Token-Budget mit Submodularitäts-/MMR-Redundanzabzug und Small-to-Big-Expansion. |
-| 4 | **Dichter Adressraum (`Gid`) + MAC-geschützte Handles** | Jede Cell erhält eine dichte, monotone `Gid(u64)` für gemeinsame Roaring64-Filter über Vektor, BM25 und Graph. LLM-Handles tragen ein 2-Zeichen-BLAKE3-MAC-Tag (`c:k7qd-3f`), um halluzinierte Zufallstreffer auszuschließen. |
-| 5 | **Hot-Head / Cold-Tail PAX-Extents + Locator** | Ein Extent packt bis zu *N* Cells spaltenorientiert (vorne kompakte Ranking-Lanes, hinten schwere Rohinhalte). Der `CellLocator` adressiert per `(PackId, ExtentNo, RowIndex)` — Re-Layout verschiebt Daten ohne Änderung von `ChunkId` oder `CommitId`. |
-| 6 | **Agentensichere Versionierung & Merge-Gates** | Agenten schreiben **nie direkt nach `main`**, sondern auf O(1)-Session-Branches mit Savepoints je Tool-Call. Promotion nach `main` passiert deterministische **Merge-Gates (`G1`–`G7`)**. Unaufgelöste Konflikte leben als `ConflictCell`s im Merge-Request, nie auf `main`. |
-| 7 | **Derivation Cache + Lineage-DAG** | Embeddings, Token-Zählungen und Summaries sind per `(content_hash, producer_id)` über Branches hinweg memoisiert und bei Quelländerung per Konstruktion als `stale` erkennbar. |
-| 8 | **Provenienz, Konfidenz (Beta), Trust & Taint** | Jede Aussage trägt Pflichtprovenienz, `source_root`-Unabhängigkeit gegen Echokammern, `TrustTier` (Minimum-Vererbung) sowie orthogonale `TaintFlags` (Union-Vererbung). Nicht vertrauenswürdige Daten werden im Prompt gekapselt. |
-| 9 | **Verlässliche Runtime-Grenzen & LLM-Fehler** | Idempotenz-Journal und Work-Queue-Leasing liegen in **nicht-versionierten Kernel-Sidecars** (kein Commit-Spam durch Worker-Heartbeats). Alle Fehler sind strukturiert, neutral bei fehlender Berechtigung und LLM-lesbar mit Remediation. |
-| 10 | **Die Engine ruft kein LLM (Deterministische Ports)** | Uhr, Zufall, Dateisystem und Inferenz sind injizierbare Traits. Der Speicherkern ist vollständig deterministisch simulierbar. |
-
----
-
-## 3. Designprinzipien und Systeminvarianten
-
-### 3.1 Zehn Leitprinzipien
-
-1. **Truth ≠ Index.** Das `RootSet` bildet den alleinigen, deterministischen Wahrheitsraum. Index-Segmente sind abgeleitete, verwerfbare und rekonstruierbare Projektionen im separaten `IndexManifest`.
-2. **Immutable first.** Truth-Chunks, Packs, Prolly-Knoten, Index-Segmente und Commits werden nie in-place überschrieben. Mutabilität existiert nur als atomar publizierte Pointer (`ArcSwap`), WAL-Tail, MemDelta/Memtable und nicht-versionierte Kernel-Sidecars.
-3. **Ein Commit-Punkt, kein Mehr-Store-2PC.** Ein Commit ist dauerhaft, sobald sein WAL-Frame die geforderte Durability-Stufe erfüllt. Index-Builds laufen entkoppelt mit Watermarks — kein kompensierendes 2PC.
-4. **Identität ≠ Ort.** Content-Addressing (BLAKE3) bestimmt Identität; physische Platzierung `(PackId, ExtentNo, RowIndex)` liegt im austauschbaren Locator.
-5. **Agenten schreiben nie nach `main`.** Schreibpfad ist `Session-Branch → Merge-Gates → Atomarer Merge`. Direktes Schreiben auf geschützte Branches erfordert explizite Admin-Privilege.
-6. **Budget & Belegbarkeit statt Top-k.** Leseoperationen optimieren Informationsabdeckung und Nutzen pro Token unter harter Budgetgarantie, liefern `EvidenceSufficiency` (inkl. `None` / `NO_EVIDENCE_FOUND` statt Halluzinationszwang) und verifizierbare Zitate.
-7. **Abgeleitet ist ersetzbar, Herkunft ist Pflicht.** Nur Rohdaten + Provenienz sind Primärwahrheit; Derivate sind memoisiert und regenerierbar.
-8. **Fail-closed in Sicherheit, Fail-open in Index-Verfügbarkeit.** Fehlende ACL/Capabilities blenden Treffer ohne Fehler-Orakel aus (ACL-Bitmaps wirken *vor/im* Ranking); fehlende Indizes fallen transparent auf exakten Scan zurück (`lane_coverage`).
-9. **Kein stilles Verwerfen.** Weder Decay noch Merge noch Compaction löschen lebendige Daten stillschweigend: Decay steuert nur Ranking und `ARCHIVED`-Empfehlungen; Konflikte erzeugen sichtbare `ConflictCell`s; Löschungen sind explizite Tombstone-Commits (`retire`).
-10. **Schichten zeigen nur nach unten.** Kein Crate hängt von einer höheren Schicht oder externen Inferenz-Implementierungen ab; Durchsetzung in CI.
-
-### 3.2 Systeminvarianten (normativ, in Simulation geprüft)
-
-| ID | Invariante | Durchsetzung |
+| Muster | Anteil [Annahme] | Optimierter Pfad |
 |---|---|---|
-| **INV-1** | **Deterministischer Truth-Hash:** Gleicher logischer Zustand (`RootSet`) ⇒ identischer `truth_hash`, unabhängig von Commit-Historie, Re-Layout oder Index-Compaction. | Property-Tests, SPEC-04 |
-| **INV-2** | **Snapshot-Einheit:** Alle Modalitäten (Vektor, BM25F, Graph, Filter, Fusion, Packer) einer Query lesen exakt einen konsistenten Branch-Snapshot `(head, mem_delta_seq, now)`. | Typestate `Snapshot<'db>`, SPEC-06 |
-| **INV-3** | **Prefix-Konsistenz nach Crash:** Nach Recovery entspricht der sichtbare Zustand exakt einem Präfix der gemäß Durability-Klasse bestätigten WAL-Commits. | `FaultVfs` Crash-Matrix, SPEC-07 |
-| **INV-4** | **Index ⊆ Truth & Watermark-Deckung:** Jeder Index-Treffer wird gegen den Snapshot (`¬dead ∧ ¬Shadow(B) ∧ ACL ∧ valid_at`) validiert; Zeilen nach `watermark_seq` werden exakt aus MemDelta/Delta-Scans ergänzt. | `ctx verify`, SPEC-05 |
-| **INV-5** | **ACL vor Ranking:** Zugriffs-Bitmaps schränken ANN-/BM25-/Graph-Operatoren direkt ein; Scores, Zähler und Fehlermeldungen leaken nie unberechtigte Existenz. | ACL-Leakage-Suite, SPEC-07 |
-| **INV-6** | **Idempotenz:** Gleicher `IdempotencyKey` + gleicher Payload-Hash ⇒ identisches Ergebnis ohne zweiten Commit; abweichender Payload ⇒ `idempotency_mismatch`. | Kernel-Idempotency-Table, SPEC-04 |
-| **INV-7** | **`main`-Integrität:** Geschützte Branches (`main`) enthalten nie unaufgelöste Merge-Konflikte; Konflikte leben auf `mr/*` oder Feature-Branches. | Merge-Gates `G1`–`G7`, SPEC-04 |
-| **INV-8** | **Budget-Garantie:** `pack_result.budget_used ≤ request.budget.max_tokens` gilt in 100 % der Fälle (inkl. Rendering-Overhead). | Property-Tests, SPEC-06 |
-| **INV-9** | **GC-Sicherheit:** Kein von einem Root (Branch-Head, Tag, Reflog-Fenster, aktiver Snapshot-Pin, Savepoint) erreichbares Objekt wird physisch entfernt. | SATB+Remark-Simulation, SPEC-07 |
+| Recall unter Budget | ~65 % | Gid-Bitmaps → Segmente → Packer |
+| `expand` | ~15 % | `CellLocator` → ein Cold-Read |
+| `window` | ~10 % | Token-Summen-Baum, O(log n) |
+| Fork → Gates → Merge | ~5 % der Transaktionen | Persistenter MemDelta, Prolly-Diff |
+| Ingest | dominiert Schreiblast | Revisions-Diff, Derivation Cache |
+| Hintergrundjobs | kontinuierlich | Work Queue, Prioritätsbudgets |
+
+---
+
+## 2. Leitprinzipien
+
+1. **Truth ≠ Index.** Nur das `RootSet` ist Wahrheit; Indizes sind verwerfbar.
+2. **Immutable first.** Veränderlich sind ausschließlich: WAL-Tail, Manifest-Tail, `CURRENT`-Slots, Kernel-Sidecars und atomar publizierte Zeiger im RAM.
+3. **Ein Commit-Punkt.** Ein Commit ist dauerhaft, sobald sein WAL-Frame die Durability-Stufe erfüllt. Kein 2PC.
+4. **Identität ≠ Ort.** Hashes bestimmen Identität, Locators den Ort.
+5. **Agenten schreiben nie direkt nach geschützten Branches.**
+6. **Budget und Belegbarkeit statt Top-k**, einschließlich expliziter Abstention.
+7. **Abgeleitet ist ersetzbar, Herkunft ist Pflicht.**
+8. **Fail-closed bei Sicherheit, fail-open bei Index-Verfügbarkeit**, wobei jede Degradierung im Ergebnis sichtbar ist.
+9. **Kein stilles Verwerfen.**
+10. **Abhängigkeiten zeigen nur nach unten**, in CI erzwungen.
+
+---
+
+## 3. Systeminvarianten (normativ)
+
+Jede Invariante besitzt ein Prüfprädikat in `contextra-sim` oder eine benannte Testsuite.
+
+| ID | Invariante | Prüfung |
+|---|---|---|
+| **INV-1** | **History-unabhängiger Truth-Hash:** Identische kanonische Schlüssel-Wert-Mengen aller sieben `RootSet`-Bäume ergeben denselben `truth_hash`, unabhängig von Schreibreihenfolge, Batching, Fold-Zeitpunkten, Re-Layout und Index-Compaction. *Nicht* zugesichert: Gleichheit zweier unabhängig erzeugter, nur inhaltlich äquivalenter Bestände (deren `Gid`, `CellKey`, `born_seq` und Beobachtungszeiten unterscheiden sich). | Property-Test: gleiche KV-Menge in Permutationen |
+| **INV-2** | **Snapshot-Einheit:** Alle Operatoren einer Query lesen denselben Snapshot `(branch, head, base, delta, index_view, catalog, now)`. | Typestate `Snapshot<'db>` |
+| **INV-3** | **Präfix-Konsistenz:** Nach Recovery ist der sichtbare Zustand ein Präfix der WAL-Commit-Folge, das mindestens alle mit `durable`/`strict` bestätigten Commits enthält. | Crash-Matrix |
+| **INV-4** | **Index ⊆ Truth:** Jeder Treffer wird gegen den Snapshot validiert. Nicht indizierte Zeilen werden exakt ergänzt, solange sie `flat_fallback_max_rows` nicht überschreiten; andernfalls MUSS `lane_coverage < 1` und `PartialIndex` gemeldet werden. | Differenzialtest gegen exakten Scan |
+| **INV-5** | **ACL vor Ranking:** Unsichtbare Cells erscheinen nie in Treffern, Zählern, Pfaden, `explain`, `did_you_mean` oder Fehlertexten; BM25-Statistiken folgen der Isolationsstufe aus [SPEC-05](SPEC-05-INDEXES.md) §3.3. | ACL-Leakage-Suite |
+| **INV-6** | **Idempotenz:** Gleicher Scope, Key und Request-Digest ⇒ dasselbe Ergebnis ohne zweiten Commit, solange der Commit auf dem Branch erreichbar und die TTL nicht abgelaufen ist; abweichender Digest ⇒ `idempotency_mismatch`. | Crash- und Race-Tests |
+| **INV-7** | **Integrität geschützter Branches:** Sie enthalten nie strukturelle Merge-Konflikte (`ConflictCell` mit Status `Open`). Inhaltliche Widersprüche (`Contradicts`-Kanten) sind zulässig und werden beim Lesen sichtbar gemacht. | Gate- und Direct-Write-Tests |
+| **INV-8** | **Budget-Garantie:** Die mit dem angeforderten, registrierten Tokenizer gezählte Länge des gerenderten Packs ist ≤ `max_tokens − reserve_tokens`. | Property-Test über Renderformate |
+| **INV-9** | **GC-Sicherheit:** Kein innerhalb des Retention-Horizonts von einer Wurzel erreichbares Objekt wird entfernt; einzige Ausnahme ist der protokollierte `Expunge` durch `purge`. | GC-Simulation |
+| **INV-10** | **Speichergrenzen:** Kein Teilsystem überschreitet sein Budget; Folge ist Backpressure, nie OOM. | Allokationsbuchhaltung, Soak |
+| **INV-11** | **Formatversionierung:** Jede Datei trägt Magic, Version und Feature-Flags; unbekannte inkompatible Flags verhindern das Öffnen. | Golden-Files, Fuzzing |
+| **INV-12** | **Branch-Isolation:** Ein Branch ändert die Sicht eines anderen nur durch Merge oder Rebase. | Referenzmodell |
+| **INV-13** | **Monotone Ableitungssicherheit:** Für jedes Derivat gilt: Sichtbarkeit ⊆ Schnitt der Quellsichtbarkeiten, Trust ≤ min(Quellen, Producer-Cap), Taint ⊇ Vereinigung der Quellen. | Property-Test über Lineage-DAG |
+| **INV-14** | **Nonce-Eindeutigkeit:** Kein Paar (AEAD-Schlüssel, Nonce) verschlüsselt je zwei verschiedene Klartexte, auch nicht nach Absturz oder Wiederholung. | Konstruktionsnachweis [SPEC-03](SPEC-03-STORAGE-ENGINE.md) §8, Fault-Tests |
 
 ---
 
 ## 4. Schichtenarchitektur
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  L6  API-Oberflächen & Server                                                │
-│      Rust-Fassade (contextra) · MCP-Server · gRPC/Arrow Flight/HTTP · CLI    │
-│      Optional: SQLite Virtual Tables (contextra-sqlite) · Python (PyO3)      │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  L5  Context Engine, Ingest & Agent-Dienste                                  │
-│      Recall-Pipeline · Zoom-Knapsack/MMR · Citation-Verifier · EvidencePack  │
-│      Agent-Sessions & Merge-Gates (G1–G7) · Egress-Guard · Ingest-Chunker    │
-│      Cognition-Jobs (via Ports) · Retention/Zoom-Down/Purge                  │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  L4  Abgeleitete Indizes (IndexManifest + Watermarks, runtime-frei)          │
-│      Vektor (Flat / RAM-HNSW / SSD-Vamana) · FTS/BM25F (FST + BlockMaxWAND)  │
-│      Graph (CSR + Forward-Push-PPR + Leiden) · Roaring-Filter-Bitmaps        │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  L3  Versionierte Wahrheit & MVCC (RootSet, runtime-frei)                    │
-│      Commit-DAG · Prolly-Trees (primary, seq, graph, aliases, policies,      │
-│      conflicts, provenance) · MemDelta · OCC/SSI Typestate · 3-Wege-Merge    │
-│      SATB+Remark GC · Nicht-versionierte Kernel-Sidecars (Idem, WorkQ, Stats)│
-├──────────────────────────────────────────────────────────────────────────────┤
-│  L2  Content-addressed Object Store & PAX-Layout (runtime-frei)              │
-│      BLAKE3-Chunks · Packs (.cxp) · Hot-Head/Cold-Tail Extents               │
-│      ObjectLocator + CellLocator (PackId, ExtentNo, RowIndex) · Re-Layout    │
-│      Partitionierter Buffer Pool (W-TinyLFU) · S3-Tier-Port                  │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  L1  Durability & System-I/O (runtime-frei)                                  │
-│      WAL (.cxw, Group Commit) · Manifest-Log (.mlog + CURRENT Superblock)    │
-│      Crash-Recovery · DurableFs · io_uring/pread-Backends (kein mmap!)       │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  L0  Fundament & Querschnitt                                                 │
-│      Typen/IDs/HLC · Port-Traits · Wire/rkyv-Codecs · SIMD · Crypto/AEAD/MAC │
-└──────────────────────────────────────────────────────────────────────────────┘
+L6  API & Server        contextra · contextra-mcp · contextra-server · contextra-cli
+                        (opt.) contextra-sqlite · contextra-py
+L5  Engine & Dienste    contextra-engine · -rank · -ingest · -agent · -cognition · -security
+L4  Abgeleitete Indizes contextra-vector · -text · -graph
+L3  Wahrheit & MVCC     contextra-mvcc
+L2  Object Store        contextra-store
+L1  Durability          contextra-wal · contextra-durable-fs
+L0  Fundament           contextra-types · -ports · -wire · -simd · -sys · -crypto
 ```
 
-### 4.1 Schichtverantwortungen & Runtime-Grenze
-
-| Schicht | Verantwortung | Verbot / Grenze |
+| Schicht | Verantwortung | Grenze |
 |---|---|---|
-| **L0** | Newtypes, `Gid`/`CellId`/`ChunkId`/`Handle`, Port-Traits, Codecs, SIMD, AEAD, Keyed-BLAKE3, Capabilities | Keine Geschäftslogik, keine I/O-Loops |
-| **L1** | WAL, Group Commit, Manifest, Superblock, `DurableFs`, Crash-Recovery, OS-I/O | Kennt kein Datenmodell; **einziger Ort für `fsync`/`fdatasync`** |
-| **L2** | Packs, PAX-Extents, Kompression, Locator (`Object` + `Cell`), Buffer Pool, Re-Layout | Kennt keine Commits/Branches/Merge-Semantik |
-| **L3** | Prolly-Trees, `RootSet`, `MemDelta`, Fold, Branches, OCC/SSI, Merge, GC, Kernel-Sidecars | Kennt keine ANN-/BM25-Algorithmen; **L0–L4 sind `tokio`-frei** (eigene I/O- + Rayon-Pools) |
-| **L4** | Vektor-, FTS-, Graph-CSR-, Bitmap-Segmente, Watermark-Tracking, Delta-Overlays | Kennt keine Score-Fusion oder LLM-Prompts |
-| **L5** | Hybrid-Planer, RRF, Packer, Verifier, Ingestion, Session-Lifecycle, Gates, Egress-Guard | Keine direkten OS-Dateizugriffe (`Vfs`-Port); `tokio` ab L5 |
-| **L6** | Protokolle (MCP, gRPC/Flight, HTTP, SQLite-vtab, CLI), FFI | Keine Storage-/Index-Interna |
+| L0 | Newtypes, Ports, kanonische Kodierung, SIMD, OS-Primitiven, Krypto-Primitiven | Keine Geschäftslogik, keine Policy |
+| L1 | WAL, Group Commit, Manifest, Superblock, Recovery | Kennt kein Datenmodell; **einziger Aufrufer von Sync-Syscalls** |
+| L2 | Packs, Extents, Kompression, Locators, Buffer Pool, Re-Layout | Kennt keine Commits oder Branches |
+| L3 | Prolly-Trees, `RootSet`, MemDelta, Fold, Transaktionen, Merge, GC, Sidecars | Kennt keine ANN-/BM25-Algorithmen |
+| L4 | Index-Segmente, Watermarks, Delta-Overlays | Kennt keine Fusion und keine Prompts |
+| L5 | Planer, Fusion, Packer, Verifier, Ingest, Sessions, Gates, Egress | Dateizugriff nur über Ports |
+| L6 | Protokolle, CLI, FFI | Keine Storage-/Index-Interna |
 
-### 4.2 Port-Schnittstellen (`contextra-ports` & Kern-Traits)
+L3 steuert L4 nicht direkt an: L4 implementiert `DerivedIndex`, die Registrierung erfolgt in L5 (Dependency Inversion). So bleibt die Richtung L4 → L3 azyklisch.
+
+### 4.1 Port-Traits (`contextra-ports`)
 
 ```rust
-// ── L0: Injizierbare Umgebungs-Ports (für deterministische Simulation) ──
-pub trait Clock: Send + Sync { fn now_hlc(&self) -> Hlc; fn now_ms(&self) -> i64; }
-pub trait RngSource: Send + Sync { fn fill_bytes(&self, dest: &mut [u8]); }
-pub trait Vfs: Send + Sync { /* open, rename, remove, list_dir, sync_dir */ }
+pub trait Clock: Send + Sync {
+    fn wall_ms(&self) -> i64;
+    fn monotonic(&self) -> MonoInstant;           // Deadlines, Leases, Group-Commit-Timer
+}
+pub trait Entropy: Send + Sync { fn fill(&self, dest: &mut [u8]) -> Result<(), EntropyError>; }
 
-// ── L1/L2: Objektspeicher & Layout-Lokator ──
+pub trait Vfs: Send + Sync {
+    fn open(&self, p: &VPath, o: OpenOptions) -> Result<Box<dyn VFile>>;
+    fn rename(&self, from: &VPath, to: &VPath) -> Result<()>;
+    fn remove(&self, p: &VPath) -> Result<()>;
+    fn list(&self, dir: &VPath) -> Result<Vec<VPath>>;
+    fn sync_dir(&self, dir: &VPath) -> Result<()>;
+}
+pub trait VFile: Send + Sync {
+    fn read_at(&self, buf: &mut [u8], off: u64) -> Result<usize>;
+    fn write_all_at(&self, buf: &[u8], off: u64) -> Result<()>;
+    fn preallocate(&self, len: u64) -> Result<()>;
+    fn sync_data(&self) -> Result<()>;
+}
+
 pub trait ObjectStore: Send + Sync {
-    fn put_chunk(&self, kind: ChunkKind, bytes: &[u8]) -> Result<ChunkId>;
-    fn get_chunk(&self, id: &ChunkId) -> Result<Bytes>;
-    fn get_extent_row(&self, addr: ExtentRowAddr, lanes: LaneMask) -> Result<ExtentRowSlice>;
+    fn put(&self, kind: ChunkKind, canonical: &[u8]) -> Result<ChunkId>;
+    fn get(&self, id: &ChunkId) -> Result<Bytes>;
+    fn extent_row(&self, addr: ExtentRowAddr, lanes: LaneMask) -> Result<ExtentRowSlice>;
     fn flush_durable(&self) -> Result<DurableMark>;
 }
 
-// ── L3: Prolly-Tree-Engine (deterministischer Truth-Layer) ──
-pub trait TreeEngine {
-    fn get(&self, root: &ChunkId, k: &[u8]) -> Result<Option<Bytes>>;
-    fn range(&self, root: &ChunkId, r: KeyRange, dir: Dir)
-        -> Box<dyn Iterator<Item = Result<(Bytes, Bytes)>>>;
-    fn apply(&self, root: &ChunkId, muts: &mut dyn Iterator<Item = Mutation>)
-        -> Result<ChunkId>;
-    fn diff(&self, a: &ChunkId, b: &ChunkId, r: KeyRange)
-        -> Box<dyn Iterator<Item = Result<DiffEntry>>>;
-}
-
-// ── L4: Abgeleitete Indizes mit Watermark-Vertrag ──
 pub trait DerivedIndex: Send + Sync {
     fn kind(&self) -> SegmentKind;
-    fn watermark(&self) -> WatermarkSeq;
-    fn build_from_truth(&self, snap: &TruthSnapshot, delta: &DiffStream) -> Result<IndexManifestDelta>;
+    fn build(&self, snap: &dyn TruthReader, delta: &dyn ChangeStream, budget: &JobBudget)
+        -> Result<SegmentDraft>;
+    fn search(&self, seg: &SegmentHandle, q: &LaneQuery, allow: &DocSet, k: usize,
+        deadline: MonoInstant) -> Result<LaneHits>;
 }
 
-// ── L5: Erweiterungs-Ports (ohne Kern-Abhängigkeit) ──
-pub trait MergeGate: Send + Sync { fn check(&self, ctx: &MergeGateContext) -> GateOutcome; }
-pub trait Embedder: Send + Sync { fn embed(&self, space: &SpaceId, inputs: &[&str]) -> Result<Vec<Vec<f32>>>; }
+pub trait MergeGate: Send + Sync {
+    fn id(&self) -> GateId;
+    fn check(&self, ctx: &MergeGateContext<'_>) -> GateOutcome;
+}
+
+// Inferenz: synchron definiert, ab L5 in Blocking-/Async-Adapter gekapselt.
+pub trait Embedder: Send + Sync { fn embed(&self, s: &SpaceId, i: &[&str]) -> Result<Vec<Vec<f32>>>; }
+pub trait Reranker: Send + Sync { fn rerank(&self, q: &str, d: &[&str], dl: MonoInstant) -> Result<Vec<f32>>; }
+pub trait Llm: Send + Sync   { fn transport(&self) -> Transport; /* Local | Cloud */ }
+pub trait Judge: Send + Sync { fn transport(&self) -> Transport; }
 pub trait Tokenizer: Send + Sync { fn id(&self) -> TokenizerId; fn count(&self, text: &str) -> u32; }
 ```
 
----
+`TokenizerId` enthält den Digest von Vokabular und Regeln; eine geänderte Implementierung ist ein neuer Tokenizer.
 
-## 5. Crate-Layout (Soll-Workspace)
+### 4.2 Determinismusregeln
 
-Bereinigtes Target-Layout ohne zirkuläre oder historische Altlasten (`contextra-core`, `contextra-db`, `contextra-checkpoint`, `contextra-audit-export`, `contextra-avv-generator`, `contextra-license`, `contextra-adapt`, `contextra-router` werden entfernt bzw. aus dem Kern ausgelagert).
-
-```
-contextra/
-├─ L0: Fundament & Querschnitt
-│  ├─ contextra-types        Newtypes (CellId, Gid, ChunkId, Handle, Hlc), TrustTier, Taint, Fehlerkatalog [safe]
-│  ├─ contextra-ports        Port-Traits (Vfs, Clock, Rng, Embedder, Reranker, Llm, Judge, Tokenizer)      [safe]
-│  ├─ contextra-wire         Kanonische rkyv-/bytemuck-Codecs, Format-Header (Magic/Version/Flags)        [safe + checked]
-│  ├─ contextra-simd         SIMD-Kernel (AVX2/AVX-512/NEON/Scalar: Distanzen, Bitpacking)                [unsafe isoliert]
-│  ├─ contextra-sys          OS-Zugriff (io_uring optional, pread/pwrite, flock, O_DIRECT-Buffer)         [unsafe isoliert]
-│  └─ contextra-crypto       Keyed BLAKE3, HKDF, AEAD (DEK/KEK), Ed25519, MAC-Handles, Capabilities, Egress [safe]
-├─ L1: Durability
-│  ├─ contextra-durable-fs   Atomares Write-Sync-Rename-DirSync, FaultVfs-Referenz                       [safe]
-│  └─ contextra-wal          WAL (.cxw), Group Commit, Torn-Write-Erkennung, Recovery-Replay             [safe]
-├─ L2: Object Store
-│  └─ contextra-store        Packs (.cxp), PAX-Extents (Hot-Head/Cold-Tail), Object/Cell-Locator,        [safe + O_DIRECT]
-│                            Partitionierter Buffer Pool (W-TinyLFU), Re-Layout, S3-Tier-Port
-├─ L3: Versionierung & MVCC
-│  └─ contextra-mvcc         Prolly-Trees, RootSet, IndexManifestRef, MemDelta, Fold, BranchSequencer,   [safe]
-│                            Typestate Txn<ReadOnly|ReadWrite>, OCC/SSI, 3-Wege-Merge, SATB-GC, Sidecars
-├─ L4: Indizes (runtime-frei)
-│  ├─ contextra-vector       Flat-SIMD, RAM-HNSW-Delta, Vamana-Segmente, SQ8/PQ/RaBitQ, Filter A/B/C    [safe via simd]
-│  ├─ contextra-text         Unicode/Snowball/DE-Decompounding, FST, Block-Max-WAND, BM25F global stats [safe]
-│  └─ contextra-graph        CSR-Segmente (fwd/rev), Hub-Skip-Index, k-Hop (mit Limits), Forward-Push-PPR[safe]
-├─ L5: Context Engine, Ingest & Agenten
-│  ├─ contextra-rank         RRF, kalibrierte Norm-Fusion, Isotonische Kalibration, MMR                  [safe]
-│  ├─ contextra-engine       Katalog, Query-Planer/-Executor, Zoom-Knapsack/Packer, Sufficiency,         [safe]
-│  │                         Citation-Verifier, Derivation Cache, WorkQueue-Dispatcher, Retention/Purge
-│  ├─ contextra-ingest       Parser (PDF/Office/HTML/Code/JSON), Chunker, Revisions-Diff, Injection-Scan [safe]
-│  ├─ contextra-agent        Session-Branches, Merge-Gates (G1–G7), Action-Log, Quoten, Conflict-Resolve  [safe]
-│  └─ contextra-cognition    Konsolidierung, L1-Summary, Entity-Resolution, Contradiction-Jobs (Ports)   [safe]
-├─ L6: APIs & Integration
-│  ├─ contextra              Einzige öffentliche Rust-Fassade (Feature-Flags für optionale Crates)       [safe]
-│  ├─ contextra-mcp          MCP-Server (stdio / streamable-HTTP, deklarative Tool-Klassifikation)       [safe]
-│  ├─ contextra-server       gRPC + Arrow Flight + HTTP/JSON-Daemon                                      [safe]
-│  ├─ contextra-cli          Admin-CLI (`ctx`)                                                           [safe]
-│  └─ contextra-sqlite       Optionales SQLite-Virtual-Table-Frontend (Feature `sqlite`)                 [unsafe isoliert]
-├─ Optional / Satelliten (Feature-gated oder eigenes Packaging)
-│  ├─ contextra-infer-onnx / -candle / -ollama   Inferenz-Adapter für Ports                              [isolierte FFI/safe]
-│  ├─ contextra-sandbox      WASM-Plugins für benutzerdefinierte MergeGates/Resolver (wasmtime)          [safe]
-│  ├─ contextra-kvcache      Optionaler Radix-Prefix-/KV-Cache (Phase 5, ohne Shredding)                 [safe]
-│  └─ contextra-py           Python-Bindings (PyO3, außerhalb default-members)                           [unsafe isoliert]
-└─ Dev / Test
-   ├─ contextra-testkit      Referenzmodell, Property-/Golden-/ACL-Tests                                 [test]
-   ├─ contextra-sim          Deterministischer Simulator (`FaultVfs` + `ManualClock` + Crash-Matrix)     [test]
-   └─ contextra-bench        Mikro- & Makro-Benchmarks (10⁶–10⁸ Skalierung)                              [bench]
-```
-
-### 5.1 Abhängigkeits- und Sicherheitsregeln
-
-1. **Strikte Gerichtetheit:** Nur nach unten; CI prüft per `cargo metadata` auf Zyklenfreiheit und Schichtgrenzen.
-2. **Runtime-Freiheit L0–L4:** `tokio` ist in L0–L4 verboten. Der Storage-Kernel arbeitet mit synchronen APIs + dedizierten I/O- und Compute-(`rayon`)-Pools.
-3. **`#![forbid(unsafe_code)]`:** Workspace-Standard (`#![deny(unsafe_code)]` in `Cargo.toml`, `#![forbid(unsafe_code)]` in allen Kern-Crates außer `contextra-simd`, `contextra-sys`, `contextra-sqlite`, `contextra-infer-*`, `contextra-py` sowie `O_DIRECT`/Archive-Helfern mit dokumentierten `// SAFETY:`-Invarianten).
-4. **Kein `unwrap()`/`expect()`/`panic!` in Produktionspfaden** (Workspace-Clippy-Lint `deny`).
-5. **Rust Edition 2021, stable Toolchain (≥ 1.89)**, `--locked` Builds, `cargo-deny` + `cargo-vet` Pflicht in CI.
+- L0–L4 MÜSSEN `SystemTime::now`, `Instant::now`, `std::fs`, `rand::thread_rng` und `HashMap`-Iterationsreihenfolge in beobachtbaren Pfaden meiden (CI-Lint mit Allowlist für `contextra-sys`).
+- Hintergrundarbeit läuft über einen injizierten `Scheduler`; die Simulation ersetzt Thread-Pools durch kooperative, seed-gesteuerte Ausführung.
+- Float-Ergebnisse (Distanzen, Scores) gehen **nie** in gehashte Objekte ein.
 
 ---
 
-## 6. Typische Zugriffsmuster
+## 5. Crate-Workspace
 
-| # | Muster | Beschreibung | Anteil |
+| Schicht | Crate | Inhalt | `unsafe` |
 |---|---|---|---|
-| 1 | **Recall unter Budget** | „Gib mir die besten ≤ 6 000 Token belegten Kontext mit Abstention-Check." | ~65 % |
-| 2 | **Fenster-Lesen (`window`)** | „Gib mir die Turns 40–60 dieser Episode, ≤ 3 000 Token" in O(log n) ohne Volltext-Scan. | ~10 % |
-| 3 | **Progressive Disclosure (`expand`)** | Agent prüft `c:k7qd-3f` (L1/L2) und lädt selektiv L0 nach. | ~15 % |
-| 4 | **Append- und Revision-Ingest** | Episoden, Tool-Ergebnisse, Dokument-Revisionen (per ContentHash-Diff inkrementell). | Hauptlast Schreiben |
-| 5 | **Session-Fork → Gates → Merge** | Agenten arbeiten isoliert auf Branches; Promotion nur nach bestandenen Gates `G1`–`G7`. | ~5 % Transaktionen |
-| 6 | **Hintergrundarbeit (Sidecar-Queue)** | Asynchrone Embeddings, L1-Summaries, Compaction, Vamana-Builds, Affinity Re-Layout. | kontinuierlich |
+| L0 | `contextra-types` | IDs, `Hlc`, `Seq`, `Lsn`, `TrustTier`, `TaintFlags`, Fehlerkatalog | verboten |
+| L0 | `contextra-ports` | Traits aus §4.1 | verboten |
+| L0 | `contextra-wire` | CBE-Kodierung ([SPEC-02](SPEC-02-DATA-MODEL.md) §2), Formatheader | verboten |
+| L0 | `contextra-simd` | Distanzen, Bitpacking (AVX2/AVX-512/NEON/Skalar) | isoliert |
+| L0 | `contextra-sys` | `pread`/`pwrite`, `io_uring`, Locks, ausgerichtete Puffer, Sync | isoliert |
+| L0 | `contextra-crypto` | BLAKE3, HKDF, AEAD, Ed25519, Handle-MAC, Capability-MAC | verboten |
+| L1 | `contextra-durable-fs` | Atomare Dateiprotokolle, `FaultVfs`-Referenz | verboten |
+| L1 | `contextra-wal` | WAL, Group Commit, Manifest-Log, Superblock | verboten |
+| L2 | `contextra-store` | Packs, Extents, Locators, Buffer Pool, Re-Layout | verboten |
+| L3 | `contextra-mvcc` | Prolly, `RootSet`, Txn, Merge, GC, Sidecars | verboten |
+| L4 | `contextra-vector`, `-text`, `-graph` | Indizes | verboten |
+| L5 | `contextra-rank` | Fusion, Kalibration, Redundanz | verboten |
+| L5 | `contextra-engine` | Katalog, Planer, Packer, Verifier, Derivations, Retention | verboten |
+| L5 | `contextra-ingest` | Parser, Chunker, Revisions-Diff, Injection-Scan | verboten |
+| L5 | `contextra-agent` | Sessions, Gates, Quoten, Action-Log | verboten |
+| L5 | `contextra-cognition` | Konsolidierungsjobs über Ports | verboten |
+| L5 | `contextra-security` | ACL-Auswertung, Capabilities, Egress-Guard | verboten |
+| L6 | `contextra`, `-mcp`, `-server`, `-cli` | Fassade, Protokolle, CLI | verboten |
+| opt. | `contextra-infer-{onnx,candle,ollama}` | Adapter | isoliert (FFI) |
+| opt. | `contextra-sandbox`, `-kvcache` | WASM-Merge/Gates; Prefix-Cache | verboten |
+| opt. | `contextra-sqlite`, `contextra-py` | FFI-Frontends | isoliert |
+| dev | `contextra-testkit`, `-sim`, `-bench` | Referenzmodell, Simulation, Benchmarks | nur Tests |
+
+**Entfernt:** `contextra-core`, `-db`, `-checkpoint`, `-audit-export`, `-avv-generator`, `-license`, `-adapt`, `-router`.
+
+### 5.1 Bauregeln (CI-erzwungen)
+
+1. Abhängigkeiten nur abwärts; `cargo metadata`-Prüfung in `xtask`.
+2. `tokio` ist in L0–L4 verboten (auch transitiv, per `cargo-deny`-Ban mit Wrapper-Allowlist).
+3. `#![forbid(unsafe_code)]` in allen als „verboten" markierten Crates. Zero-Copy-Zugriffe nutzen ausschließlich geprüfte APIs (`bytemuck`, `rkyv` mit Validierung). Jeder `unsafe`-Block trägt `// SAFETY:` und steht in der Unsafe-Baseline.
+4. Clippy `deny`: `unwrap_used`, `expect_used`, `panic`, `indexing_slicing` in Decodern.
+5. Edition 2021, stable ≥ 1.89, `--locked`, `cargo-deny`, `cargo-vet`.
+6. `panic = "unwind"`; ein Panic in einem Kern-Thread vergiftet den Store (`repo_poisoned`), er wird nie verschluckt.
 
 ---
 
-## 7. Entscheidungsregister (konsolidiert)
+## 6. Nebenläufigkeitsarchitektur
 
-| ID | Entscheidung | Begründung / Aufgelöster Widerspruch |
+| Rolle | Anzahl | Aufgabe |
 |---|---|---|
-| **C-01** | **Prolly-Trees + MemDelta** für deterministischen Truth-Layer | History-Unabhängigkeit, O(Δ·log n) Diff/Merge, strukturelles Sharing; MemDelta + Batch-Fold begrenzt Schreibamplifikation |
-| **C-02** | **Trennung `RootSet` vs. `IndexManifest`** *(löst Reibungspunkt 1)* | `RootSet` hasht nur logische Truth-Bäume; Vamana-/FTS-/CSR-Segmente hängen am separaten `IndexManifest` mit Watermarks & Flat-Fallback |
-| **C-03** | **Entkoppelte Cell (`CellContent` vs. `CellMeta`) & PAX-`CellLocator`** *(löst Reibungspunkt 3)* | Tags/`valid_to`/Trust ändern nicht `content_hash` (kein Re-Embedding); `CellLocator` nutzt `(PackId, ExtentNo, RowIndex)` statt Byte-Offsets je Lane |
-| **C-04** | **Ephemerer Laufzeitzustand in Kernel-Sidecars** *(löst Reibungspunkt 2)* | Work-Queue-Leases und Idempotenz-Journal außerhalb `RootSet`; kein Commit-Spam und kein Merge-Leakage operativer Leases |
-| **C-05** | **MAC-geschützte Handles `c:<base32>-<mac2>`** *(löst Reibungspunkt 4)* | 10-Bit BLAKE3-Tag schließt zufällige Treffer bei LLM-Halluzinationen aus und triggert zuverlässig Fuzzy-Suggestions |
-| **C-06** | **Dichtes `Gid(u64)` + segmentlokales `DocId(u32)`** | Gemeinsamer Roaring64/Roaring32-Filterraum für ACL, Zeit, Trust, Graph, Vektor und BM25F |
-| **C-07** | **Keyed CAS-Hashing über Klartext (`BLAKE3(repo_hash_key, plaintext)`)** | Verhindert Cross-Repo Existenz-Orakel **ohne** Content-Addressing und Deduplizierung durch Nonce-Ciphertext zu brechen |
-| **C-08** | **AEAD at Rest mit KEK/DEK-Hierarchie** | O(1) Master-Key-Rotation via DEK-Rewrap; lazy Pack-Rotation bei Compaction |
-| **C-09** | **Agenten schreiben nie nach `main`; Merge-Gates `G1`–`G7`** | `main` bleibt frei von unaufgelösten Konflikten und ungeprüften Schreibzugriffen |
-| **C-10** | **Obligatorische Provenienz, `BeliefBeta(α,β)` & `source_root`-Unabhängigkeit** | Verhindert LLM-Echokammern; Konfidenz nutzt 10-%-LCB und noisy-AND bei Ableitungen |
-| **C-11** | **TrustTier (min) + orthogonale TaintFlags (union) + Datenrahmen** | Wirksame Abwehr gegen Prompt-Injection-Privilegieneskalation im Retrieval |
-| **C-12** | **Ein Commit-Punkt (WAL Group Commit); kein 4-Store-2PC** | Beseitigt Split-Brain-Risiken; Packs sind Wahrheitsquelle, Indizes rekonstruierbar |
-| **C-13** | **Zoom-Knapsack + Submodularitäts-Abzug + Small-to-Big + Abstention** | Liefert Überblick & Tiefe im Budget sowie explizites `NO_EVIDENCE_FOUND` bei Evidenzmangel |
-| **C-14** | **Ein validierter Standardalgorithmus je Modalität** | HNSW/Vamana, BM25F+BMW (globale Stats), CSR+Forward-Push-PPR+Leiden, RRF(k=60) |
-| **C-15** | **Keine Löschkette, keine Löschnachweise; `retire` + Retention + Best-Effort-`purge`** | Explizite Produktentscheidung; Decay beeinflusst nur Ranking und Archivierung, löscht nie still |
-| **C-16** | **Portables I/O (`pread`/`pwrite`) + opt. `io_uring`; kein `mmap` im Produktpfad** | Vermeidet unkontrollierte Eviction, TLB-Shootdowns und SIGBUS |
-| **C-17** | **Eigener FTS statt Tantivy** | Block-Max-WAND auf segmentlokalen `DocId`s + Content-Addressing + gemeinsame ACL-/Graph-Bitmaps |
-| **C-18** | **WASM-Merge/Gates mit Fuel-Limits (`wasmtime`)** | Deterministische Sandbox ohne WASI/Float; Fallback auf `ConflictCell` |
-| **C-19** | **Eventual Consistency für `AccessStats`; Re-Layout opt-in nach Benchmark** | Hot-Head/Cold-Tail-Extents sind Basis; Affinity Re-Layout optimiert Cold-Tail-I/O ohne Semantikänderung |
-| **C-20** | **Typestate-Transaktionen (`Txn<ReadOnly|ReadWrite>`) & `Snapshot<'db>`** | Schließt unregistrierte SSI-Reads konstruktiv aus |
-| **C-21** | **Embedded-first, Single-Process (`flock`), Server als dünne Hülle** | Minimale Latenz im Standardfall; Daemon für Multi-Client-Betrieb |
+| WAL-Writer | 1 | LSN/Seq/HLC-Vergabe, Append, Sync, Publikation in Reihenfolge |
+| Branch-Sequencer | logisch 1 je Branch (Mutex, **kein** Thread) | OCC/SSI-Validierung, Einreihung |
+| I/O-Pool | konfigurierbar | Blockierende Reads, Pack-Writes |
+| Compute-Pool (`rayon`) | ≈ Kerne | Suche, Fold, Index-Builds |
+| Job-Scheduler | 1 | Prioritäten, Token-Bucket für I/O und CPU |
+| `tokio` | ab L5 | Netzwerk, Timer, Adapter |
+
+**Lock-Hierarchie** (nur in dieser Reihenfolge): `StoreAdmin → ManifestWriter → BranchSequencer → BranchDelta → SidecarShard → BufferPoolShard`. Über Sync-Syscalls und Port-Aufrufe wird kein Lock gehalten (Ausnahme: `ManifestWriter` über den eigenen Manifest-Sync).
+
+Leser holen `Arc<BranchState>` wait-free über `ArcSwap` und registrieren eine Epoche; physische Freigabe erfolgt erst nach Ablauf aller Epochen und Leases.
 
 ---
 
-## 8. Abgrenzung zu Alternativen
+## 7. Abgrenzung
 
-| Aspekt | RocksDB / LSM | Dolt (Prolly) | LanceDB / Vektor-DB | **Contextra** |
+| Aspekt | LSM-KV | Prolly-SQL | Vektor-DB | Contextra |
 |---|---|---|---|---|
-| **Primitive** | Key → Bytes | SQL-Zeilen | Vektor + Payload | **Entkoppelte Cell (`Content` + `Meta`) + Zoom** |
-| **Versionierung** | Snapshots | Branches/Merge | Dataset-Versionen | **O(1)-Session-Branches, Merge-Gates `G1`–`G7`, Zeitreise** |
-| **Indizes & Konsistenz** | Keine Vektoren/Graph | B-Tree | Vektor/FTS ohne Graph | **`RootSet` (Truth) + `IndexManifest` (Watermark + Flat-Fallback)** |
-| **Filter & Hybrid** | Scan | Join | Post-/Pre-Filter | **Gemeinsames `Gid`/`DocId` Bitmap für Vektor + BM25F + Graph** |
-| **LLM-Integration** | Keine | Keine | Top-k Chunks | **Token-Summen, Zoom-Knapsack, MAC-Handles, Abstention, Taint** |
-| **Layout** | Key-Order | Key-Order | Spalten | **Hot-Head/Cold-Tail PAX-Extents + Locator Re-Layout** |
+| Primitive | Key→Bytes | Zeilen | Vektor + Payload | Cell (Content/Meta/Edges) + Zoom |
+| Versionierung | Snapshots | Branch/Merge | Dataset-Versionen | Session-Branches, Gates, Bitemporalität |
+| Konsistenz Index/Daten | — | B-Baum | variiert | `RootSet` + `IndexManifest` + Validierung |
+| LLM-Bezug | — | — | Top-k | Budget, Handles, Abstention, Taint |
+
+Die Tabelle beschreibt typische Kategorien, keine Messung einzelner Produkte.
 
 ---
 
-*Ende SPEC-01. Weiter: [SPEC-02 Datenmodell](SPEC-02-DATA-MODEL.md)*
+## 8. Architektur-Abnahme
+
+- CI-Prüfung der Schicht-, `tokio`- und `unsafe`-Regeln ist grün und blockierend.
+- Jede INV-ID ist in `contextra-sim` oder einer Suite referenziert; `xtask invariants` meldet unreferenzierte IDs.
+- Jede Abweichung von einem SOLL besitzt einen Registereintrag in [SPEC-00](SPEC-00-INDEX.md).
+
+---
+
+*Weiter: [SPEC-02 Datenmodell](SPEC-02-DATA-MODEL.md)*

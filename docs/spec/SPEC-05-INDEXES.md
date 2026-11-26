@@ -1,169 +1,227 @@
-# SPEC-05 — Indizes: Gemeinsamer Adressraum, Segmente und Watermarks
+# SPEC-05 — Indizes: Adressraum, Manifest, Vektor, Volltext, Graph, Filter
 
-**Version 2.1 · November 2026 · Status: Final**
+**Version 3.0 · 26. November 2026 · Status: Final**
 **Querverweise:** [Index](SPEC-00-INDEX.md) · [Datenmodell](SPEC-02-DATA-MODEL.md) · [Versionierung](SPEC-04-VERSIONING.md) · [Context Engine](SPEC-06-CONTEXT-ENGINE.md)
 
-> Alle abgeleiteten Indizes sind **segmentbasiert, unveränderlich, content-addressed** und über das separate **`IndexManifest`** (mit `source_truth_hash` + `watermark_seq`) an den Commit gebunden — sie sind **nicht** Teil des deterministischen `RootSet`-Hashes (löst Reibungspunkt 1). Index-Verlust führt niemals zu Datenverlust; fehlende Segmente lösen sofortigen exakten **Watermark-Fallback** aus.
+Alle Indizes sind segmentbasiert, unveränderlich, content-addressed und **nicht** Teil des `truth_hash`. Verlust führt nie zu Datenverlust.
 
 ---
 
-## 1. Gemeinsamer Adressraum (`Gid ↔ DocId`) & Watermark-Vertrag
-
-### 1.1 Einheitlicher Filter-Pushdown (INV-5: ACL vor Ranking)
-
-Alle Retrieval-Modalitäten teilen denselben globalen Adressraum **`Gid(u64)`** und pro Segment einen dichten, lokalen **`DocId(u32)`** (`0..segment_len - 1`):
-
-1. **Vorab-Filterung im `Gid`-Raum (`Roaring64`):**
-   - `ACL-Bitmap` (Vereinigung der berechtigten Gruppen-Bitmaps des Aufrufers)
-   - `∩ Namespace ∩ TrustTier ∩ ¬TaintBlock ∩ CellKind ∩ ValidAt ∩ Attrs`
-   - `∩ ¬dead_at(snapshot) ∩ ¬Shadow(Branch)` (Liveness & Branch-Overlay)
-   - `∩ GraphFrontier` (falls Graph-Anker-Constraint aktiv)
-2. **Segment-Übersetzung (`Roaring64(Gid) → Roaring32(DocId)`):**
-   Jedes Index-Segment (Vektor, FTS, CSR) und jedes Truth-Extent speichert sein sortiertes `gids: [Gid; N]`-Array. Die Übersetzung erfolgt durch sortiertes Range-Slicing / Galloping-Merge in **O(min(|S|, log N))** und wird pro Query und Segment gecacht.
-3. **Dieselbe `Roaring32(DocId)`-Bitmap** schränkt **Vektor-Traversal, BM25F-Postings (Block-Skipping) und Flat-Scan direkt ein** — niemals nur nachträgliche Post-Filterung.
-
-### 1.2 Watermarks & Exakter Fallback
+## 1. IndexManifest und Abdeckung
 
 ```rust
-pub struct IndexManifest {
+pub struct IndexManifestRef {              // Manifest-Log, je Branch
     pub manifest_id: ChunkId,
-    pub source_truth_hash: Digest,       // Hash des RootSet, das alle Segmente abdecken
-    pub watermark_seq: u64,              // Höchste indizierte globale Seq
-    pub vec_segments: Vec<SegmentRef>,
-    pub fts_segments: Vec<SegmentRef>,
-    pub fts_corpus_stats: Vec<FtsCorpusStats>, // Globale (N, avgdl, df) je (NsId, Analyzer)
-    pub csr_segments: Vec<SegmentRef>,
-    pub bitmap_segments: Vec<SegmentRef>,
+    pub covers: CommitId,
+    pub covers_truth_hash: Digest,
+    pub watermark_seq: Seq,
+}
+
+pub struct IndexManifest {
+    pub covers: CommitId,
+    pub catalog_digest: Digest,
+    pub segments: Vec<SegmentRef>,          // kind, space/analyzer, gid_range, rows, bytes
+    pub watermarks: BTreeMap<LaneKey, Seq>, // je (Art, Space|Analyzer)
+    pub pending: BTreeMap<LaneKey, Roaring64Ref>,  // Gids ohne verfügbares Derivat
+    pub fts_stats: Vec<FtsCorpusStats>,
     pub deletion_vectors: Vec<DeletionVectorRef>,
 }
 ```
 
-- Eine Abfrage zum Snapshot `S` durchsucht:
-  1. alle Segmente in `IndexManifest` (maskiert über `DeletionVector` + `Liveness`), **plus**
-  2. alle In-Memory-Deltas (`vec_delta`, `fts_delta`, `graph_delta`) und alle noch nicht indizierten Truth-Extents mit `seq > watermark_seq` per exaktem Scan.
-- **Ergebnis-Transparenz:** `RecallResult` meldet `lane_coverage ∈ [0.0, 1.0]` je Modalität und eine `PartialIndex`-Warnung, falls auf Flat-Fallback ausgewichen wurde.
-
----
-
-## 2. Vektorindex (`contextra-vector`)
-
-### 2.1 Gestufte Segment-Architektur
+**Warum Watermark allein nicht genügt:** Ein Embedding kann lange nach seinem Commit eintreffen. Eine Cell unterhalb der Sequenzmarke ohne Vektor steht deshalb in `pending` und wird beim Eintreffen nachindiziert. Die Abdeckung eines Lanes ist:
 
 ```
-Neue Vektoren (Commits in EmbeddingSpace X)
-        │
-        ▼
-  Branch Delta-Arena (RAM: Flat SIMD ≤ 20 000 Vektoren; bei Backlog > 20k: Mini-HNSW RAM)
-        │  Asynchroner Index-Job (Work Queue / Hintergrund-Worker)
-        ▼
-  Unveränderliche Segmente (je EmbeddingSpace getrennt):
-    ├── Flat-Segment (< 50 000 Zeilen)        → exakter SIMD-Scan über body.vec
-    ├── HNSW-Segment (Profil lite/standard)    → SQ8 + Graph im RAM (~≤ 8M/Segment)
-    └── Vamana/DiskANN (Profil standard/scale) → PQ/RaBitQ-Codes im RAM, 4-KiB-Sektoren auf NVMe
-        │  Size-Tiered Compaction (Faktor 4–8, max. 8M Vektoren/Segment)
-        ▼
-  Neues Segment + Update von IndexManifestRef (ohne Änderung am RootSet!)
+lane_coverage = durchsuchbare sichtbare Kandidaten / sichtbare Kandidaten, für die der Lane anwendbar ist
 ```
 
-### 2.2 Parameter & Quantisierung
+Zähler und Nenner werden **innerhalb der ACL-Sichtmaske** gebildet (INV-5).
 
-| Parameter | HNSW (RAM) | Vamana / DiskANN (SSD) |
+**Ist `covers` kein Vorfahr des Snapshot-Heads** (Rollback, fremder Branch), bleiben Segmente nutzbar, weil jeder Treffer validiert wird (§2.3); Zeilen aus der Differenz werden über den Prolly-Diff als Delta ergänzt.
+
+Compaction ersetzt ausschließlich Manifeste. Die Publikation ist ein CAS gegen das vorherige Manifest.
+
+---
+
+## 2. Adressraum, Filter, Validierung
+
+### 2.1 Filter im `Gid`-Raum
+
+```
+allow = ACL(principal) ∩ NS ∩ Kind ∩ Trust ∩ Grounding ∩ ¬TaintBlock
+        ∩ ValidAt(v) ∩ Attrs ∩ Live(snapshot) [∩ GraphFrontier]
+```
+
+Basis sind `Roaring64`-Bitmaps aus Segmenten, überlagert mit dem RAM-Delta. Bitmaps für häufig geänderte Prädikate dürfen **Obermengen** sein, ausgenommen ACL: Die ACL-Maske MUSS exakt oder eine Untermenge sein; fehlt Information, ist die Cell unsichtbar.
+
+### 2.2 Übersetzung `Gid → DocId`
+
+Jedes Segment speichert `gids[N]`, sortiert nach `(gid, born_seq)`; `DocId` ist die Position. Mehrere Versionen derselben `Gid` sind zulässig. Übersetzung durch Galloping-Intersection, Aufwand O(m·log(n/m)) mit m = kleinere Seite; Ergebnis `Roaring32`, gecacht je (Query, Segment). Dieselbe `DocSet` schränkt Graph-Beam, Postings und Flat-Scan **während** der Suche ein.
+
+### 2.3 Treffervalidierung (verbindlich)
+
+Jeder Index-Eintrag trägt `(gid, input_digest[16])`. Ein Treffer ist gültig, wenn
+
+1. die `Gid` im Snapshot lebt und in `allow` liegt, **und**
+2. `input_digest` dem aktuellen Eingabedigest dieser Cell für diesen Producer entspricht.
+
+Damit sind veraltete Versionen unabhängig von Deletion Vectors ausgeschlossen. Deletion Vectors (je Manifest, also je Branch) sind nur Beschleuniger. Verwirft die Validierung so viele Treffer, dass weniger als `k` bleiben, wird mit verdoppeltem Over-Fetch einmal nachgesucht.
+
+### 2.4 Flat-Fallback
+
+| Zustand | Verhalten |
+|---|---|
+| Nicht indizierte Zeilen ≤ `flat_fallback_max_rows` (Default 200 000 je Lane) | exakte Ergänzung |
+| darüber | zeitbegrenzter Scan, neueste zuerst; `lane_coverage < 1`, Warnung `PartialIndex`, Index-Job mit höchster Priorität |
+| Aufrufer verlangt `require_complete` | unbegrenzter exakter Scan bis Query-Deadline, sonst `index_incomplete` |
+
+Ein vollständiger Indexverlust auf großen Beständen ist damit **verfügbar, aber degradiert**; Latenzziele gelten dann nicht. FTS-Fallback tokenisiert Rohtext und ist entsprechend teuer.
+
+---
+
+## 3. Volltext (`contextra-text`)
+
+### 3.1 Segment
+
+1. FST-Term-Dictionary (exakt, Präfix, Fuzzy per Levenshtein-Automat, Distanz ≤ 2, ≤ 64 Expansionen).
+2. Postings in 128er-Blöcken, Delta + SIMD-Bitpacking; optional Positionen.
+3. Je Block die **Impact-Grenzen** `(tf, fieldnorm)` als Pareto-Menge je Feld.
+4. Feldnormen (1 B je Feld und Dokument).
+
+Block-Max-Schranken werden **zur Abfragezeit** aus den Impact-Grenzen und den aktuellen globalen Statistiken berechnet. Zur Bauzeit berechnete Scores sind unzulässig: Ändern sich `avgdl` oder `df`, wären sie keine oberen Schranken mehr, und Block-Max-WAND lieferte falsche Top-k.
+
+### 3.2 BM25F
+
+`k1 = 1.2`; je Feld `b = 0.75`. Gewichte: `title`/`zoom.L2` 3,0 · `tags` 2,0 · `heading_path` 1,5 · `body` 1,0 · `edge_labels` 0,5. IDF in der nichtnegativen Form `ln(1 + (N − df + 0.5)/(df + 0.5))`.
+
+`(N, avgdl_feld, df_term)` werden über alle Segmente des Manifests plus Delta aggregiert. Bis zur Compaction zählen ersetzte Dokumente mit (dokumentierte Näherung). Scores sind je (Manifest, Delta) deterministisch.
+
+### 3.3 Statistik-Isolation
+
+Globale IDF-Werte verraten indirekt Termvorkommen in unsichtbaren Dokumenten. Daher je Namespace:
+
+| `idf_isolation` | Statistikbasis | Eigenschaft |
 |---|---|---|
-| **Graph-Grad** | `M = 16`, `ef_construction = 200` | `R = 64`, `L_build = 125`, `α = 1.2` |
-| **Suche** | `ef_search` adaptiv 16..256 | Beam Search (Beamweite 8, `L_search = 100`), 1 Sektor-Read je Hop |
-| **Quantisierung im Graph** | `SQ8` (0.5%/99.5% Perzentile) | `SQ8` (`standard`) oder `PQ(M=32, 8-bit)` / `RaBitQ` (`scale`) |
-| **Matryoshka-Präfix** | Optional (z. B. 128–256 Dim) im Hot-Head | Vorfilter über Präfix, Re-Rank auf vollem `f16` |
-| **Re-Ranking** | Top-2 000 Kandidaten gegen `f16` aus `emb.full` (Cold Tail) | wie links |
+| `namespace` (Default) | Namespace; Zugriff nur, wenn der Principal den Namespace lesen darf | innerhalb gemischter ACLs ist ein Score-Seitenkanal möglich und dokumentiert |
+| `acl-class` | getrennte Statistiken je `AclRef`-Klasse, aggregiert über sichtbare Klassen | kein Einfluss unsichtbarer Dokumente; höherer Speicher- und CPU-Bedarf; ≤ 1 024 Klassen |
 
-- **Co-Location im Vamana-Segment:** 4-KiB-Sektor enthält pro `DocId` den quantisierten Code + adjazente `R` Nachbar-`DocId`s (~1 KiB/Vektor → 4 Knoten pro 4-KiB-Sektor).
-- **Quantisierung ist Segment-identisch:** Parameter werden im Segment-Header gespeichert (`(EmbeddingSpaceId, QuantParams, Seed)`). Kein Live-Rekalibrieren; Drift wird beim Neuaufbau behoben.
-- **Mehrere Spaces:** Vektoren verschiedener `EmbeddingSpace`s werden **niemals** gemischt oder direkt verglichen. Modellwechsel nutzt Dual-Space-Betrieb + Re-Embedding-Jobs.
+Namespaces mit vertraulichen, gemischten ACLs MÜSSEN `acl-class` verwenden. INV-5-Tests laufen in diesem Modus auf Score-Ebene.
 
-### 2.3 Gefilterte Suche (Strategie A/B/C mit Laufzeit-Fallback)
+### 3.4 Analyzer
 
-Für gegebene Segment-Kandidatenmenge `S` (`Roaring32` aus §1.1) mit Selektivität `σ = |S| / N`:
+UAX-29-Segmentierung → NFC/Lowercasing → Umlaut-/ß-Faltung (zusätzlicher Token, Original bleibt) → Spracherkennung je Chunk → Snowball (`de`, `en`) → deutsche Komposita-Zerlegung (DP mit Fugenelementen, Wörterbuch per Digest gepinnt) → CamelCase/snake_case und N-Gramme für Bezeichner. Analyzer-ID inklusive Datendigest ist Teil des Segmentschlüssels; Änderung ⇒ Rebuild. Abfragen nutzen den Analyzer des Segments.
 
-| Strategie | Bedingung | Verfahren |
+---
+
+## 4. Vektor (`contextra-vector`)
+
+### 4.1 Stufen
+
+```
+Commit/Derivation → Branch-Delta (Flat-SIMD bis 20 000, darüber RAM-HNSW)
+   → Index-Job → Segment: Flat (< 50 000) | HNSW | Vamana
+   → größengestufte Compaction (Faktor 4–8, ≤ 8·10⁶ je Segment)
+```
+
+### 4.2 Parameter und Layout
+
+| | HNSW (RAM) | Vamana (SSD) |
 |---|---|---|
-| **A: Exakter Pre-Filter** | `|S| ≤ τ_A` (Default 20 000) oder `σ < 0.01` | Direkte SIMD-Distanzberechnung (`contextra-simd`) über `S` in `emb.full` / `emb.q` |
-| **B: Gefilterter Graph-Beam (ACORN)** | `0.01 ≤ σ < 0.5` | `S` wird als hartes Prädikat während Graph-Expansion geprüft; bei `σ < 0.1` mit 2-Hop-Nachbar-Brücke |
-| **C: Post-Filter (Over-Fetch)** | `σ ≥ 0.5` | Standard-Beam mit Over-Fetch Faktor `ceil(1/σ) · k` |
-| **Pflicht-Fallback** | Strategie B liefert nach `ef` Pops `< k` Treffer | Sofortiger Umschalt auf Strategie A |
+| Graph | `M=16`, `efC=200` | `R=64`, `L_build=125`, `α=1.2` |
+| Suche | `efSearch` 16–256 adaptiv | Beam 8, `L_search` 100 (Start) |
+| RAM je Vektor | Code + Graph | **Code aller Knoten** + `gid` |
+| Auf SSD | — | je Knoten: Vollvektor `f16` + Grad + `R` Nachbar-`DocId`s |
+| Rerank | Top-N gegen `emb.full` | exakt aus dem gelesenen Sektor |
 
-*Geteilte Top-k-Schwelle:* Alle parallelen Segment-Scans teilen eine atomare k-te Score-Untergrenze (`AtomicU32`), um frühe Zweige abzubrechen.
+Beam-Search bewertet Nachbarn über die **RAM-residenten Codes** und liest Sektoren nur für expandierte Knoten. Sektorbelegung bei R = 64 (260 B Adjazenz): 768 Dim ⇒ 1 796 B ⇒ 2 Knoten je 4 KiB; 1 024 Dim ⇒ 2 308 B ⇒ 1 Knoten; 3 072 Dim ⇒ 6 404 B ⇒ 2 Sektoren je Knoten. Vollvektoren im Segment sind eine Kopie zur I/O-Vermeidung.
 
-### 2.4 Deletion Vectors & Compaction
+### 4.3 Quantisierung
 
-Jedes Vektorsegment hat einen `DeletionVector` (`Roaring32` der ersetzten/retired `DocId`s) im `IndexManifest`. Gelöschte Knoten bleiben bis zur Compaction als **Routing-Knoten** im Vamana-/HNSW-Graph (keine Online-Graphreparatur nötig!).
-- **Compaction-Trigger:** `> 8` Segmente pro Tier/Space ODER `> 30 %` gelöschte Vektoren ODER Segmentgröße `> 8 Mio.` (Split).
-- Compaction schreibt neue Segmente + aktualisiert **ausschließlich `IndexManifestRef`** im Manifest-Log.
-
----
-
-## 3. Volltextindex (`contextra-text`)
-
-### 3.1 Segmentaufbau & Globale BM25F-Statistiken
-
-Ein FTS-Segment umfasst:
-1. **Term-Dictionary (FST):** Kompakter Finite State Transducer (`1–3 B/Term`) für exakte Suche, Präfixsuche und Fuzzy-Matching via Levenshtein-Automat (Edit-Distanz ≤ 2).
-2. **Posting Lists (128er-Blöcke):** Nach `DocId` delta-kodiert und SIMD-bitgepackt; pro Block ein **Block-Max-Upper-Bound-Score** für **Block-Max-WAND / MaxScore** (skippt ganze Blöcke ohne Dekompression). Optionale Positionsströme für Phrasen-/Nähesuche.
-3. **Field Norms:** 1-Byte-komprimierte Dokumentlängen je Feld.
-
-**Globale BM25F-Statistiken (korrigiert pro-Segment-Verzerrung):**
-Segment-Footer speichern `(doc_count, sum_field_len, per_term_df)`. Das **`IndexManifest`** aggregiert daraus **globale `(N, avgdl_field, df_term)`** über alle aktiven Segmente (+ In-Memory-`fts_delta`), sodass BM25F-Scores über Segmente und Branches hinweg **konsistent und vergleichbar** bleiben!
-
-### 3.2 BM25F-Parameter & Analyzer-Pipeline
-
-- **Parameter:** `k1 = 1.2`, `b = 0.75` (konfigurierbar).
-- **Feldgewichte:** `title` / `zoom.L2` (`3.0`), `tags` (`2.0`), `heading_path` (`1.5`), `body` (`1.0`), `edge_labels` (`0.5`).
-- **Analyzer-Pipeline** (ID + Parameter sind Teil des Segmentschlüssels; Änderung erzwingt kontrollierten Neuaufbau):
-  - Unicode-Segmentierung (UAX #29), Lowercasing, Umlaut-/ß-Normalisierung, Spracherkennung je Chunk, Snowball-Stemming (`de`, `en`, ...), **deutsches Decompounding** (DP-Zerlegung mit Fugenelementen), CamelCase-/Snake-Case-Splitting & N-Gramme für Code und Bezeichner.
-
----
-
-## 4. Graphindex (`contextra-graph`)
-
-### 4.1 Truth & Abgeleitete CSR-Segmente
-
-- **Truth (`RootSet.graph`):** Prolly-Tree mit Präfixen `G:(src_gid, edge_kind, dst_gid, edge_id) → EdgePayload` und `R:(dst_gid, edge_kind, src_gid, edge_id) → ()`. Knotenidentität ist stets `Gid(u64)`.
-- **Referentielle Sichtbarkeit:** Das `retire` einer Cell löscht ihre Kanten **nicht** kaskadierend. Stattdessen prüft jede Graph-Traversal die Sichtbarkeit beider Endpunkte gegen die aktive Snapshot-Liveness-Maske (und Merge-Gate `G1`/`G3` meldet *dangling edges*).
-- **Abgeleitete CSR-Segmente (`IndexManifest.csr_segments`):** Gebaut bei `> 10 000` Kanten oder `> 20 %` Änderung; Elias-Fano-codierte Offsets, delta+bitpack-codierte Nachbar-`Gid`s, parallele `EdgeKind`-/Gewichts-/Valid-Spalten und **Skip-Index für Hub-Knoten (`degree > 10 000`)**.
-
-### 4.2 Graph-Operatoren mit Pflichtlimits
-
-Unbegrenzte Traversals sind unzulässig (Schutz vor runaway Agent-Queries):
-
-| Operator | Parameter (Defaults & Harte Limits) | Verfahren |
+| Verfahren | RAM bei 768 Dim | Einsatz |
 |---|---|---|
-| **k-Hop-Expansion** | `max_hops = 2` (Max `5`), `fan_out_budget = 50` (Max `500`), `max_visited = 100 000`, `max_paths = 10 000`, `timeout = 200 ms` | Richtungsoptimierte BFS über CSR ⊕ `graph_delta`, Frontier als `Roaring64`, Temporal-/EdgeKind-Masken. Bei Limit-Erreichen: Teilergebnis mit `truncated = true`. |
-| **Personalized PageRank** | **Einziger Standard:** `Forward-Push PPR` (`α = 0.85`, `ε = 1e-4`, `max_iter = 50`, `top_k = 100`) | Pfad-Konfidenz-Dämpfung `C(P) = (Π conf(e_i)) · γ^(k-1)` (`γ = 0.9`) optional als Kantengewicht; Hub-Dämpfung. |
-| **Leiden-Communities** | Deterministischer Batch-Job (mit festem Seed) | Community-IDs fließen als Boost (`× 1.2`) in Retrieval und speisen hierarchische `Summary`-Cells (`level = 3`). |
+| SQ8 (0,5/99,5-Perzentile) | 768 B | wenn Budget reicht |
+| PQ M=64, 8 bit | 64 B | große Bestände |
+| RaBitQ 1 bit + Korrekturfaktoren | ≈ 96 B + ≤ 16 B | große Bestände |
+
+Der Segment-Builder wählt anhand des verbleibenden `fixed`-Budgets (Reihenfolge SQ8 → RaBitQ/PQ) und MUSS die Recall-Prüfung bestehen, sonst bleibt das alte Manifest aktiv. Parameter und Seed stehen im Segmentheader; keine Online-Rekalibrierung. Optionaler Matryoshka-Präfix (128–256 Dim) als Vorfilter, nur für Producer, die ihn unterstützen.
+
+Spaces werden nie gemischt oder verglichen. Modellwechsel: neuer Space, Doppelbetrieb, Backfill nach Salience; Abfragen fusionieren **Ränge**, nicht Distanzen.
+
+### 4.4 Gefilterte Suche
+
+`S` = erlaubte `DocId`s, `σ = |S|/N`.
+
+| Strategie | Bedingung (in dieser Reihenfolge geprüft) | Verfahren |
+|---|---|---|
+| **A** exakt | `|S| ≤ 20 000` oder `σ < 0.01` mit `|S| ≤ 200 000` | SIMD über Codes, exakter Rerank |
+| **B** In-Filter | `σ < 0.5` | Beam mit Prädikat; `σ < 0.1` mit Zwei-Hop-Expansion (ACORN-Prinzip) |
+| **C** Post-Filter | sonst | Over-Fetch `ceil(k/σ)` plus Marge |
+
+Fallback: Liefert B weniger als `min(k, |S|)` gültige Treffer innerhalb des Expansionsbudgets, wird A ausgeführt (deadlinegebunden). Unsichtbare Knoten dürfen als Routing-Knoten dienen, erscheinen aber nie in Ergebnissen oder Zählern. Parallele Segmentsuchen teilen die k-te Score-Schranke nur zwischen Scores **derselben Metrik und desselben Space**.
+
+### 4.5 Validierung der Eingaben, Löschungen, Compaction
+
+NaN, ±∞, falsche Dimension, Nullvektor bei Cosine ⇒ `vector_invalid`. Gelöschte Knoten bleiben Routing-Knoten. Compaction bei > 8 Segmenten je Stufe und Space, > 30 % toten Einträgen oder Übergröße. Sichtbarer Fan-out je Query ≤ 24; darüber erhält Compaction Priorität.
 
 ---
 
-## 5. Temporal-, Attribut- und Token-Summen-Indizes
+## 5. Graph (`contextra-graph`)
 
-### 5.1 Temporal- & Attribut-Bitmaps
+### 5.1 Truth und CSR
 
-- **Zeitbereichs-Prolly-Keyspace:** `(valid_from, gid) → valid_to` im Truth Layer für exakte Intervallabfragen.
-- **Roaring64-Bitmaps** in `IndexManifest.bitmap_segments` + RAM-Delta für: `NsId`, `CellKind`, `TrustTier`, `TaintFlags`, `ACL-Gruppen`, `Tags`, `Enum`-Attribute.
-- **Extent-Hot-Head-Bloom (8 B/Cell):** Schnelles Vorab-Ausschließen beim sequentiellen Extent-Scan.
+Wahrheit ist der Baum `graph`. CSR-Segmente (vorwärts und rückwärts): Elias-Fano-Offsets, delta-bitgepackte Nachbarn, Spalten für Art, Gewicht, Gültigkeit, Trust; Skip-Index für Grad > 10⁴. Bau ab > 10 000 Kanten oder > 20 % Änderung; Delta-Overlay bis dahin.
 
-### 5.2 Augmentierter Token-Summen-Baum
+Eine Kante ist sichtbar, wenn sie selbst und **beide Endpunkte** im Snapshot sichtbar sind. `retire` kaskadiert nicht; G1 meldet hängende Kanten. Traversierungen prüfen die Sichtmaske **bei jeder Expansion**: Pfade führen nie durch unsichtbare Knoten.
 
-In `RootSet.sequences` speichert jeder innere Prolly-Knoten (Ziel-Fanout ~128) die aggregierten **Token-Summen pro registriertem `TokenizerId`**, Zellzahl und `first_position..last_position`:
-- **`window(seq, anchor, budget, dir)`** sammelt zusammenhängende Kontextfenster in **O(log n)** Knoten-Reads, ohne vorab `raw`-Inhalte aus dem Cold Tail zu lesen.
+### 5.2 Operatoren mit Pflichtlimits
+
+| Limit | Default | Hart |
+|---|---|---|
+| Hops | 3 | 5 |
+| Fan-out je Knoten | 50 | 500 |
+| Besuchte Knoten | 100 000 | 100 000 |
+| Pfade | 10 000 | 10 000 |
+| Deadline | 200 ms | 2 s |
+
+Überschreitung ⇒ Teilergebnis mit `truncated = true`. Reihenfolge der Expansion ist deterministisch (Gewicht absteigend, dann `Gid`), damit abgeschnittene Ergebnisse reproduzierbar sind; Deadline-Abbrüche sind davon ausgenommen und gekennzeichnet.
+
+**Forward-Push Personalized PageRank** (einziger PPR-Standard): Dämpfung `d = 0.85` (Teleport 0,15), Residuum-Schwelle `ε = 1e-4` relativ zum Ausgangsgrad, `max_pushes = 10⁶`, `top_k = 100`.
+
+**Pfadkonfidenz** ist eine Min-Schranke: `C(P) = min_i conf(e_i)`; unabhängige Pfade (disjunkte `source_root`s) werden durch das Maximum zusammengefasst. Ein Hop-Dämpfungsfaktor `γ = 0.9` darf das **Ranking** beeinflussen, nicht die ausgewiesene Konfidenz.
+
+**Leiden** läuft als geseedeter, deterministischer Batch-Job; Community-Zugehörigkeit steht im IndexManifest, boostet optional (× 1,2) und speist `Summary`-Cells. Community-Zusammenfassungen unterliegen INV-13; über ACL-Klassen hinweg wird getrennt geclustert oder konjunktiv vererbt.
 
 ---
 
-## 6. Index-Lifecycle & Konsistenz-Tabelle
+## 6. Temporal, Attribute, Sequenzen
 
-| Struktur | Lebensort | Update-Modus | Crash-Schutz |
+- **Bitmaps** je Manifest: `NsId`, Kind, Trust, Taint, `AclRef`, Tags, Enum-Attribute.
+- **Zeitindex:** abgeleitete, nach `valid_from` sortierte Segmente mit Blockzusammenfassung `min/max(valid_to)`. Er ist ein Index, kein achter `RootSet`-Baum.
+- **Extent-Bloom** (8 B je Cell) zum frühen Ausschluss; Treffer werden exakt nachgeprüft.
+- **Token-Summen:** `window(seq, anchor, budget, dir, tokenizer)` summiert Knotenaggregate in O(log n) und schneidet an Cell-Grenzen. Unsichtbare Cells werden ausgeschlossen: Enthält ein Teilbaum gemischte Sichtbarkeit, wird abgestiegen; ausgegebene Summen zählen nur Sichtbares. Das O(log n)-Ziel gilt für homogene Sichtbarkeit.
+
+---
+
+## 7. Lifecycle
+
+| Struktur | Ort | Aktualisierung | Wiederherstellung |
 |---|---|---|---|
-| `primary` / `graph` / `sequences` / `aliases` / `policies` / `conflicts` / `provenance` | **`RootSet` (Truth)** | `MemDelta` (sync) → Prolly-Fold (async) | WAL Group Commit |
-| `vec_delta` / `fts_delta` / `graph_delta` / `bitmap_delta` | **Branch RAM** | Synchron beim Commit publiziert | Aus WAL/MemDelta rekonstruiert |
-| `Vamana` / `HNSW` / `FTS` / `CSR` / `Bitmap` Segmente | **`IndexManifest` (Side-Ref)** | Asynchroner Background-Job | Jederzeit aus Truth rekonstruierbar; Flat-Fallback aktiv |
+| `RootSet`-Bäume | `packs/truth` | Delta → Fold | WAL |
+| RAM-Deltas (`vec`, `fts`, `graph`, `bitmap`) | Branch | bei Publikation | aus WAL/Delta |
+| Embeddings, Summaries | Derivation Cache | `DerivationPut` | WAL/Pack, sonst neu berechnen |
+| Index-Segmente | `packs/index` | Hintergrundjob | jederzeit aus Truth + Derivationen |
+
+Index-Builds laufen im `jobs`-Budget, sind abbrechbar und setzen an Segmentgrenzen fort.
 
 ---
 
-*Ende SPEC-05. Weiter: [SPEC-06 Context Engine](SPEC-06-CONTEXT-ENGINE.md)*
+## 8. Abnahme
+
+- Recall@10 ≥ 0,95 gegen exakte Suche je Quantisierung **und** je Selektivitätsklasse σ ∈ {0,001; 0,01; 0,1; 0,5; 1}.
+- Differenzial: BM25 gegen Referenzimplementierung; Block-Max-WAND gegen erschöpfendes Scoring unter wechselnden Statistiken (identische Top-k); PPR gegen Power-Iteration innerhalb der ε-Schranke.
+- Property: `Gid→DocId` gegen naive Referenz; verspätete Derivate werden gefunden.
+- Index-Verlust-Test: identische Kandidatenmengen unterhalb der Fallback-Grenze; darüber korrekte Degradationsmeldung; vollständiger Rebuild.
+- ACL-Suite: keine unsichtbare `Gid` in Treffern, Pfaden, Zählern.
+
+---
+
+*Weiter: [SPEC-06 Context Engine](SPEC-06-CONTEXT-ENGINE.md)*

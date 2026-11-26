@@ -1,253 +1,353 @@
-# SPEC-04 — Versionierung, Transaktionen und Nebenläufigkeit
+# SPEC-04 — Versionierung, Transaktionen, Merge und Kernel-Sidecars
 
-**Version 2.1 · November 2026 · Status: Final**
+**Version 3.0 · 26. November 2026 · Status: Final**
 **Querverweise:** [Index](SPEC-00-INDEX.md) · [Datenmodell](SPEC-02-DATA-MODEL.md) · [Indizes](SPEC-05-INDEXES.md) · [Durability](SPEC-07-DURABILITY.md)
 
 ---
 
-## 1. Zustandsmodell: Prolly-Tree + MemDelta
+## 1. Prolly-Tree
 
-### 1.1 Prolly-Tree (Truth Layer)
+### 1.1 Eigenschaften
 
-Probabilistischer, inhaltsadressierter B-Baum für alle logischen Relationen des `RootSet`:
-- **History-unabhängig (INV-1):** Gleiche Schlüssel-Wert-Menge ⇒ deterministische Knotengrenzen ⇒ identischer Wurzel-Hash, unabhängig von Schreibreihenfolge, Batches oder Compaction.
-- **Strukturelles Sharing:** O(1)-Forks; Branches teilen unveränderte Teilbäume.
-- **O(Δ·log n) Diff und 3-Wege-Merge:** Hash-Gleichheit überspringt ganze Teilbäume sofort.
+History-unabhängig (INV-1), strukturell geteilt, O(Δ·log n) Diff/Merge, augmentierbar.
 
-### 1.2 Boundary-Funktion
+### 1.2 Grenzfunktion (größenbewusst)
+
+Parameter: `MIN = 2 KiB`, `TARGET = 8 KiB`, `MAX = 32 KiB`, `SPAN = TARGET − MIN = 6144`. Gezählt wird die unkomprimierte CBE-Länge der Einträge.
 
 ```rust
-fn is_boundary(key: &[u8], repo_seed: &[u8; 32]) -> bool {
-    let h = blake3::keyed_hash(repo_seed, key);
-    let prefix = u32::from_le_bytes(h.as_bytes()[0..4].try_into().unwrap());
-    prefix & ((1 << 12) - 1) == 0 // B = 12 → Ziel-Knotengröße ~4–8 KiB
+fn closes_node(level: u8, key: &[u8], entry_len: u32, size_incl: u32, seed: &[u8; 32]) -> bool {
+    if size_incl >= MAX { return true; }
+    if size_incl < MIN  { return false; }
+    let mut h = blake3::Hasher::new_keyed(seed);
+    h.update(&[level]); h.update(key);
+    let x = u32::from_le_bytes(first4(h.finalize().as_bytes()));
+    let threshold = ((u64::from(entry_len) << 32) / u64::from(SPAN)).min(u64::from(u32::MAX));
+    u64::from(x) < threshold
 }
 ```
 
-- **Min./Max.-Knotengröße:** Min `1 KiB`, Max `16 KiB` (harte Schutzgrenze gegen adversarielle Key-Folgen).
+Die Abschlusswahrscheinlichkeit ist proportional zur Eintragsgröße; die erwartete Knotengröße liegt damit unabhängig von der Eintragsgröße nahe `TARGET` (der Anteil erzwungener `MAX`-Schnitte liegt rechnerisch bei etwa e⁻⁵ ≈ 0,7 %). Eine Grenzwahrscheinlichkeit pro Schlüssel ohne Größenbezug ist unzulässig. Ein einzelner Eintrag > `MAX` ist verboten (große Werte werden ausgelagert). Die Entscheidung hängt nur von sortiertem Inhalt und `repo_seed` ab, ist ganzzahlig und damit plattformstabil. Nach einer Änderung wird neu geschnitten, bis eine alte Grenze wieder getroffen wird.
 
-### 1.3 Knotenstruktur (Hints strikt außerhalb des Hashs)
+### 1.3 Knoten
 
 ```rust
-pub struct InternalNode {
-    pub level: u8,
-    pub children: Vec<ChildEntry>,
-}
-
+pub struct InternalNode { pub level: u8, pub children: Vec<ChildEntry> }
 pub struct ChildEntry {
-    pub separator_key: Bytes,
-    pub chunk_id: ChunkId,               // Hash des Kind-Knotens
-    pub aggregates: NodeAggregates,      // count, token_sums, time_min/max, size_bytes
-}
-
-/// Optionales physisches Hint-Array — wird in RAM/Sidecar gehalten und geht NIEMALS
-/// in `ChunkId = BLAKE3(InternalNode)` ein! Re-Layout bricht keinen einzigen Hash.
-pub struct UnhashedHints {
-    pub child_hints: SmallVec<[Option<(PackId, u32)>; 16]>,
+    pub last_key: Bytes,              // größter Schlüssel im Teilbaum
+    pub chunk_id: ChunkId,
+    pub agg: NodeAggregates,          // count, bytes, token_sums, valid_min, valid_max
 }
 ```
 
-### 1.4 MemDelta & Hintergrund-Fold
-
-Einzelwrites landen über das WAL zuerst sortiert in einem pro-Branch **In-Memory-`MemDelta`** (Skip-List) plus synchronen In-Memory-Index-Deltas (`vec_delta`, `fts_delta`, `graph_delta`, `bitmap_delta`). Leser sehen stets die konsistente Überlagerung `Basis-Prolly-Tree ⊕ MemDelta`.
-
-**Fold-Trigger:** MemDelta > 32 MiB, > 10 000 Einträge, > 30 s seit letztem Fold, `branch.fold()` explizit oder Shutdown.
+Kodierung in CBE; Aggregate sind reine Funktionen der Blattinhalte und gehen in den Hash ein. Physische Hints gehören nie in Knoten.
 
 ---
 
-## 2. Commit, Deterministisches `RootSet` und separates `IndexManifest` (löst Reibungspunkt 1)
-
-Um strikte **History-Unabhängigkeit (INV-1)** mit asynchroner **Vamana-/FTS-Segment-Compaction ([SPEC-05](SPEC-05-INDEXES.md) §2.4 & §3)** zu vereinen, wird der Wurzelzustand strikt in **Wahrheit (`RootSet`)** und **physische Indizes (`IndexManifestRef`)** getrennt:
+## 2. Commit, ChangeSet, RootSet
 
 ```rust
-pub struct Commit {
-    pub parents: SmallVec<[CommitId; 2]>,
-    pub changes: Digest,                      // BLAKE3 des ChangeSets
-    pub truth_root: Option<RootSet>,          // Deterministischer Zustandshash (nach Fold)
-    pub index_manifest: Option<IndexManifestRef>, // Separater Seiten-Zeiger! NICHT in CommitId/truth_hash!
+/// Unveränderlich. CommitId = ChunkId(kind = CommitHeader, CBE(self)).
+pub struct CommitHeader {
+    pub parents: SmallVec<[CommitId; 2]>,   // parents[0] = Branch-Vorgänger
+    pub changes: ChunkId,                   // ChangeSet relativ zu parents[0]
     pub author: AgentIdentity,
-    pub intent: Intent,
-    pub seq: u64,                             // Globale monotone Commit-Sequenz
-    pub ts_tx: Hlc,
-    pub sig: Option<Signature>,               // Ed25519 (optional/konfigurierbar)
+    pub intent: Intent,                     // run_id, step_id, Begründung
+    pub seq: Seq,
+    pub hlc: Hlc,
+    pub durability: Durability,
 }
 
-/// 100 % deterministischer, history-unabhängiger Wahrheitszustand.
-/// Jedes Feld ist ein kanonischer Prolly-Tree ohne physische Segment-Layouts.
+/// Deterministische Wahrheit.
 pub struct RootSet {
-    pub primary: ChunkId,                     // CellId → CellRecord { gid, content_hash, meta_hash, flags }
-    pub sequences: ChunkId,                   // (SeqId, position) → (Gid, token_sums augmentiert)
-    pub graph: ChunkId,                       // G:(src, kind, dst, id) & R:(dst, kind, src, id)
-    pub aliases: ChunkId,                     // Bidirektional CellId ↔ Gid (+ Handle-Zuordnung)
-    pub policies: ChunkId,                    // Katalog: Namespaces, Schemas, EmbeddingSpaces, ACL-Gruppen
-    pub conflicts: ChunkId,                   // Offene & aufgelöste ConflictCells
-    pub provenance: ChunkId,                  // Append-only ProvRecords
+    pub primary: ChunkId,     // CellId → CellRecord
+    pub sequences: ChunkId,   // (SeqId, position, gid) → Token-Zählungen
+    pub graph: ChunkId,       // G: / R:
+    pub aliases: ChunkId,     // A: gid → CellId · C: CellId → gid · X: (ns, ExternalKey) → gid
+    pub policies: ChunkId,    // Katalog, AclExpr, Producer
+    pub conflicts: ChunkId,   // ConflictCells
+    pub provenance: ChunkId,  // P: ProvRecord · E: Evidenz
 }
+// truth_hash = ChunkId(kind = RootSet, CBE(RootSet))
 
-/// Nicht-deterministischer / kompaktionsabhängiger Index-Zeiger.
-/// Compaction und paralleler Vamana-Build ändern NUR dieses Objekt im Manifest —
-/// `CommitId` und `truth_hash = BLAKE3(RootSet)` bleiben völlig unberührt!
-pub struct IndexManifestRef {
-    pub manifest_id: ChunkId,                 // Zeiger auf IndexManifest-Objekt
-    pub source_truth_hash: Digest,            // Wahrheits-Hash, bis zu dem Segmente gebaut sind
-    pub watermark_seq: u64,                   // Höchste abgedeckte globale Seq
-}
+/// Nachträgliche, unveränderliche Bindung Commit → Zustand (Manifest-Record).
+pub struct TruthBinding { pub commit: CommitId, pub roots: RootSet, pub truth_hash: Digest }
 ```
 
-### 2.1 Zweistufige Identität & Zustandsgleichheit
+Ein Commit-Objekt wird **nie** nachträglich ergänzt. `RootSet`, `IndexManifest`-Zeiger und Signatur sind separate Records, die auf die `CommitId` verweisen. Optionale Ed25519-Signaturen signieren die `CommitId`; eine zweite, optionale Attestierung signiert die `TruthBinding`. Für `strict`-Commits ist die Commit-Signatur Pflicht, falls der Store einen Signaturschlüssel konfiguriert hat; ein Namespace mit `require_signature` lehnt unsignierte Commits ab.
 
-- **`CommitId`:** `BLAKE3(rkyv(Commit { truth_root: None, index_manifest: None, sig: None, ..self }))` — **sofort** beim Commit bekannt (noch vor dem Fold).
-- **`truth_hash`:** `BLAKE3(rkyv(RootSet))` — nach Fold berechnet. Zwei Branches mit identischer logischer Fakten-/Zellmenge haben **garantiert denselben `truth_hash`**, egal in welcher Reihenfolge geschrieben oder wie oft Vamana-/FTS-Segmente kompaktiert wurden!
+### 2.1 Materialisierung
+
+Nicht jeder Commit besitzt eine `TruthBinding`. Es gilt:
+
+```
+state(c) = state(m) ⊕ changes(c_1) ⊕ … ⊕ changes(c)
+m = nächster materialisierter Vorfahr entlang parents[0]
+```
+
+- Der Fold MUSS alle `ChangeSet`s und `CommitHeader` durabel in `packs/truth` ablegen, bevor der Checkpoint über sie hinausrückt. Damit ist jeder Commit innerhalb der Retention unabhängig vom WAL adressierbar.
+- **Materialisierungspflicht** für: Heads geschützter Branches (nach spätestens einem Fold), Tags/Checkpoints, Merge-Basen und -Ergebnisse sowie mindestens jeden 10 000. Commit je Linie. Fork und Savepoint erzwingen **keinen** synchronen Fold.
+- `ChangeSet` ist eine nach `(Baum, Key)` sortierte Liste `Put{value} | Delete`. Sein Digest enthält weder `seq` noch `hlc` noch `born_seq` (diese setzt die Anwendung des Commits).
 
 ---
 
-## 3. Transaktions- und Commit-Protokoll (`Txn<Mode>`)
-
-### 3.1 Typestate-API (verhindert unregistrierte SSI-Reads konstruktiv)
+## 3. Branch-Zustand und MemDelta
 
 ```rust
-let mut tx: Txn<ReadWrite> = branch.begin(Isolation::Snapshot)?; // Pinnt Branch-Head + Epochen-Lease
-let cell = tx.get(cell_id)?;     // Lesen UND Read-Set-Registrierung sind untrennbar!
-tx.put_content(content)?;
+pub struct BranchState {
+    pub head: CommitId,
+    pub head_seq: Seq,
+    pub base: Arc<Materialized>,        // CommitId + RootSet
+    pub delta: Arc<DeltaStack>,         // unveränderliche Schichten
+    pub index: Arc<IndexView>,          // Manifest + RAM-Deltas mit Sichtbarkeitsgrenze
+}
+```
+
+`DeltaStack` ist ein Stapel versiegelter Schichten plus eine persistente, strukturell geteilte geordnete Map. Jeder publizierte `BranchState` ist ein unveränderlicher Wert. Daraus folgen ohne Sonderfälle:
+
+- **Fork O(1):** neuer Ref, der dieselben `Arc`s teilt — inklusive noch nicht gefalteter Änderungen.
+- **Snapshot:** Klonen eines `Arc<BranchState>`.
+- **Rollback auf Savepoint:** Zurücksetzen auf einen früheren Zustand. Liegt der Wert nicht mehr im RAM (Neustart), wird er aus `state(c)` rekonstruiert.
+
+RAM-Index-Deltas sind append-only Arenen; jeder Zustand referenziert eine Sichtbarkeitsmaske (Länge plus Ausschlussmenge). Rollback setzt die Maske zurück.
+
+**Fold-Trigger:** Delta > 32 MiB, > 10 000 Einträge, > 30 s, explizit oder beim Schließen. Ein Fold faltet einen Präfix versiegelter Schichten, schreibt Packs und Locators, registriert die `TruthBinding` im Manifest und publiziert einen neuen Zustand mit neuer Basis. Folds verschiedener Branches deduplizieren identische Objekte.
+
+---
+
+## 4. Transaktionen
+
+### 4.1 Typestate-API
+
+```rust
+let tx: Txn<'_, ReadWrite> = branch.begin(Isolation::Snapshot)?;  // pinnt BranchState + Lease
+let cell = tx.get(id)?;           // Lesen registriert untrennbar im Read-Set
+tx.put_content(id, content)?;
 tx.put_meta(meta)?;
 tx.link(edge)?;
-let commit_id = tx.commit(CommitOpts::new("Fakt extrahiert").idempotency_key("k1"))?;
+let receipt = tx.commit(CommitOpts::new("Fakt extrahiert")
+    .idempotency(IdemKey::new(run, step, "put-fact-1")))?;
 ```
 
-Reine Leseabfragen nutzen einen lifetime-gebundenen **`Snapshot<'db>`** ohne Read-Set-Overhead. Es gibt keine API-Methode, die eine externe `snapshot_seq` akzeptiert.
+Lesezugriffe nutzen `Snapshot<'db>` ohne Read-Set. Keine öffentliche Funktion akzeptiert eine fremde Snapshot-Sequenz. `Txn` ist `!Sync`; `Drop` ohne Commit verwirft.
 
-### 3.2 Commit-Ablauf (ein Commit-Punkt, kein Mehr-Store-2PC)
+### 4.2 Commit-Protokoll
 
-1. **`begin`:** Branch-Head + MemDelta-Seq + Snapshot-Lease (TTL 300 s, erneuerbar) pinnen.
-2. **`buffer`:** Mutationen im `ChangeSet` sammeln; Pflichtprüfung auf Schema, Vektor-Validität (kein NaN/∞, Dimension passend) und **Pflichtprovenienz** (`prov_id` oder `Hypothesis`).
-3. **`idempotency`:** Prüfe Kernel-Sidecar `IdempotencyTable` (`sidecar/idempotency.cxs`). Treffer mit gleichem `changes`-Digest ⇒ sofortiges `idempotent_replay` mit gespeicherter `CommitId`; abweichender Digest ⇒ `idempotency_mismatch`!
-4. **`validate` & OCC/Rebase:**
-   - **Snapshot Isolation (Default):** Prüfe Write-Write-Disjunktheit auf `CellId`/`Gid` seit `tx.base`.
-   - **Serializable (SSI, opt-in):** Prüfe zusätzlich Read-Set + Prädikat-Bereiche (z. B. `(NsId, predicate)`-Scans, Graph-Nachbarschaften) seit `tx.base`. Bei `tx.base_seq < pruned_through` ⇒ Fail-Closed `snapshot_too_old`.
-   - **Funktionale Prädikate:** Bei `CellKind::Fact` mit `functional`-Prädikat im Konflikt zu lebendigem Fakt ⇒ Policy `SupersedeOnNewer` schließt `old.meta.valid_to` automatisch (nur `CellMeta`-Update!) oder legt `ConflictCell` an.
-   - Falls Head bewegt & disjunkt ⇒ automatischer Rebase; sonst `rebase_failed` (retryable).
-5. **`WAL append`:** Schreibe WAL-Frame (inkl. `IdempotencyKey` + `changes`-Digest!) über Group Commit. **Dies ist der einzige Durability-Commit-Punkt** (bei `volatile` entfällt Schritt 5).
-6. **`apply & publish`:** Wende Änderungen auf `MemDelta`, synchrone In-Memory-Index-Deltas und `IdempotencyTable` an; publiziere neuen `BranchState` per atomarem `ArcSwap`.
-7. **`ack & async fold`:** Client erhält `CommitId`; Hintergrund-Fold überführt `MemDelta` → `Prolly` + `PAX-Extents` + `Manifest`; abgeleitete Index-Builds und Work-Queue-Jobs laufen asynchron mit Watermark-Tracking.
+```
+1  begin      BranchState pinnen, Lease (300 s, erneuerbar)
+2  buffer     ChangeSet sammeln; lokale Prüfung (Schema, Vektoren, Provenienz, Limits)
+3  prepare    außerhalb jedes Locks: CBE, Objekt-Hashes, request_digest, ChangeSet-Digest
+4  sequence   Branch-Sequencer-Lock:
+              a) Idempotenz prüfen und Schlüssel reservieren
+              b) gegen den PENDING-Head validieren (inkl. eingereihter, noch unsynchronisierter Commits)
+              c) bei disjunkter Bewegung Rebase, sonst rebase_failed
+              d) in die WAL-Queue einreihen, Lock freigeben
+5  append     WAL-Writer vergibt lsn, seq, hlc, setzt parents[0], berechnet CommitId, schreibt Frame
+6  sync       gemäß Durability-Stufe (Group Commit)
+7  publish    strikt in seq-Reihenfolge je Branch: Delta anwenden, Idempotenz-Eintrag,
+              Work-Queue-Einträge, ArcSwap  ← Sichtbarkeitspunkt
+8  ack        CommitReceipt { commit_id, seq, durability_reached }
+9  fold       asynchron
+```
 
----
+Regeln:
+- Ein `durable`/`strict`-Commit wird **erst nach** erfolgreichem Sync sichtbar. Ein nachfolgender `buffered`-Commit desselben Branches wartet in der Publikationsreihenfolge.
+- Schlägt Schreiben oder Sync fehl, wird nichts Ausstehendes publiziert; der Store ist `repo_poisoned`. Der Ausgang dieser Commits ist für Aufrufer **unbekannt** und wird nach Recovery über den Idempotenz-Schlüssel geklärt.
+- Abbruch des Aufrufer-Futures nach Schritt 4 bricht den Commit nicht ab.
 
-## 4. Branches, Session-Isolation und Savepoints
+### 4.3 Isolation
 
-### 4.1 Branch-Modell & Schutz von `main`
+**Konfliktschlüssel** sind `(Baum, Key)` aller Schreibvorgänge, zusätzlich logische Schlüssel: `(ns, ExternalKey)`, `(subject, functional_predicate)`, `EdgeId`.
 
-- **O(1)-Fork (`< 50 µs`):** Erzeugt benannten Ref auf `CommitId` + leeres `MemDelta` + leere Index-Deltas; physische Indizes und Prolly-Teilbäume werden Zero-Copy geteilt.
-- **Prinzip: Agenten schreiben nie direkt nach `main`.**
-  - Agenten erhalten Capabilities auf Session-Branches (`agent/<id>/run-<n>` oder `sess/<agent>/<id>`).
-  - Direkte Commits auf geschützte Branches (`main`, `release/*`) werden ohne `ProtectedBranchWrite`-Capability mit `permission_denied` abgelehnt.
-  - Übernahme nach `main` erfolgt ausschließlich über **Merge-Requests (`mr/<n>`)** und die deterministischen **Merge-Gates `G1`–`G7`** (§6.3).
+| Stufe | Validierung gegen Commits seit `tx.base` |
+|---|---|
+| Snapshot (Default) | Write-Write-Disjunktheit der Konfliktschlüssel; funktionale Prädikate |
+| Serializable | zusätzlich Read-Set und Prädikatbereiche (Key-Ranges, Namespace-Scans, Nachbarschaften `G:(src, kind, *)`) |
 
-### 4.2 Branch-Typen & Lifecycle
-
-| Muster | Zweck | Default-Durability | Default-TTL |
-|---|---|---|---|
-| `main` | Kuratierte Hauptwahrheit | `durable` | unbegrenzt |
-| `dev/<name>` | Langlebige Integration | `durable` | unbegrenzt |
-| `sess/<agent>/<id>` / `agent/*` | Agenten-Arbeitszweig mit Quoten | `durable` oder `buffered` | 24 h – 7 d |
-| `mr/<n>` | Merge-Request inkl. Gate-Report & `ConflictCell`s | `durable` | bis Abschluss + 7 d |
-| `spec/<uuid>` | Spekulativer Branch (Was-wäre-wenn) | `buffered` | 24 h |
-| `scratch/<id>` | Ephemeres Arbeitsgedächtnis | `volatile` | Sitzungsende |
-| `tag/<name>` / `checkpoint/<name>` | Unveränderlicher Snapshot-Zeiger | — | unbegrenzt (pinnt GC) |
-
-**Savepoint je Tool-Call:** `branch.savepoint(name)` merkt sich `(CommitId, seq)`. `branch.rollback_to(sp)` setzt den Head per CAS zurück (`O(1)`); dazwischenliegende Commits bleiben nur forensisch im verketteten Reflog (bis TTL).
+Der Sequencer hält ein beschnittenes Änderungsfenster; ist `tx.base_seq < pruned_through` ⇒ `snapshot_too_old`. Suchabfragen über abgeleitete Indizes sind in Serializable-Transaktionen **nicht** als Prädikat erfassbar; die API verlangt dafür explizite Bereichsscans und weist `recall` in `Txn<ReadWrite>` mit Serializable ab.
 
 ---
 
-## 5. Nebenläufigkeit
+## 5. Branches
 
-- **Leser:** Komplett lock-frei über `ArcSwap<BranchState>` + Epochen-Reklamation (`crossbeam-epoch`). Leser blockieren nie Schreiber.
-- **Schreiber:** Ein **`BranchSequencer`-Actor pro Branch** (vollständig parallel zwischen verschiedenen Branches!). Der globale WAL-Writer bündelt Frames per Group Commit.
-
----
-
-## 6. Drei-Wege-Merge, Konflikte und Merge-Gates
-
-### 6.1 Normative Merge-Regeln
-
-Merge(Base, Ours, Theirs) arbeitet in **O(Δ·log n)** über den Prolly-Diff und die **entkoppelten Cell-Teile**:
-
-| Bereich | Situation | Normative Regel |
-|---|---|---|
-| **`CellContent`** | Beidseitig auf verschiedenen Inhalt geändert | **Konflikt** (`ConflictCell` für `raw`). **Niemals Embeddings mitteln oder per Cosine-Schwelle still wählen!** |
-| **`CellMeta.attrs`** | Disjunkte Attribut-Keys geändert | Automatischer **feldweiser Merge** (`content_hash` bleibt unberührt!) |
-| **`CellMeta.attrs.tags`** | Beidseitig Tags geändert | `union` (oder Policy aus Namespace) |
-| **`CellMeta.time.valid_to`** | Eine Seite schließt Gültigkeit, andere ändert Tags | Konfliktfrei kombinierbar (Entkopplung von Content/Attrs!) |
-| **`CellMeta.trust`** | Verschiedene Stufen | **`min(ours, theirs)`** (konservativer Wert); Hochstufung nur per Gate G7 |
-| **`CellMeta.taint`** | Verschiedene Taint-Flags | **`ours ∪ theirs`** (Vereinigung) |
-| **`CellMeta.belief`** | Beidseitig neue Evidenzen | **Neuberechnung über deduplizierte `source_roots`** (keine Doppelzählung!) |
-| **`Edge`** | Mengenänderung | `AddWins` (Default) / `RemoveWins` / `Manual` je `EdgeKind`-Policy |
-| **`aliases` / `provenance`** | Einträge beider Seiten | `union` (konfliktfrei durch globale `Gid`s und `ev_seq`) |
-| **`Summary` (`level > 0`)** | Quell-Chunks auf beiden Seiten geändert | **Nicht mergen** → als `stale` markieren und in Work Queue neu einplanen |
-| **Custom Merge** | Policy `custom(wasm)` | `wasmtime` (Fuel 10M, 16 MiB RAM, kein WASI/Float); Fallback auf `manual` |
-
-### 6.2 `ConflictCell` (Main bleibt konfliktfrei — INV-7)
-
-Ungelöste Konflikte werden **nicht** still in `main` gemergt: Der Merge-Versuch materialisiert `ConflictCell`s im Merge-Request-Branch **`mr/<n>`** (`MergeOutcome::Conflicts(mr_branch, list)`), während `main` sauber bleibt. Ein Agent oder Kurator löst per `resolve(conflict_id, TakeOurs | TakeTheirs | Merged(value))` auf `mr/<n>` auf und wiederholt den Merge.
-
-### 6.3 Merge-Gates (`G1`–`G7`) vor Übernahme nach `main`
-
-Jeder Merge nach `main` (außer expliziter Admin-Bypass mit Audit-Eintrag) durchläuft diff-inkrementell die konfigurierbare Gate-Pipeline:
-
-| Gate | Prüfung | Default-Verhalten |
-|---|---|---|
-| **G1 Schema & Integrität** | Typen, Kardinalitäten, `functional`-Prädikate, keine dangling edges | Blockierend |
-| **G2 Provenienz & Vertrauen** | Pflichtprovenienz (`G0`–`G2`), gültige Signaturen (falls aktiv), `trust ≥ min_main_trust` | Blockierend (sonst Quarantäne/Review) |
-| **G3 Konfliktscan** | Überlappende Gültigkeiten, Widersprüche gegen `main`-Fakten (deterministisch + asynchroner Judge mit Timeout) | Blockierend bei `Direct` gegen `Verified`/`Curated`, sonst Warnung |
-| **G4 Blast Radius** | Anteil geänderter/gelöschter `main`-Cells > Schwellwert (Default 1 % pro Session) | Stoppt Auto-Merge → Review |
-| **G5 Grounding-Check** | Bei `Fact`/`Summary`: Citation-Binding & MAC-Handle-Prüfung | Blockierend / Quarantäne (`G3`) |
-| **G6 Taint & Injection** | `INJECTION_SUSPECT`/`EXTERNAL`-Scan; verhindert Trust-Eskalation über `AgentInferred` | Cap / Blockierend |
-| **G7 Human/Curator Review** | Externer `Reviewer`-Port für geschützte Namespaces oder Trust-Promotion | Konfigurierbar |
-
----
-
-## 7. Durability-Stufen
-
-| Stufe | WAL | Sync-Verhalten | Latenz-Ziel | Einsatz |
+| Muster | Zweck | Durability | TTL | Geschützt |
 |---|---|---|---|---|
-| `volatile` | nein | nur RAM | < 10 µs | `scratch/*` Wegwerf-Branches |
-| `buffered` | ja | periodisch (≤ 10 ms) | < 1 ms | Hochfrequente Roh-Observations |
-| `durable` *(Default)* | ja | Group Commit (`fdatasync`, ≤ 1 ms / 64 Commits) | < 2 ms p99 | Standard für `main` & Sessions |
-| `strict` | ja | sofortiges `fdatasync` je Commit + Dir-Sync bei neuem Ref | ~2–5 ms | Kritische Katalog-/Audit-Commits |
-| `replicated` | ja | Quorum-Ack (ab Phase 4) | < 50 ms | Multi-Node-Replikation |
+| `main` | kuratierte Wahrheit | `durable`/`strict` | — | ja |
+| `release/<n>` | Freigabestand | `durable`/`strict` | — | ja |
+| `dev/<n>` | Integration | `durable` | — | nein |
+| `sess/<agent>/<run>` | Agentenarbeit mit Quoten | `durable`/`buffered` | 24 h (≤ 7 d) | nein |
+| `mr/<n>` | Merge-Request, Gate-Report, Konflikte | `durable` | Abschluss + 7 d | nein |
+| `spec/<uuid>` | Spekulation | `buffered` | 24 h | nein |
+| `scratch/<id>` | Arbeitsgedächtnis | `volatile` | Sitzungsende | nein |
+| `tag/<n>`, `checkpoint/<n>` | unveränderlicher Ref | — | — | pinnt GC |
 
-*Regel:* `main` erlaubt im Produktivbetrieb weder `volatile` noch unbestätigtes Verwerfen.
+- Direkte Commits auf geschützte Branches erfordern `ProtectedBranchWrite`, laufen durch G1, G2 und G3 im synchronen Modus und dürfen **keine** offene `ConflictCell` erzeugen (INV-7).
+- Geschützte Branches lehnen `volatile` und `buffered` ab.
+- **`volatile`:** nicht im WAL, geht bei Neustart verloren. Durabler Zustand referenziert volatile Commits nie als Eltern: Ein Merge aus `scratch/*` schreibt alle Inhalte als reguläre Mutationen und vermerkt die Quelle nur im `intent`.
+- **Quoten** je Session: Bytes, Cells, Schreibrate, Embedding-Aufrufe, Tokens ⇒ `quota_exceeded`.
+- **Spekulation:** N Branches vom selben Commit; Gewinner wird gemerged, Rest verworfen.
+
+### 5.1 Savepoints
+
+`savepoint(name)` speichert `(commit_id, seq)` durabel (Frame `BranchOp`). `rollback_to(name)` ist ein CAS auf den Ref und zugleich:
+
+1. Idempotenz-Einträge mit Commits jenseits des Savepoints werden **widerrufen**, damit Wiederholungen erneut ausführen.
+2. Ausstehende Work-Queue-Einträge dieser Commits werden storniert.
+3. Index-Sichtbarkeitsmasken werden zurückgesetzt.
+4. Der Reflog behält den alten Head bis zum Ablauf des Reflog-Fensters.
+
+Auf geschützten Branches ist Rollback nur als Admin-Operation zulässig; der Regelfall ist ein kompensierender Commit.
 
 ---
 
-## 8. Nicht-versionierte Kernel-Tabellen: Idempotenz & Work Queue (löst Reibungspunkt 2)
+## 6. Merge
 
-Operativer Laufzeitzustand darf **keine** Commit-Lawinen erzeugen und **nicht** über Branch-Merges verschleppt werden. Daher liegen Idempotenz-Journal und Work Queue **außerhalb des `RootSet`** in WAL-gesicherten Kernel-Sidecars (`sidecar/`):
+### 6.1 Basis und Verfahren
 
-### 8.1 Idempotenz-Journal (`sidecar/idempotency.cxs`)
+Merge-Basis ist der niedrigste gemeinsame Vorfahr. Bei mehreren Basen werden diese rekursiv zu einer virtuellen Basis zusammengeführt; Konflikte darin gelten als „beidseitig geändert". Der Diff überspringt hash-gleiche Teilbäume. Auswertungsreihenfolge: `policies` → `aliases` → `primary` → `provenance` → `graph` → `sequences` → `conflicts`.
 
-- **Schlüssel:** `(branch_id: u32, run_id: RunId, step_id: StepId, key: CompactString)`.
-- **Wert:** `(commit_id: CommitId, payload_digest: Digest, result_summary: Bytes, expires_at: Timestamp)`.
-- **Crash-Sicherheit ohne `RootSet`-Pollution:** Jeder `Commit`-WAL-Frame enthält `idempotency_key` und `changes`-Digest. Beim WAL-Replay rekonstruiert der Kernel das Idempotenz-Journal deterministisch mit demselben WAL-Commit — null Zusatz-Commits, 100 % Crash-Garantie (INV-6)!
-- **Abweichender Retry:** Wird derselbe Key mit anderem `payload_digest` wiederholt ⇒ Fehler `idempotency_mismatch` (verhindert stille Überschreibung fehlerhafter Retries).
-- **TTL:** Default 7 Tage; Background-Sweep entfernt abgelaufene Einträge ohne `RootSet`-Änderung.
+Allgemeine Dreiwegregel: nur eine Seite geändert ⇒ übernehmen (unter Gate-Vorbehalt); beide identisch ⇒ übernehmen (Vergleich ohne `born_seq`); sonst Tabelle.
 
-### 8.2 Work-Queue-Leases (`sidecar/work_queue.cxs`)
+| Gegenstand | Regel bei beidseitiger Änderung |
+|---|---|
+| Content verschieden | `ConflictCell`. Namespace-Option `text = "diff3"`: überlappungsfreie Hunks werden auf **ungeschützten** Zielen automatisch vereinigt; auf geschützten Zielen nur als Vorschlag in der `ConflictCell` |
+| `attrs`, disjunkte Keys | feldweise |
+| `attrs`, gleicher Key | `Tags`: Dreiweg-Mengenmerge · `Counter` mit `sum`: `base + Δours + Δtheirs` · sonst Konflikt |
+| `valid` | disjunkte Grenzen kombinieren; gleiche Grenze verschieden ⇒ Konflikt; entstehendes leeres Intervall ⇒ Konflikt |
+| `trust` | `min(ours, theirs)`; eine Hochstufung braucht stets ein G7-Attest |
+| `taint` | `base ∪ Zugänge`; eine Entfernung gilt nur mit Admin-Attest |
+| `acl` | Konjunktion der Klauseln (nie Ausweitung) |
+| `retire` gegen Änderung | Konflikt; `purge`/Expunge gewinnt immer |
+| `parent`, `kind`, `level`, `claim` | Konflikt |
+| Kanten | je `EdgeKind`: `add-wins` (Default), `remove-wins`, `manual` |
+| `provenance` / Evidenz | Mengenvereinigung nach [SPEC-02](SPEC-02-DATA-MODEL.md) §6.2 (konfliktfrei) |
+| `sequences` | Vereinigung; Position ist durch `gid` eindeutig |
+| `aliases` `X:` | gleicher `ExternalKey`, verschiedene `Gid` ⇒ Konflikt `DuplicateExternalKey` |
+| Katalog | disjunkte Einträge vereinigen, sonst Konflikt |
+| `Summary` mit beidseitig geänderten Quellen | nicht mergen; `stale`, neuer Job |
+| Embeddings | liegen nicht in der Wahrheit; **nie** mitteln |
+| `custom(wasm)` | `wasmtime`, Fuel 10 Mio., 16 MiB, kein WASI, keine Floats, Modul per Hash gepinnt; Fehler ⇒ Konflikt |
 
-Siehe [SPEC-06](SPEC-06-CONTEXT-ENGINE.md) §7.2: Enqueue, Leasing (`lease_owner`, `lease_expires_at`), `attempts` und Heartbeats aktualisieren **ausschließlich** die nicht-versionierte Sidecar-Queue. Erst das **Arbeitsergebnis** eines Workers (Embedding, Summary, Fakt) wird als regulärer, idempotenter Commit im `RootSet` verbucht!
+Nach dem Zusammenführen prüft die Engine funktionale Prädikate **auf dem Ergebnis**, auch wenn beide Seiten verschiedene `Gid`s geschrieben haben.
 
----
+### 6.2 ConflictCell
 
-## 9. Bitemporale Zeitreise
+```rust
+pub struct ConflictCell {
+    pub id: ConflictId,               // H(base, ours, theirs, conflict_key)
+    pub key: ConflictKey,
+    pub kind: ConflictKind,
+    pub base: Option<ValueRef>, pub ours: Option<ValueRef>, pub theirs: Option<ValueRef>,
+    pub status: ConflictStatus,       // Open | Resolved { choice, principal, commit }
+}
+```
 
-| Granularität | Syntax | Mechanismus |
+Offene Konflikte werden nur in `mr/<n>` materialisiert. `resolve(id, TakeOurs | TakeTheirs | Merged(value))` ist ein Commit auf `mr/<n>`. Inhaltliche Widersprüche ohne Schreibkollision sind keine `ConflictCell`s, sondern `Contradicts`-Kanten.
+
+### 6.3 Merge-Gates
+
+| Gate | Prüfung | Default |
 |---|---|---|
-| **G1** | `Snapshot` | `Pin` auf aktiver `Seq` (Kurzzeit für laufende Transaktionen) |
-| **G2** | `Commit` / `main~3` / `main@{ts}` | Direkter Zugriff auf `Commit.truth_root` (und Fallback falls Index fehlt) |
-| **G3** | `<commit>:tx[i]` | Replay aus WAL-Journal innerhalb eines noch nicht gekappten Fold-Batches |
-| **G4** | `history(cell_id)` / `blame` | Commit-Metadaten führen `touched_gids`-Bloom/Liste für schnelles Skipping |
+| **G1** Schema & Integrität | Typen, Kardinalitäten, funktionale Prädikate, Vorwärts-/Rückwärtskante, keine neuen hängenden Kanten, Alias-Bijektion | blockierend |
+| **G2** Provenienz & Vertrauen | Provenienz vorhanden, Signatur falls Pflicht, `trust ≥ min_main_trust` | blockierend |
+| **G3** Widerspruch | deterministischer Konfliktscan; optional `Judge` | blockierend bei direktem Widerspruch gegen `Verified`/`Curated`, sonst Warnung |
+| **G4** Blast Radius | geänderte + entfernte Cells / lebende Cells des Ziels je betroffenem Namespace > 1 % **und** absolut > 100 | Review (G7) |
+| **G5** Grounding | `Fact`/`Summary`: Spannen und `quote_hash`, referenzierte Quellen sichtbar | blockierend für `GL0`-Behauptungen, sonst Quarantäne |
+| **G6** Taint & Injection | `INJECTION_SUSPECT`, `EXTERNAL`, Trust-Eskalation, ACL-Ausweitung gegenüber Quellen | blockierend |
+| **G7** Review | externer `Reviewer`; Trust-Promotion, geschützte Namespaces | konfigurierbar |
 
-**`branch_at(ref_spec, new_branch)`** forkt direkt ab jedem historischen Commit innerhalb des Retention-Horizonts; jenseits der Retention liefert die Engine `beyond_retention` mit dem ältesten verfügbaren Commit.
+Optionaler, nicht nummerierter Beratungscheck **A1 Retrieval-Regression** (Golden Queries, Top-k-Überlappung, nDCG-Delta): warnt; kann je Namespace blockierend geschaltet werden.
+
+```rust
+pub struct GateReport {
+    pub target_head: CommitId, pub source_head: CommitId, pub base: CommitId,
+    pub results: Vec<GateResult>,     // Pass | Warn | NeedsReview | Fail { cells, reason }
+    pub policy_hash: Digest,
+}
+```
+
+**Atomarität:** Der Merge-Commit wird nur ausgeführt, wenn `target_head`, `source_head` und `policy_hash` unverändert sind (CAS im Sequencer). Andernfalls werden die Gates inkrementell neu bewertet. Gates laufen außerhalb des Sequencer-Locks auf dem virtuellen Ergebnis. Nichtdeterministische Urteile (`Judge`, Reviewer) werden mit Eingabe-Digest im Report festgehalten und nur bei identischem Digest wiederverwendet. Timeout oder Fehler eines blockierenden Gates ⇒ `NeedsReview`, nie `Pass`. Ein Admin-Bypass erzeugt einen eigenen, benannten Audit-Eintrag.
+
+### 6.4 Ergebnis
+
+```rust
+pub enum MergeOutcome {
+    Merged(CommitId), FastForward(CommitId),
+    GateRejected(GateReport), NeedsReview { mr: BranchName, report: GateReport },
+    Conflicts { mr: BranchName, conflicts: Vec<ConflictId> },
+}
+```
+
+Auch ein Fast-Forward in ein geschütztes Ziel durchläuft alle Gates.
 
 ---
 
-*Ende SPEC-04. Weiter: [SPEC-05 Indizes](SPEC-05-INDEXES.md)*
+## 7. Zeitreise
+
+| Stufe | Syntax | Mechanismus |
+|---|---|---|
+| **Z1** | aktiver `Snapshot` | gepinnter `BranchState` |
+| **Z2** | `AS OF COMMIT c`, `main~3` | `state(c)` nach §2.1 |
+| **Z3** | `AS OF TIMESTAMP t` | letzter Commit der First-Parent-Linie mit `hlc ≤ t` |
+| **Z4** | `history(cell)`, `blame` | `touched_gids`-Filter je ChangeSet |
+
+`VALID AT v` ist orthogonal kombinierbar. `branch_at(ref, name)` forkt von jedem Commit innerhalb der Retention; sonst `beyond_retention` mit ältestem verfügbarem Commit. Reproduzierbarkeit eines Recalls erfordert `(commit, catalog, index_manifest, derivation producer_ids, now, Parameter)`; fehlt ein früheres Index-Manifest, kann die Rangfolge abweichen — Explain weist das aus. Expungte Inhalte liefern `expunged`.
+
+---
+
+## 8. Kernel-Sidecars (nicht versioniert)
+
+Sidecars sind abgeleitete Zustände des WAL plus periodische Checkpoints.
+
+> **Checkpoint-Regel:** Ein WAL-Segment darf erst entfallen, wenn Truth-Fold, Idempotenz-, Work-Queue- und Derivations-Checkpoint alle seine Frames abdecken und im Manifest registriert sind.
+
+### 8.1 Idempotenz
+
+```
+Key   = (scope, run_id, step_id, client_key)       scope = (principal, target_branch_id)
+Value = { request_digest, commit_id, seq, result_summary, expires_at, state }
+state = Reserved | Committed | Revoked
+```
+
+- `request_digest` wird über die **kanonische Client-Anfrage vor jeder ID-Vergabe** gebildet (ohne `Gid`, Zeitstempel, Lease-Token). Der Schlüssel enthält die Argumente **nicht** — sonst wäre eine Abweichung nicht erkennbar.
+- Reservierung erfolgt im Sequencer; ein paralleler gleicher Schlüssel wartet auf den Ausgang.
+- `Committed` + gleicher Digest ⇒ Erfolg mit `replayed = true`. Anderer Digest ⇒ `idempotency_mismatch`.
+- TTL 7 Tage. `volatile`-Branches halten Einträge nur im RAM.
+
+### 8.2 Work Queue
+
+```rust
+pub struct WorkEntry {
+    pub task_id: TaskId,              // H(task) → doppeltes Enqueue ist wirkungslos
+    pub task: WorkTask,
+    pub priority: WorkPriority,       // IndexBuild > Embed > Judge > Summarize > Consolidate > Background
+    pub origin: (BranchId, Seq),
+    pub status: WorkStatus,           // Pending | Leased | Done | Failed
+    pub attempts: u8, pub max_attempts: u8,   // Default 3
+}
+pub struct Lease { pub token: u64, pub owner: WorkerId, pub expires: MonoInstant }
+```
+
+| Übergang | Persistenz |
+|---|---|
+| Enqueue | atomar **im selben Frame** wie der auslösende Commit |
+| Lease | nur RAM; Lease-Token monoton |
+| Versuchszähler | `WorkOp::Attempt`, `buffered` geschrieben **vor** Auslieferung, damit Absturzschleifen enden |
+| Heartbeat | nur RAM |
+| Complete | Ergebnis und Statuswechsel **im selben Frame** |
+| Neustart | alle Leases verfallen ⇒ `Pending` |
+
+Zustellung ist at-least-once. `complete(task_id, token, result)`: Mit abgelaufenem Token werden reine Derivationen akzeptiert, sofern noch keine existiert (erster gewinnt); Ergebnisse, die Wahrheit ändern, werden mit `work_task_expired` abgewiesen. Derivationen gehen in den Derivation Cache; Fakten laufen über einen Session-Branch und die Gates. Leasing erzeugt nie Commits.
+
+---
+
+## 9. Abnahme
+
+- Property: History-Unabhängigkeit; Diff/Merge-Roundtrip; Merge ohne Konflikte ist in `ours/theirs` kommutativ (bezogen auf den `RootSet`).
+- Verteilungstest: mittlere Knotengröße und Anteil erzwungener Schnitte gegen §1.2.
+- Crash-Tests: Idempotenz über Neustart und nach WAL-Recycling; Rollback + Retry; Work-Queue-Poison-Task.
+- `loom`: Reservierung, Publikationsreihenfolge, Merge-CAS.
+
+---
+
+*Weiter: [SPEC-05 Indizes](SPEC-05-INDEXES.md)*
