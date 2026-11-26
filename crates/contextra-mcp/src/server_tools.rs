@@ -439,32 +439,18 @@ impl McpServer {
                         "proof_scope": "collection_only"
                     }))
                 } else {
-                    let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
-                        .key
-                        .ok_or_else(|| {
-                            McpError::invalid_params("deletion proof key not configured")
-                        })?;
-
                     let tenant_id = contextra_types::TenantId::try_new(1)
                         .unwrap_or(contextra_types::TenantId::SYSTEM);
 
-                    let proof = self
-                        .db
-                        .drop_collection(col_name, tenant_id, proof_key.as_bytes())
+                    self.db
+                        .drop_collection(col_name, tenant_id)
                         .await
                         .map_err(McpError::from)?;
-
-                    let proof_json_str = proof
-                        .export_for_audit()
-                        .map_err(|e| McpError::internal_error(e.to_string()))?;
-                    let proof_val: Value = serde_json::from_str(&proof_json_str)
-                        .map_err(|e| McpError::internal_error(e.to_string()))?;
 
                     Ok(json!({
                         "ok": true,
                         "collection": col_name,
-                        "proof": proof_val,
-                        "proof_scope": "collection"
+                        "semantics": "tombstone"
                     }))
                 }
             }

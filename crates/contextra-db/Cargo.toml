@@ -100,5 +100,3 @@ required-features = ["experimental-diskann"]
 [[example]]
 name = "collections"
 
-[[example]]
-name = "verify_deletion_proof_external"

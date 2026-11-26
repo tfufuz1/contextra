@@ -111,7 +111,7 @@ async fn main() -> contextra_types::Result<()> {
 
     // --- Drop a collection ---
     let tenant_id = contextra_types::TenantId::new(1);
-    db.drop_collection("tools", tenant_id, &[0u8; 32]).await?;
+    db.drop_collection("tools", tenant_id).await?;
     let remaining = db.list_collections().await?;
     println!("\n=== After dropping 'tools' ===");
     for name in &remaining {

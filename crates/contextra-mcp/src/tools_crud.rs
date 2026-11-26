@@ -87,7 +87,7 @@ impl McpServer {
         }))
     }
 
-    /// Handler für `contextra_drop_collection` — Löscht eine gesamte Collection und stellt einen collection-weiten Löschbeweis aus.
+    /// Handler für `contextra_drop_collection` — Löscht eine gesamte Collection als Tombstone-Commit (SPEC §7.4, kein Löschnachweis).
     pub(crate) async fn handle_drop_collection(&self, args: &Value) -> Result<Value, McpError> {
         let col_name = match args.get("collection").or_else(|| args.get("name")) {
             Some(col_val) => {
@@ -117,29 +117,17 @@ impl McpServer {
             ));
         }
 
-        let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
-            .key
-            .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
-
         let tenant_id = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
 
-        let proof = self
-            .db
-            .drop_collection(col_name, tenant_id, proof_key.as_bytes())
+        self.db
+            .drop_collection(col_name, tenant_id)
             .await
             .map_err(McpError::from)?;
-
-        let proof_json_str = proof
-            .export_for_audit()
-            .map_err(|e| McpError::internal_error(e.to_string()))?;
-        let proof_val: Value = serde_json::from_str(&proof_json_str)
-            .map_err(|e| McpError::internal_error(e.to_string()))?;
 
         Ok(json!({
             "ok": true,
             "collection": col_name,
-            "proof": proof_val,
-            "proof_scope": "collection"
+            "semantics": "tombstone"
         }))
     }
 

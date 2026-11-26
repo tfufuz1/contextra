@@ -72,15 +72,8 @@ def test_collection_management(db_path):
     assert "col2" in cols
     assert "default" in cols
 
-    # Calling drop_collection without proof key or env var must raise error
-    with pytest.raises((contextra.ContextraValueError, ValueError)) as excinfo:
-        db.drop_collection("col1")
-    assert "deletion proof key not configured" in str(excinfo.value)
-
-    # Calling drop_collection with valid key returns JSON proof string
-    proof_json = db.drop_collection("col1", proof_key=b"k" * 32)
-    assert isinstance(proof_json, str)
-    assert '"signature"' in proof_json or '"proof_id"' in proof_json
+    # drop_collection ist ein Tombstone-Commit ohne Löschnachweis (SPEC §7.4)
+    assert db.drop_collection("col1") is None
 
     cols = db.list_collections()
     assert "col1" not in cols
