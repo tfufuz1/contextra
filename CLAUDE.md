@@ -33,19 +33,10 @@ Das Projekt verlangt Rust Toolchain 1.89.`static.rust-lang.org` ist nicht erreic
 
 - Keine Subagenten, wenn du Sonnet oder Opus bist. Skripte und Werkzeuge bevorzugen. Subagenten nur als Haiku (Vorgabe des Projekts).
 
----
-
-Das Ziel von Contextra ist es in Unternehmen einsatzbereit verwendet werden zu können ohne Ausrichtung auf DSGVO-konforme Löschung oder hochsicherheits Löschmechanismen. Contextra soll ein speziell auf LLM & Agenten ausgelegtes Datenbank und RAG-System für den effizienten Einsatz in Unternehmen sein.
-Contextra soll eine kompatible Lösung werden für Unternehmensdaten in einem RAG-System. Eine effiziente performante und ressourcenschonende Lösung.
-Aktuell ist eine komplexe Löschkette mit Nachweis implementiert und diese muss sauber und vollständig losgelöst und entfernt werden.
-Du hast vollständige Berechtigung und Entscheidungsfreiheit für die Optimierung und Refaktorisierung des contextra-store.
-Erfasse den Umfang des Projekts und die Abhängigkeiten von contextra-store um eine saubere Lösung zu konzipieren und zu planen. Lese auch die Konzepte in docs/concepts und entnehme die besten Aspekte, ignoriere jedoch auch dort die harten Löschungen und Löschkette mit Nachweis vollständig.
-Diese Anweisung hat oberste Prioriät und gilt bei Konflikten anstatt der Dokumente im Repo.
-Die Mission ist es Datenbanklösung für die Herausforderungen mit LLM und Agenten zu entwickeln die es Unternehmen ermöglicht ihre Daten sicher mit KI zu verknüpfen und einzusetzen. Diese Datenbanklösung wird also speziell für LLM & Agenten entwickeln. Unternehmen brauchen eine unkomplizierte, saubere, ressourcenschonende und Leistungsfähige Softwarelösung um den Einsatz von KI zu vereinfachen. Contextra muss effizient auf LLM ausgelegt die Daten verarbeiten und bereitlegen. Die Architektur muss sehr sauber durchdacht sein ohne Lücken oder blinde Flecken. 
-
 
 Da du die Repo klonen musstest agierst du mit dem Nutzer über den Webchat, du hast die vollständige Erlaubnis deine Github Konnektoren für Commits, Pull-Requests und Pushes zu nutzen. Aktiviere die Github-Konnektoren für Push über die Chat-Werkzeuge um Änderungen direkt in der Repo vorzunehmen. Wenn das nicht funktioniert liefere das als Dateien zum Download oder als vollständiges ZIP-Datei mit deinen Änderungen in der Ordnerstruktur zum einfachen überschreiben der veränderten Dateien. Solltest du Dateien entfernt haben liefere diese auch aber als leere Hülle zum überschreiben.
 
 Nutze das Tool add_repo , hänge das Repo ein mit Push-Zugriff an um Pull-Requests zu erstellen.
 
-Das Projekt muss umgedacht werden, bisherige Entscheidungen dürfen final überdacht oder geändert werden für ein funktionales produtionsreifes Produkt.
+In docs/SPEC.md ist die normative SOLL-Spezifikation , der Ist-Zustand weicht also bewusst von der Spezifikation ab und spezifiziert die Ziele.
+In docs/spec/ ist diese Spezifikation in Teile zerlegt zum besseren durchsuchen.
