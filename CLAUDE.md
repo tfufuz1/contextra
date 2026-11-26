@@ -35,31 +35,13 @@ Das Projekt verlangt Rust Toolchain 1.89.`static.rust-lang.org` ist nicht erreic
 
 ---
 
-Aktuelle Ziele:
-- Kompilierbarkeit behalten
-- Komplexe mehrschichtige Löschkette entfernen
-- Repo für Entwickler Claude einrichten
-- Optimierung des Stores
-- Optimierung der Vektoren
-- Komprimierung und Fokussierung der Graphen
-- Windows-Kompatibilität
-- Harte Kryptographische Sicherheitsmechanismen reduzieren oder aufheben
-- Harte Hardware Sicherheitsmechanismen reduzieren oder aufheben
-
-
-
-
-
-
-Der aktuelle Stand ist auf der Kompilierbaren Basis vom 6 Oktober mit Komponenten vom 10. November zusammengestellt.
-
-Das Archiv.zip ist der Stand vom 11. November also einen Monat später, du musst diesen Stand nach nützlichen implementerungen und funktionen durchsuchen.
-In der Zeit vom 6 Oktober bis zum 10. November wurde sehr viel entkoppelt aber auch mehr Löschung eingebaut.
-
-
- Das Projekt wurde vor wenigen Tagen auf den Kompilierbaren Stand vom 6 Oktober zurückgestellt.In der Commit-Nachricht-Chronik ab dem 6. Oktober bis 10. November dürften viele Informationen zu Fehlern oder Lücken auslesen lassen, jedoch wurde auch viel für die Löschung implementiert was nicht übernommen wird.
-
-Die mehrschichtige Löschkette wird entfernt da Behörden und Sicherheitsdienste nicht die Zielgruppe sind und die Löschung auf diese Weise zu komplex ist.
+Das Ziel von Contextra ist es in Unternehmen einsatzbereit verwendet werden zu können ohne Ausrichtung auf DSGVO-konforme Löschung oder hochsicherheits Löschmechanismen. Contextra soll ein speziell auf LLM & Agenten ausgelegtes Datenbank und RAG-System für den effizienten Einsatz in Unternehmen sein.
+Contextra soll eine kompatible Lösung werden für Unternehmensdaten in einem RAG-System. Eine effiziente performante und ressourcenschonende Lösung.
+Aktuell ist eine komplexe Löschkette mit Nachweis implementiert und diese muss sauber und vollständig losgelöst und entfernt werden.
+Du hast vollständige Berechtigung und Entscheidungsfreiheit für die Optimierung und Refaktorisierung des contextra-store.
+Erfasse den Umfang des Projekts und die Abhängigkeiten von contextra-store um eine saubere Lösung zu konzipieren und zu planen. Lese auch die Konzepte in docs/concepts und entnehme die besten Aspekte, ignoriere jedoch auch dort die harten Löschungen und Löschkette mit Nachweis vollständig.
+Diese Anweisung hat oberste Prioriät und gilt bei Konflikten anstatt der Dokumente im Repo.
+Die Mission ist es Datenbanklösung für die Herausforderungen mit LLM und Agenten zu entwickeln die es Unternehmen ermöglicht ihre Daten sicher mit KI zu verknüpfen und einzusetzen. Diese Datenbanklösung wird also speziell für LLM & Agenten entwickeln. Unternehmen brauchen eine unkomplizierte, saubere, ressourcenschonende und Leistungsfähige Softwarelösung um den Einsatz von KI zu vereinfachen. Contextra muss effizient auf LLM ausgelegt die Daten verarbeiten und bereitlegen. Die Architektur muss sehr sauber durchdacht sein ohne Lücken oder blinde Flecken. 
 
 
 Da du die Repo klonen musstest agierst du mit dem Nutzer über den Webchat, du hast die vollständige Erlaubnis deine Github Konnektoren für Commits, Pull-Requests und Pushes zu nutzen. Aktiviere die Github-Konnektoren für Push über die Chat-Werkzeuge um Änderungen direkt in der Repo vorzunehmen. Wenn das nicht funktioniert liefere das als Dateien zum Download oder als vollständiges ZIP-Datei mit deinen Änderungen in der Ordnerstruktur zum einfachen überschreiben der veränderten Dateien. Solltest du Dateien entfernt haben liefere diese auch aber als leere Hülle zum überschreiben.
