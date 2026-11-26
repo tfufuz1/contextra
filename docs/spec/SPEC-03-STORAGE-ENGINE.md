@@ -1,327 +1,216 @@
-# SPEC-03 — Storage Engine: Physisches Layout und Formate
+# SPEC-03 — Storage Engine: Packs, PAX-Extents, Locator und Verschlüsselung
 
-**Version 2.0 · November 2026 · Status: Final**
+**Version 2.1 · November 2026 · Status: Final**
 **Querverweise:** [Index](SPEC-00-INDEX.md) · [Datenmodell](SPEC-02-DATA-MODEL.md) · [Versionierung](SPEC-04-VERSIONING.md) · [Durability](SPEC-07-DURABILITY.md)
 
 ---
 
 ## 1. Objektmodell
 
-### 1.1 Chunk
+### 1.1 Chunks und Objekte
 
-Unveränderliches, content-addressed Objekt. `ChunkId = BLAKE3(kanonische Bytes)`.
-
-Zwei Arten:
-- **Index-Knoten:** Prolly-Knoten, Vektorsegmentblöcke, FTS-Segmentblöcke, Graph-CSR-Blöcke
-- **Lane-Blöcke:** Daten einer Cell-Gruppe (meta, raw, emb.q, etc.)
+Jedes persistente Datenobjekt in Contextra ist unveränderlich und wird in `.cxp`-Pack-Dateien gespeichert.
 
 ```rust
-/// Chunk-Envelope (nicht physisch gespeichert — Extents speichern direkt die Payload)
-pub struct Chunk {
-    pub id: ChunkId,          // BLAKE3(payload)
-    pub kind: ChunkKind,      // LeafNode | InternalNode | LaneBlock | Segment | Manifest
-    pub payload: Bytes,       // rkyv-serialisierte Daten
-}
-
 #[repr(u8)]
 pub enum ChunkKind {
-    ProllyLeaf     = 0,
-    ProllyInternal = 1,
-    LaneMeta       = 2,
-    LaneRaw        = 3,
-    LaneEmb        = 4,
-    LaneTokCount   = 5,
-    LaneZoom       = 6,
-    LaneTokIds     = 7,
-    VecSegment     = 8,
-    FtsSegment     = 9,
-    GraphSegment   = 10,
-    CommitObj      = 11,
-    ManifestEntry  = 12,
+    ProllyLeaf     = 0,  // Blattknoten im Truth-Prolly-Tree
+    ProllyInternal = 1,  // Innerer Knoten im Truth-Prolly-Tree (Hints NICHT im Hash!)
+    ExtentBlock    = 2,  // Spaltenorientierter PAX-Extent (Hot-Head + Cold-Tail von N Cells)
+    LargeBlob      = 3,  // Out-of-line Payload (> 2 KiB)
+    VecSegment     = 4,  // Abgeleitetes Vektorsegment (Vamana/Flat)
+    FtsSegment     = 5,  // Abgeleitetes FTS-Segment (FST + Postings)
+    GraphSegment   = 6,  // Abgeleitetes Graph-CSR-Segment
+    BitmapSegment  = 7,  // Vorkompilierte Roaring-Filter-Bitmaps
+    IndexManifest  = 8,  // IndexManifest-Objekt
+    CommitObj      = 9,  // Commit-Objekt
+    Dictionary     = 10, // Trainiertes zstd-Wörterbuch pro Namespace
 }
 ```
 
-### 1.2 Extent
+**Hash-Regel (`ChunkId`):**
+- Unverschlüsselt: `ChunkId = BLAKE3(canonical_plaintext_bytes)`.
+- Verschlüsselt: `ChunkId = BLAKE3::keyed_hash(repo_hash_key, canonical_plaintext_bytes)` (siehe §8.3 — Hash über Klartext mit Repo-Key, niemals über Nonce-Ciphertext!).
 
-Physische I/O-Einheit. Enthält mehrere Chunks derselben logischen Gruppe.
+### 1.2 PAX-Extent (I/O-Einheit)
 
-| Parameter | Wert | Begründung |
-|---|---|---|
-| Minimalgröße | 256 KiB | Mindestens ein sinnvoller Hot Head |
-| Zielgröße | 512 KiB | Optimal für NVMe-I/O-Muster |
-| Maximalgröße | 1 MiB | Begrenzung der Leseverstärkung |
-| Alignment | 4 KiB | Page-Alignment für O_DIRECT |
+Ein **Extent** ist die physische I/O-Einheit (256 KiB – 1 MiB, Ziel 512 KiB, 4-KiB-aligned für `O_DIRECT`). Er fasst bis zu **N** (typisch 128–1024) logisch gruppierte Cells **spaltenorientiert (PAX)** mit strikter Trennung in **Hot Head** und **Cold Tail** zusammen.
 
-### 1.3 Pack
+### 1.3 Pack-Datei (`.cxp`)
 
-Datei aus Extents. Append-only während des Schreibens, danach immutable.
-
-| Parameter | Wert |
-|---|---|
-| Minimalgröße | 64 MiB |
-| Zielgröße | 256 MiB |
-| Maximalgröße | 1 GiB |
-| Dateiendung | `.cxp` (Contextra Pack) |
+Append-only beim Schreiben, danach strikt unveränderlich (64 MiB – 1 GiB, Ziel 256 MiB).
 
 ---
 
-## 2. Pack-Dateiformat
+## 2. Pack- und Extent-Dateiformat (löst Reibungspunkt 3)
 
 ```
 Pack-Datei (.cxp)
 ┌─────────────────────────────────────────────────────────────┐
-│ Pack Header (64 Bytes, fester Offset 0)                     │
+│ Pack Header (64 Bytes, Offset 0)                            │
 ├─────────────────────────────────────────────────────────────┤
-│ Extent 0                                                    │
+│ Extent 0 (4-KiB-aligned) | Extent 1 | ... | Extent N        │
 ├─────────────────────────────────────────────────────────────┤
-│ Extent 1                                                    │
+│ Stand-Alone Blobs / Index-Segment-Blöcke / Prolly-Knoten    │
 ├─────────────────────────────────────────────────────────────┤
-│ ...                                                         │
-├─────────────────────────────────────────────────────────────┤
-│ Extent N                                                    │
-├─────────────────────────────────────────────────────────────┤
-│ Pack Footer (variabel, enthält Extent-Directory)            │
+│ Pack Footer (Extent-Directory, Object-Index, Cell-Index,    │
+│              Ribbon-Filter, Footer Header 32B)              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 2.1 Pack Header (64 Bytes)
+### 2.1 Pack Header (64 Bytes, little-endian)
 
 ```
 Offset  Länge  Feld              Beschreibung
-  0       4    magic             b"CXP\x01" (Contextra Pack, Format-Version 1)
+  0       4    magic             b"CXP\x01"
   4       2    format_version    u16 LE = 1
-  6       2    feature_flags     u16 LE (Bit 0: encrypted, Bit 1: compressed, Bits 2–15: reserviert)
-  8       8    pack_id           u64 LE (monoton steigender Zähler pro Repository)
- 16      32    repo_seed         [u8; 32] (Repository-Seed für Prolly-Boundary-Funktion)
- 48       8    extent_count      u64 LE
- 56       4    footer_offset     u32 LE (Offset des Footers ab Dateiende, in 4-KiB-Blöcken)
+  6       2    compat_flags      u16 LE (unbekannte Bits werden ignoriert)
+  8       4    incompat_flags    u32 LE (Bit 0: encrypted, Bit 1: compressed; unbekannt = fail-closed)
+ 12       8    pack_id           u64 LE (monoton pro Repo)
+ 20      32    repo_seed         [u8; 32] (Seed für Prolly-Boundary & Handle-MAC)
+ 52       4    extent_count      u32 LE
+ 56       4    footer_offset_4k  u32 LE (Footer-Start ab Dateiende in 4-KiB-Blöcken)
  60       4    header_crc        CRC32c über Bytes 0–59
 ```
 
-### 2.2 Extent-Layout: Hot-Head / Cold-Tail
+### 2.2 Extent-Layout: Hot-Head / Cold-Tail (PAX mit RowIndex-Adressierung)
+
+Innerhalb eines Extents werden bis zu `cell_count` (≤ 65 535, adressiert via `RowIndex: u16`) Cells spaltenorientiert abgelegt. Jede variable Spalte trägt ein `u32[cell_count + 1]`-Offset-Array für O(1)-Zugriff per `RowIndex`:
 
 ```
 Extent (z.B. 512 KiB, 4-KiB-aligned)
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ Extent Header (128 Bytes)                                                  │
-│   magic[4] | version[2] | flags[2] | extent_len[4] | cell_count[4]       │
-│   hot_end[4] | cold_start[4] | lane_dir_offset[4] | lane_count[2]       │
-│   compression[1] | encryption[1] | padding[96]                            │
+│   magic[4]="CXE1" | version[2] | flags[2] | extent_no[4] | extent_len[4]   │
+│   cell_count[4] | hot_end[4] | cold_start[4] | lane_dir_offset[4]          │
+│   lane_count[2] | compression[1] | encryption[1] | dict_chunk_id[32]       │
+│   nonce_gen[8] | padding[56]                                               │
 ├────────────────────────────────────────────────────────────────────────────┤
 │ Lane Directory (lane_count × 16 Bytes)                                     │
-│   lane_id[2] | offset[4] | length[4] | codec[1] | flags[1] | crc[4]      │
+│   lane_id[2] | offset[4] | length[4] | codec[1] | flags[1] | crc32c[4]     │
 ├────────────────────────────────────────────────────────────────────────────┤
-│ HOT HEAD (Offset 128 + lane_dir_size ... hot_end)                          │
-│   meta-Lanes aller Cells (spaltenorientiert)                               │
-│   tokcount-Lanes                                                           │
-│   zoom.L2-Lanes                                                            │
-│   zoom.L1-Lanes                                                            │
-│   emb.q-Lanes (quantisierte Embeddings)                                    │
-│   Kanten-Kurzliste                                                         │
-│   Trust-Labels                                                             │
-│   Attribut-Bloom-Filter                                                    │
+│ HOT HEAD (Offset 128 + lane_dir_size ... hot_end) — ein Prefetch/I/O       │
+│   - gid[u64; N]          (sortiert für schnelle Range-Translation!)        │
+│   - meta.fixed[N]        (kind, trust, taint, belief, valid_from/to, acl)  │
+│   - attr.bloom[N]        (8 B Bloom pro Cell für Attribute/Tags)           │
+│   - edge.hint[N]         (4 B Grad-/Kantentyp-Bitmaske, NICHT im Hash)     │
+│   - tokcount[N × T]      (u32 je registriertem Tokenizer)                  │
+│   - zoom.L2 (offsets[N+1] + UTF-8 Block)                                   │
+│   - zoom.L1 (offsets[N+1] + zstd Block)                                    │
+│   - emb.q (N × quantized_dim Bytes, z.B. SQ8/binär/Matryoshka-Präfix)     │
 ├────────────────────────────────────────────────────────────────────────────┤
-│ COLD TAIL (cold_start ... extent_len - 4)                                  │
-│   raw-Lanes (komprimiert, dict-basiert)                                    │
-│   tok.ids-Lanes (bitgepackt)                                               │
-│   emb.full-Lanes (f16/f32)                                                 │
+│ COLD TAIL (cold_start ... extent_len - 4) — nur für finale Gewinner        │
+│   - raw (offsets[N+1] + zstd-Blöcke mit Namespace-Wörterbuch;              │
+│          bei reinen Meta-Updates optional leer, Verweis via content_hash)  │
+│   - tok.ids (offsets[N+1] + delta+bitpacked Token-IDs)                     │
+│   - emb.full (N × dim × f16, 4-KiB-aligned für SIMD/O_DIRECT)              │
+│   - attrs.ext (rkyv-Archive für seltene/große Attribute)                   │
 ├────────────────────────────────────────────────────────────────────────────┤
 │ Extent Footer CRC (4 Bytes)                                                │
-│   CRC32c über gesamten Extent-Inhalt                                       │
+│   CRC32c über gesamten Extent + optional AEAD-Auth-Tag (16 Bytes)          │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **I/O-Muster:**
-1. **Ranking-Read:** Erste 32–64 KiB (Hot Head) — enthält alles für Score-Berechnung.
-2. **Winner-Read:** Gezielter Zugriff auf Cold Tail nur für die ≤ 12 Gewinner-Cells.
-3. **Typischer Recall (200 Kandidaten, 12 Gewinner):** ~200 Head-Reads (Page Cache), ≤ 12 Tail-Reads.
+1. **Ranking-Read:** Liest die ersten 32–64 KiB (`hot_end`) — liefert Metadaten, Token-Counts, Zoom-L2/L1 und quantisierte Embeddings aller *N* Cells im Extent in einem I/O.
+2. **Winner-Read:** Gezielter Offset-Read auf `cold_tail` über `RowIndex` nur für die selektierten Gewinner-Cells (typisch ≤ 12 pro Recall).
+3. **Reine Meta-Updates:** Wenn nur `CellMeta` (z. B. Tags, `valid_to`) geändert wird, schreibt der Fold nur ein leichtgewichtiges Meta-Extent (ohne `raw`/`emb.full` zu duplizieren); der Cold-Read löst `raw` über `content_hash` im `RawLocator` auf. Bei der nächsten Compaction/Re-Layout werden sie wieder ko-lokalisiert.
 
-### 2.3 Lane-Codierung innerhalb des Extents
-
-Innerhalb des Extents sind Lanes **spaltenorientiert** (PAX-artig):
-
-```
-meta-Lane für N Cells:
-┌──────────────────────────────────────────────────┐
-│ CellId[0] | CellId[1] | ... | CellId[N-1]       │  ← Array of CellIds
-│ Kind[0]   | Kind[1]   | ... | Kind[N-1]          │  ← Array of u8
-│ Trust[0]  | Trust[1]  | ... | Trust[N-1]          │  ← Array of u8
-│ ValidFrom[0] | ... | ValidFrom[N-1]               │  ← Array of i64
-│ AttrBloom[0] | ... | AttrBloom[N-1]               │  ← Array of [u8; 8]
-│ EdgeCount[0] | ... | EdgeCount[N-1]               │  ← Array of u16
-│ Edges (variable, referenziert über EdgeCount)      │
-└──────────────────────────────────────────────────┘
-```
-
-**Vorteile:** SIMD-freundliche Distanzberechnung über `emb.q`-Arrays, Prädikatsauswertung über `meta`-Arrays ohne Deserialisierung der gesamten Cell.
-
-### 2.4 Pack Footer
+### 2.3 Pack Footer
 
 ```
 Pack Footer:
-┌──────────────────────────────────────────────────┐
-│ Extent Directory (extent_count × 32 Bytes)       │
-│   extent_offset[8] | extent_len[4] | cell_count[4] │
-│   first_cell_id[16]                                │
-├──────────────────────────────────────────────────┤
-│ Chunk Index (sorted array of ChunkId → Location)  │
-│   chunk_id[32] | extent_no[4] | offset[4] | len[4] │
-├──────────────────────────────────────────────────┤
-│ Bloom Filter (Ribbon-Filter über alle ChunkIds)   │
-│   ribbon_filter_bytes[variabel]                    │
-├──────────────────────────────────────────────────┤
-│ Footer Header (32 Bytes)                          │
-│   magic[4] = b"CXPF"                              │
-│   extent_dir_offset[8]                             │
-│   chunk_index_offset[8]                            │
-│   bloom_offset[8]                                  │
-│   footer_crc[4]                                    │
-└──────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ Extent Directory (extent_count × 32 B):                     │
+│   extent_offset[8] | extent_len[4] | cell_count[4] |        │
+│   min_gid[8] | max_gid[8]                                   │
+├─────────────────────────────────────────────────────────────┤
+│ Object Index (sorted ChunkId → PackSpan):                   │
+│   chunk_id[32] | kind[1] | offset[8] | len[4]               │
+├─────────────────────────────────────────────────────────────┤
+│ Cell Index (sorted CellVerKey → ExtentRowAddr):             │
+│   cell_ver_key[32] | extent_no[4] | row_idx[2] | flags[2]   │
+├─────────────────────────────────────────────────────────────┤
+│ Ribbon Filter (über Object + Cell Keys, 0.1 % FPR)          │
+├─────────────────────────────────────────────────────────────┤
+│ Footer Header (32 B): magic=b"CXPF", Offsets, BLAKE3, CRC32c│
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Locator-Index
+## 3. Zweistufiger Locator-Index (löst Reibungspunkt 3)
 
-Globale Abbildung `ChunkId → (PackId, ExtentNo, Offset, Len)`.
+Statt für jede einzelne Lane jeder Cell einen eigenen Locator-Eintrag anzulegen (was bei 1M Cells × 6 Lanes zu 6M Einträgen führt), trennt Contextra sauber zwischen **Objekt-Adressierung** und **Zellzeilen-Adressierung**:
 
-### 3.1 Struktur
+### 3.1 `ObjectLocator` (für Prolly-Knoten, Segmente, Blobs, Dictionaries)
 
-- **Sorted Runs:** Jede Compaction/jeder Pack-Schreibvorgang erzeugt einen sortierten Run von `(ChunkId, Location)`-Paaren.
-- **Tiered Merge:** Runs werden im Hintergrund zusammengeführt (size-tiered, wie LSM L0→L1).
-- **Ribbon-Filter pro Run:** False-Positive-Rate 0.1 %. Erspart das Lesen von Runs, die einen Chunk nicht enthalten.
-- **In-Memory Hot-Set:** Die obersten 2 Runs (neueste) werden im RAM gehalten.
+`ChunkId ([u8; 32]) → PackSpan { pack_id: u64, offset: u64, len: u32 }`
+- Typische Dichte: ~1 Eintrag pro 4–16 KiB Prolly-Knoten / Index-Block.
 
-### 3.2 Parent-Hints
+### 3.2 `CellLocator` (für PAX-Extents)
 
-Prolly-Tree-Knoten speichern **physische Hints** für ihre Kinder:
+1. **`MetaRowLocator`:** `cell_ver_key = BLAKE3(content_hash || meta_hash) → ExtentRowAddr { pack_id: u64, extent_no: u32, row_idx: u16 }` (14–16 Bytes Payload — **ein einziger Eintrag pro Cell** für alle Hot-Head- und Cold-Tail-Lanes!).
+2. **`ContentRowLocator` (Fallback bei entkoppeltem Meta-Update):** `content_hash → ExtentRowAddr | BlobSpan` — liefert `raw`, `tok.ids`, `emb.full` falls ein reines Meta-Extent keinen eigenen Cold-Tail trägt.
 
-```rust
-pub struct ChildRef {
-    pub chunk_id: ChunkId,
-    pub hint: Option<LocationHint>,  // (PackId, ExtentNo) — kann veraltet sein
-}
-```
-
-Wenn der Hint stimmt (90 %+ der Fälle), wird der Locator-Index übersprungen. Bei Fehlschlag: Locator-Lookup + Hint-Update im nächsten Fold.
-
-### 3.3 Locator-Recovery
-
-Der Locator-Index ist **rekonstruierbar** aus den Pack-Footern. Recovery: alle `.cxp`-Dateien scannen, Footer lesen, Locator-Runs aufbauen. Dauer: O(Pack-Anzahl), typisch < 1 s.
+**Struktur & Lookup:**
+- Size-tiered sorted Runs (`locator/LOC-*.cxl`) mit **Ribbon-Filter (0.1 % FPR)** pro Run; die obersten 2 Runs bleiben im RAM (`T0`).
+- **Parent-Hints (unhashed):** Prolly-Tree-Leseoperationen können einen flüchtigen In-Memory-/Sidecar-Hint `(PackId, ExtentNo)` nutzen; trifft der Hint nicht, greift der Locator-Lookup. Hints gehen **niemals** in Knoten-Hashes ein!
+- **Recovery:** Beide Locators sind zu 100 % aus den Pack-Footern rekonstruierbar (`O(Pack-Anzahl)`, typisch < 1 s).
 
 ---
 
 ## 4. Gelerntes Layout (Affinity Re-Layout)
 
-### 4.1 Motivation
+### 4.1 Prinzip
 
-Wer *zusammen gelesen* wird, soll *zusammen liegen*. Das lässt sich nicht aus dem Schlüssel ableiten, wohl aber aus Zugriffsspuren.
+Wer gemeinsam abgerufen wird (`Access-Trace`), soll physisch im selben Extent liegen, um Extent-Zugriffe pro Recall zu minimieren. Re-Layout ist **als Hintergrund-Optimierung jederzeit abbrechbar** (Standard-Hot-Head/Cold-Tail wirkt ab Phase 1; Affinity-Clustering ab Phase 3 bzw. nach Benchmark-Nachweis ≥ 20 % I/O-Reduktion).
 
-### 4.2 Datenquellen (Access-Trace)
+### 4.2 Datenquellen & Verfahren
 
-| Quelle | Gewicht | Beschreibung |
+| Signal | Gewicht | Quelle |
 |---|---|---|
-| Co-Retrieval | 1.0 | Cells im selben Recall-Ergebnis |
-| Struktur | 0.8 | Gleiche Episode/Dokument/Thread (starkes Prior) |
-| Zeit | 0.3 | Zeitliche Nähe des Entstehens (schwaches Prior) |
-| Semantik | 0.5 | Gleiche Vektorzelle (IVF-Zentroid) als Fallback bei Kaltstart |
+| Co-Retrieval & Co-Expand | 1.0 | `AccessStats`/Trace-Sampling (10 % Recalls, 100 % Expands) |
+| Struktur-Prior | 0.8 | Gleiches Dokument / gleiche Episode |
+| Semantik / Zeit | 0.5 / 0.3 | Vektor-Cluster / Entstehungsnähe |
 
-Access-Trace wird **gesampelt** (10 % der Recalls) und **asynchron** verarbeitet.
-
-### 4.3 Verfahren (Hintergrund-Optimizer)
-
-1. **Co-Access-Graph aufbauen:** Gewichtete Kanten zwischen Cells, die gemeinsam gelesen werden.
-2. **Partitionierung:** Extent-große Gruppen bilden (Ziel: minimiere erwartete Extent-Zugriffe pro Recall).
-   - **Algorithmus:** Inkrementelles Label-Propagation-Clustering.
-   - **Fallback:** METIS-artige Multilevel-Partitionierung für Kaltstart mit < 1000 Datenpunkten.
-3. **Re-Layout:** Neue Extents schreiben, **nur Locator-Index umbiegen**. ChunkIds, Hashes, Commits bleiben unverändert.
-4. **Exploration:** 5 % der Recalls werden mit Zufalls-/Diversitätsbeimischung bedient (verhindert Rich-get-richer).
-
-**Invariante:** Re-Layout ist semantisch unsichtbar und jederzeit abbrechbar (neue Extents werden erst nach vollständigem Schreiben aktiviert).
-
-### 4.4 Re-Layout-Trigger
-
-| Trigger | Schwelle |
-|---|---|
-| Extent-Zugriffe pro Recall (Mittel) | > 8 (Ziel: ≤ 4) |
-| Neuer Access-Trace-Datenpunkte | > 10 000 seit letztem Re-Layout |
-| Zeitbasiert | Alle 24 h (falls andere Trigger nicht greifen) |
-| Manuell | `ctx relayout` CLI-Befehl |
+**Ablauf:**
+1. Co-Access-Graph aufbauen, mit inkrementeller Label-Propagation (oder Multilevel-Partitionierung < 1000 Knoten) in Extent-große Gruppen schneiden.
+2. **Neue PAX-Extents schreiben** (alle Lanes `meta` bis `emb.full` wieder gemeinsam gepackt, `raw_ref` aufgelöst).
+3. Erst nach vollständigem `fdatasync` des neuen Packs: **nur `CellLocator` (`MetaRowLocator` + `ContentRowLocator`) im Manifest atomar umbiegen**.
+4. **Invariante:** Alle `ChunkId`s, `content_hash`, `meta_hash`, `RootSet`-Wurzeln und `CommitId`s bleiben **zu 100 % unverändert**!
+5. **5 % Exploration:** 5 % der Recalls streuen leichte Diversität ein, um Feedback-Verfestigung zu vermeiden.
 
 ---
 
-## 5. Kompression
+## 5. Partitionierter Buffer Pool & I/O-Pfad (kein `mmap`)
 
-### 5.1 Kompressionsverfahren pro Lane
+### 5.1 Buffer Pool (`contextra-store`)
 
-| Lane | Verfahren | Level | Details |
-|---|---|---|---|
-| Text (`raw`, Zoom) | zstd mit trainiertem Wörterbuch | 3 (online), 19 (Compaction) | Wörterbuch pro Namespace, max 112 KiB |
-| Token-IDs | Bit-Packing + Delta + zstd | 3 | Bit-Breite = ceil(log2(vocab_size)) |
-| Embeddings (Head, int8) | keine (bereits kompakt) | — | 768 Bytes für 768-dim int8 |
-| Embeddings (Head, binär) | keine | — | 96 Bytes für 768-dim binär |
-| Embeddings (Tail, f16) | keine | — | 1536 Bytes für 768-dim f16 |
-| Embeddings (Tail, f32) | zstd | 1 | Kompressionsgewinn ~20 % |
-| Attribute | Dictionary + RLE + Frame-of-Reference | — | Spaltenweise innerhalb Extent |
-| Kanten | Delta-codierte Adjazenzlisten | — | Sortiert nach (src, edge_type, dst) |
-| Bloom-Filter | keine | — | Bereits kompakt |
+Da alle Packs, Prolly-Knoten und Index-Segmente **unveränderlich** sind, ist der Buffer Pool ein reiner **Read-Cache ohne Dirty-Pages**:
+- **Seitengrößen:** 4 KiB (Vektor-Sektoren, Hot-Head-Reads), 16 KiB (Prolly-Knoten, Packs/Cold-Tail-Blöcke).
+- **Eviction:** W-TinyLFU oder CLOCK-Pro mit Pin-Zählern je Frame (Zero-Copy `rkyv`-Validierung via `bytecheck` erfolgt exakt einmal beim Laden des Frames in den Pool!).
+- **Strikte Teilbudgets:** Getrennte Kontingente für `ProllyInternal` (gepinnt), `ProllyLeaf`, `ExtentHotHead`, `IndexVec`, `IndexFts`, `ColdTail` — ein großer Dokumenten-Scan verdrängt niemals heiße Graph-/Vektor-Strukturen.
 
-### 5.2 Wörterbuch-Training
+### 5.2 I/O-Backend
 
-- **Trigger:** Alle 10 000 neue Cells pro Namespace oder manuell.
-- **Trainingsmaterial:** Zufallsstichprobe von 1 000 raw-Lanes aus dem Namespace.
-- **Wörterbuchgröße:** max 112 KiB (zstd-Limit für beste Effizienz).
-- **Versionierung:** Wörterbuch-ChunkId im Extent-Header → alte Extents bleiben lesbar.
+- **Baseline (alle OS):** `pread`/`pwrite` über dedizierten Thread-Pool.
+- **Linux High-Perf (opt-in Feature `io-uring`):** `io_uring` mit `O_DIRECT`-aligned Puffern (4 KiB) für Cold-Tail- und Vamana-Sektor-Reads.
+- **`mmap` ist im Produktpfad unzulässig:** Verhindert unkontrolliertes OS-Paging, TLB-Shootdowns und unauffangbare `SIGBUS`-Signale bei Medienfehlern (`mmap` höchstens in Entwicklungs-/Offline-Tools).
 
 ---
 
-## 6. Embedding-Quantisierung
+## 6. Kompression & Wörterbücher
 
-### 6.1 Formate
-
-| Format | Precision | Größe (768-dim) | Verwendung |
+| Lane / Objekt | Verfahren | Level | Details |
 |---|---|---|---|
-| `binary` | 1 bit/dim | 96 Bytes | Vorfilter (Hamming-Distanz) |
-| `int8` | 8 bit/dim, scalar quantization | 768 Bytes | Hot-Head, Kandidatensuche |
-| `f16` | 16 bit/dim | 1 536 Bytes | Cold-Tail, Re-Ranking |
-| `f32` | 32 bit/dim | 3 072 Bytes | Nur bei expliziter Anforderung |
-| `pq` | Product Quantization | M×nbits Bytes | Große Segmente (> 100k Vektoren) |
+| Text (`raw`, `zoom.L1`) | `zstd` mit Namespace-Wörterbuch | 3 (online), 19 (Compaction) | Wörterbuch max. 112 KiB, `dict_chunk_id` im Extent-Header |
+| `tok.ids` | Delta + SIMD-Bitpacking + `zstd` | 3 | Bit-Breite = `ceil(log2(vocab_size))` |
+| `emb.q` (Hot Head) | SQ8 / binär / RaBitQ | — | Unkomprimiert für direktes SIMD-Scoring |
+| `emb.full` (Cold Tail) | `f16` (Default) oder `f32` (`zstd:1`) | — | 4-KiB-aligned für direkten Rerank-Read |
+| `meta` & `attrs` | Spalten-Dictionary + RLE + FoR | — | Zero-Copy-Filterung |
 
-### 6.2 Scalar Quantization (int8)
-
-```rust
-/// Quantisierung pro Dimension: affine Abbildung [min, max] → [0, 255]
-pub struct ScalarQuantizer {
-    pub min: Vec<f32>,     // pro Dimension
-    pub max: Vec<f32>,     // pro Dimension
-}
-
-impl ScalarQuantizer {
-    pub fn quantize(&self, v: &[f32]) -> Vec<u8> {
-        v.iter().enumerate().map(|(i, &x)| {
-            let range = self.max[i] - self.min[i];
-            ((x - self.min[i]) / range * 255.0).round().clamp(0.0, 255.0) as u8
-        }).collect()
-    }
-}
-```
-
-Quantisierungsparameter werden **pro Segment** trainiert und im Segment-Header gespeichert.
-
-### 6.3 Matryoshka-Präfix
-
-Wenn der Embedder Matryoshka-Dimensionen unterstützt (z. B. 64, 128, 256, 768):
-- **Hot Head:** Erste 128 Dimensionen als int8 (128 Bytes) für Vorfilter.
-- **Cold Tail:** Volle 768 Dimensionen als f16 für Re-Ranking.
-- Konfigurierbar über Namespace-Policy: `matryoshka_prefix_dims = 128`.
-
-### 6.4 Product Quantization (PQ)
-
-Für Segmente mit > 100k Vektoren:
-- **M = 32** Sub-Quantizer (768 / 32 = 24 Dimensionen pro Sub-Raum)
-- **nbits = 8** (256 Centroids pro Sub-Raum)
-- **Codebook:** Trainiert pro Segment, gespeichert im Segment-Header
-- **Kompaktheit:** 32 Bytes pro Vektor (statt 768 Bytes int8)
+Wörterbuch-Training läuft alle 10 000 neue Cells pro Namespace; alte Extents bleiben über ihre `dict_chunk_id` lesbar.
 
 ---
 
@@ -329,69 +218,54 @@ Für Segmente mit > 100k Vektoren:
 
 ```
 <repo-root>/
-├── contextra.toml              # Repository-Konfiguration
+├── contextra.toml               # Statische Start-Konfiguration
+├── lock                         # flock(LOCK_EX | LOCK_NB) / LockFileEx (Single-Process)
 ├── manifest/
-│   ├── MANIFEST-000001         # Manifest-Log (append-only)
-│   ├── MANIFEST-000002         # Nächstes Manifest nach Rotation
-│   └── CURRENT                 # Zeiger auf aktives Manifest
+│   ├── MANIFEST-000001.mlog     # Append-only Manifest-Log (CRC32c + Prev-Hash)
+│   └── CURRENT                  # Doppelt gepufferter atomarer Superblock
 ├── wal/
-│   ├── WAL-000001.cxw          # WAL-Segmente
-│   ├── WAL-000002.cxw
-│   └── ...
+│   └── WAL-000001.cxw           # Gemeinsamer WAL für alle Branches (vorallokiert, 64 MiB)
 ├── packs/
-│   ├── PACK-000001.cxp         # Pack-Dateien (immutable)
-│   ├── PACK-000002.cxp
-│   └── ...
+│   └── PACK-000001.cxp          # Unveränderliche Pack-Dateien (Truth, Extents, Indizes)
 ├── locator/
-│   ├── LOC-000001.cxl          # Locator-Index-Runs
-│   └── ...
-├── sidecar/
-│   └── access_stats.cxs        # Zugriffsstatistiken
-├── dictionaries/
-│   ├── ns-0001-zstd.dict       # zstd-Wörterbücher pro Namespace
-│   └── ...
-├── tmp/                        # Temporäre Dateien (Compaction, Re-Layout)
-└── lock                        # flock() für Single-Process-Garantie
+│   ├── LOC-OBJ-000001.cxl       # ObjectLocator sorted runs
+│   └── LOC-CELL-000001.cxl      # CellLocator sorted runs
+├── sidecar/                     # NICHT Teil des versionierten RootSet!
+│   ├── idempotency.cxs          # WAL-gestütztes Idempotenz-Journal (mit TTL)
+│   ├── work_queue.cxs           # Persistente Job-Tabelle (Leases nicht versioniert)
+│   └── access_stats.cxs         # Eventual-consistent Zugriffsstatistiken
+├── dictionaries/                # zstd-Wörterbücher (auch als Chunk referenziert)
+└── tmp/                         # Ziel vor atomarem write + fdatasync + rename + dirsync
 ```
-
-### 7.1 Lock-Datei
-
-`flock(LOCK_EX | LOCK_NB)` auf `lock`. Bei Fehlschlag: Fehler „Repository already open by another process". Im Server-Modus hält der Server den Lock.
-
-### 7.2 Temporäre Dateien
-
-Alle Schreibvorgänge (Pack, Locator, Manifest) schreiben zuerst in `tmp/` und benennen atomar um (`rename(2)`). Bei Crash werden Dateien in `tmp/` beim nächsten Öffnen gelöscht.
 
 ---
 
-## 8. Verschlüsselung (At-Rest)
+## 8. Verschlüsselung At-Rest (optional, KEK/DEK + Keyed Klartext-Hash)
 
 ### 8.1 Schlüsselhierarchie
 
 ```
-Master Key (extern, nie auf Disk)
-    └── Repo Key = HKDF-SHA256(master_key, repo_seed, "contextra-repo-key")
-            └── Pack Key = HKDF-SHA256(repo_key, pack_id, "contextra-pack-key")
-                    └── Extent wird verschlüsselt mit Pack Key + Extent-Nonce
+KEK (Master Key / Passphrase via Argon2id / KMS-Hook über CipherProvider, NIE auf Disk)
+ └── wraps DEK (256-bit Data Encryption Key, pro Store, in Header gewrappt)
+      ├── repo_hash_key = HKDF-BLAKE3(DEK, repo_seed, "contextra-cas-hash-v1")
+      ├── handle_mac_key= HKDF-BLAKE3(repo_seed, "contextra-handle-mac-v1")
+      └── pack_enc_key  = HKDF-SHA256(DEK, pack_id, "contextra-pack-aead-v1")
 ```
 
-### 8.2 Verschlüsselungsverfahren
+### 8.2 AEAD-Verfahren & Schlüsselrotation
 
-| Algorithmus | Nonce | Tag | Verwendung |
-|---|---|---|---|
-| AES-256-GCM | 12 Bytes (Extent-Counter) | 16 Bytes | Standard, Hardware-beschleunigt |
-| XChaCha20-Poly1305 | 24 Bytes (zufällig) | 16 Bytes | Fallback ohne AES-NI |
+- **Algorithmen:** `AES-256-GCM` (Standard mit AES-NI) oder `XChaCha20-Poly1305` (Software-Fallback). Nonce eindeutig abgeleitet aus `(pack_id, extent_no, block_no, generation)`.
+- **O(1)-KEK-Rotation:** Master-Key-Wechsel re-wrappt nur den DEK im Superblock (sofort fertig).
+- **DEK-Rotation:** Hintergrund-Compaction schreibt neue Packs mit neuem `dek_id`; alte Packs werden nach Verification gelöscht.
 
-### 8.3 Keyed ObjectIds
+### 8.3 Keyed ObjectIds über Klartext (korrigiert Nonce-Bug)
 
-Bei verschlüsselten Repos: `ChunkId = BLAKE3(key=repo_key, encrypted_payload)`. Damit ist der Hash über den verschlüsselten Inhalt gebildet → kein Existenz-Orakel (gleicher Klartext in verschiedenen Repos hat verschiedene ChunkIds).
+**Regel:** Bei verschlüsselten Repositories gilt:
+`ChunkId = BLAKE3::keyed_hash(repo_hash_key, canonical_plaintext_bytes)`.
 
-### 8.4 Key-Management
-
-- **Master Key** wird beim Öffnen als Parameter übergeben (`Config::master_key(key)`)
-- **Kein Key-Speicher in der Engine.** Key-Management ist Aufgabe der Anwendung.
-- **Key-Rotation:** Neuer Master Key → Hintergrund-Job re-verschlüsselt alle Packs. Alte Packs werden gelöscht nach Re-Verschlüsselung + Verifikation.
-- **Optionale KMS-Integration:** Über `CipherProvider`-Trait (externe Implementierung).
+- **Warum über Klartext (mit `repo_hash_key`) statt über Ciphertext?**
+  1. Verhindert Cross-Tenant-/Cross-Repo-Existenz-Orakel (da andere Repos einen anderen `repo_hash_key` haben).
+  2. Gleichzeitig bleiben **Content-Addressing, Deduplizierung im Derivation Cache, History-Unabhängigkeit des Prolly-Trees und KEK/DEK-Rotation vollständig erhalten**, weil zwei identische Klartexte trotz unterschiedlicher AEAD-Nonces denselben `ChunkId` erhalten!
 
 ---
 
