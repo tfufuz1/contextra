@@ -4,7 +4,7 @@
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
 use crate::ComputePool;
-use contextra_core::{DistanceMetric, DocId};
+use contextra_types::{DistanceMetric, DocId};
 use std::path::PathBuf;
 
 /// Fallback behavior policy when DiskANN loading, integrity checks, or reads fail.

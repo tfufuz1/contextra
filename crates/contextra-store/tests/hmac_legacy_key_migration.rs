@@ -2,9 +2,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_core::{ContextraError, TxId};
 use contextra_store::wal::hmac::{migrate_legacy_key, LegacyKeyStatus};
 use contextra_store::wal::{Wal, WalOp};
+use contextra_types::{ContextraError, TxId};
 use tempfile::tempdir;
 
 #[test]
@@ -22,7 +22,7 @@ fn test_legacy_key_status_methods_and_debug_format() {
 
 #[test]
 fn test_migrate_legacy_key_success_and_validations() {
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let new_key = [0x42u8; 32];
 
     // 1. Valid migration
@@ -53,7 +53,7 @@ async fn test_wal_legacy_key_roundtrip_migration_and_tamper_detection() {
     let dir = tempdir().expect("tempdir");
     let wal_path = dir.path().join("legacy_migration.wal");
 
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let new_key = [0x77u8; 32];
 
     // Migrate key state
@@ -119,7 +119,7 @@ async fn test_wal_legacy_key_roundtrip_migration_and_tamper_detection() {
 
 #[test]
 fn test_log_and_debug_output_excludes_key_material() {
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let new_key = [0x99u8; 32];
 
     let status = LegacyKeyStatus::LegacyActive;

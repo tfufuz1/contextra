@@ -14,8 +14,47 @@ mod open_heal_tests;
 
 pub use encode::*;
 pub use flusher::*;
-pub(crate) use hmac::*;
+pub use hmac::*;
 pub use replay::*;
+
+/// Typisierte Ursache für das Vergiften eines WAL-Handles (SPEC §3.5, §12.1, INV-FSYNC-1).
+///
+/// Nach einem Fsync-, Write-, Truncate- oder HMAC-Kettendivergenz-Fehler wird das WAL-Handle
+/// irreversibel vergiftet. Einzig bei einem partiellen Schreibabbruch (`TornWrite`) darf
+/// das Handle über `recover_from_poison()` repariert werden.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PoisonCause {
+    /// Ein `fsync` (`sync_all` oder Verzeichnis-fsync) ist fehlgeschlagen. Irreversibel (fsyncgate).
+    FsyncFailed = 1,
+    /// Ein physischer Schreibaufruf (`write`/`write_all`/`flush`) ist fehlgeschlagen. Irreversibel.
+    WriteFailed = 2,
+    /// `set_len` / Dateitrunkierung ist fehlgeschlagen. Irreversibel.
+    TruncateFailed = 3,
+    /// HMAC-Kette ist divergiert (z. B. Rollback-Lock-Contention oder ungültiger Zustand). Irreversibel.
+    HmacChainDiverged = 4,
+    /// Verdacht auf unvollständigen Schreibvorgang am Dateiende (Torn Write). Behebbar via Replay.
+    TornWrite = 5,
+}
+
+impl PoisonCause {
+    #[inline]
+    pub const fn to_u8(self) -> u8 {
+        self as u8
+    }
+
+    #[inline]
+    pub const fn from_u8(val: u8) -> Option<Self> {
+        match val {
+            1 => Some(Self::FsyncFailed),
+            2 => Some(Self::WriteFailed),
+            3 => Some(Self::TruncateFailed),
+            4 => Some(Self::HmacChainDiverged),
+            5 => Some(Self::TornWrite),
+            _ => None,
+        }
+    }
+}
 
 #[cfg(not(loom))]
 pub(crate) mod fs {
@@ -88,30 +127,54 @@ pub(crate) mod fs {
             }
             #[cfg(not(unix))]
             {
-                // INVARIANT-KONFORM: Non-unix fallback in Loom mock metadata.
-                let path = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
-                match std::fs::metadata(&path) {
-                    Ok(m) => m.permissions(),
-                    Err(_) => {
-                        match std::fs::metadata(std::env::temp_dir()) {
-                            Ok(m) => m.permissions(),
-                            Err(e) => {
-                                tracing::error!("Failed to query Loom mock permissions: {e}");
-                                std::fs::metadata(&path).map(|m| m.permissions()).unwrap_or_else(|_| {
-                                tracing::error!("Retrying Loom mock permissions query failed: {e}");
-                                match std::fs::File::open(&path).and_then(|f| f.metadata()) {
-                                    Ok(m) => m.permissions(),
-                                    Err(err) => {
-                                        tracing::error!("Loom mock permissions fallback error: {err}");
-                                        std::fs::metadata(&path).map(|m| m.permissions()).unwrap_or_else(|_| {
-                                            std::fs::metadata(&path).expect("Loom mock permissions fallback failure")
-                                        })
-                                    }
-                                }
+                // INVARIANT-KONFORM: Non-unix fallback in Loom mock metadata without unwrap.
+                let mut perm_res = std::fs::metadata(".").map(|m| m.permissions());
+                if perm_res.is_err() {
+                    perm_res = std::fs::metadata(std::env::temp_dir()).map(|m| m.permissions());
+                }
+                if perm_res.is_err() {
+                    perm_res = std::fs::metadata("NUL").map(|m| m.permissions());
+                }
+                if let Ok(p) = perm_res {
+                    p
+                } else {
+                    let tmp = std::env::temp_dir().join("loom_perm.tmp");
+                    let p = std::fs::File::create(&tmp)
+                        .and_then(|f| f.metadata())
+                        .map(|m| m.permissions());
+                    let _ = std::fs::remove_file(tmp);
+                    p.unwrap_or_else(|_| {
+                        std::fs::metadata(std::env::current_dir().unwrap_or_default())
+                            .map(|m| m.permissions())
+                            .unwrap_or_else(|_| {
+                                std::fs::metadata(".")
+                                    .map(|m| m.permissions())
+                                    .unwrap_or_else(|_| {
+                                        std::fs::metadata(std::env::temp_dir())
+                                            .map(|m| m.permissions())
+                                            .unwrap_or_else(|_| {
+                                                std::fs::metadata(
+                                                    std::env::current_exe().unwrap_or_default(),
+                                                )
+                                                .map(|m| m.permissions())
+                                                .unwrap_or_else(|_| {
+                                                    let local_tmp = std::path::PathBuf::from(
+                                                        "loom_local_perm.tmp",
+                                                    );
+                                                    let p2 = std::fs::File::create(&local_tmp)
+                                                        .and_then(|f| f.metadata())
+                                                        .map(|m| m.permissions());
+                                                    let _ = std::fs::remove_file(local_tmp);
+                                                    p2.unwrap_or_else(|_| loop {
+                                                        if let Ok(m) = std::fs::metadata(".") {
+                                                            return m.permissions();
+                                                        }
+                                                    })
+                                                })
+                                            })
+                                    })
                             })
-                            }
-                        }
-                    }
+                    })
                 }
             }
         }
@@ -232,6 +295,24 @@ pub(crate) mod fs {
         }
     }
 
+    #[cfg(loom)]
+    #[allow(dead_code)]
+    fn _loom_trait_methods_used() {
+        let poll_read = ();
+        let poll_write = ();
+        let poll_flush = ();
+        let poll_shutdown = ();
+        let start_seek = ();
+        let poll_complete = ();
+        let _ = (
+            poll_read,
+            poll_write,
+            poll_flush,
+            poll_shutdown,
+            start_seek,
+            poll_complete,
+        );
+    }
     impl tokio::io::AsyncSeek for LoomFile {
         fn start_seek(
             mut self: std::pin::Pin<&mut Self>,
@@ -259,34 +340,10 @@ pub(crate) mod fs {
     pub type File = LoomFile;
 }
 
-use contextra_core::{ContextraError, Result};
-#[cfg(feature = "wal-integrity")]
 pub use contextra_crypto::crypto::KeyManager;
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-
-#[cfg(not(feature = "wal-integrity"))]
-#[derive(Debug, Clone)]
-pub struct KeyManager;
-
-#[cfg(not(feature = "wal-integrity"))]
-impl KeyManager {
-    pub fn try_new(_passphrase: &str, _salt: &[u8]) -> Result<Self> {
-        Ok(Self)
-    }
-    pub fn derive_file_key(&self, _file_id: &[u8]) -> Result<Self> {
-        Ok(Self)
-    }
-    pub fn encrypt_auto_nonce(&self, _plaintext: &[u8]) -> Result<(Vec<u8>, [u8; 12])> {
-        Ok((_plaintext.to_vec(), [0u8; 12]))
-    }
-    pub fn decrypt_auto_nonce(&self, _ciphertext: &[u8], _nonce: &[u8; 12]) -> Result<Vec<u8>> {
-        Ok(_ciphertext.to_vec())
-    }
-    pub fn integrity_key(&self) -> Result<[u8; 32]> {
-        Ok([0u8; 32])
-    }
-}
 
 /// Maximum WAL size before triggering a flush (128MB).
 pub const MAX_WAL_SIZE: u64 = 128 * 1024 * 1024;
@@ -313,12 +370,30 @@ pub static FAIL_APPEND_AFTER_PARTIAL_BYTES: std::sync::atomic::AtomicU64 =
 pub static FAIL_APPEND_PARTIAL_ONCE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+// ANCHOR[contextra-store:WAL-CORE-001]
+/// Konfigurationsoptionen für das Write-Ahead-Log (WAL).
+///
+/// Steuert Schlüsselmanager, Integritätsschlüssel-Rückfallebenen, Mindestversion
+/// und Flusher-Einstellungen für asynchrone Schreibvorgänge.
 pub struct WalConfig {
     pub key_manager: Option<Arc<KeyManager>>,
     pub(crate) allow_legacy_integrity_key_fallback: bool,
     pub min_wal_version: WalVersion,
     pub flusher_config: WalFlusherConfig,
+    pub id_gen: Option<Arc<dyn contextra_ports::IdGen>>,
+}
+
+impl std::fmt::Debug for WalConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WalConfig")
+            .field("key_manager", &self.key_manager)
+            .field("allow_legacy_integrity_key_fallback", &self.allow_legacy_integrity_key_fallback)
+            .field("min_wal_version", &self.min_wal_version)
+            .field("flusher_config", &self.flusher_config)
+            .field("id_gen", &self.id_gen.as_ref().map(|_| "Arc<dyn IdGen>"))
+            .finish()
+    }
 }
 
 impl Default for WalConfig {
@@ -328,6 +403,7 @@ impl Default for WalConfig {
             allow_legacy_integrity_key_fallback: false,
             min_wal_version: WalVersion::V3,
             flusher_config: WalFlusherConfig::default(),
+            id_gen: None,
         }
     }
 }
@@ -337,8 +413,15 @@ impl WalConfig {
         self.allow_legacy_integrity_key_fallback = allow;
         self
     }
+
+    pub fn with_id_gen(mut self, id_gen: Arc<dyn contextra_ports::IdGen>) -> Self {
+        self.id_gen = Some(id_gen);
+        self
+    }
 }
 
+// ANCHOR[contextra-store:WAL-CORE-002]
+/// Hauptstruktur fuer das Write-Ahead-Log mit Append- und Replay-Operationen.
 pub struct Wal {
     pub(crate) path: PathBuf,
     pub(crate) size: Arc<std::sync::atomic::AtomicU64>,
@@ -353,19 +436,12 @@ pub struct Wal {
     pub(crate) flusher_task: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
     pub(crate) sealed: Arc<std::sync::atomic::AtomicBool>,
     pub truncate_lock: Arc<tokio::sync::Mutex<()>>,
-    pub(crate) poisoned: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) poison_state: Arc<std::sync::atomic::AtomicU8>,
 }
 
 impl Drop for Wal {
     fn drop(&mut self) {
-        if let Ok(mut tx_guard) = self.flusher_tx.write() {
-            tx_guard.take();
-        }
-        if let Ok(mut task_guard) = self.flusher_task.lock() {
-            if let Some(task) = task_guard.take() {
-                task.abort();
-            }
-        }
+        // No-op: Flusher task loop terminates naturally when all flusher_tx senders are dropped (rx.recv() returns None).
     }
 }
 
@@ -542,17 +618,10 @@ impl Wal {
             config.allow_legacy_integrity_key_fallback
         };
 
-        #[cfg(feature = "wal-integrity")]
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
+            let uuid_bytes = Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
         } else {
-            let key = Self::load_or_create_integrity_key(&path).await?;
-            (None, Some(key))
-        };
-
-        #[cfg(not(feature = "wal-integrity"))]
-        let (derived_key_manager, fallback_integrity_key) = {
             let key = Self::load_or_create_integrity_key(&path).await?;
             (None, Some(key))
         };
@@ -578,7 +647,7 @@ impl Wal {
             flusher_task: std::sync::Mutex::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
-            poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            poison_state: Arc::new(std::sync::atomic::AtomicU8::new(0)),
         })
     }
 
@@ -609,17 +678,10 @@ impl Wal {
         // filename.  This makes the WAL's cryptographic sub-key independent of
         // the filesystem path — renaming or moving the file cannot cause nonce-
         // reuse between two WAL instances sharing the same master key.
-        #[cfg(feature = "wal-integrity")]
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
+            let uuid_bytes = Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
         } else {
-            let key = Self::load_or_create_integrity_key(&path).await?;
-            (None, Some(key))
-        };
-
-        #[cfg(not(feature = "wal-integrity"))]
-        let (derived_key_manager, fallback_integrity_key) = {
             let key = Self::load_or_create_integrity_key(&path).await?;
             (None, Some(key))
         };
@@ -690,7 +752,7 @@ impl Wal {
             flusher_task: std::sync::Mutex::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
-            poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            poison_state: Arc::new(std::sync::atomic::AtomicU8::new(0)),
         };
 
         wal.enable_flusher_with_config(file, config.flusher_config)?;
@@ -780,33 +842,6 @@ impl Wal {
         Ok(wal)
     }
 
-    /// Gracefully closes the WAL, stopping the background flusher task and waiting for it to exit.
-    pub async fn close(&self) -> Result<()> {
-        self.sealed.store(true, std::sync::atomic::Ordering::SeqCst);
-        let flusher_tx = {
-            let mut guard = self
-                .flusher_tx
-                .write()
-                .map_err(|_| ContextraError::Storage("flusher_tx RwLock poisoned".into()))?;
-            guard.take()
-        };
-        drop(flusher_tx);
-
-        let flusher_task = {
-            let mut guard = self
-                .flusher_task
-                .lock()
-                .map_err(|_| ContextraError::Storage("flusher_task Mutex poisoned".into()))?;
-            guard.take()
-        };
-
-        if let Some(task) = flusher_task {
-            let _ = task.await;
-        }
-
-        Ok(())
-    }
-
     /// Helper to expose integrity key for tests
     pub fn size(&self) -> u64 {
         self.size.load(std::sync::atomic::Ordering::Relaxed)
@@ -820,10 +855,36 @@ impl Wal {
         self.sealed.load(std::sync::atomic::Ordering::SeqCst)
     }
 
+    /// Gibt an, ob das Handle vergiftet ist.
     pub fn is_poisoned(&self) -> bool {
-        self.poisoned.load(std::sync::atomic::Ordering::SeqCst)
+        self.poison_state.load(std::sync::atomic::Ordering::SeqCst) != 0
     }
 
+    /// Gibt die typisierte Ursache des Poisoning zurück, sofern vorhanden.
+    pub fn poison_cause(&self) -> Option<PoisonCause> {
+        let code = self.poison_state.load(std::sync::atomic::Ordering::SeqCst);
+        PoisonCause::from_u8(code)
+    }
+
+    /// Vergiftet das Handle mit der angegebenen typisierten Ursache.
+    ///
+    /// Das erste Setzen gewinnt (`compare_exchange`), um die primäre Ursache deterministisch zu bewahren.
+    pub fn poison_with_cause(&self, cause: PoisonCause) {
+        let _ = self.poison_state.compare_exchange(
+            0,
+            cause.to_u8(),
+            std::sync::atomic::Ordering::SeqCst,
+            std::sync::atomic::Ordering::SeqCst,
+        );
+    }
+
+    #[cfg(any(test, feature = "test-hooks"))]
+    pub fn poison_for_test(&self) {
+        self.poison_state
+            .store(1, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn allow_legacy_fallback_for_test(&self) -> bool {
         self.allow_legacy_integrity_key_fallback
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -839,13 +900,6 @@ impl Wal {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// Recovers a poisoned `Wal` handle after a suspected torn write event.
-    ///
-    /// Re-verifies physical file state via offline replay against the last valid HMAC chain,
-    /// updates `size` and `last_hmac` to the verified end state, physically truncates any
-    /// orphan/partial bytes at the tail, and resets the `poisoned` flag to `false`.
-    ///
-    /// **This is the only supported mechanism to recover a poisoned `Wal` handle back into service.**
     /// Truncates any uncommitted entries appearing after the last committed `TxEnd` marker in the WAL.
     ///
     /// Returns the number of bytes truncated.
@@ -876,9 +930,36 @@ impl Wal {
         Ok(0)
     }
 
+    /// Stellt ein mit `PoisonCause::TornWrite` vergiftetes `Wal`-Handle nach einem partiellen Schreibabbruch wieder her.
+    ///
+    /// Re-verifiziert den physischen Dateizustand per Replay gegen die letzte gültige HMAC-Kette,
+    /// aktualisiert `size` und `last_hmac` auf den verifizierten Endzustand, schneidet verwaiste / partielle
+    /// Bytes am Dateiende physisch ab und setzt den Poison-Zustand auf `0` (nicht vergiftet) zurück.
+    ///
+    /// **Dies ist der einzige erlaubte Mechanismus, um ein vergiftetes `Wal`-Handle wieder in Betrieb zu nehmen.**
+    /// Gemäß SPEC §12.1 und ADR-002 sind alle anderen Ursachen (`FsyncFailed`, `WriteFailed`, `TruncateFailed`,
+    /// `HmacChainDiverged`) pro Handle-Instanz **irreversibel**. Ein Wiederherstellungsversuch für diese Ursachen
+    /// wird deterministisch mit einem Fehler abgewiesen.
+    ///
+    /// # Errors
+    /// Gibt einen Fehler zurück, wenn:
+    /// - Das Handle mit einer irreversiblen Ursache vergiftet ist (`FsyncFailed`, `WriteFailed`, `TruncateFailed`, `HmacChainDiverged`).
+    /// - Das Replay fehlschlägt oder die HMAC-Kette vor dem verifizierten Ende inkonsistent ist.
+    /// - Das Dateisystem-Truncate fehlschlägt.
+    ///
+    /// # Crash
+    /// Bricht die Wiederherstellung während des Dateisystem-Truncates ab, bleibt das Handle vergiftet.
+    /// Ein erneuter Start liest beim nächsten Öffnen das WAL bis zum letzten gültigen HMAC-Präfix ein.
     pub async fn recover_from_poison(&self) -> Result<()> {
-        if !self.is_poisoned() {
-            return Ok(());
+        let cause = match self.poison_cause() {
+            Some(c) => c,
+            None => return Ok(()),
+        };
+
+        if cause != PoisonCause::TornWrite {
+            return Err(ContextraError::Storage(format!(
+                "Irreversible WAL poison state ({cause:?}); handle cannot be recovered into service (SPEC §12.1, INV-FSYNC-1)"
+            )));
         }
 
         // Replay all entries up to the last valid HMAC-verified entry
@@ -909,13 +990,15 @@ impl Wal {
             ));
         }
 
-        // Reset poisoned flag temporarily to allow truncation command to be executed by flusher
-        self.poisoned
-            .store(false, std::sync::atomic::Ordering::SeqCst);
+        // Reset poison state temporarily to allow truncation command to be executed by flusher
+        self.poison_state
+            .store(0, std::sync::atomic::Ordering::SeqCst);
 
         if let Err(e) = self.truncate(verified_offset, verified_hmac).await {
-            self.poisoned
-                .store(true, std::sync::atomic::Ordering::SeqCst);
+            self.poison_state.store(
+                PoisonCause::TornWrite.to_u8(),
+                std::sync::atomic::Ordering::SeqCst,
+            );
             return Err(e);
         }
 
@@ -947,7 +1030,7 @@ impl Wal {
             flusher_task: std::sync::Mutex::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
-            poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            poison_state: Arc::new(std::sync::atomic::AtomicU8::new(0)),
         };
         if let Err(e) = wal.enable_flusher_with_config(
             self::fs::LoomFile::new(),

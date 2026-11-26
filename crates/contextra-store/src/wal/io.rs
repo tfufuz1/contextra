@@ -1,11 +1,13 @@
-use contextra_core::{ContextraError, Result, TxId};
-#[cfg(feature = "wal-integrity")]
+//! # Low-Level Dateisystem-I/O fuer WAL (Ring 1)
+//!
+//! Fuehrt sequentielle Appends und fsync-Befehle auf dem physischen Dateisystem durch.
+
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
+use contextra_types::{ContextraError, Result, TxId};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-#[cfg(feature = "wal-integrity")]
 use super::legacy_integrity_key;
 use super::{
     PreparedBatch, Wal, WalCommand, WalEntry, WalOp, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER,
@@ -43,10 +45,8 @@ where
         return Ok(version);
     }
 
-    #[cfg(feature = "wal-integrity")]
     let key_manager = _key_manager;
 
-    #[cfg(feature = "wal-integrity")]
     let integrity_key = if let Some(km) = key_manager {
         km.integrity_key()?
     } else if let Some(key) = fallback_integrity_key {
@@ -55,7 +55,6 @@ where
         return Err(ContextraError::Storage("No integrity key available".into()));
     };
 
-    #[cfg(feature = "wal-integrity")]
     let mut verifier = IntegrityVerifier::new(&integrity_key);
     let mut using_legacy_key = false;
     let _ = (
@@ -152,7 +151,6 @@ where
         let chunk_start_pos = pos;
         pos += (4 + len) as u64;
 
-        #[cfg(feature = "wal-integrity")]
         {
             if let (Some(km), WalVersion::V2 | WalVersion::V3) = (key_manager, version) {
                 if entry_data_raw.len() < 12 {
@@ -265,15 +263,7 @@ where
                     #[allow(deprecated)]
                     let verify_res = match version {
                         WalVersion::V3 => verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
-                        WalVersion::V2 => {
-                            let _v2_chk = WalEntry::compute_checksum_v2(
-                                &entry.op,
-                                entry.seq_no,
-                                &integrity_key,
-                                entry.prev_hmac,
-                            );
-                            verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
-                        }
+                        WalVersion::V2 => verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
                         WalVersion::V1 => {
                             verifier.skip_hmac_verify_legacy(&snapshot);
                             Ok(())
@@ -285,24 +275,17 @@ where
                             let legacy_key = legacy_integrity_key()?;
                             let mut legacy_verifier = IntegrityVerifier::new(&legacy_key);
                             legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
-                            let legacy_res = match version {
-                                WalVersion::V3 => {
-                                    legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos)
-                                }
-                                WalVersion::V2 => {
-                                    let _v2_chk = WalEntry::compute_checksum_v2(
-                                        &entry.op,
-                                        entry.seq_no,
-                                        &integrity_key,
-                                        entry.prev_hmac,
-                                    );
-                                    legacy_verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
-                                }
-                                WalVersion::V1 => {
-                                    legacy_verifier.skip_hmac_verify_legacy(&snapshot);
-                                    Ok(())
-                                }
-                            };
+                            let legacy_res =
+                                match version {
+                                    WalVersion::V3 => legacy_verifier
+                                        .verify_and_update_v3(&snapshot, chunk_start_pos),
+                                    WalVersion::V2 => legacy_verifier
+                                        .verify_and_update_v2(&snapshot, chunk_start_pos),
+                                    WalVersion::V1 => {
+                                        legacy_verifier.skip_hmac_verify_legacy(&snapshot);
+                                        Ok(())
+                                    }
+                                };
                             if legacy_res.is_ok() {
                                 tracing::warn!(
                                     target: "contextra_store::wal::legacy_fallback",
@@ -428,15 +411,7 @@ where
 
                 let verify_res = match version {
                     WalVersion::V3 => verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
-                    WalVersion::V2 => {
-                        let _v2_chk = WalEntry::compute_checksum_v2(
-                            &entry.op,
-                            entry.seq_no,
-                            &integrity_key,
-                            entry.prev_hmac,
-                        );
-                        verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
-                    }
+                    WalVersion::V2 => verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
                     WalVersion::V1 => {
                         verifier.skip_hmac_verify_legacy(&snapshot);
                         Ok(())
@@ -453,12 +428,6 @@ where
                                 legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos)
                             }
                             WalVersion::V2 => {
-                                let _v2_chk = WalEntry::compute_checksum_v2(
-                                    &entry.op,
-                                    entry.seq_no,
-                                    &integrity_key,
-                                    entry.prev_hmac,
-                                );
                                 legacy_verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
                             }
                             WalVersion::V1 => {
@@ -490,29 +459,6 @@ where
                 if !callback(seq, entry, pos) {
                     break 'scan_loop;
                 }
-            }
-        }
-        #[cfg(not(feature = "wal-integrity"))]
-        {
-            let entry = match WalEntry::from_bytes_classified(&entry_data_raw) {
-                Ok(e) => e,
-                Err(parse_err) => {
-                    if let Some(err) = Wal::handle_wal_entry_parse_error(
-                        parse_err,
-                        chunk_start_pos,
-                        pos,
-                        file_size,
-                    ) {
-                        return Err(err);
-                    }
-                    break;
-                }
-            };
-
-            entries_count += 1;
-            let seq = entry.seq_no;
-            if !callback(seq, entry, pos) {
-                break 'scan_loop;
             }
         }
     }
@@ -702,10 +648,10 @@ impl Wal {
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
     ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
-        if self.is_poisoned() {
-            return Err(ContextraError::Storage(
-                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
-            ));
+        if let Some(cause) = self.poison_cause() {
+            return Err(ContextraError::Storage(format!(
+                "WAL handle poisoned ({cause:?}); requires explicit recovery or reload before further appends"
+            )));
         }
         let entries = &batch.0;
         if entries.is_empty() {
@@ -751,8 +697,15 @@ impl Wal {
     /// Non-blocking attempt to append a prepared batch. Returns `Err(ContextraError::Storage("WAL queue full (backpressure)"))`
     /// if the flusher channel buffer is full.
     pub async fn try_append_batch(&self, batch: PreparedBatch) -> Result<()> {
-        let truncate_guard = self.truncate_lock.lock().await;
-        self.try_append_batch_locked(batch, &truncate_guard).await
+        let ack_rx = {
+            let truncate_guard = self.truncate_lock.lock().await;
+            self.try_enqueue_append_batch_locked(batch, &truncate_guard)
+                .await?
+        };
+        ack_rx
+            .await
+            .map_err(|_| ContextraError::Storage("WAL flusher dropped".into()))??;
+        Ok(())
     }
 
     pub async fn try_enqueue_append_batch_locked(
@@ -760,10 +713,10 @@ impl Wal {
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
     ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
-        if self.is_poisoned() {
-            return Err(ContextraError::Storage(
-                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
-            ));
+        if let Some(cause) = self.poison_cause() {
+            return Err(ContextraError::Storage(format!(
+                "WAL handle poisoned ({cause:?}); requires explicit recovery or reload before further appends"
+            )));
         }
         let entries = &batch.0;
         if entries.is_empty() {
@@ -863,26 +816,33 @@ impl Wal {
         replayed_entries: &[(u64, WalEntry, u64)],
     ) -> Result<()> {
         let integrity_key = self.get_integrity_key()?;
+        self.rewrite_as_v3_with_key_inner(replayed_entries, integrity_key)
+            .await
+    }
 
+    /// Rewrites legacy V1 or V2 WAL files as V3 using an explicit integrity key.
+    #[cfg(feature = "fault-injection")]
+    pub async fn rewrite_as_v3_with_integrity_key(
+        &self,
+        replayed_entries: &[(u64, WalEntry, u64)],
+        integrity_key: [u8; 32],
+    ) -> Result<()> {
+        self.rewrite_as_v3_with_key_inner(replayed_entries, integrity_key)
+            .await
+    }
+
+    async fn rewrite_as_v3_with_key_inner(
+        &self,
+        replayed_entries: &[(u64, WalEntry, u64)],
+        integrity_key: [u8; 32],
+    ) -> Result<()> {
         let flusher_tx = {
             let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
             guard.clone()
         };
 
-        let tx = match flusher_tx {
-            Some(tx) => tx,
-            None => {
-                if !replayed_entries.is_empty() {
-                    let ops: Vec<(WalOp, u64)> = replayed_entries
-                        .iter()
-                        .map(|(seq, entry, _)| (entry.op.clone(), *seq))
-                        .collect();
-                    let (batch, _) = self.prepare_batch(ops).await?;
-                    self.try_append_batch(batch).await?;
-                }
-                return Ok(());
-            }
-        };
+        let tx = flusher_tx
+            .ok_or_else(|| ContextraError::Storage("WAL flusher actor is not enabled".into()))?;
 
         let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
         tx.send(WalCommand::Rewrite {

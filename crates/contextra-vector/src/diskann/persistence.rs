@@ -11,7 +11,7 @@ use super::format::{
     DISKANN_VERSION,
 };
 use super::types::{DiskAnnIndex, DiskAnnIndexInner};
-use contextra_core::{ContextraError, DocId, Result};
+use contextra_types::{ContextraError, DocId, Result};
 use std::sync::atomic::Ordering;
 
 impl DiskAnnIndex {
@@ -173,7 +173,7 @@ impl DiskAnnIndex {
             q_max,
         };
 
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
 
         let header_bytes = header.to_bytes();
         hmac.update(&header_bytes);
@@ -315,7 +315,7 @@ impl DiskAnnIndex {
                         ContextraError::Storage("DiskANN payload slice out of bounds".into())
                     })?;
 
-                let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+                let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
                 hmac.update(payload);
                 let computed_hmac = hmac.finalize();
 
@@ -628,9 +628,12 @@ impl DiskAnnIndex {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "docid-128")]
     use super::*;
+    #[cfg(feature = "docid-128")]
     use crate::diskann::config::DiskAnnConfig;
-    use contextra_core::{DistanceMetric, DocId};
+    #[cfg(feature = "docid-128")]
+    use contextra_types::{DistanceMetric, DocId};
 
     #[cfg(feature = "docid-128")]
     #[tokio::test]

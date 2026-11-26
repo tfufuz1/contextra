@@ -1,6 +1,10 @@
+//! # HMAC-Integritaetskette fuer WAL (Ring 1)
+//!
+//! Garantiert kryptografische Verkettung und Manipulationssicherheit der WAL-Frames.
+
 // ZWECK: Legacy HMAC key migration path, deobfuscation and integrity key status.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 
 use super::{PreparedBatch, Wal, WalEntry, WalOp};
@@ -58,7 +62,7 @@ pub enum LegacyKeyStatus {
 impl LegacyKeyStatus {
     /// Returns `true` if the status is [`LegacyKeyStatus::LegacyActive`].
     pub const fn is_legacy(self) -> bool {
-        !self.is_standard()
+        matches!(self, Self::LegacyActive)
     }
 
     /// Returns `true` if the status is [`LegacyKeyStatus::Standard`].
@@ -68,9 +72,6 @@ impl LegacyKeyStatus {
 }
 
 /// Internal const helper for deobfuscating the legacy static integrity key bytes.
-///
-/// Only available when the `legacy-wal-key` Cargo feature is enabled because it
-/// references the obfuscated key constants that are likewise feature-gated.
 #[cfg(feature = "legacy-wal-key")]
 pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
     let mut out = [0u8; 32];
@@ -80,16 +81,6 @@ pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
         i += 1;
     }
     out
-}
-
-/// Stub used when `legacy-wal-key` is disabled: returns an all-zero sentinel.
-///
-/// This variant exists solely so that `legacy_integrity_key_for_test` compiles in all
-/// configurations (the test helper is `#[doc(hidden)]` and used only in unit tests that
-/// themselves require the feature).
-#[cfg(not(feature = "legacy-wal-key"))]
-pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
-    [0u8; 32]
 }
 
 /// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback during WAL replay of legacy databases.
@@ -183,25 +174,25 @@ impl Wal {
         Ok((PreparedBatch(entries), prev_hmac))
     }
 
-    /// Returns the legacy integrity key status for this WAL segment.
-    pub fn legacy_key_status(&self) -> LegacyKeyStatus {
-        if self
-            .legacy_key_used
-            .load(std::sync::atomic::Ordering::SeqCst)
-        {
-            LegacyKeyStatus::LegacyActive
+    /// Rolls back the in-memory HMAC state to `prev_hmac` asynchronously.
+    pub async fn rollback_hmac(&self, prev_hmac: [u8; 32]) {
+        let mut last_hmac = self.last_hmac.lock().await;
+        *last_hmac = prev_hmac;
+    }
+
+    /// Synchronously rolls back the in-memory HMAC state to `prev_hmac` using non-blocking `try_lock`.
+    /// Suitable for use within `Drop` implementations.
+    pub fn rollback_hmac_sync(&self, prev_hmac: [u8; 32]) -> bool {
+        if let Ok(mut last_hmac) = self.last_hmac.try_lock() {
+            *last_hmac = prev_hmac;
+            true
         } else {
-            LegacyKeyStatus::Standard
+            false
         }
     }
 
     /// Internal helper to retrieve or derive the 256-bit integrity key for HMAC chaining.
     pub(crate) fn get_integrity_key(&self) -> Result<[u8; 32]> {
-        if self.legacy_key_status().is_standard() {
-            tracing::trace!("Using standard WAL integrity key");
-        } else {
-            tracing::trace!("Using legacy WAL integrity key");
-        }
         if let Some(km) = &self.key_manager {
             km.integrity_key().map_err(Into::into)
         } else if let Some(key) = self.fallback_integrity_key {
@@ -214,14 +205,20 @@ impl Wal {
     }
 
     /// Exposes the HMAC integrity key for testing.
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn integrity_key_for_test(&self) -> Result<[u8; 32]> {
         self.get_integrity_key()
     }
 
-    /// Returns the static legacy HMAC integrity key for testing.
-    #[doc(hidden)]
-    pub fn legacy_integrity_key_for_test() -> [u8; 32] {
-        deobfuscate_legacy_integrity_key()
+    /// Exposes internal `last_hmac` lock for concurrency testing.
+    #[cfg(any(test, feature = "test-hooks"))]
+    pub fn last_hmac_lock_for_test(&self) -> std::sync::Arc<tokio::sync::Mutex<[u8; 32]>> {
+        std::sync::Arc::clone(&self.last_hmac)
+    }
+
+    #[cfg(any(test, feature = "test-hooks"))]
+    pub fn legacy_integrity_key_for_test() -> Result<[u8; 32]> {
+        legacy_integrity_key()
     }
 
     /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).
@@ -232,6 +229,14 @@ impl Wal {
     /// can also alter or replace `.wal_integrity_key`. For cryptographic tamper resistance,
     /// an active `KeyManager` (passphrase-derived keying) must be supplied.
     pub(crate) async fn load_or_create_integrity_key(wal_path: &Path) -> Result<[u8; 32]> {
+        let default_source = crate::key_source::OsKeyMaterialSource;
+        Self::load_or_create_integrity_key_with_source(wal_path, &default_source).await
+    }
+
+    pub(crate) async fn load_or_create_integrity_key_with_source(
+        wal_path: &Path,
+        key_source: &dyn crate::key_source::KeyMaterialSource,
+    ) -> Result<[u8; 32]> {
         let parent = wal_path.parent().unwrap_or_else(|| Path::new(""));
         let dir_path = if parent.as_os_str().is_empty() {
             Path::new(".")
@@ -267,16 +272,15 @@ impl Wal {
         if key_path.exists() {
             read_key_file(&key_path).await
         } else {
-            use rand::RngCore;
             use tokio::io::AsyncWriteExt;
 
             let mut key = [0u8; 32];
-            rand::thread_rng().fill_bytes(&mut key);
+            key_source.fill_key_bytes(&mut key)?;
 
             let tmp_path = dir_path.join(format!(
                 ".wal_integrity_key.tmp.{}.{}",
                 std::process::id(),
-                rand::thread_rng().next_u64()
+                crate::lsm::recovery::next_temp_file_counter()
             ));
 
             let mut options = super::fs::OpenOptions::new();
@@ -382,7 +386,6 @@ impl Wal {
             parent
         };
 
-        use rand::RngCore;
         use tokio::io::AsyncWriteExt;
 
         let tmp_path = parent_dir.join(format!(
@@ -392,7 +395,7 @@ impl Wal {
                 .map(|s| s.to_string_lossy())
                 .unwrap_or_default(),
             std::process::id(),
-            rand::thread_rng().next_u64()
+            crate::lsm::recovery::next_temp_file_counter()
         ));
 
         let mut options = super::fs::OpenOptions::new();
@@ -441,8 +444,15 @@ impl Wal {
         Ok(())
     }
 
-    #[cfg(feature = "wal-integrity")]
+    #[allow(dead_code)]
     pub(crate) async fn load_or_create_wal_uuid(wal_path: &Path) -> Result<[u8; 16]> {
+        Self::load_or_create_wal_uuid_with_gen(wal_path, None).await
+    }
+
+    pub(crate) async fn load_or_create_wal_uuid_with_gen(
+        wal_path: &Path,
+        id_gen: Option<&dyn contextra_ports::IdGen>,
+    ) -> Result<[u8; 16]> {
         let uuid_path = {
             let mut p = wal_path.as_os_str().to_os_string();
             p.push(".uuid");
@@ -467,11 +477,31 @@ impl Wal {
         if uuid_path.exists() {
             read_uuid_file(&uuid_path).await
         } else {
-            use rand::RngCore;
             use tokio::io::AsyncWriteExt;
 
-            let uuid = uuid::Uuid::new_v4();
-            let bytes = *uuid.as_bytes();
+            let bytes = if let Some(gen) = id_gen {
+                let id1 = gen.next_id();
+                let id2 = gen.next_id();
+                let mut b = [0u8; 16];
+                if let Some(chunk1) = b.get_mut(..8) {
+                    chunk1.copy_from_slice(&id1.to_le_bytes());
+                }
+                if let Some(chunk2) = b.get_mut(8..) {
+                    chunk2.copy_from_slice(&id2.to_le_bytes());
+                }
+                b
+            } else {
+                let counter = crate::lsm::recovery::next_temp_file_counter();
+                let pid = std::process::id() as u64;
+                let mut b = [0u8; 16];
+                if let Some(chunk1) = b.get_mut(..8) {
+                    chunk1.copy_from_slice(&pid.to_le_bytes());
+                }
+                if let Some(chunk2) = b.get_mut(8..) {
+                    chunk2.copy_from_slice(&counter.to_le_bytes());
+                }
+                b
+            };
 
             let uuid_filename = uuid_path
                 .file_name()
@@ -481,7 +511,7 @@ impl Wal {
                 "{}.tmp.{}.{}",
                 uuid_filename,
                 std::process::id(),
-                rand::thread_rng().next_u64()
+                crate::lsm::recovery::next_temp_file_counter()
             );
 
             let parent = uuid_path.parent().unwrap_or_else(|| Path::new(""));

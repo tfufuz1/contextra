@@ -1,3 +1,6 @@
+[lints]
+workspace = true
+
 [package]
 name = "contextra-mcp-fuzz" # <!-- crate-ref-ignore -->
 version = "0.0.0"

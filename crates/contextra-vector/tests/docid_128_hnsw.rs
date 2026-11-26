@@ -1,9 +1,10 @@
-use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
+use contextra_ports::VectorIndex;
+use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::MmapIndex;
 
 #[tokio::test]
-async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_core::Result<()> {
+async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_types::Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("test_docid_128.hnsw");
 
@@ -22,7 +23,7 @@ async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_core::Result<()> {
     index.insert(tx, doc_id, &vec).await?;
     index.commit(tx).await?;
 
-    index.save(&path).await?;
+    index.save(&path)?;
 
     let mmap_index = MmapIndex::open(&path)?;
     assert_eq!(mmap_index.header.node_count(), 1);
@@ -31,7 +32,7 @@ async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_core::Result<()> {
     assert_eq!(record.doc_id, doc_id.inner());
 
     let loaded_index = HnswIndex::try_new(config)?;
-    loaded_index.load_mmap(&path).await?;
+    loaded_index.load_mmap(&path)?;
 
     let search_results = loaded_index.search(&vec, 1).await?;
     assert_eq!(search_results.len(), 1);
@@ -41,7 +42,7 @@ async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_core::Result<()> {
 }
 
 #[tokio::test]
-async fn test_docid_format_mismatch_detection() -> contextra_core::Result<()> {
+async fn test_docid_format_mismatch_detection() -> contextra_types::Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("mismatch.hnsw");
 
@@ -58,7 +59,7 @@ async fn test_docid_format_mismatch_detection() -> contextra_core::Result<()> {
         .insert(tx, DocId::from(42u64), &[1.0, 2.0, 3.0, 4.0])
         .await?;
     index.commit(tx).await?;
-    index.save(&path).await?;
+    index.save(&path)?;
 
     let mut bytes = std::fs::read(&path).map_err(|e| ContextraError::Storage(e.to_string()))?;
 

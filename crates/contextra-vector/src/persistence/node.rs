@@ -2,7 +2,7 @@
 // ZWECK: Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - NodeRecord-Format.
 // INVARIANTEN: Zero-Panic bei Deserialisierung.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 /// Represents a node's metadata in the flat file.
 #[derive(Debug, Clone, Copy)]

@@ -20,18 +20,26 @@ pub mod error;
 pub mod fault_injector;
 /// Fail-Closed-Zustandsverfolgung und Poisoning-Zustandsautomat (§18.4).
 pub mod health;
-/// Append-only-Journal mit Prüfsummen für Crash-Resilienz.
+/// Append-only-Journal mit Prüfsummen und Pending-Delete-Journal für Crash-Resilienz.
 pub mod journal;
 /// Plattformspezifische synchrone Flush-Primitive für Dateien und Verzeichnisse.
 pub mod platform;
+/// Sicheres Überschreiben (Scrubbing) und Integritätsprüfung mit Ratenbegrenzung.
+pub mod scrub;
 /// Virtuelles Dateisystem (VFS) mit atomaren Ersetzungen und synchroner Schnittstelle.
 pub mod vfs;
 
 pub use error::{DurableFsError, Error, Result};
 pub use fault_injector::{FaultInjector, NoFault};
 pub use health::{AtomicHealthState, HealthEvent, HealthState};
-pub use journal::{AppendOnlyJournal, JournalSyncPolicy, RecordRecoveryPolicy};
+pub use journal::{
+    AppendOnlyJournal, JournalSyncPolicy, PendingDeleteJournal, RecordRecoveryPolicy,
+};
 pub use platform::FlushKind;
+pub use scrub::{
+    scrub_file_with_rate_limit, scrub_if_safe, scrub_if_safe_with_injector, ScrubOutcome,
+    ScrubPolicy, ScrubReceipt, ScrubRefusal,
+};
 pub use vfs::{RealFs, StdVfs, Vfs};
 
 use crate::platform::{sync_dir_path, sync_file};
@@ -368,4 +376,80 @@ pub fn atomic_replace_with_injector<F: FaultInjector>(
     std::mem::forget(guard);
 
     Ok(())
+}
+
+/// Entfernt eine Datei dauerhaft und flusht das Elternverzeichnis mit Standardinjektor [`NoFault`].
+pub fn durable_remove(path: &Path) -> Result<()> {
+    durable_remove_with_injector(path, &NoFault)
+}
+
+/// Entfernt eine Datei dauerhaft und flusht das Elternverzeichnis mit benutzerdefiniertem [`FaultInjector`].
+pub fn durable_remove_with_injector<F: FaultInjector>(path: &Path, injector: &F) -> Result<()> {
+    let parent = path.parent().ok_or_else(|| {
+        DurableFsError::InvalidArgument("target path has no parent directory".to_string())
+    })?;
+
+    std::fs::remove_file(path).map_err(DurableFsError::Io)?;
+    injector.on_dir_fsync(parent).map_err(DurableFsError::Io)?;
+    flush_dir(parent)?;
+    Ok(())
+}
+
+/// Überschreibt eine Datei vollständig mit Nullen und entfernt sie dauerhaft (mit [`NoFault`]).
+pub fn scrub_and_remove(path: &Path) -> Result<ScrubReceipt> {
+    scrub_and_remove_with_injector(path, &NoFault)
+}
+
+/// Überschreibt eine Datei mit Nullen und entfernt sie dauerhaft unter Verwendung eines [`FaultInjector`].
+pub fn scrub_and_remove_with_injector<F: FaultInjector>(
+    path: &Path,
+    injector: &F,
+) -> Result<ScrubReceipt> {
+    let metadata = path.symlink_metadata().map_err(DurableFsError::Io)?;
+    let file_type = metadata.file_type();
+
+    if file_type.is_symlink() || !file_type.is_file() {
+        return Err(DurableFsError::InvalidArgument(
+            "path is a symlink or not a regular file".to_string(),
+        ));
+    }
+
+    let len = metadata.len();
+    if len > 0 {
+        let mut options = OpenOptions::new();
+        options.write(true);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            options.share_access(7);
+        }
+
+        let mut file = options.open(path).map_err(DurableFsError::Io)?;
+
+        let zeros = [0u8; 64 * 1024];
+        let mut remaining = len;
+
+        while remaining > 0 {
+            let chunk_size = usize::try_from(remaining)
+                .unwrap_or(zeros.len())
+                .min(zeros.len());
+            injector
+                .on_write(Some(path), chunk_size)
+                .map_err(DurableFsError::Io)?;
+            let slice = zeros.get(..chunk_size).ok_or_else(|| {
+                DurableFsError::InvalidArgument("chunk_size out of bounds".to_string())
+            })?;
+            file.write_all(slice).map_err(DurableFsError::Io)?;
+            remaining -= chunk_size as u64;
+        }
+
+        injector.on_fsync(Some(path)).map_err(DurableFsError::Io)?;
+        sync_file(&file, FlushKind::DataAndMetadata).map_err(DurableFsError::Io)?;
+    }
+
+    durable_remove_with_injector(path, injector)?;
+
+    Ok(ScrubReceipt {
+        bytes_scrubbed: len,
+    })
 }

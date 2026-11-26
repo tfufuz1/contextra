@@ -1,8 +1,12 @@
+//! # Commit-Pfade & Transaktionsabschluss (Ring 1)
+//!
+//! Verwaltet atomare Batch-Commits und Rollbacks im LSM-Speicher.
+
 use super::observer::WriteOrigin;
 use super::*;
 use crate::wal::WalEntry;
-use contextra_core::{TxId, TOMBSTONE_BIT};
 use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
+use contextra_types::{TxId, TOMBSTONE_BIT};
 
 impl LsmStorage {
     /// Notifies registered observers of committed WAL entries for a transaction.
@@ -70,18 +74,7 @@ impl LsmStorage {
             return;
         }
         if tx_id.inner() < TxId::INTERNAL_BASE {
-            let mut current = self.last_committed_tx.load(Ordering::Acquire);
-            while tx_id.inner() > current {
-                match self.last_committed_tx.compare_exchange_weak(
-                    current,
-                    tx_id.inner(),
-                    Ordering::SeqCst,
-                    Ordering::Relaxed,
-                ) {
-                    Ok(_) => break,
-                    Err(actual) => current = actual,
-                }
-            }
+            super::fence::publish_visibility(&self.last_committed_tx, tx_id.inner());
         }
     }
 
@@ -118,12 +111,6 @@ impl LsmStorage {
                         .budget_tracking_drift_bytes
                         .load(std::sync::atomic::Ordering::Relaxed),
                     "Memory budget tracking warning during commit: {e}"
-                );
-            } else {
-                tracing::debug!(
-                    delta_bytes = entry_size as u64,
-                    total_used_bytes = self.budget.memory_used(),
-                    "Memory budget consumed during commit"
                 );
             }
             memtable.put(

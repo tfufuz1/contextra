@@ -1,3 +1,9 @@
+//! # Integrationstest: ssi read path coverage
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_testkit::InMemoryStorageEngine;
@@ -6,6 +12,8 @@ use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST33-001]
+/// Testblock zur Überprüfung von `test_ssi_coverage_get_tracked`.
 /// Test 1: Single Get Tracked / get_at_seq_tracked SSI Write-Skew Prevention
 #[tokio::test]
 async fn test_ssi_coverage_get_tracked() -> Result<()> {
@@ -52,6 +60,8 @@ async fn test_ssi_coverage_get_tracked() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST33-002]
+/// Testblock zur Überprüfung von `test_ssi_coverage_link_memories`.
 /// Test 2: Link Memories SSI Write-Skew Prevention
 #[tokio::test]
 async fn test_ssi_coverage_link_memories() -> Result<()> {
@@ -105,6 +115,8 @@ async fn test_ssi_coverage_link_memories() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST33-003]
+/// Testblock zur Überprüfung von `test_ssi_coverage_update_importance`.
 /// Test 3: Document Importance Update SSI Write-Skew
 #[tokio::test]
 async fn test_ssi_coverage_update_importance() -> Result<()> {
@@ -147,6 +159,8 @@ async fn test_ssi_coverage_update_importance() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST33-004]
+/// Testblock zur Überprüfung von `test_non_ssi_storage_engine_startup_behavior`.
 /// Test 4: Startup behavior for engines without SSI tracking support.
 /// Asserts that Collection initialization with an in-memory storage engine returning supports_ssi_tracking() = false
 /// proceeds without panicking or returning an error.

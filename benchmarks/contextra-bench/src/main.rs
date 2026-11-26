@@ -3,19 +3,12 @@
 // ZWECK: Reproduzierbarer Benchmark-Harness für Retrieval-Qualität & LongMemEval / LoCoMo Regressions-Suite mit echten Embeddings
 // INVARIANTEN: Standalone, reproduzierbar, synthetischer Korpus mit Ground-Truth-Annotationen.
 
-use contextra_bench::compare::{CombinedMetrics, LocomoMetricsSummary, LongMemEvalMetricsSummary};
-use contextra_bench::locomo::{load_locomo_dataset, run_locomo_eval};
-use contextra_bench::long_mem_eval::{
-    check_regression, load_from_jsonl, run_long_mem_eval, RegressionSuite, ScoredChunk,
-};
-use contextra_core::{EmbeddingProvider, Result};
 use contextra_db::{Contextra, ContextraConfig};
-#[cfg(feature = "onnx-bench")]
-use contextra_infer_onnx::{CrossEncoderReranker, RerankConfig};
+use contextra_types::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tempfile::TempDir;
 
 /// Represents a benchmark query with ground truth relevant document IDs.
@@ -58,7 +51,6 @@ pub struct ScenarioComparison {
     pub recall_at_1_delta_pct: f64,
     pub recall_at_5_delta_pct: f64,
     pub error_rate_reduction_pct: f64,
-    pub mechanism_active: bool,
 }
 
 /// Complete benchmark report.
@@ -682,10 +674,6 @@ async fn run_scenario_a(
         0.0
     };
 
-    // Sanity check: Verify whether applying context prefix / has_context_prefix produces any observable
-    // difference in retrieval results compared to baseline.
-    let mechanism_active = baseline_retrieved != prefix_retrieved;
-
     Ok(ScenarioComparison {
         scenario_name: "Baseline vs. Kontext-Präfix".into(),
         baseline_metrics: base_metrics,
@@ -693,118 +681,16 @@ async fn run_scenario_a(
         recall_at_1_delta_pct: recall_1_delta,
         recall_at_5_delta_pct: recall_5_delta,
         error_rate_reduction_pct: err_reduction,
-        mechanism_active,
     })
 }
 
-#[cfg(feature = "onnx-bench")]
-async fn run_scenario_b(
-    docs: &[SyntheticDocument],
-    queries: &[GroundTruthQuery],
-) -> Result<ScenarioComparison> {
-    let db_cfg = ContextraConfig {
-        dimension: 768,
-        ..Default::default()
-    };
-
-    let temp_dir = TempDir::new()?;
-    let db = Contextra::open_with_config(temp_dir.path(), db_cfg).await?;
-    let col = db.collection("rerank_test").await?;
-
-    for doc in docs {
-        let metadata = serde_json::json!({
-            "title": doc.title,
-            "text": doc.raw_content,
-        });
-        col.insert(&doc.id, &doc.embedding, Some(metadata)).await?;
-    }
-
-    // 1. Without Reranking (Standard RRF)
-    let mut no_rerank_retrieved = Vec::with_capacity(queries.len());
-    for q in queries {
-        let res = col
-            .query()
-            .text(&q.query_text)
-            .embedding(&q.query_embedding)
-            .k(5)
-            .execute()
-            .await?;
-        no_rerank_retrieved.push(res.into_iter().map(|r| r.id).collect());
-    }
-
-    // 2. With Cross-Encoder Reranking
-    let reranker_config = RerankConfig::default();
-    let (reranker, is_passthrough) = match CrossEncoderReranker::new(reranker_config) {
-        Ok(r) => (r, false),
-        Err(_) => {
-            println!("[INFO] ONNX model weights not found at models/bge-reranker-base.onnx. Using Passthrough CrossEncoder for benchmark.");
-            (CrossEncoderReranker::passthrough(), true)
-        }
-    };
-
-    let mut with_rerank_retrieved = Vec::with_capacity(queries.len());
-    for q in queries {
-        let res = col
-            .query()
-            .text(&q.query_text)
-            .embedding(&q.query_embedding)
-            .reranker(&reranker)
-            .k(5)
-            .execute()
-            .await?;
-        with_rerank_retrieved.push(res.into_iter().map(|r| r.id).collect());
-    }
-
-    let base_metrics = calculate_metrics(queries, &no_rerank_retrieved);
-    let feat_metrics = calculate_metrics(queries, &with_rerank_retrieved);
-
-    let recall_1_delta = if base_metrics.recall_at_1 > 0.0 {
-        ((feat_metrics.recall_at_1 - base_metrics.recall_at_1) / base_metrics.recall_at_1) * 100.0
-    } else if feat_metrics.recall_at_1 > 0.0 {
-        100.0
-    } else {
-        0.0
-    };
-
-    let recall_5_delta = if base_metrics.recall_at_5 > 0.0 {
-        ((feat_metrics.recall_at_5 - base_metrics.recall_at_5) / base_metrics.recall_at_5) * 100.0
-    } else if feat_metrics.recall_at_5 > 0.0 {
-        100.0
-    } else {
-        0.0
-    };
-
-    let err_reduction = if base_metrics.error_rate_at_1 > 0.0 {
-        ((base_metrics.error_rate_at_1 - feat_metrics.error_rate_at_1)
-            / base_metrics.error_rate_at_1)
-            * 100.0
-    } else {
-        0.0
-    };
-
-    // Sanity check: If passthrough reranker was used or retrieved results are identical, mechanism is not active.
-    let mechanism_active = !is_passthrough && no_rerank_retrieved != with_rerank_retrieved;
-
-    Ok(ScenarioComparison {
-        scenario_name: "Ohne vs. mit Cross-Encoder-Reranking".into(),
-        baseline_metrics: base_metrics,
-        feature_metrics: feat_metrics,
-        recall_at_1_delta_pct: recall_1_delta,
-        recall_at_5_delta_pct: recall_5_delta,
-        error_rate_reduction_pct: err_reduction,
-        mechanism_active,
-    })
-}
-
-#[cfg(not(feature = "onnx-bench"))]
 async fn run_scenario_b(
     _docs: &[SyntheticDocument],
     _queries: &[GroundTruthQuery],
 ) -> Result<ScenarioComparison> {
-    eprintln!("[WARN] Scenario B (Cross-Encoder Reranking) requires the 'onnx-bench' feature.");
-    Err(contextra_core::ContextraError::CapabilityUnsupported {
-        capability: "onnx-bench".to_string(),
-        reason: "Cross-Encoder Reranking benchmark requires 'onnx-bench' feature. Recompile with --features onnx-bench.".to_string(),
+    Err(contextra_types::ContextraError::CapabilityUnsupported {
+        capability: "onnx-reranker".to_string(),
+        reason: "Cross-Encoder Reranking benchmark is unavailable because ONNX inference crates have been removed.".to_string(),
     })
 }
 
@@ -837,27 +723,16 @@ fn generate_markdown_summary(report: &BenchmarkReport) -> String {
         sc_a.baseline_metrics.mrr,
         sc_a.baseline_metrics.error_rate_at_1 * 100.0,
     ));
-    if sc_a.mechanism_active {
-        out.push_str(&format!(
-            "| | Mit Kontext-Präfix | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **+{:.1}%** | **-{:.1}%** |\n",
-            sc_a.feature_metrics.recall_at_1 * 100.0,
-            sc_a.feature_metrics.recall_at_3 * 100.0,
-            sc_a.feature_metrics.recall_at_5 * 100.0,
-            sc_a.feature_metrics.mrr,
-            sc_a.feature_metrics.error_rate_at_1 * 100.0,
-            sc_a.recall_at_1_delta_pct,
-            sc_a.error_rate_reduction_pct,
-        ));
-    } else {
-        out.push_str(&format!(
-            "| | Mit Kontext-Präfix | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **n/a — Mechanismus nicht aktiv/nicht verdrahtet** | **n/a — Mechanismus nicht aktiv/nicht verdrahtet** |\n",
-            sc_a.feature_metrics.recall_at_1 * 100.0,
-            sc_a.feature_metrics.recall_at_3 * 100.0,
-            sc_a.feature_metrics.recall_at_5 * 100.0,
-            sc_a.feature_metrics.mrr,
-            sc_a.feature_metrics.error_rate_at_1 * 100.0,
-        ));
-    }
+    out.push_str(&format!(
+        "| | Mit Kontext-Präfix | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **+{:.1}%** | **-{:.1}%** |\n",
+        sc_a.feature_metrics.recall_at_1 * 100.0,
+        sc_a.feature_metrics.recall_at_3 * 100.0,
+        sc_a.feature_metrics.recall_at_5 * 100.0,
+        sc_a.feature_metrics.mrr,
+        sc_a.feature_metrics.error_rate_at_1 * 100.0,
+        sc_a.recall_at_1_delta_pct,
+        sc_a.error_rate_reduction_pct,
+    ));
 
     let sc_b = &report.scenario_b_reranking;
     out.push_str(&format!(
@@ -868,412 +743,23 @@ fn generate_markdown_summary(report: &BenchmarkReport) -> String {
         sc_b.baseline_metrics.mrr,
         sc_b.baseline_metrics.error_rate_at_1 * 100.0,
     ));
-    if sc_b.mechanism_active {
-        out.push_str(&format!(
-            "| | Mit Cross-Encoder | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **+{:.1}%** | **-{:.1}%** |\n",
-            sc_b.feature_metrics.recall_at_1 * 100.0,
-            sc_b.feature_metrics.recall_at_3 * 100.0,
-            sc_b.feature_metrics.recall_at_5 * 100.0,
-            sc_b.feature_metrics.mrr,
-            sc_b.feature_metrics.error_rate_at_1 * 100.0,
-            sc_b.recall_at_1_delta_pct,
-            sc_b.error_rate_reduction_pct,
-        ));
-    } else {
-        out.push_str(&format!(
-            "| | Mit Cross-Encoder | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **n/a — Mechanismus nicht aktiv/nicht verdrahtet** | **n/a — Mechanismus nicht aktiv/nicht verdrahtet** |\n",
-            sc_b.feature_metrics.recall_at_1 * 100.0,
-            sc_b.feature_metrics.recall_at_3 * 100.0,
-            sc_b.feature_metrics.recall_at_5 * 100.0,
-            sc_b.feature_metrics.mrr,
-            sc_b.feature_metrics.error_rate_at_1 * 100.0,
-        ));
-    }
+    out.push_str(&format!(
+        "| | Mit Cross-Encoder | {:.1}% | {:.1}% | {:.1}% | {:.3} | {:.1}% | **+{:.1}%** | **-{:.1}%** |\n",
+        sc_b.feature_metrics.recall_at_1 * 100.0,
+        sc_b.feature_metrics.recall_at_3 * 100.0,
+        sc_b.feature_metrics.recall_at_5 * 100.0,
+        sc_b.feature_metrics.mrr,
+        sc_b.feature_metrics.error_rate_at_1 * 100.0,
+        sc_b.recall_at_1_delta_pct,
+        sc_b.error_rate_reduction_pct,
+    ));
 
     out
 }
 
-fn update_current_metrics_long_mem_eval(
-    overall_accuracy: f64,
-    total_cases: usize,
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let metrics_path = Path::new("benchmarks/results/current_metrics.json");
-    let mut combined: CombinedMetrics = if metrics_path.exists() {
-        let content = fs::read_to_string(metrics_path)?;
-        serde_json::from_str(&content).unwrap_or_default()
-    } else {
-        CombinedMetrics::default()
-    };
-
-    combined.long_mem_eval = Some(LongMemEvalMetricsSummary {
-        overall_accuracy,
-        total_cases,
-    });
-
-    if let Some(parent) = metrics_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
-    }
-    let json = serde_json::to_string_pretty(&combined)?;
-    fs::write(metrics_path, json)?;
-    Ok(())
-}
-
-fn update_current_metrics_locomo(
-    overall_recall_at_5: f64,
-    overall_mrr: f64,
-    total_eval_cases: usize,
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let metrics_path = Path::new("benchmarks/results/current_metrics.json");
-    let mut combined: CombinedMetrics = if metrics_path.exists() {
-        let content = fs::read_to_string(metrics_path)?;
-        serde_json::from_str(&content).unwrap_or_default()
-    } else {
-        CombinedMetrics::default()
-    };
-
-    combined.locomo = Some(LocomoMetricsSummary {
-        overall_recall_at_5,
-        overall_mrr,
-        total_eval_cases,
-    });
-
-    if let Some(parent) = metrics_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
-    }
-    let json = serde_json::to_string_pretty(&combined)?;
-    fs::write(metrics_path, json)?;
-    Ok(())
-}
-
-async fn run_long_mem_eval_cmd(
-    dataset_path: &Path,
-    output_path: &Path,
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    println!("=== Executing LongMemEval Benchmark ===");
-    println!("Dataset: {}", dataset_path.display());
-    println!("Output : {}", output_path.display());
-
-    let cases = load_from_jsonl(dataset_path)?;
-    println!("Loaded {} evaluation cases.", cases.len());
-
-    let db_cfg = ContextraConfig {
-        dimension: 768,
-        ..Default::default()
-    };
-    let temp_dir = TempDir::new()?;
-    let db = Contextra::open_with_config(temp_dir.path(), db_cfg).await?;
-    let col = db.collection("long_mem_eval_col").await?;
-
-    let dummy_vec = pad_vector(&[0.5, 0.5, 0.0, 0.0], 768);
-    let mut batch = Vec::new();
-    for (case_idx, case) in cases.iter().enumerate() {
-        for (turn_idx, (role, utterance, sess_idx)) in case.session_history.iter().enumerate() {
-            let doc_id = format!("lme_doc_{}_{}_{}", case_idx, sess_idx, turn_idx);
-            let metadata = serde_json::json!({
-                "text": utterance,
-                "speaker": role,
-                "case_id": case.question_id,
-                "session_idx": sess_idx,
-            });
-            batch.push((doc_id, dummy_vec.clone(), Some(metadata)));
-            if batch.len() >= 10 {
-                col.insert_many(&batch).await?;
-                batch.clear();
-            }
-        }
-    }
-    if !batch.is_empty() {
-        col.insert_many(&batch).await?;
-    }
-
-    let report = run_long_mem_eval(&cases, |q| {
-        let q_owned = q.to_string();
-        let col_ref = &col;
-        Box::pin(async move {
-            let res = col_ref.query().text(&q_owned).k(10).execute().await?;
-            let chunks = res
-                .into_iter()
-                .map(|r| {
-                    let text = r
-                        .metadata
-                        .as_ref()
-                        .and_then(|m| m.get("text"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default()
-                        .to_string();
-                    ScoredChunk {
-                        id: r.id,
-                        text,
-                        score: r.score,
-                    }
-                })
-                .collect();
-            Ok(chunks)
-        })
-    })
-    .await?;
-
-    println!(
-        "\nLongMemEval Overall Accuracy: {:.2}% ({}/{} cases)",
-        report.overall_accuracy * 100.0,
-        (report.overall_accuracy * report.total_cases as f64).round() as usize,
-        report.total_cases
-    );
-
-    if let Some(parent) = output_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
-    }
-
-    let report_json = serde_json::to_string_pretty(&report)?;
-    fs::write(output_path, report_json)?;
-    println!("Saved report to `{}`.", output_path.display());
-
-    update_current_metrics_long_mem_eval(report.overall_accuracy, report.total_cases)?;
-
-    Ok(())
-}
-
-async fn run_locomo_cmd(
-    dataset_path: &Path,
-    output_path: &Path,
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    println!("=== Executing LoCoMo Benchmark ===");
-    println!("Dataset: {}", dataset_path.display());
-    println!("Output : {}", output_path.display());
-
-    let start_time = std::time::Instant::now();
-    let dataset = load_locomo_dataset(dataset_path)?;
-    println!(
-        "Loaded {} evaluation cases (conversation index samples: {}).",
-        dataset.cases.len(),
-        dataset.conversation_index.len()
-    );
-
-    let embed_dir = Path::new("models/candle-embed");
-    let _ = fs::create_dir_all(embed_dir);
-    let embedder = std::sync::Arc::new(contextra_infer_candle::CandleEmbedClient::from_dir(
-        embed_dir,
-        contextra_infer_candle::model_registry::CandleQuantization::Q4KM,
-    )?);
-    let dim = EmbeddingProvider::embedding_dim(embedder.as_ref());
-    println!(
-        "Initialized Candle embedding provider (dim={}, provider={}) in {:.2?}",
-        dim,
-        EmbeddingProvider::provider_name(embedder.as_ref()),
-        start_time.elapsed()
-    );
-
-    let db_cfg = ContextraConfig {
-        dimension: dim,
-        ..Default::default()
-    };
-    let temp_dir = TempDir::new()?;
-    let db = Contextra::open_with_config(temp_dir.path(), db_cfg).await?;
-    let col = db.collection("locomo_col").await?;
-
-    let mut batch = Vec::new();
-    let index_start = std::time::Instant::now();
-
-    if !dataset.conversation_index.is_empty() {
-        for (sample_id, turns_map) in &dataset.conversation_index {
-            for (dia_id, turn_text) in turns_map {
-                let doc_id = format!("locomo_{}_{}", sample_id, dia_id);
-                let vec = EmbeddingProvider::embed(embedder.as_ref(), turn_text)
-                    .await
-                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
-                let metadata = serde_json::json!({
-                    "text": turn_text,
-                    "dia_id": dia_id,
-                    "sample_id": sample_id,
-                });
-                batch.push((doc_id, vec, Some(metadata)));
-                if batch.len() >= 50 {
-                    col.insert_many(&batch).await?;
-                    batch.clear();
-                }
-            }
-        }
-    } else {
-        for (case_idx, case) in dataset.cases.iter().enumerate() {
-            for (ev_idx, ev) in case.evidence.iter().enumerate() {
-                let doc_id = format!("locomo_doc_{}_{}", case_idx, ev_idx);
-                let vec = EmbeddingProvider::embed(embedder.as_ref(), ev)
-                    .await
-                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
-                let metadata = serde_json::json!({
-                    "text": ev,
-                    "case_id": case.question_id,
-                    "sample_id": case.sample_id,
-                });
-                batch.push((doc_id, vec, Some(metadata)));
-                if batch.len() >= 50 {
-                    col.insert_many(&batch).await?;
-                    batch.clear();
-                }
-            }
-        }
-    }
-    if !batch.is_empty() {
-        col.insert_many(&batch).await?;
-    }
-    println!(
-        "Indexed conversation turn corpus in {:.2?}",
-        index_start.elapsed()
-    );
-
-    let col_ref = &col;
-    let embedder_ref = &embedder;
-    let report = run_locomo_eval(&dataset.cases, &dataset.conversation_index, |q| {
-        let q_owned = q.to_string();
-        Box::pin(async move {
-            let q_vec = EmbeddingProvider::embed(embedder_ref.as_ref(), &q_owned)
-                .await
-                .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
-            let res = col_ref
-                .query()
-                .text(&q_owned)
-                .embedding(&q_vec)
-                .k(5)
-                .execute()
-                .await?;
-            let chunks = res
-                .into_iter()
-                .map(|r| {
-                    let text = r
-                        .metadata
-                        .as_ref()
-                        .and_then(|m| m.get("text"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default()
-                        .to_string();
-                    ScoredChunk {
-                        id: r.id,
-                        text,
-                        score: r.score,
-                    }
-                })
-                .collect();
-            Ok(chunks)
-        })
-    })
-    .await?;
-
-    println!(
-        "\nLoCoMo Overall Recall@5: {:.2}%, Overall MRR: {:.3} ({} eval cases)",
-        report.overall_recall_at_5 * 100.0,
-        report.overall_mrr,
-        report.total_eval_cases
-    );
-
-    if let Some(parent) = output_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
-    }
-
-    let report_json = serde_json::to_string_pretty(&report)?;
-    fs::write(output_path, report_json)?;
-    println!("Saved report to `{}`.", output_path.display());
-
-    update_current_metrics_locomo(
-        report.overall_recall_at_5,
-        report.overall_mrr,
-        report.total_eval_cases,
-    )?;
-
-    Ok(())
-}
-
-async fn run_pathrag_sweep_cmd(
-    locomo_dataset_path: &Path,
-    output_json_path: &Path,
-    output_md_path: &Path,
-    thresholds: &[f64],
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use contextra_bench::path_rag_sweep::{
-        run_pathrag_sweep_locomo, run_pathrag_sweep_long_mem_eval, PathRagSweepReport,
-    };
-
-    println!("=== Executing PathRAG Sufficiency Threshold Parameter Sweep ===");
-    println!("Thresholds: {:?}", thresholds);
-
-    let lme_sweep = run_pathrag_sweep_long_mem_eval(thresholds).await?;
-    println!("LongMemEval sweep completed.");
-
-    let locomo_sweep = run_pathrag_sweep_locomo(locomo_dataset_path, thresholds).await?;
-    println!("LoCoMo sweep completed.");
-
-    let report = PathRagSweepReport {
-        timestamp: "2026-09-07T00:00:00Z".to_string(),
-        long_mem_eval_sweep: lme_sweep,
-        locomo_sweep,
-    };
-
-    if let Some(parent) = output_json_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
-    }
-
-    let json_content = serde_json::to_string_pretty(&report)?;
-    fs::write(output_json_path, &json_content)?;
-    println!("Saved JSON report to `{}`.", output_json_path.display());
-
-    let mut md = String::new();
-    md.push_str("# PathRAG Sufficiency Threshold Sweep Results\n\n");
-    md.push_str("## LongMemEval Parameter Sweep\n\n");
-    md.push_str(
-        "| Threshold | Recall@5 | Recall@10 | Precision@5 | Precision@10 | Total Queries |\n",
-    );
-    md.push_str(
-        "|-----------|----------|-----------|-------------|--------------|---------------|\n",
-    );
-    for m in &report.long_mem_eval_sweep {
-        md.push_str(&format!(
-            "| {:.2} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} |\n",
-            m.threshold,
-            m.recall_at_5 * 100.0,
-            m.recall_at_10 * 100.0,
-            m.precision_at_5 * 100.0,
-            m.precision_at_10 * 100.0,
-            m.total_queries
-        ));
-    }
-
-    md.push_str("\n## LoCoMo Parameter Sweep\n\n");
-    md.push_str(
-        "| Threshold | Recall@5 | Recall@10 | Precision@5 | Precision@10 | Total Queries |\n",
-    );
-    md.push_str(
-        "|-----------|----------|-----------|-------------|--------------|---------------|\n",
-    );
-    for m in &report.locomo_sweep {
-        md.push_str(&format!(
-            "| {:.2} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} |\n",
-            m.threshold,
-            m.recall_at_5 * 100.0,
-            m.recall_at_10 * 100.0,
-            m.precision_at_5 * 100.0,
-            m.precision_at_10 * 100.0,
-            m.total_queries
-        ));
-    }
-
-    fs::write(output_md_path, &md)?;
-    println!("Saved Markdown report to `{}`.", output_md_path.display());
-    println!("\n{}", md);
-
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "external-benchmarks")]
     let args: Vec<String> = std::env::args().collect();
 
     #[cfg(feature = "external-benchmarks")]
@@ -1304,7 +790,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         } else if args.iter().any(|a| a == "--beir" || a == "beir") {
             println!("=== Running BEIR Evaluation Benchmark ===");
-            let dataset_dir = PathBuf::from("benchmarks/data/nfcorpus");
+            let dataset_dir = std::path::PathBuf::from("benchmarks/data/nfcorpus");
             let corpus_file = dataset_dir.join("corpus.jsonl");
             let queries_file = dataset_dir.join("queries.jsonl");
             let qrels_file = dataset_dir.join("qrels/test.tsv");
@@ -1350,61 +836,6 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    if args.len() > 1 && (args[1] == "pathrag-sweep" || args[1] == "pathrag_sweep") {
-        let locomo_dataset_path =
-            PathBuf::from("benchmarks/contextra-bench/tests/fixtures/locomo_fixture.json");
-        let sweep_output_path = PathBuf::from("benchmarks/results/pathrag_sufficiency_sweep.json");
-        let sweep_md_path = PathBuf::from("benchmarks/results/pathrag_sufficiency_sweep.md");
-
-        let thresholds = vec![0.01, 0.1, 0.3, 0.6];
-        run_pathrag_sweep_cmd(
-            &locomo_dataset_path,
-            &sweep_output_path,
-            &sweep_md_path,
-            &thresholds,
-        )
-        .await?;
-        return Ok(());
-    } else if args.len() > 1 && (args[1] == "long-mem-eval" || args[1] == "long_mem_eval") {
-        let mut dataset_path =
-            PathBuf::from("benchmarks/contextra-bench/tests/fixtures/long_mem_eval_fixture.json");
-        let mut output_path = PathBuf::from("benchmarks/results/long_mem_eval_results.json");
-
-        let mut i = 2;
-        while i < args.len() {
-            if args[i] == "--dataset" && i + 1 < args.len() {
-                dataset_path = PathBuf::from(&args[i + 1]);
-                i += 1;
-            } else if args[i] == "--output" && i + 1 < args.len() {
-                output_path = PathBuf::from(&args[i + 1]);
-                i += 1;
-            }
-            i += 1;
-        }
-
-        run_long_mem_eval_cmd(&dataset_path, &output_path).await?;
-        return Ok(());
-    } else if args.len() > 1 && args[1] == "locomo" {
-        let mut dataset_path =
-            PathBuf::from("benchmarks/contextra-bench/tests/fixtures/locomo_fixture.json");
-        let mut output_path = PathBuf::from("benchmarks/results/locomo_results.json");
-
-        let mut i = 2;
-        while i < args.len() {
-            if args[i] == "--dataset" && i + 1 < args.len() {
-                dataset_path = PathBuf::from(&args[i + 1]);
-                i += 1;
-            } else if args[i] == "--output" && i + 1 < args.len() {
-                output_path = PathBuf::from(&args[i + 1]);
-                i += 1;
-            }
-            i += 1;
-        }
-
-        run_locomo_cmd(&dataset_path, &output_path).await?;
-        return Ok(());
-    }
-
     println!("=== Running Contextra Retrieval Accuracy Benchmarks ===");
 
     let (docs, queries_a, queries_b) = create_synthetic_corpus();
@@ -1427,7 +858,6 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 recall_at_1_delta_pct: 0.0,
                 recall_at_5_delta_pct: 0.0,
                 error_rate_reduction_pct: 0.0,
-                mechanism_active: false,
             }
         }
     };
@@ -1454,47 +884,6 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     println!("\nBenchmark results saved to `benchmarks/results/results.json` and `benchmarks/results/summary.md`.\n");
     println!("{}", markdown_summary);
-
-    // ---------------------------------------------------------------------
-    // LONGMEMEVAL REGRESSION SUITE EXECUTION & BASELINE GATING
-    // ---------------------------------------------------------------------
-    println!("\n=== Running LongMemEval Regression Suite ===");
-    let db_cfg = ContextraConfig {
-        dimension: 768,
-        ..Default::default()
-    };
-    let reg_temp_dir = TempDir::new()?;
-    let reg_db = Contextra::open_with_config(reg_temp_dir.path(), db_cfg).await?;
-    let reg_col = reg_db.collection("long_mem_eval_regression").await?;
-
-    let suite = RegressionSuite::baseline();
-    let reg_report = suite.run_against_collection(&reg_col).await?;
-
-    println!(
-        "LongMemEval Regression Suite Summary: Total Scenarios = {}, Recall@5 = {:.3}, Recall@10 = {:.3}, Failed Scenarios = {:?}",
-        reg_report.total_scenarios,
-        reg_report.recall_at_5,
-        reg_report.recall_at_10,
-        reg_report.failed_scenarios
-    );
-
-    let baseline_path = Path::new("benchmarks/contextra-bench/baseline_recall.json");
-    let update_baseline = args.iter().any(|a| a == "--update-baseline") || !baseline_path.exists();
-
-    if update_baseline {
-        let baseline_json = serde_json::to_string_pretty(&reg_report)?;
-        fs::write(baseline_path, baseline_json)?;
-        println!(
-            "Saved regression baseline to `{}`.",
-            baseline_path.display()
-        );
-    } else {
-        check_regression(&reg_report, baseline_path)?;
-        println!(
-            "✅ LongMemEval regression gate PASSED against `{}`.",
-            baseline_path.display()
-        );
-    }
 
     Ok(())
 }
@@ -1527,82 +916,5 @@ mod tests {
         let (docs, q_a, _q_b) = create_synthetic_corpus();
         let sc_a = run_scenario_a(&docs, &q_a).await.unwrap();
         assert_eq!(sc_a.baseline_metrics.total_queries, q_a.len());
-        // Prepending context prefix changes BM25 indexing in Scenario A, making the mechanism active
-        assert!(sc_a.mechanism_active);
-
-        #[cfg(feature = "onnx-bench")]
-        {
-            let sc_b = run_scenario_b(&docs, &_q_b).await.unwrap();
-            assert_eq!(sc_b.baseline_metrics.total_queries, _q_b.len());
-            // Scenario B using passthrough cross-encoder produces identical ordering, so mechanism is inactive (false)
-            assert!(!sc_b.mechanism_active);
-        }
-    }
-
-    #[test]
-    fn test_markdown_summary_reporting_na_vs_active() {
-        let sc_inactive = ScenarioComparison {
-            scenario_name: "Test Inactive".into(),
-            baseline_metrics: BenchmarkMetrics {
-                recall_at_1: 0.5,
-                recall_at_3: 0.5,
-                recall_at_5: 0.5,
-                mrr: 0.5,
-                error_rate_at_1: 0.5,
-                error_rate_at_5: 0.5,
-                total_queries: 10,
-            },
-            feature_metrics: BenchmarkMetrics {
-                recall_at_1: 0.5,
-                recall_at_3: 0.5,
-                recall_at_5: 0.5,
-                mrr: 0.5,
-                error_rate_at_1: 0.5,
-                error_rate_at_5: 0.5,
-                total_queries: 10,
-            },
-            recall_at_1_delta_pct: 0.0,
-            recall_at_5_delta_pct: 0.0,
-            error_rate_reduction_pct: 0.0,
-            mechanism_active: false,
-        };
-
-        let sc_active = ScenarioComparison {
-            scenario_name: "Test Active".into(),
-            baseline_metrics: BenchmarkMetrics {
-                recall_at_1: 0.5,
-                recall_at_3: 0.5,
-                recall_at_5: 0.5,
-                mrr: 0.5,
-                error_rate_at_1: 0.5,
-                error_rate_at_5: 0.5,
-                total_queries: 10,
-            },
-            feature_metrics: BenchmarkMetrics {
-                recall_at_1: 0.75,
-                recall_at_3: 0.75,
-                recall_at_5: 0.75,
-                mrr: 0.75,
-                error_rate_at_1: 0.25,
-                error_rate_at_5: 0.25,
-                total_queries: 10,
-            },
-            recall_at_1_delta_pct: 50.0,
-            recall_at_5_delta_pct: 50.0,
-            error_rate_reduction_pct: 50.0,
-            mechanism_active: true,
-        };
-
-        let report = BenchmarkReport {
-            timestamp: "2026-10-04T00:00:00Z".into(),
-            corpus_size_docs: 50,
-            total_test_queries: 10,
-            scenario_a_context_prefix: sc_inactive,
-            scenario_b_reranking: sc_active,
-        };
-
-        let summary = generate_markdown_summary(&report);
-        assert!(summary.contains("n/a — Mechanismus nicht aktiv/nicht verdrahtet"));
-        assert!(summary.contains("+50.0%"));
     }
 }

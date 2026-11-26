@@ -1,7 +1,8 @@
 mod support;
 
-use contextra_core::{Result, StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::{Result, TxId};
 use tempfile::TempDir;
 
 #[tokio::test]

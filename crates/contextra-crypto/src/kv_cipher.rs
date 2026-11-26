@@ -1,3 +1,14 @@
+//! # KV-Segment-Verschlüsselung (`kv_cipher.rs`)
+//!
+//! Stellt die Authenticated Encryption with Associated Data (AEAD) für Key-Value-Segmente
+//! im Cache und Speicher bereit.
+//!
+//! ## Invarianten
+//! - Tenant- und Model-Fingerprints fließen als Associated Data (AD) ein, um
+//!   mandantenübergreifende Vertauschungsangriffe zu verhindern.
+//! - Format-Versionierungs-Header garantiert Abwärtskompatibilität.
+//! - Nonce-Generierung schließt Kollisionen aus.
+
 // FILE-CONTEXT
 // ZWECK: Dedicated AEAD encryption and key isolation for KV-cache segments (contextra-crypto).
 // INVARIANTEN: Key derivation per (tenant_id, model_fingerprint) tuple via KeyManager HKDF-Expand.
@@ -22,6 +33,7 @@
 #![forbid(unsafe_code)]
 
 use crate::crypto::KeyManager;
+#[cfg(feature = "legacy-erasure")]
 use crate::error::{CryptoError, Result};
 use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
@@ -92,17 +104,20 @@ impl KvCipher for KeyManager {
     }
 }
 
+#[cfg(feature = "legacy-erasure")]
 use crate::kv_shredding::KeyRegistry;
-use crate::revocation_log::RevocationLog;
-use std::sync::Arc;
 
 /// High-level cipher engine for KV-cache segment encryption and decryption.
 /// Consolidates onto `KeyRegistry` envelope crypto-shredding as the single shredding path.
+// ANCHOR[contextra-crypto:KV-001]
+/// Chiffre für segmentweise verschlüsselte KV-Einträge.
+#[cfg(feature = "legacy-erasure")]
 pub struct KvSegmentCipher {
     key_manager: KeyManager,
     registry: KeyRegistry,
 }
 
+#[cfg(feature = "legacy-erasure")]
 impl KvSegmentCipher {
     /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager`.
     pub fn new(key_manager: KeyManager) -> Self {
@@ -110,12 +125,6 @@ impl KvSegmentCipher {
             key_manager,
             registry: KeyRegistry::new(),
         }
-    }
-
-    /// Attaches a `RevocationLog` to the underlying `KeyRegistry`.
-    pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
-        self.registry = self.registry.with_revocation_log(log);
-        self
     }
 
     /// Returns a reference to the consolidated `KeyRegistry` for crypto-shredding key management.
@@ -208,6 +217,7 @@ impl KvSegmentCipher {
     }
 }
 
+#[cfg(feature = "legacy-erasure")]
 impl KvCipher for KvSegmentCipher {
     fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>> {
         self.key_manager.seal(plaintext)
@@ -218,9 +228,10 @@ impl KvCipher for KvSegmentCipher {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-erasure"))]
 mod tests {
     use super::*;
+    use crate::CryptoError;
 
     fn dummy_fingerprint(id: &str) -> ModelFingerprint {
         ModelFingerprint::new([0x42u8; 32], id, "Q4_K_M")
@@ -358,68 +369,6 @@ mod tests {
     }
 
     #[test]
-    fn test_kv_cipher_revocation_survives_registry_reconstruction() {
-        use contextra_ports::SystemClock;
-        use ed25519_dalek::SigningKey;
-        use rand::rngs::OsRng;
-        use tempfile::tempdir;
-
-        let temp_dir = tempdir().expect("Failed to create temp dir");
-        let log_path = temp_dir.path().join("kv_revocation.log");
-
-        let sk = SigningKey::generate(&mut OsRng);
-        let vk = sk.verifying_key();
-        let clock = Arc::new(SystemClock::new());
-
-        let log = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk)
-            .expect("Failed to create persistent revocation log");
-        let log_arc = Arc::new(log);
-
-        let master_km1 = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher1 = KvSegmentCipher::new(master_km1).with_revocation_log(log_arc.clone());
-
-        let tenant_id = TenantId::try_new(101).unwrap();
-        let fp = dummy_fingerprint("model-v1");
-        let group_id = 888;
-        let plaintext = b"Sensitive persistent group payload";
-
-        let encrypted = cipher1
-            .encrypt_with_version(tenant_id, group_id, 1, fp.clone(), plaintext)
-            .unwrap();
-
-        // Revoke group_id on cipher1
-        let revoked = cipher1
-            .registry()
-            .revoke_group(group_id)
-            .expect("revoke_group failed");
-        assert!(revoked, "Group 888 must be revoked on cipher1");
-        assert!(cipher1.registry().is_group_revoked(group_id));
-
-        // Drop cipher1 and log_arc simulating process shutdown / registry destruction
-        drop(cipher1);
-        drop(log_arc);
-
-        // Re-open persistent revocation log and construct a new KvSegmentCipher with new KeyRegistry
-        let reopened_log = RevocationLog::open_or_create(&log_path, clock, None, vk)
-            .expect("Failed to reopen persistent revocation log");
-        let master_km2 = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher2 = KvSegmentCipher::new(master_km2).with_revocation_log(Arc::new(reopened_log));
-
-        // Assert group 888 is still revoked in the reconstructed cipher's registry
-        assert!(
-            cipher2.registry().is_group_revoked(group_id),
-            "Revocation MUST survive registry reconstruction on persisted log"
-        );
-
-        // Decryption of encrypted layer on new reconstructed cipher MUST fail due to key revocation
-        let decrypt_res = cipher2.decrypt_with_version(&encrypted, group_id, 1);
-        assert!(
-            decrypt_res.is_err(),
-            "Decryption on reconstructed cipher MUST fail for revoked group"
-        );
-    }
-
-    #[test]
     fn test_single_shredding_path_consolidation_and_revocation() {
         // PROOF OF CONSOLIDATION: KvSegmentCipher routes segment encryption through
         // KeyRegistry envelope crypto-shredding (the single consolidated shredding path).
@@ -440,7 +389,10 @@ mod tests {
         assert_eq!(decrypted, plaintext);
 
         // Revoke sub-key in the consolidated KeyRegistry
-        let revoked = cipher.registry().revoke_subkey(segment_id).unwrap();
+        let revoked = cipher
+            .registry()
+            .revoke_subkey(segment_id)
+            .expect("revoke_subkey");
         assert!(revoked, "Sub-key revocation in KeyRegistry must succeed");
 
         // Decryption now fails because the single shredding path has been revoked

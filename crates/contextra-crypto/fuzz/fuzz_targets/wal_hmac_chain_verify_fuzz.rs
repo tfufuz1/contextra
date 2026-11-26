@@ -1,3 +1,6 @@
+//! # Fuzz-Target: WAL HMAC-Kettenvalidierung (`fuzz/wal_hmac_chain_verify_fuzz.rs`)
+//!
+//! Fuzzing von beliebigen Byteströmen gegen den WAL-Integritätsprüfer.
 #![no_main]
 
 use arbitrary::Arbitrary;

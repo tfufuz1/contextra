@@ -1,3 +1,7 @@
+//! # Komposita-Zerlegung und BM25-Recall
+//!
+//! Testet die Auswirkungen strukturierter Wortzerlegung auf den BM25-Recall.
+//!
 // TEST-SUITE: Compound Split Recall Impact Benchmark (contextra-index / contextra-db)
 // PURPOSE: Quantify actual search quality / recall degradation caused by un-split German compounds in 4-signal fusion.
 
@@ -14,6 +18,8 @@ struct CorpusDoc {
     embedding: Vec<f32>,
 }
 
+// ANCHOR[contextra-db:TEST-COMPOUND_SPLIT_RECALL_IMPACT_TEST-01-CREATE_EMBEDDING]
+// Testet die Funktionalität von `create_embedding`.
 fn create_embedding(seed: usize, dimension: usize) -> Vec<f32> {
     let mut vec = vec![0.0f32; dimension];
     for (i, val) in vec.iter_mut().enumerate().take(dimension) {
@@ -30,6 +36,8 @@ fn create_embedding(seed: usize, dimension: usize) -> Vec<f32> {
     vec
 }
 
+// ANCHOR[contextra-db:TEST-COMPOUND_SPLIT_RECALL_IMPACT_TEST-02-GET_CORPUS]
+// Testet die Funktionalität von `get_corpus`.
 fn get_corpus(dim: usize) -> Vec<CorpusDoc> {
     vec![
         // Target 1: donaudampfschifffahrtsgesellschaftskapitaen
@@ -182,6 +190,8 @@ struct TestQuery {
     query_vector_seed: usize,
 }
 
+// ANCHOR[contextra-db:TEST-COMPOUND_SPLIT_RECALL_IMPACT_TEST-03-GET_TEST_QUERIES]
+// Testet die Funktionalität von `get_test_queries`.
 fn get_test_queries() -> Vec<TestQuery> {
     vec![
         TestQuery {
@@ -235,6 +245,8 @@ fn get_test_queries() -> Vec<TestQuery> {
     ]
 }
 
+// ANCHOR[contextra-db:TEST-COMPOUND_SPLIT_RECALL_IMPACT_TEST-04-TEST_COMPOUND_SPLIT_RECALL_IMPACT_EVALUATION]
+// Testet die Funktionalität von `test_compound_split_recall_impact_evaluation`.
 #[tokio::test]
 #[allow(deprecated)]
 async fn test_compound_split_recall_impact_evaluation() {

@@ -1,3 +1,10 @@
+//! # Modul: db_transaction_commit.rs
+//!
+//! **Zweck:** Zweiphasiger Transaktionscommit mit SSI-Prüfung und WAL-Persistierung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 use super::compensating_actions::{
     CommitLedger, CompensateGraphAction, CompensateHnswAction, CompensateLsmAction,
     CompensateTextAction, RollbackStagedAction,
@@ -11,6 +18,8 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
+    // ANCHOR[contextra-engine:COM-021]
+    /// Dokumentation für `commit_text_staged` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub(super) async fn commit_text_staged(&self) -> Result<()> {
         let text_deletes = {
             let mut guard = match self.staged_text_deletes.lock() {
@@ -44,6 +53,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         Ok(())
     }
 
+    // ANCHOR[contextra-engine:COM-054]
+    /// Dokumentation für `commit_graph_staged` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub(super) async fn commit_graph_staged(&self) -> Result<()> {
         let entities = {
             let mut guard = match self.staged_graph_entities.lock() {

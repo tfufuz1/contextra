@@ -1,12 +1,13 @@
 // ZWECK: Integrationstests für Store-Level Legacy WAL Migration (`migrate_legacy_wal_keys`, `has_pending_legacy_wal_migration`)
 // INVARIANTEN: Regular open rejects legacy WAL without migration (INV-WAL-LEGACY-KEY-1); explicit migration rekeys & logs via Clock.
 
+#![cfg(feature = "test-hooks")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_core::TxId;
 use contextra_ports::{Clock, SystemClock};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::wal::{Wal, WalEntry, WalOp, WAL_V3_HEADER};
+use contextra_types::TxId;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
@@ -23,7 +24,7 @@ async fn test_regular_open_rejects_legacy_wal_without_migration() {
         key: b"legacy_key".to_vec(),
         value: b"legacy_val".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 1, &legacy_key, [0u8; 32]).expect("legacy entry");
 
     let mut wal_bytes = Vec::new();
@@ -64,7 +65,7 @@ async fn test_explicit_migration_rekeys_and_clears_pending_status() {
         key: b"k_mig".to_vec(),
         value: b"v_mig".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 42, &legacy_key, [0u8; 32]).expect("legacy entry");
 
     let mut wal_bytes = Vec::new();

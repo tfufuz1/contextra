@@ -1,3 +1,10 @@
+//! # Modul: kv_lock.rs
+//!
+//! **Zweck:** Schlüsselbasierte Sperren zur Vermeidung von Write-Skews und Datenrennen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use tokio::sync::{Mutex, MutexGuard};
 
 const KV_LOCK_SHARDS: usize = 16;
@@ -13,12 +20,16 @@ pub(crate) struct KeyGuard<'a> {
     _guard: MutexGuard<'a, ()>,
 }
 
+// ANCHOR[contextra-engine:COL-KVK-023]
+/// Dokumentation für `KvKeyLocks` im Rahmen der Collection- und Suchabstraktion.
 pub(crate) struct KvKeyLocks {
     shards: [Mutex<()>; KV_LOCK_SHARDS],
     hasher: ahash::RandomState,
 }
 
 impl KvKeyLocks {
+    // ANCHOR[contextra-engine:COL-NEW-029]
+    /// Dokumentation für `new` im Rahmen der Collection- und Suchabstraktion.
     pub fn new() -> Self {
         // INV-HASHER-SEEDS: niemals randomisieren
         let hasher = ahash::RandomState::with_seeds(SEED_A, SEED_B, SEED_C, SEED_D);
@@ -28,20 +39,29 @@ impl KvKeyLocks {
         }
     }
 
+    // ANCHOR[contextra-engine:COL-SHA-038]
+    /// Dokumentation für `shard_idx` im Rahmen der Collection- und Suchabstraktion.
     pub fn shard_idx(&self, key: &str) -> usize {
         (self.hasher.hash_one(key) as usize) % KV_LOCK_SHARDS
     }
 
+    // ANCHOR[contextra-engine:COL-LOC-042]
+    /// Dokumentation für `lock_shard` im Rahmen der Collection- und Suchabstraktion.
     pub async fn lock_shard<'a>(&'a self, idx: usize) -> KeyGuard<'a> {
-        let guard = self.shards[idx].lock().await;
-        KeyGuard { _guard: guard }
+        KeyGuard {
+            _guard: self.shards[idx].lock().await,
+        }
     }
 
+    // ANCHOR[contextra-engine:COL-LOC-047]
+    /// Dokumentation für `lock_for` im Rahmen der Collection- und Suchabstraktion.
     pub async fn lock_for<'a>(&'a self, key: &str) -> KeyGuard<'a> {
         let idx = self.shard_idx(key);
         self.lock_shard(idx).await
     }
 
+    // ANCHOR[contextra-engine:COL-TRY-053]
+    /// Dokumentation für `try_lock_shard` im Rahmen der Collection- und Suchabstraktion.
     #[cfg(test)]
     pub fn try_lock_shard<'a>(&'a self, idx: usize) -> Option<KeyGuard<'a>> {
         self.shards[idx]
@@ -50,6 +70,8 @@ impl KvKeyLocks {
             .map(|guard| KeyGuard { _guard: guard })
     }
 
+    // ANCHOR[contextra-engine:COL-TRY-061]
+    /// Dokumentation für `try_lock_for` im Rahmen der Collection- und Suchabstraktion.
     #[cfg(test)]
     pub fn try_lock_for<'a>(&'a self, key: &str) -> Option<KeyGuard<'a>> {
         let idx = self.shard_idx(key);
@@ -106,7 +128,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn prop_sorted_unique_shards_properties(
+        fn test_prop_sorted_unique_shards_properties(
             keys in prop::collection::vec(".*", 0..100),
             shard_count in 1..64usize,
         ) {
@@ -157,14 +179,20 @@ mod loom_tests {
             }
         }
 
-        fn acquire_multi_sorted(&self, keys: &[&str]) -> Vec<loom::sync::MutexGuard<'_, ()>> {
+        fn acquire_multi_sorted(
+            &self,
+            keys: &[&str],
+        ) -> contextra_types::Result<Vec<loom::sync::MutexGuard<'_, ()>>> {
             let shard_indices =
                 sorted_unique_shards(keys.iter().copied(), self.shard_count, &self.hasher);
             let mut guards = Vec::with_capacity(shard_indices.len());
             for idx in shard_indices {
-                guards.push(self.shards[idx].lock().unwrap());
+                let guard = self.shards[idx].lock().map_err(|_| {
+                    contextra_types::ContextraError::Internal("Lock poisoned".to_string())
+                })?;
+                guards.push(guard);
             }
-            guards
+            Ok(guards)
         }
     }
 
@@ -175,16 +203,43 @@ mod loom_tests {
 
             let locks_t1 = Arc::clone(&locks);
             let t1 = thread::spawn(move || {
-                let _guards = locks_t1.acquire_multi_sorted(&["key_alpha", "key_beta"]);
+                let _guards = locks_t1
+                    .acquire_multi_sorted(&["key_alpha", "key_beta"])
+                    .expect("lock acquisition should succeed");
             });
 
             let locks_t2 = Arc::clone(&locks);
             let t2 = thread::spawn(move || {
-                let _guards = locks_t2.acquire_multi_sorted(&["key_beta", "key_alpha"]);
+                let _guards = locks_t2
+                    .acquire_multi_sorted(&["key_beta", "key_alpha"])
+                    .expect("lock acquisition should succeed");
             });
 
             t1.join().expect("thread 1 completes");
             t2.join().expect("thread 2 completes");
+        });
+    }
+
+    #[test]
+    fn test_loom_poisoned_mutex_returns_error() {
+        loom::model(|| {
+            let locks = Arc::new(LoomKvKeyLocks::new(4));
+
+            let locks_poisoner = Arc::clone(&locks);
+            let t_poisoner = thread::spawn(move || {
+                let _guard = locks_poisoner.shards[0].lock().unwrap();
+                panic!("Simulated panic to poison mutex shard 0");
+            });
+
+            let _ = t_poisoner.join(); // Ignore thread panic result
+
+            // Now attempting acquire_multi_sorted for shard 0 must return ContextraError::Internal instead of panicking
+            let res = locks.acquire_multi_sorted(&["key_0"]);
+            assert!(
+                matches!(res, Err(contextra_types::ContextraError::Internal(ref msg)) if msg == "Lock poisoned"),
+                "Expected ContextraError::Internal('Lock poisoned'), got {:?}",
+                res
+            );
         });
     }
 }

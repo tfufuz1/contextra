@@ -1,5 +1,10 @@
+//! # Bloom-Filter fuer SSTables (Ring 1)
+//!
+//! Implementiert probabilistische Filter (Split-Block Lemire / Blocked Bloom),
+//! um unnoetige Plattenzugriffe fuer nicht existente Schluessel abzuwenden.
+
 use bytes::BufMut;
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 /// SPECCED: Speichereffizienter Bloom-Filter für SSTable-Pre-Checks.
 /// Ziel: False-Positive-Rate p ≤ 0.01.
@@ -19,7 +24,7 @@ impl BloomFilter {
     /// - `fpr = 0.01` (1%) uses ~9.6 bits/element.
     /// - `fpr = 0.001` (0.1%) uses ~14.4 bits/element.
     ///
-    /// Note: The default `fpr` used in [`SstableBuilder`] should be documented as a tunable
+    /// Note: The default `fpr` used in [`crate::sstable::builder::SstableBuilder`] should be documented as a tunable
     /// parameter and referenced in [`crate::lsm::LsmConfig`] where it should be configurable.
     pub fn new(expected_elements: usize, fpr: f64) -> Self {
         let n = expected_elements.max(1);
@@ -46,12 +51,17 @@ impl BloomFilter {
 
     /// Inserts a key into the filter.
     pub fn insert(&mut self, key: &[u8]) {
+        if self.num_bits == 0 {
+            return;
+        }
         let (h1, h2) = Self::hash_pair(key);
         for i in 0..self.num_hashes {
             // Double Hashing: bit_idx = (h1 + i * h2) % num_bits
             // Garantiert gleichmäßige Verteilung ohne Wiederholungen für i < num_bits
-            let bit_idx = h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize % self.num_bits;
-            self.bits[bit_idx / 64] |= 1u64 << (bit_idx % 64);
+            let bit_idx = (h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize) % self.num_bits;
+            if let Some(word) = self.bits.get_mut(bit_idx / 64) {
+                *word |= 1u64 << (bit_idx % 64);
+            }
         }
     }
 
@@ -62,9 +72,14 @@ impl BloomFilter {
         }
         let (h1, h2) = Self::hash_pair(key);
         for i in 0..self.num_hashes {
-            let bit_idx = h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize % self.num_bits;
-            if (self.bits[bit_idx / 64] & (1u64 << (bit_idx % 64))) == 0 {
-                return false;
+            let bit_idx = (h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize) % self.num_bits;
+            match self.bits.get(bit_idx / 64) {
+                Some(word) => {
+                    if (word & (1u64 << (bit_idx % 64))) == 0 {
+                        return false;
+                    }
+                }
+                None => return false,
             }
         }
         true

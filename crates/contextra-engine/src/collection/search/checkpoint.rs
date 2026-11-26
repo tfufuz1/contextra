@@ -1,3 +1,10 @@
+//! # Modul: checkpoint.rs
+//!
+//! **Zweck:** Konsistente Suchen bezogen auf historische Checkpoints.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: RAII CheckpointPinGuard und higher-order helper functions für Snapshot-Pinning während Suchoperationen.
 // INVARIANTEN: Snapshot-Pinning garantiert Isolation während gefilterter Suche.

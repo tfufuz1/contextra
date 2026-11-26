@@ -1,7 +1,6 @@
 //! Graph index trait definition and statistics.
 
 // FILE-CONTEXT
-// STAND: 2026-09-15T00:00:00Z
 // ZWECK: GraphIndex Trait & GraphIndexStats für CSR-basierte Entity-Relation-Graph-Operationen.
 // INVARIANTEN: AGT-GRAPH-001 TxId-Origin-Invariante. BoxFuture dyn-safety.
 

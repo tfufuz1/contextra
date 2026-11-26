@@ -1,4 +1,4 @@
-use contextra_core::{ContextraError, DistanceMetric, Result};
+use contextra_types::{ContextraError, DistanceMetric, Result};
 
 use super::types::HNSW_REBUILD_DELETION_RATIO;
 
@@ -62,7 +62,7 @@ impl Default for HnswConfig {
 
 /// Validates that a vector is non-empty and contains no NaN or Infinite values.
 pub(super) fn validate_vector(vec: &[f32]) -> Result<()> {
-    contextra_simd::validate_vector(vec)
+    crate::distance::validate_vector(vec)
 }
 
 impl HnswConfig {

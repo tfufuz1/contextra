@@ -88,9 +88,5 @@ pub fn estimate_tokens(text: &str) -> usize {
         tokens += 0.1;
     }
 
-    // `tokens` ist endlich und nicht negativ (Summe nicht-negativer Beiträge). Die Umwandlung
-    // in `usize` sättigt bei Überlauf, und `max(1)` garantiert mindestens einen Token.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let count = tokens.ceil() as usize;
-    count.max(1)
+    (tokens.ceil() as usize).max(1)
 }

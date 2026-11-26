@@ -10,21 +10,21 @@ use super::format::{
 };
 use super::types::{DiskAnnIndex, SearchCandidate};
 use crate::distance::compute_distance_trusted;
-use contextra_core::{ContextraError, DocId, Result};
+use contextra_types::{ContextraError, DocId, Result};
 #[cfg(not(feature = "docid-128"))]
 pub(crate) type TombstoneSet = roaring::RoaringTreemap;
 
 #[cfg(feature = "docid-128")]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct TombstoneSet {
-    pub(crate) set: std::collections::HashSet<u128>,
+    pub(crate) set: std::collections::BTreeSet<u128>,
 }
 
 #[cfg(feature = "docid-128")]
 impl TombstoneSet {
     pub(crate) fn new() -> Self {
         Self {
-            set: std::collections::HashSet::new(),
+            set: std::collections::BTreeSet::new(),
         }
     }
 
@@ -97,14 +97,13 @@ impl DiskAnnIndex {
         Ok(pruned)
     }
 
-    /// Appends a tombstone record to `tombstone.wal` with HMAC-SHA256 integrity protection.
+    /// Synchronous blocking helper to append a tombstone record to `tombstone.wal`.
     ///
-    /// # Binary Format
-    /// - File Header (written on new/empty file creation): `[TWAL: 4 bytes] [version=1: 1 byte]`
-    /// - Entry Layout:
-    ///   - `id`: `u64` LE (8 bytes)
-    ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes`)
-    pub(crate) async fn append_to_tombstone_wal(path: &std::path::Path, id: DocId) -> Result<()> {
+    /// Aufrufer wählt spawn_blocking.
+    pub(crate) fn append_to_tombstone_wal_blocking(
+        path: &std::path::Path,
+        id: DocId,
+    ) -> Result<()> {
         use std::io::Write;
 
         let is_new = match std::fs::metadata(path) {
@@ -126,7 +125,7 @@ impl DiskAnnIndex {
         }
 
         let id_bytes = id.inner().to_le_bytes();
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
         hmac.update(&id_bytes);
         let computed_hmac = hmac.finalize();
 
@@ -134,6 +133,17 @@ impl DiskAnnIndex {
         file.write_all(&computed_hmac).map_err(ContextraError::Io)?;
         file.sync_all().map_err(ContextraError::Io)?;
         Ok(())
+    }
+
+    /// Appends a tombstone record to `tombstone.wal` with HMAC-SHA256 integrity protection.
+    ///
+    /// # Binary Format
+    /// - File Header (written on new/empty file creation): `[TWAL: 4 bytes] [version=1: 1 byte]`
+    /// - Entry Layout:
+    ///   - `id`: `u64` LE (8 bytes)
+    ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes`)
+    pub(crate) async fn append_to_tombstone_wal(path: &std::path::Path, id: DocId) -> Result<()> {
+        Self::append_to_tombstone_wal_blocking(path, id)
     }
 
     /// Reads and verifies uncommitted tombstone entries from `tombstone.wal`.
@@ -210,7 +220,7 @@ impl DiskAnnIndex {
             }
             offset += 32;
 
-            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+            let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
             hmac.update(&buf_id);
             let computed_hmac = hmac.finalize();
 
@@ -227,16 +237,10 @@ impl DiskAnnIndex {
         Ok(bitset)
     }
 
-    /// Appends a vector insertion record to `pending.wal` with HMAC-SHA256 integrity protection.
+    /// Synchronous blocking helper to append a vector insertion record to `pending.wal`.
     ///
-    /// # Binary Format
-    /// - File Header (written on new/empty file creation): `[PWAL: 4 bytes] [version=1: 1 byte]`
-    /// - Entry Layout:
-    ///   - `id`: `u64` LE (8 bytes)
-    ///   - `dim`: `u32` LE (4 bytes)
-    ///   - `embedding`: `[f32 LE; dim]` (`dim * 4` bytes)
-    ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes || dim_bytes || embedding_bytes`)
-    pub(crate) async fn append_to_pending_wal(
+    /// Aufrufer wählt spawn_blocking.
+    pub(crate) fn append_to_pending_wal_blocking(
         path: &std::path::Path,
         id: DocId,
         embedding: &[f32],
@@ -273,7 +277,7 @@ impl DiskAnnIndex {
             entry_bytes.extend_from_slice(&val.to_le_bytes());
         }
 
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
         hmac.update(&entry_bytes);
         let computed_hmac = hmac.finalize();
 
@@ -281,6 +285,23 @@ impl DiskAnnIndex {
         file.write_all(&computed_hmac).map_err(ContextraError::Io)?;
         file.sync_all().map_err(ContextraError::Io)?;
         Ok(())
+    }
+
+    /// Appends a vector insertion record to `pending.wal` with HMAC-SHA256 integrity protection.
+    ///
+    /// # Binary Format
+    /// - File Header (written on new/empty file creation): `[PWAL: 4 bytes] [version=1: 1 byte]`
+    /// - Entry Layout:
+    ///   - `id`: `u64` LE (8 bytes)
+    ///   - `dim`: `u32` LE (4 bytes)
+    ///   - `embedding`: `[f32 LE; dim]` (`dim * 4` bytes)
+    ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes || dim_bytes || embedding_bytes`)
+    pub(crate) async fn append_to_pending_wal(
+        path: &std::path::Path,
+        id: DocId,
+        embedding: &[f32],
+    ) -> Result<()> {
+        Self::append_to_pending_wal_blocking(path, id, embedding)
     }
 
     /// Reads and verifies uncommitted vector entries from `pending.wal`.
@@ -383,7 +404,7 @@ impl DiskAnnIndex {
             }
             offset += 32;
 
-            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+            let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
             hmac.update(&buf_id);
             hmac.update(&buf_dim);
             hmac.update(&vec_bytes);
@@ -408,6 +429,12 @@ impl DiskAnnIndex {
     }
 
     /// Liest uncommittete Pending-Vektoren aus `pending.wal` und fügt sie in den Index ein.
+    pub fn recover_pending_delta(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<usize>> + Send + '_>> {
+        Box::pin(async move { self.recover_pending_delta_sync() })
+    }
+
     pub fn recover_pending_delta_sync(&self) -> Result<usize> {
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         if !pending_wal.exists() {
@@ -744,6 +771,7 @@ impl DiskAnnIndex {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "docid-128")]
     use super::*;
 
     #[cfg(feature = "docid-128")]

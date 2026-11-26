@@ -84,6 +84,11 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// Returns `true` if this storage engine implementation actively tracks read-sets for SSI validation.
     ///
     /// Default implementation returns `false`.
+    ///
+    /// # Fehler
+    /// Keine; statische Fähigkeitsabfrage.
+    /// # Crash
+    /// Reiner Statusabruf ohne persistente Mutation.
     fn supports_ssi_tracking(&self) -> bool {
         false
     }
@@ -257,6 +262,12 @@ pub trait StorageEngine: Send + Sync + 'static {
             ))
         })
     }
+}
+
+/// Prelude for storage engine ports.
+pub mod prelude {
+    pub use super::{StorageEngine, StorageStats};
+    pub use crate::kv::KvPrefixStore;
 }
 
 #[cfg(test)]

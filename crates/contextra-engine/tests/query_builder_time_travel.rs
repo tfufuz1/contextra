@@ -1,8 +1,16 @@
+//! # Integrationstest: query builder time travel
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST31-001]
+/// Testblock zur Überprüfung von `test_query_builder_as_of_historical_time_travel_filtering`.
 #[tokio::test]
 async fn test_query_builder_as_of_historical_time_travel_filtering() -> contextra_types::Result<()>
 {

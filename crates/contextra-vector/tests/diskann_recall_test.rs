@@ -4,7 +4,8 @@
 
 #![cfg(feature = "experimental-diskann")]
 
-use contextra_core::{DistanceMetric, DocId, VectorIndex};
+use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId};
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
 use rand::Rng;
 use std::collections::HashSet;
@@ -218,7 +219,7 @@ async fn test_diskann_incremental_vs_full_rebuild_recall_parity() {
 
     for i in base_vectors..(base_vectors + incremental_vectors) {
         inc_index
-            .insert(contextra_core::TxId(1), all_ids[i], &all_vectors[i])
+            .insert(contextra_types::TxId(1), all_ids[i], &all_vectors[i])
             .await
             .unwrap();
     }

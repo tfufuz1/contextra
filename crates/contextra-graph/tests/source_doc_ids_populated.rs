@@ -1,8 +1,14 @@
+//! Verifikationstest für die lückenlose Erfassung von Quell-Dokument-IDs bei Kanten.
+//!
+//! # Zweck
+//! Verhindert den Verlust von Provenienz-Informationen bei Kantenmodifikationen.
+
 use contextra_graph::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
+// ANCHOR[contextra-graph:TESTS-SOURCE-DOC-IDS-POPULATED-001]
 #[tokio::test]
 async fn proof_source_doc_ids_set_after_compact() {
     let graph = Arc::new(CsrGraph::new());
@@ -20,10 +26,10 @@ async fn proof_source_doc_ids_set_after_compact() {
     }
 
     // Add 10 edges with distinct non-zero source_doc_ids
-    for i in 0..10 {
+    for i in 0..10u64 {
         let id_a = EntityId::new(i);
         let id_b = EntityId::new(i + 1);
-        let doc_id = DocId::new(i + 100);
+        let doc_id = DocId::new((i + 100).into());
         let edge = Edge::new(id_a, id_b, "relates").with_source_doc_id(doc_id);
         GraphIndex::add_edge(graph.as_ref(), tx, edge)
             .await
@@ -35,9 +41,9 @@ async fn proof_source_doc_ids_set_after_compact() {
     graph.compact();
 
     // For each edge index 0..10: get_source_doc_id(idx) must be Some(DocId::new(i + 100))
-    for i in 0..10 {
+    for i in 0..10u64 {
         let idx = i as usize;
-        let expected_doc = DocId::new(i + 100);
+        let expected_doc = DocId::new((i + 100).into());
         assert_eq!(
             graph.get_source_doc_id(idx),
             Some(expected_doc),
@@ -53,6 +59,7 @@ async fn proof_source_doc_ids_set_after_compact() {
     }
 }
 
+// ANCHOR[contextra-graph:TESTS-SOURCE-DOC-IDS-POPULATED-002]
 #[tokio::test]
 async fn proof_source_doc_ids_empty_before_first_compact() {
     let graph = Arc::new(CsrGraph::new());
@@ -89,6 +96,7 @@ async fn proof_source_doc_ids_empty_before_first_compact() {
     assert_eq!(graph.source_doc_id_at(id_a, id_b), Some(doc_id));
 }
 
+// ANCHOR[contextra-graph:TESTS-SOURCE-DOC-IDS-POPULATED-003]
 #[tokio::test]
 async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
     let graph = Arc::new(CsrGraph::new());
@@ -104,9 +112,9 @@ async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
             .await
             .unwrap();
     }
-    for i in 0..50 {
+    for i in 0..50u64 {
         let edge = Edge::new(EntityId::new(i), EntityId::new(i + 1), "rel1")
-            .with_source_doc_id(DocId::new(i + 1000));
+            .with_source_doc_id(DocId::new((i + 1000).into()));
         GraphIndex::add_edge(graph.as_ref(), tx1, edge)
             .await
             .unwrap();
@@ -115,16 +123,16 @@ async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
     graph.compact();
 
     // Verify first 50 edges
-    for i in 0..50 {
+    for i in 0..50u64 {
         assert_eq!(
             graph.source_doc_id_at(EntityId::new(i), EntityId::new(i + 1)),
-            Some(DocId::new(i + 1000))
+            Some(DocId::new((i + 1000).into()))
         );
     }
 
     // Phase 2: 50 additional edges, then compact
     let tx2 = TxId::new(2);
-    for i in 50..=100 {
+    for i in 50..=100u64 {
         graph
             .add_entity(
                 tx2,
@@ -133,9 +141,9 @@ async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
             .await
             .unwrap();
     }
-    for i in 50..100 {
+    for i in 50..100u64 {
         let edge = Edge::new(EntityId::new(i), EntityId::new(i + 1), "rel2")
-            .with_source_doc_id(DocId::new(i + 1000));
+            .with_source_doc_id(DocId::new((i + 1000).into()));
         GraphIndex::add_edge(graph.as_ref(), tx2, edge)
             .await
             .unwrap();
@@ -144,10 +152,10 @@ async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
     graph.compact();
 
     // Verify all 100 edges after second compact
-    for i in 0..100 {
+    for i in 0..100u64 {
         let id_a = EntityId::new(i);
         let id_b = EntityId::new(i + 1);
-        let expected_doc = DocId::new(i + 1000);
+        let expected_doc = DocId::new((i + 1000).into());
         assert_eq!(
             graph.source_doc_id_at(id_a, id_b),
             Some(expected_doc),

@@ -1,3 +1,10 @@
+//! # Modul: tests.rs
+//!
+//! **Zweck:** Tests für Extraktionspipelines und Determinisierung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Extraktion.
+
 // FILE-CONTEXT
 // ZWECK: Unit-Tests für OpenIE Entitätsextraktion.
 // STAND: 2026-09-07

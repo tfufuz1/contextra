@@ -1,10 +1,20 @@
-use crate::collection::crud::{AutoExtractionConfig, AutoExtractionMode};
+//! # Modul: collections.rs
+//!
+//! **Zweck:** Lifecycle-Verwaltung von Collections (Erstellen, Öffnen, Schließen, Löschen).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 use crate::*;
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
+use contextra_vector::HnswConfig;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl Contextra {
+    // ANCHOR[contextra-engine:COL-001]
+    /// Liefert oder initialisiert eine Collection für einen Mandanten.
     pub async fn collection_for_tenant(
         &self,
         name: &str,
@@ -15,6 +25,8 @@ impl Contextra {
             .await
     }
 
+    // ANCHOR[contextra-engine:COL-002]
+    /// Öffnet oder erstellt eine Collection mit Sprachkonfiguration für einen Mandanten.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn collection_with_language_and_tenant(
         &self,
@@ -77,10 +89,6 @@ impl Contextra {
             col = col.with_embedder(Arc::clone(emb));
         }
 
-        if let Some(hooks) = self.kv_hooks() {
-            col.set_kv_hooks(hooks);
-        }
-
         if name != "default" {
             let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
             let tx = self.allocate_tx()?;
@@ -91,10 +99,6 @@ impl Contextra {
         col.load_index().await?;
         col.load_text_stats().await?;
         col.migrate_doc_keys_v1().await?;
-
-        let auto_cfg =
-            AutoExtractionConfig::for_regulated(false).with_mode(AutoExtractionMode::Enabled);
-        col.set_auto_extraction_config(auto_cfg);
 
         let col_arc = Arc::new(col);
 
@@ -112,18 +116,6 @@ impl Contextra {
         self.task_tracker.spawn(async move {
             if let Err(e) = worker_handle.await {
                 tracing::warn!(error = %e, "Expiry cleanup worker task failed or was cancelled");
-            }
-        });
-
-        let hyperedge_worker_handle = background_workers::start_hyperedge_cascade_deferred_worker(
-            Arc::clone(&col_arc),
-            col_arc.deferred_hyperedge_queue(),
-            self.expiry_reaper_interval,
-            self.cancel_token.clone(),
-        );
-        self.task_tracker.spawn(async move {
-            if let Err(e) = hyperedge_worker_handle.await {
-                tracing::warn!(error = %e, "Deferred hyperedge worker task failed or was cancelled");
             }
         });
 
@@ -207,10 +199,6 @@ impl Contextra {
             col = col.with_embedder(Arc::clone(emb));
         }
 
-        if let Some(hooks) = self.kv_hooks() {
-            col.set_kv_hooks(hooks);
-        }
-
         if name != "default" {
             let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
             let tx = self.allocate_tx()?;
@@ -221,10 +209,6 @@ impl Contextra {
         col.load_index().await?;
         col.load_text_stats().await?;
         col.migrate_doc_keys_v1().await?;
-
-        let auto_cfg =
-            AutoExtractionConfig::for_regulated(false).with_mode(AutoExtractionMode::Enabled);
-        col.set_auto_extraction_config(auto_cfg);
 
         let col_arc = Arc::new(col);
         write_guard.insert(name.to_string(), Arc::clone(&col_arc));
@@ -240,21 +224,11 @@ impl Contextra {
             }
         });
 
-        let hyperedge_worker_handle = background_workers::start_hyperedge_cascade_deferred_worker(
-            Arc::clone(&col_arc),
-            col_arc.deferred_hyperedge_queue(),
-            self.expiry_reaper_interval,
-            self.cancel_token.clone(),
-        );
-        self.task_tracker.spawn(async move {
-            if let Err(e) = hyperedge_worker_handle.await {
-                tracing::warn!(error = %e, "Deferred hyperedge worker task failed or was cancelled");
-            }
-        });
-
         Ok(col_arc)
     }
 
+    // ANCHOR[contextra-engine:ALL-228]
+    /// Dokumentation für `allocate_tx` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn allocate_tx(&self) -> Result<TxId> {
         let id = self.next_tx.fetch_add(1, Ordering::SeqCst);
         if id > TxId::MAX_COLLECTION_SEQUENCE {
@@ -265,6 +239,8 @@ impl Contextra {
         Ok(TxId::new(id))
     }
 
+    // ANCHOR[contextra-engine:LIS-239]
+    /// Dokumentation für `list_collections` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn list_collections(&self) -> Result<Vec<String>> {
         let col_idx_prefix = b"__col_idx:\x00";
@@ -290,6 +266,8 @@ impl Contextra {
         Ok(sorted_names)
     }
 
+    // ANCHOR[contextra-engine:LIS-264]
+    /// Dokumentation für `list_collections_for_tenant` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn list_collections_for_tenant(&self, tenant_id: TenantId) -> Result<Vec<String>> {
         let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
@@ -314,92 +292,42 @@ impl Contextra {
         Ok(sorted_names)
     }
 
-    /// Drops a collection as a tombstone commit (`retire` for all its records).
-    ///
-    /// Gemäß SPEC §7.4 / C-15: Löschung = Tombstone-Commit. Es wird kein Löschnachweis
-    /// ausgestellt und keine Signatur erzeugt; physische Entfernung erfolgt über Retention + Compaction.
+    // ANCHOR[contextra-engine:DRO-288]
+    /// Dokumentation für `drop_collection` im Rahmen der Transaktions- und Facade-Orchestrierung.
+    /// Führt die rein mechanische Löschung einer Collection und ihrer Daten durch.
     #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn drop_collection(&self, name: &str, tenant_id: TenantId) -> Result<()> {
-        if name == "default" {
-            return Err(contextra_types::ContextraError::invalid_input(
-                "Cannot drop default collection",
-            ));
+    pub async fn drop_collection(
+        &self,
+        name: &str,
+        tenant_id: TenantId,
+    ) -> Result<()> {
+        let cache_key = (tenant_id, name.to_string());
+
+        // 1. Aus Cache entfernen
+        let col = {
+            let mut write_guard = self.tenant_collections.write().await;
+            write_guard.remove(&cache_key)
+        };
+
+        let col = match col {
+            Some(c) => c,
+            None => self.collection_for_tenant(name, tenant_id).await?,
+        };
+
+        // 2. Mechanische Daten- und Indexbereinigung
+        col.drop_collection().await?;
+
+        // 3. Aus Collection-Index entfernen falls nicht default
+        if name != "default" {
+            let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
+            let tx = self.allocate_tx()?;
+            let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
+                self.storage.clone(),
+                tenant_id,
+            );
+            tenant_storage.delete(tx, &col_idx_key).await?;
+            tenant_storage.commit(tx).await?;
         }
-
-        let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
-            self.storage.clone(),
-            tenant_id,
-        );
-
-        let col_data_prefix = format!("__col:{}:", name);
-        let txt_data_prefix = format!("__txt:{}:", name);
-        let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
-
-        let tx = self.allocate_tx()?;
-
-        tenant_storage
-            .delete_prefix(tx, col_data_prefix.as_bytes())
-            .await?;
-
-        tenant_storage
-            .delete_prefix(tx, txt_data_prefix.as_bytes())
-            .await?;
-
-        tenant_storage.delete(tx, &col_idx_key).await?;
-
-        tenant_storage.commit(tx).await?;
-
-        self.collections.write().await.remove(name);
-        self.tenant_collections
-            .write()
-            .await
-            .remove(&(tenant_id, name.to_string()));
-
-        Ok(())
-    }
-
-    /// Purges all cached KV segments and stored collection data for the given tenant across the engine.
-    ///
-    /// # Limitations / Non-Guarantees (SCHRITT 4)
-    /// - Does NOT purge unmanaged hardware RAM or OS memory pages outside zeroized buffers.
-    /// - Does NOT purge raw LLM internal model activations or external prompt residues outside Contextra.
-    /// - Does NOT guarantee hardware physical SSD flash controller level sanitization (wear leveling / TRIM depend on OS & hardware).
-    /// - Does NOT clear external unmanaged block caches.
-    #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn purge_tenant(&self, tenant_id: TenantId) -> Result<()> {
-        // 0. Query collections for tenant to log and inspect before purge
-        let _tenant_cols = self
-            .list_collections_for_tenant(tenant_id)
-            .await
-            .unwrap_or_default();
-
-        // 1. Notify KV lifecycle hooks on Contextra and across active collections
-        if let Some(hooks) = self.kv_hooks() {
-            hooks.purge_tenant(tenant_id);
-        }
-
-        let read_guard = self.tenant_collections.read().await;
-        for ((t, _), col) in read_guard.iter() {
-            if *t == tenant_id {
-                if let Some(hooks) = col.kv_hooks() {
-                    hooks.purge_tenant(tenant_id);
-                }
-            }
-        }
-        drop(read_guard);
-
-        // 2. Delete all LSM storage entries for tenant
-        let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
-            self.storage.clone(),
-            tenant_id,
-        );
-        let tx = self.allocate_tx()?;
-        tenant_storage.delete_prefix(tx, b"").await?;
-        tenant_storage.commit(tx).await?;
-
-        // 3. Remove cached collection handles for this tenant
-        let mut write_guard = self.tenant_collections.write().await;
-        write_guard.retain(|(t, _), _| *t != tenant_id);
 
         Ok(())
     }

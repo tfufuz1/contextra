@@ -1,12 +1,20 @@
+#![cfg(feature = "types-compat")]
+//! Testsuite `audit_inspection.rs` für contextra-text.
+//!
+//! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
+
 use contextra_text::morphology::{
     normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer,
 };
 use contextra_text::tokenizer::{GermanMorphTokenizer, Tokenizer};
 
+// ANCHOR[contextra-text:TEST-135]
+// Testfall `inspect_20_compounds`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn inspect_20_compounds() {
     let splitter = GermanCompoundSplitter::new();
-    let tokenizer = GermanMorphTokenizer::new();
+    let tokenizer = GermanMorphTokenizer::try_new().expect("try_new succeeds");
 
     let words = vec![
         "Datenschutzgrundverordnung",
@@ -42,9 +50,11 @@ fn inspect_20_compounds() {
     }
 }
 
+// ANCHOR[contextra-text:TEST-136]
+// Testfall `inspect_umlaut_bimap`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn inspect_umlaut_bimap() {
-    let tokenizer = GermanMorphTokenizer::new();
+    let tokenizer = GermanMorphTokenizer::try_new().expect("try_new succeeds");
 
     let pairs = vec![
         ("Bär", "Baer"),
@@ -76,6 +86,8 @@ fn inspect_umlaut_bimap() {
     }
 }
 
+// ANCHOR[contextra-text:TEST-137]
+// Testfall `test_b3_avgdl_consistency_100_insert_50_delete`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Result<()> {
     use contextra_ports::{StorageEngine, TextIndex};
@@ -257,8 +269,8 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
     let text = "alpha beta gamma delta epsilon zeta eta theta iota kappa";
     assert_eq!(DefaultTokenizer.tokenize(text).len(), 10);
 
-    for i in 1..=100 {
-        let doc_id = DocId::new(i);
+    for i in 1..=100u64 {
+        let doc_id = DocId::new(i.into());
         let tx = TxId::new(i);
         index.insert(tx, doc_id, text).await?;
         index.commit(tx).await?;
@@ -276,8 +288,8 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
     assert_eq!(avgdl_x1000, 10.0, "avgdl after 100 docs must be 10.0");
 
     // Delete 50 documents
-    for i in 1..=50 {
-        let doc_id = DocId::new(i);
+    for i in 1..=50u64 {
+        let doc_id = DocId::new(i.into());
         let tx = TxId::new(100 + i);
         index.delete(tx, doc_id).await?;
         index.commit(tx).await?;
@@ -294,6 +306,8 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-138]
+// Testfall `test_b6_morphology_idempotency_and_proper_nouns`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_b6_morphology_idempotency_and_proper_nouns() {
     let splitter = GermanCompoundSplitter::new();
@@ -326,6 +340,8 @@ fn test_b6_morphology_idempotency_and_proper_nouns() {
     );
 }
 
+// ANCHOR[contextra-text:TEST-139]
+// Testfall `test_b5_wand_vs_bruteforce_1000_docs_3_terms`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_b5_wand_vs_bruteforce_1000_docs_3_terms() -> contextra_types::Result<()> {
     use contextra_ports::{StorageEngine, TextIndex};

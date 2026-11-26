@@ -1,11 +1,11 @@
-#![allow(clippy::expect_used, clippy::unwrap_used)]
 //! # Testsuite: fault_injector_tests.rs
 //!
 //! Zweck: Chaos- und Fehlerinjektionstests für `FaultInjector`-Hooks bei Schreib-, Sync- und Rename-Operationen.
 
 use contextra_durable_fs::{
-    atomic_replace_with_injector, sync_dir_with_injector, DurableHandle, FaultInjector, FlushKind,
-    NoFault,
+    atomic_replace, atomic_replace_with_injector, durable_remove_with_injector,
+    scrub_and_remove_with_injector, scrub_if_safe_with_injector, sync_dir_with_injector,
+    DurableHandle, FaultInjector, FlushKind, NoFault, ScrubPolicy,
 };
 use std::fs::File;
 use std::io::{ErrorKind, Write};
@@ -237,6 +237,28 @@ fn test_atomic_replace_rename_failure_propagation() -> std::io::Result<()> {
 }
 
 // ANCHOR[contextra-durable-fs:TEST-FAULT-REMOVE-DIR-FSYNC]
+/// Prüft die Fehlerbehandlung bei Verzeichnis-Sync-Fehlern während durable_remove.
+#[test]
+fn test_durable_remove_dir_fsync_failure() -> std::io::Result<()> {
+    let dir = tempdir()?;
+    let target = dir.path().join("remove_fail.txt");
+    atomic_replace(&target, b"to remove")?;
+
+    let injector = FailInjector {
+        fail_on_write: false,
+        fail_on_fsync: false,
+        fail_on_rename: false,
+        fail_on_dir_fsync: true,
+        error_kind: ErrorKind::Other,
+    };
+
+    let res = durable_remove_with_injector(&target, &injector);
+    assert!(res.is_err());
+
+    Ok(())
+}
+
+// ANCHOR[contextra-durable-fs:TEST-FAULT-SYNC-DIR-FAIL]
 /// Prüft die Fehlerpropagation bei Verzeichnis-Sync-Fehlern in sync_dir.
 #[test]
 fn test_sync_dir_fsync_failure() -> std::io::Result<()> {
@@ -257,3 +279,32 @@ fn test_sync_dir_fsync_failure() -> std::io::Result<()> {
 }
 
 // ANCHOR[contextra-durable-fs:TEST-FAULT-SCRUB-INJECTOR]
+/// Prüft die Fehlerpropagation bei Fehlerinjektion während scrub_and_remove.
+#[test]
+fn test_scrub_and_remove_injector_fault() -> std::io::Result<()> {
+    let dir = tempdir()?;
+    let target = dir.path().join("scrub_fail.txt");
+    atomic_replace(&target, b"data to scrub")?;
+
+    let injector = FailInjector {
+        fail_on_write: true,
+        fail_on_fsync: false,
+        fail_on_rename: false,
+        fail_on_dir_fsync: false,
+        error_kind: ErrorKind::StorageFull,
+    };
+
+    let res = scrub_and_remove_with_injector(&target, &injector);
+    assert!(res.is_err());
+
+    let res_safe = scrub_if_safe_with_injector(
+        &target,
+        ScrubPolicy::OverwriteZeros,
+        false,
+        false,
+        &injector,
+    );
+    assert!(res_safe.is_err());
+
+    Ok(())
+}

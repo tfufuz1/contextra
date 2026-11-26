@@ -1,8 +1,8 @@
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
-use contextra::collection_profile::DeploymentTier;
-use contextra_types::TenantId;
+// Deployment tier
+use contextra::collection_profile;
 use serde_json::{json, Value};
 
 impl McpServer {
@@ -34,10 +34,12 @@ impl McpServer {
         };
 
         let tier = match tier_str {
-            "EdgeMinimal" => DeploymentTier::EdgeMinimal,
-            "PowerUserLocal" => DeploymentTier::PowerUserLocal,
-            "EnterpriseShared" => DeploymentTier::EnterpriseShared,
-            "EnterpriseRegulated" => DeploymentTier::EnterpriseRegulated,
+            "EdgeMinimal" => contextra::collection_profile::DeploymentTier::EdgeMinimal,
+            "PowerUserLocal" => contextra::collection_profile::DeploymentTier::PowerUserLocal,
+            "EnterpriseShared" => contextra::collection_profile::DeploymentTier::EnterpriseShared,
+            "EnterpriseRegulated" => {
+                contextra::collection_profile::DeploymentTier::EnterpriseRegulated
+            }
             invalid => {
                 return Err(McpError::invalid_params(format!(
                     "Invalid deployment_tier '{invalid}'. Valid options are: 'EdgeMinimal', 'PowerUserLocal', 'EnterpriseShared', 'EnterpriseRegulated'"
@@ -87,7 +89,7 @@ impl McpServer {
         }))
     }
 
-    /// Handler für `contextra_drop_collection` — Löscht eine gesamte Collection als Tombstone-Commit (SPEC §7.4, kein Löschnachweis).
+    /// Handler für `contextra_drop_collection` — Entfernt eine gesamte Collection.
     pub(crate) async fn handle_drop_collection(&self, args: &Value) -> Result<Value, McpError> {
         let col_name = match args.get("collection").or_else(|| args.get("name")) {
             Some(col_val) => {
@@ -117,7 +119,9 @@ impl McpServer {
             ));
         }
 
-        let tenant_id = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
+        let tenant_id = self
+            .tenant_id
+            .ok_or_else(|| McpError::invalid_params("tenant_id not configured on server"))?;
 
         self.db
             .drop_collection(col_name, tenant_id)
@@ -126,12 +130,12 @@ impl McpServer {
 
         Ok(json!({
             "ok": true,
+            "deleted": true,
             "collection": col_name,
-            "semantics": "tombstone"
         }))
     }
 
-    /// Handler für `contextra_delete` — Löscht ein Dokument (Tombstone). Single-Doc-Löschungen stellen keinen DeletionProof aus.
+    /// Handler für `contextra_delete` — Löscht ein Einzel-Dokument.
     pub(crate) async fn handle_delete(&self, args: &Value) -> Result<Value, McpError> {
         let col_name = if let Some(col_val) = args.get("collection") {
             let s = col_val.as_str().ok_or_else(|| {
@@ -167,17 +171,20 @@ impl McpServer {
             }
         };
 
+        let _tenant_id = self
+            .tenant_id
+            .ok_or_else(|| McpError::invalid_params("tenant_id not configured on server"))?;
+
         let col = self.db.collection(col_name).await.map_err(McpError::from)?;
 
-        // Delete document from collection storage and indices
+        // Perform actual document deletion
         col.delete(id).await.map_err(McpError::from)?;
 
         Ok(json!({
             "ok": true,
+            "deleted": true,
             "collection": col_name,
             "id": id,
-            "proof": null,
-            "proof_scope": "collection_only"
         }))
     }
 }

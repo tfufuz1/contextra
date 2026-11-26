@@ -8,8 +8,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -203,10 +204,7 @@ async fn test_crash_kill_durability() {
     for iter in 1..=num_iters {
         let group_commit_micros: u64 = if rng.gen_bool(0.5) { 0 } else { 2000 };
 
-        #[cfg(feature = "encryption-at-rest")]
         let encrypted = rng.gen_bool(0.5);
-        #[cfg(not(feature = "encryption-at-rest"))]
-        let encrypted = false;
 
         let tmp_dir = TempDir::new().expect("create iteration temp directory");
         let target_ack: u64 = rng.gen_range(5..40);

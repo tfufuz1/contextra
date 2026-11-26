@@ -1,0 +1,318 @@
+[
+  {
+    "id": 1,
+    "lang": "de",
+    "text": "Alice Müller arbeitet bei Siemens in München.",
+    "expected": [
+      {"source": "Alice Müller", "target": "Siemens", "relation_type": "WORKS_AT"}
+    ]
+  },
+  {
+    "id": 2,
+    "lang": "de",
+    "text": "Bob Schneider lebt in Berlin seit fünf Jahren.",
+    "expected": [
+      {"source": "Bob Schneider", "target": "Berlin", "relation_type": "LIVES_IN"}
+    ]
+  },
+  {
+    "id": 3,
+    "lang": "de",
+    "text": "SAP kooperiert mit Microsoft bei Cloud-Diensten.",
+    "expected": [
+      {"source": "SAP", "target": "Microsoft", "relation_type": "PARTNERED_WITH"}
+    ]
+  },
+  {
+    "id": 4,
+    "lang": "de",
+    "text": "Hasso Plattner gruendete SAP im Jahr 1972.",
+    "expected": [
+      {"source": "Hasso Plattner", "target": "SAP", "relation_type": "FOUNDED"}
+    ]
+  },
+  {
+    "id": 5,
+    "lang": "de",
+    "text": "Christian Klein leitet SAP als Vorstandsvorsitzender.",
+    "expected": [
+      {"source": "Christian Klein", "target": "SAP", "relation_type": "LEADS"}
+    ]
+  },
+  {
+    "id": 6,
+    "lang": "de",
+    "text": "Clara Schumann wohnt in Leipzig nahe dem Park.",
+    "expected": [
+      {"source": "Clara Schumann", "target": "Leipzig", "relation_type": "LIVES_IN"}
+    ]
+  },
+  {
+    "id": 7,
+    "lang": "de",
+    "text": "Felix Mendelssohn hat gegruendet das Konservatorium in Leipzig.",
+    "expected": [
+      {"source": "Felix Mendelssohn", "target": "Konservatorium", "relation_type": "FOUNDED"}
+    ]
+  },
+  {
+    "id": 8,
+    "lang": "de",
+    "text": "BMW kooperiert mit Toyota in der Forschung.",
+    "expected": [
+      {"source": "BMW", "target": "Toyota", "relation_type": "PARTNERED_WITH"}
+    ]
+  },
+  {
+    "id": 9,
+    "lang": "de",
+    "text": "Oliver Zipse leitet BMW seit vielen Jahren.",
+    "expected": [
+      {"source": "Oliver Zipse", "target": "BMW", "relation_type": "LEADS"}
+    ]
+  },
+  {
+    "id": 10,
+    "lang": "de",
+    "text": "Der Entwickler Thomas Schmidt arbeitet fuer Bosch in Stuttgart.",
+    "expected": [
+      {"source": "Thomas Schmidt", "target": "Bosch", "relation_type": "WORKS_AT"}
+    ]
+  },
+  {
+    "id": 11,
+    "lang": "de",
+    "text": "Robert Bosch gruendete Bosch vor über hundert Jahren.",
+    "expected": [
+      {"source": "Robert Bosch", "target": "Bosch", "relation_type": "FOUNDED"}
+    ]
+  },
+  {
+    "id": 12,
+    "lang": "de",
+    "text": "Audi gehoert zu Volkswagen seit Jahrzehnten.",
+    "expected": [
+      {"source": "Audi", "target": "Volkswagen", "relation_type": "CONNECTED_TO"}
+    ]
+  },
+  {
+    "id": 13,
+    "lang": "de",
+    "text": "Skoda gehoert zu Volkswagen und teilt Plattformen.",
+    "expected": [
+      {"source": "Skoda", "target": "Volkswagen", "relation_type": "CONNECTED_TO"}
+    ]
+  },
+  {
+    "id": 14,
+    "lang": "de",
+    "text": "Gernot Döllner leitet Audi mit Sitz in Ingolstadt.",
+    "expected": [
+      {"source": "Gernot Döllner", "target": "Audi", "relation_type": "LEADS"}
+    ]
+  },
+  {
+    "id": 15,
+    "lang": "de",
+    "text": "Die Forscherin Maria Weber wohnt in Heidelberg.",
+    "expected": [
+      {"source": "Maria Weber", "target": "Heidelberg", "relation_type": "LIVES_IN"}
+    ]
+  },
+  {
+    "id": 16,
+    "lang": "de",
+    "text": "Daimler kooperiert mit Geely bei elektrischen Antrieben.",
+    "expected": [
+      {"source": "Daimler", "target": "Geely", "relation_type": "PARTNERED_WITH"}
+    ]
+  },
+  {
+    "id": 17,
+    "lang": "de",
+    "text": "Siemens ist verbunden mit Siemens Energy als Kernaktionär.",
+    "expected": [
+      {"source": "Siemens", "target": "Siemens Energy", "relation_type": "CONNECTED_TO"}
+    ]
+  },
+  {
+    "id": 18,
+    "lang": "de",
+    "text": "Roland Busch leitet Siemens seit Februar 2021.",
+    "expected": [
+      {"source": "Roland Busch", "target": "Siemens", "relation_type": "LEADS"}
+    ]
+  },
+  {
+    "id": 19,
+    "lang": "de",
+    "text": "Werner von Siemens gruendete Siemens in Berlin.",
+    "expected": [
+      {"source": "Werner von Siemens", "target": "Siemens", "relation_type": "FOUNDED"}
+    ]
+  },
+  {
+    "id": 20,
+    "lang": "de",
+    "text": "Das Team von Contextra entwickelt Algorithmen in Karlsruhe.",
+    "expected": []
+  },
+  {
+    "id": 21,
+    "lang": "en",
+    "text": "John Doe works at Google in Mountain View.",
+    "expected": [
+      {"source": "John Doe", "target": "Google", "relation_type": "WORKS_AT"}
+    ]
+  },
+  {
+    "id": 22,
+    "lang": "en",
+    "text": "Sundar Pichai leads Google and its parent company.",
+    "expected": [
+      {"source": "Sundar Pichai", "target": "Google", "relation_type": "LEADS"}
+    ]
+  },
+  {
+    "id": 23,
+    "lang": "en",
+    "text": "Larry Page founded Google with Sergey Brin.",
+    "expected": [
+      {"source": "Larry Page", "target": "Google", "relation_type": "FOUNDED"}
+    ]
+  },
+  {
+    "id": 24,
+    "lang": "en",
+    "text": "Jane Smith lives in London near the river.",
+    "expected": [
+      {"source": "Jane Smith", "target": "London", "relation_type": "LIVES_IN"}
+    ]
+  },
+  {
+    "id": 25,
+    "lang": "en",
+    "text": "Satya Nadella manages Microsoft from Redmond.",
+    "expected": [
+      {"source": "Satya Nadella", "target": "Microsoft", "relation_type": "LEADS"}
+    ]
+  },
+  {
+    "id": 26,
+    "lang": "en",
+    "text": "Bill Gates founded Microsoft in Albuquerque.",
+    "expected": [
+      {"source": "Bill Gates", "target": "Microsoft", "relation_type": "FOUNDED"}
+    ]
+  },
+  {
+    "id": 27,
+    "lang": "en",
+    "text": "DeepMind partnered with Blizzard on reinforcement learning.",
+    "expected": [
+      {"source": "DeepMind", "target": "Blizzard", "relation_type": "PARTNERED_WITH"}
+    ]
+  },
+  {
+    "id": 28,
+    "lang": "en",
+    "text": "Demis Hassabis leads DeepMind in London.",
+    "expected": [
+      {"source": "Demis Hassabis", "target": "DeepMind", "relation_type": "LEADS"}
+    ]
+  },
+  {
+    "id": 29,
+    "lang": "en",
+    "text": "Waymo is connected to Alphabet through shared infrastructure.",
+    "expected": [
+      {"source": "Waymo", "target": "Alphabet", "relation_type": "CONNECTED_TO"}
+    ]
+  },
+  {
+    "id": 30,
+    "lang": "en",
+    "text": "Alice Walker works for Apple on the silicon design team.",
+    "expected": [
+      {"source": "Alice Walker", "target": "Apple", "relation_type": "WORKS_AT"}
+    ]
+  },
+  {
+    "id": 31,
+    "lang": "en",
+    "text": "Tim Cook leads Apple following Steve Jobs.",
+    "expected": [
+      {"source": "Tim Cook", "target": "Apple", "relation_type": "LEADS"}
+    ]
+  },
+  {
+    "id": 32,
+    "lang": "en",
+    "text": "Steve Jobs founded Apple in a garage in California.",
+    "expected": [
+      {"source": "Steve Jobs", "target": "Apple", "relation_type": "FOUNDED"}
+    ]
+  },
+  {
+    "id": 33,
+    "lang": "en",
+    "text": "Michael Brown resides in New York during the winter.",
+    "expected": [
+      {"source": "Michael Brown", "target": "New York", "relation_type": "LIVES_IN"}
+    ]
+  },
+  {
+    "id": 34,
+    "lang": "en",
+    "text": "OpenAI partnered with Microsoft to scale infrastructure.",
+    "expected": [
+      {"source": "OpenAI", "target": "Microsoft", "relation_type": "PARTNERED_WITH"}
+    ]
+  },
+  {
+    "id": 35,
+    "lang": "en",
+    "text": "Sam Altman leads OpenAI in San Francisco.",
+    "expected": [
+      {"source": "Sam Altman", "target": "OpenAI", "relation_type": "LEADS"}
+    ]
+  },
+  {
+    "id": 36,
+    "lang": "en",
+    "text": "GitHub belongs to Microsoft since the acquisition.",
+    "expected": [
+      {"source": "GitHub", "target": "Microsoft", "relation_type": "CONNECTED_TO"}
+    ]
+  },
+  {
+    "id": 37,
+    "lang": "en",
+    "text": "Emma Watson lives in Oxford when studying.",
+    "expected": [
+      {"source": "Emma Watson", "target": "Oxford", "relation_type": "LIVES_IN"}
+    ]
+  },
+  {
+    "id": 38,
+    "lang": "en",
+    "text": "Arm collaborates with Nvidia on server processors.",
+    "expected": [
+      {"source": "Arm", "target": "Nvidia", "relation_type": "PARTNERED_WITH"}
+    ]
+  },
+  {
+    "id": 39,
+    "lang": "en",
+    "text": "Jensen Huang manages Nvidia since its inception.",
+    "expected": [
+      {"source": "Jensen Huang", "target": "Nvidia", "relation_type": "LEADS"}
+    ]
+  },
+  {
+    "id": 40,
+    "lang": "en",
+    "text": "Natural language processing continues to evolve rapidly.",
+    "expected": []
+  }
+]

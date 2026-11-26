@@ -1,4 +1,3 @@
-#![allow(clippy::expect_used, clippy::unwrap_used)]
 use contextra_durable_fs::journal::{AppendOnlyJournal, JournalSyncPolicy};
 use criterion::{criterion_group, criterion_main, Criterion};
 use tempfile::tempdir;

@@ -1,6 +1,3 @@
-use contextra_simd::kernels::scalar::{
-    cosine_distance_scalar, dot_product_scalar, euclidean_distance_scalar,
-};
 use contextra_vector::distance::*;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
@@ -13,7 +10,7 @@ fn bench_distances(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("Distances");
 
-    group.bench_function("cosine_simd", |b_bench| {
+    group.bench_function("cosine_distance", |b_bench| {
         b_bench.iter(|| cosine_distance(black_box(&a), black_box(&b)).unwrap())
     });
 
@@ -21,7 +18,7 @@ fn bench_distances(c: &mut Criterion) {
         b_bench.iter(|| cosine_distance_scalar(black_box(&a), black_box(&b)))
     });
 
-    group.bench_function("euclidean_simd", |b_bench| {
+    group.bench_function("euclidean_distance", |b_bench| {
         b_bench.iter(|| euclidean_distance(black_box(&a), black_box(&b)).unwrap())
     });
 
@@ -29,7 +26,7 @@ fn bench_distances(c: &mut Criterion) {
         b_bench.iter(|| euclidean_distance_scalar(black_box(&a), black_box(&b)))
     });
 
-    group.bench_function("dot_product_simd", |b_bench| {
+    group.bench_function("dot_product_distance", |b_bench| {
         b_bench.iter(|| dot_product_distance(black_box(&a), black_box(&b)).unwrap())
     });
 

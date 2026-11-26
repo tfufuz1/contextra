@@ -1,3 +1,10 @@
+//! # Modul: misc_tests.rs
+//!
+//! **Zweck:** Diverse Funktionstests für Hilfsroutinen auf Collections.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::fixtures::*;
 
 #[tokio::test]
@@ -589,7 +596,7 @@ async fn test_apm7_utf8_multibyte_boundary_handling() -> contextra_types::Result
 
 proptest::proptest! {
     #[test]
-    fn prop_markdown_chunker_never_panics_on_arbitrary_utf8(
+    fn test_prop_markdown_chunker_never_panics_on_arbitrary_utf8(
         input in proptest::prelude::any::<String>()
     ) {
         let chunker = crate::chunker::MarkdownChunker::with_defaults();

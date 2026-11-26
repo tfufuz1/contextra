@@ -13,7 +13,11 @@
 
 // ANCHOR[contextra-engine:WIN-001]
 /// Erzeugt überlappende Text-Chunks mit definierter Fenstergröße und Überlappung.
-pub fn chunk_text_with_overlap(text: &str, window_chars: usize, overlap_chars: usize) -> Vec<&str> {
+pub fn chunk_text_with_overlap<'a>(
+    text: &'a str,
+    window_chars: usize,
+    overlap_chars: usize,
+) -> Vec<&'a str> {
     if text.is_empty() || window_chars == 0 {
         return Vec::new();
     }

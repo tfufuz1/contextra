@@ -1,3 +1,8 @@
+//! # Integrationstest: `nonce_reuse.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `nonce_reuse`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Nonce reuse demonstration and mitigation verification suite.
 // INVARIANTEN: Unique random nonces generated per encrypt_auto_nonce call even across identical KeyManager instances.

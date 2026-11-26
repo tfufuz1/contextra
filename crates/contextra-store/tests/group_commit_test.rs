@@ -2,8 +2,9 @@
 
 #![cfg(feature = "fault-injection")]
 
-use contextra_core::{ContextraError, StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::{ContextraError, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -81,8 +82,8 @@ async fn test_group_commit_200_parallel_tasks_durability_and_replay_parity() {
 #[tokio::test]
 #[cfg(feature = "fault-injection")]
 async fn test_group_commit_mid_batch_fsync_failure_atomicity() {
-    use contextra_core::ContextraError;
     use contextra_store::wal::FAIL_APPEND_FOR_TX;
+    use contextra_types::ContextraError;
 
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {

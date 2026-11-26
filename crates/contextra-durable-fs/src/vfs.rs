@@ -25,6 +25,9 @@ pub trait Vfs: Send + Sync {
     /// Synchronisiert die Metadaten eines Verzeichnisses auf stabilen Speicher.
     fn sync_dir(&self, path: &Path) -> Result<()>;
 
+    /// Entfernt eine Datei dauerhaft und flusht das übergeordnete Verzeichnis.
+    fn remove(&self, path: &Path) -> Result<()>;
+
     /// Benennt eine Datei atomar um und flusht das übergeordnete Verzeichnis.
     fn rename(&self, from: &Path, to: &Path) -> Result<()>;
 
@@ -82,6 +85,10 @@ impl Vfs for StdVfs {
 
     fn sync_dir(&self, path: &Path) -> Result<()> {
         crate::sync_dir(path)
+    }
+
+    fn remove(&self, path: &Path) -> Result<()> {
+        crate::durable_remove(path)
     }
 
     fn rename(&self, from: &Path, to: &Path) -> Result<()> {

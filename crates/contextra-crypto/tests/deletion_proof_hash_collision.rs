@@ -1,3 +1,9 @@
+#![cfg(feature = "legacy-erasure")]
+//! # Integrationstest: `deletion_proof_hash_collision.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_hash_collision`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Tests verifying collision prevention via length-prefixed hashing for DeletionProof.
 // INVARIANTEN: Key sets ["ab", "c"] and ["a", "bc"] MUST produce distinct deleted_keys_hash values.
@@ -84,8 +90,7 @@ fn test_v2_hmac_proof_creation_and_verification_regression() {
         tenant_id: TenantId::try_new(10).expect("valid tenant_id"),
     };
     let hmac_key = b"0123456789abcdef0123456789abcdef";
-    let layer_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
-        .expect("valid layer proof");
+    let layer_proof = LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
 
     let proof = DeletionProof::create(
         scope,

@@ -1,3 +1,7 @@
+//! # LSM-Kernoperationen (Ring 1)
+//!
+//! Buendelt Lese-, Schreib-, Wartungs- und Kompaktierungsoperationen.
+
 mod compaction;
 mod maintenance;
 pub(super) mod read;
@@ -139,7 +143,7 @@ impl StorageEngine for LsmStorage {
         Box::pin(compaction::flush(self))
     }
 
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_core::StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_ports::StorageStats>> {
         Box::pin(maintenance::stats(self))
     }
 

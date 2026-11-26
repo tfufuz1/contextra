@@ -1,6 +1,6 @@
 #![no_main]
 
-use contextra_core::StorageEngine;
+use contextra_ports::StorageEngine;
 use contextra_store::{LsmConfig, LsmStorage};
 use libfuzzer_sys::fuzz_target;
 use tempfile::tempdir;

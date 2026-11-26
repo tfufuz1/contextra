@@ -1,7 +1,14 @@
-//! State machine for DiBud (Dynamic Budgeted RRF) fusion.
+//! # DiBud-Zustandsautomat (`dibud::state`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Verwaltet den internen Fortschritt der Streaming-Fusion, berechnet Schranken
+//! für noch ungesehene Dokumente und bestimmt, welche Top-K-Ränge mathematisch garantiert
+//! stabil sind (Präfix-Zertifizierung).
 
+use crate::error::RankError;
+use crate::local_types::DocId;
 use ahash::AHashMap;
-use contextra_types::{ContextraError, DocId};
 
 use super::types::{BudgetedChannel, DiBudOutcome, FusionBudget};
 use crate::fusion::{ProvenanceBuilder, ProvenanceRecord};
@@ -10,6 +17,7 @@ const RRF_K: f32 = 60.0;
 
 /// Represents the step action requested by `DiBudFusionState::next_request`.
 #[derive(Debug, Clone, PartialEq)]
+/// Nächste durchzuführende Aktion im DiBud-Zustandsautomaten.
 pub enum DiBudStep {
     /// Request reading the next item from the specified channel.
     Poll(BudgetedChannel),
@@ -26,6 +34,7 @@ struct ObservedDocState {
 
 /// Core state machine tracking channel depths, observed document scores, and prefix certification.
 #[derive(Debug, Clone)]
+/// Zustandsautomat für die budgetierte Streaming-Rangfusion.
 pub struct DiBudFusionState {
     channel_depths: [usize; 3],
     exhausted: [bool; 3],
@@ -74,11 +83,6 @@ impl DiBudFusionState {
         self.provenance.get(doc_id)
     }
 
-    /// Generates a structured retrieval explanation for a given document if present in provenance.
-    pub fn explain_doc(&self, doc_id: &DocId) -> Option<crate::explain::RetrievalExplanation> {
-        self.provenance_of(doc_id).map(crate::explain::explain)
-    }
-
     /// Feeds the result of reading a channel into the state machine.
     ///
     /// Raw scores are unknown in pure `DocId` streams and are set to 0.0 in `ProvenanceRecord`.
@@ -88,11 +92,11 @@ impl DiBudFusionState {
         item: Option<DocId>,
         er: impl Fn(DocId) -> f32,
         budget: &FusionBudget,
-    ) -> Result<(), ContextraError> {
+    ) -> Result<(), RankError> {
         self.accesses += 1;
         let ch_idx = ch.index();
         self.channel_depths[ch_idx] += 1;
-        let rank_1based = u32::try_from(self.channel_depths[ch_idx]).unwrap_or(u32::MAX);
+        let rank_1based = self.channel_depths[ch_idx] as u32;
 
         if let Some(doc_id) = item {
             let doc_state = self.observed_docs.entry(doc_id).or_default();
@@ -103,7 +107,7 @@ impl DiBudFusionState {
             if !self.er_cache.contains_key(&doc_id) {
                 let er_val = er(doc_id);
                 if !er_val.is_finite() || er_val < 0.0 {
-                    return Err(ContextraError::InvalidInput(format!(
+                    return Err(RankError::InvalidInput(format!(
                         "Edge reinforcement score for document {doc_id:?} must be a finite non-negative float, got {er_val}"
                     )));
                 }
@@ -119,6 +123,7 @@ impl DiBudFusionState {
     }
 
     /// Determines whether fusion is done or returns the next channel to poll.
+    /// Bestimmt die nächste Abfrageaktion oder schließt die Fusion ab.
     pub fn next_request(&self, budget: &FusionBudget) -> DiBudStep {
         let (ranked, certified_len) = self.certify_prefix(budget);
 
@@ -127,16 +132,11 @@ impl DiBudFusionState {
         let min_certified_reached = certified_len >= budget.min_certified_results;
 
         if min_certified_reached || max_accesses_reached || all_exhausted {
-            let provenance = ranked
-                .iter()
-                .filter_map(|id| self.provenance_of(id).cloned().map(|p| (*id, p)))
-                .collect();
             return DiBudStep::Done(DiBudOutcome {
                 ranked,
                 certified_len,
                 accesses: self.accesses,
                 budget_exhausted: max_accesses_reached,
-                provenance,
             });
         }
 
@@ -145,34 +145,30 @@ impl DiBudFusionState {
         let mut best_channel = None;
         let mut best_score = -1.0_f32;
 
-        for idx in [2, 1, 0] {
-            if let Some(ch) = BudgetedChannel::from_index(idx) {
-                if !self.exhausted[idx] {
-                    let score = budget.channel_weights[idx]
-                        / (RRF_K + self.channel_depths[idx] as f32 + 1.0);
-                    if score > best_score {
-                        best_score = score;
-                        best_channel = Some(ch);
-                    }
+        for ch in [
+            BudgetedChannel::Graph,
+            BudgetedChannel::Text,
+            BudgetedChannel::Vector,
+        ] {
+            let idx = ch.index();
+            if !self.exhausted[idx] {
+                let score =
+                    budget.channel_weights[idx] / (RRF_K + self.channel_depths[idx] as f32 + 1.0);
+                if score > best_score {
+                    best_score = score;
+                    best_channel = Some(ch);
                 }
             }
         }
 
         match best_channel {
             Some(ch) => DiBudStep::Poll(ch),
-            None => {
-                let provenance = ranked
-                    .iter()
-                    .filter_map(|id| self.provenance_of(id).cloned().map(|p| (*id, p)))
-                    .collect();
-                DiBudStep::Done(DiBudOutcome {
-                    ranked,
-                    certified_len,
-                    accesses: self.accesses,
-                    budget_exhausted: max_accesses_reached,
-                    provenance,
-                })
-            }
+            None => DiBudStep::Done(DiBudOutcome {
+                ranked,
+                certified_len,
+                accesses: self.accesses,
+                budget_exhausted: max_accesses_reached,
+            }),
         }
     }
 

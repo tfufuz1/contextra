@@ -1,6 +1,7 @@
 // FILE-CONTEXT: Criterion benchmark suite for F-02 Partial HNSW Rebuild recall regression curve across growing tombstone ratios.
 
-use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
+use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use rand::rngs::StdRng;
@@ -41,7 +42,7 @@ fn brute_force_knn(
             .filter(|(idx, _)| !deleted_set.contains(&(*idx as u64)))
             .map(|(idx, v)| {
                 let dist = 1.0 - dot_product(query, v);
-                (DocId::new(idx as u64), dist)
+                (DocId::new((idx as u64).into()), dist)
             })
             .collect();
 
@@ -103,7 +104,7 @@ fn bench_partial_rebuild_recall_curve(c: &mut Criterion) {
                             let tx = TxId::new(1);
                             for (i, v) in vectors.iter().enumerate() {
                                 index
-                                    .insert(tx, DocId::new(i as u64), v)
+                                    .insert(tx, DocId::new((i as u64).into()), v)
                                     .await
                                     .expect("insert failed");
                             }
@@ -112,7 +113,7 @@ fn bench_partial_rebuild_recall_curve(c: &mut Criterion) {
                             let tx_del = TxId::new(2);
                             for &id in &tombstone_ids {
                                 index
-                                    .delete(tx_del, DocId::new(id))
+                                    .delete(tx_del, DocId::new(id.into()))
                                     .await
                                     .expect("delete failed");
                             }
@@ -125,7 +126,6 @@ fn bench_partial_rebuild_recall_curve(c: &mut Criterion) {
                         rt.block_on(async {
                             index
                                 .rebuild_region(black_box(ts_ids))
-                                .await
                                 .expect("rebuild_region failed");
 
                             let mut total_hits = 0;

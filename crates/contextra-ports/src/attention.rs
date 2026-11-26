@@ -12,5 +12,10 @@ pub trait AttentionExporter: Send + Sync {
     /// Returns accumulated attention weights per token position for the given request ID.
     ///
     /// Returns `None` if no attention weights are tracked or available for the request.
+    ///
+    /// # Fehler
+    /// Keine; liefert `None` falls keine Aufmerksamkeitsgewichte verfügbar sind.
+    /// # Crash
+    /// Reiner flüchtiger RAM-Statusabruf ohne I/O oder persistente Mutation.
     fn export_attention_weights(&self, request_id: RequestId) -> Option<Vec<f32>>;
 }

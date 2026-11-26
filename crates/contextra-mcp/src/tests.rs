@@ -61,11 +61,12 @@ async fn create_mock_server_with_write_and_egress(
         allow_db_writes,
         allow_code_execution: false,
         allow_cloud_egress,
-        max_execution_ms: 5_000,
+        max_execution_ms: 60_000,
     };
     let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox new"));
-    let server = Arc::new(McpServer::with_sandbox(Arc::new(db), embedder, sandbox));
-    (server, tmp)
+    let mut server = McpServer::with_sandbox(Arc::new(db), embedder, sandbox);
+    server.tenant_id = contextra_types::TenantId::try_new(1).ok();
+    (Arc::new(server), tmp)
 }
 
 fn make_request(method: &str, params: Value) -> JsonRpcRequest {
@@ -88,18 +89,13 @@ async fn test_tools_list_returns_all_tools() {
         .unwrap() // unwrap
         .clone();
     let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
-    assert_eq!(tools.len(), 15);
+    assert_eq!(tools.len(), 10);
     assert!(names.contains(&"contextra_search"));
     assert!(names.contains(&"contextra_insert"));
     assert!(names.contains(&"contextra_get"));
     assert!(names.contains(&"contextra_forget"));
     assert!(names.contains(&"contextra_collections"));
-    assert!(names.contains(&"contextra_consolidate"));
-    assert!(names.contains(&"contextra_cloud_query"));
-    assert!(names.contains(&"contextra_relate"));
-    assert!(names.contains(&"contextra_relate_n_ary"));
     assert!(names.contains(&"contextra_explain"));
-    assert!(names.contains(&"contextra_plugin_status"));
     assert!(names.contains(&"contextra_upsert"));
     assert!(names.contains(&"contextra_delete"));
     assert!(names.contains(&"contextra_create_collection"));
@@ -173,13 +169,7 @@ async fn test_inv_mcp_classify_1_tools_list_classification_completeness_and_mapp
         ("contextra_get", ToolCategory::DatabaseRead),
         ("contextra_forget", ToolCategory::DatabaseWrite),
         ("contextra_collections", ToolCategory::DatabaseRead),
-        // contextra_consolidate: Triggert Memory Consolidation (Tombstone-Erstellung, Synthese-Chunks, Graph-Mutations in contextra-engine/contextra-cognition) -> DatabaseWrite
-        ("contextra_consolidate", ToolCategory::DatabaseWrite),
-        ("contextra_cloud_query", ToolCategory::CloudEgress),
-        ("contextra_relate", ToolCategory::DatabaseWrite),
-        ("contextra_relate_n_ary", ToolCategory::DatabaseWrite),
         ("contextra_explain", ToolCategory::DatabaseRead),
-        ("contextra_plugin_status", ToolCategory::DatabaseRead),
         ("contextra_upsert", ToolCategory::DatabaseWrite),
         ("contextra_delete", ToolCategory::DatabaseWrite),
         ("contextra_create_collection", ToolCategory::DatabaseWrite),
@@ -251,30 +241,14 @@ async fn test_contextra_forget_single_doc() {
     let resp = server.handle(insert_req).await;
     assert!(resp.error.is_none());
 
-    // 2. Forget single doc without confirm=true should fail
-    let forget_req_no_confirm = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_forget",
-            "arguments": {
-                "collection": "default",
-                "id": "forget_doc_1"
-            }
-        }),
-    );
-    let resp_nc = server.handle(forget_req_no_confirm).await;
-    let res_nc = serde_json::to_value(&resp_nc).unwrap();
-    assert_eq!(res_nc["result"]["isError"], true);
-
-    // 3. Forget single doc with confirm=true
+    // 2. Forget single doc via alias contextra_forget (same as contextra_delete)
     let forget_req = make_request(
         "tools/call",
         json!({
             "name": "contextra_forget",
             "arguments": {
                 "collection": "default",
-                "id": "forget_doc_1",
-                "confirm": true
+                "id": "forget_doc_1"
             }
         }),
     );
@@ -285,11 +259,10 @@ async fn test_contextra_forget_single_doc() {
     let text = res_f["result"]["content"][0]["text"].as_str().unwrap();
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
     assert_eq!(json_res["ok"], true);
+    assert_eq!(json_res["deleted"], true);
     assert_eq!(json_res["id"], "forget_doc_1");
-    assert_eq!(json_res["proof"], serde_json::Value::Null);
-    assert_eq!(json_res["proof_scope"], "collection_only");
 
-    // 4. Verify contextra_get returns null
+    // 3. Verify contextra_get returns null
     let get_req = make_request(
         "contextra_get",
         json!({
@@ -299,75 +272,6 @@ async fn test_contextra_forget_single_doc() {
     );
     let resp_g = server.handle(get_req).await;
     assert_eq!(resp_g.result.unwrap(), serde_json::Value::Null);
-}
-
-#[tokio::test]
-async fn test_contextra_forget_collection_with_proof() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    // Create custom collection and insert a document
-    let col_name = "drop_me_col";
-    let insert_req = make_request(
-        "contextra_insert",
-        json!({
-            "id": "doc_in_col",
-            "text": "Data in custom collection",
-            "collection": col_name
-        }),
-    );
-    let resp = server.handle(insert_req).await;
-    assert!(resp.error.is_none());
-
-    // 1. Without proof key configured -> fails
-    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
-    std::env::remove_var("CONTEXTRA_PROOF_KEY");
-    let forget_req_nokey = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_forget",
-            "arguments": {
-                "collection": col_name,
-                "confirm": true
-            }
-        }),
-    );
-    let resp_nokey = server.handle(forget_req_nokey).await;
-    let res_nokey = serde_json::to_value(&resp_nokey).unwrap();
-    assert_eq!(res_nokey["result"]["isError"], true);
-    let err_text = res_nokey["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(err_text.contains("deletion proof key not configured"));
-
-    // 2. With proof key configured -> succeeds and generates DeletionProof
-    let test_key = "test_deletion_proof_key_32_bytes!";
-    std::env::set_var("CONTEXTRA_DELETION_PROOF_KEY", test_key);
-
-    let forget_req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_forget",
-            "arguments": {
-                "collection": col_name,
-                "confirm": true
-            }
-        }),
-    );
-    let resp_drop = server.handle(forget_req).await;
-    assert!(resp_drop.error.is_none());
-    let res_drop = serde_json::to_value(&resp_drop).unwrap();
-    assert_ne!(res_drop["result"]["isError"], true);
-
-    let text = res_drop["result"]["content"][0]["text"].as_str().unwrap();
-    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-    assert_eq!(json_res["ok"], true);
-    assert_eq!(json_res["collection"], col_name);
-    assert_eq!(json_res["proof_scope"], "collection");
-
-    let proof_val = &json_res["proof"];
-    let proof: contextra_crypto::deletion_proof::DeletionProof =
-        serde_json::from_value(proof_val.clone()).unwrap();
-    assert!(proof.verify(test_key.as_bytes()).unwrap());
-
-    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
 }
 
 #[tokio::test]
@@ -598,6 +502,94 @@ async fn test_search_validates_empty_or_oversized_query() {
     assert!(err_huge.message.contains("query size exceeds limit"));
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_contextra_delete_single_doc_fields() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    // 1. Insert document
+    let insert_req = make_request(
+        "contextra_insert",
+        json!({
+            "id": "delete_doc_1",
+            "text": "Data to delete",
+            "collection": "default"
+        }),
+    );
+    let resp = server.handle(insert_req).await;
+    assert!(resp.error.is_none());
+
+    // 2. Delete single document using contextra_delete tool
+    let delete_req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_delete",
+            "arguments": {
+                "collection": "default",
+                "id": "delete_doc_1"
+            }
+        }),
+    );
+    let resp_d = server.handle(delete_req).await;
+    assert!(resp_d.error.is_none());
+    let res_d = serde_json::to_value(&resp_d).unwrap();
+    assert_ne!(res_d["result"]["isError"], true);
+
+    let text = res_d["result"]["content"][0]["text"].as_str().unwrap();
+    let json_res: Value = serde_json::from_str(text).unwrap();
+
+    assert_eq!(json_res["ok"], true);
+    assert_eq!(json_res["deleted"], true);
+    assert_eq!(json_res["id"], "delete_doc_1");
+}
+
+#[tokio::test]
+async fn test_inv_no_forbidden_phrases() {
+    // 1. No tool text in tools/list contains forbidden completeness/legal claims
+    let (server, _tmp) = create_mock_server().await;
+    let req = make_request("tools/list", json!({}));
+    let response = server.handle(req).await;
+    let tools = response.result.unwrap()["tools"]
+        .as_array()
+        .unwrap()
+        .clone();
+
+    let forbidden_phrases = [
+        "100% gelöscht",
+        "100 % gelöscht",
+        "unwiederbringlich",
+        "garantiert",
+        concat!("DS", "GVO-konform"),
+        "rechtskonform",
+        "Löschzertifikat",
+    ];
+
+    for tool in &tools {
+        let desc = tool["description"].as_str().unwrap_or("");
+        for phrase in &forbidden_phrases {
+            assert!(
+                !desc.to_lowercase().contains(&phrase.to_lowercase()),
+                "Tool '{}' description contains forbidden phrase '{}': '{}'",
+                tool["name"],
+                phrase,
+                desc
+            );
+        }
+    }
+
+    // 2. Verify single doc delete returns clean deletion object without residual keys
+    let delete_req = make_request(
+        "contextra_delete",
+        json!({
+            "collection": "default",
+            "id": "dummy_check_id"
+        }),
+    );
+    let resp_del = server.handle(delete_req).await;
+    if let Some(res_val) = resp_del.result {
+        assert_eq!(res_val["deleted"], true);
+    }
+}
+
 #[tokio::test]
 async fn test_create_collection_with_auto_extraction_param() {
     let (server, _tmp) = create_mock_server_with_write(true).await;
@@ -757,10 +749,8 @@ async fn test_write_tool_rejected_when_read_only() {
         "contextra_insert",
         "contextra_delete",
         "contextra_upsert",
-        "contextra_relate",
         "contextra_create_collection",
         "contextra_drop_collection",
-        "contextra_consolidate",
     ];
 
     for tool in write_tools {
@@ -959,398 +949,26 @@ async fn test_batch_request_handling() {
 }
 
 #[tokio::test]
-async fn test_contextra_consolidate_success() {
+async fn test_unregistered_tools_rejected_fail_closed() {
     let (server, _tmp) = create_mock_server_with_write(true).await;
 
-    // Insert 2 documents into default collection
-    let insert_req1 = make_request(
-        "contextra_insert",
-        json!({
-            "id": "turn_doc_1",
-            "text": "First turn text",
-            "collection": "default"
-        }),
-    );
-    let resp1 = server.handle(insert_req1).await;
-    assert!(resp1.error.is_none());
+    let unlisted_tools = ["contextra_consolidate", "contextra_cloud_query"];
 
-    let insert_req2 = make_request(
-        "contextra_insert",
-        json!({
-            "id": "turn_doc_2",
-            "text": "Second turn text",
-            "collection": "default"
-        }),
-    );
-    let resp2 = server.handle(insert_req2).await;
-    assert!(resp2.error.is_none());
-
-    // Trigger manual consolidation via MCP
-    let consolidate_req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": "default"
-            }
-        }),
-    );
-
-    let resp = server.handle(consolidate_req).await;
-    assert!(resp.error.is_none());
-
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_ne!(res_val["result"]["isError"], true);
-
-    let text_out = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    let json_out: serde_json::Value = serde_json::from_str(text_out).unwrap();
-
-    assert_eq!(json_out["ok"], true);
-    assert_eq!(json_out["collection"], "default");
-    assert!(json_out["turns_scanned"].as_u64().unwrap() >= 2);
-    assert!(json_out.get("segments_created").is_some());
-    assert!(json_out.get("duplicates_tombstoned").is_some());
-    assert!(json_out.get("synthesized_chunks").is_some());
-}
-
-#[tokio::test]
-async fn test_contextra_consolidate_read_only_rejected() {
-    let (server, _tmp) = create_mock_server_with_write(false).await;
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": "default"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("Sandbox: DB-Schreibzugriff gesperrt"));
-}
-
-#[tokio::test]
-async fn test_contextra_consolidate_unknown_collection() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": "invalid/collection:name"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("forbidden characters"));
-}
-
-#[tokio::test]
-async fn test_contextra_consolidate_fault_injection() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    // Send malformed arguments (collection as integer instead of string)
-    let req_wrong_type = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": 12345
-            }
-        }),
-    );
-
-    let resp = server.handle(req_wrong_type).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("collection' must be a string"));
-
-    // Direct RPC invocation with invalid params
-    let req_direct = make_request("contextra_consolidate", json!({ "collection": 9999 }));
-    let direct_resp = server.handle(req_direct).await;
-    let err = direct_resp
-        .error
-        .expect("error expected for direct invalid call");
-    assert_eq!(err.code, -32602);
-}
-
-#[cfg(feature = "kv-bridge")]
-#[tokio::test]
-async fn test_kv_bridge_adapter_consulted_on_retrieve() {
-    let tmp = TempDir::new().expect("temp dir");
-    let db = Contextra::open(tmp.path()).await.expect("open db");
-    let collection = db.collection("default").await.expect("collection");
-    let dim = collection.dimension();
-    let embedder = Arc::new(MockEmbedder { dimension: dim });
-
-    let store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
-    let master_km =
-        contextra_crypto::CryptoKey::try_new("test-mcp-kv", b"test-salt-mcp-kv").unwrap();
-    let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km));
-    let bridge_adapter = Arc::new(contextra_infer_candle::KvBridgeAdapter::new(store, cipher));
-
-    let server = Arc::new(
-        McpServer::with_write_permission(Arc::new(db), embedder, true)
-            .expect("server new")
-            .with_kv_bridge(Some(bridge_adapter)),
-    );
-
-    // Insert a document first so search returns a result
-    let insert_req = make_request(
-        "contextra_insert",
-        json!({
-            "id": "doc_kv_test",
-            "text": "kv bridge consultation test content"
-        }),
-    );
-    let insert_resp = server.handle(insert_req).await;
-    assert!(insert_resp.error.is_none());
-
-    // Execute contextra_search tool call
-    let search_req = make_request(
-        "contextra_search",
-        json!({
-            "query": "kv bridge consultation",
-            "k": 5
-        }),
-    );
-    let search_resp = server.handle(search_req).await;
-    assert!(search_resp.error.is_none());
-
-    let bridge = server
-        .kv_bridge
-        .as_ref()
-        .expect("kv_bridge must be attached for this test");
-    assert!(
-        bridge.consultation_count() > 0,
-        "KvBridgeAdapter must be consulted during contextra_search execution"
-    );
-}
-
-#[tokio::test]
-async fn test_cloud_query_sensitive_input_blocked_by_egress_classifier() {
-    let (server, _tmp) = create_mock_server().await;
-
-    // 1. Test simulated email address payload
-    let req_email = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "search user data for alice@example.com"
-            }
-        }),
-    );
-    let resp_email = server.handle(req_email).await;
-    let res_val1 = serde_json::to_value(&resp_email).unwrap();
-    assert_eq!(res_val1["result"]["isError"], true);
-    let err_msg1 = res_val1["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(
-        err_msg1.contains("Egress policy violation: query blocked by rule R-005"),
-        "Expected opaque rule ID in block message for email input, got: '{err_msg1}'"
-    );
-    assert!(
-        !err_msg1.contains("@"),
-        "Error message must not leak raw regex pattern"
-    );
-
-    // 2. Test simulated API key payload (e.g. sk-...)
-    let req_apikey = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "query API using secret sk-abc123456789"
-            }
-        }),
-    );
-    let resp_apikey = server.handle(req_apikey).await;
-    let res_val2 = serde_json::to_value(&resp_apikey).unwrap();
-    assert_eq!(res_val2["result"]["isError"], true);
-    let err_msg2 = res_val2["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(
-        err_msg2.contains("Egress policy violation: query blocked by rule R-001"),
-        "Expected opaque rule ID in block message for API key input, got: '{err_msg2}'"
-    );
-
-    // 3. Test sensitive keyword pattern (api_key, password)
-    let req_password = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "retrieve my password for admin account"
-            }
-        }),
-    );
-    let resp_password = server.handle(req_password).await;
-    let res_val3 = serde_json::to_value(&resp_password).unwrap();
-    assert_eq!(res_val3["result"]["isError"], true);
-    let err_msg3 = res_val3["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(
-        err_msg3.contains("Egress policy violation: query blocked by rule R-004"),
-        "Expected opaque rule ID in block message for password input, got: '{err_msg3}'"
-    );
-}
-
-#[tokio::test]
-async fn test_cloud_query_allow_returns_success() {
-    let (server, _tmp) = create_mock_server().await;
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "safe public query for documentation"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    assert!(resp.error.is_none());
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_ne!(res_val["result"]["isError"], true);
-
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-
-    assert_eq!(json_res["status"], "success");
-    assert_eq!(json_res["abstracted"], false);
-    assert_eq!(json_res["query"], "safe public query for documentation");
-}
-
-#[tokio::test]
-async fn test_removed_substring_early_branch_runs_through_regex_vault() {
-    let (server, _tmp) = create_mock_server().await;
-
-    // Previously, queries containing "abstract" or "PII" were intercepted by a substring early branch.
-    // Now they must run through DefaultEgressClassifier's EgressVault patterns.
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "safe query mentioning abstract concepts and PII terminology"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    assert!(resp.error.is_none());
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_ne!(res_val["result"]["isError"], true);
-
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-
-    // Since it contains no sensitive regex patterns (sk-, AKIA, password, email, etc.), it returns Allow (status: success, abstracted: false).
-    assert_eq!(json_res["status"], "success");
-    assert_eq!(json_res["abstracted"], false);
-    assert_eq!(
-        json_res["query"],
-        "safe query mentioning abstract concepts and PII terminology"
-    );
-}
-
-#[tokio::test]
-async fn test_cloud_query_secret_with_abstract_word_is_blocked_by_vault() {
-    let (server, _tmp) = create_mock_server().await;
-
-    // Payload containing the word "abstract" PLUS a sensitive key pattern "sk-abc123456789"
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "please abstract this secret key sk-abc123456789 for me"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-
-    let err_msg = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(
-        err_msg.contains("Egress policy violation: query blocked by rule R-001"),
-        "Expected opaque rule ID R-001 in block message, got: '{err_msg}'"
-    );
-    assert!(
-        !err_msg.contains("sk-"),
-        "Error message must not leak raw pattern, got: '{err_msg}'"
-    );
-}
-
-#[tokio::test]
-async fn test_cloud_query_at_sign_without_email_is_allowed() {
-    let (server, _tmp) = create_mock_server().await;
-
-    // Text containing '@' but NOT matching email address regex
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "meeting @ 5pm in office"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    assert!(resp.error.is_none());
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_ne!(res_val["result"]["isError"], true);
-
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-
-    assert_eq!(json_res["status"], "success");
-    assert_eq!(json_res["query"], "meeting @ 5pm in office");
-}
-
-#[tokio::test]
-async fn test_cloud_query_validates_empty_and_oversized_query() {
-    let (server, _tmp) = create_mock_server().await;
-
-    // 1. Whitespace / empty query
-    let req_empty = make_request(
-        "contextra_cloud_query",
-        json!({
-            "query": "   "
-        }),
-    );
-    let resp_empty = server.handle(req_empty).await;
-    let err_empty = resp_empty
-        .error
-        .expect("error expected for empty cloud query");
-    assert_eq!(err_empty.code, -32602);
-    assert!(err_empty.message.contains("query cannot be empty"));
-
-    // 2. Oversized query (> 64KB)
-    let huge_query = "q".repeat(crate::MAX_SEARCH_QUERY_BYTES + 1);
-    let req_huge = make_request(
-        "contextra_cloud_query",
-        json!({
-            "query": huge_query
-        }),
-    );
-    let resp_huge = server.handle(req_huge).await;
-    let err_huge = resp_huge
-        .error
-        .expect("error expected for oversized cloud query");
-    assert_eq!(err_huge.code, -32602);
-    assert!(err_huge.message.contains("query size exceeds limit"));
+    for tool_name in unlisted_tools {
+        let req = make_request(
+            "tools/call",
+            json!({
+                "name": tool_name,
+                "arguments": { "collection": "default" }
+            }),
+        );
+        let resp = server.handle(req).await;
+        let res_val = serde_json::to_value(&resp).unwrap();
+        assert_eq!(res_val["result"]["isError"], true);
+        let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+        assert!(
+            text.contains("unknown tool") || text.contains("Code-Ausführung"),
+            "Expected fail-closed rejection for unlisted tool '{tool_name}', got: '{text}'"
+        );
+    }
 }

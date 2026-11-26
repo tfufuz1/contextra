@@ -1,13 +1,18 @@
+//! # Lesepfad-Implementierung (Ring 1)
+//!
+//! Sucht Schluessel hierarchisch: Aktive MemTable -> Immutable MemTables -> L0..LN SSTables.
+
 use super::super::engine::LsmStorage;
 use super::super::scan::{check_in_range, SstableScanMode};
 use super::super::validate_key;
 use bytes::Bytes;
-use contextra_core::{Result, StorageEngine, TOMBSTONE_BIT};
+use contextra_ports::StorageEngine;
+use contextra_types::{Result, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 
 pub(crate) async fn get_tracked(
     storage: &LsmStorage,
-    tx_id: contextra_core::TxId,
+    tx_id: contextra_types::TxId,
     key: &[u8],
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
@@ -31,7 +36,7 @@ pub(crate) async fn get_tracked(
 /// handled in a separate task.
 pub(crate) async fn get_at_seq_tracked(
     storage: &LsmStorage,
-    tx_id: contextra_core::TxId,
+    tx_id: contextra_types::TxId,
     key: &[u8],
     snapshot_seq: u64,
 ) -> Result<Option<Bytes>> {
@@ -46,13 +51,10 @@ pub(crate) async fn get_at_seq_tracked(
 
 pub(crate) async fn scan_prefix_tracked(
     storage: &LsmStorage,
-    tx_id: contextra_core::TxId,
+    tx_id: contextra_types::TxId,
     prefix: &[u8],
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
     let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
-    storage
-        .tx_buffer
-        .register_prefix_read(tx_id, prefix.to_vec(), snapshot_seq);
     let results = storage.scan_prefix_at(prefix, snapshot_seq).await?;
     for (k, _) in &results {
         storage
@@ -119,7 +121,7 @@ pub(super) async fn get_at_seq(
     // 3. SSTables (newest first, filtered by seq_no and snapshot_tx)
     let sstables = storage.sstables.read().await.clone();
     for sst in sstables.iter().rev() {
-        if (sst.metadata().min_tx_id < contextra_core::TxId::INTERNAL_BASE
+        if (sst.metadata().min_tx_id < contextra_types::TxId::INTERNAL_BASE
             && snapshot_tx < sst.metadata().min_tx_id)
             || seq_no < sst.metadata().min_seq
         {

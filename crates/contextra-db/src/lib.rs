@@ -1,95 +1,108 @@
 // FILE-CONTEXT
-// ZWECK: Contextra Database Strangler Shell / Re-export Facade (Layer 3).
-// INVARIANTEN: Backward compatibility for all public types; re-exports from contextra-engine and contextra-cognition.
+// ZWECK: Contextra Database Facade & Integration Hub (Ring 3).
+// INVARIANTEN: Abwärtskompatibilität für bestehende Pfade via prelude/advanced; Forbid unsafe code.
 
 #![forbid(unsafe_code)]
 
-pub use contextra_cognition as cognition;
-pub use contextra_engine as engine;
+//! # Contextra DB — Facade & Integrationstest-Hub
+//!
+//! `contextra-db` bildet die benutzerfreundliche Hauptfassade (Ring 3) für Anwendungen,
+//! welche die Contextra-Datenbankbibliothek als eingebettete Engine nutzen.
+//!
+//! ## Architekturübersicht: Welche Schicht gehört wozu?
+//!
+//! Contextra ist als geschichteter Baukasten (Layered Toolkit) konzipiert:
+//!
+//! - **Ring 0 — Fundament & Hardware-Isolation (`contextra-store`, `contextra-sys`, `contextra-wire`)**:
+//!   Verwaltet LSM-Storage (Log-Structured Merge-Tree), WAL (Write-Ahead-Log), Speicher-Locks,
+//!   Zero-Copy-IPC sowie direkte I/O- und Durabilitätssicherungen (fsync/fdatasync).
+//! - **Ring 1 — Fachspezifische Indizes (`contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-crypto`)**:
+//!   Implementiert Vektorsuche (HNSW / Hierarchical Navigable Small World), BM25-Textsuche,
+//!   Graph-CSR-Strukturen (Compressed Sparse Row) und kryptographische Authentifizierung.
+//! - **Ring 2 — Adaption & Aggregation (`contextra-engine`, `contextra-adapt`)**:
+//!   Kombiniert Multi-Signal-Fusion (RRF / Reciprocal Rank Fusion) und dynamische Schwellenwert-Anpassung.
+//! - **Ring 3 — Fassade & Haupt-API (`contextra-db`)**:
+//!   Bündelt alle Subsysteme in eine konsistente, typ- und mandanten-sichere Storage-API ([`Contextra`], [`Collection`]).
+//!
+//! ## Einbindung und Abhängigkeiten
+//! - **Eingehende Einbindungen**: `contextra` (Top-Level Facade), `contextra-agent`, `contextra-py` (Python-Bindings), `contextra-bench`.
+//! - **Ausgehende Abhängigkeiten**: `contextra-engine`, `contextra-types`, `contextra-ports`, `contextra-store`,
+//!   `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-adapt`, `contextra-rank`,
+//!   `contextra-checkpoint`, `contextra-crypto`, `contextra-sys`.
+//!
+//! ## API-Strukturierung: `prelude` vs. `advanced`
+//!
+//! - **[`prelude`]**: Die empfohlene, stabile Kern-API für reguläre Datenbankoperationen (Einfügen, Suchen, Löschen, Multi-Step).
+//! - **[`advanced`]**: Erweiterte Steuerungselemente und fortgeschrittene Subsystem-Schnittstellen aus `adapt` und `engine`.
 
-// Re-exports from contextra-engine
-#[allow(deprecated)]
-pub use contextra_engine::MetadataFilter;
-pub use contextra_engine::{
-    background_workers, chunker, collection, export, filter, import, temporal_filter, transaction,
-};
-pub use contextra_engine::{
-    CommunityDetectionConfig, Contextra, ContextraConfig, ContextraStats, DbStats, Document,
-    EmbeddingBackend, ExportCollectionV1, ExportDocumentV1, ExportMemoryV1, ExportRelationV1,
-    HybridQueryBuilder, ImportSummary, Language, ProvenanceRecord, SearchResult, SearchStrategy,
-    SignalContribution, SignalWeights, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
-};
+// ANCHOR[contextra-db:FACADE-001]
+/// Stabile Kern-API für den alltäglichen Einsatz.
+///
+/// Enthält alle wesentlichen Typen für das Öffnen der Datenbank, Dokumentenoperationen,
+/// Hybrid-Abfragen und Multi-Step Retrieval.
+pub mod prelude {
+    pub use contextra_engine::collection::{self, Collection, CollectionConfig};
+    pub use contextra_engine::{
+        Contextra, ContextraConfig, ContextraStats, DbStats, Document, EmbeddingBackend,
+        HybridQueryBuilder, Language, ProvenanceRecord, SearchResult, SearchStrategy,
+        SignalContribution, SignalWeights,
+    };
+    pub use contextra_types::{DistanceMetric, DocId, RequestContext, TenantId, TxId};
 
-#[cfg(feature = "graph-connectivity-health")]
-pub use contextra_engine::collection::maintenance::PercolationResult;
-#[cfg(feature = "sandbox")]
-pub use contextra_engine::SandboxBridge;
+    pub use crate::multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
 
-// Re-exports from contextra-cognition
-#[allow(deprecated)]
-pub use contextra_cognition::execute_sleep_cycle;
-pub use contextra_cognition::{
-    cleanup_orphaned_consolidation_intents, compact_segment_via_context_compactor,
-    compute_community_hash, detect_near_duplicates, execute_background_consolidation,
-    execute_consolidation_pass, group_turns_into_segments, run_consolidation_pass,
-    run_synthesis_pass, CommunityStabilityTracker, CompactedContext, CompactionStrategy,
-    ConsolidationConfig, ConsolidationEngine, ConsolidationNodesGuard, ConsolidationPhaseResult,
-    ConsolidationSession, ContextCompactor, ContextManager, MaintenanceConfig,
-    MaintenanceScheduler, MetaChunk, SpatialFence, StatusToken, SynthesisConfig,
-    SynthesisPhaseResult, TurnSegment,
-};
-
-pub mod context {
-    pub use contextra_cognition::context::*;
-}
-pub mod context_compaction {
-    pub use contextra_cognition::context_compaction::*;
-}
-pub mod memory_consolidation {
-    pub use contextra_cognition::memory_consolidation::*;
-}
-pub mod synthesis_phase {
-    pub use contextra_cognition::synthesis_phase::*;
-}
-pub mod consolidation_executor {
-    pub use contextra_cognition::consolidation_executor::*;
-}
-pub mod consolidation_locks {
-    pub use contextra_cognition::consolidation_locks::*;
-}
-pub mod maintenance_scheduler {
-    pub use contextra_cognition::maintenance_scheduler::*;
-}
-pub mod maintenance_config {
-    pub use contextra_cognition::maintenance_config::*;
+    #[cfg(feature = "volatile-vault")]
+    pub use crate::volatile_vault::*;
 }
 
-#[deprecated(note = "use background_workers instead")]
-pub mod reaper {
-    pub use contextra_engine::background_workers::*;
-}
-#[deprecated(note = "use start_consolidation_worker instead")]
-#[allow(deprecated)]
-pub use contextra_cognition::start_consolidation_reaper;
+// ANCHOR[contextra-db:FACADE-002]
+/// Erweiterte Experten-Schnittstellen aus Adaption und Engine.
+pub mod advanced {
+    pub use crate::decay_controller::{
+        AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs,
+    };
+    pub use crate::homeostat::RerankDeadline;
+    #[allow(deprecated)]
+    pub use crate::homeostat::RerankPidController;
+    pub use crate::pid_latency_controller::{
+        LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS, MAX_SCALING_FACTOR,
+        MIN_SCALING_FACTOR,
+    };
 
-// mod Collection is used via pub mod collection
+    pub use contextra_engine as engine;
+    pub use contextra_engine::DurabilityMode;
+
+    pub use contextra_engine::{
+        background_workers, chunker, export, filter, import, temporal_filter, transaction,
+        CommunityDetectionConfig, ExportCollectionV1, ExportDocumentV1, ExportMemoryV1,
+        ExportRelationV1, ImportSummary, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
+    };
+}
+
+// Abwärtskompatible Re-Exports auf Root-Ebene (bestehender Code kompiliert nahtlos weiter)
+pub use advanced::*;
+pub use prelude::*;
+
+// ANCHOR[contextra-db:FACADE-012]
+/// Adaptiver Decay-Controller für zeitliche Relevanz-Abwertung.
 pub mod decay_controller {
-    pub use contextra_adapt::decay_controller::*;
+    pub use contextra_engine::decay_controller::*;
 }
 pub use contextra_engine::fusion;
+// ANCHOR[contextra-db:FACADE-013]
+/// Homeostat-Modul für PID-Kandidatenpool-Regulierung.
 pub mod homeostat;
+// ANCHOR[contextra-db:FACADE-014]
+/// Iteratives Multi-Step Retrieval mit Query Rewriting.
 pub mod multistep;
-pub mod pid_latency_controller {
-    pub use contextra_adapt::pid_latency_controller::*;
-}
+// ANCHOR[contextra-db:FACADE-015]
+/// PID-Regler zur Einhaltung von Latenzbudgets.
+pub mod pid_latency_controller;
 
 #[cfg(feature = "volatile-vault")]
 pub mod volatile_vault;
 #[cfg(feature = "volatile-vault")]
-pub use volatile_vault::{
-    CommitReceipt, PurgeReceipt, SignalModality, VaultChunk, VaultChunkMetadata, VaultConfig,
-    VaultError, VolatileContextVault,
-};
+pub use volatile_vault::*;
 
 pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
 pub use homeostat::RerankDeadline;
@@ -102,9 +115,6 @@ pub use pid_latency_controller::{
 };
 
 pub use collection::{Collection, CollectionConfig};
-pub use contextra_checkpoint;
-#[cfg(feature = "graph-connectivity-health")]
-pub use contextra_graph::percolation::PercolationConfig;
 
 pub use contextra_ports::{DriftStatusProvider, SegmentSynthesizer, TextEmbeddingEngine};
 pub use contextra_types::DistanceMetric;
@@ -118,6 +128,7 @@ mod tests {
     use std::sync::Arc;
     use tempfile::TempDir;
 
+    // Erzeugt eine temporäre Test-Datenbankinstanz mit angegebener Vektordimension.
     async fn test_db(dim: usize) -> (Contextra, TempDir) {
         let tmp = TempDir::new().expect("temp dir"); // expect
         let config = ContextraConfig {
@@ -132,6 +143,7 @@ mod tests {
         (db, tmp)
     }
 
+    // Prüft Einfügen und Vektorsuche im Roundtrip.
     #[tokio::test]
     async fn test_insert_search_roundtrip() {
         let (db, _tmp) = test_db(4).await;
@@ -162,6 +174,7 @@ mod tests {
         assert!(results[0].score > results[1].score);
     }
 
+    // Prüft, dass Suchergebnisse gespeicherte Metadaten korrekt zurückliefern.
     #[tokio::test]
     async fn test_insert_search_returns_metadata() {
         let (db, _tmp) = test_db(4).await;
@@ -182,6 +195,7 @@ mod tests {
         assert_eq!(meta["priority"], 1);
     }
 
+    // Prüft das Auslesen eines Dokuments anhand seines Primärschlüssels.
     #[tokio::test]
     async fn test_get_by_key() {
         let (db, _tmp) = test_db(4).await;
@@ -202,6 +216,7 @@ mod tests {
         assert!(none.is_none());
     }
 
+    // Prüft das Aktualisieren von Vektor und Metadaten eines Dokuments.
     #[tokio::test]
     async fn test_update() {
         let (db, _tmp) = test_db(4).await;
@@ -224,6 +239,7 @@ mod tests {
         assert_eq!(results[0].id, "doc-1");
     }
 
+    // Prüft das Löschen eines Dokuments und Konsistenz von db.len().
     #[tokio::test]
     async fn test_delete() {
         let (db, _tmp) = test_db(4).await;
@@ -241,6 +257,7 @@ mod tests {
         assert!(doc.is_none());
     }
 
+    // Prüft das Anlegen gerichteter Wissensgraph-Kanten zwischen Dokumenten.
     #[tokio::test]
     async fn test_relate() {
         let (db, _tmp) = test_db(4).await;
@@ -258,6 +275,7 @@ mod tests {
             .expect("relate"); // expect
     }
 
+    // Prüft, dass Vektoren mit inkompatibler Dimension abgewiesen werden (Fail-Closed).
     #[tokio::test]
     async fn test_dimension_mismatch() {
         let (db, _tmp) = test_db(4).await;
@@ -265,6 +283,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    // Prüft, dass eine Suche auf leerer Datenbank eine leere Ergebnismenge liefert.
     #[tokio::test]
     async fn test_empty_search() {
         let (db, _tmp) = test_db(4).await;
@@ -272,6 +291,7 @@ mod tests {
         assert!(results.is_empty());
     }
 
+    // Prüft bidirektionale Relationen und Prefix-Scans im Wissensgraphen.
     #[tokio::test]
     async fn test_relate_and_scan_prefix() {
         let (db, _tmp) = test_db(4).await;
@@ -316,6 +336,7 @@ mod tests {
         assert_eq!(backward_results[0].1["to"], "doc-1");
     }
 
+    // Prüft die Aggregation von Statistiken über Speicher und Indizes.
     #[tokio::test]
     async fn test_stats_aggregation() {
         let (db, _tmp) = test_db(4).await;
@@ -331,6 +352,7 @@ mod tests {
         assert!(stats.storage_stats.memtable_size_bytes > 0);
     }
 
+    // Prüft den Lebenszyklus von Weak-References bei Drift-Providern und Kalibratoren in den Statistiken.
     #[tokio::test]
     async fn test_stats_live_data_and_weak_reference_lifecycle() {
         let (db, _tmp) = test_db(4).await;
@@ -349,15 +371,13 @@ mod tests {
                 "stabil".to_string()
             }
         }
+        let dummy = DummyRouter;
+        assert_eq!(dummy.overall_drift_status(), "stabil");
 
         let router_arc: Arc<dyn DriftStatusProvider> = Arc::new(DummyRouter);
         let calibrator_arc = Arc::new(parking_lot::Mutex::new(
             contextra_rank::IsotonicCalibrator::new(5, 100),
         ));
-        let pid_arc = Arc::new(parking_lot::Mutex::new(
-            contextra_adapt::PidController::new(150.0, 50, 200, Some(100)),
-        ));
-
         // Warmup calibrator so ECE is populated
         {
             let mut cal = calibrator_arc.lock();
@@ -369,18 +389,15 @@ mod tests {
 
         db.set_router(Arc::downgrade(&router_arc));
         db.set_calibrator(Arc::downgrade(&calibrator_arc));
-        db.set_pid_controller(Arc::downgrade(&pid_arc));
 
         let stats_attached = db.stats().await.expect("stats");
         assert_eq!(stats_attached.drift_status, "stabil");
         assert!(stats_attached.calibration_ece.is_some());
         assert!(stats_attached.last_calibration_at.is_some());
-        assert_eq!(stats_attached.pid_pool_size, Some(100));
 
         // 3. Drop strong references (simulating shutdown) -> stats() must not panic and fallback gracefully
         drop(router_arc);
         drop(calibrator_arc);
-        drop(pid_arc);
 
         let stats_dropped = db.stats().await.expect("stats after drop");
         assert_eq!(stats_dropped.drift_status, "nicht verfügbar");
@@ -389,6 +406,7 @@ mod tests {
         assert_eq!(stats_dropped.pid_pool_size, None);
     }
 
+    // Prüft die End-to-End-Integration von Insert, Relate, Search, Update und Delete.
     #[tokio::test]
     async fn test_integration_end_to_end() {
         let (db, _tmp) = test_db(4).await;
@@ -454,6 +472,7 @@ mod tests {
         assert_eq!(db.len().await.expect("len"), 2); // 3 inserted, 1 deleted // expect
     }
 
+    // Prüft, dass nebenläufige Aufrufe von db.collection() dieselbe Collection-Instanz (Arc) liefern (Idempotenz).
     #[tokio::test]
     async fn test_concurrent_collection_idempotency() {
         let (db, _tmp) = test_db(4).await;
@@ -481,20 +500,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn collections_are_isolated() {
-        let (db, _tmp) = test_db(4).await;
-        let vec = vec![1.0, 0.0, 0.0, 0.0];
-        let col_a = db.collection("alpha").await.unwrap(); // unwrap
-        let col_b = db.collection("beta").await.unwrap(); // unwrap
-        col_a.insert("doc1", &vec, None).await.unwrap(); // unwrap
-        let results = col_b.search(&vec, 10).await.unwrap(); // unwrap
-        assert!(
-            results.is_empty(),
-            "Collection B must not see Collection A's data"
-        );
-    }
-
+    // Prüft Daten- und Schlüsselraum-Isolation über separate Kollektionen hinweg.
     #[tokio::test]
     async fn test_collections_are_isolated() {
         let (db, _tmp) = test_db(4).await;
@@ -525,6 +531,7 @@ mod tests {
         assert_eq!(search_a[0].metadata.as_ref().expect("test")["val"], "a"); // expect
     }
 
+    // Prüft Persistenz und Wiederherstellung nach Schließen und erneutem Öffnen mit 100 Dokumenten.
     #[tokio::test]
     async fn test_close_and_reopen_100_docs() {
         let tmp = TempDir::new().expect("temp dir"); // expect
@@ -564,6 +571,7 @@ mod tests {
         }
     }
 
+    // Prüft Schließen und Wiederöffnen mit Einzelwerten.
     #[tokio::test]
     async fn test_close_and_reopen() {
         let tmp = TempDir::new().expect("temp dir"); // expect
@@ -593,6 +601,7 @@ mod tests {
         }
     }
 
+    // Prüft, dass drop_collection alle Daten und Indizes der Kollektion vollständig entfernt.
     #[tokio::test]
     async fn test_drop_removes_all_data() {
         let (db, _tmp) = test_db(4).await;
@@ -617,6 +626,7 @@ mod tests {
         assert!(col2.get("k1").await.expect("get").is_none()); // expect
     }
 
+    // Prüft Abwärtskompatibilität der Standard-Kollektion ("default").
     #[tokio::test]
     async fn test_default_collection_compat() {
         let (db, _tmp) = test_db(4).await;
@@ -631,6 +641,7 @@ mod tests {
         assert_eq!(results[0].id, "k");
     }
 
+    // Prüft das Auflisten aller vorhandenen Kollektionsnamen.
     #[tokio::test]
     async fn test_list_collections() {
         let (db, _tmp) = test_db(4).await;
@@ -646,6 +657,7 @@ mod tests {
         assert_eq!(list.len(), 4);
     }
 
+    // Prüft Standardwerte von ContextraConfig (ONNX-Modell und 768 Dimensionen).
     #[test]
     fn test_contextra_config_defaults_to_onnx_backend() {
         let config = ContextraConfig::default();
@@ -666,6 +678,7 @@ mod tests {
         );
     }
 
+    // Prüft ONNX-Embedding-Integration End-to-End mit Modell-Fixtures.
     #[tokio::test]
     #[cfg(feature = "onnx")]
     async fn test_onnx_default_backend_e2e_with_fixture() {
@@ -708,6 +721,7 @@ mod tests {
         assert_eq!(vec.len(), 32);
     }
 
+    // Prüft, dass Wiederöffnen mit abweichender Vektordimension fehlschlägt.
     #[tokio::test]
     async fn test_open_dimension_mismatch_fails() -> contextra_types::Result<()> {
         let dir = tempfile::tempdir()
@@ -734,6 +748,7 @@ mod tests {
         Ok(())
     }
 
+    // Prüft Serialisierung und Deserialisierung von ProvenanceRecord im JSON-Roundtrip.
     #[test]
     fn test_provenance_record_serialization_roundtrip() {
         let p = ProvenanceRecord {
@@ -760,6 +775,7 @@ mod tests {
         assert_eq!(back.source_collection.as_deref(), Some("test_col"));
     }
 
+    // Prüft Serialisierung von SearchResult mit befülltem ProvenanceRecord.
     #[test]
     fn test_search_result_with_provenance_serialization() {
         let sr = SearchResult {
@@ -777,6 +793,7 @@ mod tests {
         assert!(json.contains("my_col"));
     }
 
+    // Prüft, dass SearchResult ohne Provenance das entsprechende Feld im JSON auslässt.
     #[test]
     fn test_search_result_without_provenance_serialization_omits_field() {
         let sr = SearchResult {
@@ -794,6 +811,7 @@ mod tests {
         );
     }
 
+    // Prüft die Invariante INV-PROV-1: Summe der Signalbeiträge entspricht dem RRF-Score.
     #[tokio::test]
     async fn test_provenance_rrf_sum_invariant() {
         let (db, _tmp) = test_db(4).await;
@@ -842,6 +860,7 @@ mod tests {
         }
     }
 
+    // Prüft, dass Suchergebnisse bei aktivierter Provenance ein befülltes Provenance-Objekt enthalten.
     #[tokio::test]
     async fn test_search_results_have_provenance_is_some() {
         let (db, _tmp) = test_db(4).await;

@@ -1,3 +1,8 @@
+//! Test für die Implementierung des `GraphCollectionMutation`-Traits.
+//!
+//! # Zweck
+//! Überprüft kollektionsbezogene Graphänderungen, Fehlerrückgaben und Rollback-Verhalten.
+
 use contextra_graph::CsrGraph;
 use contextra_ports::graph::{
     GraphCollectionMutation, GraphMutationError, HyperEdgeId, RoleBinding, RoleId,
@@ -5,6 +10,7 @@ use contextra_ports::graph::{
 use contextra_types::{DocId, EntityId};
 use std::sync::Arc;
 
+// ANCHOR[contextra-graph:TESTS-GRAPH-COLLECTION-MUTATION-TRAIT-TEST-001]
 #[test]
 fn test_csr_graph_collection_mutation_via_dyn_trait() {
     let graph = Arc::new(CsrGraph::new());

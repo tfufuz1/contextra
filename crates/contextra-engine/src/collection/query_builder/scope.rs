@@ -1,3 +1,10 @@
+//! # Modul: scope.rs
+//!
+//! **Zweck:** Mandanten- und Scope-Einschränkungen für Abfragen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Scoping-Typen und Query-Builder Ergänzung für ACORN-Hard-Boundary (Spec §5.3, §8.5, §10.4).
 // INVARIANTEN: allowed_doc_ids als BTreeSet für deterministische Iteration (P-Systeminvariante 3).
@@ -39,7 +46,10 @@ impl ScopeConstraint {
 impl Default for ScopeConstraint {
     /// Default `ScopeConstraint` uses empty document set and default `gamma = 2` (Spec §8.5 example "γ=2").
     fn default() -> Self {
-        Self::from_allowed_ids(BTreeSet::new())
+        Self {
+            allowed_doc_ids: BTreeSet::new(),
+            gamma: 2,
+        }
     }
 }
 
@@ -51,10 +61,5 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     pub fn scope(mut self, constraint: ScopeConstraint) -> Self {
         self.hard_scope = Some(constraint);
         self
-    }
-
-    /// Convenience builder method setting a hard boundary scope from allowed document IDs.
-    pub fn scope_ids(self, allowed_doc_ids: BTreeSet<DocId>) -> Self {
-        self.scope(ScopeConstraint::from_allowed_ids(allowed_doc_ids))
     }
 }

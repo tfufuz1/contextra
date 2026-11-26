@@ -1,7 +1,13 @@
+//! # Automatische Community-Erkennung im Wissensgraphen
+//!
+//! Testet automatische Erkennung zusammenhängender Cluster und Entitäts-Communities im Graphen.
+//!
 use contextra_db::{CommunityDetectionConfig, Contextra, ContextraConfig};
 use contextra_types::EntityId;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-AUTO_COMMUNITY_DETECTION_TEST-01-TEST_AUTO_COMMUNITY_DETECTION_AFTER_150_INSERTS]
+// Testet die Funktionalität von `test_auto_community_detection_after_150_inserts`.
 #[tokio::test]
 async fn test_auto_community_detection_after_150_inserts() {
     let tmp = TempDir::new().expect("temp dir");
@@ -56,6 +62,8 @@ async fn test_auto_community_detection_after_150_inserts() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-AUTO_COMMUNITY_DETECTION_TEST-02-TEST_AUTO_COMMUNITY_DETECTION_DISABLED_WHEN_THRESHOLD_IS_ZERO]
+// Testet die Funktionalität von `test_auto_community_detection_disabled_when_threshold_is_zero`.
 #[tokio::test]
 async fn test_auto_community_detection_disabled_when_threshold_is_zero() {
     let tmp = TempDir::new().expect("temp dir");
@@ -102,6 +110,8 @@ async fn test_auto_community_detection_disabled_when_threshold_is_zero() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-AUTO_COMMUNITY_DETECTION_TEST-03-TEST_AUTO_COMMUNITY_DETECTION_CUSTOM_LOW_THRESHOLD]
+// Testet die Funktionalität von `test_auto_community_detection_custom_low_threshold`.
 #[tokio::test]
 async fn test_auto_community_detection_custom_low_threshold() {
     let tmp = TempDir::new().expect("temp dir");

@@ -1,3 +1,7 @@
+//! # Manifest-Kernlogik (Ring 1)
+//!
+//! Serialisiert und deserialisiert Manifest-Eintraege fuer Dateiaustausch und Compaction.
+
 // FILE-CONTEXT
 // STAND: 2026-09-29 (S-01 / T-04)
 // ZWECK: Kernimplementierung des Manifests zum Lesen, Schreiben, Rollover und Reconstruct aktiver SSTables.
@@ -5,7 +9,7 @@
 // HOTSPOTS: load, reconstruct_valid_sstables, append_batch
 // FORMATABKÜNDIGUNG (S-01 / T-04): `rank` in `ManifestEntry::Replace` ist abgekündigt. `reconstruct_valid_sstables` nutzt ausschließlich die Manifest-Operationsreihenfolge (`next_rank`). `recovery.rs` verwirft den Wert explizit.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
@@ -18,10 +22,15 @@ pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
 pub const CURRENT_MANIFEST_VERSION: u8 = 1;
 
 /// Append-only Manifest file handle for recording active SSTable set transitions.
+// ANCHOR[contextra-store:MAN-CORE-001]
+/// Verwaltet die VersionSet-Manifestdatei zur dauerhaften Erfassung aller SSTables.
+use std::sync::atomic::{AtomicBool, Ordering};
+
 pub struct Manifest {
     pub(super) path: PathBuf,
     pub(super) file: tokio::sync::Mutex<tokio::fs::File>,
     pub(super) _dir_lock: Option<DirLock>,
+    pub(super) is_poisoned: AtomicBool,
 }
 
 impl std::fmt::Debug for Manifest {
@@ -93,7 +102,14 @@ impl Manifest {
             path,
             file: tokio::sync::Mutex::new(file),
             _dir_lock: dir_lock,
+            is_poisoned: AtomicBool::new(false),
         })
+    }
+
+    /// Checks if the manifest handle has been poisoned by a preceding fsync failure (INV-FSYNC-1).
+    #[inline]
+    pub fn is_poisoned(&self) -> bool {
+        self.is_poisoned.load(Ordering::SeqCst)
     }
 
     /// Appends a new entry to the manifest and performs flush + fsync.
@@ -103,6 +119,13 @@ impl Manifest {
 
     /// Appends multiple entries to the manifest in a single atomic batch with flush + fsync.
     pub async fn append_batch(&self, entries: &[ManifestEntry]) -> Result<()> {
+        if self.is_poisoned() {
+            return Err(ContextraError::Storage(format!(
+                "Manifest handle for {} is poisoned due to a previous fsync failure (INV-FSYNC-1)",
+                self.path.display()
+            )));
+        }
+
         if entries.is_empty() {
             return Ok(());
         }
@@ -112,27 +135,28 @@ impl Manifest {
         }
 
         let mut file = self.file.lock().await;
-        file.write_all(&batch_bytes).await.map_err(|e| {
-            ContextraError::Storage(format!(
+        if let Err(e) = file.write_all(&batch_bytes).await {
+            return Err(ContextraError::Storage(format!(
                 "MANIFEST write failed for {}: {}",
                 self.path.display(),
                 e
-            ))
-        })?;
-        file.flush().await.map_err(|e| {
-            ContextraError::Storage(format!(
+            )));
+        }
+        if let Err(e) = file.flush().await {
+            return Err(ContextraError::Storage(format!(
                 "MANIFEST flush failed for {}: {}",
                 self.path.display(),
                 e
-            ))
-        })?;
-        file.sync_all().await.map_err(|e| {
-            ContextraError::Storage(format!(
-                "MANIFEST fsync failed for {}: {}",
+            )));
+        }
+        if let Err(e) = file.sync_all().await {
+            self.is_poisoned.store(true, Ordering::SeqCst);
+            return Err(ContextraError::Storage(format!(
+                "MANIFEST fsync failed for {}: {} (handle poisoned, INV-FSYNC-1)",
                 self.path.display(),
                 e
-            ))
-        })?;
+            )));
+        }
         Ok(())
     }
 

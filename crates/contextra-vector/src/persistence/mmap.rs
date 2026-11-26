@@ -5,18 +5,20 @@
 // HOTSPOTS: persistence/mmap.rs (MmapIndex::open)
 
 use super::{HnswHeader, NodeRecord};
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 #[derive(Clone)]
 /// A reader for memory-mapped HNSW indices.
 pub struct MmapIndex {
     pub mmap: std::sync::Arc<memmap2::Mmap>,
     pub header: HnswHeader,
+    pub path: Option<std::path::PathBuf>,
 }
 
 impl MmapIndex {
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let file = std::fs::File::open(path)
+        let path_buf = path.as_ref().to_path_buf();
+        let file = std::fs::File::open(&path_buf)
             .map_err(|e| ContextraError::Storage(format!("Failed to open HNSW file: {}", e)))?;
 
         let mmap = contextra_sys::mmap_readonly(&file)
@@ -32,6 +34,7 @@ impl MmapIndex {
         let index_obj = Self {
             mmap: std::sync::Arc::new(mmap),
             header,
+            path: Some(path_buf),
         };
 
         if index_obj.header.node_count() > 0 {

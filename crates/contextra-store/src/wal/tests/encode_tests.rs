@@ -1,7 +1,11 @@
+//! # Tests fuer WAL-Frame-Kodierung (Ring 1)
+//!
+//! Validiert Roundtrips, Framing-Grenzfaelle und Bitflips.
+
 use super::*;
 #[cfg(feature = "encryption-at-rest")]
 use crate::wal::KeyManager;
-use contextra_core::TxId;
+use contextra_types::TxId;
 #[cfg(feature = "encryption-at-rest")]
 use std::sync::Arc;
 use tempfile::tempdir;

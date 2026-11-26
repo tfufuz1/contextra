@@ -128,26 +128,17 @@ async fn test_tool_registry_alignment_with_tools_list_and_dispatch() {
     }
 
     // 2. Erwartete Kategorien festschreiben
-    // Rationale for contextra_consolidate:
-    // contextra_consolidate triggert synchrone/asynchrone Memory Consolidation Passes (Tombstone-Erstellung,
-    // Synthese-Chunks, Graph-Anpassungen im Disk-/Speicher-State).
-    // Aufgrund dieser realen Schreib- und Mutationswirkung ist contextra_consolidate als DatabaseWrite klassifiziert.
     let expected_categories: HashMap<&'static str, ToolCategory> = HashMap::from([
         ("contextra_search", ToolCategory::DatabaseRead),
         ("contextra_get", ToolCategory::DatabaseRead),
         ("contextra_collections", ToolCategory::DatabaseRead),
-        ("contextra_plugin_status", ToolCategory::DatabaseRead),
         ("contextra_explain", ToolCategory::DatabaseRead),
         ("contextra_insert", ToolCategory::DatabaseWrite),
         ("contextra_upsert", ToolCategory::DatabaseWrite),
         ("contextra_delete", ToolCategory::DatabaseWrite),
         ("contextra_forget", ToolCategory::DatabaseWrite),
-        ("contextra_relate", ToolCategory::DatabaseWrite),
-        ("contextra_relate_n_ary", ToolCategory::DatabaseWrite),
         ("contextra_create_collection", ToolCategory::DatabaseWrite),
         ("contextra_drop_collection", ToolCategory::DatabaseWrite),
-        ("contextra_consolidate", ToolCategory::DatabaseWrite),
-        ("contextra_cloud_query", ToolCategory::CloudEgress),
     ]);
 
     assert_eq!(

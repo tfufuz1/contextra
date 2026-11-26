@@ -60,6 +60,8 @@ RING_META: dict[str, tuple[int, str, str]] = {
     "contextra-rank": (0, "In Migration", "4-Signal-Retrieval-Fusion, Score-Kalibrierung und Drift-Messung."),
     "contextra-adapt": (0, "Fertig", "LinUCB-Bandit-Mathematik, Lyapunov-Drift-Wächter und PID-Regler."),
     "contextra-core": (0, "Fertig (Strangler Facade)", "Re-Export-Fassade über types, ports, mvcc und wire zur Abwärtskompatibilität."),
+    "contextra-audit-export": (0, "Fertig", "Generator für Verarbeitungsverzeichnisse gemäß DSGVO Art. 30."),
+    "contextra-avv-generator": (0, "Fertig", "Template-Generator für Auftragsverarbeitungsverträge (AVV)."),
     "contextra-license": (0, "Fertig", "Lizenzierungs- und Aktivierungsprüfung für Feature-Ringe."),
     "contextra-store": (1, "Fertig", "LSM-Tree Storage Engine mit WAL-Group-Commit und HMAC-Integritätsprüfung."),
     "contextra-kvcache": (1, "Fertig", "Verschlüsselter Prefix-Radix-Baum und KV-Cache-Segment-Verwaltung."),
@@ -93,7 +95,8 @@ RING_NAMES = {
 ORDER = [
     "contextra-types", "contextra-ports", "contextra-mvcc", "contextra-wire", "contextra-sys",
     "contextra-simd", "contextra-crypto", "contextra-vector", "contextra-text", "contextra-graph",
-    "contextra-rank", "contextra-adapt", "contextra-core", "contextra-license",
+    "contextra-rank", "contextra-adapt", "contextra-core", "contextra-audit-export",
+    "contextra-avv-generator", "contextra-license",
     "contextra-store", "contextra-kvcache", "contextra-checkpoint",
     "contextra-infer-candle", "contextra-infer-ollama", "contextra-infer-onnx", "contextra-sandbox",
     "contextra-engine", "contextra-cognition", "contextra-privacy", "contextra-router",

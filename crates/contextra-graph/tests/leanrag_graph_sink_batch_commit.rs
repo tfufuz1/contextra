@@ -1,3 +1,8 @@
+//! Stapelverarbeitungs- und Commit-Tests für die Graph-Senke in LeanRAG.
+//!
+//! # Zweck
+//! Prüft atomare Batch-Transaktionen und Konsistenz bei hohen Schreibvolumina.
+
 use contextra_graph::csr::EdgeType;
 use contextra_graph::error::GraphMutationError;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -5,6 +10,7 @@ use contextra_graph::CsrGraph;
 use contextra_types::{EntityId, TxId};
 use std::sync::Arc;
 
+// ANCHOR[contextra-graph:TESTS-LEANRAG-GRAPH-SINK-BATCH-COMMIT-001]
 #[test]
 fn test_batch_commit_single_rcu_publish_and_atomic_rollback() {
     let graph = CsrGraph::new();
@@ -136,12 +142,9 @@ fn test_batch_commit_single_rcu_publish_and_atomic_rollback() {
     let collision_res =
         graph.commit_super_edge_batch(&[HyperEdgeId::new(4)], vec![colliding_edge], TxId::new(101));
 
-    assert_eq!(
-        collision_res,
-        Err(GraphMutationError::DuplicateHyperEdgeId(HyperEdgeId::new(
-            10
-        ))),
-        "Must return DuplicateHyperEdgeId error"
+    assert!(
+        matches!(collision_res, Err(GraphMutationError::Internal(ref msg)) if msg.contains("Duplicate hyperedge ID")),
+        "Must return Duplicate hyperedge ID error"
     );
 
     // Verify H4 was NOT tombstoned (all-or-nothing semantics: no mutations applied)

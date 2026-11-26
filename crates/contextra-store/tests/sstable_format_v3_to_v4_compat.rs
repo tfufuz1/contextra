@@ -1,8 +1,8 @@
 // ZWECK: Format v3 und v4 Kompatibilitäts-Integrationstests (S-04 Phase 3).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_core::TOMBSTONE_BIT;
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
+use contextra_types::TOMBSTONE_BIT;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;

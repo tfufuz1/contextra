@@ -1,9 +1,15 @@
+//! Laufzeitkomplexitäts- und Skalierungstests für den CSR-Graphen.
+//!
+//! # Zweck
+//! Bestätigt die theoretischen Komplexitätsgrenzen O(1) und O(deg) experimentell.
+
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use contextra_ports::GraphIndex;
 use contextra_types::{Entity, EntityId};
 use std::sync::Arc;
 use std::time::Instant;
 
+// ANCHOR[contextra-graph:TESTS-CSR-COMPLEXITY-BENCH-001]
 #[tokio::test]
 async fn bench_single_compaction_scaling() {
     println!("\n=== BENCHMARK 1: Single Compaction Latency vs. Graph Size (Fixed 1,000 Pending Edges) ===");
@@ -72,6 +78,7 @@ async fn bench_single_compaction_scaling() {
     }
 }
 
+// ANCHOR[contextra-graph:TESTS-CSR-COMPLEXITY-BENCH-002]
 #[tokio::test]
 async fn bench_amortized_1m_edge_inserts() {
     println!("\n=== BENCHMARK 2: Amortized 1 Million Sequential Edge Inserts (rebuild_threshold = 1000) ===");

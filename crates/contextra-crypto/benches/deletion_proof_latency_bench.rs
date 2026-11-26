@@ -1,3 +1,6 @@
+//! # Benchmark-Suite: Löschbeweis-Latenz (`benches/deletion_proof_latency_bench.rs`)
+//!
+//! Misst Erstellungs- und Verifikationszeiten für DSGVO-Löschzertifikate unter Last.
 // FILE-CONTEXT
 // ZWECK: Criterion benchmark for cryptographic deletion proof issuance and verification latency.
 // INVARIANTEN: Measures cryptographic portion only (proof creation + signature verification + audit export)
@@ -36,10 +39,8 @@ fn bench_deletion_proof_creation_latency(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(num_keys), &num_keys, |b, _| {
             b.iter(|| {
                 let cleanup_proofs = vec![
-                    LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
-                        .unwrap(),
-                    LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)
-                        .unwrap(),
+                    LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+                    LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
                 ];
                 DeletionProof::create_with_wal_receipt(
                     black_box(scope.clone()),
@@ -79,8 +80,8 @@ fn bench_deletion_proof_verification_latency(c: &mut Criterion) {
         }
 
         let cleanup_proofs = vec![
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+            LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+            LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
         ];
         let proof = DeletionProof::create_with_wal_receipt(
             scope.clone(),
@@ -126,10 +127,8 @@ fn bench_deletion_proof_full_issuance_latency(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(num_keys), &num_keys, |b, _| {
             b.iter(|| {
                 let cleanup_proofs = vec![
-                    LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
-                        .unwrap(),
-                    LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)
-                        .unwrap(),
+                    LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+                    LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
                 ];
                 let proof = DeletionProof::create_with_wal_receipt(
                     black_box(scope.clone()),

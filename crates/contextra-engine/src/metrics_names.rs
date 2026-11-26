@@ -23,6 +23,12 @@ pub const SEARCH_LATENCY_TEXT: &str = "search.latency.text";
 /// Reserved metric name for graph signal search latency observations.
 pub const SEARCH_LATENCY_GRAPH: &str = "search.latency.graph";
 
+/// Metric name for document insert operation duration histogram observations.
+pub const INSERT_LATENCY: &str = "insert.latency";
+
+/// Metric name for expired or decayed document reaper count observations.
+pub const REAPER_DOCS_REAPED: &str = "reaper.docs_reaped";
+
 /// Helper to record a histogram metric best-effort without allowing panics to propagate.
 pub fn record_histogram_safe(
     sink: &dyn contextra_ports::MetricsSink,

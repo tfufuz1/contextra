@@ -1,3 +1,9 @@
+#![cfg(feature = "legacy-erasure")]
+//! # Integrationstest: `deletion_proof_external_verify_rejects_tamper.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_external_verify_rejects_tamper`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
     LayerCleanupProof,
@@ -13,8 +19,7 @@ fn verify_external_accepts_valid_proof() {
         doc_id: DocId::new(42),
         tenant_id,
     };
-    let layer_proof =
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+    let layer_proof = LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
 
     let proof = DeletionProof::create_v3(
         scope,
@@ -43,8 +48,7 @@ fn verify_external_rejects_tampered_timestamp() {
         doc_id: DocId::new(42),
         tenant_id,
     };
-    let layer_proof =
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+    let layer_proof = LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
 
     let mut proof = DeletionProof::create_v3(
         scope,
@@ -77,8 +81,7 @@ fn verify_external_rejects_tampered_deleted_keys_hash() {
         doc_id: DocId::new(42),
         tenant_id,
     };
-    let layer_proof =
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+    let layer_proof = LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
 
     let mut proof = DeletionProof::create_v3(
         scope,

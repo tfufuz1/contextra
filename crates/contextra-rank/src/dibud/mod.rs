@@ -1,5 +1,10 @@
-//! DiBud (Dynamic Budgeted RRF) fusion state machine, drivers, and types.
-
+//! # DiBud: Discrete Budgeted Anytime Streaming Fusion (`dibud`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! DiBud (Discrete Budgeted RRF) implementiert eine inkrementelle Streaming-Rangfusion,
+//! die jederzeit unter Einhaltung harter Ressourcenbeschränkungen (Zeit- und Kanalbudgets)
+//! abbrechbar ist und dabei ein zertifiziertes Präfix (Certified Prefix) garantiert.
 pub mod driver;
 pub mod state;
 pub mod types;

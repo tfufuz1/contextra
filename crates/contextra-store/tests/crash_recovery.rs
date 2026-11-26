@@ -1,6 +1,7 @@
 // ANCHOR[TEST:STO-001] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283)
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use tempfile::TempDir;
 
 #[tokio::test]

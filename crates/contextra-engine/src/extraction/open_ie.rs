@@ -1,3 +1,10 @@
+//! # Modul: open_ie.rs
+//!
+//! **Zweck:** Open Information Extraction (OpenIE) Heuristiken zur Wissensgraphen-Generierung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Extraktion.
+
 // FILE-CONTEXT
 // ZWECK: LLM-basierte OpenIE-Entitätsextraktion aus Texten.
 // INVARIANTEN: Zero panic / unwrap / expect in non-test paths; Harte Limitierung via max_llm_calls_per_cycle.

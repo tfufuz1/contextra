@@ -1,7 +1,7 @@
 #![cfg(feature = "fault-injection")]
 
-use contextra_core::TxId;
 use contextra_store::wal::{Wal, WalOp, FAIL_APPEND_AFTER_PARTIAL_BYTES, FAIL_APPEND_PARTIAL_ONCE};
+use contextra_types::TxId;
 use tempfile::tempdir;
 
 static TEST_MUTEX: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());

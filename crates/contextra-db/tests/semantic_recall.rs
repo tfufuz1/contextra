@@ -1,3 +1,7 @@
+//! # Evaluierung des semantischen Recalls
+//!
+//! Messung der Treffergenauigkeit semantischer Einbettungen im Vergleich zu Ground-Truth-Daten.
+//!
 // ANCHOR[PERF:EVAL-001] STATUS:DONE (TS:2026-08-29T00:00:00Z) (SESSION: a3f29c1d) — Semantic Retrieval Evaluation Framework
 // REVIEW-PASS[1/2] STATUS:PASS (ID: PERF:EVAL-001) (TS: 2026-08-29T10:00:00Z) (SESSION: b8e4f1a2)
 // REVIEW-PASS[2/2] STATUS:PASS (ID: PERF:EVAL-001) (TS: 2026-08-29T11:00:00Z) (SESSION: c9f5e2b3)
@@ -19,6 +23,8 @@ struct ClusterTopic {
     keywords: Vec<&'static str>,
 }
 
+// ANCHOR[contextra-db:TEST-SEMANTIC_RECALL-01-GET_CLUSTER_TOPICS]
+// Testet die Funktionalität von `get_cluster_topics`.
 fn get_cluster_topics() -> Vec<ClusterTopic> {
     vec![
         ClusterTopic {
@@ -277,6 +283,8 @@ fn generate_query_vector(cluster_id: usize, query_idx: usize) -> Vec<f32> {
     vec
 }
 
+// ANCHOR[contextra-db:TEST-SEMANTIC_RECALL-02-TEST_SEMANTIC_RECALL_EVALUATION]
+// Testet die Funktionalität von `test_semantic_recall_evaluation`.
 #[tokio::test]
 async fn test_semantic_recall_evaluation() {
     let tmp = TempDir::new().unwrap(); // unwrap allowed

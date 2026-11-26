@@ -1,8 +1,13 @@
+//! # Integrationstest: Migrations- und Snapshot-Stabilität für Isotonische Kalibrierer und Platt-Skalierer
+//!
+//! **Crate:** `contextra-rank`
+//!
+//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // ZWECK: Snapshot-Vergleich, der garantiert, dass Isotonic- und Platt-Kalibrierung nach dem Verschieben nach contextra-rank identische Ergebnisse liefern.
 
 use contextra_rank::{IsotonicCalibrator, PlattScaler};
-
 #[test]
 fn test_isotonic_migration_snapshot() {
     let mut calibrator = IsotonicCalibrator::new(10, 100);
@@ -42,6 +47,7 @@ fn test_isotonic_migration_snapshot() {
     }
 }
 
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_platt_scaler_migration_snapshot() {
     let obs = vec![
@@ -66,5 +72,7 @@ fn test_platt_scaler_migration_snapshot() {
     for &p in &probs {
         assert!((0.0..=1.0).contains(&p));
     }
-    assert!(probs[0] < probs[1] && probs[1] < probs[2]);
+    if let (Some(&p0), Some(&p1), Some(&p2)) = (probs.first(), probs.get(1), probs.get(2)) {
+        assert!(p0 < p1 && p1 < p2);
+    }
 }

@@ -1,3 +1,10 @@
+//! # Modul: search_tests.rs
+//!
+//! **Zweck:** Tests für Einzel-Signal-Suchen (Text/Vektor).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::fixtures::*;
 
 #[tokio::test]
@@ -248,23 +255,6 @@ async fn test_search_k_zero_returns_canonical_error_message(
         "Expected 'Search k must be greater than 0', got: {err_msg_2}"
     );
     Ok(())
-}
-
-#[tokio::test]
-async fn test_single_pid_controller_instantiation_in_query_builder() {
-    // Regression test: verify that exactly one PID controller type (contextra_adapt::PidController)
-    // is instantiated across production collection search and query_builder modules.
-    let mut pid = contextra_adapt::PidController::default();
-    assert_eq!(pid.kp, 0.5);
-    assert_eq!(pid.ki, 0.05);
-    assert_eq!(pid.kd, 0.1);
-    assert_eq!(pid.target_latency_ms, 150.0);
-    assert_eq!(pid.min_pool_size, 50);
-    assert_eq!(pid.max_pool_size, 200);
-
-    let updated = pid.update(std::time::Duration::from_millis(100), 300.0);
-    assert!(updated < 100);
-    assert!(updated >= 50);
 }
 
 #[tokio::test]

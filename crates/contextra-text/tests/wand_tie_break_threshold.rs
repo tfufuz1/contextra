@@ -1,3 +1,9 @@
+#![cfg(feature = "types-compat")]
+//! Testsuite `wand_tie_break_threshold.rs` für contextra-text.
+//!
+//! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
+
 // FILE-CONTEXT: WAND Tie-Break & Threshold Boundary Test (tests/wand_tie_break_threshold.rs).
 // ZWECK: Verifiziert, dass WAND bei Score-Gleichstand an der k-ten Abbruchschwelle deterministisch nach aufsteigender DocId sortiert, exakt mit dem Brute-Force-Referenzergebnis uebereinstimmt und keine Dokumente durch accum_max_score > threshold faelschlich verwirft.
 
@@ -126,6 +132,8 @@ impl StorageEngine for MockStorage {
     }
 }
 
+// ANCHOR[contextra-text:TEST-193]
+// Testfall `test_wand_tie_break_at_threshold_boundary`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
     let storage = std::sync::Arc::new(MockStorage::new());
@@ -139,7 +147,7 @@ async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
     let doc_ids = [10u64, 20, 30, 40, 50, 60];
     for &id_val in &doc_ids {
         index
-            .upsert_document(tx, DocId::new(id_val), "alpha beta gamma delta")
+            .upsert_document(tx, DocId::new(id_val.into()), "alpha beta gamma delta")
             .await?;
     }
     index.commit(tx).await?;
@@ -175,7 +183,8 @@ async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
     );
 
     // (ii) Tie-break rule: Smaller DocId comes first
-    let returned_doc_ids: Vec<u64> = wand_results.iter().map(|(id, _)| id.inner()).collect();
+    #[allow(clippy::cast_possible_truncation)]
+    let returned_doc_ids: Vec<u64> = wand_results.iter().map(|(id, _)| id.inner() as u64).collect();
     assert_eq!(
         returned_doc_ids,
         vec![10, 20, 30],
@@ -202,6 +211,8 @@ async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-194]
+// Testfall `test_wand_tie_break_heterogeneous_scores_threshold_boundary`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_wand_tie_break_heterogeneous_scores_threshold_boundary() -> Result<()> {
     let storage = std::sync::Arc::new(MockStorage::new());
@@ -250,7 +261,8 @@ async fn test_wand_tie_break_heterogeneous_scores_threshold_boundary() -> Result
 
     assert_eq!(wand_results, reference);
 
-    let doc_ids: Vec<u64> = wand_results.iter().map(|(id, _)| id.inner()).collect();
+    #[allow(clippy::cast_possible_truncation)]
+    let doc_ids: Vec<u64> = wand_results.iter().map(|(id, _)| id.inner() as u64).collect();
     assert_eq!(
         doc_ids,
         vec![5, 10, 20],

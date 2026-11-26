@@ -10,30 +10,18 @@
 //! | `contextra_get` | `DatabaseRead` | Retrieve a document by ID |
 //! | `contextra_collections` | `DatabaseRead` | List all collections |
 //! | `contextra_explain` | `DatabaseRead` | Provenance breakdown & retrieval explanation |
-//! | `contextra_plugin_status` | `DatabaseRead` | Status of active plugins & rings |
 //! | `contextra_insert` | `DatabaseWrite` | Store a document with auto-chunking & auto-embedding |
 //! | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
-//! | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
-//! | `contextra_forget` | `DatabaseWrite` | Delete document/collection with DeletionProof |
-//! | `contextra_relate` | `DatabaseWrite` | Create binary directed/bidirectional relationship |
-//! | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
+//! | `contextra_delete` | `DatabaseWrite` | Delete single document |
+//! | `contextra_forget` | `DatabaseWrite` | Delete single document (Alias für contextra_delete) |
 //! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |
-//! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
-//! | `contextra_consolidate` | `DatabaseWrite` | Synchronous trigger for memory consolidation pass |
-//! | `contextra_cloud_query` | `CloudEgress` | External cloud query under egress classification |
+//! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection |
 
-pub mod bulk_exfiltration_detector;
 pub mod config;
-pub mod egress_gateway;
-pub mod egress_guard;
 pub mod explain;
 pub mod io;
-pub mod plugin_status;
 pub mod prompt_injection;
-pub mod proof_key;
-pub mod proof_key_env;
 pub mod protocol;
-pub mod routing;
 pub mod sandbox;
 pub mod server;
 pub mod server_dispatch;
@@ -44,19 +32,9 @@ pub mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use bulk_exfiltration_detector::{
-    BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
-};
 pub use config::*;
 
-pub use egress_gateway::{
-    CloudQueryRequest, CloudQueryResponse, DefaultEgressClassifier, EgressClassification,
-    EgressClassifier,
-};
-
 pub use explain::{ExplainRequest, ExplainResponse};
-pub use plugin_status::{handle_plugin_status, PluginStatusEntry, PluginStatusResponse};
-pub use proof_key::deletion_proof_key_from_env;
 
 pub use io::{read_line_bounded, MAX_RPC_BYTES, MAX_SEARCH_QUERY_BYTES};
 
@@ -64,10 +42,6 @@ pub use prompt_injection::{
     PromptInjectionConfig, PromptInjectionGuard, QuarantinePolicy, SecurityAuditLogger,
     SecurityAuditRecord, DEFAULT_REDACTION_PLACEHOLDER,
 };
-
-#[cfg(feature = "kv-bridge")]
-pub use routing::setup_kv_bridge;
-pub use routing::{setup_routing, RoutingHandle};
 
 pub use server::McpServer;
 pub use validation::{is_write_allowed_by_env, validate_collection_name};

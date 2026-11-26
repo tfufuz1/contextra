@@ -4,6 +4,8 @@
 
 use contextra_db::fusion::SignalKind;
 
+// ANCHOR[contextra-db:TEST-SIGNAL_KIND_NO_NEW_VARIANT-01-TEST_SIGNAL_KIND_HAS_NO_HYPEREDGE_VARIANT_AND_EXACT_VARIANT_COUNT]
+// Testet die Funktionalität von `test_signal_kind_has_no_hyperedge_variant_and_exact_variant_count`.
 #[test]
 fn test_signal_kind_has_no_hyperedge_variant_and_exact_variant_count() {
     let variants = vec![

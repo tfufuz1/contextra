@@ -1,3 +1,20 @@
+//! # Verwaltung verwaister ("orphaned") Checkpoints und Sequenz-Pins
+//!
+//! Dieses Modul behandelt unvollständige Transaktionen und gepinnte Sequenznummern nach Abstürzen oder Panics.
+//!
+//! ## Ring & Rolle
+//! Gehört zu **Ring 1 (Persistenz)**. Verhindert Ressourcenlecks im MVCC-Speicher (durch nie entpinnte
+//! Snapshots) und räumt Transaktionen auf, deren `CheckpointGuard` gedroppt wurde, ohne dass ein
+//! explizites `commit()` oder `rollback()` stattfand.
+//!
+//! ## Funktionsweise: Synchroner Drop & Asynchrones Reaping (ADR-011, ADR-053)
+//! In Rust kann der `Drop`-Trait nicht asynchron sein (`async drop`). Wenn ein Guard bei einem Panic
+//! oder vorzeitigen Funktionsabbruch zerstört wird:
+//! 1. Der synchrone `drop()`-Handler registriert den Eintrag im Speicher in [`InstanceOrphanRegistry`].
+//! 2. Dabei wird kein blockierendes Disk-I/O im Tokio-Worker-Thread ausgeführt (Non-blocking In-Memory Mutation).
+//! 3. Ein "Dirty"-Flag markiert die Registry für das nächste Persistieren (Piggyback-Flush oder Shutdown).
+//! 4. Beim nächsten Store-Start oder Recovery-Lauf (`recover_orphaned_pins`) werden die verwaisten Pins entpinnt.
+
 use crate::meta::StateCheckpoint;
 use contextra_ports::SystemClock;
 use contextra_types::{Result, TxId};
@@ -6,11 +23,37 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-/// Type alias for sequence numbers managed as pinned checkpoint identifiers.
+// ANCHOR[contextra-checkpoint:ORP-001]
+/// Typ-Alias für Sequenznummern, die als gepinnte Checkpoint-Identifikatoren verwaltet werden.
 pub type PinId = u64;
 
-/// Deprecated global orphan functions are no-ops without static mutable state (Spec §3 P29).
-/// All production code uses instance-bound [`InstanceOrphanRegistry`] instances.
+// ANCHOR[contextra-checkpoint:ORP-002]
+/// Bericht über wiederhergestellte und aufgeräumte verwaiste Pins und Checkpoints.
+///
+/// # Felder
+/// - `recovered_pins`: Liste aller erfolgreich entpinnten Sequenznummern.
+/// - `recovered_checkpoints`: Liste aller bereinigten Transaktions-IDs.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecoveryReport {
+    /// Liste aller erfolgreich entpinnten Sequenznummern.
+    pub recovered_pins: Vec<PinId>,
+    /// Liste aller bereinigten Transaktions-IDs.
+    pub recovered_checkpoints: Vec<TxId>,
+}
+
+impl RecoveryReport {
+    /// Liefert `true`, wenn keine verwaisten Einträge vorhanden waren oder bereinigt wurden.
+    pub fn is_empty(&self) -> bool {
+        self.recovered_pins.is_empty() && self.recovered_checkpoints.is_empty()
+    }
+
+    /// Liefert die Gesamtzahl aller bereinigten Pins und Checkpoints.
+    pub fn total_recovered(&self) -> usize {
+        self.recovered_pins.len() + self.recovered_checkpoints.len()
+    }
+}
+
+/// Gibt eine einmalige Warnung aus, wenn der veraltete globale Orphan-Pfad verwendet wird.
 fn warn_deprecated_global_orphan_path() {
     static WARN_ONCE: std::sync::Once = std::sync::Once::new();
     WARN_ONCE.call_once(|| {
@@ -20,6 +63,12 @@ fn warn_deprecated_global_orphan_path() {
     });
 }
 
+// ANCHOR[contextra-checkpoint:ORP-003]
+/// Veralteter globaler Zugriff auf die Orphan-Registry.
+///
+/// # Historie & ADR-053
+/// Statischer globaler Zustand verstößt gegen SPEC §3 P29 (Mandanten-/Instanz-Isolation).
+/// Bitte stattdessen instanzgebundene [`InstanceOrphanRegistry`] verwenden.
 #[deprecated(
     since = "0.1.0",
     note = "Use InstanceOrphanRegistry instead. Global functions are not safe in multi-instance environments."
@@ -32,39 +81,46 @@ pub fn global_orphan_registry() -> &'static OrphanRegistry {
     &EMPTY_ORPHAN_REGISTRY
 }
 
-/// Returns the default directory for orphan state files when no environment variable is set.
+/// Ermittelt das Standard-Datenverzeichnis für verwaiste Statusdateien.
 ///
-/// # Security & Persistence Notice
-/// Uses `dirs::data_local_dir()`. If unavailable, this falls back to [`std::env::temp_dir()`].
-/// [`std::env::temp_dir()`] is NOT a permanent storage location and may be cleared by the OS.
-/// For production deployments, `CONTEXTRA_ORPHAN_PIN_PATH` and `CONTEXTRA_ORPHAN_PATH` MUST be explicitly configured.
+/// # Sicherheit & Persistenz
+/// Nutzt `std::env::temp_dir()`.
+/// Im Produktivbetrieb sollte der Pfad explizit konfiguriert werden.
 fn default_data_dir() -> std::path::PathBuf {
-    dirs::data_local_dir().unwrap_or_else(std::env::temp_dir)
+    std::env::temp_dir()
 }
 
-/// Reads millisecond timestamp from the provided clock implementation.
+// ANCHOR[contextra-checkpoint:ORP-004]
+/// Liest einen Millisekunden-Zeitstempel deterministisch über die übergebene Clock-Port-Instanz.
+///
+/// # Parameter
+/// - `clock`: Referenz auf eine Implementierung des [`contextra_ports::Clock`]-Traits.
 pub fn monotonic_timestamp_ms_with(clock: &dyn contextra_ports::Clock) -> u64 {
+    // NOTE: Zeit und Zufall dürfen gemäß Regel 3 / INV-CHECKPOINT-DETERMINISM-1 nur über Ports fließen
     clock.now_unix_nanos() / 1_000_000
 }
 
-/// Reads millisecond timestamp using the default SystemClock.
+// ANCHOR[contextra-checkpoint:ORP-005]
+/// Liest den Millisekunden-Zeitstempel über die standardmäßige SystemClock.
 pub fn monotonic_timestamp_ms() -> u64 {
     let clock = SystemClock::new();
     monotonic_timestamp_ms_with(&clock)
 }
 
+/// Crate-interner Helfer zum Lesen der aktuellen Zeit in Millisekunden über einen Clock-Port.
 pub(crate) fn clock_timestamp_ms(clock: &dyn contextra_ports::Clock) -> u64 {
     monotonic_timestamp_ms_with(clock)
 }
 
+/// Standardpfad für die Datei verwaister Sequenz-Pins.
 fn orphan_pin_file_path() -> std::path::PathBuf {
-    if let Ok(p) = std::env::var("CONTEXTRA_ORPHAN_PIN_PATH") {
-        return std::path::PathBuf::from(p);
-    }
     default_data_dir().join("contextra_orphaned_pins.json")
 }
 
-/// Durable append-only registry for orphaned sequence pins (ADR-052).
+// ANCHOR[contextra-checkpoint:ORP-006]
+/// Persistente Append-Only-Registry für verwaiste Sequenz-Pins (ADR-052).
+///
+/// Veraltet zugunsten von [`InstanceOrphanRegistry`].
 #[deprecated(
     since = "0.1.0",
     note = "Use InstanceOrphanRegistry instead. Global OrphanRegistry is deprecated per ADR-053."
@@ -82,18 +138,24 @@ impl Default for OrphanRegistry {
 
 #[allow(deprecated)]
 impl OrphanRegistry {
+    /// Erzeugt eine neue Instanz von [`OrphanRegistry`].
     pub fn new(file_path: impl Into<std::path::PathBuf>) -> Self {
         Self {
             inner: InstanceOrphanRegistry::new(file_path),
         }
     }
 
-    /// Synchronously registers an orphaned sequence pin and persists to disk.
+    /// Registriert synchron einen verwaisten Pin.
     pub fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {
-        self.inner.register_orphan(pin_id)
+        let wall_ms = clock_timestamp_ms(self.inner.clock().as_ref());
+        self.inner.register_orphan_sync(PinnedSeqNoOrphan {
+            seq_no: pin_id,
+            timestamp_ms: wall_ms,
+        });
+        Ok(())
     }
 
-    /// Retrieves all currently registered orphaned pin sequence numbers.
+    /// Liefert alle aktuell registrierten verwaisten Pin-Sequenznummern.
     pub fn get_orphans(&self) -> Vec<PinId> {
         self.inner
             .get_orphan_pins()
@@ -102,34 +164,57 @@ impl OrphanRegistry {
             .collect()
     }
 
-    /// Synchronously clears memory and disk records.
+    /// Löscht alle Einträge im Speicher und auf der Platte synchron.
     pub fn clear_all(&self) {
         self.inner.clear_all();
     }
 
-    /// Recovers all registered orphaned pins by unpinning them in storage and cleaning the registry.
+    /// Bereinigt alle verwaisten Pins durch Entpinnen in der Storage-Engine.
+    ///
+    /// # Ablauf von `recover_and_clean`:
+    /// 1. Liste aller verwaisten Pins abfragen.
+    /// 2. Für jeden Pin `storage.unpin_checkpoint` aufrufen.
+    /// 3. Bei Erfolg den Pin aus der inneren Registry entfernen.
+    /// 4. Liste der erfolgreich wiederhergestellten Pins zurückgeben.
     pub async fn recover_and_clean<S: contextra_ports::StorageEngine>(
         &self,
         storage: &S,
     ) -> Result<Vec<PinId>> {
-        self.inner.recover_and_clean(storage).await
+        let orphans = self.get_orphans();
+        let mut recovered = Vec::new();
+
+        for pin_id in orphans {
+            // NOTE: Schlägt unpin fehl, wird geloggt und der Pin nicht aus der Registry entfernt (Fail-Closed)
+            if let Err(e) = storage.unpin_checkpoint(pin_id).await {
+                tracing::warn!(pin_id = pin_id, error = %e, "Failed to unpin orphaned pin during recovery");
+            } else {
+                recovered.push(pin_id);
+                self.inner.clear_orphan_pin(pin_id);
+            }
+        }
+
+        Ok(recovered)
     }
 }
 
+/// Standardpfad für die Datei verwaister Checkpoints.
 fn orphan_file_path() -> std::path::PathBuf {
-    if let Ok(p) = std::env::var("CONTEXTRA_ORPHAN_PATH") {
-        return std::path::PathBuf::from(p);
-    }
     default_data_dir().join("contextra_orphaned_checkpoints.json")
 }
 
-/// Orphaned gepinnte Sequenznummer — wird beim Recovery verarbeitet.
+// ANCHOR[contextra-checkpoint:ORP-007]
+/// Verwaiste gepinnte Sequenznummer — wird beim Recovery verarbeitet.
+///
+/// # Felder
+/// - `seq_no`: Die Sequenznummer, die entpinnt werden muss.
+/// - `timestamp_ms`: Zeitpunkt der Registrierung in Millisekunden.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PinnedSeqNoOrphan {
     pub seq_no: u64,
     pub timestamp_ms: u64,
 }
 
+/// Veraltete Funktion zur Registrierung gepinnter Sequenznummer-Orphans.
 #[deprecated(
     since = "0.1.0",
     note = "Use PersistentCheckpointStore::register_pinned_seq_no_orphan instead. Global functions are not safe in multi-instance environments."
@@ -138,12 +223,17 @@ pub struct PinnedSeqNoOrphan {
 pub fn register_pinned_seq_no_orphan(orphan: PinnedSeqNoOrphan) {
     tracing::warn!(
         seq_no = orphan.seq_no,
-        "register_pinned_seq_no_orphan is deprecated; forwarding to global_orphan_registry (ADR-053)"
+        "register_pinned_seq_no_orphan is deprecated and no-op; use InstanceOrphanRegistry instead"
     );
-    let _ = global_orphan_registry().register_orphan(orphan.seq_no);
 }
 
-/// Instance-scoped orphan state for checkpoints and pinned sequence numbers.
+// ANCHOR[contextra-checkpoint:ORP-008]
+/// Serialisierbarer Gesamtzustand aller verwaisten Checkpoints und Pins einer Instanz.
+///
+/// # Felder
+/// - `checkpoints`: Liste unvollendeter Transaktions-Checkpoints.
+/// - `pinned_seq_nos`: Liste unvollendeter Pin-Reservierungen.
+/// - `persist_path`: Dateipfad zur dauerhaften Ablage im JSON-Format.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct OrphanState {
     pub checkpoints: Vec<StateCheckpoint>,
@@ -152,6 +242,7 @@ pub struct OrphanState {
 }
 
 impl OrphanState {
+    /// Schreibt den Zustand synchron als formatierte JSON-Datei auf die Festplatte (ggf. über Vfs).
     pub fn persist_sync(&self) -> std::io::Result<()> {
         if self.persist_path.as_os_str().is_empty() {
             return Ok(());
@@ -160,6 +251,17 @@ impl OrphanState {
         std::fs::write(&self.persist_path, data)
     }
 
+    /// Schreibt den Zustand über die Vfs-Schnittstelle crash-konsistent (`write_atomic`).
+    pub fn persist_vfs(&self, vfs: &dyn contextra_ports::Vfs) -> std::io::Result<()> {
+        if self.persist_path.as_os_str().is_empty() {
+            return Ok(());
+        }
+        let data = serde_json::to_vec_pretty(self)?;
+        vfs.write_atomic(&self.persist_path, &data)
+            .map_err(|e| std::io::Error::other(e.to_string()))
+    }
+
+    /// Lädt den Zustand synchron von der Festplatte oder liefert einen leeren Zustand bei Fehlern.
     pub fn load_sync(path: &std::path::Path) -> Self {
         if let Ok(data) = std::fs::read(path) {
             if let Ok(state) = serde_json::from_slice::<OrphanState>(&data) {
@@ -172,15 +274,37 @@ impl OrphanState {
             persist_path: path.to_path_buf(),
         }
     }
+
+    /// Lädt den Zustand über die Vfs-Schnittstelle.
+    pub fn load_vfs(vfs: &dyn contextra_ports::Vfs, path: &std::path::Path) -> Self {
+        if !path.as_os_str().is_empty() {
+            if let Ok(data) = vfs.read(path) {
+                if let Ok(state) = serde_json::from_slice::<OrphanState>(&data) {
+                    return state;
+                }
+            }
+        }
+        Self {
+            checkpoints: Vec::new(),
+            pinned_seq_nos: Vec::new(),
+            persist_path: path.to_path_buf(),
+        }
+    }
 }
 
-/// Instance-scoped orphan registry for checkpoints and pinned sequence numbers (ADR-053).
+// ANCHOR[contextra-checkpoint:ORP-009]
+/// Instanz-gebundene Orphan-Registry für Checkpoints und gepinnte Sequenznummern (ADR-053).
+///
+/// # Thread-Sicherheit & Nebenläufigkeit
+/// Verwendet [`parking_lot::Mutex`] für minimale Latenz beim Guard-Drop ohne OS-Thread-Blockaden.
+/// Ein atomares `is_dirty`-Flag synchronisiert anstehende Disk-Schreibvorgänge.
 pub struct InstanceOrphanRegistry {
     pins: Mutex<Vec<PinnedSeqNoOrphan>>,
     checkpoints: Mutex<Vec<StateCheckpoint>>,
     persist_path: std::path::PathBuf,
     is_dirty: AtomicBool,
     clock: Arc<dyn contextra_ports::Clock>,
+    vfs: Option<Arc<dyn contextra_ports::Vfs>>,
 }
 
 impl std::fmt::Debug for InstanceOrphanRegistry {
@@ -202,24 +326,49 @@ impl Default for InstanceOrphanRegistry {
 }
 
 impl InstanceOrphanRegistry {
+    /// Erzeugt eine neue instanzgebundene Registry für den angegebenen Dateipfad.
     pub fn new(persist_path: impl Into<std::path::PathBuf>) -> Self {
         let path = persist_path.into();
         Self::load_sync(&path)
     }
 
+    /// Erzeugt eine neue instanzgebundene Registry über den VFS-Port.
+    pub fn new_with_vfs(
+        persist_path: impl Into<std::path::PathBuf>,
+        vfs: Arc<dyn contextra_ports::Vfs>,
+    ) -> Self {
+        let path = persist_path.into();
+        Self::load_vfs_internal(&path, vfs)
+    }
+
+    /// Konfiguriert die Registry mit einer spezifischen Clock-Implementierung.
     pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
         self.clock = clock;
         self
     }
 
+    /// Konfiguriert die Registry mit einer VFS-Implementierung.
+    pub fn with_vfs(mut self, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {
+        self.vfs = Some(vfs);
+        self
+    }
+
+    /// Setzt die Clock-Implementierung nachträglich.
     pub fn set_clock(&mut self, clock: Arc<dyn contextra_ports::Clock>) {
         self.clock = clock;
     }
 
+    /// Liefert eine Referenz auf den injizierten Clock-Port.
     pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
         &self.clock
     }
 
+    /// Liefert eine Referenz auf das injizierte VFS (falls vorhanden).
+    pub fn vfs(&self) -> Option<&Arc<dyn contextra_ports::Vfs>> {
+        self.vfs.as_ref()
+    }
+
+    /// Lädt den Zustand synchron von der Festplatte.
     pub fn load_sync(path: &std::path::Path) -> Self {
         let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
         if !path.as_os_str().is_empty() {
@@ -231,6 +380,7 @@ impl InstanceOrphanRegistry {
                         persist_path: path.to_path_buf(),
                         is_dirty: AtomicBool::new(false),
                         clock,
+                        vfs: None,
                     };
                 }
             }
@@ -241,9 +391,24 @@ impl InstanceOrphanRegistry {
             persist_path: path.to_path_buf(),
             is_dirty: AtomicBool::new(false),
             clock,
+            vfs: None,
         }
     }
 
+    fn load_vfs_internal(path: &std::path::Path, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {
+        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+        let state = OrphanState::load_vfs(vfs.as_ref(), path);
+        Self {
+            pins: Mutex::new(state.pinned_seq_nos),
+            checkpoints: Mutex::new(state.checkpoints),
+            persist_path: path.to_path_buf(),
+            is_dirty: AtomicBool::new(false),
+            clock,
+            vfs: Some(vfs),
+        }
+    }
+
+    /// Persistiert den aktuellen Zustand synchron auf die Festplatte (bevorzugt über Vfs).
     pub fn persist_sync(&self) -> std::io::Result<()> {
         if self.persist_path.as_os_str().is_empty() {
             return Ok(());
@@ -253,44 +418,28 @@ impl InstanceOrphanRegistry {
             pinned_seq_nos: self.pins.lock().clone(),
             persist_path: self.persist_path.clone(),
         };
-        let data = serde_json::to_vec_pretty(&state)?;
-        std::fs::write(&self.persist_path, data)
+        if let Some(ref vfs) = self.vfs {
+            state.persist_vfs(vfs.as_ref())
+        } else {
+            let data = serde_json::to_vec_pretty(&state)?;
+            std::fs::write(&self.persist_path, data)
+        }
     }
 
-    /// Registers a pinned sequence number orphan in-memory without blocking disk I/O.
+    // ANCHOR[contextra-checkpoint:ORP-010]
+    /// Registriert einen verwaisten Sequenz-Pin rein im Arbeitsspeicher ohne blockierendes Disk-I/O.
     ///
-    /// # Crash-Safety & RAII Drop Semantics
-    /// This method is called synchronously from [`PinGuard::drop`]. It strictly performs
-    /// in-memory mutations (`Mutex<Vec<...>>`) and flags the registry as dirty without triggering
-    /// synchronous disk I/O on Tokio worker threads. Unpersisted orphans remain in memory and are
-    /// persisted during piggyback flushes (e.g., explicit unpin, commit, rollback) or graceful shutdown.
-    /// An orphan registered between drops and the next flush is retained in memory and would only be lost
-    /// across an ungraceful process panic/crash before the next flush, matching pre-existing crash window semantics.
-    /// Synchronously registers an orphaned sequence pin by pin ID using the configured clock.
-    pub fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {
-        let wall_ms = clock_timestamp_ms(self.clock().as_ref());
-        self.register_orphan_sync(PinnedSeqNoOrphan {
-            seq_no: pin_id,
-            timestamp_ms: wall_ms,
-        });
-        Ok(())
-    }
-
-    /// Registers a pinned sequence number orphan in-memory without blocking disk I/O.
-    ///
-    /// # Crash-Safety & RAII Drop Semantics
-    /// This method is called synchronously from [`PinGuard::drop`]. It strictly performs
-    /// in-memory mutations (`Mutex<Vec<...>>`) and flags the registry as dirty without triggering
-    /// synchronous disk I/O on Tokio worker threads. Unpersisted orphans remain in memory and are
-    /// persisted during piggyback flushes (e.g., explicit unpin, commit, rollback) or graceful shutdown.
-    /// An orphan registered between drops and the next flush is retained in memory and would only be lost
-    /// across an ungraceful process panic/crash before the next flush, matching pre-existing crash window semantics.
+    /// # Crash-Safety & RAII Drop Semantik
+    /// Wird synchron aus [`crate::PinGuard`]`::drop()` aufgerufen. Führt strikt nur
+    /// Speicher-Mutationen (`Mutex<Vec<...>>`) aus und setzt `is_dirty = true`.
+    /// Persistenz auf Platte folgt entkoppelt beim nächsten regulären Flush.
     pub fn register_orphan_sync(&self, orphan: PinnedSeqNoOrphan) {
         let mut lock = self.pins.lock();
         if !lock.iter().any(|o| o.seq_no == orphan.seq_no) {
             let seq_no = orphan.seq_no;
             lock.push(orphan);
             drop(lock);
+            // NOTE: Ordering::Release garantiert, dass der Vector-Eintrag vor dem Dirty-Flag sichtbar ist
             self.is_dirty.store(true, Ordering::Release);
             tracing::debug!(
                 seq = seq_no,
@@ -299,35 +448,12 @@ impl InstanceOrphanRegistry {
         }
     }
 
-    /// Recovers all registered orphaned pins in this instance registry by unpinning them in storage and cleaning the registry.
-    pub async fn recover_and_clean<S: contextra_ports::StorageEngine>(
-        &self,
-        storage: &S,
-    ) -> Result<Vec<PinId>> {
-        let orphans = self.drain_orphan_pins();
-        let mut recovered = Vec::new();
-
-        for orphan in orphans {
-            if let Err(e) = storage.unpin_checkpoint(orphan.seq_no).await {
-                tracing::warn!(pin_id = orphan.seq_no, error = %e, "Failed to unpin orphaned pin during recovery");
-                self.register_orphan_sync(orphan);
-            } else {
-                recovered.push(orphan.seq_no);
-            }
-        }
-
-        Ok(recovered)
-    }
-
-    /// Registers an orphaned checkpoint in-memory without blocking disk I/O.
+    // ANCHOR[contextra-checkpoint:ORP-011]
+    /// Registriert einen verwaisten Checkpoint rein im Arbeitsspeicher ohne blockierendes Disk-I/O.
     ///
-    /// # Crash-Safety & RAII Drop Semantics
-    /// This method is called synchronously from [`CheckpointGuard::drop`]. It strictly performs
-    /// in-memory mutations (`Mutex<Vec<...>>`) and flags the registry as dirty without triggering
-    /// synchronous disk I/O on Tokio worker threads. Unpersisted orphans remain in memory and are
-    /// persisted during piggyback flushes (e.g., explicit unpin, commit, rollback) or graceful shutdown.
-    /// An orphan registered between drops and the next flush is retained in memory and would only be lost
-    /// across an ungraceful process panic/crash before the next flush, matching pre-existing crash window semantics.
+    /// # Crash-Safety & RAII Drop Semantik
+    /// Wird synchron aus [`crate::CheckpointGuard`]`::drop()` aufgerufen.
+    /// Verhindert Blockaden der Tokio-Worker-Threads bei Panics oder Transaktionsabbrüchen.
     pub fn register_checkpoint_sync(&self, cp: StateCheckpoint) {
         let mut lock = self.checkpoints.lock();
         if !lock.iter().any(|o| o.tx_id == cp.tx_id) {
@@ -342,7 +468,14 @@ impl InstanceOrphanRegistry {
         }
     }
 
-    /// Asynchronously flushes the in-memory orphan registry to disk if dirty.
+    // ANCHOR[contextra-checkpoint:ORP-012]
+    /// Flusht die In-Memory-Einträge asynchron auf Festplatte, sofern Änderungen vorliegen (`is_dirty`).
+    ///
+    /// # Ablauf von `flush_orphan_registry`:
+    /// 1. Prüfen, ob ein Pfad konfiguriert ist; falls leer, sofort `Ok(())`.
+    /// 2. Atomarer Tausch von `is_dirty` gegen `false` (`AcqRel`). War es nicht dirty, sofort `Ok(())`.
+    /// 3. Zustand klonen und bei vorhandener Tokio-Laufzeit via `spawn_blocking` schreiben.
+    /// 4. Bei Schreibfehler `is_dirty` wieder auf `true` setzen (Fail-Closed).
     pub async fn flush_orphan_registry(&self) -> std::io::Result<()> {
         if self.persist_path.as_os_str().is_empty() {
             return Ok(());
@@ -355,6 +488,7 @@ impl InstanceOrphanRegistry {
             pinned_seq_nos: self.pins.lock().clone(),
             persist_path: self.persist_path.clone(),
         };
+        // NOTE: spawn_blocking verhindert Blockieren des asynchronen Executors bei Dateisystem-I/O
         let res = if tokio::runtime::Handle::try_current().is_ok() {
             tokio::task::spawn_blocking(move || state.persist_sync())
                 .await
@@ -369,6 +503,7 @@ impl InstanceOrphanRegistry {
         res
     }
 
+    /// Entnimmt alle verwaisten Pins aus dem Speicher und aktualisiert die Statusdatei.
     pub fn drain_orphan_pins(&self) -> Vec<PinnedSeqNoOrphan> {
         let mut lock = self.pins.lock();
         let drained = std::mem::take(&mut *lock);
@@ -385,10 +520,12 @@ impl InstanceOrphanRegistry {
         drained
     }
 
+    /// Liefert eine Momentaufnahme aller verwaisten Pins im Speicher.
     pub fn get_orphan_pins(&self) -> Vec<PinnedSeqNoOrphan> {
         self.pins.lock().clone()
     }
 
+    /// Entfernt eine einzelne gepinnte Sequenznummer aus dem Speicher und persistiert.
     pub fn clear_orphan_pin(&self, seq_no: u64) {
         let mut lock = self.pins.lock();
         lock.retain(|o| o.seq_no != seq_no);
@@ -405,6 +542,7 @@ impl InstanceOrphanRegistry {
         }
     }
 
+    /// Entnimmt alle verwaisten Checkpoints aus dem Speicher und aktualisiert die Statusdatei.
     pub fn drain_orphaned_checkpoints(&self) -> Vec<StateCheckpoint> {
         let mut lock = self.checkpoints.lock();
         let drained = std::mem::take(&mut *lock);
@@ -421,10 +559,12 @@ impl InstanceOrphanRegistry {
         drained
     }
 
+    /// Liefert eine Momentaufnahme aller verwaisten Checkpoints im Speicher.
     pub fn get_orphaned_checkpoints(&self) -> Vec<StateCheckpoint> {
         self.checkpoints.lock().clone()
     }
 
+    /// Entfernt einen einzelnen verwaisten Checkpoint anhand seiner Transaktions-ID und persistiert.
     pub fn clear_orphaned_checkpoint(&self, tx_id: TxId) {
         let mut lock = self.checkpoints.lock();
         lock.retain(|o| o.tx_id != tx_id);
@@ -437,6 +577,7 @@ impl InstanceOrphanRegistry {
         }
     }
 
+    /// Löscht alle Einträge (Pins und Checkpoints) und leert die Statusdatei.
     pub fn clear_all(&self) {
         self.pins.lock().clear();
         self.checkpoints.lock().clear();
@@ -449,7 +590,7 @@ impl InstanceOrphanRegistry {
     }
 }
 
-/// Registers an uncommitted checkpoint as orphaned and persists it to disk.
+/// Veralteter globaler Wrapper zur Registrierung verwaister Checkpoints.
 #[deprecated(
     since = "0.1.0",
     note = "Use PersistentCheckpointStore::register_orphaned_checkpoint instead. Global functions are not safe in multi-instance environments."
@@ -462,7 +603,7 @@ pub fn register_orphaned_checkpoint(cp: StateCheckpoint) {
     );
 }
 
-/// Retrieves all active registered orphaned checkpoints.
+/// Veralteter globaler Wrapper zum Abfragen verwaister Checkpoints.
 #[deprecated(
     since = "0.1.0",
     note = "Use PersistentCheckpointStore::get_orphaned_checkpoints instead. Global functions are not safe in multi-instance environments."
@@ -472,7 +613,7 @@ pub fn get_orphaned_checkpoints() -> Vec<StateCheckpoint> {
     Vec::new()
 }
 
-/// Retrieves orphaned checkpoints registered for a specific namespace.
+/// Liefert verwaiste Checkpoints eines bestimmten Namespaces (veraltet).
 #[allow(deprecated)]
 pub fn get_orphaned_checkpoints_for_namespace(ns: &str) -> Vec<StateCheckpoint> {
     get_orphaned_checkpoints()
@@ -481,7 +622,7 @@ pub fn get_orphaned_checkpoints_for_namespace(ns: &str) -> Vec<StateCheckpoint> 
         .collect()
 }
 
-/// Removes a specific orphaned checkpoint after recovery.
+/// Entfernt einen verwaisten Checkpoint (veraltet).
 #[deprecated(
     since = "0.1.0",
     note = "Use PersistentCheckpointStore::clear_orphaned_checkpoint instead. Global functions are not safe in multi-instance environments."
@@ -489,7 +630,7 @@ pub fn get_orphaned_checkpoints_for_namespace(ns: &str) -> Vec<StateCheckpoint> 
 #[allow(deprecated)]
 pub fn clear_orphaned_checkpoint(_tx_id: TxId) {}
 
-/// Clears all registered orphaned checkpoints.
+/// Löscht alle verwaisten Checkpoints (veraltet).
 #[deprecated(
     since = "0.1.0",
     note = "Use PersistentCheckpointStore::clear_all_orphaned_checkpoints instead. Global functions are not safe in multi-instance environments."
@@ -497,10 +638,10 @@ pub fn clear_orphaned_checkpoint(_tx_id: TxId) {}
 #[allow(deprecated)]
 pub fn clear_all_orphaned_checkpoints() {}
 
-/// Retained for backward compatibility. No background tasks are spawned during drop.
+/// Rückwärtskompatibilität: Wartet auf ausstehende Rollbacks (No-op, da Hintergrund-Tasks entfernt wurden).
 pub async fn await_pending_rollbacks() {}
 
-/// Retained for backward compatibility. Always returns 0 as background task spawning is removed.
+/// Rückwärtskompatibilität: Liefert die Anzahl ausstehender Rollback-Hintergrundaufgaben (immer 0).
 pub fn pending_rollback_count() -> usize {
     0
 }
@@ -513,26 +654,33 @@ pub fn orphaned_checkpoint_count() -> usize {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::disallowed_types,
+    clippy::disallowed_methods
+)]
 mod tests {
     use super::*;
 
+    // Prüft, dass der veraltete globale Orphan-Pfad Warnungen ausgibt und ohne Panic ausgeführt wird.
     #[test]
     fn test_deprecated_global_orphan_path_warns() {
         #[allow(deprecated)]
         {
-            global_orphan_registry().clear_all();
             clear_all_orphaned_checkpoints();
             register_pinned_seq_no_orphan(PinnedSeqNoOrphan {
                 seq_no: 99999,
                 timestamp_ms: 1000,
             });
             let _orphans = get_orphaned_checkpoints();
-            global_orphan_registry().clear_all();
             clear_all_orphaned_checkpoints();
         }
     }
 
+    // Prüft, dass aufeinanderfolgende Zeitstempel über die Clock monoton ansteigen oder gleich bleiben.
     #[test]
     fn timestamp_ms_is_monotonic() {
         let clock = SystemClock::new();
@@ -541,6 +689,7 @@ mod tests {
         assert!(t2 >= t1, "Timestamp must be monotonic");
     }
 
+    // Prüft das Entnehmen ("drain") von verwaisten Pins und Checkpoints aus der InstanceOrphanRegistry.
     #[test]
     fn test_instance_orphan_registry_drain_pins_and_checkpoints() {
         let registry = InstanceOrphanRegistry::new("");
@@ -568,6 +717,7 @@ mod tests {
         assert!(registry.get_orphaned_checkpoints().is_empty());
     }
 
+    // Prüft, dass das Löschen nicht existierender Einträge existierende Einträge unberührt lässt.
     #[test]
     fn test_instance_orphan_registry_clear_nonexistent() {
         let registry = InstanceOrphanRegistry::new("");
@@ -589,6 +739,7 @@ mod tests {
         assert_eq!(registry.get_orphaned_checkpoints().len(), 1);
     }
 
+    // Prüft, dass eine Registry ohne Persistenzpfad (`""`) Schreiboperationen als erfolgreichen No-op behandelt.
     #[test]
     fn test_instance_orphan_registry_empty_path_persistence_noop() {
         let registry = InstanceOrphanRegistry::new("");
@@ -598,6 +749,30 @@ mod tests {
         assert!(state.persist_sync().is_ok());
     }
 
+    // Prüft, dass die Orphan-Registry über ein injiziertes Vfs (FaultVfs) sauber lädt und speichert.
+    #[test]
+    fn test_instance_orphan_registry_with_vfs() {
+        use contextra_testkit::FaultVfs;
+        let vfs = Arc::new(FaultVfs::new());
+        let path = std::path::PathBuf::from("/test/orphans.json");
+
+        let reg = InstanceOrphanRegistry::new_with_vfs(&path, vfs.clone());
+        reg.register_orphan_sync(PinnedSeqNoOrphan {
+            seq_no: 777,
+            timestamp_ms: 5000,
+        });
+
+        reg.persist_sync()
+            .expect("persist_sync via VFS must succeed");
+
+        // Neuer Ladevorgang über VFS
+        let loaded_reg = InstanceOrphanRegistry::new_with_vfs(&path, vfs);
+        let orphans = loaded_reg.get_orphan_pins();
+        assert_eq!(orphans.len(), 1);
+        assert_eq!(orphans[0].seq_no, 777);
+    }
+
+    // Prüft die strikte Trennung und gegenseitige Isolation zweier unabhängiger InstanceOrphanRegistry-Instanzen.
     #[test]
     fn test_two_instance_registries_independent() {
         let dir1 = tempfile::tempdir().expect("tempdir 1");
@@ -627,6 +802,7 @@ mod tests {
         assert_eq!(reg2.get_orphaned_checkpoints().len(), 1);
     }
 
+    // Property-basierter Test für die Monotonie der Zeitstempel über die SystemClock.
     proptest::proptest! {
         #[test]
         fn prop_monotonic_timestamp_ms_increases_or_equals(_n: u8) {

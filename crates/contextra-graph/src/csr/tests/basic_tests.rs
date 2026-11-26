@@ -1,3 +1,8 @@
+//! Grundlegende Funktionsprüfungen für `CsrGraph`.
+//!
+//! # Zweck
+//! Testet Kantenhinzufügung, Gewichtsberechnung und Kantenentfernung in Standardfällen.
+
 use super::super::*;
 use crate::csr::types::CsrGraphConfig;
 use crate::csr::visibility::is_suspicious_tx_id;
@@ -60,6 +65,7 @@ pub(super) async fn setup_test_graph() -> CsrGraph {
     graph
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-001]
 #[tokio::test]
 async fn test_sentinel_representation_no_value_cases() {
     let graph = Arc::new(CsrGraph::new());
@@ -99,6 +105,7 @@ async fn test_sentinel_representation_no_value_cases() {
     assert_eq!(inner.source_doc_id_at(0), None);
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-002]
 #[tokio::test]
 async fn test_invalid_edge_weights_rejected() {
     let graph = Arc::new(CsrGraph::new());
@@ -139,6 +146,7 @@ async fn test_invalid_edge_weights_rejected() {
     assert!(matches!(err_add, ContextraError::InvalidInput(_)));
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-003]
 #[tokio::test]
 async fn test_compact_entities_without_edges_syncs_offsets() {
     let graph = CsrGraph::new();
@@ -174,6 +182,7 @@ async fn test_compact_entities_without_edges_syncs_offsets() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-004]
 #[tokio::test]
 async fn test_csr_graph_compact_layout() {
     let graph = CsrGraph::new();
@@ -214,6 +223,7 @@ async fn test_csr_graph_compact_layout() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-005]
 #[tokio::test]
 async fn test_csr_delta_buffer_uncompacted_traversal() {
     // Test that committed edges in the pending_edges delta buffer (uncompacted)
@@ -278,6 +288,7 @@ async fn test_csr_delta_buffer_uncompacted_traversal() {
     assert!(ids.contains(&3));
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-006]
 #[tokio::test]
 async fn test_graph_transaction_isolation() {
     let graph = CsrGraph::new();
@@ -313,6 +324,7 @@ async fn test_graph_transaction_isolation() {
     assert_eq!(results[0].0, EntityId::new(2));
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-007]
 #[tokio::test]
 async fn test_graph_rollback_isolation() {
     let graph = CsrGraph::new();
@@ -372,6 +384,7 @@ async fn test_graph_rollback_isolation() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-008]
 #[tokio::test]
 async fn test_csr_graph_bfs_score_decay() {
     let graph = setup_test_graph().await;
@@ -392,6 +405,7 @@ async fn test_csr_graph_bfs_score_decay() {
     assert!((s4 - 0.16464).abs() < f32::EPSILON);
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-009]
 #[tokio::test]
 async fn test_csr_graph_cycle_handling() {
     let graph = CsrGraph::new();
@@ -420,6 +434,7 @@ async fn test_csr_graph_cycle_handling() {
     assert_eq!(results[0].0, EntityId::new(2));
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-010]
 #[tokio::test]
 async fn test_csr_graph_max_hop_enforcement() {
     let graph = setup_test_graph().await;
@@ -441,6 +456,7 @@ async fn test_csr_graph_max_hop_enforcement() {
     assert_eq!(results_hop1_n3[0].0, EntityId::new(4));
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-011]
 #[tokio::test]
 async fn test_csr_graph_stats_accuracy() {
     let graph = setup_test_graph().await;
@@ -460,6 +476,7 @@ async fn test_csr_graph_stats_accuracy() {
     assert_eq!(stats.memory_usage_bytes, expected_mem);
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-012]
 #[tokio::test]
 async fn test_add_edge_rollback_no_index_growth() {
     let graph = CsrGraph::new();
@@ -496,6 +513,7 @@ async fn test_add_edge_rollback_no_index_growth() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-013]
 #[tokio::test]
 async fn test_compaction_excludes_uncommitted_edges() {
     let graph = setup_test_graph().await;
@@ -526,6 +544,7 @@ async fn test_compaction_excludes_uncommitted_edges() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-014]
 #[tokio::test]
 async fn test_suspicious_txid_does_not_silently_overwrite() {
     let graph = CsrGraph::new();
@@ -561,6 +580,7 @@ async fn test_suspicious_txid_does_not_silently_overwrite() {
     assert_eq!(&*entity.name, "EntityFromB");
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-015]
 #[tokio::test]
 #[should_panic(expected = "AGT-GRAPH-001")]
 async fn test_wallclock_txid_debug_assert_panics() {
@@ -579,6 +599,7 @@ async fn test_wallclock_txid_debug_assert_panics() {
         .await;
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-016]
 #[tokio::test]
 #[should_panic(expected = "AGT-GRAPH-001")]
 async fn test_sentinel_txid_zero_debug_assert_panics() {
@@ -595,6 +616,7 @@ async fn test_sentinel_txid_zero_debug_assert_panics() {
         .await;
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-017]
 #[tokio::test]
 async fn test_graph_operation_sequence_txid_determinism() {
     // Test executing identical operation sequences with canonical TxIds yields identical state
@@ -640,6 +662,7 @@ async fn test_graph_operation_sequence_txid_determinism() {
     assert_eq!(edge1, edge2);
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-018]
 #[tokio::test]
 async fn test_get_communities_batch_api() {
     let graph = CsrGraph::new();
@@ -669,6 +692,7 @@ async fn test_get_communities_batch_api() {
     assert_eq!(map.get(&EntityId::new(3)), None);
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-019]
 #[tokio::test]
 async fn test_neighbors_api() {
     let graph = CsrGraph::new();
@@ -705,6 +729,7 @@ async fn test_neighbors_api() {
     assert!(n.contains(&id_c));
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-020]
 #[tokio::test]
 async fn test_neighbors_hub_node_dedup() {
     let graph = CsrGraph::new();

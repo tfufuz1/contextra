@@ -301,3 +301,136 @@ impl AppendOnlyJournal {
         self.health.load()
     }
 }
+
+/// Journal zur dauerhaften Aufzeichnung von Entfernungsaufträgen über Prozessabstürze hinweg.
+#[derive(Debug)]
+pub struct PendingDeleteJournal {
+    journal_path: PathBuf,
+    entries: Vec<PathBuf>,
+    health: Arc<AtomicHealthState>,
+}
+
+impl PendingDeleteJournal {
+    /// Öffnet oder erstellt ein `PendingDeleteJournal` am angegebenen Pfad mit neuem Health-State.
+    pub fn open(journal_path: impl Into<PathBuf>) -> Result<Self> {
+        Self::open_with_health(journal_path, Arc::new(AtomicHealthState::new()))
+    }
+
+    /// Öffnet oder erstellt ein `PendingDeleteJournal` mit einer geteilten [`AtomicHealthState`]-Instanz.
+    pub fn open_with_health(
+        journal_path: impl Into<PathBuf>,
+        health: Arc<AtomicHealthState>,
+    ) -> Result<Self> {
+        let journal_path = journal_path.into();
+        let mut entries = Vec::new();
+
+        if journal_path.exists() {
+            let content = std::fs::read_to_string(&journal_path).map_err(DurableFsError::Io)?;
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    entries.push(PathBuf::from(trimmed));
+                }
+            }
+        }
+
+        Ok(Self {
+            journal_path,
+            entries,
+            health,
+        })
+    }
+
+    /// Fragt den aktuellen Gesundheitsstatus ([`HealthState`]) des Journals ab.
+    #[must_use]
+    pub fn health_state(&self) -> HealthState {
+        self.health.load()
+    }
+
+    /// Fügt einen neuen Dateipfad dauerhaft zum Journal hinzu.
+    pub fn record(&mut self, path: &std::path::Path) -> Result<()> {
+        self.entries.push(path.to_path_buf());
+        self.flush()
+    }
+
+    /// Liefert eine unveränderliche Sicht auf alle aktuell ausstehenden Pfade.
+    #[must_use]
+    pub fn pending(&self) -> &[PathBuf] {
+        &self.entries
+    }
+
+    /// Verarbeitet alle ausstehenden Einträge unter Verwendung der Entfernungsfunktion `remove_fn`.
+    pub fn process<F>(&mut self, mut remove_fn: F) -> Result<usize>
+    where
+        F: FnMut(&std::path::Path) -> Result<()>,
+    {
+        self.process_inner(&mut remove_fn)
+    }
+
+    fn process_inner<F>(&mut self, remove_fn: &mut F) -> Result<usize>
+    where
+        F: FnMut(&std::path::Path) -> Result<()>,
+    {
+        let mut processed_count = 0;
+        let mut remaining = Vec::new();
+
+        for (idx, entry) in self.entries.iter().enumerate() {
+            match remove_fn(entry) {
+                Ok(()) => {
+                    processed_count += 1;
+                }
+                Err(DurableFsError::NotFound { .. }) => {
+                    processed_count += 1;
+                }
+                Err(err) => {
+                    if let Some(sub) = self.entries.get(idx..) {
+                        remaining.extend(sub.iter().cloned());
+                    }
+                    self.entries = remaining;
+                    if let Err(flush_err) = self.flush() {
+                        self.health.record_event(HealthEvent::FsyncFailure);
+                        return Err(flush_err);
+                    }
+                    return Err(err);
+                }
+            }
+        }
+
+        self.entries = remaining;
+        self.flush()?;
+
+        if self.entries.is_empty() && self.journal_path.exists() {
+            if let Err(err) = crate::durable_remove(&self.journal_path) {
+                self.health.record_event(HealthEvent::FsyncFailure);
+                return Err(err);
+            }
+        }
+
+        Ok(processed_count)
+    }
+
+    fn flush(&self) -> Result<()> {
+        let mut buffer = String::new();
+        for path in &self.entries {
+            buffer.push_str(&path.to_string_lossy());
+            buffer.push('\n');
+        }
+        match crate::atomic_replace(&self.journal_path, buffer.as_bytes()) {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                self.health.record_event(HealthEvent::FsyncFailure);
+                Err(err)
+            }
+        }
+    }
+}
+
+impl Drop for PendingDeleteJournal {
+    fn drop(&mut self) {
+        if !self.entries.is_empty() && self.journal_path.exists() {
+            if let Err(_err) = self.flush() {
+                self.health.record_event(HealthEvent::FsyncFailure);
+            }
+        }
+    }
+}

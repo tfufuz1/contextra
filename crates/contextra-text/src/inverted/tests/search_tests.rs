@@ -1,3 +1,8 @@
+//! Testsuite `search_tests.rs` für contextra-text.
+//!
+//! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
+
 use super::mock::MockStorage;
 use crate::inverted::{InvertedIndex, Language, TextIndexMetadata};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
@@ -5,6 +10,8 @@ use contextra_types::{ContextraError, DocId, Result, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+// ANCHOR[contextra-text:TEST-101]
+// Testfall `test_wand_exact_threshold_tie_break_determinism`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_wand_exact_threshold_tie_break_determinism(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -77,6 +84,8 @@ async fn test_wand_exact_threshold_tie_break_determinism(
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-102]
+// Testfall `test_bm25_ranks_exact_keyword_higher`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_bm25_ranks_exact_keyword_higher(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -129,6 +138,8 @@ async fn test_bm25_ranks_exact_keyword_higher(
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-103]
+// Testfall `test_stats_consistency`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_stats_consistency() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let storage = Arc::new(MockStorage::new());
@@ -189,6 +200,8 @@ async fn test_stats_consistency() -> std::result::Result<(), Box<dyn std::error:
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-104]
+// Testfall `test_forward_index_consistency`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_forward_index_consistency() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let storage = Arc::new(MockStorage::new());
@@ -231,6 +244,8 @@ async fn test_forward_index_consistency() -> std::result::Result<(), Box<dyn std
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-105]
+// Testfall `test_text_index_trait_implementation`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_text_index_trait_implementation() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
@@ -268,6 +283,8 @@ async fn test_text_index_trait_implementation() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-106]
+// Testfall `test_bm25_stability_edge_cases`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_bm25_stability_edge_cases() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
@@ -307,6 +324,8 @@ async fn test_bm25_stability_edge_cases() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-107]
+// Testfall `test_language_from_iso`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_language_from_iso() {
     assert_eq!(Language::from_iso("de"), Language::German);
@@ -328,11 +347,15 @@ fn test_language_from_iso() {
     assert_eq!(Language::from_iso(""), Language::English);
 }
 
+// ANCHOR[contextra-text:TEST-108]
+// Testfall `test_language_default_is_english`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_language_default_is_english() {
     assert_eq!(Language::default(), Language::English);
 }
 
+// ANCHOR[contextra-text:TEST-109]
+// Testfall `test_new_with_language_german_tokenizes_compounds`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_new_with_language_german_tokenizes_compounds() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
@@ -357,6 +380,8 @@ async fn test_new_with_language_german_tokenizes_compounds() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-110]
+// Testfall `test_new_default_english_does_not_split_compounds`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_new_default_english_does_not_split_compounds() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
@@ -387,6 +412,8 @@ async fn test_new_default_english_does_not_split_compounds() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-111]
+// Testfall `test_contextual_bm25_indexes_prefix_terms`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_contextual_bm25_indexes_prefix_terms() -> Result<()> {
     use contextra_types::ContextChunk;
@@ -421,6 +448,8 @@ async fn test_contextual_bm25_indexes_prefix_terms() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-112]
+// Testfall `test_german_tokenizer_symmetry_index_and_query`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_german_tokenizer_symmetry_index_and_query() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
@@ -448,6 +477,8 @@ async fn test_german_tokenizer_symmetry_index_and_query() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-113]
+// Testfall `test_idf_recalculation_after_delete`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_idf_recalculation_after_delete() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
@@ -495,6 +526,8 @@ async fn test_idf_recalculation_after_delete() -> Result<()> {
     // But let's verify score_after_d2 > score_before_d2 with terms having idf_arg > 1.0:
     Ok(())
 }
+// ANCHOR[contextra-text:TEST-114]
+// Testfall `test_search_bm25_at_clamped_k`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_search_bm25_at_clamped_k() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
@@ -511,6 +544,8 @@ async fn test_search_bm25_at_clamped_k() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-115]
+// Testfall `test_search_bm25_prefix_overlapping_colon_terms`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_search_bm25_prefix_overlapping_colon_terms() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
@@ -530,6 +565,8 @@ async fn test_search_bm25_prefix_overlapping_colon_terms() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-116]
+// Testfall `test_bm25_bounded_top_k_ordering_equivalence`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_bm25_bounded_top_k_ordering_equivalence() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
@@ -643,6 +680,8 @@ impl StorageEngine for CountingStorage {
     }
 }
 
+// ANCHOR[contextra-text:TEST-117]
+// Testfall `test_tombstone_lookup_caching_per_query_run`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_tombstone_lookup_caching_per_query_run() -> Result<()> {
     let storage = Arc::new(CountingStorage::new());
@@ -678,6 +717,8 @@ async fn test_tombstone_lookup_caching_per_query_run() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-118]
+// Testfall `test_high_frequency_term_resident_index_performance`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_high_frequency_term_resident_index_performance() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
@@ -738,6 +779,8 @@ async fn test_high_frequency_term_resident_index_performance() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-119]
+// Testfall `test_batch_posting_list_persistence_and_fallback`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_batch_posting_list_persistence_and_fallback() -> Result<()> {
     let storage = Arc::new(MockStorage::new());

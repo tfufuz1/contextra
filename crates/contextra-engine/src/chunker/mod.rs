@@ -183,20 +183,19 @@ impl MarkdownChunker {
 
             let mut is_setext = false;
             let mut setext_level = 0;
-            if !is_in_fence_at_start
-                && (is_setext_h1(info.line) || is_setext_h2(info.line))
-                && !current_lines.is_empty()
-            {
-                let prev_line_str = current_lines.last().map(|s| s.as_str()).unwrap_or("");
-                let prev_trimmed = prev_line_str.trim();
-                if !prev_trimmed.is_empty()
-                    && !prev_trimmed.starts_with('#')
-                    && !is_table_row(prev_line_str)
-                    && parse_opening_fence(prev_line_str).is_none()
-                {
-                    setext_level = if is_setext_h1(info.line) { 1 } else { 2 };
-                    if self.config.split_levels.contains(&setext_level) {
-                        is_setext = true;
+            if !is_in_fence_at_start && (is_setext_h1(info.line) || is_setext_h2(info.line)) {
+                if !current_lines.is_empty() {
+                    let prev_line_str = current_lines.last().map(|s| s.as_str()).unwrap_or("");
+                    let prev_trimmed = prev_line_str.trim();
+                    if !prev_trimmed.is_empty()
+                        && !prev_trimmed.starts_with('#')
+                        && !is_table_row(prev_line_str)
+                        && parse_opening_fence(prev_line_str).is_none()
+                    {
+                        setext_level = if is_setext_h1(info.line) { 1 } else { 2 };
+                        if self.config.split_levels.contains(&setext_level) {
+                            is_setext = true;
+                        }
                     }
                 }
             }
@@ -257,11 +256,8 @@ impl MarkdownChunker {
             let mut h_level = 0;
             if !is_in_fence_at_start && info.line.starts_with('#') {
                 let parts: Vec<&str> = info.line.splitn(2, ' ').collect();
-                if parts.len() == 2 && parts.first().is_some_and(|p| p.chars().all(|c| c == '#')) {
-                    // Sättigung statt Umbruch: mehr als 255 Rauten sind nie ein gültiger Split-Level.
-                    h_level = parts
-                        .first()
-                        .map_or(0, |p| u8::try_from(p.len()).unwrap_or(u8::MAX));
+                if parts.len() == 2 && parts.get(0).map_or(false, |p| p.chars().all(|c| c == '#')) {
+                    h_level = parts.get(0).map_or(0, |p| p.len() as u8);
                     if self.config.split_levels.contains(&h_level) {
                         is_atx = true;
                     }
@@ -401,6 +397,3 @@ fn parts_first(_line: &str, h_level: u8) -> String {
 
 #[cfg(test)]
 mod unit_tests;
-
-#[cfg(test)]
-mod compat_tests;

@@ -1,9 +1,18 @@
+// ANCHOR[contextra-mvcc:TEST-AUDIT-REGRESSION-ROOT]
+//! # Audit-Regressions-Tests für `contextra-mvcc`
+//!
+//! Stellt sicher, dass behobene Fehler aus Sicherheits- und Architektur-Audits
+//! nicht erneut auftreten:
+//! - Wiederherstellung früherer Commit-Historie durch `forget_from`.
+//! - Zuverlässiges Ausmaskieren des `TOMBSTONE_BIT` in allen Teilsystemen (`ReadSet`, `TxBuffer`, `SequenceLog`).
+
 use contextra_mvcc::seq_log::{SeqLogEntry, SequenceLog};
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::tx_buffer::TxBuffer;
 use contextra_mvcc::types::{TxId, TOMBSTONE_BIT};
 use contextra_mvcc::ContextraError;
 
+// Prüft, dass forget_from nach einem Rollback vorherige Commit-Versionen desselben Schlüssels korrekt wiederherstellt.
 #[test]
 fn test_forget_from_restores_earlier_commit_history() {
     let validator = SequenceLogSsiValidator::new();
@@ -30,6 +39,7 @@ fn test_forget_from_restores_earlier_commit_history() {
     );
 }
 
+// Prüft, dass das gesetzte TOMBSTONE_BIT bei der ReadSet-Registrierung und Commit-Validierung korrekt ignoriert wird.
 #[test]
 fn test_tombstone_bit_masking_in_read_set_and_validator() {
     let validator = SequenceLogSsiValidator::new();
@@ -58,6 +68,7 @@ fn test_tombstone_bit_masking_in_read_set_and_validator() {
     );
 }
 
+// Prüft, dass das TOMBSTONE_BIT beim Transaktions-Read-Tracking im TxBuffer ausmaskiert wird.
 #[test]
 fn test_tombstone_bit_masking_in_tx_buffer() {
     let buffer = TxBuffer::<String>::new();
@@ -74,6 +85,7 @@ fn test_tombstone_bit_masking_in_tx_buffer() {
     );
 }
 
+// Prüft, dass SeqLogEntry::is_visible und SequenceLog-Methoden mit gesetztem TOMBSTONE_BIT fehlerfrei arbeiten.
 #[test]
 fn test_tombstone_bit_masking_in_seq_log() {
     let doc_id = contextra_mvcc::types::DocId::from(100);

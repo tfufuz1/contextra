@@ -1,10 +1,8 @@
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
-use contextra_core::{
-    ContextraError, DistanceMetric, DocId, IndexOp, Result, ScoredDocument, TxId, VectorIndex,
-    VectorIndexStats,
-};
+use contextra_ports::{VectorIndex, VectorIndexStats};
+use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId};
 
 use super::batch::{BatchContext, SearchContext};
 use super::config::validate_vector;
@@ -31,20 +29,19 @@ impl VectorIndex for HnswIndex {
 
         self.inner.cold.tx_buffer.stage(
             tx,
-            IndexOp::Insert {
+            super::staging::VectorStagingOp::Insert {
                 doc_id: id,
-                data: embedding.to_vec(),
+                embedding: embedding.to_vec(),
             },
-        )?;
-        Ok(())
+        )
     }
 
     async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {
-        if k > contextra_core::MAX_SEARCH_K {
+        if k > contextra_types::MAX_SEARCH_K {
             return Err(ContextraError::invalid_input(format!(
                 "Requested k ({}) exceeds maximum allowed search limit ({})",
                 k,
-                contextra_core::MAX_SEARCH_K
+                contextra_types::MAX_SEARCH_K
             )));
         }
         if let Some(ref err) = self.inner.cold.validation_error {
@@ -139,7 +136,7 @@ impl VectorIndex for HnswIndex {
         let score = self.inner.connectivity_score();
         if score < self.inner.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
-            let err = contextra_core::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+            let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
             tracing::warn!(
                 error = %err,
                 connectivity_score = score,
@@ -234,14 +231,10 @@ impl VectorIndex for HnswIndex {
                 err
             )));
         }
-        self.inner.cold.tx_buffer.stage(
-            tx,
-            IndexOp::Delete {
-                doc_id: id,
-                data: None,
-            },
-        )?;
-        Ok(())
+        self.inner
+            .cold
+            .tx_buffer
+            .stage(tx, super::staging::VectorStagingOp::Delete { doc_id: id })
     }
 
     async fn commit(&self, tx: TxId) -> Result<()> {
@@ -257,8 +250,8 @@ impl VectorIndex for HnswIndex {
         if self.inner.cold.config.quantize && self.inner.cold.quantizer.read().is_none() {
             let mut train_data = Vec::with_capacity(256.min(ops.len()));
             for op in &ops {
-                if let IndexOp::Insert { data, .. } = op {
-                    train_data.push(data.clone());
+                if let super::staging::VectorStagingOp::Insert { ref embedding, .. } = op {
+                    train_data.push(embedding.clone());
                     if train_data.len() >= 256 {
                         break;
                     }
@@ -303,25 +296,18 @@ impl VectorIndex for HnswIndex {
 
         for op in &ops {
             match op {
-                IndexOp::Insert { doc_id, data } => {
+                super::staging::VectorStagingOp::Insert { doc_id, embedding } => {
                     let prepared = self.inner.compute_insert_with_context(
                         *doc_id,
-                        data,
+                        embedding,
                         prepared_inserts.len(),
                         &mut prepared_inserts,
                         &mut batch_ctx,
                     )?;
                     prepared_inserts.push(prepared);
                 }
-                IndexOp::Delete { doc_id, .. } => {
+                super::staging::VectorStagingOp::Delete { doc_id } => {
                     deletes_to_apply.push(*doc_id);
-                }
-                other => {
-                    return Err(ContextraError::Index(format!(
-                        "HNSW commit received unsupported IndexOp variant: {:?}. \
-                         Add a handler arm before enabling this operation.",
-                        std::mem::discriminant(other)
-                    )));
                 }
             }
         }
@@ -340,13 +326,12 @@ impl VectorIndex for HnswIndex {
         let mut seq_log = self.inner.cold.seq_log.write();
         for op in &ops {
             match op {
-                IndexOp::Insert { doc_id, .. } => {
+                super::staging::VectorStagingOp::Insert { doc_id, .. } => {
                     seq_log.record_insert(*doc_id, seq);
                 }
-                IndexOp::Delete { doc_id, .. } => {
+                super::staging::VectorStagingOp::Delete { doc_id } => {
                     seq_log.record_delete(*doc_id, seq);
                 }
-                _ => {}
             }
         }
         drop(seq_log);
@@ -375,7 +360,7 @@ impl VectorIndex for HnswIndex {
     /// ## Invariant (v17 K-02 / SSI-Determinism & Pin-first):
     /// This method pins the sequence log via [`SnapshotPinGuard`] and applies `is_visible(doc_id, seq_no)`
     /// filtering over all candidates. Searches executed concurrently with background index rebuilds
-    /// ([`HnswIndexCore::rebuild`]) are guaranteed to yield 100% identical document results as pre-rebuild
+    /// ([`super::types::HnswIndexCore::rebuild`]) yield identical document results as pre-rebuild
     /// searches at the same pinned sequence number, regardless of rebuild progress or graph swaps.
     ///
     /// Verified by integration tests `crates/contextra-vector/tests/k02_snapshot_rebuild_determinism.rs` and
@@ -383,7 +368,10 @@ impl VectorIndex for HnswIndex {
     /// targeted timing execution inside the critical rebuild swap window.
     async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
         let _pin_guard = SnapshotPinGuard::new(&self.inner, seq_no);
-        let log = self.inner.cold.seq_log.read().clone();
+        let log = {
+            let guard = self.inner.cold.seq_log.read();
+            guard.clone()
+        };
         let filter_fn = move |doc_id: DocId| -> bool { log.is_visible(doc_id, seq_no) };
         self.search_filtered_internal(query, k, Some(&filter_fn), Some(seq_no))
             .await
@@ -565,5 +553,274 @@ impl VectorIndex for HnswIndex {
             deleted_ratio: self.inner.deleted_ratio(),
             rebuild_count: self.inner.rebuild_count(),
         })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Normative Klasse-A-Schnittstellen (SPEC §4.3 / B1–B12)
+// ---------------------------------------------------------------------------
+
+use crate::contract::{Error as ContractError, ExternalId, Result as ContractResult, ScoredPoint};
+
+/// Normative Index-Schnittstelle gemäß SPEC §4.3 (Klasse A).
+pub trait Index<Id, Query: ?Sized> {
+    /// Treffertyp der Suchoperation.
+    type Hit;
+
+    /// Fügt ein Dokument mit gegebener ID und Byte-Nutzlast in den Index ein.
+    fn insert(&mut self, id: Id, payload: &[u8]) -> ContractResult<()>;
+
+    /// Entfernt ein Dokument anhand seiner ID aus dem Index.
+    fn remove(&mut self, id: &Id) -> ContractResult<bool>;
+
+    /// Führt eine Suche anhand der Query aus und liefert bis zu `limit` Treffer zurück.
+    fn search(&self, query: &Query, limit: usize) -> ContractResult<Vec<Self::Hit>>;
+}
+
+/// Normative Wartungsschnittstelle gemäß SPEC §4.3 (Klasse A).
+pub trait Maintain {
+    /// Statistiktyp der Kompaktierungsoperation.
+    type Stats;
+
+    /// Führt eine Kompaktierung durch und gibt gelöschte Einträge tatsächlich frei.
+    fn compact(&mut self) -> ContractResult<Self::Stats>;
+
+    /// Bereinigt fragmentierte interne Strukturen.
+    fn vacuum(&mut self) -> ContractResult<()>;
+}
+
+/// Statistiken über den Kompaktierungsvorgang des HNSW-Vektorindex.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct HnswCompactStats {
+    /// Anzahl physisch bereinigter Tombstones.
+    pub purged_docs: usize,
+    /// Anzahl verbliebener aktiver Dokumente.
+    pub active_docs: usize,
+}
+
+impl Index<ExternalId, [f32]> for HnswIndex {
+    type Hit = ScoredPoint;
+
+    fn insert(&mut self, id: ExternalId, payload: &[u8]) -> ContractResult<()> {
+        let dim = self.inner.cold.config.dimension;
+        let expected_bytes =
+            dim.checked_mul(std::mem::size_of::<f32>())
+                .ok_or(ContractError::CapacityExceeded {
+                    requested: usize::MAX,
+                    maximum: usize::MAX,
+                })?;
+
+        if payload.len() != expected_bytes {
+            return Err(ContractError::InvalidInput(
+                "Payload byte length does not match index dimension (f32 little-endian)",
+            ));
+        }
+
+        let mut embedding = Vec::with_capacity(dim);
+        for chunk in payload.chunks_exact(4) {
+            let arr: [u8; 4] = chunk
+                .try_into()
+                .map_err(|_| ContractError::Corrupt("Ungültige Byte-Konvertierung"))?;
+            let val = f32::from_le_bytes(arr);
+            if !val.is_finite() {
+                return Err(ContractError::InvalidInput(
+                    "Embedding contains NaN or infinite values",
+                ));
+            }
+            embedding.push(val);
+        }
+
+        let doc_id = DocId::from(id.0 as u64);
+        let _lock = self.inner.hot.write_mutex.lock();
+        let current_tx = self.inner.hot.last_tx_id.fetch_add(1, Ordering::SeqCst) + 1;
+
+        self.inner
+            .do_insert(doc_id, &embedding, current_tx)
+            .map_err(|_| ContractError::StateConflict("HNSW insert failed"))?;
+
+        Ok(())
+    }
+
+    fn remove(&mut self, id: &ExternalId) -> ContractResult<bool> {
+        let doc_id = DocId::from(id.0 as u64);
+        let _lock = self.inner.hot.write_mutex.lock();
+        let was_present = self
+            .inner
+            .hot
+            .doc_to_node
+            .read()
+            .contains_key(&doc_id.inner());
+        if !was_present {
+            return Ok(false);
+        }
+
+        self.inner
+            .do_delete(doc_id)
+            .map_err(|_| ContractError::StateConflict("HNSW delete failed"))?;
+        Ok(true)
+    }
+
+    fn search(&self, query: &[f32], limit: usize) -> ContractResult<Vec<Self::Hit>> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        if limit > crate::types::MAX_SEARCH_K {
+            return Err(ContractError::CapacityExceeded {
+                requested: limit,
+                maximum: crate::types::MAX_SEARCH_K,
+            });
+        }
+
+        let dim = self.inner.cold.config.dimension;
+        if query.len() != dim {
+            return Err(ContractError::InvalidInput("Query dimension mismatch"));
+        }
+
+        for &val in query {
+            if !val.is_finite() {
+                return Err(ContractError::InvalidInput(
+                    "Query vector contains NaN or infinite values",
+                ));
+            }
+        }
+
+        let mut ep = Vec::new();
+        if let Some(global_ep) = self.inner.hot.get_entry_point() {
+            ep.push(global_ep);
+        }
+        if let Some(ram_ep) = self.inner.hot.get_ram_entry_point() {
+            if !ep.contains(&ram_ep) {
+                ep.push(ram_ep);
+            }
+        }
+
+        if ep.is_empty() {
+            let nodes = self.inner.hot.nodes.read();
+            let deleted = self.inner.cold.deleted_nodes.read();
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            let mmap_node_count = mmap_guard
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+            let total = mmap_node_count + nodes.len();
+            for i in 0..total {
+                if !deleted.contains(i as u64) {
+                    ep.push(i);
+                    self.inner.hot.set_entry_point(Some(i));
+                    break;
+                }
+            }
+        }
+
+        if ep.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let max_layer = self.inner.hot.max_layer.load(Ordering::SeqCst) as usize;
+
+        for layer in (1..=max_layer).rev() {
+            let best = self
+                .inner
+                .search_layer(query, None, &ep, 1, layer)
+                .map_err(|_| ContractError::StateConflict("search_layer descent failed"))?;
+            if let Some(closest) = best.first() {
+                ep = vec![closest.index];
+            }
+        }
+
+        if let Some(ram_ep) = self.inner.hot.get_ram_entry_point() {
+            if !ep.contains(&ram_ep) {
+                ep.push(ram_ep);
+            }
+        }
+
+        let ef = self.inner.cold.config.ef_search.max(limit);
+        let candidates = self
+            .inner
+            .search_layer(query, None, &ep, ef, 0)
+            .map_err(|_| ContractError::StateConflict("search_layer bottom layer failed"))?;
+
+        let nodes = self.inner.hot.nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
+        let mmap_guard = self.inner.cold.mmap_index.read();
+        let mmap_node_count = mmap_guard
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+
+        let ctx = SearchContext {
+            nodes: &nodes,
+            mmap: mmap_guard.as_ref(),
+            mmap_node_count,
+            prior_prepared: &[],
+            backlink_map: None,
+            quantizer: None,
+            arena: &self.inner.hot.arena,
+        };
+
+        let mut results = Vec::with_capacity(limit);
+
+        for c in candidates.iter() {
+            if deleted.contains(c.index as u64) {
+                continue;
+            }
+            if c.index >= mmap_node_count {
+                if let Some(node) = nodes.get(c.index - mmap_node_count) {
+                    if node.committed_tx == 0 {
+                        continue;
+                    }
+                }
+            }
+            let doc_id = self
+                .inner
+                .resolve_doc_id(c.index, &ctx)
+                .map_err(|_| ContractError::Corrupt("Failed to resolve doc_id"))?;
+
+            let final_dist = c.distance;
+            let score = match self.inner.cold.config.distance_metric {
+                DistanceMetric::Cosine => 1.0 - final_dist,
+                DistanceMetric::Euclidean => 1.0 / (1.0 + final_dist),
+                DistanceMetric::DotProduct => -final_dist,
+                _ => 1.0 / (1.0 + final_dist),
+            };
+
+            results.push(ScoredPoint {
+                id: ExternalId(doc_id.inner() as u128),
+                score,
+            });
+        }
+
+        // Deterministisches Tie-Breaking: Höherer Score zuerst, bei Gleichstand ExternalId aufsteigend
+        if results.len() > limit {
+            results.select_nth_unstable_by(limit - 1, |a, b| {
+                b.score.total_cmp(&a.score).then_with(|| a.id.cmp(&b.id))
+            });
+            results.truncate(limit);
+        }
+        results.sort_by(|a, b| b.score.total_cmp(&a.score).then_with(|| a.id.cmp(&b.id)));
+
+        Ok(results)
+    }
+}
+
+impl Maintain for HnswIndex {
+    type Stats = HnswCompactStats;
+
+    fn compact(&mut self) -> ContractResult<Self::Stats> {
+        let deleted_before = self.inner.hot.deleted_count.load(Ordering::SeqCst) as usize;
+        self.inner
+            .rebuild_sync()
+            .map_err(|_| ContractError::StateConflict("HNSW compact / rebuild failed"))?;
+
+        let total_nodes = self.inner.hot.nodes.read().len();
+        Ok(HnswCompactStats {
+            purged_docs: deleted_before,
+            active_docs: total_nodes,
+        })
+    }
+
+    fn vacuum(&mut self) -> ContractResult<()> {
+        let _ = self.compact()?;
+        Ok(())
     }
 }

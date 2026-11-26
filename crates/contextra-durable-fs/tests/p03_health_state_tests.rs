@@ -1,4 +1,3 @@
-#![allow(clippy::expect_used, clippy::unwrap_used)]
 //! # Testsuite: p03_health_state_tests.rs
 //!
 //! Zweck: Zustandsautomaten-Tests für `HealthState` und `AtomicHealthState` (§18.4, `INV-POISON-1`).

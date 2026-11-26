@@ -1,3 +1,10 @@
+//! # Modul: relate.rs
+//!
+//! **Zweck:** Graph-Relationen und Verknüpfungen zwischen Dokumenten innerhalb einer Collection.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::{crud::validate_doc_id, Collection};
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, Result};
@@ -161,7 +168,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         .with_tx_validity(Some(db_tx.tx_id), None)
         .with_source_doc_id(parsed_src_doc_id);
 
-        hyperedge.validate()?;
+        hyperedge
+            .validate()
+            .map_err(|e| contextra_types::ContextraError::InvalidInput(e.to_string()))?;
 
         // 4. Persist HyperEdge in LSM storage under __graph:hyperedge:{id}
         let hyperedge_key = format!(

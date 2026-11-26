@@ -62,6 +62,13 @@ Vollständige Übersicht aller öffentlichen Typen, Traits, Structs und Funktion
 | `pub fn flush(&mut self) -> Result<()> ` | Flusht ausstehende Journal-Schreibvorgänge synchron auf stabilen Speicher (`INV-FSYNC-1`). |
 | `pub fn recover(&mut self, recovery_policy: RecordRecoveryPolicy) -> Result<Vec<JournalRecord>> ` | Führt die Recovery des Journals durch und liest gültige Records ein. |
 | `pub fn health_state(&self) -> HealthState ` |  |
+| `pub struct PendingDeleteJournal ` |  |
+| `pub fn open(journal_path: impl Into<PathBuf>) -> Result<Self> ` | Öffnet oder erstellt ein `PendingDeleteJournal` am angegebenen Pfad mit neuem Health-State. |
+| `pub fn open_with_health(` | Öffnet oder erstellt ein `PendingDeleteJournal` mit einer geteilten [`AtomicHealthState`]-Instanz. |
+| `pub fn health_state(&self) -> HealthState ` |  |
+| `pub fn record(&mut self, path: &std::path::Path) -> Result<()> ` | Fügt einen neuen Dateipfad dauerhaft zum Journal hinzu. |
+| `pub fn pending(&self) -> &[PathBuf] ` |  |
+| `pub fn process<F>(&mut self, mut remove_fn: F) -> Result<usize>` | Verarbeitet alle ausstehenden Einträge unter Verwendung der Entfernungsfunktion `remove_fn`. |
 
 ## `src/lib.rs`
 
@@ -70,14 +77,16 @@ Vollständige Übersicht aller öffentlichen Typen, Traits, Structs und Funktion
 | `pub mod error` | Fehlertypen und Result-Definitionen für Dateisystemoperationen. |
 | `pub mod fault_injector` | Fehlerinjektor und VFS-Dekorator zur Simulation von Ausfällen und Crash-Punkten. |
 | `pub mod health` | Fail-Closed-Zustandsverfolgung und Poisoning-Zustandsautomat (§18.4). |
-| `pub mod journal` | Append-only-Journal mit Prüfsummen für Crash-Resilienz. |
+| `pub mod journal` | Append-only-Journal mit Prüfsummen und Pending-Delete-Journal für Crash-Resilienz. |
 | `pub mod platform` | Plattformspezifische synchrone Flush-Primitive für Dateien und Verzeichnisse. |
+| `pub mod scrub` | Sicheres Überschreiben (Scrubbing) und Integritätsprüfung mit Ratenbegrenzung. |
 | `pub mod vfs` | Virtuelles Dateisystem (VFS) mit atomaren Ersetzungen und synchroner Schnittstelle. |
 | `pub use error::{DurableFsError, Error, Result}` |  |
 | `pub use fault_injector::{FaultInjector, NoFault}` |  |
 | `pub use health::{AtomicHealthState, HealthEvent, HealthState}` |  |
 | `pub use journal::` |  |
 | `pub use platform::FlushKind` |  |
+| `pub use scrub::` |  |
 | `pub use vfs::{RealFs, StdVfs, Vfs}` |  |
 | `pub enum FsClass ` |  |
 | `pub const fn is_supported_local(&self) -> bool ` |  |
@@ -103,6 +112,10 @@ Vollständige Übersicht aller öffentlichen Typen, Traits, Structs und Funktion
 | `pub fn sync_dir_with_injector<F: FaultInjector>(dir: &Path, injector: &F) -> Result<()> ` | Synchronisiert die Verzeichnismetadaten eines Ordners mit benutzerdefiniertem [`FaultInjector`]. |
 | `pub fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<()> ` | Ersetzt den Inhalt der Datei unter `path` atomar mit `bytes` unter Verwendung des Standardinjektors [`NoFault`]. |
 | `pub fn atomic_replace_with_injector<F: FaultInjector>(` | Ersetzt den Inhalt der Datei unter `path` atomar mit `bytes` unter Verwendung eines [`FaultInjector`] (`INV-VFS-ATOMIC-1`). |
+| `pub fn durable_remove(path: &Path) -> Result<()> ` | Entfernt eine Datei dauerhaft und flusht das Elternverzeichnis mit Standardinjektor [`NoFault`]. |
+| `pub fn durable_remove_with_injector<F: FaultInjector>(path: &Path, injector: &F) -> Result<()> ` | Entfernt eine Datei dauerhaft und flusht das Elternverzeichnis mit benutzerdefiniertem [`FaultInjector`]. |
+| `pub fn scrub_and_remove(path: &Path) -> Result<ScrubReceipt> ` | Überschreibt eine Datei vollständig mit Nullen und entfernt sie dauerhaft (mit [`NoFault`]). |
+| `pub fn scrub_and_remove_with_injector<F: FaultInjector>(` | Überschreibt eine Datei mit Nullen und entfernt sie dauerhaft unter Verwendung eines [`FaultInjector`]. |
 
 ## `src/platform.rs`
 
@@ -111,6 +124,22 @@ Vollständige Übersicht aller öffentlichen Typen, Traits, Structs und Funktion
 | `pub enum FlushKind ` |  |
 | `pub fn sync_file(file: &File, kind: FlushKind) -> io::Result<()> ` | Flusht eine geöffnete Datei synchron und crash-sicher auf das Speichermedium. |
 | `pub fn sync_dir_path(dir: &Path) -> io::Result<()> ` | Flusht Verzeichniseinträge synchron auf stabile Speichermedien. |
+
+## `src/scrub.rs`
+
+| Signatur | Beschreibung |
+|---|---|
+| `pub struct ScrubReceipt ` |  |
+| `pub bytes_scrubbed: u64,` | Gesamtanzahl der vor dem Löschen mit Nullen überschriebenen Bytes. |
+| `pub enum ScrubPolicy ` |  |
+| `pub enum ScrubRefusal ` |  |
+| `pub enum ScrubOutcome ` |  |
+| `pub struct ScrubProgress ` |  |
+| `pub bytes_processed: u64,` | Bisher verarbeitete Bytes. |
+| `pub total_bytes: u64,` | Gesamtgröße der zu prüfenden Datei / des Segments in Bytes. |
+| `pub fn scrub_file_with_rate_limit<F>(` | Prüft eine Datei segmentweise auf Prüfsummenintegrität mit konfigurierbarer Ratenbegrenzung. |
+| `pub fn scrub_if_safe(` | Bereinigt und löscht eine Datei sicher, sofern alle Sicherheitsvorbedingungen erfüllt sind. |
+| `pub fn scrub_if_safe_with_injector<F: FaultInjector>(` | Bereinigt und löscht eine Datei sicher unter Verwendung eines benutzerdefinierten [`FaultInjector`]. |
 
 ## `src/vfs.rs`
 

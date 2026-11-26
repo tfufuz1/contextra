@@ -1,3 +1,8 @@
+//! # Integrationstest: `wal_completeness_tests.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `wal_completeness_tests`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Unit & proptest verification for WAL chain completeness checks.
 // INVARIANTEN: Zero false negatives, zero false positives, constant-time verification.

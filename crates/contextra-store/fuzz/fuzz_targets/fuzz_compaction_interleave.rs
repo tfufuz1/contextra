@@ -1,7 +1,8 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::TxId;
 use contextra_store::{LsmConfig, LsmStorage};
 use libfuzzer_sys::fuzz_target;
 use std::collections::HashMap;

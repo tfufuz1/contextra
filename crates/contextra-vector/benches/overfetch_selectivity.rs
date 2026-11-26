@@ -1,5 +1,6 @@
-use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_ports::SeededRng;
+use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::sync::Arc;
@@ -25,7 +26,7 @@ fn bench_overfetch_selectivity(c: &mut Criterion) {
         let tx = TxId::new(1);
         let mut seed = 12345u64;
         for i in 1..=num_vecs {
-            let doc_id = DocId::new(i as u64);
+            let doc_id = DocId::new((i as u64).into());
             let vec: Vec<f32> = (0..dim)
                 .map(|_| {
                     seed = seed

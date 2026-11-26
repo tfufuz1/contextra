@@ -1,9 +1,10 @@
 //! Write- and Read-Amplification benchmark for `contextra-store`.
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::compaction::CompactionConfig;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::sstable::BloomFilter;
+use contextra_types::TxId;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};

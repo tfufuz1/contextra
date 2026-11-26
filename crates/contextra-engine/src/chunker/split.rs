@@ -73,8 +73,9 @@ pub(crate) fn split_raw_section(
                     fence_info,
                 } => {
                     let mut code_chunk_lines = Vec::new();
-                    let closing_fence: String =
-                        std::iter::repeat_n(fence_info.char_type, fence_info.length).collect();
+                    let closing_fence = std::iter::repeat(fence_info.char_type)
+                        .take(fence_info.length)
+                        .collect::<String>();
                     let base_tokens = estimate_tokens(&format!("{}\n{}", fence, closing_fence));
                     let mut code_chunk_tokens = base_tokens;
 

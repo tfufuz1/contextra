@@ -8,6 +8,7 @@ pub(crate) mod build;
 pub(crate) mod config;
 pub(crate) mod filtered;
 pub(crate) mod format;
+pub(crate) mod integrity;
 pub(crate) mod persistence;
 #[cfg(feature = "experimental-predicate-augmented-search")]
 pub mod predicate_augmented;

@@ -1,14 +1,26 @@
-use ahash::AHashSet;
 use roaring::RoaringTreemap;
+use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;
 
-use contextra_core::{ContextraError, DocId, Result};
+use contextra_types::{ContextraError, DocId, Result};
 
 use super::arena::HnswArena;
 use super::batch::{PreparedInsert, SearchContext};
 use super::sq8_bias::Sq8Bias;
 use super::types::{Candidate, HnswIndex, HnswIndexCore, RebuildGuard, RebuildStatus, VectorData};
-use crate::distance::compute_distance_trusted;
+
+fn get_last_rebuild_nanos(core: &HnswIndexCore) -> Option<u64> {
+    let val = core.cold.last_rebuild_nanos.load(Ordering::Acquire);
+    if val == 0 {
+        None
+    } else {
+        Some(val)
+    }
+}
+
+fn set_last_rebuild_nanos(core: &HnswIndexCore, nanos: u64) {
+    core.cold.last_rebuild_nanos.store(nanos, Ordering::Release);
+}
 
 impl HnswIndexCore {
     pub fn rebuild_status(&self) -> RebuildStatus {
@@ -19,20 +31,44 @@ impl HnswIndexCore {
         }
     }
 
-    pub async fn wait_for_rebuild(&self) -> bool {
-        self.wait_for_rebuild_with_timeout(std::time::Duration::from_secs(60))
-            .await
-    }
-
-    pub async fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {
-        let deadline = std::time::Instant::now() + timeout;
+    pub fn wait_for_rebuild_blocking(
+        &self,
+        timeout: std::time::Duration,
+        _clock: &dyn contextra_ports::Clock,
+    ) -> bool {
+        if !self.hot.rebuilding.load(Ordering::Acquire) {
+            return true;
+        }
+        let mut guard = self.hot.rebuild_mutex.lock();
         while self.hot.rebuilding.load(Ordering::Acquire) {
-            if std::time::Instant::now() >= deadline {
-                return false;
+            let res = self.hot.rebuild_condvar.wait_for(&mut guard, timeout);
+            if res.timed_out() {
+                return !self.hot.rebuilding.load(Ordering::Acquire);
             }
-            std::thread::sleep(std::time::Duration::from_millis(50));
         }
         true
+    }
+
+    pub fn wait_for_rebuild(&self) -> bool {
+        let clock = self.cold.clock.read().clone();
+        self.wait_for_rebuild_with_clock(clock.as_ref())
+    }
+
+    pub fn wait_for_rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> bool {
+        self.wait_for_rebuild_blocking(std::time::Duration::from_secs(60), clock)
+    }
+
+    pub fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {
+        let clock = self.cold.clock.read().clone();
+        self.wait_for_rebuild_blocking(timeout, clock.as_ref())
+    }
+
+    pub fn wait_for_rebuild_with_timeout_and_clock(
+        &self,
+        timeout: std::time::Duration,
+        clock: &dyn contextra_ports::Clock,
+    ) -> bool {
+        self.wait_for_rebuild_blocking(timeout, clock)
     }
 
     /// Assigns a random layer for node insertion using geometric distribution.
@@ -56,9 +92,11 @@ impl HnswIndexCore {
         quantizer_opt: Option<&crate::quantize::ScalarQuantizer>,
     ) -> Result<f32> {
         match data {
-            VectorData::F32(v) => {
-                compute_distance_trusted(query_exact, v, self.cold.config.distance_metric)
-            }
+            VectorData::F32(v) => crate::distance::compute_distance_trusted(
+                query_exact,
+                v,
+                self.cold.config.distance_metric,
+            ),
             VectorData::U8(v) => {
                 let guard;
                 let q = if let Some(q_ref) = quantizer_opt {
@@ -66,7 +104,7 @@ impl HnswIndexCore {
                 } else {
                     guard = self.cold.quantizer.read();
                     guard.as_ref().ok_or_else(|| {
-                        contextra_core::ContextraError::Index("Quantizer not trained".into())
+                        contextra_types::ContextraError::Index("Quantizer not trained".into())
                     })?
                 };
                 if let Some(qq) = query_quantized {
@@ -94,7 +132,7 @@ impl HnswIndexCore {
             } else {
                 guard = self.cold.quantizer.read();
                 guard.as_ref().ok_or_else(|| {
-                    contextra_core::ContextraError::Index("Quantizer not trained".into())
+                    contextra_types::ContextraError::Index("Quantizer not trained".into())
                 })?
             };
             if let Some(qq) = query_quantized {
@@ -113,15 +151,17 @@ impl HnswIndexCore {
 
     fn compute_symmetric_distance(&self, data_a: &VectorData, data_b: &VectorData) -> Result<f32> {
         match (data_a, data_b) {
-            (VectorData::F32(a), VectorData::F32(b)) => {
-                compute_distance_trusted(a, b, self.cold.config.distance_metric)
-            }
+            (VectorData::F32(a), VectorData::F32(b)) => crate::distance::compute_distance_trusted(
+                a,
+                b,
+                self.cold.config.distance_metric,
+            ),
             (VectorData::U8(a), VectorData::U8(b)) => {
                 let guard = self.cold.quantizer.read();
                 guard
                     .as_ref()
                     .ok_or_else(|| {
-                        contextra_core::ContextraError::Index("Quantizer not trained".into())
+                        contextra_types::ContextraError::Index("Quantizer not trained".into())
                     })?
                     .symmetric_dist(a, b, self.cold.config.distance_metric)
             }
@@ -294,7 +334,11 @@ impl HnswIndexCore {
 
         let mut result: Vec<Candidate> = Vec::with_capacity(m);
         let mut sorted_cands = candidates.to_vec();
-        sorted_cands.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+        sorted_cands.sort_by(|a, b| {
+            a.distance
+                .total_cmp(&b.distance)
+                .then_with(|| a.index.cmp(&b.index))
+        });
 
         for closest in sorted_cands {
             if result.len() >= m {
@@ -325,7 +369,11 @@ impl HnswIndexCore {
         if result.len() < min_neighbors && candidates.len() >= min_neighbors {
             let mut fallback = result;
             let mut sorted_fallback = candidates.to_vec();
-            sorted_fallback.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+            sorted_fallback.sort_by(|a, b| {
+                a.distance
+                    .total_cmp(&b.distance)
+                    .then_with(|| a.index.cmp(&b.index))
+            });
 
             for cand in sorted_fallback {
                 if (fallback.len() >= m
@@ -349,18 +397,6 @@ impl HnswIndexCore {
         if let Some(idx) = node_idx {
             self.cold.deleted_nodes.write().insert(idx as u64);
             self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
-
-            let mmap_node_count = self
-                .cold
-                .mmap_index
-                .read()
-                .as_ref()
-                .map(|m| m.header.node_count() as usize)
-                .unwrap_or(0);
-            if idx >= mmap_node_count {
-                let ram_idx = idx - mmap_node_count;
-                self.hot.arena.free_node(ram_idx);
-            }
 
             let ep_val = self.hot.get_entry_point();
             let ram_ep_val = self.hot.get_ram_entry_point();
@@ -386,8 +422,11 @@ impl HnswIndexCore {
                                 Ok(r) => r,
                                 Err(_) => continue,
                             };
-                            if record.max_layer as usize >= max_layer {
-                                max_layer = record.max_layer as usize;
+                            let rec_layer = record.max_layer as usize;
+                            if rec_layer > max_layer
+                                || (rec_layer == max_layer && best_node.is_none_or(|b| i < b))
+                            {
+                                max_layer = rec_layer;
                                 best_node = Some(i);
                             }
                         }
@@ -397,11 +436,17 @@ impl HnswIndexCore {
                 for (i, node) in nodes.iter().enumerate() {
                     let global_idx = mmap_node_count + i;
                     if global_idx != idx && !deleted.contains(global_idx as u64) {
-                        if node.max_layer >= max_layer {
+                        if node.max_layer > max_layer
+                            || (node.max_layer == max_layer
+                                && best_node.is_none_or(|b| global_idx < b))
+                        {
                             max_layer = node.max_layer;
                             best_node = Some(global_idx);
                         }
-                        if node.max_layer >= max_ram_layer {
+                        if node.max_layer > max_ram_layer
+                            || (node.max_layer == max_ram_layer
+                                && best_ram_node.is_none_or(|b| global_idx < b))
+                        {
                             max_ram_layer = node.max_layer;
                             best_ram_node = Some(global_idx);
                         }
@@ -464,16 +509,25 @@ impl HnswIndexCore {
         false
     }
 
-    pub async fn rebuild(&self) -> Result<()> {
+    pub fn rebuild(&self) -> Result<()> {
         self.rebuild_sync()
     }
 
+    pub fn rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
+        self.rebuild_sync_with_clock(clock)
+    }
+
     pub fn rebuild_sync(&self) -> Result<()> {
-        let now = std::time::Instant::now();
+        let clock = self.cold.clock.read().clone();
+        self.rebuild_sync_with_clock(clock.as_ref())
+    }
+
+    pub fn rebuild_sync_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
+        let now_nanos = clock.monotonic_nanos();
         {
-            let last_rebuild_guard = self.cold.last_rebuild_instant.lock();
-            if let Some(last_instant) = *last_rebuild_guard {
-                let elapsed = now.duration_since(last_instant);
+            if let Some(last_nanos) = get_last_rebuild_nanos(self) {
+                let elapsed_nanos = now_nanos.saturating_sub(last_nanos);
+                let elapsed = std::time::Duration::from_nanos(elapsed_nanos);
                 let consecutive = self.cold.consecutive_rapid_rebuilds.load(Ordering::SeqCst);
 
                 let cooldown = if consecutive == 0 {
@@ -542,10 +596,10 @@ impl HnswIndexCore {
             tracing::debug!("HNSW rebuild already in progress, skipping");
             return Ok(());
         }
-        let _guard = RebuildGuard(&self.hot.rebuilding);
+        let _guard = RebuildGuard(&self.hot.rebuilding, &self.hot.rebuild_condvar);
 
         tracing::info!("Starting HNSW index rebuild (Phase 1)");
-        let start_time = std::time::Instant::now();
+        let start_nanos = clock.monotonic_nanos();
 
         let rebuild_res =
             self.rebuild_phase1_snapshot_and_build()
@@ -556,18 +610,19 @@ impl HnswIndexCore {
                     self.rebuild_phase2_merge_and_swap(new_index, snapshot_tx)
                 });
 
-        let elapsed_secs = start_time.elapsed().as_secs_f64();
+        let elapsed_secs =
+            (clock.monotonic_nanos().saturating_sub(start_nanos) as f64) / 1_000_000_000.0;
         let sink = self.cold.metrics_sink.read().clone();
 
         if rebuild_res.is_ok() {
             self.cold.rebuild_count.fetch_add(1, Ordering::SeqCst);
-            *self.cold.last_rebuild_instant.lock() = Some(std::time::Instant::now());
+            set_last_rebuild_nanos(self, clock.monotonic_nanos());
             self.cold
                 .consecutive_rapid_rebuilds
                 .store(0, Ordering::SeqCst);
             sink.record_histogram("vector_rebuild_duration_seconds", elapsed_secs, &[]);
             sink.record_counter("vector_rebuild_total", 1, &[("status", "success")]);
-            tracing::info!("HNSW rebuild completed in {:?}", start_time.elapsed());
+            tracing::info!("HNSW rebuild completed in {:.6}s", elapsed_secs);
         } else {
             sink.record_counter("vector_rebuild_total", 1, &[("status", "error")]);
         }
@@ -575,7 +630,7 @@ impl HnswIndexCore {
         rebuild_res
     }
 
-    pub async fn rebuild_region(&self, region_node_ids: Vec<u64>) -> Result<()> {
+    pub fn rebuild_region(&self, region_node_ids: Vec<u64>) -> Result<()> {
         self.rebuild_region_sync(region_node_ids)
     }
 
@@ -586,7 +641,7 @@ impl HnswIndexCore {
 
         let _write_lock = self.hot.write_mutex.lock();
 
-        let region_set: AHashSet<u64> = region_node_ids.into_iter().collect();
+        let region_set: BTreeSet<u64> = region_node_ids.into_iter().collect();
 
         let mmap_count = self
             .cold
@@ -610,7 +665,7 @@ impl HnswIndexCore {
             return Ok(());
         }
 
-        let tombstoned_set: AHashSet<u32> =
+        let tombstoned_set: BTreeSet<u32> =
             tombstoned_in_region.iter().map(|&id| id as u32).collect();
 
         let m = self.cold.config.m;
@@ -645,10 +700,7 @@ impl HnswIndexCore {
                                     kept.push(neighbor_u32);
                                 }
                             }
-                            counts[count_start + layer] = u8::try_from(
-                                contextra_types::SaturatingU16::from(kept.len()).get(),
-                            )
-                            .unwrap_or(u8::MAX);
+                            counts[count_start + layer] = kept.len() as u8;
                             arena[l_offset..l_offset + kept.len()].copy_from_slice(&kept);
                         }
                     }
@@ -722,7 +774,8 @@ impl HnswIndexCore {
         };
 
         let rng = self.cold.rng.clone();
-        let new_index = HnswIndex::try_new_with_rng(config, rng)?;
+        let clock = self.cold.clock.read().clone();
+        let new_index = HnswIndex::try_new_with_rng_and_clock(config, rng, clock)?;
         *new_index.inner.cold.seq_log.write() = self.cold.seq_log.read().clone();
 
         {
@@ -811,7 +864,7 @@ impl HnswIndexCore {
 
         for change in delta_changes {
             match change {
-                contextra_core::SeqLogChange::Insert { doc_id, seq } => {
+                contextra_mvcc::SeqLogChange::Insert { doc_id, seq } => {
                     let vector_opt = {
                         let doc_map = self.hot.doc_to_node.read();
                         let mmap_count = self
@@ -852,7 +905,7 @@ impl HnswIndexCore {
                         new_index.inner.do_insert(doc_id, &f32_vec, seq)?;
                     }
                 }
-                contextra_core::SeqLogChange::Delete { doc_id, .. } => {
+                contextra_mvcc::SeqLogChange::Delete { doc_id, .. } => {
                     new_index.inner.do_delete(doc_id)?;
                 }
             }
@@ -924,5 +977,226 @@ impl HnswIndexCore {
         }
 
         Ok(())
+    }
+}
+
+impl HnswIndex {
+    /// Führt Graphtraversierung durch zur Überprüfung von `INV-VEC-CONNECTIVITY-1`.
+    ///
+    /// Verifiziert, dass jeder lebende Knoten im Index vom Einstiegspunkt über
+    /// Graphkanten erreichbar ist.
+    pub fn verify_full_connectivity(&self) -> bool {
+        let mmap_guard = self.inner.cold.mmap_index.read();
+        let mmap_node_count = mmap_guard
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+        let nodes = self.inner.hot.nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
+        let total = mmap_node_count + nodes.len();
+
+        let mut alive_nodes = ahash::AHashSet::new();
+        for i in 0..total {
+            if !deleted.contains(i as u64) {
+                alive_nodes.insert(i as u32);
+            }
+        }
+
+        if alive_nodes.is_empty() {
+            return true;
+        }
+
+        let ep = match self.inner.hot.get_entry_point() {
+            Some(e) => e as u32,
+            None => return false,
+        };
+
+        if !alive_nodes.contains(&ep) {
+            return false;
+        }
+
+        let m = self.inner.cold.config.m;
+        let mut visited = ahash::AHashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+
+        visited.insert(ep);
+        queue.push_back(ep);
+
+        while let Some(curr) = queue.pop_front() {
+            let curr_idx = curr as usize;
+            let max_layer = if curr_idx < mmap_node_count {
+                if let Some(mmap) = mmap_guard.as_ref() {
+                    mmap.get_node_record(curr_idx)
+                        .map(|r| r.max_layer as usize)
+                        .unwrap_or(0)
+                } else {
+                    0
+                }
+            } else {
+                let ram_idx = curr_idx - mmap_node_count;
+                nodes.get(ram_idx).map(|n| n.max_layer).unwrap_or(0)
+            };
+
+            for layer in 0..=max_layer {
+                let conns = if curr_idx < mmap_node_count {
+                    if let Some(mmap) = mmap_guard.as_ref() {
+                        if let Ok(rec) = mmap.get_node_record(curr_idx) {
+                            mmap.get_connections(&rec, layer).unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        }
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    let ram_idx = curr_idx - mmap_node_count;
+                    self.inner
+                        .hot
+                        .arena
+                        .get_ram_node_connections(ram_idx, layer, m)
+                };
+
+                for &neighbor in &conns {
+                    if alive_nodes.contains(&neighbor) && visited.insert(neighbor) {
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+        }
+
+        alive_nodes.is_subset(&visited)
+    }
+}
+
+impl crate::types::Maintain for HnswIndex {
+    fn compact(&self) -> crate::error::Result<()> {
+        self.inner
+            .rebuild_sync()
+            .map_err(|e| crate::error::VectorError::Index(e.to_string()))?;
+        if !self.verify_full_connectivity() {
+            return Err(crate::error::VectorError::ConnectivityDegraded {
+                deleted_ratio: self.deleted_ratio(),
+            });
+        }
+        Ok(())
+    }
+
+    fn is_rebuild_required(&self) -> bool {
+        self.is_rebuild_required()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hnsw::config::HnswConfig;
+    use contextra_ports::{Clock, SeededRng};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+
+    struct TestClock {
+        nanos: AtomicU64,
+    }
+
+    impl TestClock {
+        fn new(start_nanos: u64) -> Self {
+            Self {
+                nanos: AtomicU64::new(start_nanos),
+            }
+        }
+
+        fn advance_nanos(&self, delta: u64) {
+            self.nanos.fetch_add(delta, Ordering::SeqCst);
+        }
+    }
+
+    impl Clock for TestClock {
+        fn now_unix_nanos(&self) -> u64 {
+            self.nanos.load(Ordering::SeqCst)
+        }
+
+        fn monotonic_nanos(&self) -> u64 {
+            self.nanos.load(Ordering::SeqCst)
+        }
+    }
+
+    #[test]
+    fn test_core_rebuild_no_direct_time_and_deterministic_with_same_seed() {
+        let clock = TestClock::new(1_000_000_000);
+
+        let build_and_rebuild_index = |seed: u64| -> Result<(f32, Vec<u32>, usize)> {
+            let mut config = HnswConfig::default();
+            config.dimension = 4;
+            config.m = 8;
+            config.ef_construction = 16;
+            let rng: Arc<dyn contextra_ports::Rng> = Arc::new(SeededRng::new(seed));
+            let index = HnswIndex::try_new_with_rng(config, rng)?;
+
+            for i in 1..=20 {
+                let doc_id = DocId::new(i as u64);
+                let vec = vec![i as f32, (i * 2) as f32, (i * 3) as f32, (i * 4) as f32];
+                index.inner.do_insert(doc_id, &vec, i as u64)?;
+            }
+
+            for i in 1..=5 {
+                index.inner.do_delete(DocId::new(i as u64))?;
+            }
+
+            clock.advance_nanos(10_000_000_000);
+            assert!(clock.now_unix_nanos() > 0);
+            index.inner.rebuild_sync_with_clock(&clock)?;
+
+            let ep = index.inner.hot.get_entry_point().unwrap_or(0);
+            let conns = index.inner.hot.get_ram_node_connections(0, 0, 8);
+
+            let query = vec![10.0, 20.0, 30.0, 40.0];
+            let nodes_guard = index.inner.hot.nodes.read();
+            let search_ctx = SearchContext {
+                mmap: None,
+                nodes: nodes_guard.as_slice(),
+                mmap_node_count: 0,
+                prior_prepared: &[],
+                quantizer: None,
+                arena: &index.inner.hot.arena,
+                backlink_map: None,
+            };
+            let dist = index.inner.resolve_dist(0, &query, None, &search_ctx)?;
+
+            Ok((dist, conns, ep))
+        };
+
+        let run1 = build_and_rebuild_index(42).expect("run 1 succeeds");
+        let run2 = build_and_rebuild_index(42).expect("run 2 succeeds");
+
+        assert_eq!(run1.2, run2.2, "Entry points must be bit-identical");
+        assert_eq!(run1.1, run2.1, "RAM connections must be bit-identical");
+        assert_eq!(run1.0, run2.0, "Distances must be bit-identical");
+    }
+
+    #[test]
+    fn test_core_rebuild_last_rebuild_nanos_field_backoff() {
+        let clock = Arc::new(TestClock::new(10_000_000_000));
+        let mut config = HnswConfig::default();
+        config.dimension = 4;
+        config.backoff_base_delay = std::time::Duration::from_millis(500);
+        let rng: Arc<dyn contextra_ports::Rng> = Arc::new(SeededRng::new(42));
+        let index = HnswIndex::try_new_with_rng_and_clock(config, rng, clock.clone())
+            .expect("index creation succeeds");
+
+        // Initial rebuild sets last_rebuild_nanos
+        assert_eq!(index.inner.cold.last_rebuild_nanos.load(Ordering::Acquire), 0);
+        index.inner.rebuild_sync().expect("rebuild succeeds");
+        let first_rebuild_nanos = index.inner.cold.last_rebuild_nanos.load(Ordering::Acquire);
+        assert_eq!(first_rebuild_nanos, 10_000_000_000);
+
+        // Immediate rebuild suppressed by backoff
+        let err = index.inner.rebuild_sync().unwrap_err();
+        assert!(format!("{err:?}").contains("Rebuild rate limited by backoff"));
+
+        // Advance clock past cooldown
+        clock.advance_nanos(600_000_000); // 600ms > 500ms
+        index.inner.rebuild_sync().expect("second rebuild succeeds after clock advance");
+        let second_rebuild_nanos = index.inner.cold.last_rebuild_nanos.load(Ordering::Acquire);
+        assert_eq!(second_rebuild_nanos, 10_600_000_000);
     }
 }

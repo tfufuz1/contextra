@@ -1,4 +1,3 @@
-#![allow(clippy::expect_used, clippy::unwrap_used)]
 use contextra_durable_fs::vfs::{StdVfs, Vfs};
 use tempfile::tempdir;
 
@@ -30,4 +29,8 @@ fn test_vfs_conformance_basic_ops() {
     vfs.rename(&file_path, &renamed).expect("rename");
     assert!(!vfs.exists(&file_path));
     assert!(vfs.exists(&renamed));
+
+    // remove
+    vfs.remove(&renamed).expect("remove");
+    assert!(!vfs.exists(&renamed));
 }

@@ -4,11 +4,11 @@
 
 #![cfg(feature = "fault-injection")]
 
-use contextra_core::{ContextraError, TxId};
 use contextra_store::wal::{
     Wal, WalConfig, WalOp, WalVersion, FAIL_APPEND_FOR_TX, FAIL_TRUNCATE_ONCE,
 };
 use contextra_testkit::{FaultConfig, FaultVfs};
+use contextra_types::{ContextraError, TxId};
 use tempfile::TempDir;
 
 /// Number of fault time points tested per command type (at least 15 per task spec)
@@ -22,11 +22,8 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
     let tmp = TempDir::new().map_err(|e| format!("TempDir creation failed: {e}"))?;
     let wal_path = tmp.path().join("lifecycle_matrix.wal");
 
-    let config = WalConfig {
-        allow_legacy_integrity_key_fallback: true,
-        min_wal_version: WalVersion::V1,
-        ..Default::default()
-    };
+    let mut config = WalConfig::default().with_legacy_fallback(true);
+    config.min_wal_version = WalVersion::V1;
 
     // 1. Initialise WAL and write 10 baseline entries
     let wal = Wal::open_with_config(&wal_path, config.clone())

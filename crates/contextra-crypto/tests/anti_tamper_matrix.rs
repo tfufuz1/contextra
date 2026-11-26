@@ -1,3 +1,8 @@
+//! # Integrationstest: `anti_tamper_matrix.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `anti_tamper_matrix`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Systematic WAL anti-tamper matrix, single bit-flip analysis, replay attack protection, and constant-time check.
 // INVARIANTEN: Every single byte flip in WAL entry payload/header MUST cause verification failure. Hash chain prevents replay.

@@ -1,6 +1,37 @@
+//! # Commit-Tests (Ring 1)
+//!
+//! Prueft Rollbacks, Timeouts und Batch-Sicherheit.
+
 use super::*;
+use contextra_testkit::ManualClock;
 use std::sync::atomic::Ordering;
 use tempfile::TempDir;
+
+#[tokio::test]
+async fn test_clock_port_integration_with_manual_clock() {
+    let tmp = TempDir::new().expect("temp dir");
+    let clock = Arc::new(ManualClock::new(100_000));
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::new(config)
+        .await
+        .expect("create storage")
+        .with_clock(Arc::clone(&clock) as Arc<dyn contextra_ports::Clock>);
+
+    assert_eq!(storage.clock().now_unix_nanos(), 100_000);
+
+    clock.advance(Duration::from_nanos(50_000));
+    assert_eq!(storage.clock().now_unix_nanos(), 150_000);
+
+    let tx = TxId::new(1);
+    storage.put(tx, b"clock_key", b"clock_val").await.unwrap();
+    storage.commit(tx).await.unwrap();
+
+    let val = storage.get(b"clock_key").await.unwrap();
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"clock_val")));
+}
 
 #[tokio::test]
 async fn test_put_get_roundtrip() {
@@ -213,7 +244,8 @@ async fn test_commit_tracks_budget_drift_on_consume_memory_failure() {
 
     let key = b"drift_key";
     let value = vec![b'v'; 60000];
-    let expected_entry_size = (key.len() + value.len() + 8) as u64;
+    let expected_entry_size =
+        (key.len() + value.len() + contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES) as u64;
 
     let tx = TxId::new(1);
     storage.put(tx, key, &value).await.expect("put succeeds");
@@ -258,8 +290,8 @@ async fn test_sequence_numbers_strictly_monotonic_across_concurrent_commits() {
 
     let last_seq = storage.last_seq_no().await.unwrap();
     assert_eq!(
-        last_seq, 10,
-        "10 commits must generate sequence numbers 1..10 monotonically"
+        last_seq, 20,
+        "10 commits must generate 20 sequence numbers (Put + TxEnd per commit) monotonically"
     );
 }
 

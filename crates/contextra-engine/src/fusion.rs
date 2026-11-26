@@ -5,12 +5,22 @@
 pub use contextra_rank::fusion::{
     apply_resonance_bonus, reciprocal_rank_fusion, score_normalized_fusion_with_options,
     weighted_reciprocal_rank_fusion, weighted_reciprocal_rank_fusion_with_options,
-    weighted_reciprocal_rank_fusion_with_priority, weights_to_signal_factors, BoundedTopK,
-    MetadataMergePriority, ProvenanceBuilder, ProvenanceRecord, ResonanceConfig, SearchReport,
-    SearchResult, Signal, SignalContribution, SignalFailurePolicy, SignalKind,
+    weighted_reciprocal_rank_fusion_with_priority, BoundedTopK, MetadataMergePriority,
+    ProvenanceBuilder, ProvenanceRecord, ResonanceConfig, SearchReport, SearchResult, Signal,
+    SignalContribution, SignalFailurePolicy, SignalKind,
 };
 
 pub use contextra_types::{FusionStrategy, SignalFusionStrategies};
+
+/// Converts optional [`contextra_types::FusionWeights`] into `(vector, text, graph)` factors.
+pub fn weights_to_signal_factors(
+    weights: Option<&contextra_types::FusionWeights>,
+) -> (f32, f32, f32) {
+    match weights {
+        Some(w) => (w.vector(), w.text(), w.graph()),
+        None => (1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0),
+    }
+}
 
 /// Fuses search result sets using the specified FusionStrategy.
 pub fn fuse_search_results_with_strategy(
@@ -27,7 +37,7 @@ pub fn fuse_search_results_with_strategy(
         priority,
         include_provenance,
         resonance_config,
-        strategy,
+        strategy.into(),
     )
 }
 
@@ -46,7 +56,7 @@ pub fn fuse_search_results_with_signal_strategies(
         priority,
         include_provenance,
         resonance_config,
-        strategies,
+        strategies.into(),
     )
 }
 

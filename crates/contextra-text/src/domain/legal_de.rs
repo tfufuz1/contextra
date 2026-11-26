@@ -3,6 +3,11 @@
 // QUELLE: data/legal_de.txt (Offene Rechts- und Justizterminologie der Bundesrepublik Deutschland).
 // REGELN: Kleingeschrieben, alphabetisch sortiert, keine Duplikate, Staemme und geschuetzte Begriffe ueberschneiden sich nicht, keine Eigennamen/Marken.
 
+//! Deutsches Juristisches Fachvokabular (`domain::legal_de`).
+//!
+//! # Ring-Zuordnung
+//! Ring 0 (Kern).
+
 use super::{parse_domain_resource, DomainVocabulary, ParsedVocabulary};
 use std::sync::OnceLock;
 
@@ -14,7 +19,8 @@ fn get_parsed_legal() -> &'static ParsedVocabulary {
     PARSED_LEGAL.get_or_init(|| parse_domain_resource(RAW_LEGAL_DATA))
 }
 
-/// Deutsches Juristisches Fachvokabular.
+// ANCHOR[contextra-text:DOM-002]
+/// Deutsches Juristisches Fachvokabular zur Anbindung an [`DomainVocabulary`].
 pub struct LegalDomainVocabulary;
 
 impl DomainVocabulary for LegalDomainVocabulary {
@@ -31,18 +37,24 @@ impl DomainVocabulary for LegalDomainVocabulary {
     }
 }
 
-/// Exportierte Hilfsfunktionen für direkten Slice-Zugriff.
+// ANCHOR[contextra-text:DOM-003]
+/// Liefert den statischen Slice aller juristischen Komposita-Wortstämme.
 pub fn get_legal_compound_stems() -> &'static [&'static str] {
     get_parsed_legal().compound_stems
 }
 
+// ANCHOR[contextra-text:DOM-004]
+/// Liefert den statischen Slice aller juristischen geschützten Begriffe.
 pub fn get_legal_protected_terms() -> &'static [&'static str] {
     get_parsed_legal().protected_terms
 }
 
+// ANCHOR[contextra-text:DOM-005]
 /// Statische Referenz-Slices für Abwärtskompatibilität in vorhandenen Tests.
 pub static LEGAL_COMPOUND_STEMS: std::sync::LazyLock<&'static [&'static str]> =
     std::sync::LazyLock::new(get_legal_compound_stems);
 
+// ANCHOR[contextra-text:DOM-006]
+/// Statische Referenz-Slices geschützter Begriffe für Abwärtskompatibilität.
 pub static LEGAL_PROTECTED_TERMS: std::sync::LazyLock<&'static [&'static str]> =
     std::sync::LazyLock::new(get_legal_protected_terms);

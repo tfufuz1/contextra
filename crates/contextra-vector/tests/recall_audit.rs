@@ -4,8 +4,8 @@
 
 #![cfg(feature = "experimental-diskann")]
 
-use contextra_core::traits::VectorIndex;
-use contextra_core::types::{DistanceMetric, DocId, TxId};
+use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use rand::seq::SliceRandom;

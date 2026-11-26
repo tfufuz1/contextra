@@ -1,6 +1,10 @@
+//! # Unit-Tests fuer SSTables (Ring 1)
+//!
+//! Testet Serialisierung, Deserialisierung, Block-Caching und Filter-Korrektheit.
+
 use super::*;
 use bytes::Bytes;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 

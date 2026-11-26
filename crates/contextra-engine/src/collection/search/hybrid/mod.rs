@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** Hybride Multi-Signal-Suche mit paralleler Signalerfassung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Hybrid-Familie (hybrid_search, hybrid_search_reranked, hybrid_search_with_weights, hybrid_search_with_strategy, traverse_links, filter_by_importance) für Collection.
 
@@ -30,6 +37,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// k_pool=20 → Recall@5=0.458; k_pool=100 → Recall@5=0.888 (Qualitätsknie).
     pub const DEFAULT_MIN_RERANK_CANDIDATES: usize = 100;
 
+    // ANCHOR[contextra-engine:COL-HYB-043]
+    /// Dokumentation für `hybrid_search_reranked` im Rahmen der Collection- und Suchabstraktion.
     #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, text, vector, reranker, anchor_entities))]
@@ -167,40 +176,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             };
 
             let graph_results = if let Some(anchors) = anchors_ref {
-                let tuples = match graph_strat {
-                    contextra_types::GraphTraversalStrategy::Hops { max_hops } => {
-                        let mut raw_tuples = self
-                            .graph_index
-                            .multi_traverse_at(anchors, *max_hops, seq)
-                            .await?;
-                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        raw_tuples.truncate(k);
-                        raw_tuples
-                    }
-                    contextra_types::GraphTraversalStrategy::PersonalizedPageRank(cfg) => {
-                        let mut raw_tuples = self
-                            .graph_index
-                            .personalized_page_rank_at(anchors, cfg, seq)
-                            .await?;
-                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        raw_tuples.truncate(k);
-                        raw_tuples
-                    }
-                    contextra_types::GraphTraversalStrategy::PathRag { max_hops, .. } => {
-                        let mut raw_tuples = self
-                            .graph_index
-                            .path_rag_at(anchors, *max_hops, seq)
-                            .await?;
-                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        raw_tuples.truncate(k);
-                        raw_tuples
-                    }
-                };
-                let doc_tuples = tuples
-                    .into_iter()
-                    .map(|(eid, score)| (contextra_types::DocId::new(eid.inner()), score))
-                    .collect();
-                self.hydrate_from_tuples_at(doc_tuples, seq).await?
+                self.evaluate_graph_signal_tuples_at(anchors, graph_strat, k, seq)
+                    .await?
             } else {
                 Vec::new()
             };
@@ -257,6 +234,50 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             Ok(boosted)
         })
         .await
+    }
+
+    /// Evaluates graph signal traversal at snapshot `seq` and returns hydrated search results.
+    async fn evaluate_graph_signal_tuples_at(
+        &self,
+        anchors: &[contextra_types::EntityId],
+        graph_strat: &contextra_types::GraphTraversalStrategy,
+        k: usize,
+        seq: u64,
+    ) -> Result<Vec<crate::SearchResult>> {
+        let tuples = match graph_strat {
+            contextra_types::GraphTraversalStrategy::Hops { max_hops } => {
+                let mut raw_tuples = self
+                    .graph_index
+                    .multi_traverse_at(anchors, *max_hops, seq)
+                    .await?;
+                raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                raw_tuples.truncate(k);
+                raw_tuples
+            }
+            contextra_types::GraphTraversalStrategy::PersonalizedPageRank(cfg) => {
+                let mut raw_tuples = self
+                    .graph_index
+                    .personalized_page_rank_at(anchors, cfg, seq)
+                    .await?;
+                raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                raw_tuples.truncate(k);
+                raw_tuples
+            }
+            contextra_types::GraphTraversalStrategy::PathRag { max_hops, .. } => {
+                let mut raw_tuples = self
+                    .graph_index
+                    .path_rag_at(anchors, *max_hops, seq)
+                    .await?;
+                raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                raw_tuples.truncate(k);
+                raw_tuples
+            }
+        };
+        let doc_tuples = tuples
+            .into_iter()
+            .map(|(eid, score)| (contextra_types::DocId::new(eid.inner().into()), score))
+            .collect();
+        self.hydrate_from_tuples_at(doc_tuples, seq).await
     }
 
     /// Standard overfetch factor applied to candidate limits before fusion to balance OOM protection and recall.

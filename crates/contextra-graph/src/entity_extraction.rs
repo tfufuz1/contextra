@@ -1,3 +1,8 @@
+//! Regelbasierte Entitäts- und Relationsextraktion ohne Machine-Learning-Laufzeit.
+//!
+//! # Zweck
+//! Extrahiert Eigennamen, numerische Codes und semantische Relationen aus Textdokumenten.
+
 // FILE-CONTEXT
 // ZWECK: Regelbasierte Entitäts- und Relations-Extraktion aus Freitext mit Graph-Ingestion-Anbindung.
 //
@@ -13,12 +18,12 @@
 #![forbid(unsafe_code)]
 
 use crate::csr::{CsrGraph, EdgeType};
-use crate::error::GraphMutationError;
 use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::{DocId, Entity, EntityId, Result};
 
 /// Repräsentiert eine aus Freitext extrahierte Binärbeziehung zwischen zwei Entitäten.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:SRC-ENTITY-EXTRACTION-001]
 pub struct ExtractedRelation {
     /// Name / Identifikator der Quell-Entität (Subjekt).
     pub source: String,
@@ -32,6 +37,7 @@ pub struct ExtractedRelation {
 
 impl ExtractedRelation {
     /// Erstellt eine neue `ExtractedRelation`.
+    // ANCHOR[contextra-graph:SRC-ENTITY-EXTRACTION-002]
     pub fn new(
         source: impl Into<String>,
         target: impl Into<String>,
@@ -48,6 +54,13 @@ impl ExtractedRelation {
 }
 
 /// Trait für Entitäts- und Relations-Extraktionsstufen.
+///
+/// # Abgrenzung zu `contextra-engine`
+/// Dieser Trait im `contextra-graph`-Crate definiert das Basis-Interface für regelbasierte
+/// Entitäts- und Relations-Extraktion auf Graph-Ebene (`RuleBasedEntityExtractor`).
+/// Er unterscheidet sich von `EntityExtractor` in `contextra-engine`, welcher die
+/// LLM-/Inferenz-gestützte Pipeline im Ingestion-Prozess kapselt.
+// ANCHOR[contextra-graph:SRC-ENTITY-EXTRACTION-003]
 pub trait EntityExtractor: Send + Sync {
     /// Extrahiert Relationen aus dem gegebenen Freitext.
     fn extract(&self, text: &str) -> Vec<ExtractedRelation>;
@@ -69,6 +82,7 @@ struct RelationPattern {
 /// Nutzt Phrasen-Matching in Kombination mit Erkennung von Großbuchstaben-Substantiven / Eigennamen
 /// zur Identifikation von Subjekt- und Objekt-Entitäten.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-graph:SRC-ENTITY-EXTRACTION-004]
 pub struct RuleBasedEntityExtractor {
     /// Minimale Konfidenzschwelle. Ergebnisse unterhalb dieser Schwelle werden nicht zurückgegeben.
     min_confidence: f32,
@@ -78,6 +92,7 @@ pub struct RuleBasedEntityExtractor {
 
 impl RuleBasedEntityExtractor {
     /// Erstellt einen neuen `RuleBasedEntityExtractor` mit der angegebenen Mindest-Konfidenz-Schwelle.
+    // ANCHOR[contextra-graph:SRC-ENTITY-EXTRACTION-005]
     pub fn new(min_confidence: f32) -> Self {
         let patterns = vec![
             RelationPattern {
@@ -232,6 +247,7 @@ impl EntityExtractor for RuleBasedEntityExtractor {
 ///
 /// # Rückgabe
 /// Gibt ein `Vec<HyperEdge>` aller erfolgreich im Graph erstellten Hyperkanten zurück.
+// ANCHOR[contextra-graph:SRC-ENTITY-EXTRACTION-006]
 pub fn ingest_extracted_relations(
     graph: &CsrGraph,
     relations: &[ExtractedRelation],
@@ -274,8 +290,8 @@ pub fn ingest_extracted_relations(
             Ok(he) => {
                 created_edges.push(he);
             }
-            Err(GraphMutationError::DuplicateHyperEdgeId(_)) => {
-                // Falls ID kollidiert, versuche mit versetztem Offset
+            Err(e) => {
+                // Falls ID kollidiert oder Fehler auftritt, versuche mit versetztem Offset
                 let alt_id = HyperEdgeId::new(next_he_id.inner() + 1000);
                 let participants_alt = vec![
                     RoleBinding::new(RoleId::new(1), source_id),
@@ -289,12 +305,11 @@ pub fn ingest_extracted_relations(
                     doc_id,
                 ) {
                     created_edges.push(he);
+                } else {
+                    return Err(contextra_types::ContextraError::Internal(format!(
+                        "Failed to convert ExtractedRelation to hyperedge: {e}"
+                    )));
                 }
-            }
-            Err(e) => {
-                return Err(contextra_types::ContextraError::Internal(format!(
-                    "Failed to convert ExtractedRelation to hyperedge: {e}"
-                )));
             }
         }
     }

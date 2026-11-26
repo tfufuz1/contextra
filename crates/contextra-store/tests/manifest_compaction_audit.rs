@@ -1,9 +1,11 @@
 // Integration tests for store manifest and compaction audit findings.
 
-use contextra_core::{ResourceBudget, ResourceTracker, SnapshotRegistry, TOMBSTONE_BIT};
+use contextra_mvcc::SnapshotRegistry;
+use contextra_ports::{ResourceBudget, ResourceTracker};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::manifest::ManifestEntry;
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
+use contextra_types::TOMBSTONE_BIT;
 use std::sync::Arc;
 use tempfile::tempdir;
 

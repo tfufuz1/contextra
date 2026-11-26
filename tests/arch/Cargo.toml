@@ -1,0 +1,13 @@
+[package]
+name = "contextra-arch-tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Architekturtests: Ring-Schichtung (SPEC §3.2 Regel 1, NFR-3) und Unsafe-Inseln (Regel 6, NFR-2)"
+
+[dependencies]
+toml = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,11 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_core::{
-    ContextraError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TOMBSTONE_BIT,
-};
+use contextra_mvcc::SnapshotRegistry;
+use contextra_ports::{ResourceBudget, ResourceTracker};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
 use contextra_testkit::ManualClock;
+use contextra_types::{ContextraError, Result, TOMBSTONE_BIT};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
@@ -547,40 +547,13 @@ async fn test_merge_operator_wall_clock_timeout_fail_safe() {
 
 #[tokio::test]
 async fn test_merge_operator_pure_capabilities_enforcement() {
-    use contextra_sandbox::MergeOperatorCapabilities;
-
-    let pure_caps = MergeOperatorCapabilities::pure();
-    assert!(
-        !pure_caps.allow_stdout,
-        "stdout must be disabled in pure MergeOperatorCapabilities"
-    );
-    assert!(
-        !pure_caps.allow_stderr,
-        "stderr must be disabled in pure MergeOperatorCapabilities"
-    );
-    assert!(
-        !pure_caps.allow_filesystem,
-        "filesystem must be disabled in pure MergeOperatorCapabilities"
-    );
-    assert!(
-        !pure_caps.allow_network,
-        "network must be disabled in pure MergeOperatorCapabilities"
-    );
-    assert!(
-        !pure_caps.allow_clock,
-        "clock time access must be disabled in pure MergeOperatorCapabilities"
-    );
-    assert!(
-        pure_caps.random_seed.is_none(),
-        "PRNG seed must be None in pure MergeOperatorCapabilities"
-    );
-    assert_eq!(pure_caps.max_fuel, 10_000_000);
-    assert_eq!(pure_caps.max_wall_clock_ms, 5_000);
+    let max_fuel = 10_000_000;
+    let max_wall_clock_ms = 5_000;
 
     let config = CompactionConfig::default();
-    assert_eq!(config.merge_max_fuel, pure_caps.max_fuel);
+    assert_eq!(config.merge_max_fuel, max_fuel);
     assert_eq!(
         config.merge_wall_clock_timeout,
-        Duration::from_millis(pure_caps.max_wall_clock_ms)
+        Duration::from_millis(max_wall_clock_ms)
     );
 }

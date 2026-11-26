@@ -1,3 +1,8 @@
+//! # MemTable - In-Memory Schreibpuffer (Ring 1)
+//!
+//! Verwaltet aktive Mutationen im Hauptspeicher mit sequenzbasierter
+//! Sortierung und MVCC-Unterstuetzung vor dem Schreiben auf Festplatte.
+
 // FILE-CONTEXT
 // STAND: 2026-08-30T15:00:19Z (SESSION: 283abf0f)
 // ZWECK: In-Memory BTreeMap MemTable-Sharding mit MVCC Snapshot-Isolation.
@@ -30,15 +35,17 @@
 //! - **INVARIANT 2**: Tombstone entries have TOMBSTONE_BIT set in seq_no.
 //! - **INVARIANT 3**: flush() serializes entries in ascending key order (required by SSTable format).
 //! - **INVARIANT 4**: rollback(tx_id) removes ALL entries from that transaction atomically.
+//! - **INVARIANT 5**: Sequence numbers assigned to concurrent writes may arrive out of order at a key's version list. put() maintains version lists strictly sorted by raw sequence number (seq & !TOMBSTONE_BIT) in ascending order so that binary search and MVCC snapshot reads remain valid.
 
 use bytes::Bytes;
-use contextra_core::{TxId, TOMBSTONE_BIT};
 use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
+use contextra_types::{TxId, TOMBSTONE_BIT};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::ops::Bound;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
+// Compile-time Invariante: TOMBSTONE_BIT muss exakt Bit 63 sein für atomare Bitmaskierung.
 const _: () = assert!(TOMBSTONE_BIT == 1u64 << 63);
 
 /// Helper function to check if a sequence number has TOMBSTONE_BIT set.
@@ -217,22 +224,43 @@ impl MemTable {
     }
 
     /// Inserts a key-value pair with a sequence number and transaction ID.
+    ///
+    /// ## Concurrent Sequence Invariant
+    /// Sequence numbers pre-allocated to concurrent transactions may arrive out-of-order
+    /// at the shard lock. To ensure MVCC snapshot readers (`get`, `get_at_seq`, `iter_latest`,
+    /// `scan_prefix_into`) correctly resolve the latest visible version, `put` preserves
+    /// ascending sequence number order for each key's version list. If a lower sequence
+    /// number arrives after a higher sequence number, it is inserted into its sorted
+    /// position via binary search rather than appended.
     pub fn put(&self, key: Bytes, value: Bytes, seq_no: u64, tx_id: u64) {
         let additional_size = key.len() + value.len() + STAGING_ENTRY_OVERHEAD_BYTES;
         let shard_idx = Self::shard_for(&key);
         let mut entries = self.shards[shard_idx].entries.write();
 
         let versions = entries.entry(key).or_insert_with(|| Vec::with_capacity(2));
-        #[cfg(debug_assertions)]
-        if let Some((last_seq, _, _)) = versions.last() {
-            let raw_seq = seq_no & !TOMBSTONE_BIT;
-            let last_raw_seq = last_seq & !TOMBSTONE_BIT;
-            debug_assert!(
-                raw_seq >= last_raw_seq,
-                "Sequence numbers for a key in memtable must be monotonically non-decreasing: raw_seq {raw_seq} < last_raw_seq {last_raw_seq}"
-            );
+        let raw_seq = seq_no & !TOMBSTONE_BIT;
+
+        if versions
+            .last()
+            .map_or(true, |(last_s, _, _)| (*last_s & !TOMBSTONE_BIT) <= raw_seq)
+        {
+            // Fast path: sequence numbers are monotonically non-decreasing
+            versions.push((seq_no, value, tx_id));
+        } else {
+            // Out-of-order insertion: find the correct sorted position for `raw_seq`
+            let idx = match versions.binary_search_by_key(&raw_seq, |(s, _, _)| *s & !TOMBSTONE_BIT)
+            {
+                Ok(i) => {
+                    let mut pos = i + 1;
+                    while pos < versions.len() && (versions[pos].0 & !TOMBSTONE_BIT) == raw_seq {
+                        pos += 1;
+                    }
+                    pos
+                }
+                Err(i) => i,
+            };
+            versions.insert(idx, (seq_no, value, tx_id));
         }
-        versions.push((seq_no, value, tx_id));
 
         // Note: Simple size tracking (sums all versions)
         self.size.fetch_add(additional_size, Ordering::Relaxed);
@@ -263,7 +291,6 @@ impl MemTable {
     }
 
     /// Returns the transaction ID range covered by this MemTable.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn tx_range(&self) -> (u64, u64) {
         (
             self.min_tx.load(Ordering::Acquire),
@@ -333,7 +360,7 @@ impl MemTable {
         let entries = self.shards[shard_idx].entries.read();
         let versions = entries.get(key)?;
 
-        use contextra_core::{TxId, TOMBSTONE_BIT};
+        use contextra_types::{TxId, TOMBSTONE_BIT};
 
         let target_raw_seq = seq_no & !TOMBSTONE_BIT;
 
@@ -388,7 +415,7 @@ impl MemTable {
     /// atomic snapshot, but this method is only called on the flush guard
     /// path which is a rare, single-threaded check.
     pub fn is_empty(&self) -> bool {
-        self.shard_entry_counts().iter().all(|&c| c == 0)
+        self.shards.iter().all(|s| s.entries.read().is_empty())
     }
 
     /// Iterates over all entries (all versions) in sorted key order.
@@ -485,7 +512,6 @@ impl MemTable {
     ///
     /// Iterates over each shard's range defined by `(start, end)` bounds and merges matching visible entries directly
     /// into `target`. Higher `seq_no` versions shadow lower `seq_no` versions.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn scan_range_into(
         &self,
         start: Bound<&[u8]>,
@@ -570,7 +596,6 @@ impl MemTable {
 
     /// Returns entry count for each shard (used for testing shard distribution).
     #[doc(hidden)]
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn shard_entry_counts(&self) -> [usize; SHARD_COUNT] {
         std::array::from_fn(|i| self.shards[i].entries.read().len())
     }
@@ -654,7 +679,7 @@ mod tests {
 
     #[test]
     fn test_mvcc_tombstone_binary_search() {
-        use contextra_core::TOMBSTONE_BIT;
+        use contextra_types::TOMBSTONE_BIT;
         let mt = MemTable::new();
         let key = Bytes::from("key1");
 
@@ -1022,5 +1047,39 @@ mod tests {
 
         writer_handle.join().expect("writer finished"); // #[cfg(test)]
         scanner_handle.join().expect("scanner finished"); // #[cfg(test)]
+    }
+
+    #[test]
+    fn test_out_of_order_seq_put() {
+        let mt = MemTable::new();
+        let key = Bytes::from("key_ooo");
+
+        // Insert seq 20 first, then seq 10 (out-of-order), then seq 30, then seq 15
+        mt.put(key.clone(), Bytes::from("v20"), 20, 2);
+        mt.put(key.clone(), Bytes::from("v10"), 10, 1);
+        mt.put(key.clone(), Bytes::from("v30"), 30, 3);
+        mt.put(key.clone(), Bytes::from("v15"), 15, 2);
+
+        // get() should return the highest sequence version (v30 at seq 30)
+        let (val, seq) = mt.get(&key).expect("key should exist");
+        assert_eq!(val.as_ref(), b"v30");
+        assert_eq!(seq, 30);
+
+        // get_at_seq at seq 12 -> should find v10 at seq 10
+        let (val, seq, tx) = mt.get_at_seq(&key, 12, u64::MAX).expect("seq 10 visible");
+        assert_eq!(val.as_ref(), b"v10");
+        assert_eq!(seq, 10);
+        assert_eq!(tx, 1);
+
+        // get_at_seq at seq 18 -> should find v15 at seq 15
+        let (val, seq, tx) = mt.get_at_seq(&key, 18, u64::MAX).expect("seq 15 visible");
+        assert_eq!(val.as_ref(), b"v15");
+        assert_eq!(seq, 15);
+        assert_eq!(tx, 2);
+
+        // iter_latest should return key_ooo with seq 30
+        let latest = mt.iter_latest();
+        assert_eq!(latest.len(), 1);
+        assert_eq!(latest[0].2, 30);
     }
 }

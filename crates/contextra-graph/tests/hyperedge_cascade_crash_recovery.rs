@@ -1,3 +1,8 @@
+//! Crash-Recovery-Test für unterbrochene Hyperkanten-Kaskaden.
+//!
+//! # Zweck
+//! Simuliert Prozessabbrüche während einer Kaskaden-Invalidierung und verifiziert die Konsistenz nach Wiederanlauf.
+
 #![expect(clippy::unwrap_used)]
 
 use contextra_graph::cascade::{
@@ -6,18 +11,17 @@ use contextra_graph::cascade::{
 };
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId, HYPEREDGE_PREFIX};
+use contextra_graph::test_doubles::InMemoryStorageEngine;
+use contextra_graph::test_doubles::{FaultConfig, FaultVfs};
 use contextra_ports::StorageEngine;
-use contextra_store::{LsmConfig, LsmStorage};
-use contextra_testkit::{FaultConfig, FaultVfs};
 use contextra_types::{DocId, EntityId, TxId};
 use std::path::Path;
 use std::sync::Arc;
-use tempfile::tempdir;
 
+// ANCHOR[contextra-graph:TESTS-HYPEREDGE-CASCADE-CRASH-RECOVERY-001]
 #[tokio::test]
 async fn test_hyperedge_cascade_crash_recovery() {
-    let dir = tempdir().unwrap();
-    let db_path = dir.path().to_path_buf();
+    let storage = Arc::new(InMemoryStorageEngine::new());
 
     let doc_superseded = DocId::from_key("doc-crash-recovery-test").unwrap();
     const ROLE_1: RoleId = RoleId::new(1);
@@ -28,14 +32,7 @@ async fn test_hyperedge_cascade_crash_recovery() {
 
     // Phase 1: Setup storage & graph, insert total_count hyperedges derived from doc_superseded
     {
-        let storage = Arc::new(
-            LsmStorage::new(LsmConfig {
-                path: db_path.clone(),
-                ..Default::default()
-            })
-            .await
-            .unwrap(),
-        );
+        let storage = storage.clone();
 
         let graph = CsrGraph::with_storage(storage.clone());
 
@@ -113,14 +110,7 @@ async fn test_hyperedge_cascade_crash_recovery() {
     // Phase 3: Post-crash restart & persistent queue drain recovery
     {
         // Reopen storage as if process restarted
-        let storage = Arc::new(
-            LsmStorage::new(LsmConfig {
-                path: db_path,
-                ..Default::default()
-            })
-            .await
-            .unwrap(),
-        );
+        let storage = storage.clone();
 
         let recovered_graph = CsrGraph::with_storage(storage.clone());
 

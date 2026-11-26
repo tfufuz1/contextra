@@ -1,7 +1,7 @@
-use contextra_core::{ContextraError, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::manifest::{Manifest, ManifestEntry};
 use contextra_store::wal::{Wal, WalEntry, WalOp, WAL_V3_HEADER};
+use contextra_types::{ContextraError, TxId};
 use tempfile::tempdir;
 use tokio::fs;
 
@@ -158,7 +158,7 @@ async fn test_legacy_key_migration_isolation() {
 
     // 2. Write a legacy WAL file signed with the legacy static key
     {
-        let legacy_key = Wal::legacy_integrity_key_for_test();
+        let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
         let op = WalOp::Put {
             tx_id: TxId::new(1),
             key: b"legacy_k".to_vec(),

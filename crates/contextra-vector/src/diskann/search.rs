@@ -8,9 +8,10 @@ use super::config::{DiskAnnFallbackPolicy, VectorData};
 use super::format::DiskAnnHeader;
 use super::types::{DiskAnnIndex, SearchCandidate};
 use crate::distance::compute_distance_trusted;
-use contextra_core::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, VectorIndex};
+use contextra_ports::VectorIndex;
+use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::{BinaryHeap, BTreeSet};
 
 impl DiskAnnIndex {
     pub(crate) fn get_dist_to_query(&self, query: &[f32], node_idx: u32) -> Result<f32> {
@@ -37,7 +38,7 @@ impl DiskAnnIndex {
         entry_point: u32,
         beam_width: usize,
     ) -> Result<Vec<SearchCandidate>> {
-        let mut visited = HashSet::new();
+        let mut visited = std::collections::BTreeSet::new();
         let mut candidates = BinaryHeap::new();
         let mut results = BinaryHeap::new();
 
@@ -159,7 +160,7 @@ impl DiskAnnIndex {
         entry_point: u32,
         beam_width: usize,
     ) -> Result<Vec<SearchCandidate>> {
-        let mut visited = HashSet::new();
+        let mut visited = std::collections::BTreeSet::new();
         let mut candidates = BinaryHeap::new();
         let mut results = BinaryHeap::new();
 
@@ -223,11 +224,11 @@ impl DiskAnnIndex {
     }
 
     pub async fn search_internal(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {
-        if k > contextra_core::MAX_SEARCH_K {
+        if k > contextra_types::MAX_SEARCH_K {
             return Err(ContextraError::invalid_input(format!(
                 "Requested k ({}) exceeds maximum allowed search limit ({})",
                 k,
-                contextra_core::MAX_SEARCH_K
+                contextra_types::MAX_SEARCH_K
             )));
         }
 
@@ -295,7 +296,7 @@ impl DiskAnnIndex {
         let beam_width = self.inner.config.beam_width;
         let metric = self.inner.config.distance_metric;
 
-        let mut visited = HashSet::new();
+        let mut visited = std::collections::BTreeSet::new();
         let mut candidates = BinaryHeap::new();
         let mut results = BinaryHeap::new();
 

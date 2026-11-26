@@ -1,3 +1,10 @@
+//! # Modul: update.rs
+//!
+//! **Zweck:** Aktualisierungspfade für Dokumentinhalte und Metadaten.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::internal::{validate_doc_id, validate_embedding};
 use crate::collection::{
     ensure_importance_metadata, extract_text, Collection, StoredDocument, StoredDocumentMeta,
@@ -23,12 +30,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         let _guard = self.kv_locks.lock_for(id).await;
-        drop(_guard);
         let db_tx = self.begin_transaction()?;
 
         match self.update_op(&db_tx, id, embedding, metadata).await {
             Ok(_) => {
                 db_tx.commit().await?;
+                drop(_guard);
                 self.check_and_trigger_community_detection(1);
                 Ok(())
             }
@@ -36,11 +43,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if let Err(rollback_err) = db_tx.rollback().await {
                     tracing::error!("[INV-DB-3] Failed to rollback update: {}", rollback_err);
                 }
+                drop(_guard);
                 Err(e)
             }
         }
     }
 
+    // ANCHOR[contextra-engine:COL-UPD-051]
+    /// Dokumentation für `update_op` im Rahmen der Collection- und Suchabstraktion.
     pub async fn update_op(
         &self,
         db_tx: &crate::transaction::DbTransaction<S, V>,

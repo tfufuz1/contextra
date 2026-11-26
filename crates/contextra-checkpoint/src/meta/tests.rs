@@ -1,5 +1,14 @@
+//! # Tests für Checkpoint-Metadaten
+//!
+//! Dieses Modul enthält Unit-Tests für `CheckpointMeta`, `StateCheckpoint` und `validate_identifier`.
+//!
+//! ## Zweck
+//! Verifiziert die Roundtrip-Serialisierung, die Konvertierung in `WorkflowState`
+//! sowie die Validierungsgrenzen von String-Bezeichnern.
+
 use super::*;
 
+// Prüft die fehlerfreie JSON-Serialisierung und -Deserialisierung von CheckpointMeta (Roundtrip).
 #[test]
 fn checkpoint_meta_CASE_serialization_roundtrip() {
     let meta = CheckpointMeta {
@@ -24,6 +33,7 @@ fn checkpoint_meta_CASE_serialization_roundtrip() {
     assert_eq!(deserialized.created_at, 1700000000123);
 }
 
+// Prüft die fehlerfreie Roundtrip-Serialisierung von StateCheckpoint mit gesetztem Namespace.
 #[test]
 fn state_checkpoint_CASE_serialization_roundtrip() {
     let state = StateCheckpoint {
@@ -42,6 +52,7 @@ fn state_checkpoint_CASE_serialization_roundtrip() {
     assert_eq!(deserialized.namespace, Some("test_namespace".to_string()));
 }
 
+// Prüft, dass JSON-Daten im Altzustand ohne `namespace`-Feld abwärtskompatibel deserialisiert werden.
 #[test]
 fn state_checkpoint_deserializes_legacy_json_without_namespace() {
     let legacy_json = r#"{"tx_id": 999, "timestamp_ms": 1700000000000}"#;
@@ -53,6 +64,7 @@ fn state_checkpoint_deserializes_legacy_json_without_namespace() {
     assert_eq!(deserialized.namespace, None);
 }
 
+// Prüft die Konvertierung eines StateCheckpoints in einen WorkflowState inklusive deterministischem Graph-Hash.
 #[test]
 fn into_workflow_state_CASE_valid_conversion() {
     let state = StateCheckpoint {
@@ -66,6 +78,7 @@ fn into_workflow_state_CASE_valid_conversion() {
     assert_ne!(ws.graph_hash, [0u8; 32]);
 }
 
+// Prüft, dass leere Strings und reine Whitespace-Strings als ungültige Bezeichner abgewiesen werden.
 #[test]
 fn test_validate_identifier_empty_or_whitespace() {
     assert!(validate_identifier("field", "").is_err());
@@ -73,6 +86,7 @@ fn test_validate_identifier_empty_or_whitespace() {
     assert!(validate_identifier("field", "\t\n").is_err());
 }
 
+// Prüft die Obergrenze von Bezeichnern (256 Zeichen gültig, 257 Zeichen ungültig).
 #[test]
 fn test_validate_identifier_boundary_oversized_257() {
     let valid_256 = "a".repeat(256);

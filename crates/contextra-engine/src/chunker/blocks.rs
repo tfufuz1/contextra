@@ -90,8 +90,9 @@ impl MarkdownBlock {
                 if !s.ends_with('\n') {
                     s.push('\n');
                 }
-                let closing: String =
-                    std::iter::repeat_n(fence_info.char_type, fence_info.length).collect();
+                let closing = std::iter::repeat(fence_info.char_type)
+                    .take(fence_info.length)
+                    .collect::<String>();
                 s.push_str(&closing);
                 s
             }
@@ -158,18 +159,18 @@ pub(crate) fn parse_markdown_blocks(lines: &[String]) -> Vec<MarkdownBlock> {
                 i = i.saturating_add(1);
             }
 
-            let first_row = table_lines.first();
+            let first_row = table_lines.get(0);
             let second_row = table_lines.get(1);
 
             let (header_lines, body_lines) = if table_lines.len() >= 2
-                && second_row.is_some_and(|r| is_table_delimiter_row(r))
+                && second_row.map_or(false, |r| is_table_delimiter_row(r))
             {
                 (
                     table_lines.get(..2).map(|s| s.to_vec()).unwrap_or_default(),
                     table_lines.get(2..).map(|s| s.to_vec()).unwrap_or_default(),
                 )
             } else if !table_lines.is_empty()
-                && first_row.is_some_and(|r| is_table_delimiter_row(r))
+                && first_row.map_or(false, |r| is_table_delimiter_row(r))
             {
                 (
                     table_lines.get(..1).map(|s| s.to_vec()).unwrap_or_default(),

@@ -1,10 +1,15 @@
+//! # LSM-Haupttests (Ring 1)
+//!
+//! Modultests fuer den LSM-Speicherkern.
+
 pub use super::*;
 pub use crate::compaction::{CompactionConfig, CompactionEngine};
-pub use contextra_core::TOMBSTONE_BIT;
+pub use contextra_types::TOMBSTONE_BIT;
 pub use std::sync::Arc;
 pub use std::time::Duration;
 use tempfile::TempDir;
 
+#[cfg(test)]
 pub(crate) async fn test_storage() -> (LsmStorage, TempDir) {
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {

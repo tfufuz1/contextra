@@ -9,6 +9,7 @@ use contextra_types::EntityId;
 use std::cmp::Ordering;
 
 /// Formal default-flip gate trait evaluating whether APPRH can replace ForwardPush as default.
+// ANCHOR[contextra-graph:SRC-APPRH-SHADOW-001]
 pub trait ApprhFlipGate {
     /// Evaluates whether APPRH meets default flip criteria.
     fn should_flip(&self, report: &ApprhShadowComparison) -> bool;
@@ -16,6 +17,7 @@ pub trait ApprhFlipGate {
 
 /// Standard default flip gate evaluator for APPRH.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+// ANCHOR[contextra-graph:SRC-APPRH-SHADOW-002]
 pub struct DefaultApprhFlipGate;
 
 impl ApprhFlipGate for DefaultApprhFlipGate {
@@ -26,6 +28,7 @@ impl ApprhFlipGate for DefaultApprhFlipGate {
 
 /// Result structure of shadow mode comparison between Forward-Push PPR and APPRH.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:SRC-APPRH-SHADOW-003]
 pub struct ApprhShadowComparison {
     /// Maximum absolute score difference across top-k union nodes.
     pub max_abs_diff: f32,
@@ -47,6 +50,7 @@ pub struct ApprhShadowComparison {
 ///
 /// # Errors
 /// Returns [`ApprhError`] if APPRH execution fails.
+// ANCHOR[contextra-graph:SRC-APPRH-SHADOW-004]
 pub fn shadow_compare_forward_push_vs_apprh<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],

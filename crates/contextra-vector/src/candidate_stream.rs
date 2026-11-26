@@ -3,8 +3,9 @@
 // INVARIANTEN: #![forbid(unsafe_code)], zero panic/unwrap, max_depth = MAX_SEARCH_K.
 // STAND: TS:2026-09-15T00:00:00Z
 
-use contextra_core::{DocId, Result, ScoredDocument, VectorIndex, MAX_SEARCH_K};
-use std::collections::{HashSet, VecDeque};
+use contextra_ports::VectorIndex;
+use contextra_types::{DocId, Result, ScoredDocument, MAX_SEARCH_K};
+use std::collections::{BTreeSet, VecDeque};
 
 /// Default batch size for vector candidate retrieval.
 pub const DEFAULT_VECTOR_STREAM_BATCH_SIZE: usize = 16;
@@ -42,7 +43,7 @@ pub struct VectorCandidateStream<'a, V: VectorIndex> {
     seq_no: Option<u64>,
     batch_size: usize,
     buffer: VecDeque<ScoredDocument>,
-    seen: HashSet<DocId>,
+    seen: BTreeSet<DocId>,
     fetched_k: usize,
     yielded: usize,
     exhausted: bool,
@@ -57,7 +58,7 @@ impl<'a, V: VectorIndex> VectorCandidateStream<'a, V> {
             seq_no,
             batch_size: DEFAULT_VECTOR_STREAM_BATCH_SIZE,
             buffer: VecDeque::new(),
-            seen: HashSet::new(),
+            seen: BTreeSet::new(),
             fetched_k: 0,
             yielded: 0,
             exhausted: false,

@@ -6,6 +6,11 @@ use std::sync::Arc;
 /// Port trait for unique ID generation.
 pub trait IdGen: Send + Sync + 'static {
     /// Generates and returns the next unique 64-bit unsigned identifier.
+    ///
+    /// # Fehler
+    /// Keine; garantiert panikfrei durch atomare Operationen.
+    /// # Crash
+    /// Reiner flüchtiger RAM-Zustand; bei Crash wird der Generator neu initialisiert.
     fn next_id(&self) -> u64;
 }
 
@@ -47,7 +52,7 @@ impl<T: IdGen + ?Sized> IdGen for Arc<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
 
     fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
 
@@ -75,7 +80,7 @@ mod tests {
             })
             .collect();
 
-        let mut all_ids = HashSet::with_capacity(8000);
+        let mut all_ids = BTreeSet::new();
         for handle in handles {
             let ids = handle.join().expect("Thread panicked");
             for id in ids {

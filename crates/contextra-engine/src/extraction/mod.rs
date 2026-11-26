@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** Entitäts- und Relationsextraktion aus unstrukturiertem Text.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Extraktion.
+
 // FILE-CONTEXT
 // ZWECK: Moduldefinition für Entitätsextraktion (OpenIE & Rule-Based) (Layer 3 - Engine).
 // INVARIANTEN: Zero panic / unwrap / expect in non-test paths.
@@ -14,7 +21,7 @@ pub mod tests;
 pub mod types;
 
 pub use open_ie::extract_triples;
-pub use rule_based::RuleBasedExtractor;
+pub use rule_based::{RuleBasedExtractor, MAX_EXTRACTION_TEXT_LENGTH};
 pub use types::{EntityExtractionConfig, ExtractedTriple, ExtractorMode};
 
 use contextra_ports::{BoxFuture, LlmTextGenerator};

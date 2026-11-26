@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** Fluent Query Builder für hybride Abfragen (Text, Vektor, Graph).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Fluent HybridQueryBuilder Fassade für Konsolidierung aller Search-Signaturen.
 // INVARIANTEN: execute() delegiert an hybrid_search_with_strategy(); keine Logikduplikation.

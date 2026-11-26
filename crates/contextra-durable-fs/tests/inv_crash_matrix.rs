@@ -1,4 +1,3 @@
-#![allow(clippy::expect_used, clippy::unwrap_used)]
 use contextra_durable_fs::fault_injector::FaultInjectingVfs;
 use contextra_durable_fs::vfs::{StdVfs, Vfs};
 use tempfile::tempdir;

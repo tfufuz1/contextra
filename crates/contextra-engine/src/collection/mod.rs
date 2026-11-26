@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** Collection-Abstraktion: Bündelt LSM-Speicher, Vektor-, Text- und Graph-Indizes.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Sammlung/Collection-Namespace Verwaltung und gemeinsame Hilfsfunktionen.
 // INVARIANTEN: Strikte Isolation durch Präfixe; doc_keys (key_type=1) halten nur Metadaten (keine Vektoren).
@@ -32,8 +39,8 @@ mod tests;
 use contextra_graph::CsrGraph;
 #[cfg(not(loom))]
 use contextra_ports::{
-    Clock, KvLifecycleHooks, MetricsSink, NoopMetricsSink, StorageEngine, SystemClock,
-    TextEmbeddingEngine, VectorIndex,
+    Clock, MetricsSink, NoopMetricsSink, StorageEngine, SystemClock, TextEmbeddingEngine,
+    VectorIndex,
 };
 #[cfg(not(loom))]
 use contextra_store::LsmStorage;
@@ -66,6 +73,8 @@ impl Default for CollectionConfig {
     }
 }
 
+// ANCHOR[contextra-engine:COL-STO-077]
+/// Dokumentation für `StoredDocument` im Rahmen der Collection- und Suchabstraktion.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StoredDocument {
     pub id: String,
@@ -261,30 +270,6 @@ pub(super) fn extract_text(metadata: &Option<serde_json::Value>) -> Option<Strin
 /// Each collection provides its own vector index and inverted text index,
 /// while sharing the underlying LSM-Tree storage with other collections.
 #[cfg(not(loom))]
-/// Adapter struct wrapping `contextra_crypto::TenantIsolatedKvStore` to fulfill `KvLifecycleHooks`.
-#[cfg(feature = "encryption-at-rest")]
-struct CryptoKvStoreAdapter(Arc<contextra_crypto::TenantIsolatedKvStore>);
-
-#[cfg(feature = "encryption-at-rest")]
-impl KvLifecycleHooks for CryptoKvStoreAdapter {
-    fn on_rollback(&self, tenant: contextra_types::TenantId, chunk_ids: &[u64]) {
-        self.0.on_rollback(tenant, chunk_ids);
-    }
-
-    fn remove_doc_segments(&self, tenant: contextra_types::TenantId, doc: DocId) {
-        if let Ok(id) = u64::try_from(doc.inner()) {
-            self.0.remove_segment(tenant, id);
-        }
-    }
-
-    fn purge_tenant(&self, tenant: contextra_types::TenantId) {
-        let segs = self.0.get_segments(tenant);
-        if !segs.is_empty() {
-            self.0.remove_segments_for_rollback(tenant, &segs);
-        }
-    }
-}
-
 pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex> {
     pub(super) name: String,
     pub(super) prefix: Vec<u8>,
@@ -297,11 +282,6 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) embedder: parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>,
     pub consolidation_guard: Arc<tokio::sync::Mutex<()>>,
     pub(super) kv_locks: Arc<kv_lock::KvKeyLocks>,
-    /// Optionaler tenant-isolierter KV-Cache-Store zur automatischen KV-Cache-Bereinigung bei Rollbacks (legacy field).
-    #[cfg(feature = "encryption-at-rest")]
-    pub(super) kv_store: Option<Arc<dyn KvLifecycleHooks>>,
-    /// Feature-independent KV lifecycle hooks port.
-    pub(super) kv_hooks: parking_lot::RwLock<Option<Arc<dyn KvLifecycleHooks>>>,
     /// Zählt Graph-Mutationen seit letzter Community Detection.
     pub(super) mutations_since_community_detection: Arc<AtomicU64>,
     /// Trigger-Schwelle: bei Überschreitung wird Community Detection geplant (Default: 100, 0 = deaktiviert).
@@ -317,8 +297,6 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) clock: parking_lot::RwLock<Arc<dyn Clock>>,
     /// Injected metrics sink port for operational observability.
     pub(super) metrics: parking_lot::RwLock<Arc<dyn MetricsSink>>,
-    /// Thread-safe FIFO queue for deferred cascade tombstoning of hyperedges.
-    pub(super) deferred_hyperedge_queue: Arc<crate::background_workers::DeferredHyperedgeQueue>,
 }
 
 #[cfg(not(loom))]
@@ -336,9 +314,6 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             embedder: parking_lot::RwLock::new(self.embedder.read().as_ref().map(Arc::clone)),
             consolidation_guard: self.consolidation_guard.clone(),
             kv_locks: self.kv_locks.clone(),
-            #[cfg(feature = "encryption-at-rest")]
-            kv_store: self.kv_store.clone(),
-            kv_hooks: parking_lot::RwLock::new(self.kv_hooks.read().as_ref().map(Arc::clone)),
             mutations_since_community_detection: self.mutations_since_community_detection.clone(),
             community_detection_trigger_threshold: self
                 .community_detection_trigger_threshold
@@ -348,7 +323,6 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             pressure_rx: parking_lot::RwLock::new(self.pressure_rx.read().clone()),
             clock: parking_lot::RwLock::new(self.clock.read().clone()),
             metrics: parking_lot::RwLock::new(self.metrics.read().clone()),
-            deferred_hyperedge_queue: self.deferred_hyperedge_queue.clone(),
         }
     }
 }
@@ -420,9 +394,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             embedder: parking_lot::RwLock::new(None),
             consolidation_guard: Arc::new(tokio::sync::Mutex::new(())),
             kv_locks: Arc::new(kv_lock::KvKeyLocks::new()),
-            #[cfg(feature = "encryption-at-rest")]
-            kv_store: None,
-            kv_hooks: parking_lot::RwLock::new(None),
             mutations_since_community_detection: Arc::new(AtomicU64::new(0)),
             community_detection_trigger_threshold: Arc::new(AtomicU64::new(100)),
             consolidation_in_progress: Arc::new(AtomicBool::new(false)),
@@ -430,13 +401,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             pressure_rx: parking_lot::RwLock::new(pressure_rx),
             clock: parking_lot::RwLock::new(Arc::new(SystemClock::new())),
             metrics: parking_lot::RwLock::new(Arc::new(NoopMetricsSink)),
-            deferred_hyperedge_queue: Arc::new(crate::background_workers::DeferredHyperedgeQueue::new()),
         }
-    }
-
-    /// Returns a cloned handle to the deferred hyperedge queue.
-    pub fn deferred_hyperedge_queue(&self) -> Arc<crate::background_workers::DeferredHyperedgeQueue> {
-        self.deferred_hyperedge_queue.clone()
     }
 
     /// Sets or overrides the metrics sink implementation (builder version).
@@ -514,75 +479,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.graph_index.clone()
     }
 
-    /// Attaches KV lifecycle hooks port implementation to the collection.
-    pub fn with_kv_hooks(self, hooks: Arc<dyn KvLifecycleHooks>) -> Self {
-        *self.kv_hooks.write() = Some(hooks);
-        self
+    /// Returns the abstract graph index port for this collection (M3 Trait-Decoupling).
+    pub fn graph_port(&self) -> Arc<dyn contextra_ports::GraphIndex> {
+        self.graph_index.clone()
     }
 
-    /// Sets KV lifecycle hooks port implementation on the collection.
-    pub fn set_kv_hooks(&self, hooks: Arc<dyn KvLifecycleHooks>) {
-        *self.kv_hooks.write() = Some(hooks);
-    }
-
-    /// Returns a cloned reference to the attached `KvLifecycleHooks`, if configured.
-    pub fn kv_hooks(&self) -> Option<Arc<dyn KvLifecycleHooks>> {
-        self.kv_hooks.read().as_ref().map(Arc::clone)
-    }
-
-    /// Returns the tenant ID for this collection (extracted from `TenantScopedStorage` if present,
-    /// otherwise defaulting to `TenantId::default()`).
-    pub fn tenant_id(&self) -> contextra_types::TenantId {
-        (self.storage.as_ref() as &dyn std::any::Any)
-            .downcast_ref::<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>()
-            .map(|s| s.tenant_id())
-            .or_else(|| {
-                (self.storage.as_ref() as &dyn std::any::Any)
-                    .downcast_ref::<contextra_store::tenant_codec::TenantScopedStorage<LsmStorage>>(
-                    )
-                    .map(|s| s.tenant_id())
-            })
-            .unwrap_or_default()
-    }
-
-    /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
-    #[cfg(feature = "encryption-at-rest")]
-    pub fn with_kv_store(mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) -> Self {
-        let adapter: Arc<dyn KvLifecycleHooks> = Arc::new(CryptoKvStoreAdapter(kv_store));
-        *self.kv_hooks.write() = Some(adapter.clone());
-        self.kv_store = Some(adapter);
-        self
-    }
-
-    /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
-    #[cfg(feature = "encryption-at-rest")]
-    pub fn set_kv_store(&mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) {
-        let adapter: Arc<dyn KvLifecycleHooks> = Arc::new(CryptoKvStoreAdapter(kv_store));
-        *self.kv_hooks.write() = Some(adapter.clone());
-        self.kv_store = Some(adapter);
-    }
-
-    #[cfg(all(not(feature = "encryption-at-rest"), test))]
-    pub fn set_kv_store(&mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) {
-        let _ = kv_store;
-    }
-
-    #[cfg(all(not(feature = "encryption-at-rest"), test))]
-    pub fn with_kv_store(self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) -> Self {
-        let _ = kv_store;
-        self
-    }
-
-    /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
-    #[cfg(feature = "encryption-at-rest")]
-    pub fn kv_store(&self) -> Option<&Arc<dyn KvLifecycleHooks>> {
-        self.kv_store.as_ref()
-    }
-
-    /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
-    #[cfg(not(feature = "encryption-at-rest"))]
-    pub fn kv_store(&self) -> Option<&Arc<dyn KvLifecycleHooks>> {
-        None
+    /// Returns a clone of the configured embedder engine, if set.
+    pub fn embedder(&self) -> Option<Arc<dyn TextEmbeddingEngine>> {
+        self.embedder.read().clone()
     }
 
     /// Sets the text embedder for this collection (consuming version).
@@ -775,72 +679,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub fn mutations_since_community_detection(&self) -> u64 {
         self.mutations_since_community_detection
             .load(std::sync::atomic::Ordering::Relaxed)
-    }
-
-    /// Delegates KV segment payload writing to `contextra_store::kv::KvSegmentManager`.
-    pub fn write_kv_segment(
-        &self,
-        manager: &contextra_store::kv::KvSegmentManager,
-        group_id: u64,
-        plaintext: &[u8],
-    ) -> std::result::Result<contextra_store::kv::KvSegmentPayload, contextra_types::ContextraError>
-    {
-        manager.write_segment(group_id, plaintext)
-    }
-
-    /// Delegates KV segment reading/decryption to `contextra_store::kv::KvSegmentManager`.
-    pub fn read_kv_segment(
-        &self,
-        manager: &contextra_store::kv::KvSegmentManager,
-        segment: &contextra_store::kv::KvSegmentPayload,
-    ) -> std::result::Result<Vec<u8>, contextra_types::ContextraError> {
-        manager.read_segment(segment)
-    }
-
-    /// Delegates KV segment key revocation/deletion to `contextra_store::kv::KvSegmentManager`.
-    pub fn delete_kv_segment(
-        &self,
-        manager: &contextra_store::kv::KvSegmentManager,
-        group_id: u64,
-    ) -> bool {
-        manager.delete_segment(group_id)
-    }
-
-    /// Delegates KV deletion proof generation to `contextra_store::kv::KvSegmentManager`.
-    pub fn generate_kv_deletion_proof(
-        &self,
-        manager: &contextra_store::kv::KvSegmentManager,
-        group_id: u64,
-    ) -> std::result::Result<bool, contextra_types::ContextraError> {
-        manager.generate_deletion_proof(group_id)
-    }
-
-    /// Generates a collection prefix using TenantKeyCodec.
-    pub fn tenant_collection_prefix(
-        &self,
-        codec: &contextra_store::tenant_codec::TenantKeyCodec,
-        collection: &contextra_types::CollectionId,
-    ) -> Vec<u8> {
-        codec.collection_prefix(collection)
-    }
-
-    /// Encodes a graph key using TenantKeyCodec.
-    pub fn tenant_encode_graph_key(
-        &self,
-        codec: &contextra_store::tenant_codec::TenantKeyCodec,
-        collection: &contextra_types::CollectionId,
-        entity_id: u64,
-    ) -> Vec<u8> {
-        codec.encode_graph_key(collection, entity_id)
-    }
-
-    /// Evaluates point lookup traversal metrics on the underlying LSM storage engine.
-    pub async fn point_lookup_metrics(
-        &self,
-        storage: &contextra_store::LsmStorage,
-        key: &[u8],
-    ) -> (usize, usize, usize, usize, bool) {
-        storage.point_lookup_metrics(key).await
     }
 
     /// Increments mutation counter and triggers background community detection if threshold is reached.

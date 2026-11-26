@@ -1,3 +1,18 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::indexing_slicing,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::await_holding_lock
+)]
+//! # Integrationstest: TxId-Monotonie und Wiederherstellung nach Neustart
+//!
+//! Stellt sicher, dass Transaktions-IDs auch nach unsauberen Neustarts streng monoton bleiben.
+
 use contextra_checkpoint::{CheckpointManifest, CheckpointMeta, PersistentCheckpointStore};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{ContextraError, Result, TxId};

@@ -1,6 +1,22 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::indexing_slicing,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::await_holding_lock
+)]
+//! # Integrationstest: Determinismus der ID-Generierung
+//!
+//! Prüft die deterministische Vergabe interner Checkpoint-Transaktions-IDs.
+
 use contextra_ports::{IdGen, SequentialIdGen};
 use std::sync::Arc;
 
+// Testet: test checkpoint id gen determinism.
 #[test]
 fn test_checkpoint_id_gen_determinism() {
     let seed = 100u64;

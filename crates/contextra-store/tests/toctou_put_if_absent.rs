@@ -1,8 +1,8 @@
-use contextra_core::error::ContextraError;
-use contextra_core::traits::{BoxFuture, StorageEngine, StorageStats};
-use contextra_core::types::*;
-use contextra_core::Result;
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::ContextraError;
+use contextra_types::Result;
+use contextra_types::*;
 use futures::future::join_all;
 use std::sync::Arc;
 

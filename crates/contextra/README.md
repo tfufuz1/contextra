@@ -1,32 +1,60 @@
 # contextra
 
-`contextra` ist die primäre Fassade und Composition Root des Contextra Cognitive OS (Ring 4).
+High-Level-Hauptfassade und Composition Root des Contextra-Baukastensystems.
 
-## Zweck
+Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; SPEC §4.4, §4.5, `capabilities.toml`).
 
-Stellt den zentralen Einstiegspunkt und Builder-Muster (`ContextraBuilder`) für Rust-Anwendungen bereit. Dient als einzige Composition Root des Systems, um Backends, Memory Engines, Privatsphäre-Filter und Inferenz-Anbindungen sauber zu verbinden.
+## Rolle & Zweck
+`contextra` ist die übergeordnete Endanwender-Bibliothek und zentrale Composition Root (Ring 4). Sie orchestriert die Teilsysteme (`contextra-db`, `contextra-ports`, `contextra-types`) über das Builder-Muster (`ContextraBuilder`) zu einer gebrauchsfertigen Gesamtlösung.
 
-## Ring-Zugehörigkeit & Status
+## Baukasten-Profil & Entkopplung (Paket B27)
+- **Ring:** Ring 4 (Hauptfassade)
+- **Minimale Abhängigkeiten:** Keine unbedingten Bindungen an Inferenz-Backends oder Lizenzmodule.
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` und Zero-Panic-Doktrin im Produktionscode.
+- **Optionale Features:**
+  - `embedded` (Standard): Minimaler lokaler Betrieb ohne Inferenz.
+  - `candle`: Lokale Inferenz via `contextra-infer-candle`.
 
-- **Ring:** Ring 4 (Ränder / Composition Root)
-- **Status:** 🟡 In Migration / Shell (Fassade)
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+## Baukasten-Nutzung
 
-## Öffentliche API-Übersicht
+```rust
+use contextra::builder::ContextraBuilder;
+use contextra_types::DistanceMetric;
 
-In Phase 1b des Migrationsplans wird die Fassade kontinuierlich erweitert. Momentan stellt `contextra` grundlegende Module und Builder-Typen bereit:
+# async fn doc_example() -> Result<(), Box<dyn std::error::Error>> {
+let tmp_dir = tempfile::tempdir()?;
+let db = ContextraBuilder::new(384)
+    .with_storage_path(tmp_dir.path())
+    .with_distance_metric(DistanceMetric::Cosine)
+    .build()
+    .await?;
 
-- **Composition Root / Builder:** `ContextraBuilder`
-- **Konfiguration:** `ContextraConfig`
+let coll = db.collection("demo").await?;
+coll.insert("doc1", &[0.1; 384], None).await?;
+let found = coll.get("doc1").await?;
+assert!(found.is_some());
+coll.delete("doc1").await?;
+assert!(coll.get("doc1").await?.is_none());
+# Ok(())
+# }
+```
 
-## Architektur & Verweise
+## Agent Memory
+Für KI-Agenten stellt die Fassade die Abstraktion `AgentMemory` bereit:
 
-Für Details zur Zielarchitektur, Ring-Struktur und den einzelnen Migrationsphasen siehe [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §A2 / §4.2 im Repository-Root.
+```rust
+use contextra::{builder, AgentMemory};
 
-## Feature-Ringe (Ring-Split)
+let db = builder(384).build().await?;
+let memory = AgentMemory::new(db);
 
-| Ring-Name | Enthaltene Features | Zielgruppe | Lizenzmodell |
-| --- | --- | --- | --- |
-| `fast` | `fast` | OSS-Adoption | Open Source (MIT/Apache-2.0) |
-| `sovereign` | `sovereign`, `contextra-crypto`, `contextra-privacy` | Kanzlei-Appliance | Open Source (MIT/Apache-2.0) |
-| `compliance` | `compliance`, `sovereign`, `audit-export`, `avv-generator` | Kommerziell | Trade-Secret / Kommerziell (`compliance`) |
+let id = memory.remember("Wichtiger Kontext", None).await?;
+let results = memory.recall("Suchbegriff", 5).await?;
+```
+
+## Beispiel ausführen
+Ein eigenständiges Minimalbeispiel befindet sich unter `examples/embedded_facade.rs`:
+
+```bash
+cargo run -p contextra --example embedded_facade
+```

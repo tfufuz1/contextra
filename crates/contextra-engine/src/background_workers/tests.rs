@@ -1,3 +1,10 @@
+//! # Modul: tests.rs
+//!
+//! **Zweck:** Unit-Tests für Hintergrund-Worker und periodische Ausführungszyklen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Unit-Tests für background_workers Submodule.
 
@@ -493,7 +500,7 @@ async fn test_orphan_cleanup_worker_removes_expired() {
 }
 
 #[tokio::test]
-async fn trigger_expiry_cleanup_deletes_expired_documents() {
+async fn test_trigger_expiry_cleanup_deletes_expired_documents() {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -660,6 +667,7 @@ async fn test_decay_eviction_thresholds() {
     let decay_controller = AdaptiveDecayController::new(DecayControllerConfig {
         kappa: 2.0,
         base_half_life_tx: 1_000,
+        base_half_life_ms: None,
         eviction_threshold: 0.01,
     });
 

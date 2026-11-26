@@ -1,6 +1,7 @@
 #![cfg(feature = "partial-index-rebuild")]
 
-use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
+use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::MmapIndex;
 use rand::rngs::StdRng;
@@ -151,7 +152,7 @@ async fn extract_raw_layer0_connections(
     index: &HnswIndex,
     save_path: &std::path::Path,
 ) -> HashMap<u64, Vec<u32>> {
-    index.save(save_path).await.expect("save failed");
+    index.save(save_path).expect("save failed");
     let mmap = MmapIndex::open(save_path).expect("MmapIndex open failed");
     let node_count = mmap.header.node_count() as usize;
 
@@ -200,7 +201,6 @@ async fn test_partial_rebuild_recall_regression() {
         // rebuild_region() ausführen
         index
             .rebuild_region(tombstone_ids.clone())
-            .await
             .expect("rebuild_region failed");
 
         // Recall@10 NACH rebuild_region()
@@ -250,7 +250,6 @@ async fn test_partial_rebuild_recall_regression() {
         // rebuild_region() ausführen
         index
             .rebuild_region(tombstone_ids.clone())
-            .await
             .expect("rebuild_region failed");
 
         // Recall@10 NACH rebuild_region()
@@ -303,7 +302,6 @@ async fn test_partial_rebuild_node_degree_no_isolation() {
     // rebuild_region() ausführen
     index
         .rebuild_region(tombstone_ids)
-        .await
         .expect("rebuild_region failed");
 
     // Nachbarlisten NACH rebuild_region() sichern

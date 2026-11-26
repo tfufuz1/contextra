@@ -78,3 +78,53 @@ fn test_durability_mode_feature_gate_matrix() {
         "Must evaluate exactly 3x2x3 = 18 matrix combinations"
     );
 }
+
+
+#[test]
+fn test_durability_mode_validate_durability_neutral_matrix() {
+    use DurabilityMode::*;
+
+    let durability_modes = [Full, WalNoHmac, MemoryOnly];
+    let integrity_states = [false, true];
+    let persistence_states = [false, true];
+
+    for &mode in &durability_modes {
+        for &integrity in &integrity_states {
+            for &persistence in &persistence_states {
+                let result = mode.validate_durability(integrity, persistence);
+                match (mode, integrity, persistence) {
+                    (Full, _, _) => {
+                        assert!(result.is_ok());
+                    }
+                    (WalNoHmac, true, _) => {
+                        assert_eq!(
+                            result,
+                            Err(DurabilityConfigError::IncompatibleCombination {
+                                mode: WalNoHmac,
+                                feature: "integrity-chain",
+                                reason: "no HMAC integrity chain to anchor the proof or audit trail",
+                            })
+                        );
+                    }
+                    (WalNoHmac, false, _) => {
+                        assert!(result.is_ok());
+                    }
+                    (MemoryOnly, true, _) | (MemoryOnly, _, true) => {
+                        assert_eq!(
+                            result,
+                            Err(DurabilityConfigError::IncompatibleCombination {
+                                mode: MemoryOnly,
+                                feature: "persistence-required",
+                                reason: "no persistence layer exists to prove integrity or durability from",
+                            })
+                        );
+                    }
+                    (MemoryOnly, false, false) => {
+                        assert!(result.is_ok());
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+    }
+}

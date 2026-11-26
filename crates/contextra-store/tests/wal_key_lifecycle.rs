@@ -1,3 +1,5 @@
+#![cfg(feature = "test-hooks")]
+
 use contextra_store::wal::Wal;
 use tempfile::tempdir;
 

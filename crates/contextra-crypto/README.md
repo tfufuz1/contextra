@@ -1,23 +1,44 @@
 # contextra-crypto
 
-`contextra-crypto` stellt die kryptographischen Grundlagen at rest und zur Datenintegrität bereit (Ring 0).
+Kryptographische Primitive, AEAD, Schlüsselableitung, Integritätsketten und geheime Container (Klasse A, Ring 0).
 
-## Zweck
+## Rolle in einem Satz
+`contextra-crypto` stellt I/O-freie kryptographische Primitive, symmetrische/asymmetrische Schlüsselcontainer, Integritätsprüfketten und Nonce-sichere AEAD-Verschlüsselung nach RFC 8452 bereit.
 
-Verwaltet AEAD-Verschlüsselung (AES-256-GCM-SIV), HKDF-Schlüsselableitung, HMAC-Integritätsketten für WAL-Einträge sowie DSGVO-Art.-17-Löschnachweise (`DeletionProof`).
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Kryptographie & Kernprimitive, I/O-frei im Kern)
+- **Klasse:** Klasse A (Baukasten-Baustein, vollständig autark)
+- **Reifegrad:** `stable`
+- **Abhängigkeiten:** Keine internen `contextra-*` Abhängigkeiten; exportierbar und autark kompilierbar.
+- **Lints:** `#![forbid(unsafe_code)]`, Zero-Panic in Produktionscode (`zero_panic_analyzer`).
 
-## Ring-Zugehörigkeit & Status
+## Sicherheitsmodell & Bedrohungsmodell
+- **Vertraulichkeit & Authentizität:** AES-256-GCM-SIV (RFC 8452) bietet Nonce-Misuse-Resistance gegen versehentliche Nonce-Wiederverwendung und authentifiziert Header/Metadaten vollständig über Associated Data (AAD).
+- **Timing-Orakel-Schutz (INV-CRYPTO-CONSTANT-TIME-1):** Sämtliche kryptographischen Hash-, Schlüssel- und Tag-Vergleiche werden ausnahmslos in konstanter Zeit mittels `subtle::ConstantTimeEq` ausgeführt.
+- **Speicherhygiene (INV-CRYPTO-ZEROIZE-1):** Alle Schlüsselstrukturen (`SecretKey`, `Secret`, `VolatileEncryptionKey`, `UnitKey`, `Dek`) implementieren `ZeroizeOnDrop` und werden bei Freigabe deterministisch genullt. Sensible Daten werden in `Debug` und `Display` als `[REDACTED]` maskiert.
+- **Nicht-Ziele:** Keine juristische Nachweiserstellung oder DSGVO-Löschketten (diese liegen in `contextra-erasure`).
 
-- **Ring:** Ring 0 (Kryptographischer Kern)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** Safe API (In-Memory Zeroization, Key Hierarchy)
+## Minimalbeispiel (Autarker Einsatz)
 
-## Öffentliche API-Übersicht
+```rust
+use contextra_crypto::aead::{seal_record_with_nonce, open_record};
+use contextra_crypto::dek::Dek;
+use contextra_crypto::secret::SecretKey;
 
-- **Key Management:** `KeyManager`, `CryptoKey`
-- **Deletion Proofs:** `DeletionProof`, `DeletionLayer`, `DeletionScope`, `LayerCleanupProof`
-- **Egress Vault & Filter:** `EgressVault`, `EgressClassifier`, `EgressClassification`, `CompiledPattern`
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let dek = Dek::new([0x42u8; 32]);
+    let doc_id = [0x11u8; 16];
+    let key_meta = b"user_record_key";
+    let nonce = [0x99u8; 12];
+    let plaintext = b"Sensible Nutzlast";
 
-## Architektur & Verweise
+    // 1. Versiegeln mit AES-256-GCM-SIV und AAD-Bindung
+    let envelope = seal_record_with_nonce(&dek, doc_id, key_meta, plaintext, nonce)?;
 
-Details zum Sicherheitsmodell finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §10.
+    // 2. Öffnen und Authentifizieren
+    let opened = open_record(&dek, key_meta, &envelope)?;
+    assert_eq!(opened.as_slice(), plaintext);
+
+    Ok(())
+}
+```

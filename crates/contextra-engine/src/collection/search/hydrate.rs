@@ -1,3 +1,10 @@
+//! # Modul: hydrate.rs
+//!
+//! **Zweck:** Hydratisierung von Suchtreffer-IDs zu vollständigen Dokumentdaten.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Hydrierungs-Familie (hydrate_from_scored_at, hydrate_from_tuples_at) für Collection.
 
@@ -6,6 +13,8 @@ use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
+    // ANCHOR[contextra-engine:COL-HYD-016]
+    /// Dokumentation für `hydrate_from_scored_at` im Rahmen der Collection- und Suchabstraktion.
     pub(super) async fn hydrate_from_scored_at(
         &self,
         scored_docs: Vec<contextra_types::ScoredDocument>,
@@ -53,6 +62,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok((results, skipped_tombstones))
     }
 
+    // ANCHOR[contextra-engine:COL-HYD-063]
+    /// Dokumentation für `hydrate_from_tuples_at` im Rahmen der Collection- und Suchabstraktion.
     pub(super) async fn hydrate_from_tuples_at(
         &self,
         scored_tuples: Vec<(DocId, f32)>,

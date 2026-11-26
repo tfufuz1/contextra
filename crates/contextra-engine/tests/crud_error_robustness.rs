@@ -1,9 +1,17 @@
+//! # Integrationstest: crud error robustness
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig, MAX_SCAN_RESULTS};
 use contextra_types::ContextraError;
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST09-001]
+/// Testblock zur Überprüfung von `test_crud_error_path_robustness_returns_typed_errors`.
 #[tokio::test]
 async fn test_crud_error_path_robustness_returns_typed_errors() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create temporary directory");

@@ -1,3 +1,10 @@
+//! # Modul: read.rs
+//!
+//! **Zweck:** Lesepfad für Dokumente nach DocId oder Schlüssel mit MVCC-Sichtbarkeit.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::internal::validate_doc_id;
 use crate::collection::{Collection, StoredDocument, StoredDocumentMeta};
 use contextra_ports::{StorageEngine, VectorIndex};
@@ -15,6 +22,8 @@ pub const HARD_SCAN_CEILING: usize = 100_000;
 pub const MAX_SCAN_RESULTS: usize = DEFAULT_SCAN_LIMIT;
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
+    // ANCHOR[contextra-engine:COL-SNA-028]
+    /// Dokumentation für `snapshot_seq` im Rahmen der Collection- und Suchabstraktion.
     // AI-TAG[CONVENTION-DRIFT][MAJOR] RESOLVED: AGT-DB-001 — snapshot_seq() now propagates storage errors (TS:2026-08-25T00:00:00Z)
     // instead of silently mapping them to u64::MAX (ID: AGT-DB-001).
     // Consistent with every other error-propagation path in this file.
@@ -178,45 +187,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             Some(n) => n,
         };
 
-        use std::ops::Bound;
-
-        let start_ns = match start {
-            Bound::Included(b) => Bound::Included(self.namespaced_key(b, 0)),
-            Bound::Excluded(b) => Bound::Excluded(self.namespaced_key(b, 0)),
-            Bound::Unbounded => {
-                if self.name == "default" {
-                    Bound::Unbounded
-                } else {
-                    let mut b = self.prefix.clone();
-                    b.push(0);
-                    Bound::Included(b)
-                }
-            }
-        };
-
-        let end_ns = match end {
-            Bound::Included(b) => Bound::Included(self.namespaced_key(b, 0)),
-            Bound::Excluded(b) => Bound::Excluded(self.namespaced_key(b, 0)),
-            Bound::Unbounded => {
-                if self.name == "default" {
-                    Bound::Unbounded
-                } else {
-                    let mut b = self.prefix.clone();
-                    b.push(1);
-                    Bound::Excluded(b)
-                }
-            }
-        };
+        let (start_ns, end_ns) = self.build_namespaced_scan_bounds(start, end);
 
         let start_bytes = match &start_ns {
-            Bound::Included(v) => Bound::Included(v.as_slice()),
-            Bound::Excluded(v) => Bound::Excluded(v.as_slice()),
-            Bound::Unbounded => Bound::Unbounded,
+            std::ops::Bound::Included(v) => std::ops::Bound::Included(v.as_slice()),
+            std::ops::Bound::Excluded(v) => std::ops::Bound::Excluded(v.as_slice()),
+            std::ops::Bound::Unbounded => std::ops::Bound::Unbounded,
         };
         let end_bytes = match &end_ns {
-            Bound::Included(v) => Bound::Included(v.as_slice()),
-            Bound::Excluded(v) => Bound::Excluded(v.as_slice()),
-            Bound::Unbounded => Bound::Unbounded,
+            std::ops::Bound::Included(v) => std::ops::Bound::Included(v.as_slice()),
+            std::ops::Bound::Excluded(v) => std::ops::Bound::Excluded(v.as_slice()),
+            std::ops::Bound::Unbounded => std::ops::Bound::Unbounded,
         };
 
         let mut results = Vec::new();
@@ -265,6 +246,45 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         Ok(results)
+    }
+
+    /// Helper converting user slice bounds into collection-namespaced byte vector bounds.
+    fn build_namespaced_scan_bounds(
+        &self,
+        start: std::ops::Bound<&[u8]>,
+        end: std::ops::Bound<&[u8]>,
+    ) -> (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>) {
+        use std::ops::Bound;
+
+        let start_ns = match start {
+            Bound::Included(b) => Bound::Included(self.namespaced_key(b, 0)),
+            Bound::Excluded(b) => Bound::Excluded(self.namespaced_key(b, 0)),
+            Bound::Unbounded => {
+                if self.name == "default" {
+                    Bound::Unbounded
+                } else {
+                    let mut b = self.prefix.clone();
+                    b.push(0);
+                    Bound::Included(b)
+                }
+            }
+        };
+
+        let end_ns = match end {
+            Bound::Included(b) => Bound::Included(self.namespaced_key(b, 0)),
+            Bound::Excluded(b) => Bound::Excluded(self.namespaced_key(b, 0)),
+            Bound::Unbounded => {
+                if self.name == "default" {
+                    Bound::Unbounded
+                } else {
+                    let mut b = self.prefix.clone();
+                    b.push(1);
+                    Bound::Excluded(b)
+                }
+            }
+        };
+
+        (start_ns, end_ns)
     }
 
     /// Fetches a document by user ID and tracks the read in the active transaction's `ReadSet`.

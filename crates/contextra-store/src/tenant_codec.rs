@@ -1,3 +1,8 @@
+//! # Mandantentrennung & Key-Codec (Ring 1)
+//!
+//! Definiert [`TenantKeyCodec`] und [`TenantScopedStorage`], um Daten strikt
+//! mandantenfaehig zu praefigieren und logisch zu isolieren.
+
 // FILE-CONTEXT
 // STAND: 2026-09-28T00:00:00Z
 // ZWECK: Multi-Tenant Key Isolation & Encoding für LSM Storage Engine
@@ -15,8 +20,9 @@
 
 use crate::lsm::LsmStorage;
 use bytes::Bytes;
-use contextra_core::{CollectionId, DocId, StorageStats, TenantId, TxId};
+use contextra_ports::StorageStats;
 use contextra_ports::{BoxFuture, Result, StorageEngine};
+use contextra_types::{CollectionId, DocId, TenantId, TxId};
 use std::ops::Bound;
 use std::sync::Arc;
 
@@ -39,7 +45,6 @@ impl TenantKeyCodec {
 
     /// Encodes a document chunk key: `t:{tenant}:{collection}:chunk:{doc}`.
     #[inline]
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn encode_chunk_key(&self, collection: &CollectionId, doc_id: DocId) -> Vec<u8> {
         format!(
             "t:{}:{}:chunk:{}",
@@ -52,7 +57,6 @@ impl TenantKeyCodec {
 
     /// Encodes a graph entity key: `t:{tenant}:{collection}:graph:{entity}`.
     #[inline]
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn encode_graph_key(&self, collection: &CollectionId, entity_id: u64) -> Vec<u8> {
         format!(
             "t:{}:{}:graph:{}",
@@ -71,24 +75,39 @@ impl TenantKeyCodec {
     }
 
     /// Collection-spezifisches Scan-Präfix: `t:{tenant}:{col}:`
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn collection_prefix(&self, collection: &CollectionId) -> Vec<u8> {
         format!("t:{}:{}:", self.tenant_id.inner(), collection.0).into_bytes()
     }
 
     /// Dekodiert TenantId aus encoded Key. None bei ungültigem Format.
     /// Kein Unwrap — robuste Nutzung im Recovery-Pfad.
-    // TODO(wiring): Facade-Anbindung in contextra/src/builder.rs folgt in separatem Task
     pub fn decode_tenant_id(key: &[u8]) -> Option<TenantId> {
         let s = std::str::from_utf8(key).ok()?;
         let rest = s.strip_prefix("t:")?;
         let end = rest.find(':')?;
-        let id: u64 = rest[..end].parse().ok()?;
-        if id == 0 {
-            None
-        } else {
-            Some(TenantId(id))
+        let id_slice = rest.get(..end)?;
+        let id: u64 = id_slice.parse().ok()?;
+        TenantId::try_new(id).ok()
+    }
+
+    /// Dekodiert einen Chunk-Key vollständig in (TenantId, CollectionId, DocId).
+    /// Invariante: decode(encode(x)) == x (Injektivität).
+    pub fn decode_chunk_key(key: &[u8]) -> Option<(TenantId, CollectionId, DocId)> {
+        let s = std::str::from_utf8(key).ok()?;
+        let rest = s.strip_prefix("t:")?;
+        let mut parts = rest.split(':');
+        let tenant_raw: u64 = parts.next()?.parse().ok()?;
+        let col_raw: u64 = parts.next()?.parse().ok()?;
+        let doc_type = parts.next()?;
+        if doc_type != "chunk" {
+            return None;
         }
+        let doc_raw: u64 = parts.next()?.parse().ok()?;
+        if parts.next().is_some() {
+            return None; // keine nachfolgenden Segmente erlaubt
+        }
+        let tenant = TenantId::try_new(tenant_raw).ok()?;
+        Some((tenant, CollectionId(col_raw), DocId::new(doc_raw.into())))
     }
 }
 

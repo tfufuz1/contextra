@@ -32,6 +32,10 @@ pub enum DurableFsError {
     #[error("checksum or corruption error: {0}")]
     Corruption(String),
 
+    /// Bereinigung (Scrubbing) aus Sicherheits- oder Plattformgründen verweigert.
+    #[error("scrubbing refused: {0}")]
+    ScrubRefused(String),
+
     /// Nicht unterstütztes Dateisystem für Durability/Locking-Garantien.
     #[error("unsupported filesystem: {0}")]
     UnsupportedFilesystem(String),
@@ -50,6 +54,7 @@ impl DurableFsError {
             Self::PoisonedHandle => std::io::ErrorKind::Other,
             Self::InvalidArgument(_) => std::io::ErrorKind::InvalidInput,
             Self::Corruption(_) => std::io::ErrorKind::InvalidData,
+            Self::ScrubRefused(_) => std::io::ErrorKind::PermissionDenied,
             Self::UnsupportedFilesystem(_) => std::io::ErrorKind::Unsupported,
         }
     }

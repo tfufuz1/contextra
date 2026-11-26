@@ -1,4 +1,4 @@
-use crate::protocol::{response_from_error, JsonRpcRequest, JsonRpcResponse, McpError};
+use crate::protocol::{response_from_error, JsonRpcRequest, JsonRpcResponse};
 use crate::server::McpServer;
 use serde_json::{json, Value};
 
@@ -7,12 +7,35 @@ impl McpServer {
     /// Gibt `Some(Value)` zurück, falls eine Antwort nach stdout gesendet werden muss,
     /// oder `None`, falls der Client eine Notification war (keine Antwort erforderlich).
     pub async fn handle_value(&self, val: Value) -> Option<Value> {
+        if let Err(depth_err) =
+            crate::protocol::validate_json_depth(&val, crate::protocol::MAX_JSON_DEPTH)
+        {
+            let resp = JsonRpcResponse::err(None, depth_err.code(), depth_err.to_string());
+            return serde_json::to_value(resp).ok();
+        }
+
         if let Some(arr) = val.as_array() {
             if arr.is_empty() {
                 return Some(
-                    serde_json::to_value(response_from_error(
+                    serde_json::to_value(JsonRpcResponse::err(
                         None,
-                        McpError::invalid_request("Invalid Request: empty batch array"),
+                        -32600,
+                        "Invalid Request: empty batch array",
+                    ))
+                    .unwrap_or_default(),
+                );
+            }
+
+            if arr.len() > crate::protocol::MAX_BATCH_SIZE {
+                return Some(
+                    serde_json::to_value(JsonRpcResponse::err(
+                        None,
+                        -32600,
+                        format!(
+                            "Invalid Request: batch size {} exceeds maximum allowed limit of {}",
+                            arr.len(),
+                            crate::protocol::MAX_BATCH_SIZE
+                        ),
                     ))
                     .unwrap_or_default(),
                 );
@@ -42,10 +65,8 @@ impl McpServer {
                         }
                     }
                     Err(e) => {
-                        let resp = response_from_error(
-                            req_id,
-                            McpError::invalid_request(format!("Invalid Request: {e}")),
-                        );
+                        let resp =
+                            JsonRpcResponse::err(req_id, -32600, format!("Invalid Request: {e}"));
                         if let Ok(v) = serde_json::to_value(resp) {
                             responses.push(v);
                         }
@@ -80,15 +101,13 @@ impl McpServer {
                     }
                 }
                 Err(e) => {
-                    let resp = response_from_error(
-                        req_id,
-                        McpError::invalid_request(format!("Invalid Request: {e}")),
-                    );
+                    let resp =
+                        JsonRpcResponse::err(req_id, -32600, format!("Invalid Request: {e}"));
                     serde_json::to_value(resp).ok()
                 }
             }
         } else {
-            let resp = response_from_error(None, McpError::invalid_request("Invalid Request"));
+            let resp = JsonRpcResponse::err(None, -32600, "Invalid Request");
             serde_json::to_value(resp).ok()
         }
     }
@@ -102,12 +121,13 @@ impl McpServer {
     pub async fn handle(&self, req: JsonRpcRequest) -> JsonRpcResponse {
         let id = req.id.clone();
         if req.jsonrpc != "2.0" {
-            return response_from_error(
+            return JsonRpcResponse::err(
                 id,
-                McpError::invalid_request(format!(
+                -32600,
+                format!(
                     "Invalid Request: jsonrpc version must be '2.0', got '{}'",
                     req.jsonrpc
-                )),
+                ),
             );
         }
         match req.method.as_str() {
@@ -170,15 +190,14 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_forget",
-                            "description": "Delete a single document (tombstone, no DeletionProof) or drop an entire collection (returns a collection-scoped DeletionProof; requires CONTEXTRA_DELETION_PROOF_KEY).",
+                            "description": "Delete a document without verification receipt (Alias for contextra_delete).",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "collection": { "type": "string" },
                                     "id":         { "type": "string" },
-                                    "confirm":    { "type": "boolean" }
+                                    "collection": { "type": "string", "default": "default" }
                                 },
-                                "required": ["collection", "confirm"]
+                                "required": ["id"]
                             }
                         },
                         {
@@ -187,70 +206,6 @@ impl McpServer {
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {}
-                            }
-                        },
-                        {
-                            "name": "contextra_consolidate",
-                            "description": "Manual, synchronous trigger for an immediate memory consolidation pass (structural consolidation pass and optional synthesis) on the specified collection. Automatic background consolidation runs unaffected.",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "collection": { "type": "string", "default": "default" }
-                                }
-                            }
-                        },
-                        {
-                            "name": "contextra_cloud_query",
-                            "description": "Executes an external cloud query under egress classification check and automatic abstraction.",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "query":       { "type": "string" },
-                                    "collection":  { "type": "string", "default": "default" },
-                                    "max_results": { "type": "integer", "default": 10 }
-                                },
-                                "required": ["query"]
-                            }
-                        },
-                        {
-                            "name": "contextra_relate",
-                            "description": "Create a directed or bidirectional binary relationship between two documents. Write permissions must be enabled.",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "from":          { "type": "string" },
-                                    "to":            { "type": "string" },
-                                    "label":         { "type": "string" },
-                                    "collection":    { "type": "string", "default": "default" },
-                                    "bidirectional": { "type": "boolean", "default": false }
-                                },
-                                "required": ["from", "to", "label"]
-                            }
-                        },
-                        {
-                            "name": "contextra_relate_n_ary",
-                            "description": "Create an n-ary hyperedge graph relationship connecting multiple participants with assigned roles. Core Spec §6 feature. Write permissions must be enabled.",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "predicate": { "type": "string" },
-                                    "participants": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "doc_id": { "type": "string" },
-                                                "role":   { "type": "string" }
-                                            },
-                                            "required": ["doc_id", "role"]
-                                        },
-                                        "minItems": 2,
-                                        "maxItems": 64
-                                    },
-                                    "source_doc_id": { "type": "string" },
-                                    "collection":    { "type": "string", "default": "default" }
-                                },
-                                "required": ["predicate", "participants"]
                             }
                         },
                         {
@@ -263,14 +218,6 @@ impl McpServer {
                                     "collection": { "type": "string", "default": "default" }
                                 },
                                 "required": ["id"]
-                            }
-                        },
-                        {
-                            "name": "contextra_plugin_status",
-                            "description": "Get status of all active plugins with version, ring, and required feature ring.",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {}
                             }
                         },
                         {
@@ -290,7 +237,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_delete",
-                            "description": "Delete a single document (tombstone). No DeletionProof is issued for single documents; use contextra_drop_collection for a collection-scoped proof.",
+                            "description": "Delete a single document.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -315,7 +262,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_drop_collection",
-                            "description": "Delete an entire collection and issue a collection-wide cryptographic DeletionProof.",
+                            "description": "Delete an entire collection.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -334,11 +281,10 @@ impl McpServer {
                 let tool_name = match req.params.get("name").and_then(|v| v.as_str()) {
                     Some(name) if !name.is_empty() => name,
                     _ => {
-                        return response_from_error(
+                        return JsonRpcResponse::err(
                             id,
-                            McpError::invalid_params(
-                                "Invalid params: missing or empty tool 'name'",
-                            ),
+                            -32602,
+                            "Invalid params: missing or empty tool 'name'",
                         );
                     }
                 };
@@ -376,15 +322,10 @@ impl McpServer {
             | "contextra_get"
             | "contextra_forget"
             | "contextra_collections"
-            | "contextra_consolidate"
-            | "contextra_cloud_query"
-            | "contextra_relate"
-            | "contextra_relate_n_ary"
             | "contextra_upsert"
             | "contextra_delete"
             | "contextra_create_collection"
-            | "contextra_drop_collection"
-            | "contextra_plugin_status" => {
+            | "contextra_drop_collection" => {
                 let tool_name = req.method.as_str();
                 match self
                     .sandbox
@@ -411,10 +352,7 @@ impl McpServer {
             "ping" => JsonRpcResponse::ok(id, json!({})),
 
             // ── Unbekannte Methode ──────────────────────────────────────────────
-            other => response_from_error(
-                id,
-                McpError::method_not_found(format!("Method not found: {other}")),
-            ),
+            other => JsonRpcResponse::err(id, -32601, format!("Method not found: {other}")),
         }
     }
 }

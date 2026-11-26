@@ -1,14 +1,19 @@
+//! # Crash-Recovery des LSM-Trees (Ring 1)
+//!
+//! Stellt den letzten konsistenten Zustand durch Manifest- und WAL-Replay wieder her.
+
 use super::*;
 use crate::compaction::{CompactionEngine, MergeOperator};
+use crate::io_seam::RealFs;
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
 use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp};
-use contextra_core::{
-    ContextraError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TxBuffer, TxId,
-    TOMBSTONE_BIT,
-};
+use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_ports::Vfs;
+use contextra_ports::{ResourceBudget, ResourceTracker};
+use contextra_types::{ContextraError, Result, TxId, TOMBSTONE_BIT};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -22,14 +27,19 @@ pub(crate) fn next_temp_file_counter() -> u64 {
     TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-/// Helper to generate a 32-byte cryptographic salt.
-///
-/// P28-Ausnahme: kryptografisches Salt-Material (Spezifikation v17 Teil 3.1 & Governance-Regel 5).
-pub(crate) fn generate_crypto_salt() -> [u8; 32] {
+/// Helper to generate a 32-byte cryptographic salt using the provided [`KeyMaterialSource`].
+pub(crate) fn generate_crypto_salt_with_source(
+    key_source: &dyn crate::key_source::KeyMaterialSource,
+) -> Result<[u8; 32]> {
     let mut buf = [0u8; 32];
-    use rand::Rng;
-    rand::thread_rng().fill(&mut buf);
-    buf
+    key_source.fill_key_bytes(&mut buf)?;
+    Ok(buf)
+}
+
+/// Helper to generate a 32-byte cryptographic salt with default OS-CSPRNG.
+pub(crate) fn generate_crypto_salt() -> Result<[u8; 32]> {
+    let source = crate::key_source::OsKeyMaterialSource;
+    generate_crypto_salt_with_source(&source)
 }
 
 pub(crate) async fn write_salt_atomically(
@@ -157,16 +167,21 @@ impl LsmStorage {
             )));
         }
 
-        tokio::fs::create_dir_all(&config.path)
-            .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to create dir: {}", e)))?;
+        let vfs: Arc<dyn Vfs> = config
+            .vfs
+            .clone()
+            .map(|s| s.vfs().clone())
+            .unwrap_or_else(|| Arc::new(RealFs));
 
-        crate::util::fsync_parent_dir(&config.path).await?;
+        vfs.create_dir_all(&config.path)?;
+        if let Some(parent) = config.path.parent() {
+            vfs.sync_dir(parent)?;
+        }
 
         let dir_lock = DirLock::acquire(&config.path, config.durability_mode)?;
 
         let salt_path = config.path.join("SALT");
-        let salt = match tokio::fs::read(&salt_path).await {
+        let salt = match vfs.read(&salt_path) {
             Ok(buf) => {
                 if buf.len() != 32 {
                     return Err(ContextraError::Storage(format!(
@@ -176,13 +191,13 @@ impl LsmStorage {
                 }
                 buf
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Err(ContextraError::NotFound(_)) => {
                 if !directory_is_pristine(&config.path).await? {
                     return Err(ContextraError::Storage(
                         "SALT file missing in non-pristine database directory".into(),
                     ));
                 }
-                let buf = generate_crypto_salt();
+                let buf = generate_crypto_salt()?;
                 write_salt_atomically(&salt_path, &buf).await?;
                 buf.to_vec()
             }
@@ -382,12 +397,6 @@ impl LsmStorage {
                     "Memory budget tracking nach WAL-Replay fehlgeschlagen: {e}. \
                      Budget-Accounting unpräzise bis zum nächsten Flush."
                 );
-            } else {
-                tracing::debug!(
-                    replayed_bytes = replayed_size,
-                    total_used_bytes = resource_tracker.memory_used(),
-                    "Memory budget consumed during WAL replay recovery"
-                );
             }
         }
 
@@ -470,10 +479,11 @@ impl LsmStorage {
 
         let mut sstables = Vec::new();
         for path in sst_files {
-            let reader = SstableReader::open_with_key_manager(
+            let reader = SstableReader::open_with_vfs(
                 path,
                 Arc::clone(&block_cache),
                 key_manager.clone(),
+                Arc::clone(&vfs),
             )
             .await?;
 
@@ -520,8 +530,11 @@ impl LsmStorage {
         let wal_queue_depth = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let wal_queue_depth_clone = Arc::clone(&wal_queue_depth);
 
-        let pressure_monitor = crate::system_pressure::SystemPressureMonitor::new(
+        let clock_arc: Arc<dyn contextra_ports::Clock> =
+            Arc::new(contextra_ports::SystemClock::new());
+        let pressure_monitor = crate::system_pressure::SystemPressureMonitor::new_with_clock(
             std::time::Duration::from_millis(100),
+            Arc::clone(&clock_arc),
         );
         let pressure_rx = pressure_monitor.pressure_rx.clone();
         let ct_pressure = cancel_token.clone();
@@ -551,16 +564,8 @@ impl LsmStorage {
             Arc::clone(&resource_tracker),
             Some(Arc::clone(&manifest)),
         )
-        .with_pressure_rx(pressure_rx.clone());
-
-        if config.compaction.enable_adaptive_compaction {
-            let planner = Arc::new(crate::compaction::adaptive::CostBasedAdaptivePlanner::new(
-                config.compaction.adaptive_read_ratio_threshold,
-                config.compaction.min_sstables_per_tier,
-                config.compaction.size_ratio,
-            ));
-            compaction_engine_builder = compaction_engine_builder.with_adaptive_planner(planner);
-        }
+        .with_pressure_rx(pressure_rx.clone())
+        .with_vfs(Arc::clone(&vfs));
 
         if let Some(mo) = merge_operator {
             compaction_engine_builder = compaction_engine_builder.with_merge_operator(mo);
@@ -568,10 +573,27 @@ impl LsmStorage {
 
         let compaction_engine = Arc::new(compaction_engine_builder);
 
+        let compaction_engine_for_loop = Arc::clone(&compaction_engine);
+        let compaction_sstables = Arc::clone(&sstables);
+        let compaction_path = config.path.clone();
+
+        let ct_clone = cancel_token.clone();
+        task_tracker.spawn(async move {
+            compaction_engine_for_loop
+                .run_loop(compaction_sstables, compaction_path, ct_clone)
+                .await;
+        });
+        task_tracker.close();
+
         let flush_notify = Arc::new(tokio::sync::Notify::new());
         let health = Arc::new(parking_lot::RwLock::new(StorageHealth::Healthy));
 
         let ssi_max_tracked_keys = config.ssi_max_tracked_keys;
+
+        let default_ssi_val = Arc::new(
+            contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(ssi_max_tracked_keys)
+                .with_metrics_sink(Arc::clone(&metrics_sink_container)),
+        );
 
         let storage = Self {
             config,
@@ -595,6 +617,7 @@ impl LsmStorage {
             health,
             commit_mutex: tokio::sync::Mutex::new(()),
             flush_mutex: tokio::sync::Mutex::new(()),
+            flush_purge_fence: super::fence::FlushPurgeFence::new(),
             pending_sealed_wals: tokio::sync::Mutex::new(Vec::new()),
             cancel_token,
             task_tracker,
@@ -606,23 +629,12 @@ impl LsmStorage {
             pressure_rx,
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
-            ssi_validator: Arc::new(
-                contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(ssi_max_tracked_keys)
-                    .with_metrics_sink(Arc::clone(&metrics_sink_container)),
-            ),
+            clock: parking_lot::RwLock::new(clock_arc),
+            ssi_validator: Arc::clone(&default_ssi_val)
+                as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+            sequence_log_ssi_validator: Some(default_ssi_val),
             metrics_sink: metrics_sink_container,
         };
-
-        let compaction_engine_for_loop = Arc::clone(&storage.compaction_engine);
-        let compaction_sstables = Arc::clone(&storage.sstables);
-        let compaction_path = storage.config.path.clone();
-        let ct_clone = storage.cancel_token.clone();
-
-        storage.spawn_tracked(async move {
-            compaction_engine_for_loop
-                .run_loop(compaction_sstables, compaction_path, ct_clone)
-                .await;
-        });
 
         if replayed_size > 0 && !wal_files.is_empty() {
             tracing::info!(
@@ -736,8 +748,7 @@ impl LsmStorage {
         let (target_offset, target_hmac) = wal.find_tx_offset(target_tx).await?;
         wal.truncate(target_offset, target_hmac).await?;
 
-        fn prune_memtable_above_tx(memtable: &crate::memtable::MemTable, target_tx: u64) -> usize {
-            let initial_size = memtable.size();
+        fn prune_memtable_above_tx(memtable: &crate::memtable::MemTable, target_tx: u64) {
             let txs_to_rollback: std::collections::HashSet<u64> = memtable
                 .iter()
                 .into_iter()
@@ -747,20 +758,11 @@ impl LsmStorage {
             for tx_id in txs_to_rollback {
                 memtable.rollback(tx_id);
             }
-            initial_size.saturating_sub(memtable.size())
         }
 
-        let mut bytes_freed = prune_memtable_above_tx(&state.memtable, target_tx.inner()) as u64;
+        prune_memtable_above_tx(&state.memtable, target_tx.inner());
         for imm in &state.immutable_memtables {
-            bytes_freed += prune_memtable_above_tx(imm, target_tx.inner()) as u64;
-        }
-        if bytes_freed > 0 {
-            self.budget.release_memory(bytes_freed);
-            tracing::debug!(
-                freed_bytes = bytes_freed,
-                total_used_bytes = self.budget.memory_used(),
-                "Memory budget released during transaction rollback"
-            );
+            prune_memtable_above_tx(imm, target_tx.inner());
         }
 
         let mut sstables_lock = self.sstables.write().await;
@@ -789,6 +791,7 @@ impl LsmStorage {
                 }
             }
 
+            const MIN_ENTRIES_FOR_SSTABLE_REBUILD: usize = 8;
             if surviving_entries.len() >= MIN_ENTRIES_FOR_SSTABLE_REBUILD {
                 let count = self.segment_counter.fetch_add(1, Ordering::Relaxed);
                 let seq = self.next_seq_no.load(Ordering::Relaxed);
@@ -825,7 +828,9 @@ impl LsmStorage {
                 sstables_lock.push(Arc::new(new_reader));
             } else if !surviving_entries.is_empty() {
                 for (k, v, seq, tx) in surviving_entries {
-                    state.memtable.put(k, v, seq, tx);
+                    state
+                        .memtable
+                        .put(bytes::Bytes::from(k), bytes::Bytes::from(v), seq, tx);
                 }
             }
 

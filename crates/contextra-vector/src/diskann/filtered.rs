@@ -3,7 +3,7 @@
 // INVARIANTEN: MAX_SEARCH_K Schranke; deterministische Ordnung (Score absteigend, DocId aufsteigend); kein unbegrenzter Loop.
 
 use super::types::DiskAnnIndex;
-use contextra_core::{ContextraError, DocId, Result, ScoredDocument};
+use contextra_types::{ContextraError, DocId, Result, ScoredDocument};
 
 impl DiskAnnIndex {
     /// Executes a predicate-filtered vector search using adaptive oversampling with post-filtering.
@@ -17,17 +17,17 @@ impl DiskAnnIndex {
     /// - Non-prefix-stable ANN search: A larger `fetch_k` does not strictly guarantee a superset of candidates.
     /// - Snapshot search (`search_at` / `snapshot_read_at`) is **not supported** by DiskANN because DiskANN
     ///   does not maintain an append-only sequence log; calling `search_at` will return
-    ///   [`ContextraError::CapabilityUnsupported`][contextra_core::ContextraError::CapabilityUnsupported].
+    ///   [`ContextraError::CapabilityUnsupported`][contextra_types::ContextraError::CapabilityUnsupported].
     pub(crate) async fn search_filtered_internal(
         &self,
         query: &[f32],
         k: usize,
         filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
     ) -> Result<Vec<ScoredDocument>> {
-        if k == 0 || k > contextra_core::MAX_SEARCH_K {
+        if k == 0 || k > contextra_types::MAX_SEARCH_K {
             return Err(ContextraError::invalid_input(format!(
                 "Requested k ({k}) is invalid or exceeds maximum allowed search limit ({})",
-                contextra_core::MAX_SEARCH_K
+                contextra_types::MAX_SEARCH_K
             )));
         }
 
@@ -35,7 +35,7 @@ impl DiskAnnIndex {
             return self.search_internal(query, k).await;
         };
 
-        let mut fetch_k = (k * 4).min(contextra_core::MAX_SEARCH_K);
+        let mut fetch_k = (k * 4).min(contextra_types::MAX_SEARCH_K);
         let mut filtered_results = Vec::new();
 
         for _ in 0..10 {
@@ -55,12 +55,12 @@ impl DiskAnnIndex {
 
             if filtered_results.len() >= k
                 || raw_len < fetch_k
-                || fetch_k >= contextra_core::MAX_SEARCH_K
+                || fetch_k >= contextra_types::MAX_SEARCH_K
             {
                 break;
             }
 
-            let next_fetch_k = (fetch_k * 2).min(contextra_core::MAX_SEARCH_K);
+            let next_fetch_k = (fetch_k * 2).min(contextra_types::MAX_SEARCH_K);
             if next_fetch_k == fetch_k {
                 break;
             }

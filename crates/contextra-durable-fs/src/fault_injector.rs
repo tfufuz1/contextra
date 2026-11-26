@@ -152,6 +152,12 @@ impl<V: Vfs> FaultInjectingVfs<V> {
             self.inner.write_atomic(path, synced_data)?;
         }
 
+        for path in dirty.keys() {
+            if !synced.contains_key(path) && self.inner.exists(path) {
+                let _ = self.inner.remove(path);
+            }
+        }
+
         dirty.clear();
         Ok(())
     }
@@ -248,6 +254,17 @@ impl<V: Vfs> Vfs for FaultInjectingVfs<V> {
             )));
         }
         self.inner.sync_dir(path)
+    }
+
+    fn remove(&self, path: &Path) -> Result<()> {
+        self.inner.remove(path)?;
+        if let Ok(mut synced) = self.synced_snapshots.lock() {
+            synced.remove(path);
+        }
+        if let Ok(mut dirty) = self.dirty_snapshots.lock() {
+            dirty.remove(path);
+        }
+        Ok(())
     }
 
     fn rename(&self, from: &Path, to: &Path) -> Result<()> {

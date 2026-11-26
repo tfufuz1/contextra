@@ -1,3 +1,8 @@
+//! # Integrationstest: `campaign_j25.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_j25`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Kampagne J-25: Kryptografische Compliance- & Compliance-Testsuite für contextra-crypto
 // INVARIANTEN: Zero-Panic, Safe Rust (#![forbid(unsafe_code)]), Anti-Mirroring (R4), Unabhängige Orakel (R5)

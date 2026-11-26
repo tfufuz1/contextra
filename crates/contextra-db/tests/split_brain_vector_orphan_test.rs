@@ -1,7 +1,6 @@
 //! Split-Brain & Idempotency Integration Testsuite for Vector-ID ↔ Document Consistency.
 // ANCHOR[TEST:SPLIT_BRAIN_CONSISTENCY] STATUS:IN_PROGRESS (TS:2026-09-09T22:00:00Z) (SESSION: 504d02fc)
 
-use contextra_db::context_compaction::ConsolidationSession;
 use contextra_db::transaction::CommitIntent;
 use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_ports::{StorageEngine, VectorIndex};
@@ -21,17 +20,23 @@ pub struct GroundTruth {
 }
 
 impl GroundTruth {
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-01-NEW]
+    // Testet die Funktionalität von `new`.
     pub fn new() -> Self {
         Self {
             docs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-02-INSERT]
+    // Testet die Funktionalität von `insert`.
     pub fn insert(&self, id: String, vector: Vec<f32>) {
         let mut map = self.docs.lock().unwrap();
         map.insert(id, (vector, true));
     }
 
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-03-MARK_DELETED]
+    // Testet die Funktionalität von `mark_deleted`.
     pub fn mark_deleted(&self, id: &str) {
         let mut map = self.docs.lock().unwrap();
         if let Some(entry) = map.get_mut(id) {
@@ -39,6 +44,8 @@ impl GroundTruth {
         }
     }
 
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-04-MARK_ACTIVE]
+    // Testet die Funktionalität von `mark_active`.
     pub fn mark_active(&self, id: &str) {
         let mut map = self.docs.lock().unwrap();
         if let Some(entry) = map.get_mut(id) {
@@ -46,6 +53,8 @@ impl GroundTruth {
         }
     }
 
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-05-IS_ACTIVE]
+    // Testet die Funktionalität von `is_active`.
     pub fn is_active(&self, id: &str) -> bool {
         let map = self.docs.lock().unwrap();
         map.get(id).map(|(_, active)| *active).unwrap_or(false)
@@ -136,7 +145,6 @@ async fn test_vector_deleted_process_killed_before_document_tombstone() {
     let hnsw_path = dir_path.join("hnsw.index");
     col.vector_index()
         .save(&hnsw_path)
-        .await
         .expect("save hnsw");
 
     // 3. Direct query before repair_on_open: verify HNSW index alone returns 0 hits for doc_2
@@ -330,6 +338,8 @@ enum Op {
     Delete { id: u32 },
 }
 
+// ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-06-OP_STRATEGY]
+// Testet die Funktionalität von `op_strategy`.
 fn op_strategy() -> impl Strategy<Value = Vec<Op>> {
     let vec_strat = prop::collection::vec(-1.0f32..1.0f32, 4);
     let op_strat = prop_oneof![
@@ -346,6 +356,8 @@ fn op_strategy() -> impl Strategy<Value = Vec<Op>> {
 // MUST exist in LSM storage (verified via independent GroundTruth map).
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(20))]
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-07-PROP_NO_DANGLING_SEARCH_RESULT_UNDER_RANDOM_INSERT_DELETE_SEQUENCE]
+    // Testet die Funktionalität von `prop_no_dangling_search_result_under_random_insert_delete_sequence`.
     #[test]
     fn prop_no_dangling_search_result_under_random_insert_delete_sequence(ops in op_strategy()) {
         let rt = tokio::runtime::Builder::new_multi_thread()
@@ -498,23 +510,15 @@ async fn test_concurrent_partial_rebuild_and_context_compaction_no_lock_starvati
         col_rebuild
             .vector_index()
             .rebuild_region(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-            .await
     });
 
     let col_compaction = col.clone();
     let task_compaction = tokio::spawn(async move {
-        let doc_5 = DocId::from_key("doc_5").expect("DocId from key");
-        let doc_6 = DocId::from_key("doc_6").expect("DocId from key");
-        let target_doc_id = DocId::from_key("doc_target_compacted").expect("DocId target");
-
-        let session =
-            ConsolidationSession::start(&col_compaction, &[doc_5, doc_6], target_doc_id).await?;
-        session
-            .commit(
+        col_compaction
+            .insert(
                 "doc_target_compacted",
                 &[1.0, 1.0, 0.0, 0.0],
-                "Compacted summary text",
-                None,
+                Some(json!({ "text": "Compacted summary text" })),
             )
             .await
     });

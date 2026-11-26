@@ -1,9 +1,17 @@
+//! # Integrationstest: invariant tenant isolation
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_types::{ContextraError, TenantId};
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST24-001]
+/// Testblock zur Überprüfung von `test_tenant_isolation_cross_tenant_document_and_collection_operations`.
 #[tokio::test]
 async fn test_tenant_isolation_cross_tenant_document_and_collection_operations(
 ) -> contextra_types::Result<()> {
@@ -48,8 +56,9 @@ async fn test_tenant_isolation_cross_tenant_document_and_collection_operations(
         "Delete operation on Tenant Y must NOT delete document from Tenant X"
     );
 
-    // 4. Drop collection for Tenant X (tombstone commit)
-    db.drop_collection("tenant_x_collection", tenant_x_id).await?;
+    // 4. Drop collection for Tenant X
+    db.drop_collection("tenant_x_collection", tenant_x_id)
+        .await?;
 
     // Tenant Y collection remains intact
     col_y
@@ -91,6 +100,8 @@ async fn test_tenant_isolation_cross_tenant_document_and_collection_operations(
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST24-002]
+/// Testblock zur Überprüfung von `test_tenant_isolation_via_collection_for_tenant`.
 #[tokio::test]
 async fn test_tenant_isolation_via_collection_for_tenant() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create temporary directory");

@@ -1,9 +1,10 @@
 #![allow(unsafe_code)]
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::sstable::SstableBuilder;
 use contextra_store::wal::{Wal, WalOp};
+use contextra_types::TxId;
 use tempfile::TempDir;
 
 #[tokio::test]
@@ -64,16 +65,11 @@ async fn test_recovery_fd_exhaustion_regression() {
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    // Artificially lower FD limit to 64 on Unix to test recovery under tight file descriptor limits.
-    #[cfg(unix)]
-    unsafe {
-        let rlim = libc::rlimit {
-            rlim_cur: 64,
-            rlim_max: 64,
-        };
-        let res = libc::setrlimit(libc::RLIMIT_NOFILE, &rlim);
-        assert_eq!(res, 0, "Failed to set RLIMIT_NOFILE");
-    }
+    // Artificially lower FD limit to 64 to test recovery under tight file descriptor limits.
+    assert!(
+        contextra_sys::set_fd_limit(64),
+        "Failed to set RLIMIT_NOFILE"
+    );
 
     let config = LsmConfig {
         path: db_path.clone(),

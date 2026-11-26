@@ -8,7 +8,7 @@ use super::config::{CachedNode, DiskAnnConfig};
 use super::format::DiskAnnHeader;
 use crate::ComputePool;
 use ahash::AHashMap;
-use contextra_core::{ContextraError, DocId, Result};
+use contextra_types::{ContextraError, DocId, Result};
 use memmap2::Mmap;
 use parking_lot::RwLock;
 use std::io::Read;

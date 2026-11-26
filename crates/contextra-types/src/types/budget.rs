@@ -1,4 +1,16 @@
-//! Resource budget management for Contextra.
+//! Ressourcen- und Token-Budgetverwaltung für Contextra.
+//!
+//! # Architektur-Rolle: Ring 0 (Budget- und Backpressure-Management)
+//!
+//! Dieses Modul überwacht und steuert den Ressourcenverbrauch:
+//! - `TokenBudget`: Atomares Tracking und RAII-Reservierung (`Reservation`) von LLM-Tokens
+//!   zur Vermeidung von Obergrenzenüberschreitungen und Double-Spending.
+//! - `ResourceTracker`: Speicherüberwachung (RAM) mit automatischem Backpressure-Signal
+//!   (`has_memory_capacity`), wenn die 95%-Grenze erreicht wird.
+//!
+//! # Invarianten
+//! - Atomare Zähler mit `Ordering::Acquire`, `Ordering::Release` und `compare_exchange_weak`.
+//! - Sättigende Subtraktion (`saturating_sub`) verhindert Underflow-Wrapping bei Speicherfreigaben.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
@@ -23,6 +35,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 /// Strategie für Token-Budget-Management.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-types:BUDGET-STRAT]
 pub enum BudgetStrategy {
     /// Konservativ: 80% des Limits als sicherer Puffer (Standard)
     Conservative,
@@ -34,6 +47,7 @@ pub enum BudgetStrategy {
 
 /// Token budget configuration for LLM context management.
 #[derive(Debug)]
+// ANCHOR[contextra-types:BUDGET-TOKEN]
 pub struct TokenBudget {
     /// Maximum total token limit.
     pub limit: usize,
@@ -113,6 +127,7 @@ impl<'de> Deserialize<'de> for TokenBudget {
 
 /// RAII reservation structure for guaranteed atomicity & drop-refund against double-spend.
 #[derive(Debug)]
+// ANCHOR[contextra-types:BUDGET-RESERVE]
 pub struct Reservation<'a> {
     budget: &'a TokenBudget,
     amount: usize,
@@ -174,12 +189,10 @@ impl TokenBudget {
     }
 
     /// Calculates the effective token limit based on strategy.
-    // FIX(2026-10-05): Safe non-negative float multiplication scaled from positive usize token budget.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn effective_limit(&self) -> usize {
         match self.strategy {
-            BudgetStrategy::Conservative => (self.limit as f64 * 0.8) as usize,
-            BudgetStrategy::Aggressive => (self.limit as f64 * 0.95) as usize,
+            BudgetStrategy::Conservative => self.limit.saturating_mul(4) / 5,
+            BudgetStrategy::Aggressive => self.limit.saturating_mul(19) / 20,
             BudgetStrategy::Exact(n) => n,
         }
     }
@@ -209,12 +222,38 @@ impl TokenBudget {
     /// Reserviert `amount` Tokens atomar. Schlägt fehl, wenn das verfügbare Budget
     /// (limit - reserved - consumed) unterschritten würde.
     pub fn reserve(&self, amount: usize) -> Result<Reservation<'_>> {
-        self.try_reserve(amount)?;
-        Ok(Reservation {
-            budget: self,
-            amount,
-            settled: AtomicBool::new(false),
-        })
+        loop {
+            let current_consumed = self.consumed.load(Ordering::Acquire);
+            let effective = self.effective_limit();
+            let avail = effective
+                .saturating_sub(self.reserved)
+                .saturating_sub(current_consumed);
+
+            if avail == 0 || avail < amount {
+                return Err(ContextraError::Internal(format!(
+                    "Token budget exhausted before step execution (available: {}, required: {})",
+                    avail, amount
+                )));
+            }
+
+            let next_consumed = current_consumed.saturating_add(amount);
+            if self
+                .consumed
+                .compare_exchange_weak(
+                    current_consumed,
+                    next_consumed,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                )
+                .is_ok()
+            {
+                return Ok(Reservation {
+                    budget: self,
+                    amount,
+                    settled: AtomicBool::new(false),
+                });
+            }
+        }
     }
 
     /// Tries to reserve `tokens` from the available budget before step execution.
@@ -266,7 +305,7 @@ impl<'a> Reservation<'a> {
 
 impl<'a> Drop for Reservation<'a> {
     /// Falls NICHT `settle()` aufgerufen meinte (z. B. wegen eines vorzeitigen `?`-Returns
-    /// im Aufrufer), wird die reservierte Menge garantiert und atomar zurückerstattet.
+    /// im Aufrufer), wird die reservierte Menge atomar zurückerstattet.
     fn drop(&mut self) {
         if !self.settled.load(Ordering::Acquire) {
             loop {
@@ -287,12 +326,18 @@ impl<'a> Drop for Reservation<'a> {
 
 impl Default for TokenBudget {
     fn default() -> Self {
-        Self::for_model("default").with_reserved(512, 0)
+        Self {
+            limit: 8192,
+            strategy: BudgetStrategy::Conservative,
+            reserved: 512,
+            consumed: AtomicUsize::new(0),
+        }
     }
 }
 
 /// Resource budget for memory management.
 #[derive(Debug, Clone, Copy)]
+// ANCHOR[contextra-types:BUDGET-RESOURCE]
 pub struct ResourceBudget {
     /// Maximum allowed memory usage in bytes.
     pub memory_limit: u64,
@@ -308,6 +353,7 @@ impl Default for ResourceBudget {
 
 /// Tracks resource usage against a budget.
 #[derive(Debug)]
+// ANCHOR[contextra-types:BUDGET-TRACKER]
 pub struct ResourceTracker {
     /// The configured budget.
     budget: ResourceBudget,
@@ -398,10 +444,9 @@ impl ResourceTracker {
     }
 
     /// Returns true if memory usage is below 95% of the limit.
-    // FIX(2026-10-05): Safe non-negative float multiplication for 95% memory threshold calculation.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn has_memory_capacity(&self) -> bool {
-        self.memory_used() < (self.budget.memory_limit as f64 * 0.95) as u64
+        let threshold = self.budget.memory_limit.saturating_mul(95) / 100;
+        self.memory_used() < threshold
     }
 }
 

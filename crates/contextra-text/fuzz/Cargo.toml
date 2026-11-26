@@ -1,3 +1,6 @@
+[lints]
+workspace = true
+
 [package]
 name = "contextra-text-fuzz" # <!-- crate-ref-ignore -->
 version = "0.0.0"
@@ -16,5 +19,11 @@ contextra-text = { path = ".." }
 [[bin]]
 name = "fuzz_bm25_tokenize"
 path = "fuzz_targets/fuzz_bm25_tokenize.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_tokenizer_smoke"
+path = "fuzz_targets/fuzz_tokenizer_smoke.rs"
 test = false
 doc = false

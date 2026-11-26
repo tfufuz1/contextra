@@ -1,3 +1,9 @@
+#![cfg(feature = "legacy-erasure")]
+//! # Integrationstest: `deletion_proof_v3_validation.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_v3_validation`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_crypto::deletion_proof::{
@@ -16,8 +22,8 @@ fn test_create_v3_with_empty_graph_repair_for_hnsw_layer_fails() {
     };
 
     let layer_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+        LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
     ];
 
     // Attempt to create v3 proof with empty graph_repair slice when HnswIndex is covered
@@ -59,8 +65,7 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
         tenant_id,
     };
 
-    let layer_proofs =
-        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap()];
+    let layer_proofs = vec![LayerCleanupProof::for_test(DeletionLayer::HnswIndex)];
 
     let graph_repair = vec![GraphRepairAttestation {
         doc_id: DocId::new(42),
@@ -100,8 +105,7 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
         tenant_id,
     };
 
-    let layer_proofs =
-        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
+    let layer_proofs = vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)];
 
     // 1. Create a valid Ed25519 Version 3 proof
     let valid_v3_proof = DeletionProof::create_v3(

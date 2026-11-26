@@ -1,3 +1,8 @@
+//! Typdefinitionen, Konfigurationsstrukturen und Basistypen des CSR-Graphen.
+//!
+//! # Zweck
+//! Definiert `CsrEdge`, `CsrGraphConfig`, `InternalIndex` und zugehörige Konstanten.
+
 use contextra_types::{DocId, EntityId, ResourceTracker, TxId};
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +14,7 @@ pub(crate) const GRAPH_COMMUNITY_PREFIX: &[u8] = b"__graph:community:";
 /// Edge type representation for CSR edges.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+// ANCHOR[contextra-graph:SRC-CSR-TYPES-001]
 pub enum EdgeType {
     #[default]
     Default,
@@ -16,7 +22,8 @@ pub enum EdgeType {
 
 /// Edge structure in CSR graph representation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Edge {
+// ANCHOR[contextra-graph:SRC-CSR-TYPES-002]
+pub struct CsrEdge {
     pub target: EntityId,
     pub weight: f32,
     pub edge_type: EdgeType,
@@ -26,7 +33,8 @@ pub struct Edge {
     pub traversal_weight: f32, // τ_ij, initialisiert mit 0.0
 }
 
-impl Edge {
+impl CsrEdge {
+    // ANCHOR[contextra-graph:SRC-CSR-TYPES-003]
     pub fn new(target: EntityId, weight: f32) -> Self {
         Self {
             target,
@@ -43,6 +51,7 @@ use std::sync::Arc;
 
 /// Persisted edge payload format for storage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:SRC-CSR-TYPES-004]
 pub struct PersistedEdgePayload {
     pub weight: f32,
     #[serde(default, alias = "valid_from")]
@@ -58,20 +67,22 @@ pub struct PersistedEdgePayload {
 }
 
 /// Score decay factor per hop (0.7^hop).
+// ANCHOR[contextra-graph:SRC-CSR-TYPES-005]
 pub const SCORE_DECAY: f32 = 0.7;
 
 /// Maximum traversal depth.
+// ANCHOR[contextra-graph:SRC-CSR-TYPES-006]
 pub const MAX_TRAVERSAL_HOPS: u8 = 3;
 
 /// Maximum visited nodes limit during BFS traversal to prevent intermediate hub-node memory explosion.
+// ANCHOR[contextra-graph:SRC-CSR-TYPES-007]
 pub const MAX_VISITED_NODES: usize = 10_000;
+
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-graph:SRC-CSR-TYPES-008]
 pub struct CsrGraphConfig {
-    /// Rebuild threshold: max number of uncompacted pending edges in delta buffer before triggering an automatic full CSR rebuild.
     pub rebuild_threshold: usize,
-    /// Max compaction peak memory limit in MB (IP-08). Compaction will be deferred if current graph memory + rebuild allocation exceeds this threshold.
     pub max_compaction_peak_memory_mb: Option<usize>,
-    /// Optional global ResourceTracker handle for cross-crate memory budget coupling (IP-08).
     pub resource_tracker: Option<Arc<ResourceTracker>>,
 }
 
@@ -85,10 +96,8 @@ impl Default for CsrGraphConfig {
     }
 }
 
-/// Internal contiguous index for CSR arrays.
 pub(crate) type InternalIndex = usize;
 
-/// Internal representation of an edge payload.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct EdgePayload {
     pub(crate) target: InternalIndex,
@@ -100,7 +109,6 @@ pub(crate) struct EdgePayload {
     pub(crate) source_doc_id: Option<DocId>,
 }
 
-/// Staging representation of an edge before index allocation at commit time.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct StagedEdgePayload {
     pub(crate) target: EntityId,

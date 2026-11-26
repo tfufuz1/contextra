@@ -1,0 +1,4 @@
+[crates.contextra-checkpoint]
+klasse = "B"
+may_depend_on = ["contextra-ports", "contextra-types"]
+transitional = []

@@ -1,3 +1,9 @@
+//! Benchmark für Traversierungsoperationen im Compressed Sparse Row (CSR) Graphen.
+//!
+//! # Zweck
+//! Evaluiert Latenzen und Speichereffizienz bei BFS-Nachbarschaftsabfragen (1-Hop, 2-Hop)
+//! und Pfadprüfungen auf synthetischen und dichten Graphen.
+
 use contextra_graph::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{DocId, Entity, EntityId, TxId};
@@ -6,6 +12,7 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 // Helper trait to support benchmark invocation syntax `graph.bfs(...)` and `graph.get_neighbors(...)`
+// ANCHOR[contextra-graph:BENCHES-CSR-TRAVERSAL-BENCH-001]
 pub trait CsrGraphBenchExt {
     #[allow(clippy::type_complexity)]
     fn bfs(
@@ -40,7 +47,8 @@ impl CsrGraphBenchExt for CsrGraph {
                 + '_,
         >,
     > {
-        Box::pin(self.traverse(EntityId::new(doc_id.inner()), max_hops))
+        #[allow(clippy::cast_possible_truncation)]
+        Box::pin(self.traverse(EntityId::new(doc_id.inner() as u64), max_hops))
     }
 
     fn get_neighbors(
@@ -49,7 +57,8 @@ impl CsrGraphBenchExt for CsrGraph {
     ) -> std::pin::Pin<
         Box<dyn std::future::Future<Output = contextra_types::Result<Vec<EntityId>>> + Send + '_>,
     > {
-        Box::pin(self.neighbors(EntityId::new(doc_id.inner())))
+        #[allow(clippy::cast_possible_truncation)]
+        Box::pin(self.neighbors(EntityId::new(doc_id.inner() as u64)))
     }
 }
 

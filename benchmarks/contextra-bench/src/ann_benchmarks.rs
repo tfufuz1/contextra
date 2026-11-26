@@ -7,8 +7,8 @@ use std::path::Path;
 use std::time::Instant;
 
 use anyhow::Result;
-use contextra_core::traits::VectorIndex;
-use contextra_core::types::{DistanceMetric, DocId, TxId};
+use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use hdrhistogram::Histogram;
 use rand::rngs::StdRng;
@@ -165,7 +165,7 @@ pub async fn run_ann_benchmark(
         let tx = TxId(1);
 
         for (idx, vec) in base_vectors.iter().enumerate() {
-            index.insert(tx, DocId(idx as u64), vec).await?;
+            index.insert(tx, DocId::new((idx as u64).into()), vec).await?;
         }
         index.commit(tx).await?;
 
@@ -182,7 +182,11 @@ pub async fn run_ann_benchmark(
             let _ = ef_hist.record(elapsed_us.max(1));
             let _ = overall_hist.record(elapsed_us.max(1));
 
-            let retrieved_ids: Vec<u64> = results.into_iter().map(|r| r.doc_id.0).collect();
+            #[allow(clippy::cast_possible_truncation)]
+            let retrieved_ids: Vec<u64> = results
+                .into_iter()
+                .map(|r| r.doc_id.inner() as u64)
+                .collect();
             let rec = recall_at_k(&retrieved_ids, &ground_truth[q_idx], k);
             total_recall += rec;
         }

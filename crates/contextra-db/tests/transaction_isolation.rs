@@ -1,9 +1,15 @@
+//! # Transaktions-Isolations-Tests
+//!
+//! Überprüft Snapshot-Isolation und Verhindern von Dirty Reads / Phantom Reads.
+//!
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_types::{DistanceMetric, Result};
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::sync::Barrier;
 
+// ANCHOR[contextra-db:TEST-TRANSACTION_ISOLATION-01-TEST_TRANSACTION_ATOMICITY_UNDER_LOAD]
+// Testet die Funktionalität von `test_transaction_atomicity_under_load`.
 #[tokio::test]
 async fn test_transaction_atomicity_under_load() -> Result<()> {
     let dir = tempdir().unwrap();

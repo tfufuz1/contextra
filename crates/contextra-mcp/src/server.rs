@@ -1,17 +1,11 @@
-use crate::config::LlmConfig;
-use crate::egress_gateway::{DefaultEgressClassifier, EgressClassifier, EgressGuardCheck};
 use crate::io::{read_line_bounded, MAX_RPC_BYTES};
 use crate::prompt_injection::PromptInjectionGuard;
-use crate::proof_key::deletion_proof_key_from_env;
 use crate::protocol::JsonRpcResponse;
-#[cfg(feature = "kv-bridge")]
-use crate::routing::setup_kv_bridge;
-use crate::routing::RoutingHandle;
 use crate::sandbox::{McpSandbox, SandboxPolicy};
 use crate::validation::is_write_allowed_by_env;
 use contextra::Contextra;
 use contextra_ports::EmbeddingProvider;
-use contextra_types::ContextraError;
+use contextra_types::{ContextraError, TenantId};
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{AsyncWriteExt, BufReader};
@@ -21,12 +15,8 @@ pub struct McpServer {
     pub embedder: Arc<dyn EmbeddingProvider>,
     pub sandbox: Arc<McpSandbox>,
     pub injection_guard: Arc<PromptInjectionGuard>,
-    pub egress_classifier: Arc<dyn EgressClassifier>,
-    pub egress_guard: Option<Arc<dyn EgressGuardCheck>>,
-    pub routing: Option<Arc<RoutingHandle>>,
     pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
-    #[cfg(feature = "kv-bridge")]
-    pub kv_bridge: Option<Arc<contextra_infer_candle::KvBridgeAdapter>>,
+    pub tenant_id: Option<TenantId>,
 }
 
 impl McpServer {
@@ -35,31 +25,6 @@ impl McpServer {
         embedder: Arc<dyn EmbeddingProvider>,
     ) -> Result<Self, ContextraError> {
         Self::with_write_permission(db, embedder, is_write_allowed_by_env())
-    }
-
-    /// Instantiates an `McpServer` fully configured from environment variables and default runtime components.
-    pub fn from_env(
-        db: Arc<Contextra>,
-        embedder: Arc<dyn EmbeddingProvider>,
-    ) -> Result<Self, ContextraError> {
-        let allow_write = is_write_allowed_by_env();
-        let server = Self::with_write_permission(db, embedder, allow_write)?;
-
-        // Verify LLM generator build configuration from environment
-        let _llm_generator = LlmConfig::from_env().build_generator()?;
-
-        // Verify deletion proof key configuration from environment if available
-        let _deletion_key = deletion_proof_key_from_env().ok();
-
-        let injection_guard = Arc::new(PromptInjectionGuard::from_env());
-        let egress_classifier: Arc<dyn EgressClassifier> =
-            Arc::new(DefaultEgressClassifier::default());
-        let plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>> = None;
-
-        Ok(server
-            .with_injection_guard(injection_guard)
-            .with_egress_classifier(egress_classifier)
-            .with_plugin_registry(plugin_registry))
     }
 
     pub fn with_write_permission(
@@ -84,49 +49,24 @@ impl McpServer {
         embedder: Arc<dyn EmbeddingProvider>,
         sandbox: Arc<McpSandbox>,
     ) -> Self {
-        #[cfg(feature = "kv-bridge")]
-        let kv_bridge = setup_kv_bridge(&db);
-
+        let tenant_id = TenantId::try_new(1).ok();
         Self {
             db,
             embedder,
             sandbox,
             injection_guard: Arc::new(PromptInjectionGuard::from_env()),
-            egress_classifier: Arc::new(DefaultEgressClassifier::default()),
-            egress_guard: None,
-            routing: None,
             plugin_registry: None,
-            #[cfg(feature = "kv-bridge")]
-            kv_bridge,
+            tenant_id,
         }
     }
 
-    #[cfg(feature = "kv-bridge")]
-    pub fn with_kv_bridge(
-        mut self,
-        kv_bridge: Option<Arc<contextra_infer_candle::KvBridgeAdapter>>,
-    ) -> Self {
-        self.kv_bridge = kv_bridge;
+    pub fn with_tenant_id(mut self, tenant_id: Option<TenantId>) -> Self {
+        self.tenant_id = tenant_id;
         self
     }
 
     pub fn with_injection_guard(mut self, injection_guard: Arc<PromptInjectionGuard>) -> Self {
         self.injection_guard = injection_guard;
-        self
-    }
-
-    pub fn with_egress_classifier(mut self, classifier: Arc<dyn EgressClassifier>) -> Self {
-        self.egress_classifier = classifier;
-        self
-    }
-
-    pub fn with_egress_guard(mut self, guard: Arc<dyn EgressGuardCheck>) -> Self {
-        self.egress_guard = Some(guard);
-        self
-    }
-
-    pub fn with_routing(mut self, routing: Option<Arc<RoutingHandle>>) -> Self {
-        self.routing = routing;
         self
     }
 
@@ -136,14 +76,6 @@ impl McpServer {
     ) -> Self {
         self.plugin_registry = registry;
         self
-    }
-
-    /// Retrieves and decrypts a volatile tool result stored in the MCP sandbox.
-    pub fn get_volatile_output(
-        &self,
-        key: &str,
-    ) -> Result<Option<zeroize::Zeroizing<Vec<u8>>>, ContextraError> {
-        self.sandbox.get_volatile(key)
     }
 
     /// Startet den MCP stdio-Loop.

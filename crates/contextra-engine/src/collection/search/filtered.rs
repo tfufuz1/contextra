@@ -1,3 +1,10 @@
+//! # Modul: filtered.rs
+//!
+//! **Zweck:** Kombination von Suchtreffern mit Prädikatfiltern.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Filter-Familie (Selectivity, Match-DocIDs, search_filtered) für Collection.
 
@@ -75,6 +82,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
     }
 
+    // ANCHOR[contextra-engine:COL-GET-085]
+    /// Dokumentation für `get_matching_doc_ids_at` im Rahmen der Collection- und Suchabstraktion.
     pub(super) async fn get_matching_doc_ids_at(
         &self,
         filter: &FilterExpr,
@@ -109,6 +118,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(matched)
     }
 
+    // ANCHOR[contextra-engine:COL-GET-119]
+    /// Dokumentation für `get_matching_doc_ids_for_query_at` im Rahmen der Collection- und Suchabstraktion.
     pub(super) async fn get_matching_doc_ids_for_query_at(
         &self,
         query: &contextra_types::HybridQuery,

@@ -1,3 +1,7 @@
+//! # Multi-Step Rewriter mit verschiedenen Modalitäten
+//!
+//! Testet die Generierung multimodaler Sub-Queries (Text, Vektor, Graph) im Multi-Step-Zyklus.
+//!
 // FILE-CONTEXT
 // ZWECK: Testet Multi-Modal Sub-Queries (Text, Vektor, Graph) im Multi-Step Retrieval mit Mock-Rewriter und Mock-Embedder.
 
@@ -17,6 +21,8 @@ struct MultiModalMockRewriter {
 }
 
 impl QueryRewriter for MultiModalMockRewriter {
+    // ANCHOR[contextra-db:TEST-MULTISTEP_QUERY_REWRITER_MODALITIES-01-REWRITE_STRUCTURED]
+    // Testet die Funktionalität von `rewrite_structured`.
     fn rewrite_structured<'a>(
         &'a self,
         _original_query: &'a str,
@@ -35,6 +41,8 @@ impl QueryRewriter for MultiModalMockRewriter {
 struct FailingMockRewriter;
 
 impl QueryRewriter for FailingMockRewriter {
+    // ANCHOR[contextra-db:TEST-MULTISTEP_QUERY_REWRITER_MODALITIES-02-REWRITE_STRUCTURED]
+    // Testet die Funktionalität von `rewrite_structured`.
     fn rewrite_structured<'a>(
         &'a self,
         _original_query: &'a str,
@@ -53,12 +61,16 @@ struct MockEmbedder {
 }
 
 impl TextEmbeddingEngine for MockEmbedder {
+    // ANCHOR[contextra-db:TEST-MULTISTEP_QUERY_REWRITER_MODALITIES-03-EMBED]
+    // Testet die Funktionalität von `embed`.
     fn embed<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, Result<Vec<f32>>> {
         let dim = self.dimension;
         Box::pin(async move { Ok(vec![1.0; dim]) })
     }
 }
 
+// ANCHOR[contextra-db:TEST-MULTISTEP_QUERY_REWRITER_MODALITIES-04-CREATE_TEST_COLLECTION]
+// Testet die Funktionalität von `create_test_collection`.
 async fn create_test_collection() -> Arc<Collection<LsmStorage>> {
     let dir = tempdir().expect("tempdir");
     let lsm_config = LsmConfig {
@@ -87,6 +99,8 @@ async fn create_test_collection() -> Arc<Collection<LsmStorage>> {
     Arc::new(col)
 }
 
+// ANCHOR[contextra-db:TEST-MULTISTEP_QUERY_REWRITER_MODALITIES-05-TEST_ALL_THREE_MODALITIES_HANDLED]
+// Testet die Funktionalität von `test_all_three_modalities_handled`.
 #[tokio::test]
 async fn test_all_three_modalities_handled() {
     let col = create_test_collection().await;
@@ -134,6 +148,8 @@ async fn test_all_three_modalities_handled() {
     assert_eq!(result.sub_rewrites.len(), 1);
 }
 
+// ANCHOR[contextra-db:TEST-MULTISTEP_QUERY_REWRITER_MODALITIES-06-TEST_FALLBACK_ON_REWRITER_ERROR]
+// Testet die Funktionalität von `test_fallback_on_rewriter_error`.
 #[tokio::test]
 async fn test_fallback_on_rewriter_error() {
     let col = create_test_collection().await;
@@ -166,6 +182,8 @@ async fn test_fallback_on_rewriter_error() {
     assert!(!result.results.is_empty());
 }
 
+// ANCHOR[contextra-db:TEST-MULTISTEP_QUERY_REWRITER_MODALITIES-07-TEST_DETERMINISM_SAME_INPUTS]
+// Testet die Funktionalität von `test_determinism_same_inputs`.
 #[tokio::test]
 async fn test_determinism_same_inputs() {
     let col = create_test_collection().await;
