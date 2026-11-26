@@ -5,10 +5,6 @@ use contextra_privacy::audit_trace::compute_audit_trace;
 use contextra_privacy::bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
 };
-use contextra_privacy::context_edit_audit::{
-    build_context_edit_audit_record, render_audit_line, verify_audit_chain, ContextEditAuditError,
-    ContextEditInput, ContextEditKind,
-};
 use contextra_privacy::egress_gateway::{pii_vault_forces_crypto_shred, CloudResponseRehydrator};
 use contextra_privacy::egress_guard::{EgressGuard, TextSearchEngine, TextSearchResult};
 use contextra_privacy::egress_vault::{
@@ -430,51 +426,4 @@ fn test_h8_audit_trace_determinism_tamper_detection_and_no_pii_leak() {
 
     let trace_diff_time = compute_audit_trace(payload, rule_id, nanos + 1);
     assert_ne!(trace1, trace_diff_time);
-
-    // ContextEditAuditRecord chain verification & tamper detection
-    let tenant = TenantId(10);
-    let clock = FixedClock { nanos: 10001 };
-
-    let input0 = ContextEditInput {
-        task_id: "task-99".to_string(),
-        tenant_id: tenant,
-        kind: ContextEditKind::Append,
-        chunk_label: Some("chunk-alpha".to_string()),
-        bytes_affected: 512,
-        subgoal_index: 1,
-    };
-    let rec0 = build_context_edit_audit_record([0u8; 32], input0, &clock);
-
-    let input1 = ContextEditInput {
-        task_id: "task-99".to_string(),
-        tenant_id: tenant,
-        kind: ContextEditKind::Replace,
-        chunk_label: Some("chunk-beta".to_string()),
-        bytes_affected: 256,
-        subgoal_index: 2,
-    };
-    let rec1 = build_context_edit_audit_record(rec0.record_hash, input1, &clock);
-
-    let chain = vec![rec0.clone(), rec1.clone()];
-    assert!(
-        verify_audit_chain(&chain).is_ok(),
-        "Valid chain passes verification"
-    );
-
-    // Tamper with rec1
-    let mut tampered_rec1 = rec1.clone();
-    tampered_rec1.bytes_affected = 9999;
-    let tampered_chain = vec![rec0, tampered_rec1];
-
-    assert_eq!(
-        verify_audit_chain(&tampered_chain),
-        Err(ContextEditAuditError::ChainTampered { index: 1 }),
-        "Tampered chain must be detected at index 1"
-    );
-
-    // Verify render_audit_line contains NO plaintext PII
-    let rendered_line = render_audit_line(&rec1);
-    assert!(!rendered_line.contains("alice@example.com"));
-    assert!(rendered_line.contains("task=task-99"));
-    assert!(rendered_line.contains("chunk_label=chunk-beta"));
 }

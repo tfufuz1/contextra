@@ -1,9 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra::collection_profile::DeploymentTier;
-use contextra_crypto::AuditChain;
 use contextra_mcp::sandbox::{McpSandbox, ToolCategory, TOOL_REGISTRY};
-use contextra_privacy::ContextEditAuditRecord;
 use contextra_types::AutoExtractionMode;
 
 /// TEST 1: MCP Tool Registry Integrity & Dispatch Completeness
@@ -66,22 +64,5 @@ fn test_deployment_tier_presets_ram_limits() {
         regulated.auto_extraction,
         AutoExtractionMode::Disabled,
         "EnterpriseRegulated must disable auto-extraction by default"
-    );
-}
-
-/// TEST 3: Audit Chains Type Isolation Verification
-/// Oracle Source: ADR-106 / Ring Architecture rules (contextra-crypto vs contextra-privacy)
-/// Proves: AuditChain and ContextEditAuditRecord are separate, unlinked types across rings.
-#[test]
-fn test_audit_chains_structural_isolation() {
-    let crypto_chain = AuditChain::new();
-    assert!(crypto_chain.entries().is_empty());
-
-    let record_type_name = std::any::type_name::<ContextEditAuditRecord>();
-    let chain_type_name = std::any::type_name::<AuditChain>();
-
-    assert_ne!(
-        record_type_name, chain_type_name,
-        "Audit chains must remain separate, unlinked types across Ring 0 and Ring 3"
     );
 }

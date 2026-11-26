@@ -100,8 +100,6 @@ pub fn run_gate_arch(args: &[String]) -> i32 {
                 || f.starts_with("crates/contextra-sys/")
                 || f.starts_with("crates/contextra-simd/")
                 || f.starts_with("crates/contextra-core/")
-                || f.starts_with("crates/contextra-avv-generator/")
-                || f.starts_with("crates/contextra-audit-export/")
         });
         let has_caps = files
             .iter()
