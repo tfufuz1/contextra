@@ -17,6 +17,8 @@ pub struct McpServer {
     pub injection_guard: Arc<PromptInjectionGuard>,
     pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
     pub tenant_id: Option<TenantId>,
+    /// Erase tools are opt-in and default to disabled.
+    pub allow_erase: bool,
 }
 
 impl McpServer {
@@ -57,11 +59,18 @@ impl McpServer {
             injection_guard: Arc::new(PromptInjectionGuard::from_env()),
             plugin_registry: None,
             tenant_id,
+            allow_erase: false,
         }
     }
 
     pub fn with_tenant_id(mut self, tenant_id: Option<TenantId>) -> Self {
         self.tenant_id = tenant_id;
+        self
+    }
+
+    /// Enables the destructive erase tools for this server instance.
+    pub fn with_erase_enabled(mut self, enabled: bool) -> Self {
+        self.allow_erase = enabled;
         self
     }
 

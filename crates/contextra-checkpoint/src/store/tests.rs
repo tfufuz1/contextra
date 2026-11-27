@@ -150,6 +150,20 @@ async fn test_create_and_load() {
 }
 
 #[tokio::test]
+async fn test_restore_fails_closed_when_read_gate_blocks_checkpoint_key() {
+    let storage = Arc::new(MockStorage::new());
+    let store = PersistentCheckpointStore::new(storage, "test")
+        .unwrap()
+        .with_gate(Arc::new(contextra_testkit::gates::AlwaysRestrictedGate));
+    store
+        .create_checkpoint("cp_erased", "c1", 1, TxId::new(0), serde_json::json!({}))
+        .await
+        .unwrap();
+
+    assert!(matches!(store.restore_checkpoint("cp_erased").await, Err(ContextraError::Erased)));
+}
+
+#[tokio::test]
 // Prüft die Eindeutigkeit von Checkpoint-Namen und das automatische Überschreiben älterer Versionen.
 async fn test_name_uniqueness() {
     let storage = Arc::new(MockStorage::new());

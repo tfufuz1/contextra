@@ -42,6 +42,7 @@ fn test_collection_profile_matrix() {
                 kv_delete_mode: kv,
                 lsm_tuning: dummy_tuning,
                 auto_extraction: AutoExtractionMode::Enabled,
+                erasure: contextra_types::ErasureProfile::Standard,
             };
 
             let res = profile.validate();

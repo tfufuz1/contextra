@@ -123,15 +123,18 @@ impl McpServer {
             .tenant_id
             .ok_or_else(|| McpError::invalid_params("tenant_id not configured on server"))?;
 
-        self.db
-            .drop_collection(col_name, tenant_id)
+        let handle = self.db
+            .drop_collection_with_erasure(col_name, tenant_id)
             .await
             .map_err(McpError::from)?;
 
         Ok(json!({
             "ok": true,
             "deleted": true,
-            "collection": col_name,
+            "erasure_id": crate::tools_erase::format_erasure_id(handle.id),
+            "state": format!("{:?}", handle.state),
+            "guarantee": handle.reached.label(),
+            "purged": handle.reached.purged,
         }))
     }
 

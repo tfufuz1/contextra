@@ -367,6 +367,9 @@ impl McpServer {
             }
             "contextra_create_collection" => self.handle_create_collection(args).await,
             "contextra_drop_collection" => self.handle_drop_collection(args).await,
+            "contextra_erase" => self.handle_erase(args).await,
+            "contextra_erase_status" => self.handle_erase_status(args).await,
+            "contextra_erase_dry_run" => self.handle_erase_dry_run(args).await,
 
             other => Err(McpError::invalid_params(format!(
                 "Unbekanntes Tool: {other}"

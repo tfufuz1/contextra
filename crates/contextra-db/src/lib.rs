@@ -82,6 +82,7 @@ pub mod advanced {
 // Abwärtskompatible Re-Exports auf Root-Ebene (bestehender Code kompiliert nahtlos weiter)
 pub use advanced::*;
 pub use prelude::*;
+pub use contextra_engine::erasure::{EraseHandle, EraseOptions, ErasePlanSummary, ErasureConfig};
 
 // ANCHOR[contextra-db:FACADE-012]
 /// Adaptiver Decay-Controller für zeitliche Relevanz-Abwertung.

@@ -232,7 +232,10 @@ pub struct ContextraConfig {
     /// Default: DurabilityMode::Full.
     pub durability_mode: DurabilityMode,
 
-    /// Controls whether deletion proof generation and HMAC integrity guarantees are active.
+    /// Enables storage integrity proofs and their durability constraints.
+    ///
+    /// This setting does not enable a deletion proof. Erasure evidence is recorded by
+    /// the durable erasure ledger.
     /// Default: false.
     pub deletion_proof_active: bool,
 

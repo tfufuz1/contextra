@@ -139,6 +139,9 @@ async fn test_tool_registry_alignment_with_tools_list_and_dispatch() {
         ("contextra_forget", ToolCategory::DatabaseWrite),
         ("contextra_create_collection", ToolCategory::DatabaseWrite),
         ("contextra_drop_collection", ToolCategory::DatabaseWrite),
+        ("contextra_erase", ToolCategory::DatabaseErase),
+        ("contextra_erase_status", ToolCategory::DatabaseRead),
+        ("contextra_erase_dry_run", ToolCategory::DatabaseRead),
     ]);
 
     assert_eq!(

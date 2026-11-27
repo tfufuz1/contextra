@@ -85,6 +85,8 @@ pub struct CollectionProfile {
     pub kv_delete_mode: KvDeleteMode,
     pub lsm_tuning: LsmTuning,
     pub auto_extraction: AutoExtractionMode,
+    /// Erasure guarantee profile selected by this deployment tier.
+    pub erasure: contextra_types::ErasureProfile,
 }
 
 // ANCHOR[contextra:PRF-005]
@@ -160,6 +162,7 @@ impl DeploymentTier {
                     block_cache_shards: 2,
                 },
                 auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
+                erasure: contextra_types::ErasureProfile::Standard,
             },
             Self::PowerUserLocal => CollectionProfile {
                 performance: PerformanceProfile::Balanced,
@@ -171,6 +174,7 @@ impl DeploymentTier {
                     block_cache_shards: 8,
                 },
                 auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
+                erasure: contextra_types::ErasureProfile::Standard,
             },
             Self::EnterpriseShared => CollectionProfile {
                 performance: PerformanceProfile::Balanced,
@@ -182,6 +186,7 @@ impl DeploymentTier {
                     block_cache_shards: 32,
                 },
                 auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
+                erasure: contextra_types::ErasureProfile::Standard,
             },
             Self::EnterpriseRegulated => CollectionProfile {
                 performance: PerformanceProfile::Compliance,
@@ -193,6 +198,7 @@ impl DeploymentTier {
                     block_cache_shards: 32,
                 },
                 auto_extraction: ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT,
+                erasure: contextra_types::ErasureProfile::Regulated,
             },
         }
     }

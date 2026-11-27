@@ -271,6 +271,21 @@ impl McpServer {
                                 },
                                 "required": ["collection", "confirm"]
                             }
+                        },
+                        {
+                            "name": "contextra_erase",
+                            "description": "Start a confirmed durable erase operation.",
+                            "inputSchema": {"type":"object","properties":{"scope":{"type":"string","enum":["document","collection"]},"collection":{"type":"string"},"id":{"type":"string"},"reason":{"type":"string"},"await":{"type":"string"},"confirm":{"type":"boolean"}},"required":["scope","reason","confirm"]}
+                        },
+                        {
+                            "name": "contextra_erase_status",
+                            "description": "Read erase progress and guarantees.",
+                            "inputSchema": {"type":"object","properties":{"erasure_id":{"type":"string"}},"required":["erasure_id"]}
+                        },
+                        {
+                            "name": "contextra_erase_dry_run",
+                            "description": "Preview counts for a proposed erase operation.",
+                            "inputSchema": {"type":"object","properties":{"scope":{"type":"string"},"collection":{"type":"string"},"id":{"type":"string"}},"required":["scope"]}
                         }
                     ]
                 }),
@@ -325,7 +340,10 @@ impl McpServer {
             | "contextra_upsert"
             | "contextra_delete"
             | "contextra_create_collection"
-            | "contextra_drop_collection" => {
+            | "contextra_drop_collection"
+            | "contextra_erase"
+            | "contextra_erase_status"
+            | "contextra_erase_dry_run" => {
                 let tool_name = req.method.as_str();
                 match self
                     .sandbox

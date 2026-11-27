@@ -174,6 +174,9 @@ async fn test_inv_mcp_classify_1_tools_list_classification_completeness_and_mapp
         ("contextra_delete", ToolCategory::DatabaseWrite),
         ("contextra_create_collection", ToolCategory::DatabaseWrite),
         ("contextra_drop_collection", ToolCategory::DatabaseWrite),
+        ("contextra_erase", ToolCategory::DatabaseErase),
+        ("contextra_erase_status", ToolCategory::DatabaseRead),
+        ("contextra_erase_dry_run", ToolCategory::DatabaseRead),
     ];
 
     let (server, _tmp) = create_mock_server().await;

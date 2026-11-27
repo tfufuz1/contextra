@@ -54,7 +54,7 @@ pub const DEK_SALT_LABEL: &[u8] = b"ctx/dek-salt/v2";
 pub const WRAP_AAD: &[u8] = b"ctx/dek-wrap/v1";
 
 /// Derives a DEK using AncestorSalts and DocTag.
-pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek {
+pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Result<Dek> {
     let mut hasher = Sha256::new();
     hasher.update(DEK_SALT_LABEL);
     hasher.update(a.t);
@@ -73,8 +73,8 @@ pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek {
     info.extend_from_slice(&salt);
     info.extend_from_slice(&doc);
 
-    let _ = hkdf_expand(unit.0.as_bytes(), &info, &mut out);
-    Dek(SecretKey::new(out))
+    hkdf_expand(unit.0.as_bytes(), &info, &mut out)?;
+    Ok(Dek(SecretKey::new(out)))
 }
 
 /// Wraps a DEK using a Key Encryption Key (KEK / UnitKey) and AES-256-GCM-SIV.

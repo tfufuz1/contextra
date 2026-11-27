@@ -27,6 +27,7 @@ pub mod server;
 pub mod server_dispatch;
 pub mod server_tools;
 pub mod tools_crud;
+pub mod tools_erase;
 pub mod validation;
 
 #[cfg(test)]

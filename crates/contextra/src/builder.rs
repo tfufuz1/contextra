@@ -64,6 +64,10 @@ impl std::fmt::Debug for EncryptionMode {
 pub trait ContextraConfigExt {
     /// Returns `true` if storage encryption is configured with a non-empty passphrase.
     fn is_encrypted(&self) -> bool;
+    /// Returns the durable erasure configuration.
+    fn erasure_config(&self) -> &contextra_db::ErasureConfig;
+    /// Replaces the durable erasure configuration.
+    fn set_erasure_config(&mut self, config: contextra_db::ErasureConfig);
 }
 
 impl ContextraConfigExt for ContextraConfig {
@@ -71,6 +75,14 @@ impl ContextraConfigExt for ContextraConfig {
         self.encryption_passphrase
             .as_ref()
             .is_some_and(|pass| !pass.is_empty())
+    }
+
+    fn erasure_config(&self) -> &contextra_db::ErasureConfig {
+        &self.erasure
+    }
+
+    fn set_erasure_config(&mut self, config: contextra_db::ErasureConfig) {
+        self.erasure = config;
     }
 }
 
@@ -152,6 +164,18 @@ impl ContextraBuilder {
     /// - `path`: Pfad im Dateisystem (z. B. `/var/lib/contextra` oder `./data`).
     pub fn with_storage_path(mut self, path: impl Into<PathBuf>) -> Self {
         self.storage_path = path.into();
+        self
+    }
+
+    /// Configures durable erasure scheduling and checkpoint policy.
+    pub fn erasure_config(mut self, config: contextra_db::ErasureConfig) -> Self {
+        self.config.erasure = config;
+        self
+    }
+
+    /// Selects the erasure guarantee profile.
+    pub fn erasure_profile(mut self, profile: contextra_types::ErasureProfile) -> Self {
+        self.config.erasure.profile = profile;
         self
     }
 

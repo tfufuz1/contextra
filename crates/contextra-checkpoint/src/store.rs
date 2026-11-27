@@ -253,6 +253,8 @@ pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
     clock: Arc<dyn contextra_ports::Clock>,
     /// Injected metrics sink for operational monitoring
     metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+    /// Optional read gate used to prevent restores from resurrecting erased data.
+    gate: Option<Arc<dyn contextra_ports::ReadGate>>,
 }
 
 impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
@@ -325,6 +327,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             skipped_rollbacks,
             clock,
             metrics_sink: None,
+            gate: None,
         })
     }
 
@@ -454,6 +457,12 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             reg.set_clock(clock.clone());
         }
         self.clock = clock;
+        self
+    }
+
+    /// Installs the engine read gate for checkpoint restore protection.
+    pub fn with_gate(mut self, gate: Arc<dyn contextra_ports::ReadGate>) -> Self {
+        self.gate = Some(gate);
         self
     }
 
@@ -633,12 +642,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             }
 
             // 2. Erst nach erfolgreichem Storage-Delete entpinnen
-            if let Err(e) = self.storage.unpin_checkpoint(checkpoint.seq_no).await {
-                tracing::warn!(
-                    seq = checkpoint.seq_no,
-                    "Unpin nach drop fehlgeschlagen: {e}"
-                );
-            }
+            self.storage.unpin_checkpoint(checkpoint.seq_no).await?;
 
             // 3. Cache bereinigen
             self.index.write().remove_by_name(&checkpoint.name);
@@ -757,10 +761,13 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         validate_identifier("Checkpoint name", name)?;
         let _guard = self.write_lock.lock().await;
 
+        let gate_epoch = self.gate.as_ref().map(|gate| gate.epoch());
         let meta = self
             .get_checkpoint_internal(name)
             .await?
             .ok_or(ContextraError::CheckpointNotFound)?;
+
+        self.ensure_restore_allowed(name, &meta)?;
 
         let last_tx = self.storage.last_tx_id().await?;
         if last_tx > meta.tx_id {
@@ -772,6 +779,14 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             )));
         }
 
+        // The gate is memory-resident and may change while checkpoint metadata is loaded.
+        // Recheck after async preparation, before the irreversible store rollback.
+        if let (Some(gate), Some(epoch)) = (self.gate.as_ref(), gate_epoch) {
+            if gate.epoch() != epoch {
+                self.ensure_restore_allowed(name, &meta)?;
+            }
+        }
+
         // 1. Rollback storage state
         self.storage.rollback_to_tx(meta.tx_id).await?;
 
@@ -779,6 +794,19 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         self.list_checkpoints().await?;
 
         Ok(meta)
+    }
+
+    fn ensure_restore_allowed(&self, name: &str, meta: &CheckpointMeta) -> Result<()> {
+        if let Some(gate) = self.gate.as_ref().filter(|gate| gate.is_active()) {
+            let key = format!("{}:checkpoint:{name}", self.namespace);
+            if gate
+                .check_version(key.as_bytes(), contextra_types::Seq(meta.seq_no))
+                .is_blocked()
+            {
+                return Err(ContextraError::Erased);
+            }
+        }
+        Ok(())
     }
 
     /// Liefert eine Referenz auf die Orphan-Registry.

@@ -46,6 +46,9 @@ pub struct ToolDefinition {
 /// | `contextra_forget` | `DatabaseWrite` | Delete document (Alias for contextra_delete) |
 /// | `contextra_create_collection` | `DatabaseWrite` | Create collection with DeploymentTier |
 /// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection |
+/// | `contextra_erase` | `DatabaseErase` | Permanently erase a scope |
+/// | `contextra_erase_status` | `DatabaseRead` | Read erase progress |
+/// | `contextra_erase_dry_run` | `DatabaseRead` | Preview erase counts |
 pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_search",
@@ -179,6 +182,33 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
             "required": ["collection", "confirm"]
         }),
     },
+    ToolDefinition {
+        name: "contextra_erase",
+        category: ToolCategory::DatabaseErase,
+        description: "Start a confirmed, durable erase operation.",
+        input_schema: || json!({
+            "type":"object",
+            "properties":{
+                "scope":{"type":"string","enum":["document","collection"]},
+                "collection":{"type":"string"}, "id":{"type":"string"},
+                "reason":{"type":"string","enum":["user_request","legal_request","retention_expiry","operator_action","tenant_offboarding"]},
+                "await":{"type":"string","enum":["accepted","gated","purged"],"default":"gated"},
+                "confirm":{"type":"boolean"}
+            }, "required":["scope","reason","confirm"]
+        }),
+    },
+    ToolDefinition {
+        name: "contextra_erase_status",
+        category: ToolCategory::DatabaseRead,
+        description: "Read the state and guarantees of an erase operation.",
+        input_schema: || json!({"type":"object","properties":{"erasure_id":{"type":"string"}},"required":["erasure_id"]}),
+    },
+    ToolDefinition {
+        name: "contextra_erase_dry_run",
+        category: ToolCategory::DatabaseRead,
+        description: "Preview counts for a proposed erase operation.",
+        input_schema: || json!({"type":"object","properties":{"scope":{"type":"string","enum":["document","collection"]},"collection":{"type":"string"},"id":{"type":"string"}},"required":["scope"]}),
+    },
 ];
 
 /// Erlaubte MCP-Tool-Kategorien (Whitelist-Prinzip).
@@ -188,6 +218,8 @@ pub enum ToolCategory {
     DatabaseRead,
     /// Schreibende Datenbankoperationen (erfordern explizite Freigabe).
     DatabaseWrite,
+    /// Destructive erasure operation, separately classifiable from ordinary writes.
+    DatabaseErase,
     /// Externe Code-Ausführung (höchste Risikostufe, standardmäßig gesperrt).
     CodeExecution,
     /// Externe Cloud-Anfragen / Egress (standardmäßig gesperrt; erfordert explizites Opt-in).
@@ -324,6 +356,10 @@ impl McpSandbox {
                         "Sandbox: DB-Schreibzugriff gesperrt für '{method}'"
                     )));
                 }
+            }
+            ToolCategory::DatabaseErase => {
+                // Erase has its own opt-in in McpServer; do not couple it to ordinary
+                // write permission (the handler fails closed when allow_erase is false).
             }
             ToolCategory::CodeExecution => {
                 if !self.policy.allow_code_execution {

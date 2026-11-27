@@ -49,6 +49,7 @@ pub mod deletion_proof;
 #[cfg(feature = "legacy-erasure")]
 pub mod ed25519_proof;
 pub mod error;
+pub mod erasure_root;
 pub mod kdf;
 pub mod kv_cipher;
 pub mod kv_segment;
@@ -81,6 +82,7 @@ pub use deletion_proof::{
 #[allow(deprecated)]
 pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
+pub use erasure_root::{ErasureLabel, ErasureRoot};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
 #[cfg(feature = "legacy-erasure")]
 pub use kv_cipher::KvSegmentCipher;

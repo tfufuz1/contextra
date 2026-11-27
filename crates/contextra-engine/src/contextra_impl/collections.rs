@@ -301,6 +301,15 @@ impl Contextra {
         name: &str,
         tenant_id: TenantId,
     ) -> Result<()> {
+        self.drop_collection_with_erasure(name, tenant_id).await.map(|_| ())
+    }
+
+    /// Drops a collection through the durable erasure pipeline and returns its G1 handle.
+    pub async fn drop_collection_with_erasure(
+        &self,
+        name: &str,
+        tenant_id: TenantId,
+    ) -> Result<crate::erasure::EraseHandle> {
         use crate::erasure::{EraseOptions, LayerRegistry};
         use contextra_types::{AwaitLevel, EraseTarget, ErasureReason};
 
@@ -311,13 +320,11 @@ impl Contextra {
             let guard = self.tenant_collections.read().await;
             guard.get(&cache_key).cloned()
         };
-        let col = match col {
+        let _col = match col {
             Some(c) => c,
             None => self.collection_for_tenant(name, tenant_id).await?,
         };
-        col.drop_collection().await?;
-
-        // 2. Durable Löschkette: G1 synchron, G3 im Hintergrund (K-44: HNSW, Graph,
+        // Durable Löschkette: G1 synchron, G3 im Hintergrund (K-44: HNSW, Graph,
         //    Checkpoints und `__col_idx` werden von der Kette bereinigt).
         let handle = self
             .erase(
@@ -346,6 +353,6 @@ impl Contextra {
             }
         });
 
-        Ok(())
+        Ok(handle)
     }
 }

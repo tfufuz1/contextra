@@ -55,6 +55,11 @@ pub use contextra_types::types::domain::{DocId, ScoredDocument};
 pub use contextra_types::DistanceMetric;
 pub use performance_profile::{DurabilityConfigError, DurabilityMode, PerformanceProfile};
 pub use query_rewriter::LlmQueryRewriter;
+pub use contextra_db::{EraseHandle, EraseOptions, ErasePlanSummary, ErasureConfig};
+pub use contextra_types::{
+    AwaitLevel, CheckpointTaintPolicy, EraseTarget, ErasureException, ErasureId, ErasurePolicy,
+    ErasureProfile, ErasureReason, ErasureState, ErasureStatus, Guarantee, ReinsertPolicy,
+};
 
 // ANCHOR[contextra:LIB-001]
 /// Erzeugt einen neuen [`ContextraBuilder`] zur Konfiguration und Instanziierung der Datenbank [`Contextra`].
