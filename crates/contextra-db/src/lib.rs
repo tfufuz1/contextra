@@ -13,21 +13,21 @@
 //!
 //! Contextra ist als geschichteter Baukasten (Layered Toolkit) konzipiert:
 //!
-//! - **Ring 0 — Fundament & Hardware-Isolation (`contextra-store`, `contextra-sys`, `contextra-wire`)**:
+//! - **Ring 0 — Fundament & Hardware-Isolation (`contextra-store`, `contextra-sys`)**:
 //!   Verwaltet LSM-Storage (Log-Structured Merge-Tree), WAL (Write-Ahead-Log), Speicher-Locks,
 //!   Zero-Copy-IPC sowie direkte I/O- und Durabilitätssicherungen (fsync/fdatasync).
 //! - **Ring 1 — Fachspezifische Indizes (`contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-crypto`)**:
 //!   Implementiert Vektorsuche (HNSW / Hierarchical Navigable Small World), BM25-Textsuche,
 //!   Graph-CSR-Strukturen (Compressed Sparse Row) und kryptographische Authentifizierung.
-//! - **Ring 2 — Adaption & Aggregation (`contextra-engine`, `contextra-adapt`)**:
+//! - **Ring 2 — Adaption & Aggregation (`contextra-engine`)**:
 //!   Kombiniert Multi-Signal-Fusion (RRF / Reciprocal Rank Fusion) und dynamische Schwellenwert-Anpassung.
 //! - **Ring 3 — Fassade & Haupt-API (`contextra-db`)**:
 //!   Bündelt alle Subsysteme in eine konsistente, typ- und mandanten-sichere Storage-API ([`Contextra`], [`Collection`]).
 //!
 //! ## Einbindung und Abhängigkeiten
-//! - **Eingehende Einbindungen**: `contextra` (Top-Level Facade), `contextra-agent`, `contextra-py` (Python-Bindings), `contextra-bench`.
+//! - **Eingehende Einbindungen**: `contextra` (Top-Level Facade), `contextra-bench`.
 //! - **Ausgehende Abhängigkeiten**: `contextra-engine`, `contextra-types`, `contextra-ports`, `contextra-store`,
-//!   `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-adapt`, `contextra-rank`,
+//!   `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`,
 //!   `contextra-checkpoint`, `contextra-crypto`, `contextra-sys`.
 //!
 //! ## API-Strukturierung: `prelude` vs. `advanced`

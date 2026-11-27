@@ -84,8 +84,6 @@ pub mod vfs;
 
 /// Environment abstractions (Clock, Rng, IdGen, MetricsSink) with sub-prelude.
 pub mod env;
-/// Legacy erasure ports isolated under Decision D-E1 prior to relocation to `contextra-erasure-spi`.
-pub mod erasure_legacy;
 /// Filesystem abstractions (Vfs, VfsFile) with sub-prelude.
 pub mod fs;
 /// Indexing subsystem abstractions (VectorIndex, TextIndex, GraphIndex) with sub-prelude.

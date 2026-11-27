@@ -18,14 +18,10 @@
 //! - Reines Rust mit Basis-Bibliotheken: `serde`, `serde_json`, `bincode`, `ahash`, `blake3`, `sha2`, `bytes`, `thiserror`.
 //! - Keine Abhängigkeiten zu anderen Contextra-Crates.
 //!
-//! **Wird eingebunden von (eingehend, 30 Crates):**
-//! - `contextra`, `contextra-adapt`, `contextra-agent`, `contextra-audit-export`, `contextra-agreement-generator`,
-//!   `contextra-checkpoint`, `contextra-cognition`, `contextra-crypto`, `contextra-db`,
-//!   `contextra-engine`, `contextra-graph`, `contextra-infer-candle`, `contextra-infer-ollama`,
-//!   `contextra-infer-onnx`, `contextra-ingest`, `contextra-kvcache`, `contextra-license`, `contextra-mcp`,
-//!   `contextra-mvcc`, `contextra-ports`, `contextra-privacy`, `contextra-py`, `contextra-rank`,
-//!   `contextra-router`, `contextra-simd`, `contextra-store`, `contextra-testkit`, `contextra-text`,
-//!   `contextra-vector`.
+//! **Wird eingebunden von (eingehend):**
+//! - `contextra`, `contextra-checkpoint`, `contextra-crypto`, `contextra-db`, `contextra-engine`,
+//!   `contextra-graph`, `contextra-mcp`, `contextra-mvcc`, `contextra-ports`, `contextra-rank`,
+//!   `contextra-simd`, `contextra-store`, `contextra-testkit`, `contextra-text`, `contextra-vector`.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -57,13 +53,11 @@ pub mod tombstone;
 pub mod types;
 // ANCHOR[contextra-types:MOD-WIT]
 /// Audit-Trails, Zeugnisse (Witnesses) und Saga-Transaktionsaufzeichnungen.
-pub mod erasure;
 pub mod ids;
 pub mod refs;
 pub mod witness;
 
 #[allow(deprecated)]
-pub use erasure::*;
 #[allow(deprecated)]
 pub use ids::{ErasureId, FileId, GateId, Seq, StoreId, Timestamp};
 pub use refs::{CollectionRef, DocKey, OperatorRef, SubjectRef, TenantRef, MAX_REF_LEN};

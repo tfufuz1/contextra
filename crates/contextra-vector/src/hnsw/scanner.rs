@@ -13,10 +13,7 @@ use super::types::{HnswIndex, VectorData};
 
 /// Neutrale Scan- und Validierungsroutine für Vektorknoten.
 ///
-/// Gemäß D-E1 als Prüfprimitiv isoliert.
-#[deprecated(
-    note = "Gemäß D-E1 als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach contextra-erasure"
-)]
+/// Als Prüfprimitiv implementiert.
 pub struct HnswScanner {
     index: Arc<HnswIndex>,
 }
@@ -199,9 +196,6 @@ impl HnswScanner {
 
 /// Erzeugt einen `Arc<dyn LayerScanner>` für einen HNSW Index.
 #[allow(deprecated)]
-#[deprecated(
-    note = "Gemäß D-E1 als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach contextra-erasure"
-)]
 pub fn hnsw_scanner(index: Arc<HnswIndex>) -> Arc<dyn LayerScanner> {
     Arc::new(HnswScanner::new(index))
 }

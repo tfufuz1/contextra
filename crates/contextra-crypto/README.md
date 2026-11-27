@@ -16,7 +16,7 @@ Kryptographische Primitive, AEAD, Schlüsselableitung, Integritätsketten und ge
 - **Vertraulichkeit & Authentizität:** AES-256-GCM-SIV (RFC 8452) bietet Nonce-Misuse-Resistance gegen versehentliche Nonce-Wiederverwendung und authentifiziert Header/Metadaten vollständig über Associated Data (AAD).
 - **Timing-Orakel-Schutz (INV-CRYPTO-CONSTANT-TIME-1):** Sämtliche kryptographischen Hash-, Schlüssel- und Tag-Vergleiche werden ausnahmslos in konstanter Zeit mittels `subtle::ConstantTimeEq` ausgeführt.
 - **Speicherhygiene (INV-CRYPTO-ZEROIZE-1):** Alle Schlüsselstrukturen (`SecretKey`, `Secret`, `VolatileEncryptionKey`, `UnitKey`, `Dek`) implementieren `ZeroizeOnDrop` und werden bei Freigabe deterministisch genullt. Sensible Daten werden in `Debug` und `Display` als `[REDACTED]` maskiert.
-- **Nicht-Ziele:** Keine juristische Nachweiserstellung oder DSGVO-Löschketten (diese liegen in `contextra-erasure`).
+- **Nicht-Ziele:** Keine juristische Nachweiserstellung oder DSGVO-Löschketten (diese sind nicht Teil dieses Crates).
 
 ## Minimalbeispiel (Autarker Einsatz)
 

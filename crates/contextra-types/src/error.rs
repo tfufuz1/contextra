@@ -31,10 +31,6 @@ use thiserror::Error;
 /// Errors that can occur during HNSW graph deletion and repair operations.
 #[derive(Error, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-types:ERR-001]
-#[deprecated(
-    since = "0.1.0",
-    note = "Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
-)]
 pub enum HnswDeletionError {
     /// Target node with doc_id not found in graph.
     #[error("Node for doc_id {0:?} not found in HNSW index")]
@@ -119,7 +115,7 @@ pub type Result<T> = std::result::Result<T, ContextraError>;
 /// # Non-Exhaustive Variant Guarantee
 /// This enum is marked `#[non_exhaustive]` to allow appending new error variants
 /// in future minor releases without breaking downstream `match` statements across crate boundaries
-/// (such as `contextra-py` and `contextra-mcp`).
+/// (such as `contextra-mcp`).
 ///
 /// Downstream callers matching on `ContextraError` must include a wildcard arm (`_ => ...`).
 /// New variants are appended strictly to the bottom of the enum to preserve binary and FFI compatibility.

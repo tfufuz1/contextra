@@ -26,10 +26,6 @@ use std::sync::Arc;
 // ANCHOR[contextra-text:SCAN-001]
 /// Geparstes Zielobjekt (Dokument-ID oder Kollektion) für den Scanner.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[deprecated(
-    since = "0.1.0",
-    note = "Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)"
-)]
 pub enum ParsedTextTarget {
     Document(DocId),
     Collection(String),
@@ -87,10 +83,6 @@ where
 
 // ANCHOR[contextra-text:SCAN-002]
 /// Scanner zur Feststellung verbleibender Restdaten im Textindex.
-#[deprecated(
-    since = "0.1.0",
-    note = "Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)"
-)]
 pub struct TextScanner<S: StorageEngine + 'static> {
     index: Arc<InvertedIndex<S>>,
     target: Arc<parking_lot::Mutex<Option<ScanTarget>>>,
@@ -296,10 +288,6 @@ impl<S: StorageEngine + 'static> LayerScanner for TextScanner<S> {
 
 // ANCHOR[contextra-text:SCAN-008]
 /// Erzeugt eine instanziierte Implementierung des [`LayerScanner`]-Ports für den Textindex.
-#[deprecated(
-    since = "0.1.0",
-    note = "Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)"
-)]
 pub fn text_scanner<S: StorageEngine + 'static>(
     index: Arc<InvertedIndex<S>>,
 ) -> Arc<dyn LayerScanner> {

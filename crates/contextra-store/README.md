@@ -38,7 +38,7 @@ Im Baukastensystem von Contextra (SPEC §2, §5) ist `contextra-store` nicht als
 | `lsm` | Speicherorchester (`LsmStorage`), Commit-, Flush-, Scan- und Recovery-Prozesse |
 | `manifest` | Transaktionales Manifest für SSTable-Generationen und Versionierung |
 | `compaction` | Leveled / Adaptive Compaction Engine und Merge-Operatoren |
-| `scanner` | Übergangsweise Port-Implementierungen (`LayerScanner`, `LsmPurger`) — Ziel: `contextra-erasure-adapters` (Welle 4) |
+| `scanner` | Port-Implementierungen (`LayerScanner`, `LsmPurger`) |
 | `fsync` | Zentrale Flush- und Sync-Abstraktion (INV-FSYNC-1) |
 | `tenant_codec` | Mandanten-Präfixierung (`TenantId`) und Schlüssel-Isolation |
 | `system_pressure` | Systemdruck-Monitoring für adaptive Compaction |
@@ -50,7 +50,7 @@ Im Baukastensystem von Contextra (SPEC §2, §5) ist `contextra-store` nicht als
 - Feature `inspect`: Öffnet unveränderliche Schnappschuss-APIs (`sstables_snapshot()`, `memtables_snapshot()`) für externe Audit- und Scan-Adapter.
 
 ## Nicht-Ziele & Grenzen
-- **Keine Rechts- oder Löschsagas:** Juristische Begriffe (DSGVO/GDPR), Löschbeweise und Sagas gehören nach `contextra-erasure`. Der Speicher stellt neutrale Bereinigungs- und Scan-Primitive bereit.
+- **Keine Rechts- oder Löschsagas:** Juristische Begriffe (DSGVO/GDPR), Löschbeweise und Sagas sind nicht Teil dieses Crates. Der Speicher stellt neutrale Bereinigungs- und Scan-Primitive bereit.
 - **Keine Vektor-/Volltext-Logik:** Reines Key-Value-Triebwerk; Vektoren liegen in `contextra-vector`, Volltextindizes in `contextra-text`.
 - **Keine automatische Bit-Rot-Korrektur:** Bit-Rot wird über CRC32C und HMAC deterministisch erkannt, jedoch nicht automatisch repariert.
 - **Lokaler HMAC-Schlüssel:** Das Ablegen von `.wal_integrity_key` im Dateisystem schützt vor Bit-Rot, jedoch nicht vor Manipulation durch Angreifer mit Schreibrechten (SECURITY NOTE in `wal/hmac.rs`).
@@ -69,7 +69,7 @@ Im Baukastensystem von Contextra (SPEC §2, §5) ist `contextra-store` nicht als
 ## Garantien
 - **ACID / Durability:** Atomare Commits über Write-Ahead-Logging mit synchronen Gruppen-Flushes.
 - **Speichersicherheit:** Striktes `#![forbid(unsafe_code)]` im gesamten Produktionscode.
-- **Neutralität:** Datenhaltung und physische Bereinigung ohne Rechts- oder Berichtsbegrifflichkeiten (SPEC §6.1, E-04). Die Port-Namen in `scanner/` (`Purger`, `LayerScanner`, `WitnessLayer`) verbleiben bis zur Bereitstellung von `contextra-erasure-adapters` hier und bilden die einzige dokumentierte Ausnahme.
+- **Neutralität:** Datenhaltung und physische Bereinigung ohne Rechts- oder Berichtsbegrifflichkeiten (SPEC §6.1, E-04). Die Port-Namen in `scanner/` (`Purger`, `LayerScanner`, `WitnessLayer`) verbleiben hier.
 
 ```rust,no_run
 use contextra_ports::StorageEngine;
