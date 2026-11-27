@@ -160,6 +160,36 @@ mod dyn_safety {
     fn _assert_dyn_egress_policy(_: Option<&dyn crate::policy::EgressPolicy>) {}
 
     #[test]
+    fn test_ports_reexport_type_id_equality() {
+        use std::any::TypeId;
+        assert_eq!(TypeId::of::<crate::Seq>(), TypeId::of::<contextra_types::Seq>());
+        assert_eq!(
+            TypeId::of::<crate::gate::Seq>(),
+            TypeId::of::<contextra_types::Seq>()
+        );
+        assert_eq!(
+            TypeId::of::<crate::Timestamp>(),
+            TypeId::of::<contextra_types::Timestamp>()
+        );
+        assert_eq!(
+            TypeId::of::<crate::ledger::Timestamp>(),
+            TypeId::of::<contextra_types::Timestamp>()
+        );
+        assert_eq!(
+            TypeId::of::<crate::observer::Timestamp>(),
+            TypeId::of::<contextra_types::Timestamp>()
+        );
+        assert_eq!(
+            TypeId::of::<crate::TargetKind>(),
+            TypeId::of::<contextra_types::TargetKind>()
+        );
+        assert_eq!(
+            TypeId::of::<crate::observer::TargetKind>(),
+            TypeId::of::<contextra_types::TargetKind>()
+        );
+    }
+
+    #[test]
     fn test_dyn_safety_compiles() {
         _assert_dyn_storage(None);
         _assert_dyn_metrics_sink(None);

@@ -376,6 +376,11 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "target_path": target_path,
                 })),
             },
+            ContextraError::Erased => Self {
+                kind: "ERASED".to_string(),
+                message: err.to_string(),
+                details: None,
+            },
         }
     }
 }
@@ -539,6 +544,7 @@ mod tests {
                 },
                 "CrossDeviceLink",
             ),
+            (ContextraError::Erased, "ERASED"),
         ];
 
         for (err, expected_kind) in variants {

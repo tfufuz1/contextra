@@ -53,11 +53,17 @@ pub mod tombstone;
 pub mod types;
 // ANCHOR[contextra-types:MOD-WIT]
 /// Audit-Trails, Zeugnisse (Witnesses) und Saga-Transaktionsaufzeichnungen.
+/// Kanonische Datentypen der Löschkette (Auftrag, Ziel, Garantiemodell, Zustandsautomat, Fehler).
+pub mod erasure;
 pub mod ids;
 pub mod refs;
 pub mod witness;
 
-#[allow(deprecated)]
+pub use erasure::{
+    AwaitLevel, CheckpointTaintPolicy, Cursor, EraseTarget, ErasureError, ErasureException,
+    ErasurePolicy, ErasureProfile, ErasureReason, ErasureState, ErasureStatus, Guarantee,
+    LayerErrorKind, LayerProgress, LayerState, LayerStatus, ReinsertPolicy, TargetKind,
+};
 #[allow(deprecated)]
 pub use ids::{ErasureId, FileId, GateId, Seq, StoreId, Timestamp};
 pub use refs::{CollectionRef, DocKey, OperatorRef, SubjectRef, TenantRef, MAX_REF_LEN};

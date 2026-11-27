@@ -8,28 +8,9 @@
 
 use crate::BoxFuture;
 use contextra_types::ids::ErasureId;
+pub use contextra_types::{TargetKind, Timestamp};
 use std::fmt;
 use std::sync::Arc;
-
-/// Type representing a millisecond or microsecond timestamp (SPEC D-118).
-pub type Timestamp = u64;
-
-/// Target kind indicating which hierarchy level was targeted (SPEC D-118, P13).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TargetKind {
-    /// Single document erasure.
-    Document,
-    /// Subject-level erasure (all documents belonging to a subject).
-    Subject,
-    /// Collection-level erasure.
-    Collection,
-    /// Tenant-level erasure.
-    Tenant,
-    /// Document replacement (`replace_erasing`, D-115).
-    DocumentReplace,
-    /// Superseded document version (`update_with(..., Purge)`, D-117).
-    Superseded,
-}
 
 /// Observed lifecycle phase of an erasure operation (SPEC D-118).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -101,19 +82,6 @@ impl<T: ErasureObserver + ?Sized> ErasureObserver for Arc<T> {
     }
 }
 
-impl fmt::Display for TargetKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Document => write!(f, "Document"),
-            Self::Subject => write!(f, "Subject"),
-            Self::Collection => write!(f, "Collection"),
-            Self::Tenant => write!(f, "Tenant"),
-            Self::DocumentReplace => write!(f, "DocumentReplace"),
-            Self::Superseded => write!(f, "Superseded"),
-        }
-    }
-}
-
 impl fmt::Display for ObservedPhase {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -149,7 +117,7 @@ mod tests {
             id: ErasureId::new([42u8; 16]),
             target_kind: TargetKind::Document,
             phase: ObservedPhase::Gated,
-            at: 1000,
+            at: Timestamp::from_micros(1000),
         };
         let res = obs.on_erased(ev).now_or_never().expect("now or never");
         assert!(res.is_ok());

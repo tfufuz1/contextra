@@ -380,6 +380,10 @@ pub enum ContextraError {
         /// Path of target file.
         target_path: String,
     },
+
+    /// Zugriff auf Daten, die einem Erase-Auftrag unterliegen. Absichtlich ohne Details.
+    #[error("Operation rejected: target is subject to erasure")]
+    Erased,
 }
 
 impl ContextraError {

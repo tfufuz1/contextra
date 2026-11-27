@@ -2,25 +2,10 @@
 //!
 //! Provides durable audit tracking of completed purges outside the primary data directory.
 
-use crate::gate::{KeyBuf, Seq};
+use crate::gate::KeyBuf;
+pub use contextra_types::{Seq, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-
-/// Discrete point in time measured in epoch milliseconds or nanoseconds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Timestamp(pub u64);
-
-impl Timestamp {
-    /// Creates a new timestamp.
-    pub const fn new(val: u64) -> Self {
-        Self(val)
-    }
-
-    /// Returns the underlying numeric value.
-    pub const fn as_u64(&self) -> u64 {
-        self.0
-    }
-}
 
 /// Set of key ranges or tokens included in an erasure ledger entry.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]

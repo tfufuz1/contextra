@@ -5,21 +5,8 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Monotonic sequence number for transactions and gate markers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Seq(pub u64);
-
-impl Seq {
-    /// Creates a new sequence number.
-    pub const fn new(val: u64) -> Self {
-        Self(val)
-    }
-
-    /// Returns the underlying numeric sequence.
-    pub const fn as_u64(&self) -> u64 {
-        self.0
-    }
-}
+/// Re-export canonical monotonic sequence number from `contextra-types`.
+pub use contextra_types::Seq;
 
 /// Fixed or bounded key buffer for storage operations (SPEC §8.1).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

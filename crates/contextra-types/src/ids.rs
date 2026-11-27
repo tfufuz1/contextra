@@ -78,9 +78,28 @@ impl ErasureId {
         Self(bytes)
     }
 
+    /// Erzeugt eine `ErasureId` aus einem `u128` (Big-Endian).
+    pub const fn from_u128(v: u128) -> Self {
+        Self(v.to_be_bytes())
+    }
+
+    /// Wandelt die `ErasureId` in ein `u128` (Big-Endian) um.
+    pub const fn as_u128(&self) -> u128 {
+        u128::from_be_bytes(self.0)
+    }
+
     /// Liefert die 16 Bytes als Slice.
     pub const fn as_bytes(&self) -> &[u8; 16] {
         &self.0
+    }
+}
+
+impl fmt::Display for ErasureId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for b in &self.0 {
+            write!(f, "{:02x}", b)?;
+        }
+        Ok(())
     }
 }
 
@@ -193,6 +212,11 @@ impl Seq {
 pub struct Timestamp(pub u64);
 
 impl Timestamp {
+    /// Erzeugt einen neuen Zeitstempel aus einem Rohwert.
+    pub const fn new(val: u64) -> Self {
+        Self(val)
+    }
+
     /// Erzeugt einen neuen Zeitstempel aus Mikrosekunden seit Unix-Epoche.
     pub const fn from_micros(micros: u64) -> Self {
         Self(micros)
@@ -200,6 +224,11 @@ impl Timestamp {
 
     /// Liefert den Mikrosekunden-Wert.
     pub const fn as_micros(&self) -> u64 {
+        self.0
+    }
+
+    /// Liefert den Rohwert als `u64`.
+    pub const fn as_u64(&self) -> u64 {
         self.0
     }
 }
