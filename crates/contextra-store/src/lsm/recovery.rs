@@ -270,8 +270,12 @@ impl LsmStorage {
             Option<[u8; 32]>,
         ) = if manifest_exists {
             let state = manifest.state_snapshot().await;
-            let valid_set = state.live().keys().cloned().collect();
-            let dead_set = state.dead().iter().cloned().collect();
+            let valid_set = state
+                .live()
+                .keys()
+                .map(|name| name.to_path_buf())
+                .collect();
+            let dead_set = state.dead().iter().map(|name| name.to_path_buf()).collect();
             let hwm = state.wal_hwm();
             (Some(valid_set), Some(dead_set), hwm)
         } else {

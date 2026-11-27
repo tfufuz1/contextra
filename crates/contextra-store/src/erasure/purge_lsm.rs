@@ -322,7 +322,6 @@ pub(crate) async fn erase_compact_tick(
                     removed: vec![old_path.clone()],
                     added: final_path.clone(),
                     added_max_tx: sst.metadata().max_tx_id,
-                    rank: 0,
                 })
                 .await
                 .map_err(|e| ErasureError::Io(e.to_string()))?;

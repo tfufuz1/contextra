@@ -188,7 +188,6 @@ async fn scenario5_replace_mid_file_corruption_returns_err() {
         removed: vec![PathBuf::from("sst-1.sst")],
         added: PathBuf::from("sst-compact-1.sst"),
         added_max_tx: 10,
-        rank: 0,
     };
     let add2 = ManifestEntry::Add {
         path: PathBuf::from("sst-2.sst"),

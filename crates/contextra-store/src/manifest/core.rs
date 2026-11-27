@@ -7,7 +7,7 @@
 // ZWECK: Kernimplementierung des Manifests zum Lesen, Schreiben, Rollover und Reconstruct aktiver SSTables.
 // INVARIANTEN: Atomare Schreiboperationen via Buffer & Sync; Tail-Truncation Recovery bei unvollständigem Frame am EOF.
 // HOTSPOTS: load, reconstruct_valid_sstables, append_batch
-// FORMATABKÜNDIGUNG (S-01 / T-04): `rank` in `ManifestEntry::Replace` ist abgekündigt. `reconstruct_valid_sstables` nutzt ausschließlich die Manifest-Operationsreihenfolge (`next_rank`). `recovery.rs` verwirft den Wert explizit.
+// `Replace` enthält kein gespeichertes Rank-Feld; die interne Recovery-Reihenfolge wird aus der Operationsfolge rekonstruiert.
 
 use contextra_types::{ContextraError, Result};
 use crate::io_seam::append_file::{AppendFile, IoFault};

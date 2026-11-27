@@ -7,6 +7,12 @@ use contextra_types::{ContextraError, Result, TxId};
 
 use super::MAX_WAL_ENTRY_SIZE;
 
+fn checked_u32_len(len: usize, field: &str) -> Result<u32> {
+    u32::try_from(len).map_err(|_| {
+        ContextraError::Serialization(format!("WAL {field} exceeds the u32 format limit"))
+    })
+}
+
 /// Typed parsing errors encountered when decoding WAL entries from raw bytes.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum WalParseError {
@@ -157,14 +163,14 @@ impl WalEntry {
         match op {
             WalOp::Put { key, value, .. } => {
                 mac.update(&[0u8]); // op type
-                mac.update(&(key.len() as u32).to_le_bytes());
+                mac.update(&checked_u32_len(key.len(), "key")?.to_le_bytes());
                 mac.update(key);
-                mac.update(&(value.len() as u32).to_le_bytes());
+                mac.update(&checked_u32_len(value.len(), "value")?.to_le_bytes());
                 mac.update(value);
             }
             WalOp::Delete { key, .. } => {
                 mac.update(&[1u8]); // op type
-                mac.update(&(key.len() as u32).to_le_bytes());
+                mac.update(&checked_u32_len(key.len(), "key")?.to_le_bytes());
                 mac.update(key);
             }
             WalOp::TxEnd { committed, .. } => {
@@ -215,6 +221,16 @@ impl WalEntry {
 
     /// Serializes the entry to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        match &self.op {
+            WalOp::Put { key, value, .. } => {
+                checked_u32_len(key.len(), "key")?;
+                checked_u32_len(value.len(), "value")?;
+            }
+            WalOp::Delete { key, .. } => {
+                checked_u32_len(key.len(), "key")?;
+            }
+            WalOp::TxEnd { .. } => {}
+        }
         let op_size = match &self.op {
             WalOp::Put { key, value, .. } => 1 + 8 + 4 + key.len() + 4 + value.len(),
             WalOp::Delete { key, .. } => 1 + 8 + 4 + key.len(),
@@ -222,11 +238,17 @@ impl WalEntry {
         };
 
         // payload = seq_no(8) + checksum(32) + prev_hmac(32) + op
-        let payload_size = 8 + 32 + 32 + op_size;
+        let payload_size = 72usize
+            .checked_add(op_size)
+            .ok_or_else(|| ContextraError::Serialization("WAL payload size overflow".into()))?;
         // total_payload = CRC32(4) + payload
-        let total_payload_size = 4 + payload_size;
+        let total_payload_size = 4usize
+            .checked_add(payload_size)
+            .ok_or_else(|| ContextraError::Serialization("WAL entry size overflow".into()))?;
         // total_size = length_prefix(4) + total_payload
-        let total_size = 4 + total_payload_size;
+        let total_size = 4usize
+            .checked_add(total_payload_size)
+            .ok_or_else(|| ContextraError::Serialization("WAL entry size overflow".into()))?;
 
         let mut buf = Vec::with_capacity(total_size);
 
@@ -237,7 +259,7 @@ impl WalEntry {
                 total_payload_size, MAX_WAL_ENTRY_SIZE
             )));
         }
-        buf.extend_from_slice(&(total_payload_size as u32).to_le_bytes());
+        buf.extend_from_slice(&checked_u32_len(total_payload_size, "entry")?.to_le_bytes());
 
         // 2. CRC32 Placeholder (we'll fill this at the end)
         let crc_offset = buf.len();
@@ -253,15 +275,15 @@ impl WalEntry {
             WalOp::Put { tx_id, key, value } => {
                 buf.push(0u8);
                 buf.extend_from_slice(&tx_id.inner().to_le_bytes());
-                buf.extend_from_slice(&(key.len() as u32).to_le_bytes());
+                buf.extend_from_slice(&checked_u32_len(key.len(), "key")?.to_le_bytes());
                 buf.extend_from_slice(key);
-                buf.extend_from_slice(&(value.len() as u32).to_le_bytes());
+                buf.extend_from_slice(&checked_u32_len(value.len(), "value")?.to_le_bytes());
                 buf.extend_from_slice(value);
             }
             WalOp::Delete { tx_id, key } => {
                 buf.push(1u8);
                 buf.extend_from_slice(&tx_id.inner().to_le_bytes());
-                buf.extend_from_slice(&(key.len() as u32).to_le_bytes());
+                buf.extend_from_slice(&checked_u32_len(key.len(), "key")?.to_le_bytes());
                 buf.extend_from_slice(key);
             }
             WalOp::TxEnd { tx_id, committed } => {

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[tokio::test]
-async fn test_manifest_replace_rank_backward_compatibility() -> Result<()> {
+async fn test_manifest_replace_has_no_persisted_rank_field() -> Result<()> {
     let tmp = TempDir::new().expect("temp dir");
     let manifest_path = tmp.path().join("MANIFEST");
 
@@ -13,6 +13,40 @@ async fn test_manifest_replace_rank_backward_compatibility() -> Result<()> {
     let sst1 = PathBuf::from("sst-001.sst");
     let sst2 = PathBuf::from("sst-002.sst");
     let sst3_compacted = PathBuf::from("sst-compact-003.sst");
+
+    // Legacy v1 payloads contain a reserved rank word. The reader keeps format compatibility
+    // while the public Replace variant no longer exposes that obsolete field.
+    let legacy_entry = ManifestEntry::Replace {
+        removed: vec![sst1.clone()],
+        added: sst3_compacted.clone(),
+        added_max_tx: 20,
+    }
+    .to_bytes()?;
+    let mut legacy_entry = legacy_entry;
+    legacy_entry
+        .get_mut(17..25)
+        .ok_or_else(|| contextra_types::ContextraError::Serialization("missing v1 rank field".into()))?
+        .copy_from_slice(&42u64.to_le_bytes());
+    let legacy_payload = legacy_entry
+        .get(8..)
+        .ok_or_else(|| contextra_types::ContextraError::Serialization("missing v1 payload".into()))?;
+    let legacy_crc = crc32fast::hash(legacy_payload);
+    legacy_entry
+        .get_mut(4..8)
+        .ok_or_else(|| contextra_types::ContextraError::Serialization("missing v1 CRC".into()))?
+        .copy_from_slice(&legacy_crc.to_le_bytes());
+    assert_eq!(
+        ManifestEntry::from_bytes(
+            legacy_entry
+                .get(4..)
+                .ok_or_else(|| contextra_types::ContextraError::Serialization("missing entry frame".into()))?
+        )?,
+        ManifestEntry::Replace {
+            removed: vec![sst1.clone()],
+            added: sst3_compacted.clone(),
+            added_max_tx: 20,
+        }
+    );
 
     // 1. Append Add entries
     manifest
@@ -28,12 +62,11 @@ async fn test_manifest_replace_rank_backward_compatibility() -> Result<()> {
         })
         .await?;
 
-    // 2. Append legacy Replace entry with explicit non-zero rank (e.g. rank = 42)
+    // 2. Append a Replace entry. The current model carries no persisted rank field.
     let legacy_replace = ManifestEntry::Replace {
         removed: vec![sst1.clone(), sst2.clone()],
         added: sst3_compacted.clone(),
         added_max_tx: 20,
-        rank: 42,
     };
     manifest.append(&legacy_replace).await?;
 
@@ -45,7 +78,7 @@ async fn test_manifest_replace_rank_backward_compatibility() -> Result<()> {
     assert_eq!(valid.len(), 1);
     assert_eq!(valid[0].0, sst3_compacted);
 
-    // 4. Append a new Replace entry (writes rank = 0 internally)
+    // 4. Append another Replace entry.
     let sst4 = PathBuf::from("sst-004.sst");
     let sst5_compacted = PathBuf::from("sst-compact-005.sst");
 
@@ -60,7 +93,6 @@ async fn test_manifest_replace_rank_backward_compatibility() -> Result<()> {
         removed: vec![sst3_compacted.clone(), sst4.clone()],
         added: sst5_compacted.clone(),
         added_max_tx: 30,
-        rank: 0,
     };
     manifest.append(&new_replace).await?;
 

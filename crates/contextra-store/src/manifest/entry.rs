@@ -7,15 +7,44 @@
 // ZWECK: Datenstruktur und (De-)Serialisierungslogik für SSTable-Manifest-Einträge (ManifestEntry).
 // INVARIANTEN: Binäre Abwärtskompatibilität der Serialisierung; CRC32-Integritätsprüfung für jeden Eintrag.
 // HOTSPOTS: to_bytes, from_bytes
-// FORMATABKÜNDIGUNG (S-01 / T-04): Der Schreibpfad schreibt kein rank mehr in Replace-Einträge (schreibt stets 0u64 für binäre Nutzlastkompatibilität).
-// Der Reader akzeptiert bestehende Einträge mit rank weiterhin und ignoriert das Feld für Sortierung oder Sichtbarkeit.
+// v1-Reader-Kompatibilität: Das reservierte Rank-Wort wird gelesen und verworfen. Im Modell und im v2-Format gibt es kein Rank-Feld.
 
 use contextra_types::{ContextraError, Result};
-use std::path::PathBuf;
-
 use super::MAX_MANIFEST_ENTRY_SIZE;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::borrow::Borrow;
+
+/// Validated, path-free SSTable identity used by manifest state.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct SstName(String);
+
+impl SstName {
+    pub(crate) fn try_from_path(path: &Path) -> Result<Self> {
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| ContextraError::Serialization("SST name is not valid UTF-8".into()))?;
+        if !name.ends_with(".sst") || name.contains('/') || name.contains('\\') {
+            return Err(ContextraError::Serialization(format!("Invalid SST name: {name}")));
+        }
+        Ok(Self(name.to_owned()))
+    }
+
+    pub(crate) fn as_path(&self) -> &Path {
+        Path::new(&self.0)
+    }
+
+    pub(crate) fn to_path_buf(&self) -> PathBuf {
+        PathBuf::from(&self.0)
+    }
+}
+
+impl Borrow<Path> for SstName {
+    fn borrow(&self) -> &Path {
+        self.as_path()
+    }
+}
 
 fn checked_u32_len(len: usize, field: &str) -> Result<u32> {
     u32::try_from(len).map_err(|_| {
@@ -48,7 +77,7 @@ fn encode_v2_entry(entry: &ManifestEntry, out: &mut Vec<u8>) -> Result<()> {
             encode_name(path, out)?;
             out.extend_from_slice(&max_tx.to_le_bytes());
         }
-        ManifestEntry::Replace { removed, added, added_max_tx, .. } => {
+        ManifestEntry::Replace { removed, added, added_max_tx } => {
             out.push(2);
             out.extend_from_slice(&checked_u32_len(removed.len(), "removed count")?.to_le_bytes());
             for path in removed {
@@ -106,20 +135,20 @@ pub(crate) fn encode_batch_frame(entries: &[ManifestEntry]) -> Result<Vec<u8>> {
 }
 
 pub(crate) fn encode_snapshot_frame(
-    live: &BTreeMap<std::path::PathBuf, u64>,
-    dead: &BTreeSet<std::path::PathBuf>,
+    live: &BTreeMap<SstName, u64>,
+    dead: &BTreeSet<SstName>,
     rollbacks: &BTreeSet<u64>,
     wal_hwm: Option<[u8; 32]>,
 ) -> Result<Vec<u8>> {
     let mut body = Vec::new();
     body.extend_from_slice(&checked_u32_len(live.len(), "live count")?.to_le_bytes());
     for (name, max_tx) in live {
-        encode_name(name, &mut body)?;
+        encode_name(name.as_path(), &mut body)?;
         body.extend_from_slice(&max_tx.to_le_bytes());
     }
     body.extend_from_slice(&checked_u32_len(dead.len(), "dead count")?.to_le_bytes());
     for name in dead {
-        encode_name(name, &mut body)?;
+        encode_name(name.as_path(), &mut body)?;
     }
     body.extend_from_slice(&checked_u32_len(rollbacks.len(), "rollback count")?.to_le_bytes());
     for target_tx in rollbacks {
@@ -203,7 +232,6 @@ fn decode_v2_entry(data: &[u8], pos: &mut usize) -> Result<ManifestEntry> {
                 removed,
                 added,
                 added_max_tx,
-                rank: 0,
             })
         }
         3 => Ok(ManifestEntry::Remove {
@@ -331,15 +359,6 @@ pub enum ManifestEntry {
         removed: Vec<PathBuf>,
         added: PathBuf,
         added_max_tx: u64,
-        /// Existenzprüfung, keine Sortierung
-        ///
-        /// Dieses Feld dient ausschließlich einer historischen Existenz-/Gültigkeitszähler-Funktion
-        /// während des Manifest-Replays (siehe `core::reconstruct_valid_sstables`) und wird NICHT für die
-        /// Bestimmung der Lese-Sichtbarkeitsreihenfolge verwendet — diese wird ausschließlich über
-        /// `SstableMetadata::max_seq` bestimmt (siehe `lsm/ops/compaction.rs`,
-        /// `sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT)`). Zukünftige Wartende dürfen `rank`
-        /// NICHT als Sortierkriterium interpretieren oder heranziehen.
-        rank: u64,
     },
     /// A WAL high-water-mark entry recording the valid WAL-tail HMAC at flush/checkpoint time.
     WalCheckpoint { hmac: [u8; 32] },
@@ -373,11 +392,11 @@ impl ManifestEntry {
                 removed,
                 added,
                 added_max_tx,
-                rank: _,
             } => {
                 payload.push(3u8); // op_tag = 3
                 payload.extend_from_slice(&added_max_tx.to_le_bytes());
-                payload.extend_from_slice(&0u64.to_le_bytes()); // Abgekündigtes rank-Feld (S-01): stets 0u64
+                // Keep the reserved v1 word so callers that still write v1 fixtures remain compatible.
+                payload.extend_from_slice(&0u64.to_le_bytes());
                 let added_str = added.to_string_lossy();
                 let added_bytes = added_str.as_bytes();
                 payload.extend_from_slice(&checked_u32_len(added_bytes.len(), "added path")?.to_le_bytes());
@@ -556,13 +575,10 @@ impl ManifestEntry {
                     u64::from_le_bytes(added_max_tx_bytes.try_into().map_err(|_| {
                         ContextraError::Serialization("Invalid added_max_tx format".into())
                     })?);
-                let rank_bytes = remaining
+                // v1 persisted a reserved rank field; consume it for compatibility, then discard it.
+                remaining
                     .get(8..16)
-                    .ok_or_else(|| ContextraError::Serialization("rank bytes missing".into()))?;
-                let rank =
-                    u64::from_le_bytes(rank_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid rank format".into())
-                    })?);
+                    .ok_or_else(|| ContextraError::Serialization("reserved rank bytes missing".into()))?;
                 let added_path_len_bytes = remaining.get(16..20).ok_or_else(|| {
                     ContextraError::Serialization("added_path_len bytes missing".into())
                 })?;
@@ -651,7 +667,6 @@ impl ManifestEntry {
                     removed,
                     added,
                     added_max_tx,
-                    rank,
                 })
             }
             4 => {

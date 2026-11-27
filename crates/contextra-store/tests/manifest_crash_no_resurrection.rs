@@ -213,7 +213,6 @@ async fn test_manifest_crash_scenario_c_truncated_replace_record_ignored() -> Re
             removed: ssts.clone(),
             added: tmp.path().join("sst-compact-001.sst"),
             added_max_tx: 2,
-            rank: 0,
         };
 
         {

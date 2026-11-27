@@ -58,6 +58,12 @@ impl Manifest {
     /// remains untouched and valid.
     pub async fn maybe_rollover(&self, threshold_bytes: u64) -> Result<bool> {
         let _operation = self.operation_lock.lock().await;
+        if self.is_poisoned() {
+            return Err(ContextraError::Storage(format!(
+                "Manifest handle for {} is poisoned and cannot roll over",
+                self.path.display()
+            )));
+        }
         let current_len = self.file.lock().committed_len();
         let state_snapshot = self.state.lock().await.clone();
         let snapshot_frame = state_snapshot.snapshot_frame()?;
@@ -96,6 +102,7 @@ impl Manifest {
         };
 
         let mut renamed = false;
+        let mut rename_attempted = false;
         let rollover_res: Result<()> = async {
             let mut header = Vec::with_capacity(5);
             header.extend_from_slice(super::core::MANIFEST_HEADER_MAGIC);
@@ -104,6 +111,7 @@ impl Manifest {
 
             write_durable_temp(&self.io, &tmp_path, header).await?;
 
+            rename_attempted = true;
             self.io.rename(&tmp_path, &self.path).await.map_err(|e| {
                 ContextraError::Storage(format!(
                     "Failed to rename temporary MANIFEST from {:?} to {:?}: {e}",
@@ -135,7 +143,7 @@ impl Manifest {
         .await;
 
         if let Err(ref e) = rollover_res {
-            if renamed {
+            if rename_attempted {
                 self.is_poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
             }
             tracing::error!(

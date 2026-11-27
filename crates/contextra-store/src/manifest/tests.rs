@@ -17,7 +17,6 @@ fn manifest_v2_batch_and_snapshot_frames_roundtrip() {
             removed: vec![PathBuf::from("old.sst")],
             added: PathBuf::from("new.sst"),
             added_max_tx: 23,
-            rank: 99,
         },
         ManifestEntry::WalCheckpoint { hmac: [0x37; 32] },
     ];
@@ -29,7 +28,6 @@ fn manifest_v2_batch_and_snapshot_frames_roundtrip() {
         removed: vec![PathBuf::from("old.sst")],
         added: PathBuf::from("new.sst"),
         added_max_tx: 23,
-        rank: 0,
     });
     assert_eq!(decoded[2], batch[2]);
 
@@ -73,6 +71,47 @@ async fn manifest_rollover_keeps_wal_hwm_and_dead_sstables() {
     assert!(Manifest::reconstruct_valid_sstables(&entries)
         .iter()
         .any(|(name, _)| name == &live));
+}
+
+#[tokio::test]
+async fn manifest_rollover_racing_append_keeps_both_catalog_entries() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("MANIFEST");
+    let manifest = std::sync::Arc::new(Manifest::open(&path).await.expect("open manifest"));
+    manifest
+        .append(&ManifestEntry::Add {
+            path: PathBuf::from("before.sst"),
+            max_tx: 1,
+        })
+        .await
+        .expect("seed manifest");
+
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(3));
+    let rollover_manifest = std::sync::Arc::clone(&manifest);
+    let rollover_barrier = std::sync::Arc::clone(&barrier);
+    let rollover = tokio::spawn(async move {
+        rollover_barrier.wait().await;
+        rollover_manifest.rollover().await
+    });
+    let append_manifest = std::sync::Arc::clone(&manifest);
+    let append_barrier = std::sync::Arc::clone(&barrier);
+    let append = tokio::spawn(async move {
+        append_barrier.wait().await;
+        append_manifest
+            .append(&ManifestEntry::Add {
+                path: PathBuf::from("racing.sst"),
+                max_tx: 2,
+            })
+            .await
+    });
+    barrier.wait().await;
+    rollover.await.expect("rollover task").expect("rollover");
+    append.await.expect("append task").expect("append");
+
+    let entries = Manifest::load(&path).await.expect("load raced manifest");
+    let state = super::state::ManifestState::from_entries(&entries).expect("reduce state");
+    assert_eq!(state.live().get(Path::new("before.sst")), Some(&1));
+    assert_eq!(state.live().get(Path::new("racing.sst")), Some(&2));
 }
 
 #[tokio::test]
@@ -171,7 +210,6 @@ fn test_manifest_entry_roundtrip() {
             ],
             added: PathBuf::from("sst-compact-00000000000000000003-0000.sst"),
             added_max_tx: 50,
-            rank: 0,
         },
     ];
 
@@ -275,7 +313,6 @@ async fn test_manifest_replace_tail_truncation_discards_incomplete_replace() {
         removed: vec![PathBuf::from("sst-1.sst"), PathBuf::from("sst-2.sst")],
         added: PathBuf::from("sst-compact-1.sst"),
         added_max_tx: 20,
-        rank: 0,
     };
 
     manifest.append(&add1).await.expect("append add1");
@@ -336,7 +373,6 @@ fn test_reconstruct_valid_sstables() {
             removed: vec![PathBuf::from("sst-2.sst"), PathBuf::from("sst-3.sst")],
             added: PathBuf::from("sst-compact-1.sst"),
             added_max_tx: 30,
-            rank: 0,
         },
     ];
 

@@ -1,21 +1,15 @@
+use super::entry::SstName;
 use super::ManifestEntry;
 use contextra_types::{ContextraError, Result};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
 
 /// Reduced durable state of the manifest.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ManifestState {
-    live: BTreeMap<PathBuf, u64>,
-    dead: BTreeSet<PathBuf>,
+    live: BTreeMap<SstName, u64>,
+    dead: BTreeSet<SstName>,
     rollbacks: BTreeSet<u64>,
     wal_hwm: Option<[u8; 32]>,
-}
-
-fn name(path: &Path) -> PathBuf {
-    path.file_name()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| path.to_path_buf())
 }
 
 impl ManifestState {
@@ -30,12 +24,12 @@ impl ManifestState {
     pub(crate) fn apply(&mut self, entry: &ManifestEntry) -> Result<()> {
         match entry {
             ManifestEntry::Add { path, max_tx } => {
-                let key = name(path);
+                let key = SstName::try_from_path(path)?;
                 self.dead.remove(&key);
                 self.live.insert(key, *max_tx);
             }
             ManifestEntry::Remove { path } => {
-                let key = name(path);
+                let key = SstName::try_from_path(path)?;
                 self.live.remove(&key);
                 self.dead.insert(key);
             }
@@ -45,7 +39,10 @@ impl ManifestState {
                 added_max_tx,
                 ..
             } => {
-                let removed_names = removed.iter().map(|path| name(path));
+                let removed_names = removed
+                    .iter()
+                    .map(|path| SstName::try_from_path(path))
+                    .collect::<Result<Vec<_>>>()?;
                 for key in removed_names {
                     if self.live.remove(&key).is_none() {
                         return Err(ContextraError::Storage(format!(
@@ -54,7 +51,7 @@ impl ManifestState {
                     }
                     self.dead.insert(key);
                 }
-                let key = name(added);
+                let key = SstName::try_from_path(added)?;
                 self.dead.remove(&key);
                 self.live.insert(key, *added_max_tx);
             }
@@ -66,11 +63,11 @@ impl ManifestState {
         Ok(())
     }
 
-    pub(crate) fn live(&self) -> &BTreeMap<PathBuf, u64> {
+    pub(crate) fn live(&self) -> &BTreeMap<SstName, u64> {
         &self.live
     }
 
-    pub(crate) fn dead(&self) -> &BTreeSet<PathBuf> {
+    pub(crate) fn dead(&self) -> &BTreeSet<SstName> {
         &self.dead
     }
 

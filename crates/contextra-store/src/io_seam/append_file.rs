@@ -43,6 +43,10 @@ impl AppendFile {
         }
 
         let byte_len = u64::try_from(bytes.len()).map_err(|_| IoFault::Poisoned)?;
+        let new_len = self
+            .committed_len
+            .checked_add(byte_len)
+            .ok_or(IoFault::Poisoned)?;
         let mut written = 0usize;
         while written < bytes.len() {
             let offset = self
@@ -52,7 +56,11 @@ impl AppendFile {
             let chunk = bytes.get(written..).ok_or(IoFault::Poisoned)?;
             match self.file.write_at(chunk, offset) {
                 Ok(0) => return self.rollback_error(IoFault::WriteZero { written }, written),
-                Ok(count) => written += count,
+                Ok(count) if count <= chunk.len() => written += count,
+                Ok(_) => {
+                    self.poisoned = true;
+                    return Err(IoFault::Poisoned);
+                }
                 Err(error) if error.kind() == io::ErrorKind::WriteZero => {
                     return self.rollback_error(IoFault::NoSpace { written }, written)
                 }
@@ -69,10 +77,7 @@ impl AppendFile {
             self.poisoned = true;
             return Err(IoFault::SyncFailed(error));
         }
-        self.committed_len = self
-            .committed_len
-            .checked_add(byte_len)
-            .ok_or(IoFault::Poisoned)?;
+        self.committed_len = new_len;
         Ok(())
     }
 
