@@ -109,7 +109,7 @@ contextra-rank = { path = "crates/contextra-rank" }
 [workspace.lints.rust]
 unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
-unexpected_cfgs = { level = "deny", check-cfg = ['cfg(loom)', 'cfg(feature, values("onnx", "test-utils", "encryption-at-rest"))'] }
+unexpected_cfgs = { level = "deny", check-cfg = ['cfg(loom)', 'cfg(feature, values("test-utils", "encryption-at-rest"))'] }
 
 [workspace.lints.clippy]
 undocumented_unsafe_blocks = "deny"
@@ -137,7 +137,7 @@ codegen-units = 1
 strip = true
 overflow-checks = true
 
-# Profile for standalone binaries without FFI/PyO3 bindings.
+# Profile for standalone binaries (panic = abort).
 [profile.release-abort]
 inherits = "release"
 panic = "abort"

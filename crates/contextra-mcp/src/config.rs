@@ -1,13 +1,13 @@
 // FILE-CONTEXT
 // STAND:       2026-10-31T00:00:00Z
-// ZWECK:       Dynamic Provider Construction for Embedding & LLM backends (Ollama, ONNX, Candle, Mock)
+// ZWECK:       Dynamic Provider Construction for Embedding & LLM backends (Mock)
 // INVARIANTEN: No default mock provider in production; fail-closed explicit provider configuration; startup embedding probe
 // HOTSPOTS:    create_embedding_provider(), create_llm_text_generator(), verify_embedding_provider()
 // SIEHE AUCH:  ADR-010, contextra-ports/src/traits/mod.rs
 
 use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
 use contextra_types::ContextraError;
-use std::path::{Path, PathBuf};
+
 use std::sync::{Arc, Once};
 
 static EMBEDDING_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
@@ -16,9 +16,6 @@ static LLM_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
 /// Returns the list of currently compiled provider identifiers.
 pub fn available_compiled_providers() -> Vec<&'static str> {
     let mut list = Vec::new();
-    if cfg!(feature = "onnx") {
-        list.push("onnx");
-    }
     if cfg!(any(test, feature = "test-utils")) {
         list.push("mock");
     }
@@ -28,17 +25,18 @@ pub fn available_compiled_providers() -> Vec<&'static str> {
 fn no_provider_error() -> ContextraError {
     let avail = available_compiled_providers();
     let avail_str = if avail.is_empty() {
-        "keine einkompiliert (features: candle, ollama, onnx) / none compiled in".to_string()
+        "keine einkompiliert / none compiled in".to_string()
     } else {
         avail.join(", ")
     };
     ContextraError::InvalidInput(format!(
         "Kein Embedding-Provider konfiguriert / No embedding provider configured. \
-         Bitte CONTEXTRA_EMBEDDING_PROVIDER setzen (z.B. CONTEXTRA_EMBEDDING_PROVIDER=ollama). \
+         Bitte CONTEXTRA_EMBEDDING_PROVIDER setzen. \
          Einkompilierte Provider / Available compiled providers: [{avail_str}]."
     ))
 }
 
+#[cfg(not(any(test, feature = "test-utils")))]
 fn uncompiled_provider_error(provider: &str) -> ContextraError {
     let avail = available_compiled_providers();
     let avail_str = if avail.is_empty() {
@@ -166,16 +164,8 @@ pub(crate) fn resolve_provider_setting(
 /// Embedding provider configuration settings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EmbeddingConfig {
-    /// Provider type ("ollama", "onnx", "candle", or "mock"). Unconfigured when empty.
+    /// Provider type ("mock" in test/dev builds). Unconfigured when empty.
     pub provider: String,
-    /// Base URL for Ollama HTTP API.
-    pub ollama_url: String,
-    /// Model identifier for Ollama embeddings.
-    pub embed_model: String,
-    /// Optional path to ONNX model file or directory.
-    pub onnx_model_path: Option<PathBuf>,
-    /// Optional path to Candle model directory.
-    pub candle_model_dir: Option<PathBuf>,
     /// Optional expected dimension for index alignment verification.
     pub expected_dim: Option<usize>,
 }
@@ -184,10 +174,6 @@ impl Default for EmbeddingConfig {
     fn default() -> Self {
         Self {
             provider: String::new(),
-            ollama_url: "http://localhost:11434".to_string(),
-            embed_model: "nomic-embed-text".to_string(),
-            onnx_model_path: None,
-            candle_model_dir: None,
             expected_dim: None,
         }
     }
@@ -208,28 +194,8 @@ impl EmbeddingConfig {
             });
         }
 
-        let provider = resolved.value;
-
-        let ollama_url = std::env::var("CONTEXTRA_OLLAMA_URL")
-            .unwrap_or_else(|_| "http://localhost:11434".to_string());
-
-        let embed_model = std::env::var("CONTEXTRA_EMBED_MODEL")
-            .unwrap_or_else(|_| "nomic-embed-text".to_string());
-
-        let onnx_model_path = std::env::var("CONTEXTRA_ONNX_MODEL_PATH")
-            .ok()
-            .map(PathBuf::from);
-
-        let candle_model_dir = std::env::var("CONTEXTRA_CANDLE_MODEL_DIR")
-            .ok()
-            .map(PathBuf::from);
-
         Self {
-            provider,
-            ollama_url,
-            embed_model,
-            onnx_model_path,
-            candle_model_dir,
+            provider: resolved.value,
             expected_dim: None,
         }
     }
@@ -250,13 +216,7 @@ impl EmbeddingConfig {
 
     /// Instantiates the configured `EmbeddingProvider` as an `Arc<dyn EmbeddingProvider>` and runs startup probe.
     pub fn build_provider(&self) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
-        let provider = create_embedding_provider(
-            self.provider_opt(),
-            &self.ollama_url,
-            &self.embed_model,
-            self.onnx_model_path.as_deref(),
-            self.candle_model_dir.as_deref(),
-        )?;
+        let provider = create_embedding_provider(self.provider_opt())?;
         verify_embedding_provider(provider.as_ref(), self.expected_dim)?;
         Ok(provider)
     }
@@ -265,23 +225,13 @@ impl EmbeddingConfig {
 /// Dynamically constructs an `EmbeddingProvider` implementation based on provider identifier.
 pub fn create_embedding_provider(
     provider_type: Option<&str>,
-    ollama_url: &str,
-    embed_model: &str,
-    onnx_model_path: Option<&Path>,
-    candle_model_dir: Option<&Path>,
 ) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
     let provider = match provider_type {
         Some(p) if !p.trim().is_empty() => p.trim().to_lowercase(),
         _ => return Err(no_provider_error()),
     };
 
-    let _ = (ollama_url, embed_model, onnx_model_path, candle_model_dir);
-
     match provider.as_str() {
-        "candle" => Err(uncompiled_provider_error("candle")),
-        "ollama" => Err(uncompiled_provider_error("ollama")),
-        "onnx" => Err(uncompiled_provider_error("onnx")),
-
         #[cfg(any(test, feature = "test-utils"))]
         "mock" => {
             let embedder = MockEmbedder::new(768);
@@ -297,23 +247,14 @@ pub fn create_embedding_provider(
 /// LLM provider configuration settings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LlmConfig {
-    /// Provider type ("ollama", "candle", or "mock"). Unconfigured when empty.
+    /// Provider type ("mock" in test/dev builds). Unconfigured when empty.
     pub provider: String,
-    /// Base URL for Ollama HTTP API.
-    pub ollama_url: String,
-    /// Model identifier for Ollama LLM.
-    pub llm_model: String,
-    /// Optional path to Candle model directory.
-    pub candle_model_dir: Option<PathBuf>,
 }
 
 impl Default for LlmConfig {
     fn default() -> Self {
         Self {
             provider: String::new(),
-            ollama_url: "http://localhost:11434".to_string(),
-            llm_model: "llama3.2:3b".to_string(),
-            candle_model_dir: None,
         }
     }
 }
@@ -333,23 +274,8 @@ impl LlmConfig {
             });
         }
 
-        let provider = resolved.value;
-
-        let ollama_url = std::env::var("CONTEXTRA_OLLAMA_URL")
-            .unwrap_or_else(|_| "http://localhost:11434".to_string());
-
-        let llm_model =
-            std::env::var("CONTEXTRA_LLM_MODEL").unwrap_or_else(|_| "llama3.2:3b".to_string());
-
-        let candle_model_dir = std::env::var("CONTEXTRA_CANDLE_MODEL_DIR")
-            .ok()
-            .map(PathBuf::from);
-
         Self {
-            provider,
-            ollama_url,
-            llm_model,
-            candle_model_dir,
+            provider: resolved.value,
         }
     }
 
@@ -364,21 +290,13 @@ impl LlmConfig {
 
     /// Instantiates the configured `LlmTextGenerator` as an `Arc<dyn LlmTextGenerator>`.
     pub fn build_generator(&self) -> Result<Arc<dyn LlmTextGenerator>, ContextraError> {
-        create_llm_text_generator(
-            self.provider_opt(),
-            &self.ollama_url,
-            &self.llm_model,
-            self.candle_model_dir.as_deref(),
-        )
+        create_llm_text_generator(self.provider_opt())
     }
 }
 
 /// Dynamically constructs an `LlmTextGenerator` implementation based on provider identifier.
 pub fn create_llm_text_generator(
     provider_type: Option<&str>,
-    ollama_url: &str,
-    llm_model: &str,
-    candle_model_dir: Option<&Path>,
 ) -> Result<Arc<dyn LlmTextGenerator>, ContextraError> {
     let provider = match provider_type {
         Some(p) if !p.trim().is_empty() => p.trim().to_lowercase(),
@@ -389,12 +307,7 @@ pub fn create_llm_text_generator(
         }
     };
 
-    let _ = (ollama_url, llm_model, candle_model_dir);
-
     match provider.as_str() {
-        "candle" => Err(uncompiled_provider_error("candle")),
-        "ollama" => Err(uncompiled_provider_error("ollama")),
-
         #[cfg(any(test, feature = "test-utils"))]
         "mock" => {
             let generator = MockLlmGenerator;
@@ -498,15 +411,15 @@ mod tests {
 
     #[test]
     fn test_resolve_provider_setting_prefixed_wins() {
-        let res = resolve_provider_setting(Some("onnx"), Some("ollama"));
-        assert_eq!(res.value, "onnx");
+        let res = resolve_provider_setting(Some("mock"), Some("other"));
+        assert_eq!(res.value, "mock");
         assert!(!res.used_unprefixed_fallback);
     }
 
     #[test]
     fn test_resolve_provider_setting_unprefixed_fallback() {
-        let res = resolve_provider_setting(None, Some("ollama"));
-        assert_eq!(res.value, "ollama");
+        let res = resolve_provider_setting(None, Some("mock"));
+        assert_eq!(res.value, "mock");
         assert!(res.used_unprefixed_fallback);
     }
 
@@ -522,10 +435,6 @@ mod tests {
         let config = EmbeddingConfig::default();
         assert!(config.provider.is_empty());
         assert!(config.provider_opt().is_none());
-        assert_eq!(config.ollama_url, "http://localhost:11434");
-        assert_eq!(config.embed_model, "nomic-embed-text");
-        assert!(config.onnx_model_path.is_none());
-        assert!(config.candle_model_dir.is_none());
         assert!(config.expected_dim.is_none());
     }
 
@@ -534,20 +443,11 @@ mod tests {
         let config = LlmConfig::default();
         assert!(config.provider.is_empty());
         assert!(config.provider_opt().is_none());
-        assert_eq!(config.ollama_url, "http://localhost:11434");
-        assert_eq!(config.llm_model, "llama3.2:3b");
-        assert!(config.candle_model_dir.is_none());
     }
 
     #[test]
     fn test_create_embedding_provider_no_provider_error() {
-        let res = create_embedding_provider(
-            None,
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        );
+        let res = create_embedding_provider(None);
         assert!(res.is_err());
         let err = res.err().unwrap();
         assert!(matches!(err, ContextraError::InvalidInput(_)));
@@ -558,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_create_llm_generator_no_provider_error() {
-        let res = create_llm_text_generator(None, "http://localhost:11434", "llama3.2:3b", None);
+        let res = create_llm_text_generator(None);
         assert!(res.is_err());
         let err = res.err().unwrap();
         assert!(matches!(err, ContextraError::InvalidInput(_)));
@@ -568,13 +468,7 @@ mod tests {
 
     #[test]
     fn test_create_embedding_provider_unknown_error_lists_available() {
-        let res = create_embedding_provider(
-            Some("invalid_provider"),
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        );
+        let res = create_embedding_provider(Some("invalid_provider"));
         assert!(res.is_err());
         let err = res.err().unwrap();
         assert!(matches!(err, ContextraError::InvalidInput(_)));
@@ -584,12 +478,7 @@ mod tests {
 
     #[test]
     fn test_create_llm_generator_unknown_error_lists_available() {
-        let res = create_llm_text_generator(
-            Some("invalid_provider"),
-            "http://localhost:11434",
-            "llama3.2:3b",
-            None,
-        );
+        let res = create_llm_text_generator(Some("invalid_provider"));
         assert!(res.is_err());
         let err = res.err().unwrap();
         assert!(matches!(err, ContextraError::InvalidInput(_)));
@@ -599,13 +488,7 @@ mod tests {
 
     #[test]
     fn test_mock_embedder_available_in_test() {
-        let provider = create_embedding_provider(
-            Some("mock"),
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        )
+        let provider = create_embedding_provider(Some("mock"))
         .unwrap();
         assert_eq!(provider.provider_name(), "mock");
         assert_eq!(provider.embedding_dim(), 768);
@@ -706,52 +589,4 @@ mod tests {
         assert!(resp.contains("[Mock LLM response for: hello]"));
     }
 
-    #[test]
-    fn test_create_embedding_provider_candle_uncompiled_error() {
-        let res = create_embedding_provider(
-            Some("candle"),
-            "http://localhost:11434",
-            "embed_model",
-            None,
-            None,
-        );
-        assert!(res.is_err());
-        let err = res.err().unwrap();
-        assert!(matches!(err, ContextraError::CapabilityUnsupported { .. }));
-        let msg = err.to_string();
-        assert!(msg.contains("Provider 'candle' ist nicht einkompiliert"));
-    }
-
-    #[test]
-    fn test_create_embedding_provider_ollama_uncompiled_error() {
-        let res = create_embedding_provider(
-            Some("ollama"),
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        );
-        assert!(res.is_err());
-        let err = res.err().unwrap();
-        assert!(matches!(err, ContextraError::CapabilityUnsupported { .. }));
-        let msg = err.to_string();
-        assert!(msg.contains("Provider 'ollama' ist nicht einkompiliert"));
-    }
-
-    #[cfg(not(feature = "onnx"))]
-    #[test]
-    fn test_create_embedding_provider_onnx_uncompiled_error() {
-        let res = create_embedding_provider(
-            Some("onnx"),
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        );
-        assert!(res.is_err());
-        let err = res.err().unwrap();
-        assert!(matches!(err, ContextraError::CapabilityUnsupported { .. }));
-        let msg = err.to_string();
-        assert!(msg.contains("Provider 'onnx' ist nicht einkompiliert"));
-    }
 }

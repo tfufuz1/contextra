@@ -31,21 +31,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config.provider = val.clone();
         }
     }
-    if let Some(i) = args.iter().position(|a| a == "--ollama-url") {
-        if let Some(val) = args.get(i + 1) {
-            config.ollama_url = val.clone();
-        }
-    }
-    if let Some(i) = args.iter().position(|a| a == "--embed-model") {
-        if let Some(val) = args.get(i + 1) {
-            config.embed_model = val.clone();
-        }
-    }
-    if let Some(i) = args.iter().position(|a| a == "--onnx-model-path") {
-        if let Some(val) = args.get(i + 1) {
-            config.onnx_model_path = Some(std::path::PathBuf::from(val));
-        }
-    }
 
     let allow_write = if args.iter().any(|a| a == "--read-only") {
         false
