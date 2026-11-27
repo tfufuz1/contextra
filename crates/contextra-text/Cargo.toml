@@ -40,6 +40,7 @@ parking_lot = { workspace = true }
 tracing = { workspace = true }
 blake3 = { workspace = true }
 futures = "0.3"
+tokio = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }

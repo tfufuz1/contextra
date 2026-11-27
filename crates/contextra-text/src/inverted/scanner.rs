@@ -22,6 +22,7 @@ use contextra_ports::scanner::{LayerScanner, ScanSession, ScanTarget, WitnessLay
 use contextra_ports::{StorageEngine, TextIndex};
 use contextra_types::{ContextraError, DocId, RequestContext, Result, TxId};
 use std::sync::Arc;
+use std::collections::{BTreeSet, HashSet};
 
 // ANCHOR[contextra-text:SCAN-001]
 /// Geparstes Zielobjekt (Dokument-ID oder Kollektion) für den Scanner.
@@ -86,6 +87,7 @@ where
 pub struct TextScanner<S: StorageEngine + 'static> {
     index: Arc<InvertedIndex<S>>,
     target: Arc<parking_lot::Mutex<Option<ScanTarget>>>,
+    erasure_scope: Arc<parking_lot::RwLock<Option<(BTreeSet<DocId>, BTreeSet<String>, bool)>>>,
 }
 
 impl<S: StorageEngine + 'static> TextScanner<S> {
@@ -95,6 +97,7 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
         Self {
             index,
             target: Arc::new(parking_lot::Mutex::new(None)),
+            erasure_scope: Arc::new(parking_lot::RwLock::new(None)),
         }
     }
 
@@ -104,6 +107,7 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
         Self {
             index,
             target: Arc::new(parking_lot::Mutex::new(Some(target))),
+            erasure_scope: Arc::new(parking_lot::RwLock::new(None)),
         }
     }
 
@@ -118,6 +122,11 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
     /// Weist dem Scanner ein neues Zielobjekt zu.
     pub fn set_target(&self, target: ScanTarget) {
         *self.target.lock() = Some(target);
+    }
+
+    /// Installs the in-memory document/term needles for an active erasure witness.
+    pub(crate) fn set_erasure_scope(&self, docs: BTreeSet<DocId>, terms: BTreeSet<String>, whole_collection: bool) {
+        *self.erasure_scope.write() = Some((docs, terms, whole_collection));
     }
 
     // ANCHOR[contextra-text:SCAN-007]
@@ -211,6 +220,50 @@ impl<S: StorageEngine + 'static> LayerScanner for TextScanner<S> {
         let index_prefix = self.index.prefix().to_vec();
         let storage = self.index.storage().clone();
         let raw_entries = block_on_async(async move { storage.scan_prefix(&index_prefix).await })?;
+
+        if let Some((scope_docs, scope_terms, whole_collection)) = self.erasure_scope.read().clone() {
+            let mut allowed_terms = scope_terms;
+            let terms_prefix = self.index.key("plb:");
+            for (key, value) in &raw_entries {
+                let is_plb = key.starts_with(&terms_prefix);
+                let is_legacy = key.starts_with(&self.index.key("pl:"));
+                if !is_plb && !is_legacy { continue; }
+                let residual = if is_plb {
+                    let raw_term = std::str::from_utf8(&key[terms_prefix.len()..])
+                        .map_err(|_| ContextraError::Internal("Invalid text dictionary key".into()))?;
+                    allowed_terms.insert(raw_term.to_owned());
+                    let postings = PostingList::decode_compact(value)?;
+                    whole_collection || postings.as_slice().iter().any(|p| scope_docs.contains(&p.doc_id()))
+                } else {
+                    let prefix = self.index.key("pl:");
+                    let suffix = &key[prefix.len()..];
+                    let split = suffix.iter().rposition(|b| *b == b':');
+                    let Some(split) = split else { continue };
+                    let term = std::str::from_utf8(&suffix[..split])
+                        .map_err(|_| ContextraError::Internal("Invalid legacy text key".into()))?;
+                    let id_raw = std::str::from_utf8(&suffix[split + 1..])
+                        .map_err(|_| ContextraError::Internal("Invalid legacy document key".into()))?;
+                    #[cfg(not(feature = "docid-128"))]
+                    let id = id_raw.parse::<u64>().map(|v| DocId::new(v as _));
+                    #[cfg(feature = "docid-128")]
+                    let id = id_raw.parse::<u128>().map(|v| DocId::new(v as _));
+                    let id = id.map_err(|_| ContextraError::Internal("Invalid legacy document id".into()))?;
+                    allowed_terms.insert(term.to_owned());
+                    whole_collection || scope_docs.contains(&id)
+                };
+                let mut hasher = blake3::Hasher::new(); hasher.update(key); hasher.update(value);
+                session.record_unit(*hasher.finalize().as_bytes(), residual);
+            }
+            let resident_terms = if allowed_terms.is_empty() { self.index.resident_index.terms().into_iter().collect::<HashSet<_>>() } else { allowed_terms.into_iter().collect() };
+            for term in resident_terms {
+                if let Some(list) = self.index.resident_index.get(&term) {
+                    let residual = whole_collection || list.as_slice().iter().any(|p| scope_docs.contains(&p.doc_id()));
+                    let mut hasher = blake3::Hasher::new(); hasher.update(b"resident:"); hasher.update(term.as_bytes());
+                    session.record_unit(*hasher.finalize().as_bytes(), residual);
+                }
+            }
+            return Ok(());
+        }
 
         match parsed_target {
             ParsedTextTarget::Document(target_doc_id) => {

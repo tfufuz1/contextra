@@ -3,6 +3,6 @@
 //! # Ring-Zuordnung
 //! Ring LAB / Testbereich.
 
-mod mock;
+pub(crate) mod mock;
 mod search_tests;
 mod tx_tests;

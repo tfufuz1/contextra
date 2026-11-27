@@ -1,4 +1,4 @@
-use super::types::{Language, StagedStatsChange, TextIndexMetadata};
+use super::types::{Language, RemovedDocStats, StagedStatsChange, TextIndexMetadata};
 use crate::posting_list::{Posting, ResidentPostingIndex};
 use crate::tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 use std::collections::HashMap;
@@ -6,7 +6,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
+use contextra_ports::gate::ReadGate;
 use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_SEARCH_K};
+use contextra_types::TenantId;
 // ANCHOR[contextra-text:INV-008]
 /// Persistenter invertierter Index über einer Kollektion im Storage-Backend.
 ///
@@ -18,6 +20,7 @@ use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_S
 pub struct InvertedIndex<S: StorageEngine> {
     storage: Arc<S>,
     prefix: Vec<u8>,
+    namespace: String,
     tokenizer: Arc<dyn Tokenizer>,
     pub(crate) total_docs: Arc<AtomicU64>,
     pub(crate) total_tokens: Arc<AtomicU64>,
@@ -26,6 +29,9 @@ pub struct InvertedIndex<S: StorageEngine> {
     pub(crate) staged_terms: Arc<parking_lot::Mutex<HashMap<TxId, Vec<String>>>>,
     commit_lock: Arc<parking_lot::Mutex<()>>,
     pub(crate) resident_index: Arc<ResidentPostingIndex>,
+    pub(crate) erased_docs: Arc<parking_lot::RwLock<Arc<std::collections::BTreeSet<DocId>>>>,
+    pub(crate) erased_all: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) erasure_gate: Arc<parking_lot::RwLock<Option<(Arc<dyn ReadGate>, TenantId, String)>>>,
 }
 
 impl<S: StorageEngine> Clone for InvertedIndex<S> {
@@ -33,6 +39,7 @@ impl<S: StorageEngine> Clone for InvertedIndex<S> {
         Self {
             storage: self.storage.clone(),
             prefix: self.prefix.clone(),
+            namespace: self.namespace.clone(),
             tokenizer: self.tokenizer.clone(),
             total_docs: self.total_docs.clone(),
             total_tokens: self.total_tokens.clone(),
@@ -41,6 +48,9 @@ impl<S: StorageEngine> Clone for InvertedIndex<S> {
             staged_terms: self.staged_terms.clone(),
             commit_lock: self.commit_lock.clone(),
             resident_index: self.resident_index.clone(),
+            erased_docs: self.erased_docs.clone(),
+            erased_all: self.erased_all.clone(),
+            erasure_gate: self.erasure_gate.clone(),
         }
     }
 }
@@ -77,6 +87,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         Self {
             storage,
             prefix,
+            namespace: namespace.to_owned(),
             tokenizer,
             total_docs: Arc::new(AtomicU64::new(0)),
             total_tokens: Arc::new(AtomicU64::new(0)),
@@ -85,6 +96,9 @@ impl<S: StorageEngine> InvertedIndex<S> {
             staged_terms: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             commit_lock: Arc::new(parking_lot::Mutex::new(())),
             resident_index: Arc::new(ResidentPostingIndex::new()),
+            erased_docs: Arc::new(parking_lot::RwLock::new(Arc::new(std::collections::BTreeSet::new()))),
+            erased_all: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            erasure_gate: Arc::new(parking_lot::RwLock::new(None)),
         }
     }
 
@@ -109,6 +123,12 @@ impl<S: StorageEngine> InvertedIndex<S> {
     /// Accessor for index storage prefix bytes.
     pub fn prefix(&self) -> &[u8] {
         &self.prefix
+    }
+
+    pub(crate) fn namespace(&self) -> &str { &self.namespace }
+
+    pub(crate) fn install_erasure_gate(&self, gate: Arc<dyn ReadGate>, tenant: TenantId) {
+        *self.erasure_gate.write() = Some((gate, tenant, self.namespace.clone()));
     }
 
     /// Accessor for single-writer commit lock.
@@ -185,6 +205,21 @@ impl<S: StorageEngine> InvertedIndex<S> {
         k.extend_from_slice(b"plb:");
         k.extend_from_slice(term.as_bytes());
         k
+    }
+
+    /// Evicts posting lists changed by an erase so subsequent reads reload the committed view.
+    pub(crate) fn drop_resident_terms(&self, terms: &[String]) {
+        self.resident_index.remove_terms(terms);
+    }
+
+    /// Applies a committed document-statistics delta to the in-memory BM25 counters.
+    pub(crate) fn recompute_stats_after(&self, removed: &RemovedDocStats) {
+        let docs = self.total_docs.load(Ordering::Acquire).saturating_sub(removed.docs);
+        let tokens = self.total_tokens.load(Ordering::Acquire).saturating_sub(removed.tokens);
+        let avg = if docs == 0 { 0 } else { tokens.saturating_mul(1000) / docs };
+        self.total_docs.store(docs, Ordering::Release);
+        self.total_tokens.store(tokens, Ordering::Release);
+        self.avg_doc_len_x1000.store(avg, Ordering::Release);
     }
 
     /// Ensures that the posting list for a term is loaded into the resident index from storage.
@@ -633,6 +668,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         k: usize,
         max_seq: Option<u64>,
     ) -> Result<Vec<(DocId, f32)>> {
+        if self.erased_all.load(Ordering::Acquire) { return Ok(Vec::new()); }
         if query.is_empty() || k == 0 {
             return Ok(Vec::new());
         }
@@ -661,6 +697,10 @@ impl<S: StorageEngine> InvertedIndex<S> {
             0.0
         };
 
+        let erased = self.erased_docs.read().clone();
+        let gate = self.erasure_gate.read().clone();
+        let gate_epoch = gate.as_ref().map(|(gate, _, _)| gate.epoch());
+        let gate_active = gate.as_ref().is_some_and(|(gate, _, _)| gate.is_active());
         let wand_res = crate::wand::block_max_wand_search(
             self.storage.as_ref(),
             &tokens,
@@ -668,6 +708,9 @@ impl<S: StorageEngine> InvertedIndex<S> {
             |term| self.key_term_prefix(term),
             |doc_id, term| self.key_tombstone(doc_id, term),
             |doc_id_inner| self.key_with_id("dl:", doc_id_inner),
+            |doc| erased.contains(&doc) || (gate_active && gate.as_ref().is_some_and(|(gate, tenant, collection)| {
+                gate.check_doc(*tenant, collection, doc).is_blocked()
+            })),
             k,
             max_seq,
             n,
@@ -675,7 +718,12 @@ impl<S: StorageEngine> InvertedIndex<S> {
         )
         .await?;
 
-        Ok(wand_res.results)
+        let epoch_changed = gate.as_ref().zip(gate_epoch).is_some_and(|((gate, _, _), epoch)| gate.epoch() != epoch);
+        let gate_active_after = if gate_active || epoch_changed { gate.as_ref().is_some_and(|(gate, _, _)| gate.is_active()) } else { false };
+        let must_recheck = epoch_changed || gate_active_after;
+        Ok(wand_res.results.into_iter().filter(|(doc, _)| {
+            !erased.contains(doc) && (!must_recheck || gate.as_ref().is_none_or(|(gate, tenant, collection)| !gate.check_doc(*tenant, collection, *doc).is_blocked()))
+        }).collect())
     }
 }
 

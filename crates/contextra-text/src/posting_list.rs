@@ -374,6 +374,11 @@ impl ResidentPostingIndex {
         self.index.read().get(term).cloned()
     }
 
+    /// Snapshot of resident dictionary terms for witness scans and scoped cache eviction.
+    pub fn terms(&self) -> Vec<String> {
+        self.index.read().keys().cloned().collect()
+    }
+
     // ANCHOR[contextra-text:POST-019]
     /// Fügt eine Posting-Liste in den Index ein oder ersetzt sie.
     pub fn insert_list(&self, term: String, list: PostingList) {

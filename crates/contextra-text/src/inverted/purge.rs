@@ -91,6 +91,7 @@ impl Default for PurgeReport {
 
 // ANCHOR[contextra-text:PURGE-005]
 /// Physischer Purger für den Textindex zur Bereinigung von Storage und Metadaten.
+#[deprecated(note = "Use TextErasure; this synchronous compatibility purger will be removed")]
 pub struct TextPurger<S: StorageEngine + 'static> {
     index: Arc<InvertedIndex<S>>,
 }
@@ -490,6 +491,7 @@ impl<S: StorageEngine + 'static> Purger for TextPurger<S> {
 
 // ANCHOR[contextra-text:PURGE-006]
 /// Erzeugt eine instanziierte Implementierung des [`Purger`]-Ports für den Textindex.
+#[deprecated(note = "Use TextErasure registered as an ErasureLayer")]
 pub fn text_purger<S: StorageEngine + 'static>(index: Arc<InvertedIndex<S>>) -> Arc<dyn Purger> {
     Arc::new(TextPurger::new(index))
 }

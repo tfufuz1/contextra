@@ -45,6 +45,13 @@ pub struct TextIndexMetadata {
     pub avg_doc_len_x1000: u64, // Fixed-point for BM25 caching (FIND-TXT-004)
 }
 
+/// Dokument- und Tokenmengen, die aus den persistierten BM25-Zählern abzuziehen sind.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct RemovedDocStats {
+    pub(crate) docs: u64,
+    pub(crate) tokens: u64,
+}
+
 // ANCHOR[contextra-text:INV-004]
 /// Gepufferte statistische Änderungen einer uncommitted Transaktion.
 #[derive(Default, Clone, Copy, Debug)]

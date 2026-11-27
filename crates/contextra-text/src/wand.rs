@@ -266,6 +266,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
     prefix_helper: impl Fn(&str) -> Vec<u8>,
     tombstone_key_helper: impl Fn(DocId, &str) -> Vec<u8>,
     doc_len_key_helper: impl Fn(u128) -> Vec<u8>,
+    candidate_blocked: impl Fn(DocId) -> bool,
     k: usize,
     max_seq: Option<u64>,
     total_docs: u64,
@@ -499,6 +500,15 @@ pub async fn block_max_wand_search<S: StorageEngine>(
 
         if min_doc_id == pivot_doc_id {
             let doc_id = DocId::new(pivot_doc_id as _);
+
+            if candidate_blocked(doc_id) {
+                for c in cursors.iter_mut() {
+                    if c.current_doc_id() == Some(pivot_doc_id) {
+                        c.advance_to(pivot_doc_id + 1);
+                    }
+                }
+                continue;
+            }
 
             // Check if block max scores at pivot_doc_id still exceed threshold
             let block_max_sum: f32 = cursors
@@ -868,6 +878,7 @@ mod tests {
             |term| index.key_term_prefix(term),
             |doc_id, term| index.key_tombstone(doc_id, term),
             |doc_id_inner| index.key_with_id("dl:", doc_id_inner),
+            |_| false,
             k,
             None,
             n,

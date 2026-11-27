@@ -53,6 +53,8 @@ pub use types::{DocId as LocalDocId, TextHit, MAX_SEARCH_K as LOCAL_MAX_SEARCH_K
 pub mod bm25;
 pub mod domain;
 #[cfg(feature = "types-compat")]
+pub mod erasure;
+#[cfg(feature = "types-compat")]
 pub mod inverted;
 pub mod morphology;
 pub mod posting_list;
@@ -69,6 +71,8 @@ pub use inverted::{
     text_purger, text_scanner, BM25MorphIndex, InvertedIndex, Language, PurgeReport, TextPurger,
     TextScanner,
 };
+#[cfg(feature = "types-compat")]
+pub use erasure::{TextErasure, TextErasureConfig, TextTxSource};
 pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};
 pub use posting_list::{Posting, PostingList, ResidentPostingIndex};
 #[cfg(feature = "types-compat")]

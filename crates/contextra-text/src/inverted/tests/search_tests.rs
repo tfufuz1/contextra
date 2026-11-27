@@ -84,6 +84,23 @@ async fn test_wand_exact_threshold_tie_break_determinism(
     Ok(())
 }
 
+#[tokio::test]
+async fn gated_documents_are_removed_before_wand_top_k() -> Result<()> {
+    let storage = Arc::new(MockStorage::new());
+    let index = InvertedIndex::new(storage.clone(), "erase_filter");
+    let tx = TxId::new(1001);
+    for id in [10u64, 20, 30] {
+        index.upsert_document(tx, DocId::new(id), "shared token").await?;
+    }
+    index.commit_stats(tx).await?;
+    storage.commit(tx).await?;
+    *index.erased_docs.write() = Arc::new([DocId::new(10), DocId::new(20)].into_iter().collect());
+    let hits = index.search_bm25("shared", 1, None).await?;
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].0, DocId::new(30));
+    Ok(())
+}
+
 // ANCHOR[contextra-text:TEST-102]
 // Testfall `test_bm25_ranks_exact_keyword_higher`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
