@@ -8,7 +8,7 @@
 //! ## Architektur & Datenpfad
 //! - **Client / Transaktion:** Sendet atomare Schreiboperationen (Put, Delete) über Transaktionspuffer.
 //! - **WAL (Write-Ahead-Log):** Persistiert alle Mutationen sequentiell auf Festplatte inklusive
-//!   CRC32C- und HMAC-SHA256-Integritätsprüfung, bevor sie im RAM bestätigt werden.
+//!   CRC-32 (IEEE) und HMAC-SHA256-Integritätsprüfung, bevor sie im RAM bestätigt werden.
 //! - **MemTable:** Haltebereich im Arbeitsspeicher (geschardete BTreeMap), der schnelle
 //!   Suchen und Einfügungen bei geordneten Sequenznummern ermöglicht.
 //! - **Flush & SSTable:** Bei Erreichen von Größenschwellen wird die aktive MemTable eingefroren
@@ -29,7 +29,6 @@
 
 #![forbid(unsafe_code)]
 #![deny(dead_code)]
-#![allow(unexpected_cfgs)]
 #![deny(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -88,7 +87,7 @@ pub use compaction::{
 pub use key_source::{KeyMaterialSource, OsKeyMaterialSource, StaticKeyMaterialSource};
 #[cfg(not(loom))]
 pub use lsm::{
-    CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,
+    CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, RecoveryPolicy, WalEntryRef, WalObserver, WriteOrigin,
     DEFAULT_MAX_OBSERVER_LATENCY,
 };
 #[cfg(not(loom))]

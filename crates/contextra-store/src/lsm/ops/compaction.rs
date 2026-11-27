@@ -189,6 +189,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             manifest_entries.push(crate::manifest::ManifestEntry::WalCheckpoint { hmac });
         }
 
+        let _catalog_lock = storage.catalog_mutex.lock().await;
         storage.manifest.append_batch(&manifest_entries).await?;
         // === SSTABLE MANIFEST INTEGRATION END ===
 
@@ -217,6 +218,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
         drop(sstables);
         drop(state);
+        drop(_catalog_lock);
 
         // Delete ALL sealed WAL files whose data was flushed into SSTable (H4b, WP-4.1 PendingDelete)
         {

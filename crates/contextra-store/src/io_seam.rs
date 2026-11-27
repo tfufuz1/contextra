@@ -4,6 +4,8 @@
 //! Bietet synchronen und asynchronen Zugriff für SSTable-Reader, Builder,
 //! Compaction und Recovery unter Vermeidung direkter std::fs / tokio::fs Aufrufe.
 
+pub(crate) mod append_file;
+
 use contextra_ports::{ContextraError, Result, Vfs, VfsFile, VfsOpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -96,7 +98,11 @@ impl Vfs for RealFs {
     }
 
     fn exists(&self, path: &Path) -> Result<bool> {
-        Ok(path.exists())
+        match std::fs::metadata(path) {
+            Ok(_) => Ok(true),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(ContextraError::Io(error)),
+        }
     }
 
     fn len(&self, path: &Path) -> Result<u64> {
@@ -238,6 +244,19 @@ impl StoreIo {
     /// Opens a file using positional VfsFile options.
     pub fn open(&self, path: &Path, opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
         self.vfs.open(path, opts)
+    }
+
+    /// Opens a file on the blocking pool through the configured VFS.
+    pub async fn open_async(
+        &self,
+        path: &Path,
+        opts: VfsOpenOptions,
+    ) -> Result<Box<dyn VfsFile>> {
+        let vfs = Arc::clone(&self.vfs);
+        let path = path.to_path_buf();
+        tokio::task::spawn_blocking(move || vfs.open(&path, &opts))
+            .await
+            .map_err(|error| ContextraError::Storage(format!("VFS open task failed: {error}")))?
     }
 
     /// Reads an entire file to a vector of bytes.

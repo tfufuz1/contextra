@@ -28,6 +28,7 @@
 //! | 100 | [`RANK_DOCUMENT_INTENT`] | `std::sync::Mutex` | `LsmStorage::intent_locks` | < 10 µs (RAM) | Exklusive Reservierung von Schlüsseln vor Commit |
 //! | 200 | [`RANK_COMMIT_MUTEX`] | `tokio::sync::Mutex` | `LsmStorage::commit_mutex` | < 50 ms (Group Commit Batching) | Serialisiert Validierung und Transaktions-Commit |
 //! | 300 | [`RANK_FLUSH_MUTEX`] | `tokio::sync::Mutex` | `LsmStorage::flush_mutex` | < 500 ms (I/O Flush) | Verhindert parallele Memtable-Flushes |
+//! | 350 | [`RANK_CATALOG_MUTEX`] | `tokio::sync::Mutex` | `LsmStorage::catalog_mutex` | Katalog-Publish | Serialisiert Manifest- und SSTable-Katalog-Mutationen |
 //! | 400 | [`RANK_STATE_RWLOCK`] | `tokio::sync::RwLock` | `LsmStorage::state` | < 50 µs (Write), < 5 µs (Read) | Schützt aktive/unveränderliche Memtables |
 //! | 500 | [`RANK_WAL_TRUNCATE`] | `tokio::sync::Mutex` | `Wal::truncate_lock` | < 10 ms (I/O Truncate) | Schützt WAL-Größe und Segment-Abschneiden |
 //! | 600 | [`RANK_SSTABLES_RWLOCK`] | `tokio::sync::RwLock` | `LsmStorage::sstables` | < 100 µs (Write), < 10 µs (Read) | Schützt aktive SSTable-Reader-Liste |
@@ -54,6 +55,9 @@ pub const RANK_COMMIT_MUTEX: u32 = 200;
 
 /// Rang 300: Flush-Mutex des Stores (`flush_mutex`), serialisiert Flush-Vorgänge.
 pub const RANK_FLUSH_MUTEX: u32 = 300;
+
+/// Rang 350: Katalog-Mutation (`catalog_mutex`), serialisiert Manifest- und RAM-Katalog-Publikation.
+pub const RANK_CATALOG_MUTEX: u32 = 350;
 
 /// Rang 400: LSM-Zustand (`state`), schützt MemTable-Zeiger und unveränderliche MemTables.
 pub const RANK_STATE_RWLOCK: u32 = 400;

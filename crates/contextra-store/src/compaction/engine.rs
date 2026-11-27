@@ -21,6 +21,32 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing;
 
+struct OutputGuard {
+    vfs: Arc<dyn Vfs>,
+    path: PathBuf,
+    armed: bool,
+}
+
+impl OutputGuard {
+    fn new(vfs: Arc<dyn Vfs>, path: PathBuf) -> Self {
+        Self { vfs, path, armed: true }
+    }
+
+    fn commit(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for OutputGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            if let Err(error) = self.vfs.remove_file(&self.path) {
+                tracing::warn!(path = ?self.path, error = %error, "Failed to clean up uncommitted compaction output");
+            }
+        }
+    }
+}
+
 // ANCHOR[contextra-store:COMP-ENG-001]
 /// Orchestriert die periodische Verdichtung und Bereinigung von SSTables.
 pub struct CompactionEngine {
@@ -42,6 +68,7 @@ pub struct CompactionEngine {
         Arc<parking_lot::RwLock<Arc<crate::erasure::filter::CollapseMap>>>,
     )>,
     pending_delete: Option<Arc<crate::erasure::pending::PendingDelete>>,
+    catalog_mutex: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl CompactionEngine {
@@ -81,7 +108,14 @@ impl CompactionEngine {
             vfs: Arc::new(RealFs),
             erase_filter: None,
             pending_delete: None,
+            catalog_mutex: Arc::new(tokio::sync::Mutex::new(())),
         }
+    }
+
+    /// Shares the store's serialized catalog-publication lock.
+    pub(crate) fn with_catalog_mutex(mut self, mutex: Arc<tokio::sync::Mutex<()>>) -> Self {
+        self.catalog_mutex = mutex;
+        self
     }
 
     /// Configures a custom VFS implementation for compaction file operations.
@@ -346,6 +380,7 @@ impl CompactionEngine {
             cancel_token,
         )
         .await?;
+        let mut output_guard = OutputGuard::new(Arc::clone(&self.vfs), output_path.clone());
 
         // Explicit fsync of output file and parent directory
         if let Some(parent) = output_path.parent() {
@@ -363,77 +398,67 @@ impl CompactionEngine {
             .await?,
         );
 
-        // In-memory SSTable swap under write-lock with MANIFEST durability
-        let old_paths = {
-            let mut ssts = sstables.write().await;
-
-            let start_opt = ssts.iter().position(|s| Arc::ptr_eq(s, &input_ssts[0]));
-            let is_contiguous = match start_opt {
-                Some(start) => {
-                    if start + input_ssts.len() <= ssts.len() {
-                        input_ssts
-                            .iter()
-                            .enumerate()
-                            .all(|(idx, inp)| Arc::ptr_eq(inp, &ssts[start + idx]))
-                    } else {
-                        false
-                    }
-                }
-                None => false,
-            };
-
-            if !is_contiguous {
-                tracing::warn!(
-                    "Compaction aborted under write lock: input SSTables are no longer contiguous or modified \
-                     (concurrent flush or rollback detected)"
-                );
-                if let Err(e) = self.vfs.remove_file(&output_path) {
-                    tracing::warn!(
-                        "Failed to clean up aborted compaction output {:?}: {}",
-                        output_path,
-                        e
-                    );
-                }
-                return Ok(false);
-            }
-
-            let insertion_point = start_opt.unwrap_or(0);
-            let old_paths: Vec<PathBuf> = input_ssts
-                .iter()
-                .map(|s| s.file_path().to_path_buf())
-                .collect();
-
-            // Write EXACTLY ONE atomic `Replace` entry to MANIFEST before swapping in-memory state
-            if let Some(ref manifest) = self.manifest {
-                manifest
-                    .append(&crate::manifest::ManifestEntry::Replace {
-                        removed: old_paths.clone(),
-                        added: output_path.clone(),
-                        added_max_tx: new_reader.metadata().max_tx_id,
-                        rank: 0,
-                    })
-                    .await?;
-            }
-
-            // Remove input SSTables by identity (Arc::ptr_eq)
-            ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
-
-            // Add new SSTable at insertion point
-            let insert_idx = insertion_point.min(ssts.len());
-            ssts.insert(insert_idx, new_reader);
-
-            // Re-sort SSTable list by max_seq to guarantee shadowing/visibility order.
-            ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
-
-            debug_assert!(
-                ssts.windows(2)
-                    .all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
-                        <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
-                "SSTable list must be sorted by max_seq in ascending order after compaction swap"
-            );
-
-            old_paths
+        // Catalog mutations serialize publication, while the SSTables write lock covers only RAM work.
+        let _catalog_guard = self.catalog_mutex.lock().await;
+        let start_opt = {
+            let ssts = sstables.read().await;
+            ssts.iter().position(|s| Arc::ptr_eq(s, &input_ssts[0]))
         };
+        let is_contiguous = if let Some(start) = start_opt {
+            let ssts = sstables.read().await;
+            start + input_ssts.len() <= ssts.len()
+                && input_ssts
+                    .iter()
+                    .enumerate()
+                    .all(|(idx, input)| Arc::ptr_eq(input, &ssts[start + idx]))
+        } else {
+            false
+        };
+        if !is_contiguous {
+            tracing::warn!("Compaction aborted: input SSTables are no longer contiguous");
+            return Ok(false);
+        }
+        let insertion_point = start_opt.unwrap_or(0);
+        let old_paths: Vec<PathBuf> = input_ssts
+            .iter()
+            .map(|sst| sst.file_path().to_path_buf())
+            .collect();
+
+        if let Some(ref manifest) = self.manifest {
+            if let Err(error) = manifest
+                .append(&crate::manifest::ManifestEntry::Replace {
+                    removed: old_paths.clone(),
+                    added: output_path.clone(),
+                    added_max_tx: new_reader.metadata().max_tx_id,
+                    rank: 0,
+                })
+                .await
+            {
+                return Err(error);
+            }
+        }
+        output_guard.commit();
+
+        let mut ssts = sstables.write().await;
+        debug_assert!(
+            input_ssts.iter().enumerate().all(|(idx, input)| {
+                ssts.get(insertion_point + idx)
+                    .is_some_and(|current| Arc::ptr_eq(input, current))
+            }),
+            "catalog changed without catalog_mutex"
+        );
+        ssts.retain(|sst| !input_ssts.iter().any(|input| Arc::ptr_eq(input, sst)));
+        let insert_idx = insertion_point.min(ssts.len());
+        ssts.insert(insert_idx, new_reader);
+        ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
+        debug_assert!(
+            ssts.windows(2)
+                .all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
+                    <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
+            "SSTable list must be sorted by max_seq in ascending order after compaction swap"
+        );
+        drop(ssts);
+        drop(_catalog_guard);
 
         for old_sst in &input_ssts {
             self.block_cache.evict_file(old_sst.file_id());
@@ -472,27 +497,6 @@ impl CompactionEngine {
             input_ssts.len(),
             output_path
         );
-
-        if let Some(ref manifest) = self.manifest {
-            let current_live_entries: Vec<crate::manifest::ManifestEntry> = {
-                let ssts = sstables.read().await;
-                ssts.iter()
-                    .map(|sst| crate::manifest::ManifestEntry::Add {
-                        path: sst.file_path().to_path_buf(),
-                        max_tx: sst.metadata().max_tx_id,
-                    })
-                    .collect()
-            };
-            if let Err(e) = manifest
-                .maybe_rollover(
-                    &current_live_entries,
-                    crate::manifest::DEFAULT_ROLLOVER_THRESHOLD_BYTES,
-                )
-                .await
-            {
-                tracing::warn!("Periodic MANIFEST rollover failed after compaction: {e}");
-            }
-        }
 
         Ok(true)
     }
@@ -949,26 +953,6 @@ impl CompactionEngine {
                         }
                         Ok(false) => {
                             tracing::trace!("No compaction needed");
-                            if let Some(ref manifest) = self.manifest {
-                                let current_live_entries: Vec<crate::manifest::ManifestEntry> = {
-                                    let ssts = sstables.read().await;
-                                    ssts.iter()
-                                        .map(|sst| crate::manifest::ManifestEntry::Add {
-                                            path: sst.file_path().to_path_buf(),
-                                            max_tx: sst.metadata().max_tx_id,
-                                        })
-                                        .collect()
-                                };
-                                if let Err(e) = manifest
-                                    .maybe_rollover(
-                                        &current_live_entries,
-                                        crate::manifest::DEFAULT_ROLLOVER_THRESHOLD_BYTES,
-                                    )
-                                    .await
-                                {
-                                    tracing::warn!("Periodic MANIFEST rollover check failed: {e}");
-                                }
-                            }
                         }
                         Err(e) => {
                             tracing::error!("Background compaction failed: {}", e);

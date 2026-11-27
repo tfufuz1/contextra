@@ -7,6 +7,45 @@ use std::sync::atomic::Ordering;
 use tempfile::TempDir;
 
 #[tokio::test]
+async fn recovery_policy_fails_or_quarantines_unmanifested_sstables() {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    drop(LsmStorage::new(config.clone()).await.expect("create storage"));
+
+    let orphan = tmp.path().join("orphan.sst");
+    tokio::fs::write(&orphan, b"unmanifested fixture")
+        .await
+        .expect("write orphan fixture");
+    let failed = LsmStorage::open_with_recovery_policy(
+        config.clone(),
+        crate::lsm::RecoveryPolicy::Fail,
+    )
+    .await;
+    assert!(failed.is_err());
+    assert!(tokio::fs::try_exists(&orphan).await.unwrap_or(false));
+
+    let storage = LsmStorage::open_with_recovery_policy(
+        config,
+        crate::lsm::RecoveryPolicy::Quarantine,
+    )
+    .await
+    .expect("quarantine orphan");
+    assert!(!tokio::fs::try_exists(&orphan).await.unwrap_or(false));
+    let quarantined = tokio::fs::read_dir(tmp.path().join("quarantine"))
+        .await
+        .expect("read quarantine directory")
+        .next_entry()
+        .await
+        .expect("read quarantine entry")
+        .expect("quarantined file exists");
+    assert!(quarantined.file_name().to_string_lossy().starts_with("orphan.sst."));
+    assert_eq!(storage.erasure_boot_report().orphans.len(), 1);
+}
+
+#[tokio::test]
 async fn test_lsm_rollback_persistence() {
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {

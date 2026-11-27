@@ -6,6 +6,45 @@ use super::*;
 use std::path::{Path, PathBuf};
 use tempfile::tempdir;
 
+#[tokio::test]
+async fn manifest_rollover_keeps_wal_hwm_and_dead_sstables() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("MANIFEST");
+    let hwm = [0x5au8; 32];
+    let live = PathBuf::from("live.sst");
+    let dead = PathBuf::from("dead.sst");
+    let manifest = Manifest::open(&path).await.expect("open manifest");
+    for entry in [
+        ManifestEntry::Add { path: live.clone(), max_tx: 7 },
+        ManifestEntry::Add { path: dead.clone(), max_tx: 5 },
+        ManifestEntry::Remove { path: dead.clone() },
+        ManifestEntry::WalCheckpoint { hmac: hwm },
+    ] {
+        manifest.append(&entry).await.expect("append manifest entry");
+    }
+    manifest.rollover(&[]).await.expect("rollover");
+
+    let entries = Manifest::load(&path).await.expect("load rolled manifest");
+    assert_eq!(Manifest::extract_high_water_mark(&entries), Some(hwm));
+    assert!(Manifest::reconstruct_dead_sstables(&entries).contains(&dead));
+    assert!(Manifest::reconstruct_valid_sstables(&entries)
+        .iter()
+        .any(|(name, _)| name == &live));
+}
+
+#[tokio::test]
+async fn manifest_load_propagates_vfs_read_errors() {
+    let path = PathBuf::from("MANIFEST");
+    let vfs = contextra_testkit::FaultVfs::new();
+    vfs.write_file(&path, b"MFMN\x01").expect("seed manifest");
+    vfs.set_config(contextra_testkit::FaultConfig {
+        fail_reads_after: Some(0),
+        ..Default::default()
+    });
+    let io = crate::io_seam::StoreIo::new(std::sync::Arc::new(vfs));
+    assert!(Manifest::load_with_io(&path, io).await.is_err());
+}
+
 #[test]
 fn test_manifest_entry_roundtrip() {
     let entries = vec![

@@ -8,6 +8,7 @@ mod core;
 mod entry;
 mod recovery;
 mod rollover;
+mod state;
 
 #[cfg(test)]
 mod tests;

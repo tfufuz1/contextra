@@ -10,16 +10,53 @@
 // FORMATABKÜNDIGUNG (S-01 / T-04): `rank` in `ManifestEntry::Replace` ist abgekündigt. `reconstruct_valid_sstables` nutzt ausschließlich die Manifest-Operationsreihenfolge (`next_rank`). `recovery.rs` verwirft den Wert explizit.
 
 use contextra_types::{ContextraError, Result};
+use crate::io_seam::append_file::{AppendFile, IoFault};
+use contextra_ports::VfsOpenOptions;
 use std::path::{Path, PathBuf};
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use std::sync::Arc;
 
 use super::entry::ManifestEntry;
 use super::recovery::is_valid_tail_truncation_candidate;
+use super::state::ManifestState;
 use super::MAX_MANIFEST_ENTRY_SIZE;
+use crate::io_seam::StoreIo;
 use crate::util::DirLock;
 
 pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
 pub const CURRENT_MANIFEST_VERSION: u8 = 1;
+
+async fn append_durable(
+    file: Arc<parking_lot::Mutex<AppendFile>>,
+    bytes: Vec<u8>,
+) -> std::result::Result<(), IoFault> {
+    tokio::task::spawn_blocking(move || file.lock().append_durable(&bytes))
+        .await
+        .map_err(|error| IoFault::TaskFailed(error.to_string()))?
+}
+
+async fn truncate_durable(
+    file: Arc<parking_lot::Mutex<AppendFile>>,
+    len: u64,
+) -> Result<()> {
+    tokio::task::spawn_blocking(move || file.lock().truncate_durable(len))
+        .await
+        .map_err(|error| ContextraError::Storage(format!("Manifest truncate task failed: {error}")))?
+        .map_err(ContextraError::Io)
+}
+
+async fn read_append_file(file: Arc<parking_lot::Mutex<AppendFile>>) -> Result<Vec<u8>> {
+    tokio::task::spawn_blocking(move || file.lock().read_all())
+        .await
+        .map_err(|error| ContextraError::Storage(format!("Manifest read task failed: {error}")))?
+        .map_err(ContextraError::Io)
+}
+
+async fn sync_all_file(file: Arc<parking_lot::Mutex<AppendFile>>) -> Result<()> {
+    tokio::task::spawn_blocking(move || file.lock().sync_all())
+        .await
+        .map_err(|error| ContextraError::Storage(format!("Manifest sync task failed: {error}")))?
+        .map_err(|error| ContextraError::Storage(error.to_string()))
+}
 
 /// Append-only Manifest file handle for recording active SSTable set transitions.
 // ANCHOR[contextra-store:MAN-CORE-001]
@@ -28,7 +65,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 pub struct Manifest {
     pub(super) path: PathBuf,
-    pub(super) file: tokio::sync::Mutex<tokio::fs::File>,
+    pub(super) io: StoreIo,
+    pub(super) file: Arc<parking_lot::Mutex<AppendFile>>,
+    pub(super) operation_lock: tokio::sync::Mutex<()>,
+    pub(super) state: tokio::sync::Mutex<ManifestState>,
     pub(super) _dir_lock: Option<DirLock>,
     pub(super) is_poisoned: AtomicBool,
 }
@@ -42,65 +82,111 @@ impl std::fmt::Debug for Manifest {
 }
 
 impl Manifest {
-    /// Opens or creates an append-only Manifest file at `path`.
-    pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_dir_lock(path, None).await
+    pub(crate) async fn state_snapshot(&self) -> ManifestState {
+        self.state.lock().await.clone()
     }
 
-    /// Opens or creates an append-only Manifest file at `path`, attaching `dir_lock`.
-    pub(crate) async fn open_with_dir_lock(
+    /// Opens or creates an append-only Manifest file at `path`.
+    pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with_io(path, None, StoreIo::default()).await
+    }
+
+    /// Opens or creates an append-only Manifest file with the selected I/O port.
+    pub(crate) async fn open_with_io(
         path: impl AsRef<Path>,
         dir_lock: Option<DirLock>,
+        io: StoreIo,
     ) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        let (mut file, is_new) = match tokio::fs::OpenOptions::new()
-            .create_new(true)
-            .append(true)
-            .read(true)
-            .open(&path)
-            .await
-        {
-            Ok(file) => (file, true),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                let file = tokio::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .read(true)
-                    .open(&path)
-                    .await
-                    .map_err(|e| {
-                        ContextraError::Storage(format!("Failed to open MANIFEST: {}", e))
-                    })?;
-                (file, false)
-            }
-            Err(e) => {
-                return Err(ContextraError::Storage(format!(
-                    "Failed to create MANIFEST: {}",
-                    e
-                )));
-            }
+        let create_new = VfsOpenOptions {
+            read: true,
+            write: true,
+            create_new: true,
+            ..Default::default()
         };
+        let (file, is_new) = match io.open_async(&path, create_new).await {
+            Ok(file) => (file, true),
+            Err(ContextraError::Io(error))
+                if error.kind() == std::io::ErrorKind::AlreadyExists =>
+            {
+                let options = VfsOpenOptions {
+                    read: true,
+                    write: true,
+                    ..Default::default()
+                };
+                (io.open_async(&path, options).await?, false)
+            }
+            Err(error) => return Err(error),
+        };
+        let (file, file_len) = tokio::task::spawn_blocking(move || {
+            let len = file.len().map_err(ContextraError::Io)?;
+            Ok::<_, ContextraError>((file, len))
+        })
+        .await
+        .map_err(|error| ContextraError::Storage(format!("Manifest metadata task failed: {error}")))??;
+        let file = Arc::new(parking_lot::Mutex::new(AppendFile::new(file, file_len)));
+
+        if !is_new && file_len < 5 {
+            let prefix = read_append_file(Arc::clone(&file)).await?;
+            if !prefix.is_empty()
+                && !MANIFEST_HEADER_MAGIC
+                    .get(..prefix.len().min(MANIFEST_HEADER_MAGIC.len()))
+                    .is_some_and(|expected| expected == prefix.as_slice())
+            {
+                return Err(ContextraError::Storage(
+                    "Unknown or incomplete MANIFEST format header".into(),
+                ));
+            }
+            truncate_durable(Arc::clone(&file), 0).await?;
+            let mut header = Vec::with_capacity(5);
+            header.extend_from_slice(MANIFEST_HEADER_MAGIC);
+            header.push(CURRENT_MANIFEST_VERSION);
+            append_durable(Arc::clone(&file), header)
+                .await
+                .map_err(|error| ContextraError::Storage(error.to_string()))?;
+            sync_all_file(Arc::clone(&file)).await?;
+        }
 
         if is_new {
             let mut header = Vec::with_capacity(5);
             header.extend_from_slice(MANIFEST_HEADER_MAGIC);
             header.push(CURRENT_MANIFEST_VERSION);
-            file.write_all(&header).await.map_err(|e| {
-                ContextraError::Storage(format!("Failed to write MANIFEST header: {}", e))
-            })?;
-            file.sync_all().await.map_err(|e| {
-                ContextraError::Storage(format!(
-                    "MANIFEST file fsync failed for {}: {}",
-                    path.display(),
-                    e
-                ))
-            })?;
-            crate::util::fsync_parent_dir(&path).await?;
+            append_durable(Arc::clone(&file), header)
+                .await
+                .map_err(|error| ContextraError::Storage(error.to_string()))?;
+            sync_all_file(Arc::clone(&file)).await?;
+            if let Some(parent) = path.parent() {
+                io.sync_dir(parent).await?;
+            }
         }
 
+        let entries = Self::load_with_io(&path, io.clone()).await?;
+        let state = ManifestState::from_entries(&entries)?;
+        let current_bytes = read_append_file(Arc::clone(&file)).await?;
+        let has_header = current_bytes
+            .get(..4)
+            .is_some_and(|magic| magic == MANIFEST_HEADER_MAGIC.as_slice());
+        let mut valid_len = if has_header { 5u64 } else { 0u64 };
+        for entry in &entries {
+            let encoded_len = u64::try_from(entry.to_bytes()?.len()).map_err(|_| {
+                ContextraError::Storage("MANIFEST entry length is not representable".into())
+            })?;
+            valid_len = valid_len
+                .checked_add(encoded_len)
+                .ok_or_else(|| ContextraError::Storage("MANIFEST length overflow".into()))?;
+        }
+        let actual_len = u64::try_from(current_bytes.len()).map_err(|_| {
+            ContextraError::Storage("MANIFEST length is not representable".into())
+        })?;
+        if actual_len > valid_len {
+            truncate_durable(Arc::clone(&file), valid_len).await?;
+        }
         Ok(Self {
             path,
-            file: tokio::sync::Mutex::new(file),
+            io,
+            file,
+            operation_lock: tokio::sync::Mutex::new(()),
+            state: tokio::sync::Mutex::new(state),
             _dir_lock: dir_lock,
             is_poisoned: AtomicBool::new(false),
         })
@@ -134,28 +220,38 @@ impl Manifest {
             batch_bytes.extend(entry.to_bytes()?);
         }
 
-        let mut file = self.file.lock().await;
-        if let Err(e) = file.write_all(&batch_bytes).await {
-            return Err(ContextraError::Storage(format!(
-                "MANIFEST write failed for {}: {}",
-                self.path.display(),
-                e
-            )));
+        let _operation = self.operation_lock.lock().await;
+        let mut state = self.state.lock().await;
+        let mut next_state = state.clone();
+        for entry in entries {
+            next_state.apply(entry)?;
         }
-        if let Err(e) = file.flush().await {
-            return Err(ContextraError::Storage(format!(
-                "MANIFEST flush failed for {}: {}",
-                self.path.display(),
-                e
-            )));
-        }
-        if let Err(e) = file.sync_all().await {
-            self.is_poisoned.store(true, Ordering::SeqCst);
-            return Err(ContextraError::Storage(format!(
-                "MANIFEST fsync failed for {}: {} (handle poisoned, INV-FSYNC-1)",
-                self.path.display(),
-                e
-            )));
+        append_durable(Arc::clone(&self.file), batch_bytes)
+            .await
+            .map_err(|error| {
+                if matches!(&error, IoFault::SyncFailed(_) | IoFault::Poisoned) {
+                    self.is_poisoned.store(true, Ordering::SeqCst);
+                }
+                ContextraError::Storage(format!(
+                    "MANIFEST append failed for {}: {}",
+                    self.path.display(), error
+                ))
+            })?;
+        *state = next_state;
+        drop(state);
+        let should_rollover = self.file.lock().committed_len()
+            >= super::DEFAULT_ROLLOVER_THRESHOLD_BYTES;
+        drop(_operation);
+        if should_rollover {
+            if let Err(error) = self
+                .maybe_rollover(&[], super::DEFAULT_ROLLOVER_THRESHOLD_BYTES)
+                .await
+            {
+                if self.is_poisoned() {
+                    return Err(error);
+                }
+                tracing::warn!(error = %error, "Automatic MANIFEST rollover failed; durable append remains committed");
+            }
         }
         Ok(())
     }
@@ -167,132 +263,104 @@ impl Manifest {
     /// safely by returning valid entries read up to the point of truncation.
     /// Mid-file corruption or CRC mismatches on complete frames return `Err`.
     pub async fn load(path: &Path) -> Result<Vec<ManifestEntry>> {
-        if !tokio::fs::try_exists(path).await.unwrap_or(false) {
+        Self::load_with_io(path, StoreIo::default()).await
+    }
+
+    pub(crate) async fn load_with_io(path: &Path, io: StoreIo) -> Result<Vec<ManifestEntry>> {
+        if !io.exists(path).await? {
+            return Ok(Vec::new());
+        }
+        let data = io.read(path).await?;
+        if data.is_empty() {
             return Ok(Vec::new());
         }
 
-        let mut file = match tokio::fs::File::open(path).await {
-            Ok(f) => f,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(e) => {
+        let mut pos = 0usize;
+        if data.len() >= 5 && data.get(0..4) == Some(MANIFEST_HEADER_MAGIC.as_slice()) {
+            let version = *data
+                .get(4)
+                .ok_or_else(|| ContextraError::Storage("MANIFEST version missing".into()))?;
+            if version > CURRENT_MANIFEST_VERSION {
                 return Err(ContextraError::Storage(format!(
-                    "Failed to open MANIFEST for reading: {}",
-                    e
-                )))
+                    "Unsupported MANIFEST format version: {}",
+                    version
+                )));
             }
-        };
-
-        let file_size = file
-            .metadata()
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?
-            .len();
-
-        let mut reader = tokio::io::BufReader::new(&mut file);
-        let mut entries = Vec::new();
-        let mut pos = 0u64;
-
-        if file_size >= 5 {
-            let mut header = [0u8; 5];
-            if reader.read_exact(&mut header).await.is_ok() {
-                if &header[0..4] == MANIFEST_HEADER_MAGIC {
-                    let version = header[4];
-                    if version > CURRENT_MANIFEST_VERSION {
-                        return Err(ContextraError::Storage(format!(
-                            "Unsupported MANIFEST format version: {}",
-                            version
-                        )));
-                    }
-                    pos = 5;
-                } else {
-                    // Legacy version 0 manifest without header magic
-                    reader
-                        .seek(tokio::io::SeekFrom::Start(0))
-                        .await
-                        .map_err(|e| {
-                            ContextraError::Storage(format!("Failed to seek MANIFEST: {}", e))
-                        })?;
-                }
+            pos = 5;
+        } else if data.len() < 5 {
+            let prefix_matches = MANIFEST_HEADER_MAGIC
+                .get(..data.len())
+                .is_some_and(|prefix| prefix == data.as_slice());
+            if prefix_matches {
+                tracing::warn!("Torn MANIFEST header detected; open will initialize it");
+                return Ok(Vec::new());
             }
+            return Err(ContextraError::Storage("Unknown MANIFEST format".into()));
         }
 
+        let mut entries = Vec::new();
         loop {
-            if pos == file_size {
+            if pos == data.len() {
                 break;
             }
-
-            let mut len_bytes = [0u8; 4];
-            match reader.read_exact(&mut len_bytes).await {
-                Ok(_) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                    tracing::warn!(
-                        "MANIFEST tail truncation detected (incomplete length header) at offset {}",
-                        pos
-                    );
-                    break;
-                }
-                Err(e) => {
-                    return Err(ContextraError::Storage(format!(
-                        "MANIFEST read error at offset {}: {}",
-                        pos, e
-                    )));
-                }
+            let entry_pos = pos;
+            let len_end = pos.checked_add(4).ok_or_else(|| {
+                ContextraError::Storage("MANIFEST offset overflow".into())
+            })?;
+            if len_end > data.len() {
+                tracing::warn!("MANIFEST tail truncation detected at offset {entry_pos}");
+                break;
             }
-
-            let len = u32::from_le_bytes(len_bytes) as usize;
+            let len_bytes: [u8; 4] = data
+                .get(pos..len_end)
+                .and_then(|slice| slice.try_into().ok())
+                .ok_or_else(|| ContextraError::Storage("MANIFEST length header invalid".into()))?;
+            let len = usize::try_from(u32::from_le_bytes(len_bytes)).map_err(|_| {
+                ContextraError::Storage("MANIFEST frame length is not representable".into())
+            })?;
             if len < 5 || len > MAX_MANIFEST_ENTRY_SIZE as usize {
                 return Err(ContextraError::Storage(format!(
                     "MANIFEST entry length ({}) invalid or exceeds max size ({}) at offset {}",
-                    len, MAX_MANIFEST_ENTRY_SIZE, pos
+                    len, MAX_MANIFEST_ENTRY_SIZE, entry_pos
                 )));
             }
-
-            let entry_pos = pos;
-            pos += 4 + len as u64;
-
-            if pos <= file_size {
-                let mut entry_raw = vec![0u8; len];
-                if let Err(e) = reader.read_exact(&mut entry_raw).await {
-                    return Err(ContextraError::Storage(format!(
-                        "MANIFEST read error at offset {}: {}",
-                        entry_pos, e
-                    )));
+            let frame_end = len_end.checked_add(len).ok_or_else(|| {
+                ContextraError::Storage("MANIFEST frame end overflow".into())
+            })?;
+            if frame_end > data.len() {
+                let partial = data.get(len_end..).ok_or_else(|| {
+                    ContextraError::Storage("MANIFEST partial frame range invalid".into())
+                })?;
+                if is_valid_tail_truncation_candidate(len, partial) {
+                    tracing::warn!("MANIFEST tail truncation detected at offset {entry_pos}");
+                    break;
                 }
-
-                match ManifestEntry::from_bytes(&entry_raw) {
-                    Ok(entry) => entries.push(entry),
-                    Err(e) => {
-                        return Err(ContextraError::Storage(format!(
-                            "MANIFEST entry corruption at offset {}: {}",
-                            entry_pos, e
-                        )));
-                    }
-                }
-            } else {
-                let avail = (file_size - (entry_pos + 4)) as usize;
-                let mut partial_raw = vec![0u8; avail];
-                if let Err(e) = reader.read_exact(&mut partial_raw).await {
-                    return Err(ContextraError::Storage(format!(
-                        "MANIFEST read error for partial payload at offset {}: {}",
-                        entry_pos, e
-                    )));
-                }
-
-                if is_valid_tail_truncation_candidate(len, &partial_raw) {
+                return Err(ContextraError::Storage(format!(
+                    "MANIFEST mid-file corruption at offset {}: invalid frame length {}",
+                    entry_pos, len
+                )));
+            }
+            let entry_raw = data.get(len_end..frame_end).ok_or_else(|| {
+                ContextraError::Storage("MANIFEST frame range invalid".into())
+            })?;
+            pos = frame_end;
+            match ManifestEntry::from_bytes(entry_raw) {
+                Ok(entry) => entries.push(entry),
+                Err(error) if pos == data.len() => {
                     tracing::warn!(
-                        "MANIFEST tail truncation detected (incomplete payload) at offset {}",
-                        entry_pos
+                        "MANIFEST final-frame CRC/decoding error at EOF offset {}; discarding torn tail: {}",
+                        entry_pos, error
                     );
                     break;
-                } else {
+                }
+                Err(error) => {
                     return Err(ContextraError::Storage(format!(
-                        "MANIFEST mid-file corruption at offset {}: invalid frame length {} or corrupt frame structure (possible SSTable resurrection risk)",
-                        entry_pos, len
-                    )));
+                        "MANIFEST entry corruption at offset {}: {}",
+                        entry_pos, error
+                    )))
                 }
             }
         }
-
         Ok(entries)
     }
 

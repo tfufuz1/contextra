@@ -294,6 +294,7 @@ impl Wal {
                             .load(std::sync::atomic::Ordering::Acquire)
                             && size_before == 0;
 
+                        let simulated_partial_write = std::cell::Cell::new(false);
                         let write_res: Result<()> = async {
                             if write_header {
                                 file.write_all(&WAL_V3_HEADER).await.map_err(|e| {
@@ -315,6 +316,7 @@ impl Wal {
                                 )
                                 .is_ok()
                             {
+                                simulated_partial_write.set(true);
                                 let partial_bytes = crate::wal::FAIL_APPEND_AFTER_PARTIAL_BYTES
                                     .swap(0, std::sync::atomic::Ordering::SeqCst);
                                 let cut = (partial_bytes as usize).min(batch_payload.len());
@@ -361,7 +363,7 @@ impl Wal {
                         .await;
 
                         if let Err(write_err) = write_res {
-                            let cause = if write_err.to_string().contains("FAIL_APPEND_PARTIAL_ONCE") {
+                            let cause = if simulated_partial_write.get() {
                                 PoisonCause::TornWrite
                             } else {
                                 PoisonCause::WriteFailed

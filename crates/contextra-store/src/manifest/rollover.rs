@@ -3,10 +3,37 @@
 //! Schreibt periodisch kompakte Manifest-Snapshots, um Logdateien klein zu halten.
 
 use contextra_types::{ContextraError, Result};
-use tokio::io::AsyncWriteExt;
+use crate::io_seam::append_file::AppendFile;
+use crate::io_seam::StoreIo;
+use contextra_ports::VfsOpenOptions;
+use std::path::Path;
+use std::sync::Arc;
+use parking_lot::Mutex;
 
 use super::core::Manifest;
 use super::entry::ManifestEntry;
+
+async fn write_durable_temp(io: &StoreIo, path: &Path, contents: Vec<u8>) -> Result<()> {
+    let options = VfsOpenOptions {
+        write: true,
+        create_new: true,
+        ..Default::default()
+    };
+    let file = io.open_async(path, options).await?;
+    let file = Arc::new(Mutex::new(AppendFile::new(file, 0)));
+    let append_file = Arc::clone(&file);
+    tokio::task::spawn_blocking(move || append_file.lock().append_durable(&contents))
+        .await
+        .map_err(|error| ContextraError::Storage(format!("Temporary MANIFEST write task failed: {error}")))?
+        .map_err(|error| ContextraError::Storage(error.to_string()))?;
+    let sync_file = Arc::clone(&file);
+    tokio::task::spawn_blocking(move || sync_file.lock().sync_all())
+        .await
+        .map_err(|error| ContextraError::Storage(format!("Temporary MANIFEST sync task failed: {error}")))?
+        .map_err(|error| ContextraError::Storage(error.to_string()))?;
+    drop(file);
+    Ok(())
+}
 
 impl Manifest {
     /// Evaluates whether the MANIFEST file size exceeds `threshold_bytes` and performs an atomic
@@ -44,20 +71,18 @@ impl Manifest {
     /// remains untouched and valid.
     pub async fn maybe_rollover(
         &self,
-        live_entries: &[ManifestEntry],
+        _live_entries: &[ManifestEntry],
         threshold_bytes: u64,
     ) -> Result<bool> {
-        let mut file = self.file.lock().await;
-        let metadata = file.metadata().await.map_err(|e| {
-            ContextraError::Storage(format!("Failed to get MANIFEST file metadata: {e}"))
-        })?;
-
-        if metadata.len() < threshold_bytes {
+        let _operation = self.operation_lock.lock().await;
+        let current_len = self.file.lock().committed_len();
+        let durable_entries = self.state.lock().await.snapshot_entries();
+        if current_len < threshold_bytes {
             return Ok(false);
         }
 
         tracing::info!(
-            manifest_size = metadata.len(),
+            manifest_size = current_len,
             threshold_bytes = threshold_bytes,
             "MANIFEST size threshold exceeded; initiating atomic rollover"
         );
@@ -71,118 +96,84 @@ impl Manifest {
 
         const MAX_ATTEMPTS: usize = 100;
         let mut attempt = 0;
-        let mut tmp_path;
-        let mut new_file = loop {
+        let tmp_path = loop {
             attempt += 1;
             let counter = crate::lsm::recovery::next_temp_file_counter();
-            tmp_path = parent.join(format!("MANIFEST.new.{}.{}", pid, counter));
-
-            match tokio::fs::OpenOptions::new()
-                .create_new(true)
-                .write(true)
-                .open(&tmp_path)
-                .await
-            {
-                Ok(f) => break f,
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                    if attempt >= MAX_ATTEMPTS {
-                        return Err(ContextraError::Storage(format!(
-                            "Exhausted {} attempts trying to create temporary MANIFEST file {:?}",
-                            MAX_ATTEMPTS, tmp_path
-                        )));
-                    }
-                    continue;
-                }
-                Err(e) => {
-                    return Err(ContextraError::Storage(format!(
-                        "Failed to create temporary MANIFEST file {:?}: {e}",
-                        tmp_path
-                    )));
-                }
+            let path = parent.join(format!("MANIFEST.new.{}.{}", pid, counter));
+            if !self.io.exists(&path).await? {
+                break path;
+            }
+            if attempt >= MAX_ATTEMPTS {
+                return Err(ContextraError::Storage(format!(
+                    "Exhausted {} attempts trying to create temporary MANIFEST file {:?}",
+                    MAX_ATTEMPTS, path
+                )));
             }
         };
 
+        let mut renamed = false;
         let rollover_res: Result<()> = async {
             let mut header = Vec::with_capacity(5);
             header.extend_from_slice(super::core::MANIFEST_HEADER_MAGIC);
             header.push(super::core::CURRENT_MANIFEST_VERSION);
-            new_file.write_all(&header).await.map_err(|e| {
-                ContextraError::Storage(format!(
-                    "Failed to write header to temporary MANIFEST {:?}: {e}",
-                    tmp_path
-                ))
-            })?;
+            let mut contents = header;
 
-            for entry in live_entries {
+            for entry in &durable_entries {
                 let bytes = entry.to_bytes()?;
-                new_file.write_all(&bytes).await.map_err(|e| {
-                    ContextraError::Storage(format!(
-                        "Failed to write entry to temporary MANIFEST {:?}: {e}",
-                        tmp_path
-                    ))
-                })?;
+                contents.extend_from_slice(&bytes);
             }
 
-            new_file.flush().await.map_err(|e| {
-                ContextraError::Storage(format!(
-                    "Failed to flush temporary MANIFEST {:?}: {e}",
-                    tmp_path
-                ))
-            })?;
-            new_file.sync_all().await.map_err(|e| {
-                ContextraError::Storage(format!(
-                    "Failed to fsync temporary MANIFEST {:?}: {e}",
-                    tmp_path
-                ))
-            })?;
+            write_durable_temp(&self.io, &tmp_path, contents).await?;
 
-            drop(new_file);
-
-            let io = crate::io_seam::StoreIo::default();
-            io.rename(&tmp_path, &self.path).await.map_err(|e| {
+            self.io.rename(&tmp_path, &self.path).await.map_err(|e| {
                 ContextraError::Storage(format!(
                     "Failed to rename temporary MANIFEST from {:?} to {:?}: {e}",
                     tmp_path, self.path
                 ))
             })?;
+            renamed = true;
 
             if let Some(parent) = self.path.parent() {
-                io.sync_dir(parent).await?;
+                self.io.sync_dir(parent).await?;
             }
 
-            let reopened_file = tokio::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .read(true)
-                .open(&self.path)
-                .await
-                .map_err(|e| {
-                    ContextraError::Storage(format!(
-                        "Failed to reopen MANIFEST after rollover {:?}: {e}",
-                        self.path
-                    ))
-                })?;
+            let options = VfsOpenOptions {
+                read: true,
+                write: true,
+                ..Default::default()
+            };
+            let reopened_file = self.io.open_async(&self.path, options).await?;
+            let (reopened_file, len) = tokio::task::spawn_blocking(move || {
+                let len = reopened_file.len().map_err(ContextraError::Io)?;
+                Ok::<_, ContextraError>((reopened_file, len))
+            })
+            .await
+            .map_err(|error| ContextraError::Storage(format!("Reopen MANIFEST metadata task failed: {error}")))??;
 
-            *file = reopened_file;
+            self.file.lock().replace_file(reopened_file, len);
             Ok(())
         }
         .await;
 
         if let Err(ref e) = rollover_res {
+            if renamed {
+                self.is_poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
             tracing::error!(
                 path = ?self.path,
                 tmp_path = ?tmp_path,
                 error = %e,
                 "MANIFEST rollover failed"
             );
-            let io = crate::io_seam::StoreIo::default();
-            if let Err(clean_err) = io.remove_file(&tmp_path).await {
-                if !matches!(clean_err, ContextraError::NotFound(_)) {
+            if !renamed {
+                if let Err(clean_err) = self.io.remove_file(&tmp_path).await {
+                    if !matches!(clean_err, ContextraError::NotFound(_)) {
                     tracing::warn!(
                         tmp_path = ?tmp_path,
                         error = %clean_err,
                         "Failed to remove temporary MANIFEST file after failed rollover"
                     );
+                    }
                 }
             }
             rollover_res?;
@@ -190,7 +181,7 @@ impl Manifest {
 
         tracing::info!(
             path = ?self.path,
-            live_entries_count = live_entries.len(),
+            durable_entries_count = durable_entries.len(),
             "MANIFEST rollover completed successfully"
         );
 

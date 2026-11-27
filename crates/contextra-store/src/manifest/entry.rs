@@ -15,6 +15,12 @@ use std::path::PathBuf;
 
 use super::MAX_MANIFEST_ENTRY_SIZE;
 
+fn checked_u32_len(len: usize, field: &str) -> Result<u32> {
+    u32::try_from(len).map_err(|_| {
+        ContextraError::Serialization(format!("Manifest {field} exceeds u32 length"))
+    })
+}
+
 /// An entry in the SSTable manifest log.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ManifestEntry {
@@ -53,14 +59,14 @@ impl ManifestEntry {
                 payload.extend_from_slice(&max_tx.to_le_bytes());
                 let path_str = path.to_string_lossy();
                 let path_bytes = path_str.as_bytes();
-                payload.extend_from_slice(&(path_bytes.len() as u32).to_le_bytes());
+                payload.extend_from_slice(&checked_u32_len(path_bytes.len(), "path")?.to_le_bytes());
                 payload.extend_from_slice(path_bytes);
             }
             ManifestEntry::Remove { path } => {
                 payload.push(1u8); // op_tag = 1
                 let path_str = path.to_string_lossy();
                 let path_bytes = path_str.as_bytes();
-                payload.extend_from_slice(&(path_bytes.len() as u32).to_le_bytes());
+                payload.extend_from_slice(&checked_u32_len(path_bytes.len(), "path")?.to_le_bytes());
                 payload.extend_from_slice(path_bytes);
             }
             ManifestEntry::RollbackComplete { target_tx } => {
@@ -78,13 +84,13 @@ impl ManifestEntry {
                 payload.extend_from_slice(&0u64.to_le_bytes()); // Abgekündigtes rank-Feld (S-01): stets 0u64
                 let added_str = added.to_string_lossy();
                 let added_bytes = added_str.as_bytes();
-                payload.extend_from_slice(&(added_bytes.len() as u32).to_le_bytes());
+                payload.extend_from_slice(&checked_u32_len(added_bytes.len(), "added path")?.to_le_bytes());
                 payload.extend_from_slice(added_bytes);
-                payload.extend_from_slice(&(removed.len() as u32).to_le_bytes());
+                payload.extend_from_slice(&checked_u32_len(removed.len(), "removed count")?.to_le_bytes());
                 for p in removed {
                     let p_str = p.to_string_lossy();
                     let p_bytes = p_str.as_bytes();
-                    payload.extend_from_slice(&(p_bytes.len() as u32).to_le_bytes());
+                    payload.extend_from_slice(&checked_u32_len(p_bytes.len(), "removed path")?.to_le_bytes());
                     payload.extend_from_slice(p_bytes);
                 }
             }
@@ -94,7 +100,10 @@ impl ManifestEntry {
             }
         }
 
-        let total_payload_size = (4 + payload.len()) as u32;
+        let entry_len = payload.len().checked_add(4).ok_or_else(|| {
+            ContextraError::Serialization("Manifest entry length overflow".into())
+        })?;
+        let total_payload_size = checked_u32_len(entry_len, "entry")?;
         if total_payload_size > MAX_MANIFEST_ENTRY_SIZE {
             return Err(ContextraError::Serialization(format!(
                 "Manifest entry exceeds max size: {} bytes",

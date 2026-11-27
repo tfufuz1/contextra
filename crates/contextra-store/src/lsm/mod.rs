@@ -92,7 +92,7 @@ mod tests;
 
 pub mod ops;
 
-pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
+pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig, RecoveryPolicy};
 pub use engine::{LsmStorage, StorageHealth};
 
 pub(super) use guard::{CommitGuard, LsmState};

@@ -98,12 +98,46 @@ struct PendingTxOp {
 
 impl LsmStorage {
     pub async fn new(config: LsmConfig) -> Result<Self> {
-        Self::new_with_merge_operator(config, None).await
+        Self::new_with_merge_operator_and_policy(
+            config,
+            None,
+            super::config::RecoveryPolicy::Quarantine,
+        )
+        .await
+    }
+
+    /// Opens storage with an explicit policy for SSTables absent from the manifest.
+    pub async fn new_with_recovery_policy(
+        config: LsmConfig,
+        recovery_policy: super::config::RecoveryPolicy,
+    ) -> Result<Self> {
+        Self::new_with_merge_operator_and_policy(config, None, recovery_policy).await
+    }
+
+    /// Opens storage with an explicit policy for unmanifested SSTables.
+    pub async fn open_with_recovery_policy(
+        config: LsmConfig,
+        recovery_policy: super::config::RecoveryPolicy,
+    ) -> Result<Self> {
+        Self::new_with_recovery_policy(config, recovery_policy).await
     }
 
     pub async fn new_with_merge_operator(
         config: LsmConfig,
         merge_operator: Option<Arc<dyn MergeOperator>>,
+    ) -> Result<Self> {
+        Self::new_with_merge_operator_and_policy(
+            config,
+            merge_operator,
+            super::config::RecoveryPolicy::Quarantine,
+        )
+        .await
+    }
+
+    async fn new_with_merge_operator_and_policy(
+        config: LsmConfig,
+        merge_operator: Option<Arc<dyn MergeOperator>>,
+        recovery_policy: super::config::RecoveryPolicy,
     ) -> Result<Self> {
         if config.block_cache_shards == 0 || !config.block_cache_shards.is_power_of_two() {
             return Err(ContextraError::InvalidInput(format!(
@@ -221,19 +255,24 @@ impl LsmStorage {
 
         let manifest_path = config.path.join("MANIFEST");
         let manifest_exists = store_io.exists(&manifest_path).await?;
+        let manifest = Arc::new(
+            crate::manifest::Manifest::open_with_io(
+                &manifest_path,
+                Some(dir_lock),
+                store_io.clone(),
+            )
+            .await?,
+        );
         #[allow(clippy::type_complexity)]
         let (valid_manifest_sstables, dead_manifest_sstables, manifest_hwm): (
             Option<std::collections::HashSet<std::path::PathBuf>>,
             Option<std::collections::HashSet<std::path::PathBuf>>,
             Option<[u8; 32]>,
         ) = if manifest_exists {
-            let entries = crate::manifest::Manifest::load(&manifest_path).await?;
-            let valid_set = crate::manifest::Manifest::reconstruct_valid_sstables(&entries)
-                .into_iter()
-                .map(|(path, _rank)| path)
-                .collect();
-            let dead_set = crate::manifest::Manifest::reconstruct_dead_sstables(&entries);
-            let hwm = crate::manifest::Manifest::extract_high_water_mark(&entries);
+            let state = manifest.state_snapshot().await;
+            let valid_set = state.live().keys().cloned().collect();
+            let dead_set = state.dead().iter().cloned().collect();
+            let hwm = state.wal_hwm();
             (Some(valid_set), Some(dead_set), hwm)
         } else {
             (None, None, None)
@@ -245,7 +284,7 @@ impl LsmStorage {
         let clock_lock = Arc::new(parking_lot::RwLock::new(Arc::clone(&clock_arc)));
         let erasure_cfg = crate::erasure::StoreErasureConfig::for_data_dir(&config.path);
         let key_source = crate::key_source::OsKeyMaterialSource;
-        let (erasure_kernel, erasure_boot_report) =
+        let (erasure_kernel, mut erasure_boot_report) =
             crate::erasure::StoreErasureKernel::open_early(
                 erasure_cfg,
                 config.path.clone(),
@@ -410,6 +449,8 @@ impl LsmStorage {
 
         let mut pending_rollbacks = Vec::new();
         let mut sst_files = Vec::new();
+        let mut adopted_orphans = std::collections::HashSet::new();
+        let mut reported_orphans = Vec::new();
         let dir_entries = store_io
             .read_dir(&config.path)
             .await
@@ -452,30 +493,76 @@ impl LsmStorage {
                             tracing::warn!("Failed to remove dead SSTable {:?}: {}", path, e);
                         }
                     } else {
-                        tracing::warn!(
-                            "Unmanifested or orphaned SSTable file found in data directory (skipping): {:?}",
-                            path
-                        );
+                        match recovery_policy {
+                            super::config::RecoveryPolicy::Fail => {
+                                return Err(ContextraError::Storage(format!(
+                                    "UnmanifestedSstable: {:?}", path
+                                )));
+                            }
+                            super::config::RecoveryPolicy::Adopt => {
+                                adopted_orphans.insert(path.clone());
+                                reported_orphans.push(path.clone());
+                                sst_files.push(path);
+                            }
+                            super::config::RecoveryPolicy::Quarantine => {
+                                let quarantine_dir = config.path.join("quarantine");
+                                store_io.create_dir_all(&quarantine_dir).await.map_err(|e| {
+                                    ContextraError::Storage(format!(
+                                        "Failed to create orphan quarantine directory: {e}"
+                                    ))
+                                })?;
+                                let quarantine_path = quarantine_dir.join(format!(
+                                    "{}.{}.{}",
+                                    file_name,
+                                    clock_arc.now_unix_nanos(),
+                                    next_temp_file_counter()
+                                ));
+                                store_io.rename(&path, &quarantine_path).await.map_err(|e| {
+                                    ContextraError::Storage(format!(
+                                        "Failed to quarantine unmanifested SSTable {:?}: {e}",
+                                        path
+                                    ))
+                                })?;
+                                store_io.sync_dir(&quarantine_dir).await?;
+                                store_io.sync_dir(&config.path).await?;
+                                reported_orphans.push(path.clone());
+                                tracing::warn!(
+                                    "Unmanifested or orphaned SSTable quarantined: {:?} -> {:?}",
+                                    path,
+                                    quarantine_path
+                                );
+                            }
+                        }
                     }
                 } else {
+                    reported_orphans.push(path.clone());
                     sst_files.push(path);
                 }
             }
         }
+        erasure_boot_report.orphans = reported_orphans;
         pending_rollbacks.sort_unstable();
         sst_files.sort();
 
         let block_cache = create_block_cache_with_shards(64, config.block_cache_shards);
 
         let mut sstables = Vec::new();
+        let mut adopted_entries = Vec::new();
         for path in sst_files {
             let reader = SstableReader::open_with_vfs(
-                path,
+                &path,
                 Arc::clone(&block_cache),
                 key_manager.clone(),
                 Arc::clone(&vfs),
             )
             .await?;
+
+            if adopted_orphans.contains(&path) {
+                adopted_entries.push(crate::manifest::ManifestEntry::Add {
+                    path: path.clone(),
+                    max_tx: reader.metadata().max_tx_id,
+                });
+            }
 
             let raw_sst_max_seq = reader.metadata().max_seq & !TOMBSTONE_BIT;
             if raw_sst_max_seq > max_seq {
@@ -493,9 +580,6 @@ impl LsmStorage {
         sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
         let sstables = Arc::new(RwLock::new(sstables));
 
-        let manifest = Arc::new(
-            crate::manifest::Manifest::open_with_dir_lock(&manifest_path, Some(dir_lock)).await?,
-        );
         if !manifest_exists {
             let ssts_read = sstables.read().await;
             let mut add_entries = Vec::with_capacity(ssts_read.len() + 1);
@@ -510,6 +594,8 @@ impl LsmStorage {
                 hmac: initial_wal_hmac,
             });
             manifest.append_batch(&add_entries).await?;
+        } else if !adopted_entries.is_empty() {
+            manifest.append_batch(&adopted_entries).await?;
         }
 
         let snapshot_registry = Arc::new(SnapshotRegistry::new());
@@ -544,6 +630,7 @@ impl LsmStorage {
                 .await;
         });
 
+        let catalog_mutex = Arc::new(tokio::sync::Mutex::new(()));
         let mut compaction_engine_builder = CompactionEngine::new(
             config.compaction.clone(),
             Arc::clone(&snapshot_registry),
@@ -552,6 +639,7 @@ impl LsmStorage {
             Arc::clone(&resource_tracker),
             Some(Arc::clone(&manifest)),
         )
+        .with_catalog_mutex(Arc::clone(&catalog_mutex))
         .with_pressure_rx(pressure_rx.clone())
         .with_vfs(Arc::clone(&vfs))
         .with_erase_filter(
@@ -617,6 +705,7 @@ impl LsmStorage {
             last_applied_seq: Arc::clone(&last_applied_seq),
             commit_mutex: Arc::clone(&commit_mutex),
             flush_mutex: Arc::clone(&flush_mutex),
+            catalog_mutex: Arc::clone(&catalog_mutex),
             pending_sealed_wals: Arc::clone(&pending_sealed_wals),
             flush_counter: Arc::clone(&flush_counter),
             segment_counter: Arc::clone(&segment_counter),
@@ -641,6 +730,7 @@ impl LsmStorage {
             health,
             commit_mutex,
             flush_mutex,
+            catalog_mutex,
             flush_purge_fence: super::fence::FlushPurgeFence::new(),
             pending_sealed_wals,
             cancel_token,
@@ -769,6 +859,7 @@ impl LsmStorage {
             store_io.sync_dir(&self.config.path).await?;
         }
 
+        let _catalog_guard = self.catalog_mutex.lock().await;
         let state = self.state.write().await;
         let wal = self.wal.read().await.clone();
 
@@ -903,9 +994,8 @@ impl LsmStorage {
             target_tx: target_tx.inner(),
         });
 
-        if let Err(e) = self.manifest.append_batch(&manifest_batch).await {
-            tracing::warn!("Failed to write Manifest batch during rollback: {}", e);
-        }
+        self.manifest.append_batch(&manifest_batch).await?;
+        drop(_catalog_guard);
 
         if let Err(e) = store_io.remove_file(&intent_path).await {
             if !matches!(e, ContextraError::NotFound(_)) {

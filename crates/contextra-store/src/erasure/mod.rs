@@ -1,7 +1,7 @@
 //! # Erasure-Kernel (`contextra-store`, Ring 1)
 //!
 //! Implementiert das nicht umgehbare Lösch-Subsystem im primären Speicher:
-//! - Durables Auftragsjournal (`journal.log`) mit Pre-Allokation, CRC32C und Vergiftungsschutz
+//! - Durables Auftragsjournal (`journal.log`) mit Pre-Allokation, CRC-32 (IEEE) und Vergiftungsschutz
 //! - Synchrones, I/O-freies Read-Gate (`StoreGate`) mit copy-on-write Snapshot und Epoche
 //! - Zustandsloser Löschfilter (`EraseFilter`) für MemTable, Flush, Compaction und Replay
 //! - Physisches Entfernen in MemTable (`MemTable::retain`), SSTables (1:1-Rewrite) und WAL-Schnitt
@@ -97,7 +97,7 @@ impl StoreErasureConfig {
 }
 
 /// Startbericht des Erasure-Kernels nach Recovery (§5.4).
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct BootReport {
     /// `true`, wenn das Journal korrupt war und der Store im Fail-Closed-Modus gestartet ist.
     pub fail_closed: bool,
@@ -107,6 +107,8 @@ pub struct BootReport {
     pub torn_tail_truncated: bool,
     /// Anzahl der beim Boot über Pending-Delete entfernten Dateien.
     pub pending_deleted: u32,
+    /// SSTable-Pfade, die beim Start als unmanifestiert erkannt wurden.
+    pub orphans: Vec<PathBuf>,
 }
 
 #[inline]
@@ -421,6 +423,7 @@ impl StoreErasureKernel {
                 jobs_open: 0,
                 torn_tail_truncated: false,
                 pending_deleted: 0,
+                orphans: Vec::new(),
             };
             return Ok((kernel, report));
         }
@@ -491,6 +494,7 @@ impl StoreErasureKernel {
             jobs_open,
             torn_tail_truncated: j_open.torn_tail_truncated,
             pending_deleted,
+            orphans: Vec::new(),
         };
         Ok((kernel, report))
     }

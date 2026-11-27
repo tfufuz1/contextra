@@ -55,6 +55,8 @@ pub struct LsmStorage {
     pub(super) commit_mutex: Arc<tokio::sync::Mutex<()>>,
     /// Mutex to serialize flush executions and prevent duplicate SST / double-release races (H4c).
     pub(super) flush_mutex: Arc<tokio::sync::Mutex<()>>,
+    /// Serializes durable manifest publication with the in-memory SSTable catalog swap.
+    pub(super) catalog_mutex: Arc<tokio::sync::Mutex<()>>,
     /// Write-fencing coordinator between Flush and Purge (SPEC §3.5, WP-STO-5).
     pub(crate) flush_purge_fence: super::fence::FlushPurgeFence,
     /// Pending sealed WAL files awaiting SST flush and cleanup (H4a + H4b).
@@ -139,7 +141,7 @@ impl LsmStorage {
 
     /// Liefert den Boot-Bericht des Erasure-Kernels (§5.4).
     pub fn erasure_boot_report(&self) -> crate::erasure::BootReport {
-        self.erasure_boot_report
+        self.erasure_boot_report.clone()
     }
 
     /// Signals the background compaction engine to stop.

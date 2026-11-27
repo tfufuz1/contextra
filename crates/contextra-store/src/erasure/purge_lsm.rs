@@ -46,6 +46,7 @@ pub(crate) struct StoreDeps {
     pub last_applied_seq: Arc<AtomicU64>,
     pub commit_mutex: Arc<Mutex<()>>,
     pub flush_mutex: Arc<Mutex<()>>,
+    pub catalog_mutex: Arc<Mutex<()>>,
     pub pending_sealed_wals: Arc<Mutex<Vec<(PathBuf, [u8; 32])>>>,
     pub flush_counter: Arc<AtomicU64>,
     pub segment_counter: Arc<AtomicU64>,
@@ -251,21 +252,24 @@ pub(crate) async fn erase_compact_tick(
             drop(builder);
             let _rm = deps.io.remove_file(&tmp_path).await;
 
-            let committed = {
-                let mut ssts = deps.sstables.write().await;
-                if let Some(pos) = ssts.iter().position(|s| Arc::ptr_eq(s, sst)) {
-                    deps.manifest
-                        .append(&ManifestEntry::Remove {
-                            path: old_path.clone(),
-                        })
-                        .await
-                        .map_err(|e| ErasureError::Io(e.to_string()))?;
-                    ssts.remove(pos);
-                    true
-                } else {
-                    false
-                }
+            let _catalog = deps.catalog_mutex.lock().await;
+            let pos = deps
+                .sstables
+                .read()
+                .await
+                .iter()
+                .position(|current| Arc::ptr_eq(current, sst));
+            let committed = if let Some(pos) = pos {
+                deps.manifest
+                    .append(&ManifestEntry::Remove { path: old_path.clone() })
+                    .await
+                    .map_err(|e| ErasureError::Io(e.to_string()))?;
+                deps.sstables.write().await.remove(pos);
+                true
+            } else {
+                false
             };
+            drop(_catalog);
 
             if committed {
                 deps.block_cache.evict_file(sst.file_id());
@@ -305,26 +309,31 @@ pub(crate) async fn erase_compact_tick(
             .map_err(|e| ErasureError::Io(e.to_string()))?,
         );
 
-        let committed = {
-            let mut ssts = deps.sstables.write().await;
-            if let Some(pos) = ssts.iter().position(|s| Arc::ptr_eq(s, sst)) {
-                deps.manifest
-                    .append(&ManifestEntry::Replace {
-                        removed: vec![old_path.clone()],
-                        added: final_path.clone(),
-                        added_max_tx: sst.metadata().max_tx_id,
-                        rank: 0,
-                    })
-                    .await
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                if let Some(slot) = ssts.get_mut(pos) {
-                    *slot = new_reader;
-                }
-                true
-            } else {
-                false
+        let _catalog = deps.catalog_mutex.lock().await;
+        let pos = deps
+            .sstables
+            .read()
+            .await
+            .iter()
+            .position(|current| Arc::ptr_eq(current, sst));
+        let committed = if let Some(pos) = pos {
+            deps.manifest
+                .append(&ManifestEntry::Replace {
+                    removed: vec![old_path.clone()],
+                    added: final_path.clone(),
+                    added_max_tx: sst.metadata().max_tx_id,
+                    rank: 0,
+                })
+                .await
+                .map_err(|e| ErasureError::Io(e.to_string()))?;
+            if let Some(slot) = deps.sstables.write().await.get_mut(pos) {
+                *slot = new_reader;
             }
+            true
+        } else {
+            false
         };
+        drop(_catalog);
 
         if !committed {
             // Konkurrenz mit regulärer Compaction (R3): Ausgabe löschen, nächster Durchlauf.
@@ -465,6 +474,7 @@ pub(crate) async fn erase_wal_cut(
             .await
             .map_err(|e| ErasureError::Io(e.to_string()))?;
 
+            let _catalog = deps.catalog_mutex.lock().await;
             deps.manifest
                 .append(&ManifestEntry::Add {
                     path: sst_path,
@@ -479,6 +489,9 @@ pub(crate) async fn erase_wal_cut(
                 .retain(|mt| !to_flush.iter().any(|tf| Arc::ptr_eq(mt, tf)));
             ssts.push(Arc::new(reader));
             ssts.sort_by_key(|s| s.metadata().max_seq & !TOMBSTONE_BIT);
+            drop(ssts);
+            drop(st);
+            drop(_catalog);
         } else {
             let mut st = deps.state.write().await;
             st.immutable_memtables

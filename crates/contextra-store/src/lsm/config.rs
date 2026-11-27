@@ -135,6 +135,18 @@ pub struct LsmConfig {
     pub vfs: Option<crate::io_seam::StoreIo>,
 }
 
+/// Startup handling for SSTables that are absent from an otherwise valid manifest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RecoveryPolicy {
+    /// Move unknown SSTables into a durable quarantine directory.
+    #[default]
+    Quarantine,
+    /// Abort startup and preserve the unknown files in place.
+    Fail,
+    /// Validate unknown SSTables with the reader and add them to the manifest.
+    Adopt,
+}
+
 impl Default for LsmConfig {
     fn default() -> Self {
         Self {
