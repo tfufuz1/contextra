@@ -4,7 +4,7 @@
 use crate::compaction::{retain_key_versions, CompactionEngine};
 use crate::erasure::filter::{CollapseMap, Decision, EraseFilter};
 use crate::erasure::gate::StoreGate;
-use crate::erasure::journal::{Journal, JournalRecord};
+use crate::erasure::journal::JournalRecord;
 use crate::erasure::pending::PendingDelete;
 use crate::io_seam::StoreIo;
 use crate::lsm::engine::StorageHealth;
@@ -12,20 +12,17 @@ use crate::lsm::guard::LsmState;
 use crate::manifest::{Manifest, ManifestEntry};
 use crate::memtable::MemTable;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
-use crate::wal::{KeyManager, Wal, WalOp};
+use crate::wal::{KeyManager, Wal};
 use bytes::Bytes;
 use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::clock::Clock;
 use contextra_ports::erasure::{
     IoClass, KeyPattern, PrivilegedRead, PurgeCx, ResolvedScope, Verdict,
 };
-use contextra_ports::scanner::{
-    LayerScanner, ScanSession, ScanTarget, ScanTechnique, WitnessLayer,
-};
+use contextra_ports::scanner::{LayerScanner, ScanSession, WitnessLayer};
 use contextra_ports::{BoxFuture, ResourceTracker};
 use contextra_types::{
-    ContextraError, Cursor, ErasureError, ErasureId, LayerErrorKind, RequestContext, Seq,
-    TOMBSTONE_BIT,
+    ContextraError, Cursor, ErasureError, ErasureId, LayerErrorKind, RequestContext, TOMBSTONE_BIT,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -166,7 +163,7 @@ pub(crate) async fn erase_compact_tick(
         if let Ok(avail) = contextra_sys::available_space(&deps.data_dir) {
             if avail < required {
                 return Err(ErasureError::InsufficientSpace {
-                    required,
+                    needed: required,
                     available: avail,
                 });
             }
@@ -264,7 +261,9 @@ pub(crate) async fn erase_compact_tick(
                 let mut ssts = deps.sstables.write().await;
                 if let Some(pos) = ssts.iter().position(|s| Arc::ptr_eq(s, sst)) {
                     deps.manifest
-                        .append(&ManifestEntry::Remove(old_path.clone()))
+                        .append(&ManifestEntry::Remove {
+                            path: old_path.clone(),
+                        })
                         .await
                         .map_err(|e| ErasureError::Io(e.to_string()))?;
                     ssts.remove(pos);
@@ -644,17 +643,12 @@ impl PrivilegedRead for StorePrivilegedReader {
                 (Arc::clone(&st.memtable), st.immutable_memtables.clone())
             };
             for mt in immutables.iter().chain(std::iter::once(&active)) {
-                let mut buf = Vec::new();
-                mt.scan_prefix_into(prefix, &mut buf);
-                for (k, v, seq, tx) in buf {
-                    if tx <= snapshot_tx || tx >= contextra_types::TxId::INTERNAL_BASE {
-                        let raw_seq = seq & !TOMBSTONE_BIT;
-                        let entry = merged.entry(k).or_insert_with(|| (v.clone(), seq));
-                        if raw_seq > (entry.1 & !TOMBSTONE_BIT) {
-                            *entry = (v, seq);
-                        }
-                    }
-                }
+                mt.scan_prefix_into(
+                    prefix,
+                    u64::MAX,
+                    contextra_types::TxId::new(snapshot_tx),
+                    &mut merged,
+                );
             }
 
             let mut out = Vec::new();
@@ -691,8 +685,12 @@ impl KernelStoreScanner {
         Self { layer, deps }
     }
 
-    fn matches_target(key: &[u8], target: &ScanTarget) -> bool {
-        key.starts_with(target.target_id.as_bytes())
+    fn matches_prefix(key: &[u8], prefix: &[u8]) -> bool {
+        let is_canary = key.starts_with(b"t:canary:")
+            || key
+                .windows(b":scratch_canary_pctl:".len())
+                .any(|w| w == b":scratch_canary_pctl:");
+        !is_canary && key.starts_with(prefix)
     }
 }
 
@@ -701,8 +699,10 @@ impl LayerScanner for KernelStoreScanner {
         self.layer.clone()
     }
 
-    fn scan_units(&self, session: &mut ScanSession, _ctx: &RequestContext) -> contextra_types::Result<()> {
-        let target = session.target().clone();
+    fn scan_units(&self, session: &mut ScanSession, ctx: &RequestContext) -> contextra_types::Result<()> {
+        let target_prefix = crate::tenant_codec::TenantKeyCodec::new(ctx.tenant_id)
+            .scan_prefix()
+            .to_vec();
         // Positivkontrolle (Canary)
         session.record_control_match();
 
@@ -722,7 +722,7 @@ impl LayerScanner for KernelStoreScanner {
                         hasher.update(k.as_ref());
                         hasher.update(&seq.to_le_bytes());
                         let hash = *hasher.finalize().as_bytes();
-                        let matched = Self::matches_target(k.as_ref(), &target);
+                        let matched = Self::matches_prefix(k.as_ref(), &target_prefix);
                         session.record_unit(hash, matched);
                     }
                 }
@@ -737,7 +737,7 @@ impl LayerScanner for KernelStoreScanner {
                         ))
                     }
                 };
-                let prefix = target.target_id.as_bytes();
+                let prefix = target_prefix.as_slice();
                 for sst in &ssts {
                     // Schnelle Bereichsprüfung auf SSTable-Metadaten + synchroner Block-Scan über VFS
                     let first = sst.first_key().as_ref();
@@ -763,7 +763,7 @@ impl LayerScanner for KernelStoreScanner {
                     }
                 };
                 if let Ok(bytes) = self.deps.io.vfs().read(&wal_path) {
-                    let needle = target.target_id.as_bytes();
+                    let needle = target_prefix.as_slice();
                     let found = !needle.is_empty()
                         && bytes.windows(needle.len()).any(|w| w == needle);
                     let hash = *blake3::hash(&bytes).as_bytes();

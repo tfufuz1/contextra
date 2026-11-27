@@ -13,7 +13,7 @@ use contextra_types::{
 };
 use parking_lot::Mutex;
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -147,7 +147,9 @@ fn encode_target_kind(k: TargetKind) -> u8 {
         TargetKind::Document => 1,
         TargetKind::Collection => 2,
         TargetKind::Tenant => 3,
-        TargetKind::KeyPrefix => 4,
+        TargetKind::Subject => 4,
+        TargetKind::DocumentReplace => 5,
+        TargetKind::Superseded => 6,
         _ => 4,
     }
 }
@@ -157,7 +159,9 @@ fn decode_target_kind(tag: u8) -> Result<TargetKind, ErasureError> {
         1 => Ok(TargetKind::Document),
         2 => Ok(TargetKind::Collection),
         3 => Ok(TargetKind::Tenant),
-        4 => Ok(TargetKind::KeyPrefix),
+        4 => Ok(TargetKind::Subject),
+        5 => Ok(TargetKind::DocumentReplace),
+        6 => Ok(TargetKind::Superseded),
         _ => Err(ErasureError::Io("invalid target kind tag".into())),
     }
 }
@@ -1038,6 +1042,18 @@ pub(crate) struct Journal {
     completed_since_compact: u64,
 }
 
+impl std::fmt::Debug for Journal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Journal")
+            .field("dir", &self.dir)
+            .field("path", &self.path)
+            .field("offset", &self.offset)
+            .field("reserved_len", &self.reserved_len)
+            .field("poisoned", &self.poisoned.load(Ordering::Relaxed))
+            .finish_non_exhaustive()
+    }
+}
+
 impl Journal {
     /// Öffnet oder erstellt `<dir>/journal.log` und liest alle gültigen Frames (§5.4).
     pub async fn open(
@@ -1791,7 +1807,7 @@ mod tests {
         let id = sample_id(0x77);
         let scope = ResolvedScope {
             id,
-            target_kind: TargetKind::KeyPrefix,
+            target_kind: TargetKind::Subject,
             keys: KeyScope::new(vec![(KeyPattern::Prefix(canary.to_vec()), Verdict::In)]).unwrap(),
             docs: vec![],
             plan_hash: [0x88; 32],

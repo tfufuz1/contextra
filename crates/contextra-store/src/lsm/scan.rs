@@ -4,6 +4,7 @@
 
 use super::*;
 use crate::memtable::is_valid_range_bounds;
+use contextra_ports::gate::ReadGate;
 use contextra_types::{Result, TOMBSTONE_BIT};
 
 pub(super) enum SstableScanMode<'a> {
@@ -95,6 +96,15 @@ impl LsmStorage {
         self.compaction_engine.record_read_op();
         let mut map: std::collections::BTreeMap<Bytes, (Bytes, u64)> =
             std::collections::BTreeMap::new();
+        let gate = self.erasure.gate_ref();
+        let gate_active = gate.is_active();
+        if gate_active {
+            if let SstableScanMode::Prefix(prefix) = mode {
+                if gate.check_prefix(prefix) == contextra_ports::gate::RangeGate::EntirelyBlocked {
+                    return Ok(map);
+                }
+            }
+        }
         let state = self.state.read().await;
         let sstables = self.sstables.read().await;
 
@@ -199,6 +209,14 @@ impl LsmStorage {
                 context: format!(
                     "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
                 ),
+            });
+        }
+
+        if gate_active {
+            map.retain(|k, (_v, seq)| {
+                !gate
+                    .check_version(k.as_ref(), contextra_types::Seq(*seq & !TOMBSTONE_BIT))
+                    .is_blocked()
             });
         }
 

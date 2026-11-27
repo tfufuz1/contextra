@@ -6,6 +6,7 @@ use super::observer::WriteOrigin;
 use super::*;
 use crate::wal::WalEntry;
 use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
+use contextra_ports::gate::ReadGate;
 use contextra_types::{TxId, TOMBSTONE_BIT};
 
 impl LsmStorage {
@@ -95,11 +96,18 @@ impl LsmStorage {
         mem_updates: &[(Vec<u8>, Vec<u8>, u64)],
         tx_id: TxId,
     ) {
+        let gate = self.erasure.gate_ref();
+        let gate_active = gate.is_active();
         let mut max_seq = 0u64;
         for (key, value, seq) in mem_updates {
             let raw_seq = seq & !TOMBSTONE_BIT;
             if raw_seq > max_seq {
                 max_seq = raw_seq;
+            }
+            // H-2: Kein Verwerfen im Late-Apply (Atomarität von WAL/MemTable); nur Zähler (§6.3).
+            if gate_active && gate.check(key).is_blocked() {
+                self.metrics_sink()
+                    .record_counter("erasure_late_apply_total", 1, &[]);
             }
             let entry_size = key.len() + value.len() + STAGING_ENTRY_OVERHEAD_BYTES;
             if let Err(e) = self.budget.consume_memory(entry_size as u64) {

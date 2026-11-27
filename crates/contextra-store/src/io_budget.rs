@@ -17,12 +17,21 @@ use tokio::sync::watch;
 ///
 /// Kapselt die exakte Arithmetik aus der Compaction-Schleife (`compaction/engine.rs`),
 /// sodass bestehende Ratenbegrenzungs-Tests (`compaction_io_rate_limit.rs`) verhaltensgleich bleiben.
-#[derive(Debug)]
 pub struct TokenBucket {
     bytes_written: u64,
     last_reset_nanos: u64,
     max_bps: u64,
     clock: Arc<dyn Clock>,
+}
+
+impl std::fmt::Debug for TokenBucket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TokenBucket")
+            .field("bytes_written", &self.bytes_written)
+            .field("last_reset_nanos", &self.last_reset_nanos)
+            .field("max_bps", &self.max_bps)
+            .finish_non_exhaustive()
+    }
 }
 
 impl TokenBucket {

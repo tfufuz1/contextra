@@ -12,6 +12,7 @@ use super::super::validate::{derive_doc_id, validate_key, validate_value};
 use super::super::{WalOp, MAX_BATCH_SIZE, MAX_GROUP_COMMIT_BATCH_SIZE};
 use crate::wal::PoisonCause;
 use contextra_mvcc::IndexOp;
+use contextra_ports::gate::ReadGate;
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, Result, TxId, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
@@ -188,11 +189,14 @@ pub(super) async fn delete_many(
 }
 
 pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u8]) -> Result<u64> {
+    let gate = storage.erasure.gate_ref();
+    let gate_active = gate.is_active();
     let matching_keys: Vec<Vec<u8>> = storage
         .scan_prefix(prefix)
         .await?
         .into_iter()
         .map(|(key, _)| key)
+        .filter(|key| !gate_active || !gate.check(key).is_blocked())
         .collect();
     storage.delete_many(tx_id, matching_keys).await
 }
@@ -302,6 +306,32 @@ fn prepare_commit_ops(
     tx_id: TxId,
     ops: &[IndexOp<(Vec<u8>, Vec<u8>)>],
 ) -> Result<(Vec<(WalOp, u64)>, Vec<(Vec<u8>, Vec<u8>, u64)>, u64)> {
+    // H-1: Commit-Ablehnung vor der ersten Sequenzvergabe (§6.3)
+    let gate = storage.erasure.gate_ref();
+    if gate.is_active() {
+        if gate.is_fail_closed() {
+            storage.cleanup_intent_locks_for_tx(tx_id);
+            return Err(ContextraError::Storage(
+                "erasure journal unreadable".to_string(),
+            ));
+        }
+        for op in ops {
+            let key_opt = match op {
+                IndexOp::Insert { data: (k, _), .. } => Some(k.as_slice()),
+                IndexOp::Delete {
+                    data: Some((k, _)), ..
+                } => Some(k.as_slice()),
+                _ => None,
+            };
+            if let Some(key) = key_opt {
+                if gate.check(key).is_blocked() {
+                    storage.cleanup_intent_locks_for_tx(tx_id);
+                    return Err(ContextraError::Erased);
+                }
+            }
+        }
+    }
+
     let mut wal_ops = Vec::with_capacity(ops.len() + 1);
     let mut mem_updates = Vec::with_capacity(ops.len());
 
@@ -613,7 +643,7 @@ async fn leader_commit_path(
 
     struct LeaderCancelGuard<'a> {
         storage: &'a LsmStorage,
-        wal: &'a super::super::Wal,
+        wal: Arc<super::super::Wal>,
         leader_tx_id: TxId,
         leader_first_seq: u64,
         pending_queue: Option<PendingCommitQueue>,
@@ -687,7 +717,7 @@ async fn leader_commit_path(
 
     let mut leader_guard = LeaderCancelGuard {
         storage,
-        wal: &wal,
+        wal: Arc::clone(&wal),
         leader_tx_id,
         leader_first_seq: first_seq,
         pending_queue: None,
@@ -725,7 +755,12 @@ async fn leader_commit_path(
         }
     }
 
-    let (all_wal_entries, prev_hmac) = match wal.prepare_batch(all_wal_ops).await {
+    // K-15: Nach Re-Akquisition von `commit_mutex` aktuelles WAL neu lesen,
+    // falls während des Group-Commit-Fensters eine Rotation stattfand.
+    let active_wal = storage.wal.read().await.clone();
+    leader_guard.wal = Arc::clone(&active_wal);
+
+    let (all_wal_entries, prev_hmac) = match active_wal.prepare_batch(all_wal_ops).await {
         Ok(res) => res,
         Err(e) => {
             return Err(e);
@@ -746,9 +781,9 @@ async fn leader_commit_path(
 
     let durability_mode = storage.config.durability_mode;
     let batch_for_append = all_wal_entries.clone();
-    let truncate_guard = wal.truncate_lock.lock().await;
+    let truncate_guard = active_wal.truncate_lock.lock().await;
     let append_res = execute_group_commit_append(
-        &wal,
+        &active_wal,
         durability_mode,
         batch_for_append,
         truncate_guard,
@@ -757,7 +792,7 @@ async fn leader_commit_path(
     .await;
 
     if durability_mode == DurabilityMode::MemoryOnly {
-        let _ = wal.rollback_hmac(prev_hmac).await;
+        let _ = active_wal.rollback_hmac(prev_hmac).await;
     }
 
     if let Err(e) = append_res {

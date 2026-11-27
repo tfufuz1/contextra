@@ -25,6 +25,7 @@ use tokio::sync::RwLock;
 pub enum StorageHealth {
     Healthy,
     FlushFailing,
+    JournalPoisoned,
 }
 
 /// LSM-Tree based storage engine.
@@ -33,45 +34,47 @@ pub enum StorageHealth {
 pub struct LsmStorage {
     pub(super) config: LsmConfig,
     pub(super) key_manager: Option<Arc<KeyManager>>,
-    pub(super) state: RwLock<LsmState>,
+    pub(super) state: Arc<RwLock<LsmState>>,
     /// SSTables stored separately for shared access with compaction engine.
     pub(super) sstables: Arc<RwLock<Vec<Arc<SstableReader>>>>,
     pub(super) tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
     pub(super) budget: Arc<ResourceTracker>,
     pub(super) block_cache: Arc<BlockCache>,
-    pub(super) wal: RwLock<Arc<Wal>>,
+    pub(super) wal: Arc<RwLock<Arc<Wal>>>,
     pub snapshot_registry: Arc<SnapshotRegistry>,
     /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
     /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).
     pub(super) compaction_engine: Arc<CompactionEngine>,
     pub(super) manifest: Arc<crate::manifest::Manifest>,
-    pub(super) next_seq_no: AtomicU64,
-    pub(super) last_committed_tx: AtomicU64,
-    pub(super) last_applied_seq: AtomicU64,
+    pub(super) next_seq_no: Arc<AtomicU64>,
+    pub(super) last_committed_tx: Arc<AtomicU64>,
+    pub(super) last_applied_seq: Arc<AtomicU64>,
     pub(super) flush_notify: Arc<tokio::sync::Notify>,
     pub(super) health: Arc<parking_lot::RwLock<StorageHealth>>,
     /// Mutex to serialize commits and prevent snapshot inversion (parallel seq_no holes).
-    pub(super) commit_mutex: tokio::sync::Mutex<()>,
+    pub(super) commit_mutex: Arc<tokio::sync::Mutex<()>>,
     /// Mutex to serialize flush executions and prevent duplicate SST / double-release races (H4c).
-    pub(super) flush_mutex: tokio::sync::Mutex<()>,
+    pub(super) flush_mutex: Arc<tokio::sync::Mutex<()>>,
     /// Write-fencing coordinator between Flush and Purge (SPEC §3.5, WP-STO-5).
     pub(crate) flush_purge_fence: super::fence::FlushPurgeFence,
     /// Pending sealed WAL files awaiting SST flush and cleanup (H4a + H4b).
-    pub(super) pending_sealed_wals: tokio::sync::Mutex<Vec<(std::path::PathBuf, [u8; 32])>>,
+    pub(super) pending_sealed_wals: Arc<tokio::sync::Mutex<Vec<(std::path::PathBuf, [u8; 32])>>>,
     pub(super) cancel_token: tokio_util::sync::CancellationToken,
     pub(super) task_tracker: tokio_util::task::TaskTracker,
-    pub(super) flush_counter: AtomicU64,
-    pub(super) segment_counter: AtomicU64,
+    pub(super) flush_counter: Arc<AtomicU64>,
+    pub(super) segment_counter: Arc<AtomicU64>,
     pub(super) budget_tracking_drift_bytes: std::sync::atomic::AtomicU64,
     pub(super) pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,
     pub(super) wal_queue_depth: Arc<std::sync::atomic::AtomicUsize>,
     pub(super) pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
     pub(super) observer_registry: ObserverRegistry,
-    pub(super) clock: parking_lot::RwLock<Arc<dyn contextra_ports::Clock>>,
+    pub(super) clock: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::Clock>>>,
     pub ssi_validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
     pub(super) sequence_log_ssi_validator: Option<Arc<contextra_mvcc::SequenceLogSsiValidator>>,
     pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+    pub(super) erasure: Arc<crate::erasure::StoreErasureKernel>,
+    pub(super) erasure_boot_report: crate::erasure::BootReport,
 }
 
 impl Drop for LsmStorage {
@@ -122,6 +125,16 @@ impl LsmStorage {
         &self,
     ) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {
         self.pressure_rx.clone()
+    }
+
+    /// Liefert den primären Erasure-Kernel dieses Stores (K-24, §3).
+    pub fn erasure_kernel(&self) -> Arc<dyn contextra_ports::ErasureKernel> {
+        Arc::clone(&self.erasure) as Arc<dyn contextra_ports::ErasureKernel>
+    }
+
+    /// Liefert den Boot-Bericht des Erasure-Kernels (§5.4).
+    pub fn erasure_boot_report(&self) -> crate::erasure::BootReport {
+        self.erasure_boot_report
     }
 
     /// Signals the background compaction engine to stop.

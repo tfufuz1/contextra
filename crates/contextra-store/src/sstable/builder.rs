@@ -9,7 +9,7 @@ use crate::io_seam::RealFs;
 use crate::wal::KeyManager;
 use bytes::{BufMut, Bytes, BytesMut};
 use contextra_ports::{Vfs, VfsFile, VfsOpenOptions};
-use contextra_types::{ContextraError, Result};
+use contextra_types::{ContextraError, Result, TOMBSTONE_BIT};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 

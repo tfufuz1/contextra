@@ -9,6 +9,7 @@ use crate::io_seam::RealFs;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
 use contextra_mvcc::SnapshotRegistry;
+use contextra_ports::gate::ReadGate;
 use contextra_ports::StorageStats;
 use contextra_ports::Vfs;
 use contextra_types::{Result, TOMBSTONE_BIT};
@@ -36,6 +37,11 @@ pub struct CompactionEngine {
     merge_operator: Option<Arc<dyn MergeOperator>>,
     clock: Arc<dyn contextra_ports::Clock>,
     pub(crate) vfs: Arc<dyn Vfs>,
+    erase_filter: Option<(
+        Arc<crate::erasure::gate::StoreGate>,
+        Arc<parking_lot::RwLock<Arc<crate::erasure::filter::CollapseMap>>>,
+    )>,
+    pending_delete: Option<Arc<crate::erasure::pending::PendingDelete>>,
 }
 
 impl CompactionEngine {
@@ -73,12 +79,33 @@ impl CompactionEngine {
             merge_operator: None,
             clock: Arc::new(contextra_ports::SystemClock::new()),
             vfs: Arc::new(RealFs),
+            erase_filter: None,
+            pending_delete: None,
         }
     }
 
     /// Configures a custom VFS implementation for compaction file operations.
     pub fn with_vfs(mut self, vfs: Arc<dyn Vfs>) -> Self {
         self.vfs = vfs;
+        self
+    }
+
+    /// Verknüpft das Erasure-Gate und die Collapse-Map für H-7-Filterung beim Merge.
+    pub(crate) fn with_erase_filter(
+        mut self,
+        gate: Arc<crate::erasure::gate::StoreGate>,
+        collapse: Arc<parking_lot::RwLock<Arc<crate::erasure::filter::CollapseMap>>>,
+    ) -> Self {
+        self.erase_filter = Some((gate, collapse));
+        self
+    }
+
+    /// Verknüpft die Pending-Delete-Liste für sichere Datei-Entsorgung (WP-4.1).
+    pub(crate) fn with_pending_delete(
+        mut self,
+        pending: Arc<crate::erasure::pending::PendingDelete>,
+    ) -> Self {
+        self.pending_delete = Some(pending);
         self
     }
 
@@ -408,19 +435,34 @@ impl CompactionEngine {
             old_paths
         };
 
-        // Delete old SSTable files
-        for path in &old_paths {
-            if let Err(e) = self.vfs.remove_file(path) {
-                tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
+        for old_sst in &input_ssts {
+            self.block_cache.evict_file(old_sst.file_id());
+        }
+
+        // Delete old SSTable files (WP-4.1 PendingDelete wenn konfiguriert)
+        if let Some(ref pending) = self.pending_delete {
+            let mut to_remove = Vec::with_capacity(old_paths.len() * 2);
+            for path in &old_paths {
+                to_remove.push(path.clone());
+                to_remove.push(PathBuf::from(format!("{}.uuid", path.display())));
             }
-            let uuid_sidecar = PathBuf::from(format!("{}.uuid", path.display()));
-            if matches!(self.vfs.exists(&uuid_sidecar), Ok(true)) {
-                if let Err(e) = self.vfs.remove_file(&uuid_sidecar) {
-                    tracing::debug!(
-                        "Could not remove SSTable UUID sidecar {:?}: {} (non-critical)",
-                        uuid_sidecar,
-                        e
-                    );
+            if let Err(e) = pending.remove_after_commit(&to_remove).await {
+                tracing::warn!("Pending-delete for compacted SSTables deferred: {}", e);
+            }
+        } else {
+            for path in &old_paths {
+                if let Err(e) = self.vfs.remove_file(path) {
+                    tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
+                }
+                let uuid_sidecar = PathBuf::from(format!("{}.uuid", path.display()));
+                if matches!(self.vfs.exists(&uuid_sidecar), Ok(true)) {
+                    if let Err(e) = self.vfs.remove_file(&uuid_sidecar) {
+                        tracing::debug!(
+                            "Could not remove SSTable UUID sidecar {:?}: {} (non-critical)",
+                            uuid_sidecar,
+                            e
+                        );
+                    }
                 }
             }
         }
@@ -632,9 +674,21 @@ impl CompactionEngine {
         let mut floor_emitted = false;
         let mut processed_count = 0;
 
-        // Token-Bucket-State für I/O-Rate-Limiting (§4.12 C-2)
-        let mut io_token_bytes_written: u64 = 0;
-        let mut io_token_last_reset_nanos = self.clock.monotonic_nanos();
+        // Token-Bucket-State für I/O-Rate-Limiting (WP-4.0 Extraktion)
+        let mut io_bucket = crate::io_budget::TokenBucket::new(
+            self.config.max_io_bytes_per_second.unwrap_or(0),
+            Arc::clone(&self.clock),
+        );
+        let erase_filter_opt = self.erase_filter.as_ref().and_then(|(gate, collapse)| {
+            if gate.is_active() {
+                Some(crate::erasure::purge_lsm::build_filter(
+                    gate,
+                    &Arc::clone(&collapse.read()),
+                ))
+            } else {
+                None
+            }
+        });
 
         while let Some(item) = heap.pop() {
             if let Some(ct) = cancel_token {
@@ -772,39 +826,15 @@ impl CompactionEngine {
                                     let merged_bytes = bytes::Bytes::from(merged_val);
                                     let entry_bytes =
                                         (item.key.len() + merged_bytes.len() + 16) as u64;
-                                    builder
-                                        .add(&item.key, &merged_bytes, item.seq, item.tx)
-                                        .await?;
-
-                                    // Token-Bucket I/O Rate Limiting
-                                    if let Some(max_bps) = self.config.max_io_bytes_per_second {
-                                        if max_bps > 0 {
-                                            io_token_bytes_written += entry_bytes;
-                                            let elapsed_nanos = self
-                                                .clock
-                                                .monotonic_nanos()
-                                                .saturating_sub(io_token_last_reset_nanos);
-                                            let elapsed = std::time::Duration::from_nanos(elapsed_nanos);
-                                            let target = std::time::Duration::from_secs_f64(
-                                                io_token_bytes_written as f64 / max_bps as f64,
-                                            );
-                                            if target > elapsed {
-                                                let delay = (target - elapsed)
-                                                    .min(std::time::Duration::from_millis(100));
-                                                tokio::time::sleep(delay).await;
-                                                let total_elapsed_nanos = self
-                                                    .clock
-                                                    .monotonic_nanos()
-                                                    .saturating_sub(io_token_last_reset_nanos);
-                                                let total_elapsed = std::time::Duration::from_nanos(total_elapsed_nanos);
-                                                let allowed_bytes = (total_elapsed.as_secs_f64()
-                                                    * max_bps as f64)
-                                                    as u64;
-                                                io_token_bytes_written = io_token_bytes_written
-                                                    .saturating_sub(allowed_bytes);
-                                                io_token_last_reset_nanos = self.clock.monotonic_nanos();
-                                            }
-                                        }
+                                    let skip_erased = erase_filter_opt.as_ref().is_some_and(|f| {
+                                        f.decide(item.key.as_ref(), raw_seq, is_tombstone)
+                                            == crate::erasure::filter::Decision::Drop
+                                    });
+                                    if !skip_erased {
+                                        builder
+                                            .add(&item.key, &merged_bytes, item.seq, item.tx)
+                                            .await?;
+                                        io_bucket.charge(entry_bytes).await;
                                     }
 
                                     last_key = Some(item.key.clone());
@@ -854,44 +884,17 @@ impl CompactionEngine {
                     // and no older SSTables exist, so GC'ing it is safe.
                     let should_gc_tombstone =
                         is_tombstone && is_full_compaction && raw_seq < min_snapshot_seq;
-                    if !should_gc_tombstone {
+                    let skip_erased = erase_filter_opt.as_ref().is_some_and(|f| {
+                        f.decide(item.key.as_ref(), raw_seq, is_tombstone)
+                            == crate::erasure::filter::Decision::Drop
+                    });
+                    if !should_gc_tombstone && !skip_erased {
                         let entry_bytes = (item.key.len() + item.value.len() + 16) as u64; // +16 für Overhead
                         builder
                             .add(&item.key, &item.value, item.seq, item.tx)
                             .await?;
 
-                        // Token-Bucket I/O Rate Limiting (plattformneutral, außerhalb aller Write-Locks)
-                        if let Some(max_bps) = self.config.max_io_bytes_per_second {
-                            if max_bps > 0 {
-                                io_token_bytes_written += entry_bytes;
-                                let elapsed_nanos = self
-                                    .clock
-                                    .monotonic_nanos()
-                                    .saturating_sub(io_token_last_reset_nanos);
-                                let elapsed = std::time::Duration::from_nanos(elapsed_nanos);
-                                let target = std::time::Duration::from_secs_f64(
-                                    io_token_bytes_written as f64 / max_bps as f64,
-                                );
-                                if target > elapsed {
-                                    let delay = (target - elapsed)
-                                        .min(std::time::Duration::from_millis(100));
-                                    // INVARIANTE: Kein MVCC-Write-Lock aktiv an dieser Stelle (merge läuft lock-frei).
-                                    // Verifiziert durch Lektüre von merge_sstables() — kein RwLock::write() im Merge-Loop.
-                                    tokio::time::sleep(delay).await;
-                                    // Deduct allowed bytes based on actual elapsed time instead of wiping to 0
-                                    let total_elapsed_nanos = self
-                                        .clock
-                                        .monotonic_nanos()
-                                        .saturating_sub(io_token_last_reset_nanos);
-                                    let total_elapsed = std::time::Duration::from_nanos(total_elapsed_nanos);
-                                    let allowed_bytes =
-                                        (total_elapsed.as_secs_f64() * max_bps as f64) as u64;
-                                    io_token_bytes_written =
-                                        io_token_bytes_written.saturating_sub(allowed_bytes);
-                                    io_token_last_reset_nanos = self.clock.monotonic_nanos();
-                                }
-                            }
-                        }
+                        io_bucket.charge(entry_bytes).await;
                     }
                 }
             }

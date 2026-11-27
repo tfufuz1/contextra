@@ -168,7 +168,7 @@ impl PendingDelete {
             }
             let encoded = Self::encode(&st.entries)?;
             self.io
-                .write_atomic(&self.list_path, &encoded)
+                .write_atomic(&self.list_path, encoded)
                 .await
                 .map_err(|e| ErasureError::Io(e.to_string()))?;
             self.remaining_count
@@ -238,7 +238,7 @@ impl PendingDelete {
 
         let encoded = Self::encode(&st.entries)?;
         self.io
-            .write_atomic(&self.list_path, &encoded)
+            .write_atomic(&self.list_path, encoded)
             .await
             .map_err(|e| ErasureError::Io(e.to_string()))?;
         self.remaining_count

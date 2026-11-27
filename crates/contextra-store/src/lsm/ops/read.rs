@@ -6,6 +6,7 @@ use super::super::engine::LsmStorage;
 use super::super::scan::{check_in_range, SstableScanMode};
 use super::super::validate_key;
 use bytes::Bytes;
+use contextra_ports::gate::ReadGate;
 use contextra_ports::StorageEngine;
 use contextra_types::{Result, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
@@ -100,9 +101,19 @@ pub(super) async fn get_at_seq(
         snapshot_tx
     );
 
+    let gate = storage.erasure.gate_ref();
+    let gate_active = gate.is_active();
+
     // 1. MemTable (only if seq_no in entry <= target seq_no AND tx_id <= snapshot_tx)
     if let Some((val, seq, _tx)) = memtable.get_at_seq(key, seq_no, snapshot_tx) {
         if (seq & TOMBSTONE_BIT) != 0 {
+            return Ok(None);
+        }
+        if gate_active
+            && gate
+                .check_version(key, contextra_types::Seq(seq & !TOMBSTONE_BIT))
+                .is_blocked()
+        {
             return Ok(None);
         }
         return Ok(Some(val));
@@ -112,6 +123,13 @@ pub(super) async fn get_at_seq(
     for mt in immutable_memtables.iter().rev() {
         if let Some((val, seq, _tx)) = mt.get_at_seq(key, seq_no, snapshot_tx) {
             if (seq & TOMBSTONE_BIT) != 0 {
+                return Ok(None);
+            }
+            if gate_active
+                && gate
+                    .check_version(key, contextra_types::Seq(seq & !TOMBSTONE_BIT))
+                    .is_blocked()
+            {
                 return Ok(None);
             }
             return Ok(Some(val));
@@ -137,6 +155,13 @@ pub(super) async fn get_at_seq(
             );
             if (seq & TOMBSTONE_BIT) != 0 {
                 tracing::debug!("LsmStorage::get_at_seq FOUND TOMBSTONE");
+                return Ok(None);
+            }
+            if gate_active
+                && gate
+                    .check_version(key, contextra_types::Seq(seq & !TOMBSTONE_BIT))
+                    .is_blocked()
+            {
                 return Ok(None);
             }
             tracing::debug!("LsmStorage::get_at_seq MATCH found in SSTable");

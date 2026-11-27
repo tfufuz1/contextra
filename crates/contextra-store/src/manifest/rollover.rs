@@ -138,16 +138,17 @@ impl Manifest {
 
             drop(new_file);
 
-            tokio::fs::rename(&tmp_path, &self.path)
-                .await
-                .map_err(|e| {
-                    ContextraError::Storage(format!(
-                        "Failed to rename temporary MANIFEST from {:?} to {:?}: {e}",
-                        tmp_path, self.path
-                    ))
-                })?;
+            let io = crate::io_seam::StoreIo::default();
+            io.rename(&tmp_path, &self.path).await.map_err(|e| {
+                ContextraError::Storage(format!(
+                    "Failed to rename temporary MANIFEST from {:?} to {:?}: {e}",
+                    tmp_path, self.path
+                ))
+            })?;
 
-            crate::util::fsync_parent_dir(&self.path).await?;
+            if let Some(parent) = self.path.parent() {
+                io.sync_dir(parent).await?;
+            }
 
             let reopened_file = tokio::fs::OpenOptions::new()
                 .create(true)
@@ -174,8 +175,9 @@ impl Manifest {
                 error = %e,
                 "MANIFEST rollover failed"
             );
-            if let Err(clean_err) = tokio::fs::remove_file(&tmp_path).await {
-                if clean_err.kind() != std::io::ErrorKind::NotFound {
+            let io = crate::io_seam::StoreIo::default();
+            if let Err(clean_err) = io.remove_file(&tmp_path).await {
+                if !matches!(clean_err, ContextraError::NotFound(_)) {
                     tracing::warn!(
                         tmp_path = ?tmp_path,
                         error = %clean_err,

@@ -6,6 +6,7 @@ use super::super::engine::LsmStorage;
 use super::super::{MemTable, SstableBuilder, SstableReader, Wal};
 use crate::compaction::retain_key_versions;
 use bytes::Bytes;
+use contextra_ports::gate::ReadGate;
 use contextra_types::{ContextraError, Result, TOMBSTONE_BIT};
 use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
@@ -125,7 +126,29 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         )
         .await?;
 
+        let gate = storage.erasure.gate_ref();
+        let filter_opt = if gate.is_active() {
+            Some(crate::erasure::purge_lsm::build_filter(
+                gate,
+                &storage.erasure.collapse_snapshot(),
+            ))
+        } else {
+            None
+        };
+
         for (k, mut versions) in key_map {
+            if let Some(ref filter) = filter_opt {
+                versions.retain(|(_v, seq, _tx)| {
+                    filter.decide(
+                        k.as_ref(),
+                        *seq & !TOMBSTONE_BIT,
+                        (*seq & TOMBSTONE_BIT) != 0,
+                    ) == crate::erasure::filter::Decision::Keep
+                });
+                if versions.is_empty() {
+                    continue;
+                }
+            }
             versions.sort_by(|a, b| (b.1 & !TOMBSTONE_BIT).cmp(&(a.1 & !TOMBSTONE_BIT)));
             let retained = retain_key_versions(versions, |(_, seq, _)| *seq, floor_seq);
             for (v, seq, tx) in retained {
@@ -195,7 +218,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         drop(sstables);
         drop(state);
 
-        // Delete ALL sealed WAL files whose data was flushed into SSTable (H4b)
+        // Delete ALL sealed WAL files whose data was flushed into SSTable (H4b, WP-4.1 PendingDelete)
         {
             let mut pending_guard = storage.pending_sealed_wals.lock().await;
             let active_wal_path = {
@@ -203,37 +226,32 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                 wal_read.path().to_path_buf()
             };
 
+            let mut to_remove = Vec::new();
+            let mut trunc_guards = Vec::new();
             for (wal_path, _) in pending_guard.drain(..) {
                 if wal_path != active_wal_path {
-                    let mut trunc_guard_opt = None;
                     if let Some(ref old_wal) = old_wal_opt {
                         if old_wal.path() == wal_path.as_path() {
-                            trunc_guard_opt = Some(old_wal.truncate_lock.lock().await);
+                            trunc_guards.push(old_wal.truncate_lock.lock().await);
                         }
                     }
-
-                    if let Err(e) = storage.compaction_engine.vfs.remove_file(&wal_path) {
-                        tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
-                    } else {
-                        let uuid_sidecar =
-                            std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
-                        if let Err(e) = storage.compaction_engine.vfs.remove_file(&uuid_sidecar) {
-                            if !matches!(e, contextra_types::ContextraError::NotFound(_)) {
-                                tracing::debug!(
-                                    "Could not delete sidecar {:?}: {}",
-                                    uuid_sidecar,
-                                    e
-                                );
-                            }
-                        }
-                    }
-                    drop(trunc_guard_opt);
+                    let uuid_sidecar =
+                        std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
+                    to_remove.push(wal_path);
+                    to_remove.push(uuid_sidecar);
                 }
             }
-            storage
-                .compaction_engine
-                .vfs
-                .sync_dir(&storage.config.path)?;
+            if !to_remove.is_empty() {
+                if let Err(e) = storage
+                    .erasure
+                    .pending_ref()
+                    .remove_after_commit(&to_remove)
+                    .await
+                {
+                    tracing::warn!("Pending-delete for sealed WALs deferred: {}", e);
+                }
+            }
+            drop(trunc_guards);
         }
 
         let bytes_freed: u64 = to_flush.iter().map(|mt| mt.size() as u64).sum();

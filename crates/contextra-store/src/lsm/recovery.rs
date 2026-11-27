@@ -11,6 +11,7 @@ use crate::util::DirLock;
 use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp};
 use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_ports::gate::ReadGate;
 use contextra_ports::Vfs;
 use contextra_ports::{ResourceBudget, ResourceTracker};
 use contextra_types::{ContextraError, Result, TxId, TOMBSTONE_BIT};
@@ -271,6 +272,30 @@ impl LsmStorage {
             (None, None, None)
         };
 
+        let health = Arc::new(parking_lot::RwLock::new(StorageHealth::Healthy));
+        let clock_arc: Arc<dyn contextra_ports::Clock> =
+            Arc::new(contextra_ports::SystemClock::new());
+        let clock_lock = Arc::new(parking_lot::RwLock::new(Arc::clone(&clock_arc)));
+        let store_io = config
+            .vfs
+            .clone()
+            .unwrap_or_else(|| crate::io_seam::StoreIo::new(Arc::clone(&vfs)));
+        let erasure_cfg = crate::erasure::StoreErasureConfig::for_data_dir(&config.path);
+        let key_source = crate::key_source::OsKeyMaterialSource;
+        let (erasure_kernel, erasure_boot_report) =
+            crate::erasure::StoreErasureKernel::open_early(
+                erasure_cfg,
+                config.path.clone(),
+                store_io.clone(),
+                Arc::clone(&health),
+                Arc::clone(&clock_lock),
+                &key_source,
+                None,
+            )
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Erasure kernel open failed: {e}")))?;
+        let erasure = Arc::new(erasure_kernel);
+
         let memtable = MemTable::new();
         let mut max_seq = 0u64;
         let mut max_tx = 0u64;
@@ -314,10 +339,20 @@ impl LsmStorage {
                             max_tx = tx_raw;
                         }
                         if *committed {
+                            let gate = erasure.gate_ref();
+                            let gate_active = gate.is_active();
                             if let Some(ops) = pending_tx_map.remove(&tx_raw) {
                                 for op in ops {
                                     match op.op {
                                         WalOp::Put { key, value, tx_id } => {
+                                            if gate_active
+                                                && gate.discard_rule(
+                                                    &key,
+                                                    contextra_types::Seq(op.lsn & !TOMBSTONE_BIT),
+                                                ) == contextra_ports::gate::DiscardRule::MayDrop
+                                            {
+                                                continue;
+                                            }
                                             replayed_size += (key.len() + value.len()) as u64;
                                             memtable.put(
                                                 Bytes::from(key),
@@ -327,6 +362,14 @@ impl LsmStorage {
                                             );
                                         }
                                         WalOp::Delete { key, tx_id } => {
+                                            if gate_active
+                                                && gate.discard_rule(
+                                                    &key,
+                                                    contextra_types::Seq(op.lsn & !TOMBSTONE_BIT),
+                                                ) == contextra_ports::gate::DiscardRule::MayDrop
+                                            {
+                                                continue;
+                                            }
                                             replayed_size += key.len() as u64;
                                             memtable.put(
                                                 Bytes::from(key),
@@ -446,7 +489,7 @@ impl LsmStorage {
                 || file_name.starts_with("MANIFEST.new.")
             {
                 tracing::warn!("Removing leftover un-renamed temp file: {:?}", path);
-                if let Err(e) = tokio::fs::remove_file(&path).await {
+                if let Err(e) = store_io.remove_file(&path).await {
                     tracing::warn!("Failed to remove leftover temp file {:?}: {}", path, e);
                 }
             } else if path.extension().is_some_and(|ext| ext == "sst") {
@@ -459,7 +502,7 @@ impl LsmStorage {
                         .is_some_and(|dead_set| dead_set.contains(path_key))
                     {
                         tracing::info!("Removing dead SSTable file proven by MANIFEST: {:?}", path);
-                        if let Err(e) = tokio::fs::remove_file(&path).await {
+                        if let Err(e) = store_io.remove_file(&path).await {
                             tracing::warn!("Failed to remove dead SSTable {:?}: {}", path, e);
                         }
                     } else {
@@ -530,8 +573,6 @@ impl LsmStorage {
         let wal_queue_depth = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let wal_queue_depth_clone = Arc::clone(&wal_queue_depth);
 
-        let clock_arc: Arc<dyn contextra_ports::Clock> =
-            Arc::new(contextra_ports::SystemClock::new());
         let pressure_monitor = crate::system_pressure::SystemPressureMonitor::new_with_clock(
             std::time::Duration::from_millis(100),
             Arc::clone(&clock_arc),
@@ -565,7 +606,12 @@ impl LsmStorage {
             Some(Arc::clone(&manifest)),
         )
         .with_pressure_rx(pressure_rx.clone())
-        .with_vfs(Arc::clone(&vfs));
+        .with_vfs(Arc::clone(&vfs))
+        .with_erase_filter(
+            Arc::clone(erasure.gate_ref()),
+            erasure.global_collapse_handle(),
+        )
+        .with_pending_delete(Arc::clone(erasure.pending_ref()));
 
         if let Some(mo) = merge_operator {
             compaction_engine_builder = compaction_engine_builder.with_merge_operator(mo);
@@ -586,7 +632,6 @@ impl LsmStorage {
         task_tracker.close();
 
         let flush_notify = Arc::new(tokio::sync::Notify::new());
-        let health = Arc::new(parking_lot::RwLock::new(StorageHealth::Healthy));
 
         let ssi_max_tracked_keys = config.ssi_max_tracked_keys;
 
@@ -595,45 +640,82 @@ impl LsmStorage {
                 .with_metrics_sink(Arc::clone(&metrics_sink_container)),
         );
 
+        let state = Arc::new(RwLock::new(LsmState {
+            memtable: Arc::new(memtable),
+            immutable_memtables: Vec::new(),
+        }));
+        let wal_lock = Arc::new(RwLock::new(Arc::new(wal)));
+        let next_seq_no = Arc::new(AtomicU64::new(max_seq.saturating_add(1)));
+        let last_committed_tx = Arc::new(AtomicU64::new(max_tx));
+        let last_applied_seq = Arc::new(AtomicU64::new(max_seq));
+        let commit_mutex = Arc::new(tokio::sync::Mutex::new(()));
+        let flush_mutex = Arc::new(tokio::sync::Mutex::new(()));
+        let pending_sealed_wals = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+        let flush_counter = Arc::new(AtomicU64::new(max_wal_id.map(|m| m.saturating_add(1)).unwrap_or(0)));
+        let segment_counter = Arc::new(AtomicU64::new(0));
+
+        erasure.attach_deps(crate::erasure::purge_lsm::StoreDeps {
+            data_dir: config.path.clone(),
+            io: store_io.clone(),
+            key_manager: key_manager.clone(),
+            state: Arc::clone(&state),
+            sstables: Arc::clone(&sstables),
+            wal: Arc::clone(&wal_lock),
+            snapshot_registry: Arc::clone(&snapshot_registry),
+            compaction_engine: Arc::clone(&compaction_engine),
+            manifest: Arc::clone(&manifest),
+            block_cache: Arc::clone(&block_cache),
+            budget: Arc::clone(&resource_tracker),
+            health: Arc::clone(&health),
+            next_seq_no: Arc::clone(&next_seq_no),
+            last_committed_tx: Arc::clone(&last_committed_tx),
+            last_applied_seq: Arc::clone(&last_applied_seq),
+            commit_mutex: Arc::clone(&commit_mutex),
+            flush_mutex: Arc::clone(&flush_mutex),
+            pending_sealed_wals: Arc::clone(&pending_sealed_wals),
+            flush_counter: Arc::clone(&flush_counter),
+            segment_counter: Arc::clone(&segment_counter),
+            clock: Arc::clone(&clock_lock),
+        });
+
         let storage = Self {
             config,
             key_manager,
-            state: RwLock::new(LsmState {
-                memtable: Arc::new(memtable),
-                immutable_memtables: Vec::new(),
-            }),
+            state,
             sstables,
             tx_buffer,
             budget: resource_tracker,
             block_cache,
-            wal: RwLock::new(Arc::new(wal)),
+            wal: wal_lock,
             snapshot_registry,
             compaction_engine,
             manifest,
-            next_seq_no: AtomicU64::new(max_seq.saturating_add(1)),
-            last_committed_tx: AtomicU64::new(max_tx),
-            last_applied_seq: AtomicU64::new(max_seq),
+            next_seq_no,
+            last_committed_tx,
+            last_applied_seq,
             flush_notify,
             health,
-            commit_mutex: tokio::sync::Mutex::new(()),
-            flush_mutex: tokio::sync::Mutex::new(()),
+            commit_mutex,
+            flush_mutex,
             flush_purge_fence: super::fence::FlushPurgeFence::new(),
-            pending_sealed_wals: tokio::sync::Mutex::new(Vec::new()),
+            pending_sealed_wals,
             cancel_token,
             task_tracker,
-            flush_counter: AtomicU64::new(max_wal_id.map(|m| m.saturating_add(1)).unwrap_or(0)),
-            segment_counter: AtomicU64::new(0),
+            flush_counter,
+            segment_counter,
             budget_tracking_drift_bytes: std::sync::atomic::AtomicU64::new(0),
             pending_commit_queue: tokio::sync::Mutex::new(None),
             wal_queue_depth,
             pressure_rx,
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
-            clock: parking_lot::RwLock::new(clock_arc),
+            clock: clock_lock,
             ssi_validator: Arc::clone(&default_ssi_val)
                 as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
             sequence_log_ssi_validator: Some(default_ssi_val),
             metrics_sink: metrics_sink_container,
+            erasure,
+            erasure_boot_report,
         };
 
         if replayed_size > 0 && !wal_files.is_empty() {
@@ -653,19 +735,15 @@ impl LsmStorage {
             };
             for (_ts, old_wal_path) in &wal_files[..wal_files.len() - 1] {
                 if old_wal_path != &active_wal_path {
-                    if let Err(e) = tokio::fs::remove_file(old_wal_path).await {
+                    let uuid_sidecar =
+                        PathBuf::from(format!("{}.uuid", old_wal_path.display()));
+                    if let Err(e) = storage
+                        .erasure
+                        .pending_ref()
+                        .remove_after_commit(&[old_wal_path.clone(), uuid_sidecar])
+                        .await
+                    {
                         tracing::warn!("Failed to remove old WAL file {:?}: {}", old_wal_path, e);
-                    } else {
-                        tracing::info!("Removed old replayed WAL file: {:?}", old_wal_path);
-                        let uuid_sidecar =
-                            PathBuf::from(format!("{}.uuid", old_wal_path.display()));
-                        if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
-                            tracing::debug!(
-                                "Could not remove WAL UUID sidecar {:?}: {} (non-critical)",
-                                uuid_sidecar,
-                                e
-                            );
-                        }
                     }
                 }
             }
@@ -722,24 +800,18 @@ impl LsmStorage {
             let mut intent_bytes = Vec::with_capacity(16);
             intent_bytes.extend_from_slice(INTENT_MAGIC);
             intent_bytes.extend_from_slice(&target_tx.inner().to_le_bytes());
-            tokio::fs::write(&intent_path, &intent_bytes)
+            let store_io = self
+                .config
+                .vfs
+                .clone()
+                .unwrap_or_else(crate::io_seam::StoreIo::default);
+            store_io
+                .write_atomic(&intent_path, intent_bytes)
                 .await
                 .map_err(|e| {
                     ContextraError::Storage(format!("Failed to write rollback intent file: {e}"))
                 })?;
-            let parent = self.config.path.clone();
-            tokio::task::spawn_blocking(move || {
-                // INVARIANT-KONFORM: In spawn_blocking gewrappt; Parent-Directory FSync bei Crash-Recovery / Rollback (kein Hot-Path).
-                std::fs::File::open(&parent)
-                    .and_then(|f| f.sync_all())
-                    .map_err(|e| {
-                        ContextraError::Storage(format!(
-                            "Failed to fsync dir after intent file: {e}"
-                        ))
-                    })
-            })
-            .await
-            .map_err(|e| ContextraError::Internal(e.to_string()))??;
+            store_io.sync_dir(&self.config.path).await?;
         }
 
         let state = self.state.write().await;
@@ -853,12 +925,17 @@ impl LsmStorage {
         }
         drop(sstables_lock);
 
+        let store_io = self
+            .config
+            .vfs
+            .clone()
+            .unwrap_or_else(crate::io_seam::StoreIo::default);
         let mut manifest_batch = Vec::new();
         for path in sst_to_remove {
             tracing::info!("Removing SSTable during rollback: {:?}", path);
             manifest_batch.push(crate::manifest::ManifestEntry::Remove { path: path.clone() });
-            if let Err(e) = tokio::fs::remove_file(&path).await {
-                if e.kind() != std::io::ErrorKind::NotFound {
+            if let Err(e) = store_io.remove_file(&path).await {
+                if !matches!(e, ContextraError::NotFound(_)) {
                     tracing::error!(
                         path = ?path,
                         "Orphaned SSTable konnte nicht entfernt werden: {e}. Manuelles Cleanup nötig."
@@ -875,8 +952,8 @@ impl LsmStorage {
             tracing::warn!("Failed to write Manifest batch during rollback: {}", e);
         }
 
-        if let Err(e) = tokio::fs::remove_file(&intent_path).await {
-            if e.kind() != std::io::ErrorKind::NotFound {
+        if let Err(e) = store_io.remove_file(&intent_path).await {
+            if !matches!(e, ContextraError::NotFound(_)) {
                 tracing::warn!(
                     "Could not remove rollback intent file {:?}: {} \
                      (non-fatal — recovery will re-run on next startup)",

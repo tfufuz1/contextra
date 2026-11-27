@@ -21,8 +21,7 @@ pub(crate) mod purge_lsm;
 use crate::erasure::filter::CollapseMap;
 use crate::erasure::gate::{GatePhase, JobGate, StoreGate};
 use crate::erasure::journal::{
-    decode_resolved_scope, encode_resolved_scope, encode_reason, layer_sort_key, Journal,
-    JournalRecord,
+    decode_resolved_scope, encode_resolved_scope, layer_sort_key, Journal, JournalRecord,
 };
 use crate::erasure::ledger::{validate_external_ledger_path, StoreLedger};
 use crate::erasure::pending::PendingDelete;
@@ -42,12 +41,12 @@ use contextra_ports::BoxFuture;
 use contextra_types::{
     Cursor, ErasureError, ErasureException, ErasureId, ErasurePolicy, ErasureReason,
     ErasureState, ErasureStatus, Guarantee, LayerErrorKind, LayerProgress, LayerState,
-    LayerStatus, Seq, TargetKind, TenantId, Timestamp,
+    LayerStatus, Seq, TargetKind, Timestamp,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tokio::sync::Mutex;
 
 const DEFAULT_RESERVE_BYTES: u64 = 8 * 1024 * 1024;
@@ -110,6 +109,12 @@ pub struct BootReport {
     pub pending_deleted: u32,
 }
 
+#[inline]
+fn layer_map_key(layer: &WitnessLayer) -> (u8, String) {
+    let (tag, name) = layer_sort_key(layer);
+    (tag, name.to_string())
+}
+
 #[derive(Clone)]
 pub(crate) struct Job {
     pub id: ErasureId,
@@ -120,9 +125,9 @@ pub(crate) struct Job {
     pub policy: ErasurePolicy,
     pub expected_layers: Vec<WitnessLayer>,
     pub gated_seq: Option<Seq>,
-    pub layer_cursor: BTreeMap<WitnessLayer, LayerProgress>,
-    pub layer_attempts: BTreeMap<WitnessLayer, u32>,
-    pub layer_remaining: BTreeMap<WitnessLayer, u64>,
+    pub layer_cursor: BTreeMap<(u8, String), LayerProgress>,
+    pub layer_attempts: BTreeMap<(u8, String), u32>,
+    pub layer_remaining: BTreeMap<(u8, String), u64>,
     pub collapse: CollapseMap,
     pub attempt: u32,
     pub guarantee_reached: Guarantee,
@@ -144,7 +149,7 @@ impl Job {
             id: self.id,
             scope: Arc::new(self.plan.keys.clone()),
             docs: self.plan.docs.clone(),
-            up_to: self.gated_seq.unwrap_or(Seq::MAX),
+            up_to: self.gated_seq.unwrap_or(Seq(u64::MAX)),
             phase: if self.purge_started {
                 GatePhase::Erased
             } else {
@@ -161,9 +166,10 @@ impl Job {
     fn to_status(&self) -> ErasureStatus {
         let mut layers = Vec::with_capacity(self.expected_layers.len());
         for layer in &self.expected_layers {
-            let progress = self.layer_cursor.get(layer);
-            let remaining = self.layer_remaining.get(layer).copied();
-            let attempt = self.layer_attempts.get(layer).copied().unwrap_or(0);
+            let lkey = layer_map_key(layer);
+            let progress = self.layer_cursor.get(&lkey);
+            let remaining = self.layer_remaining.get(&lkey).copied();
+            let attempt = self.layer_attempts.get(&lkey).copied().unwrap_or(0);
             let lstate = match &self.state {
                 ErasureState::Requested | ErasureState::Planned | ErasureState::Gating => {
                     LayerState::Pending
@@ -201,6 +207,7 @@ impl Job {
                         LayerState::Purging
                     }
                 }
+                _ => LayerState::Pending,
             };
             layers.push(LayerStatus {
                 layer: layer.as_str().to_string(),
@@ -226,7 +233,7 @@ impl Job {
     fn to_job_view(&self) -> JobView {
         let mut layers_done = Vec::new();
         for layer in &self.expected_layers {
-            if let Some(p) = self.layer_cursor.get(layer) {
+            if let Some(p) = self.layer_cursor.get(&layer_map_key(layer)) {
                 if p.cursor.is_none() {
                     layers_done.push(layer.clone());
                 }
@@ -280,7 +287,11 @@ impl KernelState {
 /// Implementiert [`ports::ErasureKernel`].
 pub struct StoreErasureKernel {
     cfg: StoreErasureConfig,
-    deps: StoreDeps,
+    data_dir: PathBuf,
+    io: crate::io_seam::StoreIo,
+    health: Arc<parking_lot::RwLock<crate::lsm::engine::StorageHealth>>,
+    clock: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::Clock>>>,
+    deps: OnceLock<StoreDeps>,
     gate: Arc<StoreGate>,
     pending: Arc<PendingDelete>,
     ledger: Option<Arc<StoreLedger>>,
@@ -303,9 +314,12 @@ impl StoreErasureKernel {
     /// # Crash
     /// Schneidet unvollständige Tail-Frames ab (CP-13) und bereinigt verwaiste Temp-Dateien (CP-15)
     /// sowie ausstehende Löschungen aus `pending-delete.list` (CP-17, CP-18).
-    pub(crate) async fn open(
+    pub(crate) async fn open_early(
         cfg: StoreErasureConfig,
-        deps: StoreDeps,
+        data_dir: PathBuf,
+        io: crate::io_seam::StoreIo,
+        health: Arc<parking_lot::RwLock<crate::lsm::engine::StorageHealth>>,
+        clock: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::Clock>>>,
         key_source: &dyn KeyMaterialSource,
         anchor: Option<Arc<dyn LedgerAnchor>>,
     ) -> Result<(Self, BootReport), ErasureError> {
@@ -315,9 +329,9 @@ impl StoreErasureKernel {
                     "require_external_ledger requires ledger_path to be set",
                 ));
             };
-            validate_external_ledger_path(lp, &deps.data_dir)?;
+            validate_external_ledger_path(lp, &data_dir)?;
         } else if let Some(ref lp) = cfg.ledger_path {
-            validate_external_ledger_path(lp, &deps.data_dir)?;
+            validate_external_ledger_path(lp, &data_dir)?;
         }
 
         // Schlüsselmaterial ableiten (§11.1) — niemals aus Konstanten.
@@ -334,7 +348,7 @@ impl StoreErasureKernel {
 
         let ledger = if let Some(ref ledger_dir) = cfg.ledger_path {
             Some(Arc::new(
-                StoreLedger::open(deps.io.clone(), ledger_dir.clone(), ledger_key, anchor).await?,
+                StoreLedger::open(io.clone(), ledger_dir.clone(), ledger_key, anchor).await?,
             ))
         } else {
             None
@@ -342,16 +356,16 @@ impl StoreErasureKernel {
 
         let pending = Arc::new(
             PendingDelete::open(
-                deps.io.clone(),
+                io.clone(),
                 &cfg.dir,
-                deps.data_dir.clone(),
+                data_dir.clone(),
                 cfg.pending_retry_limit,
             )
             .await?,
         );
 
         let j_open = Journal::open(
-            deps.io.clone(),
+            io.clone(),
             cfg.dir.clone(),
             cfg.reserve_bytes,
             cfg.max_plan_bytes,
@@ -363,7 +377,7 @@ impl StoreErasureKernel {
         if j_open.corrupt {
             // I-7: Fail-Closed-Modus!
             gate.set_fail_closed();
-            *deps.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+            *health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
             let ks = KernelState {
                 jobs: BTreeMap::new(),
                 completed_summaries: BTreeMap::new(),
@@ -372,7 +386,11 @@ impl StoreErasureKernel {
             };
             let kernel = Self {
                 cfg,
-                deps,
+                data_dir,
+                io,
+                health,
+                clock,
+                deps: OnceLock::new(),
                 gate,
                 pending,
                 ledger,
@@ -399,7 +417,7 @@ impl StoreErasureKernel {
         }
 
         // Temp-Dateien aus TempFile-Frames über Pending-Delete bereinigen (§5.4.7, CP-15)
-        let temp_paths = collect_temp_file_paths(&deps.data_dir, &j_open.records);
+        let temp_paths = collect_temp_file_paths(&data_dir, &j_open.records);
         let mut pending_deleted = pending.drain_pending().await?;
         if !temp_paths.is_empty() {
             let rm_tmp = pending.remove_after_commit(&temp_paths).await?;
@@ -418,7 +436,7 @@ impl StoreErasureKernel {
         }
 
         let jobs_open = jobs.values().filter(|j| !j.state.is_terminal()).count() as u32;
-        let mut ks = KernelState {
+        let ks = KernelState {
             jobs,
             completed_summaries: BTreeMap::new(),
             summary_records,
@@ -438,12 +456,13 @@ impl StoreErasureKernel {
             .map(Job::to_job_view)
             .collect();
 
-        // Entferne bereits abgeschlossene Jobs aus `jobs`? Behalten für status(id) bis Verdichtung.
-        let _ = &mut ks;
-
         let kernel = Self {
             cfg,
-            deps,
+            data_dir,
+            io,
+            health,
+            clock,
+            deps: OnceLock::new(),
             gate,
             pending,
             ledger,
@@ -461,6 +480,16 @@ impl StoreErasureKernel {
             pending_deleted,
         };
         Ok((kernel, report))
+    }
+
+    pub(crate) fn attach_deps(&self, deps: StoreDeps) {
+        let _ = self.deps.set(deps);
+    }
+
+    fn deps_ref(&self) -> Result<&StoreDeps, ErasureError> {
+        self.deps
+            .get()
+            .ok_or_else(|| ErasureError::Io("erasure kernel store deps not yet attached".into()))
     }
 
     fn apply_record_to_jobs(
@@ -481,7 +510,7 @@ impl StoreErasureKernel {
                     state: ErasureState::Requested,
                     plan: Arc::new(ResolvedScope {
                         id: *id,
-                        target_kind: TargetKind::KeyPrefix,
+                        target_kind: TargetKind::Subject,
                         keys: contextra_ports::erasure::KeyScope::default(),
                         docs: Vec::new(),
                         plan_hash: [0u8; 32],
@@ -575,14 +604,14 @@ impl StoreErasureKernel {
                         Some(Cursor::new(cursor.clone())?)
                     };
                     job.layer_cursor.insert(
-                        layer.clone(),
+                        layer_map_key(layer),
                         LayerProgress {
                             cursor: c,
                             units_done: *units_done,
                             bytes_freed: *bytes_freed,
                         },
                     );
-                    job.layer_attempts.insert(layer.clone(), *attempt);
+                    job.layer_attempts.insert(layer_map_key(layer), *attempt);
                     job.raw_records.push(rec.clone());
                 }
             }
@@ -680,7 +709,7 @@ impl StoreErasureKernel {
             return Ok(());
         }
         let mut ks = self.state.lock().await;
-        let now = self.deps.clock.read().unix_nanos();
+        let now = self.clock.read().now_unix_nanos();
         let mut to_append = Vec::new();
         let mut updated_ids = Vec::new();
 
@@ -699,7 +728,7 @@ impl StoreErasureKernel {
 
         if !to_append.is_empty() {
             if let Err(e) = ks.journal.append_batch(&to_append).await {
-                *self.deps.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+                *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
             for (idx, id) in updated_ids.iter().enumerate() {
@@ -736,6 +765,10 @@ impl StoreErasureKernel {
         Arc::clone(&self.global_collapse.read())
     }
 
+    pub(crate) fn global_collapse_handle(&self) -> Arc<parking_lot::RwLock<Arc<CollapseMap>>> {
+        Arc::clone(&self.global_collapse)
+    }
+
     /// Registriert Version-Collapse-Einträge (A-1) durabel im Journal und RAM (§7.2).
     pub(crate) async fn register_collapse(
         &self,
@@ -760,7 +793,7 @@ impl StoreErasureKernel {
                 entries: chunk.to_vec(),
             };
             if let Err(e) = ks.journal.append_batch(&[rec.clone()]).await {
-                *self.deps.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+                *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
             if let Some(job_mut) = ks.jobs.get_mut(&id) {
@@ -855,7 +888,7 @@ impl ErasureKernel for StoreErasureKernel {
             }
 
             let expected_layers = Self::default_expected_layers();
-            let now = self.deps.clock.read().unix_nanos();
+            let now = self.clock.read().now_unix_nanos();
             let target_hash = *blake3::hash(&req.target.canonical_bytes()).as_bytes();
 
             let r_req = JournalRecord::Requested {
@@ -879,14 +912,14 @@ impl ErasureKernel for StoreErasureKernel {
             // (4) Platzbedarf prüfen
             if !ks.journal.has_space_for(est_bytes.saturating_add(self.cfg.reserve_bytes)) {
                 return Err(ErasureError::InsufficientSpace {
-                    required: est_bytes.saturating_add(self.cfg.reserve_bytes),
+                    needed: est_bytes.saturating_add(self.cfg.reserve_bytes),
                     available: 0,
                 });
             }
 
             // (5) Requested + Planned in einem append_batch + sync_data
             if let Err(e) = ks.journal.append_batch(&[r_req.clone(), r_plan.clone()]).await {
-                *self.deps.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+                *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
 
@@ -943,10 +976,11 @@ impl ErasureKernel for StoreErasureKernel {
                 return Err(ErasureError::InvalidTransition);
             }
 
-            let now = self.deps.clock.read().unix_nanos();
+            let deps = self.deps_ref()?;
+            let now = self.clock.read().now_unix_nanos();
             let intent_rec = JournalRecord::GateIntent { id, ts: now };
             if let Err(e) = ks.journal.append_batch(&[intent_rec.clone()]).await {
-                *self.deps.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+                *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
 
@@ -957,8 +991,8 @@ impl ErasureKernel for StoreErasureKernel {
 
             // Protokoll §6.2 Schritte 4..10 unter commit_mutex (Rang 200) -> snap (Rang 960)
             let (gated_seq, epoch, target_kind, docs) = {
-                let _commit_lock = self.deps.commit_mutex.lock().await;
-                let seq_val = self.deps.next_seq_no.load(Ordering::SeqCst).saturating_sub(1);
+                let _commit_lock = deps.commit_mutex.lock().await;
+                let seq_val = deps.next_seq_no.load(Ordering::SeqCst).saturating_sub(1);
                 let job_ref = ks.jobs.get(&id).ok_or(ErasureError::NotFound)?;
                 let mut jg = job_ref.to_job_gate();
                 jg.up_to = Seq(seq_val);
@@ -976,7 +1010,7 @@ impl ErasureKernel for StoreErasureKernel {
                 ts: now,
             };
             if let Err(e) = ks.journal.append_batch(&[gated_rec.clone()]).await {
-                *self.deps.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+                *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
 
@@ -996,7 +1030,7 @@ impl ErasureKernel for StoreErasureKernel {
             if target_kind == TargetKind::Tenant {
                 for ds in docs {
                     if let DocScope::Tenant { tenant } = ds {
-                        let _ = self.deps.snapshot_registry.revoke_covering(
+                        let _ = deps.snapshot_registry.revoke_covering(
                             tenant,
                             0..gated_seq.saturating_add(1),
                             gated_seq,
@@ -1045,10 +1079,10 @@ impl ErasureKernel for StoreErasureKernel {
                 let attempt = job.attempt;
 
                 if need_start {
-                    let now = self.deps.clock.read().unix_nanos();
+                    let now = self.clock.read().now_unix_nanos();
                     let rec = JournalRecord::PurgeStart { id, ts: now };
                     if let Err(e) = ks.journal.append_batch(&[rec.clone()]).await {
-                        *self.deps.health.write() =
+                        *self.health.write() =
                             crate::lsm::engine::StorageHealth::JournalPoisoned;
                         return Err(e);
                     }
@@ -1066,15 +1100,16 @@ impl ErasureKernel for StoreErasureKernel {
             };
             let _ = need_purge_start;
 
+            let deps = self.deps_ref()?;
             let collapse = self.collapse_snapshot();
             let filter = build_filter(&self.gate, &collapse);
 
             // Phase 1: MemTable-Retain (§7.1)
-            let (mem_dropped, mem_freed) = purge_memtables(&self.deps, &filter).await;
+            let (mem_dropped, mem_freed) = purge_memtables(deps, &filter).await;
 
             // Phase 2: Erase-Compaction über SSTables (§7.3)
             let (next_cursor, sst_units, sst_freed) = erase_compact_tick(
-                &self.deps,
+                deps,
                 id,
                 &scope,
                 &filter,
@@ -1089,7 +1124,7 @@ impl ErasureKernel for StoreErasureKernel {
 
             // Phase 3: WAL-Schnitt nur, wenn alle SSTables durch sind (§7.4)
             let (wal_dropped, wal_freed) = if next_cursor.is_none() {
-                erase_wal_cut(&self.deps, &filter, &self.pending).await?
+                erase_wal_cut(deps, &filter, &self.pending).await?
             } else {
                 (0, 0)
             };
@@ -1131,7 +1166,7 @@ impl ErasureKernel for StoreErasureKernel {
             ) {
                 return Err(ErasureError::InvalidTransition);
             }
-            let attempt = job.layer_attempts.get(layer).copied().unwrap_or(0);
+            let attempt = job.layer_attempts.get(&layer_map_key(layer)).copied().unwrap_or(0);
             let cursor_bytes = p
                 .cursor
                 .as_ref()
@@ -1146,11 +1181,11 @@ impl ErasureKernel for StoreErasureKernel {
                 attempt,
             };
             if let Err(e) = ks.journal.append_batch(&[rec.clone()]).await {
-                *self.deps.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+                *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
             if let Some(job_mut) = ks.jobs.get_mut(&id) {
-                job_mut.layer_cursor.insert(layer.clone(), p.clone());
+                job_mut.layer_cursor.insert(layer_map_key(layer), p.clone());
                 job_mut.raw_records.push(rec);
             }
             self.refresh_caches(&ks);
@@ -1176,7 +1211,7 @@ impl ErasureKernel for StoreErasureKernel {
                 attempt,
                 _existing_state,
             ) = {
-                let mut ks = self.state.lock().await;
+                let ks = self.state.lock().await;
                 if ks.journal.is_poisoned() {
                     return Err(ErasureError::JournalPoisoned);
                 }
@@ -1216,7 +1251,7 @@ impl ErasureKernel for StoreErasureKernel {
 
             let mut all_zero_remaining = true;
             let mut missing_or_disabled = false;
-            let mut remaining_map: BTreeMap<WitnessLayer, u64> = BTreeMap::new();
+            let mut remaining_map: BTreeMap<(u8, String), u64> = BTreeMap::new();
 
             let mut sorted_expected = expected_layers.clone();
             sorted_expected.sort_by(|a, b| layer_sort_key(a).cmp(&layer_sort_key(b)));
@@ -1229,7 +1264,7 @@ impl ErasureKernel for StoreErasureKernel {
                 if let Some(wit) = witness_by_layer.get(&(tag, name.to_string())) {
                     root_hasher.update(&[tag]);
                     root_hasher.update(wit.digest());
-                    remaining_map.insert(layer.clone(), wit.remaining());
+                    remaining_map.insert(layer_map_key(layer), wit.remaining());
                     if wit.remaining() > 0 {
                         all_zero_remaining = false;
                     }
@@ -1257,8 +1292,9 @@ impl ErasureKernel for StoreErasureKernel {
                 }
             }
 
+            let deps = self.deps_ref()?;
             if let Some(gs) = gated_seq {
-                if let Some(min_snap) = self.deps.snapshot_registry.min_read_snapshot() {
+                if let Some(min_snap) = deps.snapshot_registry.min_read_snapshot() {
                     if min_snap <= gs.0 {
                         exceptions.push(ErasureException::OverlappingSnapshotPinned {
                             min_seq: min_snap,
@@ -1273,7 +1309,7 @@ impl ErasureKernel for StoreErasureKernel {
             let crypto_erased = gated && keys_destroyed;
             let guarantee = Guarantee::new(gated, purged, crypto_erased)?;
 
-            let now = self.deps.clock.read().unix_nanos();
+            let now = self.clock.read().now_unix_nanos();
             let id_hmac = contextra_crypto::ledger_mac(&self.erasure_log_key, &id.0)
                 .map_err(|e| ErasureError::Io(e.to_string()))?;
 
@@ -1286,7 +1322,7 @@ impl ErasureKernel for StoreErasureKernel {
                     exceptions: exceptions.clone(),
                     plan_hash,
                     policy_version: 1,
-                    completed_at: Timestamp::from_nanos(now),
+                    completed_at: Timestamp::new(now / 1_000),
                 };
                 let entry = ledger.append(draft).await?;
                 if let Ok(head) = ledger.head().await {
@@ -1325,7 +1361,7 @@ impl ErasureKernel for StoreErasureKernel {
                 return Err(ErasureError::JournalPoisoned);
             }
             if let Err(e) = ks.journal.append_batch(&[r_ver.clone(), r_seal.clone()]).await {
-                *self.deps.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+                *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
 
@@ -1356,6 +1392,7 @@ impl ErasureKernel for StoreErasureKernel {
 
     fn complete<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<(), ErasureError>> {
         Box::pin(async move {
+            let deps = self.deps_ref()?;
             let mut ks = self.state.lock().await;
             if ks.journal.is_poisoned() {
                 return Err(ErasureError::JournalPoisoned);
@@ -1368,7 +1405,7 @@ impl ErasureKernel for StoreErasureKernel {
             // §6.5 Freigabebedingungen (I-9)
             // 1. Alle erwarteten Layer remaining == 0
             for layer in &job.expected_layers {
-                match job.layer_remaining.get(layer) {
+                match job.layer_remaining.get(&layer_map_key(layer)) {
                     Some(0) => {}
                     _ => return Err(ErasureError::InvalidTransition),
                 }
@@ -1384,7 +1421,7 @@ impl ErasureKernel for StoreErasureKernel {
             }
             // 3. Snapshot-Freigabe: min_read_snapshot > gated_seq oder OverlappingSnapshotPinned
             if let Some(gs) = job.gated_seq {
-                if let Some(min_snap) = self.deps.snapshot_registry.min_read_snapshot() {
+                if let Some(min_snap) = deps.snapshot_registry.min_read_snapshot() {
                     let has_pinned_exc = job
                         .exceptions
                         .iter()
@@ -1395,10 +1432,10 @@ impl ErasureKernel for StoreErasureKernel {
                 }
             }
 
-            let now = self.deps.clock.read().unix_nanos();
+            let now = self.clock.read().now_unix_nanos();
             let comp_rec = JournalRecord::Completed { id, ts: now };
             if let Err(e) = ks.journal.append_batch(&[comp_rec.clone()]).await {
-                *self.deps.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+                *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
 
@@ -1416,6 +1453,8 @@ impl ErasureKernel for StoreErasureKernel {
             if should_compact {
                 let mut compact_records = Vec::new();
                 let mut completed_ids = Vec::new();
+                let mut new_summaries = Vec::new();
+                let mut new_completed = Vec::new();
                 for (jid, j) in &ks.jobs {
                     if j.state.is_terminal() {
                         let id_hmac = contextra_crypto::ledger_mac(&self.erasure_log_key, &jid.0)
@@ -1441,12 +1480,16 @@ impl ErasureKernel for StoreErasureKernel {
                             guarantee: g,
                             completed_at: now,
                         };
-                        ks.summary_records.push(sum.clone());
-                        ks.completed_summaries.insert(*jid, j.to_status());
+                        new_summaries.push(sum);
+                        new_completed.push((*jid, j.to_status()));
                         completed_ids.push(*jid);
                     } else {
                         compact_records.extend(j.raw_records.clone());
                     }
+                }
+                ks.summary_records.extend(new_summaries);
+                for (jid, st) in new_completed {
+                    ks.completed_summaries.insert(jid, st);
                 }
                 for cid in completed_ids {
                     ks.jobs.remove(&cid);
@@ -1522,7 +1565,7 @@ impl ErasureKernel for StoreErasureKernel {
             };
 
             if let Err(e) = ks.journal.append_batch(&[rec.clone()]).await {
-                *self.deps.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+                *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
 
@@ -1530,7 +1573,7 @@ impl ErasureKernel for StoreErasureKernel {
                 job_mut.attempt = next_attempt;
                 job_mut.state = new_state.clone();
                 if let Some(l) = layer {
-                    job_mut.layer_attempts.insert(l.clone(), next_attempt);
+                    job_mut.layer_attempts.insert(layer_map_key(l), next_attempt);
                 }
                 job_mut.raw_records.push(rec);
             }
@@ -1548,6 +1591,7 @@ impl ErasureKernel for StoreErasureKernel {
     }
 
     fn privileged_reader(&self, id: ErasureId) -> Result<Arc<dyn PrivilegedRead>, ErasureError> {
+        let deps = self.deps_ref()?.clone();
         let views = self.open_views_cache.read();
         let view = views
             .iter()
@@ -1564,7 +1608,7 @@ impl ErasureKernel for StoreErasureKernel {
         }
         let sealed_flag = Arc::new(AtomicBool::new(false));
         Ok(Arc::new(StorePrivilegedReader::new(
-            self.deps.clone(),
+            deps,
             Arc::clone(&view.scope),
             sealed_flag,
         )))
@@ -1575,18 +1619,21 @@ impl ErasureKernel for StoreErasureKernel {
     }
 
     fn store_scanners(&self) -> Vec<Arc<dyn LayerScanner>> {
+        let Some(deps) = self.deps.get().cloned() else {
+            return Vec::new();
+        };
         vec![
             Arc::new(KernelStoreScanner::new(
                 WitnessLayer::LsmMemtable,
-                self.deps.clone(),
+                deps.clone(),
             )),
             Arc::new(KernelStoreScanner::new(
                 WitnessLayer::SsTableAllLevels,
-                self.deps.clone(),
+                deps.clone(),
             )),
             Arc::new(KernelStoreScanner::new(
                 WitnessLayer::WalAllSegments,
-                self.deps.clone(),
+                deps,
             )),
         ]
     }

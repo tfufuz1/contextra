@@ -7,7 +7,7 @@ use contextra_ports::erasure::{DocScope, KeyPattern, KeyScope, Verdict};
 use contextra_ports::gate::{DiscardRule, GateDecision, RangeGate, ReadGate};
 use contextra_types::{DocId, ErasureId, Seq, TenantId};
 use parking_lot::RwLock;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 

@@ -83,7 +83,7 @@ fn encode_payload_without_mac(
     encode_exceptions(&draft.exceptions, &mut out)?;
     out.extend_from_slice(&draft.plan_hash);
     out.extend_from_slice(&draft.policy_version.to_le_bytes());
-    out.extend_from_slice(&draft.completed_at.as_nanos().to_le_bytes());
+    out.extend_from_slice(&draft.completed_at.as_u64().to_le_bytes());
     out.extend_from_slice(prev_hash);
     Ok(out)
 }
@@ -138,7 +138,7 @@ fn decode_entry_payload(payload: &[u8]) -> Result<(LedgerEntry, [u8; 32]), Erasu
             exceptions,
             plan_hash,
             policy_version,
-            completed_at: Timestamp::from_nanos(completed_nanos),
+            completed_at: Timestamp::new(completed_nanos),
             prev_hash,
             entry_mac,
         },
@@ -486,10 +486,10 @@ mod tests {
             erasure_id_hmac: [0x11; 32],
             guarantee: Guarantee::new(true, true, false).unwrap(),
             layers_root: [0x22; 32],
-            exceptions: vec![ErasureException::OutOfScopeExternalCopies],
+            exceptions: vec![contextra_types::ErasureException::OutOfScopeExternalCopies],
             plan_hash: [0x33; 32],
             policy_version: 1,
-            completed_at: Timestamp::from_nanos(12345),
+            completed_at: Timestamp::new(12345),
         };
 
         let e1 = ledger.append(draft.clone()).await.unwrap();

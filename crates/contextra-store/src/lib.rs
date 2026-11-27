@@ -52,7 +52,10 @@
 #[cfg(not(loom))]
 pub mod compaction;
 pub mod engine;
+#[cfg(not(loom))]
+pub mod erasure;
 pub mod fsync;
+pub mod io_budget;
 pub mod key_source;
 #[cfg(not(loom))]
 pub mod lsm;
@@ -96,4 +99,6 @@ pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
 
 pub mod io_seam;
+#[cfg(not(loom))]
+pub use erasure::{BootReport, StoreErasureConfig, StoreErasureKernel};
 pub use io_seam::{RealFs, RealFsFile, StoreIo};
