@@ -301,33 +301,50 @@ impl Contextra {
         name: &str,
         tenant_id: TenantId,
     ) -> Result<()> {
+        use crate::erasure::{EraseOptions, LayerRegistry};
+        use contextra_types::{AwaitLevel, EraseTarget, ErasureReason};
+
         let cache_key = (tenant_id, name.to_string());
 
-        // 1. Aus Cache entfernen
+        // 1. Collection laden (nur zur Validierung; `default` wird abgewiesen).
         let col = {
-            let mut write_guard = self.tenant_collections.write().await;
-            write_guard.remove(&cache_key)
+            let guard = self.tenant_collections.read().await;
+            guard.get(&cache_key).cloned()
         };
-
         let col = match col {
             Some(c) => c,
             None => self.collection_for_tenant(name, tenant_id).await?,
         };
-
-        // 2. Mechanische Daten- und Indexbereinigung
         col.drop_collection().await?;
 
-        // 3. Aus Collection-Index entfernen falls nicht default
-        if name != "default" {
-            let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
-            let tx = self.allocate_tx()?;
-            let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
-                self.storage.clone(),
-                tenant_id,
-            );
-            tenant_storage.delete(tx, &col_idx_key).await?;
-            tenant_storage.commit(tx).await?;
-        }
+        // 2. Durable Löschkette: G1 synchron, G3 im Hintergrund (K-44: HNSW, Graph,
+        //    Checkpoints und `__col_idx` werden von der Kette bereinigt).
+        let handle = self
+            .erase(
+                EraseTarget::Collection {
+                    tenant: tenant_id,
+                    collection: name.to_string(),
+                },
+                EraseOptions {
+                    reason: ErasureReason::OperatorAction,
+                    await_level: AwaitLevel::Gated,
+                    policy: None,
+                },
+            )
+            .await?;
+
+        // 3. Erst nach `Gated` aus den Caches nehmen, damit kein Schreibzugriff durchkommt.
+        self.tenant_collections.write().await.remove(&cache_key);
+
+        // 4. Layer-Registrierung erst nach `Completed` entfernen (G3 braucht die Layer noch).
+        let rt = std::sync::Arc::clone(self.erasure.inner());
+        let reg_key = LayerRegistry::collection_key(tenant_id, name);
+        let id = handle.id;
+        self.task_tracker.spawn(async move {
+            if rt.wait_completed(id).await.is_ok() {
+                rt.registry.write().remove_collection(&reg_key);
+            }
+        });
 
         Ok(())
     }

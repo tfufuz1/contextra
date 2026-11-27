@@ -64,6 +64,36 @@ impl ScopeResolverImpl {
         doc_key: Vec<u8>,
         reverse_value: &[u8],
     ) -> Result<ResolvedScope, ErasureError> {
+        Self::document_with_extras(
+            id,
+            tenant,
+            collection,
+            key,
+            user_key,
+            doc_key,
+            reverse_value,
+            Vec::new(),
+            0,
+        )
+    }
+
+    /// Document scope including text rows, relation rows and the graph provenance row.
+    ///
+    /// `extra_keys` are collection-logical exact keys (no tenant prefix yet). The graph
+    /// provenance key `__graph:prov:{collection}:{doc}` is added here (08 §4);
+    /// `unprovenanced` is the count of graph objects without provenance.
+    #[allow(clippy::too_many_arguments)]
+    pub fn document_with_extras(
+        id: ErasureId,
+        tenant: TenantId,
+        collection: &str,
+        key: &str,
+        user_key: Vec<u8>,
+        doc_key: Vec<u8>,
+        reverse_value: &[u8],
+        extra_keys: Vec<Vec<u8>>,
+        unprovenanced: u64,
+    ) -> Result<ResolvedScope, ErasureError> {
         let target = EraseTarget::Document {
             tenant,
             collection: collection.to_owned(),
@@ -75,11 +105,22 @@ impl ScopeResolverImpl {
         if reverse.id.as_bytes() != key.as_bytes() {
             return Err(ErasureError::ScopeAmbiguous);
         }
-        let keys = KeyScope::new(vec![
-            (KeyPattern::Exact(prefixed(&tenant_prefix(tenant), &user_key)), Verdict::In),
-            (KeyPattern::Exact(prefixed(&tenant_prefix(tenant), &doc_key)), Verdict::In),
-        ])?;
         let doc = DocId::from_key(key).map_err(|_| ErasureError::InvalidTarget("invalid document key"))?;
+        let ns = tenant_prefix(tenant);
+        let mut rules = vec![
+            (KeyPattern::Exact(prefixed(&ns, &user_key)), Verdict::In),
+            (KeyPattern::Exact(prefixed(&ns, &doc_key)), Verdict::In),
+        ];
+        for extra in &extra_keys {
+            rules.push((KeyPattern::Exact(prefixed(&ns, extra)), Verdict::In));
+        }
+        let prov = format!("__graph:prov:{collection}:{}", doc.inner());
+        rules.push((KeyPattern::Exact(prefixed(&ns, prov.as_bytes())), Verdict::In));
+        let keys = KeyScope::new(rules)?;
+        // Tenant isolation check (I-8): every In-rule carries the tenant prefix.
+        if !keys.rules().iter().all(|(p, _)| p.bytes().starts_with(&ns)) {
+            return Err(ErasureError::TenantViolation);
+        }
         let mut docs = BTreeSet::new();
         docs.insert(doc);
         Ok(ResolvedScope::new(
@@ -88,7 +129,7 @@ impl ScopeResolverImpl {
             &target,
             keys,
             vec![DocScope::Set { tenant, collection: collection.to_owned(), docs }],
-            0,
+            unprovenanced,
         ))
     }
 }
