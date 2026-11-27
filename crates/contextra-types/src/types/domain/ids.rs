@@ -15,7 +15,7 @@ use crate::error::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
 ///
-/// LAYER-BEGRÜNDUNG: TenantId ist Abhängigkeit für KV-Cache-Isolation (Layer 4).
+/// LAYER-BEGRÜNDUNG: TenantId ist Abhängigkeit für Mandanten-Isolation (Layer 4).
 /// In Layer 1+ definiert → zyklische Crate-Abhängigkeit unvermeidbar.
 ///
 /// INVARIANTE INV-TENANT-1: TenantId(0) ist SYSTEM-reserviert.

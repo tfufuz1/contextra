@@ -13,8 +13,7 @@
 use contextra_crypto::kdf::{KDF_HEADER_MAGIC, KDF_HEADER_VERSION_1, KDF_ID_ARGON2ID};
 use contextra_crypto::kv_shredding::{GroupKek, RecordDek};
 use contextra_crypto::{
-    KdfHeader, KdfParams, KeyManager, KeyRegistry, KvCipher, KvSegmentCipher, SignatureVersion,
-    SubKey,
+    KdfHeader, KdfParams, KeyManager, KeyRegistry, SignatureVersion, SubKey,
 };
 
 #[test]
@@ -101,50 +100,6 @@ fn killer_test_kdf_header_from_bytes_boundary_validations() {
         KdfHeader::from_bytes(&huge_salt_len_bytes).is_err(),
         "salt_len > 10000 must fail"
     );
-}
-
-#[test]
-fn killer_test_key_manager_kv_cipher_seal_open_roundtrip() {
-    // Kills mutants in <impl KvCipher for KeyManager>::seal & open
-    // Oracle: Decrypted plaintext MUST equal original plaintext
-    let km = KeyManager::try_new("test-passphrase-kv-cipher", b"test-salt-kv-cipher").unwrap();
-    let plaintext = b"exact plaintext payload for KeyManager KvCipher trait";
-
-    let sealed = km.seal(plaintext).expect("KeyManager seal must succeed");
-    assert!(
-        sealed.len() >= 12 + plaintext.len(),
-        "Sealed payload must contain 12B nonce"
-    );
-
-    let opened = km.open(&sealed).expect("KeyManager open must succeed");
-    assert_eq!(
-        opened, plaintext,
-        "Opened payload must equal original plaintext"
-    );
-
-    // Short ciphertext (< 12 bytes) must fail open
-    let short_ct = vec![0u8; 11];
-    assert!(
-        km.open(&short_ct).is_err(),
-        "Ciphertext < 12 bytes must fail open"
-    );
-}
-
-#[test]
-fn killer_test_kv_segment_cipher_kv_cipher_seal_open() {
-    // Kills mutants in <impl KvCipher for KvSegmentCipher>::seal & open
-    // Oracle: Decrypted payload MUST equal original plaintext
-    let km = KeyManager::try_new("test-passphrase-kv-cipher", b"test-salt-kv-cipher").unwrap();
-    let cipher = KvSegmentCipher::new(km);
-    let plaintext = b"exact plaintext payload for KvSegmentCipher seal open";
-
-    let sealed = cipher
-        .seal(plaintext)
-        .expect("KvSegmentCipher seal must succeed");
-    let opened = cipher
-        .open(&sealed)
-        .expect("KvSegmentCipher open must succeed");
-    assert_eq!(opened, plaintext);
 }
 
 #[test]

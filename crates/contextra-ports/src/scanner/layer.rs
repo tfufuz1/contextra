@@ -21,8 +21,6 @@ pub enum WitnessLayer {
     WalAllSegments,
     /// Compressed Sparse Row Graph
     CsrGraph,
-    /// Key-Value Cache Segmente
-    KvCacheSegments,
     /// In-Memory Embedding Cache
     EmbeddingCache,
     /// Benutzerdefinierte Schichtbezeichnung für Erweiterungen
@@ -38,7 +36,6 @@ impl WitnessLayer {
             Self::HnswIndex => "HnswIndex",
             Self::WalAllSegments => "WalAllSegments",
             Self::CsrGraph => "CsrGraph",
-            Self::KvCacheSegments => "KvCacheSegments",
             Self::EmbeddingCache => "EmbeddingCache",
             Self::Custom(s) => s.as_str(),
         }
@@ -53,7 +50,6 @@ impl From<&str> for WitnessLayer {
             "HnswIndex" => WitnessLayer::HnswIndex,
             "WalAllSegments" => WitnessLayer::WalAllSegments,
             "CsrGraph" => WitnessLayer::CsrGraph,
-            "KvCacheSegments" => WitnessLayer::KvCacheSegments,
             "EmbeddingCache" => WitnessLayer::EmbeddingCache,
             other => WitnessLayer::Custom(other.to_string()),
         }

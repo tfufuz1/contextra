@@ -454,7 +454,7 @@ Contextra erzwingt ein striktes 5-Ring-Schichtenmodell. Abhängigkeiten dürfen 
 | Ring | Name | Verantwortung | Merkmal |
 |---|---|---|---|
 | **0** | Foundation & Pure Numerics/Types | Domänentypen, Traits/Ports, Kryptographie, Mathematik, Vektor-/Text-/Graph-Primitive | **Kein `tokio`** — Sync-Kern, async-Schale (P26) |
-| **1** | Persistence & Cache | LSM-Tree-Storage, WAL, Block-Cache, KV-Cache-Segmente, Time-Travel-Checkpoints | Async-I/O nur an den Rändern |
+| **1** | Persistence & Cache | LSM-Tree-Storage, WAL, Block-Cache, Time-Travel-Checkpoints | Async-I/O nur an den Rändern |
 | **2** | External Adapters & Sandboxing | Candle/GGUF-, Ollama-, ONNX-Inferenz, WASM-Sandbox | Blätter im Abhängigkeitsgraphen |
 | **3** | Orchestration & Cognition | Transaktions-Engine, Collection-Engine, Kompaktierung, Privacy-Gateway, Routing, Agent-Workflows | Geschäfts-/Orchestrierungslogik |
 | **4** | Boundary & Composition Roots | Öffentliche Fassade (`contextra`), MCP-Server, Python-Bindings | Einzige Composition Root |

@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Encryption at Rest and KV-Cache Security utilities for Contextra"
+description = "Encryption at Rest and crypto-erase utilities for Contextra"
 
 [package.metadata.contextra]
 ring = "0"
@@ -36,10 +36,9 @@ regex = { workspace = true }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [features]
-default = ["legacy-erasure", "kv-encryption", "test-utils"]
+default = ["legacy-erasure", "test-utils"]
 legacy-erasure = []
 test-utils = []
-kv-encryption = ["legacy-erasure"]
 cloud-egress-guard = []
 
 [dev-dependencies]
