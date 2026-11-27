@@ -351,10 +351,6 @@ pub enum ContextraError {
     #[error("Plugin error: {0}")]
     Plugin(String),
 
-    /// KV Cache segment pin memory budget exceeded for a tenant.
-    #[error("Pin budget exceeded: {0}")]
-    PinBudgetExceeded(String),
-
     /// HNSW graph repair failure.
     #[deprecated(
         since = "0.1.0",
@@ -470,12 +466,6 @@ impl ContextraError {
         Self::DurabilityConfig(msg.into())
     }
 
-    /// Creates a `PinBudgetExceeded` error.
-    // ANCHOR[contextra-types:ERR-FN-PIN_BUDGET_EXCEEDED]
-    pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self {
-        Self::PinBudgetExceeded(msg.into())
-    }
-
     /// Creates a `CrossDeviceLink` error.
     // ANCHOR[contextra-types:ERR-FN-CROSS_DEVICE_LINK]
     pub fn cross_device_link(
@@ -567,7 +557,6 @@ mod tests {
             },
             ContextraError::KvQuantization("test".into()),
             ContextraError::DurabilityConfig("test".into()),
-            ContextraError::PinBudgetExceeded("test".into()),
             ContextraError::CrossDeviceLink {
                 source_path: "/a/file.sst".into(),
                 target_path: "/b/file.sst".into(),
@@ -1115,19 +1104,6 @@ mod tests {
         assert!(
             matches!(dir_step, CacheDirective::ReleaseAfterStep { step_id: s } if s.inner() == 42)
         );
-    }
-
-    #[test]
-    fn test_pin_budget_exceeded_display_and_helper() {
-        let err = ContextraError::pin_budget_exceeded("Tenant 10 requested 100MB");
-        assert_eq!(
-            err.to_string(),
-            "Pin budget exceeded: Tenant 10 requested 100MB"
-        );
-        match err {
-            ContextraError::PinBudgetExceeded(msg) => assert_eq!(msg, "Tenant 10 requested 100MB"),
-            _ => panic!("Expected PinBudgetExceeded variant"),
-        }
     }
 
     #[test]

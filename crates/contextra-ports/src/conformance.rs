@@ -8,7 +8,6 @@
 /// Trait contract verification routines ensuring all trait methods are syntactically
 /// and semantically valid in generic contexts.
 pub mod check {
-    use crate::attention::{AttentionExporter, RequestId};
     use crate::checkpoint::{Checkpoint, CheckpointCoordinator};
     #[allow(deprecated)]
     use crate::embedding::TextGenerator;
@@ -66,11 +65,6 @@ pub mod check {
         drop(t.search_hybrid("query", &[0.0; 4], 10));
         drop(t.search_at(&[0.0; 4], 10, 0).await);
         drop(t.insert(TxId(1), doc, &[0.0; 4]).await);
-    }
-
-    /// Verifies that [`AttentionExporter`] methods can be invoked.
-    pub fn assert_attention_exporter_contract<T: AttentionExporter>(t: &T, req: RequestId) {
-        drop(t.export_attention_weights(req));
     }
 
     /// Verifies that [`GraphIndex`] and [`CommunityResolver`] methods can be invoked.

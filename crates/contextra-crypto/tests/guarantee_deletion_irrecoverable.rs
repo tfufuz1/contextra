@@ -204,10 +204,8 @@ fn test_scenario_2_key_derivation_boundary_and_reconstruction_check() {
      *    `KeyRegistry::get_or_derive(&master_km, group_id)` prüft explizit `is_group_revoked(group_id)`.
      *    Wenn die Gruppe widerrufen wurde, wird `CryptoError::KeyRevoked` zurückgegeben, d. h. selbst bei erneutem
      *    Aufruf derselben Methode über die KeyRegistry wird kein neuer Schlüssel für die gelöschte Gruppe erzeugt.
-     * 4. UNTERSCHIED ZU KvSegmentCipher/HKDF:
-     *    `KeyManager::derive_kv_key(tenant_id, model_fingerprint)` ist eine zustandslose HKDF-Sha256-Ableitung.
-     *    Für unzerstörbares Crypto-Shredding auf Segment-/Record-Ebene nutzt Contextra die `KeyRegistry`,
-     *    welche zufällige KEKs speichert und explizit vernichtet.
+     * 4. Für unzerstörbares Crypto-Shredding auf Record-Ebene nutzt Contextra die `KeyRegistry`,
+     *    welche zufällige KEKs speichert und explizit vernichtet (zustandslose HKDF-Ableitung scheidet aus).
      */
 
     let master_km = KeyManager::try_new("master-passphrase-shredding", b"master-salt-123")

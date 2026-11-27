@@ -35,7 +35,6 @@ pub(crate) fn encode_layer(layer: &WitnessLayer, out: &mut Vec<u8>) -> Result<()
         WitnessLayer::HnswIndex => out.push(3),
         WitnessLayer::WalAllSegments => out.push(4),
         WitnessLayer::CsrGraph => out.push(5),
-        WitnessLayer::KvCacheSegments => out.push(6),
         WitnessLayer::EmbeddingCache => out.push(7),
         WitnessLayer::Custom(s) => {
             let b = s.as_bytes();
@@ -61,7 +60,7 @@ pub(crate) fn decode_layer(r: &mut ByteReader<'_>) -> Result<WitnessLayer, Erasu
         3 => Ok(WitnessLayer::HnswIndex),
         4 => Ok(WitnessLayer::WalAllSegments),
         5 => Ok(WitnessLayer::CsrGraph),
-        6 => Ok(WitnessLayer::KvCacheSegments),
+        // 6: reserviert (ehem. KvCacheSegments, entfernt). Nicht wiederverwenden.
         7 => Ok(WitnessLayer::EmbeddingCache),
         0xFF => {
             let len = r.read_u8()? as usize;
@@ -86,7 +85,6 @@ pub(crate) fn layer_sort_key(layer: &WitnessLayer) -> (u8, &str) {
         WitnessLayer::HnswIndex => (3, ""),
         WitnessLayer::WalAllSegments => (4, ""),
         WitnessLayer::CsrGraph => (5, ""),
-        WitnessLayer::KvCacheSegments => (6, ""),
         WitnessLayer::EmbeddingCache => (7, ""),
         WitnessLayer::Custom(s) => (0xFF, s.as_str()),
     }

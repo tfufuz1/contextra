@@ -60,7 +60,6 @@ pub fn map_witness_layer_to_deletion_layer(
             Ok(DeletionLayer::WalAllSegments { seq_after })
         }
         WitnessLayer::CsrGraph => Ok(DeletionLayer::CsrGraph),
-        WitnessLayer::KvCacheSegments => Ok(DeletionLayer::KvCacheSegments),
         WitnessLayer::EmbeddingCache => Ok(DeletionLayer::EmbeddingCache),
         WitnessLayer::Custom(s) => match s.as_str() {
             "TextIndex" => Ok(DeletionLayer::TextIndex),
@@ -201,8 +200,6 @@ pub enum DeletionLayer {
     },
     /// Compressed Sparse Row knowledge graph edges purged.
     CsrGraph,
-    /// Key-value cache entries invalidated.
-    KvCacheSegments,
     /// In-memory vector embedding cache cleared.
     EmbeddingCache,
     /// Full-text inverted index posting lists and tombstones purged.

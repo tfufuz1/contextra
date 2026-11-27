@@ -355,12 +355,6 @@ fn test_all_error_variant_constructors_and_helpers() {
         ContextraError::DurabilityConfig(ref msg) if msg == "sync required"
     ));
 
-    let err_pin = ContextraError::pin_budget_exceeded("memory limit");
-    assert!(matches!(
-        err_pin,
-        ContextraError::PinBudgetExceeded(ref msg) if msg == "memory limit"
-    ));
-
     let err_link = ContextraError::cross_device_link("/a", "/b");
     assert!(matches!(
         err_link,

@@ -43,14 +43,6 @@ pub enum CryptoError {
     #[error("crypto error: {0}")]
     Crypto(String),
 
-    #[error("KV cache format version mismatch: expected {expected}, found {found}")]
-    KvFormatVersionMismatch {
-        /// Expected format version number.
-        expected: u8,
-        /// Format version number found in payload.
-        found: u8,
-    },
-
     #[error("WAL corruption detected at offset {offset}: {reason}")]
     WalCorruption {
         /// Byte offset in WAL file where corruption occurred.
@@ -90,9 +82,6 @@ impl From<CryptoError> for contextra_types::ContextraError {
         match e {
             CryptoError::WalCorruption { offset, reason } => Self::wal_corruption(offset, reason),
             CryptoError::InvalidInput(msg) => Self::InvalidInput(msg),
-            CryptoError::KvFormatVersionMismatch { expected, found } => Self::InvalidInput(
-                format!("KV cache format version mismatch: expected {expected}, found {found}"),
-            ),
             other => Self::Crypto(other.to_string()),
         }
     }
@@ -131,16 +120,6 @@ mod tests {
         assert!(matches!(
             mf_err_gen,
             ContextraError::Crypto(ref msg) if msg.contains("encryption failed")
-        ));
-
-        let version_mismatch = CryptoError::KvFormatVersionMismatch {
-            expected: 2,
-            found: 1,
-        };
-        let mf_err_version: ContextraError = version_mismatch.into();
-        assert!(matches!(
-            mf_err_version,
-            ContextraError::InvalidInput(ref msg) if msg.contains("expected 2, found 1")
         ));
     }
 }

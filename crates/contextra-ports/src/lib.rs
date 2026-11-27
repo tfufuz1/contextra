@@ -35,8 +35,6 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// Type alias for a pinned, heap-allocated `Stream` that is `Send` and dyn-compatible.
 pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> + Send + 'a>>;
 
-/// Attention exporter trait and request ID types.
-pub mod attention;
 /// Checkpoint and snapshot traits.
 pub mod checkpoint;
 /// Clock port trait and system time implementation.
@@ -52,9 +50,7 @@ pub mod graph_index;
 /// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
 /// Key-value prefix store traits and types.
-pub mod kv;
 /// Key-value bridge storage port trait.
-pub mod kv_bridge_port;
 /// License and activation gate port traits.
 pub mod license;
 /// Grounding validator traits and context preparer contracts.
@@ -93,7 +89,6 @@ pub mod inference;
 /// Policy subsystem abstractions (LicenseGate, EgressPolicy) with sub-prelude.
 pub mod policy;
 
-pub use attention::*;
 pub use checkpoint::*;
 pub use clock::*;
 pub use conformance::*;
@@ -101,8 +96,6 @@ pub use embedding::*;
 pub use graph::*;
 pub use graph_index::*;
 pub use id_gen::*;
-pub use kv::*;
-pub use kv_bridge_port::*;
 pub use license::*;
 pub use lifecycle::*;
 pub use metrics::*;
@@ -141,8 +134,6 @@ mod dyn_safety {
 
     fn _assert_dyn_storage(_: Option<&dyn StorageEngine>) {}
     fn _assert_dyn_metrics_sink(_: Option<&dyn MetricsSink>) {}
-    fn _assert_dyn_kv_bridge_storage(_: Option<&dyn KvBridgeStorage>) {}
-    fn _assert_dyn_kv_prefix_store(_: Option<&dyn KvPrefixStore>) {}
     fn _assert_dyn_graph_mutation(_: Option<&dyn GraphCollectionMutation>) {}
     fn _assert_dyn_graph(_: Option<&dyn GraphIndex>) {}
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
@@ -151,7 +142,6 @@ mod dyn_safety {
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
     fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
     fn _assert_dyn_license_gate(_: Option<&dyn LicenseGate>) {}
-    fn _assert_dyn_attention_exporter(_: Option<&dyn AttentionExporter>) {}
     fn _assert_dyn_reranker(_: Option<&dyn Reranker>) {}
     fn _assert_dyn_query_rewriter(_: Option<&dyn QueryRewriter>) {}
     fn _assert_dyn_layer_scanner(_: Option<&dyn LayerScanner>) {}
@@ -214,8 +204,6 @@ mod dyn_safety {
     fn test_dyn_safety_compiles() {
         _assert_dyn_storage(None);
         _assert_dyn_metrics_sink(None);
-        _assert_dyn_kv_bridge_storage(None);
-        _assert_dyn_kv_prefix_store(None);
         _assert_dyn_graph_mutation(None);
         _assert_dyn_graph(None);
         _assert_dyn_embedding(None);
@@ -223,7 +211,6 @@ mod dyn_safety {
         _assert_dyn_rng(None);
         _assert_dyn_id_gen(None);
         _assert_dyn_license_gate(None);
-        _assert_dyn_attention_exporter(None);
         _assert_dyn_reranker(None);
         _assert_dyn_query_rewriter(None);
         _assert_dyn_layer_scanner(None);

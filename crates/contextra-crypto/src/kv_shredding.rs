@@ -1,4 +1,4 @@
-//! # Kryptographisches Shredding für KV-Daten (`kv_shredding.rs`)
+//! # Kryptographisches Shredding (`kv_shredding.rs`)
 //!
 //! Ermöglicht kryptografische Bereinigung einzelner Datensätze oder ganzer Mandantengruppen
 //! durch gezielte Zerstörung des zugehörigen kryptographischen Schlüssels (Crypto-Erase).

@@ -29,8 +29,8 @@
 //!    das Write-Ahead-Log (WAL).
 //! 4. **Kryptographische Attestationsbeweise:** Erstellung und Verifikation signierter
 //!    Attestationszertifikate (Ed25519, BLAKE3).
-//! 5. **KV-Segment-Verschlüsselung & Shredding:** Feingranulare Mandanten- und Segment-
-//!    Isolierung mit kryptographischem Shredding (Crypto-Erase).
+//! 5. **Crypto-Shredding:** Feingranulare Mandanten- und Record-Isolierung mit
+//!    kryptographischem Shredding (Crypto-Erase).
 //!
 //! ## Invarianten
 //! - `#![forbid(unsafe_code)]`: Es gibt ausnahmslos keinen Unsafe-Code in dieser Crate.
@@ -51,8 +51,6 @@ pub mod ed25519_proof;
 pub mod error;
 pub mod erasure_root;
 pub mod kdf;
-pub mod kv_cipher;
-pub mod kv_segment;
 #[cfg(feature = "legacy-erasure")]
 pub mod kv_shredding;
 #[cfg(feature = "legacy-erasure")]
@@ -84,17 +82,6 @@ pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
 pub use erasure_root::{ErasureLabel, ErasureRoot};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
-#[cfg(feature = "legacy-erasure")]
-pub use kv_cipher::KvSegmentCipher;
-pub use kv_cipher::{EncryptedKvLayer, KvCipher, ModelFingerprint};
-pub use kv_segment::{
-    delete_mode::KvDeleteMode,
-    eviction_worker::{emergency_wipe, EvictionWorker},
-    manager::{KvSegmentConfig, KvSegmentManager, KvSegmentPayload},
-    segment::KvSegment,
-    store::TenantIsolatedKvStore,
-    CURRENT_KV_KEY_DERIVATION_VERSION,
-};
 #[cfg(feature = "legacy-erasure")]
 #[allow(deprecated)]
 pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE};

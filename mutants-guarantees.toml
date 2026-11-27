@@ -13,7 +13,6 @@
 # G2 (Loeschung/Krypto):
 #   cargo mutants --config mutants-guarantees.toml -p contextra-crypto \
 #     -f "crates/contextra-crypto/src/kv_shredding.rs" \
-#     -f "crates/contextra-crypto/src/kv_cipher.rs" \
 #     -f "crates/contextra-crypto/src/deletion_proof.rs" \
 #     -f "crates/contextra-crypto/src/ed25519_proof.rs" \
 #     -f "crates/contextra-crypto/src/kdf.rs" \

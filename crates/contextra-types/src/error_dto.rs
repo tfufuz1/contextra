@@ -344,11 +344,6 @@ impl From<&ContextraError> for ContextraErrorDto {
                 message: msg.clone(),
                 details: None,
             },
-            ContextraError::PinBudgetExceeded(msg) => Self {
-                kind: "PinBudgetExceeded".to_string(),
-                message: msg.clone(),
-                details: None,
-            },
             ContextraError::GraphRepairFailed(err) => Self {
                 kind: "GraphRepairFailed".to_string(),
                 message: err.to_string(),
@@ -520,10 +515,6 @@ mod tests {
                 "DurabilityConfig",
             ),
             (ContextraError::Plugin("plugin error".into()), "Plugin"),
-            (
-                ContextraError::PinBudgetExceeded("pin budget error".into()),
-                "PinBudgetExceeded",
-            ),
             (
                 ContextraError::GraphRepairFailed(crate::error::HnswDeletionError::NodeNotFound(
                     crate::DocId::new(1),
