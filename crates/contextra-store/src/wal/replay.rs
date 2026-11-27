@@ -161,7 +161,7 @@ impl Wal {
         self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "encryption-at-rest"))]
     #[allow(clippy::type_complexity)]
     pub(crate) fn parse_mmap_slice(
         &self,

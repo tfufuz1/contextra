@@ -30,11 +30,10 @@ async fn test_temp_file_naming_pattern_and_determinism() {
     let manifest_path = db_path.join("MANIFEST");
     let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
 
-    let live_entries =
-        vec![contextra_store::manifest::ManifestEntry::WalCheckpoint { hmac: [1u8; 32] }];
-
+    // rollover() schreibt den reduzierten Zustand des Manifest-Objekts selbst;
+    // es gibt keine externen Live-Einträge mehr als Argument.
     manifest
-        .rollover(&live_entries)
+        .rollover()
         .await
         .expect("manifest rollover");
 
