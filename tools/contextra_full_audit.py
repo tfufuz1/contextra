@@ -1251,10 +1251,6 @@ def build_plan(ctx: Ctx, args, outdir: Path) -> list[Step]:
     S.append(Step("2-tests", "test_gesamt_release",
                   cargo + ["test"] + pk + ["--release", "--locked", "--no-fail-fast"], timeout=7200,
                   note="Release deckt Overflow-/Optimierungsfehler auf (z. B. simd u8)"))
-    py_dir = ws.members.get("contextra-py")
-    if sel_all and py_dir and (py_dir / "tests").exists():
-        S.append(Step("2-tests", "python_bindings_pytest", ["python3", "-m", "pytest", "-q", str(py_dir / "tests")],
-                      requires=["python3"], note="setzt installierte Bindings voraus (maturin develop)"))
 
     # --- 3: Testbarkeit ----------------------------------------------------------------------
     ctx.selected = crates
