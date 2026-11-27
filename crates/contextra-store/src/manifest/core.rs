@@ -59,6 +59,19 @@ async fn sync_all_file(file: Arc<parking_lot::Mutex<AppendFile>>) -> Result<()> 
         .map_err(|error| ContextraError::Storage(error.to_string()))
 }
 
+fn has_crc_mismatch(raw: &[u8]) -> bool {
+    let Some(crc_bytes) = raw.get(..4) else {
+        return false;
+    };
+    let Ok(crc_bytes) = <[u8; 4]>::try_from(crc_bytes) else {
+        return false;
+    };
+    let Some(payload) = raw.get(4..) else {
+        return false;
+    };
+    u32::from_le_bytes(crc_bytes) != crc32fast::hash(payload)
+}
+
 fn parse_manifest_bytes(data: &[u8]) -> Result<(Vec<ManifestEntry>, usize, u8)> {
     if data.is_empty() {
         return Ok((Vec::new(), 0, CURRENT_MANIFEST_VERSION));
@@ -159,9 +172,9 @@ fn parse_manifest_bytes(data: &[u8]) -> Result<(Vec<ManifestEntry>, usize, u8)> 
         pos = frame_end;
         match decoded {
             Ok(mut frame_entries) => entries.append(&mut frame_entries),
-            Err(error) if pos == data.len() => {
+            Err(error) if pos == data.len() && has_crc_mismatch(raw) => {
                 tracing::warn!(
-                    "MANIFEST final-frame CRC/decoding error at EOF offset {}; discarding torn tail: {}",
+                    "MANIFEST final-frame CRC error at EOF offset {}; discarding torn tail: {}",
                     entry_pos, error
                 );
                 pos = entry_pos;

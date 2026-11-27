@@ -13,6 +13,14 @@ fn checked_u32_len(len: usize, field: &str) -> Result<u32> {
     })
 }
 
+fn checked_encoded_size(parts: &[usize], field: &str) -> Result<usize> {
+    parts.iter().try_fold(0usize, |total, part| {
+        total.checked_add(*part).ok_or_else(|| {
+            ContextraError::Serialization(format!("WAL {field} size overflow"))
+        })
+    })
+}
+
 /// Typed parsing errors encountered when decoding WAL entries from raw bytes.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum WalParseError {
@@ -232,9 +240,13 @@ impl WalEntry {
             WalOp::TxEnd { .. } => {}
         }
         let op_size = match &self.op {
-            WalOp::Put { key, value, .. } => 1 + 8 + 4 + key.len() + 4 + value.len(),
-            WalOp::Delete { key, .. } => 1 + 8 + 4 + key.len(),
-            WalOp::TxEnd { .. } => 1 + 8 + 1,
+            WalOp::Put { key, value, .. } => {
+                checked_encoded_size(&[1, 8, 4, key.len(), 4, value.len()], "Put operation")?
+            }
+            WalOp::Delete { key, .. } => {
+                checked_encoded_size(&[1, 8, 4, key.len()], "Delete operation")?
+            }
+            WalOp::TxEnd { .. } => checked_encoded_size(&[1, 8, 1], "TxEnd operation")?,
         };
 
         // payload = seq_no(8) + checksum(32) + prev_hmac(32) + op

@@ -161,7 +161,8 @@ impl Wal {
         self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
     }
 
-    #[allow(dead_code, clippy::type_complexity)]
+    #[cfg(test)]
+    #[allow(clippy::type_complexity)]
     pub(crate) fn parse_mmap_slice(
         &self,
         mmap: &[u8],

@@ -52,6 +52,12 @@ fn checked_u32_len(len: usize, field: &str) -> Result<u32> {
     })
 }
 
+fn u32_len_to_usize(len: u32, field: &str) -> Result<usize> {
+    usize::try_from(len).map_err(|_| {
+        ContextraError::Serialization(format!("Manifest {field} is not representable as usize"))
+    })
+}
+
 fn encode_name(path: &Path, out: &mut Vec<u8>) -> Result<()> {
     let name = path
         .file_name()
@@ -428,7 +434,11 @@ impl ManifestEntry {
 
         let crc = crc32fast::hash(&payload);
 
-        let mut buf = Vec::with_capacity(4 + total_payload_size as usize);
+        let capacity = usize::try_from(total_payload_size)
+            .map_err(|_| ContextraError::Serialization("Manifest entry size is not representable".into()))?
+            .checked_add(4)
+            .ok_or_else(|| ContextraError::Serialization("Manifest entry capacity overflow".into()))?;
+        let mut buf = Vec::with_capacity(capacity);
         buf.extend_from_slice(&total_payload_size.to_le_bytes());
         buf.extend_from_slice(&crc.to_le_bytes());
         buf.extend_from_slice(&payload);
@@ -490,11 +500,15 @@ impl ManifestEntry {
                 let path_len_bytes = remaining.get(8..12).ok_or_else(|| {
                     ContextraError::Serialization("Add path_len bytes missing".into())
                 })?;
-                let path_len =
+                let path_len = u32_len_to_usize(
                     u32::from_le_bytes(path_len_bytes.try_into().map_err(|_| {
                         ContextraError::Serialization("Invalid path_len format".into())
-                    })?) as usize;
-                let expected_len = 12 + path_len;
+                    })?),
+                    "path length",
+                )?;
+                let expected_len = 12usize.checked_add(path_len).ok_or_else(|| {
+                    ContextraError::Serialization("Add path length overflow".into())
+                })?;
                 if remaining.len() != expected_len {
                     return Err(ContextraError::Serialization(format!(
                         "Add payload length mismatch or trailing unparsed bytes: expected {}, got {}",
@@ -502,7 +516,7 @@ impl ManifestEntry {
                         remaining.len()
                     )));
                 }
-                let path_bytes = remaining.get(12..12 + path_len).ok_or_else(|| {
+                let path_bytes = remaining.get(12..expected_len).ok_or_else(|| {
                     ContextraError::Serialization("Add path bytes missing".into())
                 })?;
                 let path_str = std::str::from_utf8(path_bytes).map_err(|e| {
@@ -523,11 +537,15 @@ impl ManifestEntry {
                 let path_len_bytes = remaining.get(0..4).ok_or_else(|| {
                     ContextraError::Serialization("Remove path_len bytes missing".into())
                 })?;
-                let path_len =
+                let path_len = u32_len_to_usize(
                     u32::from_le_bytes(path_len_bytes.try_into().map_err(|_| {
                         ContextraError::Serialization("Invalid path_len format".into())
-                    })?) as usize;
-                let expected_len = 4 + path_len;
+                    })?),
+                    "path length",
+                )?;
+                let expected_len = 4usize.checked_add(path_len).ok_or_else(|| {
+                    ContextraError::Serialization("Remove path length overflow".into())
+                })?;
                 if remaining.len() != expected_len {
                     return Err(ContextraError::Serialization(format!(
                         "Remove payload length mismatch or trailing unparsed bytes: expected {}, got {}",
@@ -535,7 +553,7 @@ impl ManifestEntry {
                         remaining.len()
                     )));
                 }
-                let path_bytes = remaining.get(4..4 + path_len).ok_or_else(|| {
+                let path_bytes = remaining.get(4..expected_len).ok_or_else(|| {
                     ContextraError::Serialization("Remove path bytes missing".into())
                 })?;
                 let path_str = std::str::from_utf8(path_bytes).map_err(|e| {
@@ -582,19 +600,24 @@ impl ManifestEntry {
                 let added_path_len_bytes = remaining.get(16..20).ok_or_else(|| {
                     ContextraError::Serialization("added_path_len bytes missing".into())
                 })?;
-                let added_path_len =
+                let added_path_len = u32_len_to_usize(
                     u32::from_le_bytes(added_path_len_bytes.try_into().map_err(|_| {
                         ContextraError::Serialization("Invalid added_path_len format".into())
-                    })?) as usize;
-                let mut offset = 20;
-                if remaining.len() < offset + added_path_len {
+                    })?),
+                    "added path length",
+                )?;
+                let mut offset = 20usize;
+                let added_path_end = offset.checked_add(added_path_len).ok_or_else(|| {
+                    ContextraError::Serialization("Replace added path length overflow".into())
+                })?;
+                if remaining.len() < added_path_end {
                     return Err(ContextraError::Serialization(
                         "Replace added path data truncated".into(),
                     ));
                 }
                 let added_path_bytes =
                     remaining
-                        .get(offset..offset + added_path_len)
+                        .get(offset..added_path_end)
                         .ok_or_else(|| {
                             ContextraError::Serialization("added_path bytes missing".into())
                         })?;
@@ -602,21 +625,26 @@ impl ManifestEntry {
                     ContextraError::Serialization(format!("Invalid added path UTF-8: {}", e))
                 })?;
                 let added = PathBuf::from(added_str);
-                offset += added_path_len;
+                offset = added_path_end;
 
-                if remaining.len() < offset + 4 {
+                let count_end = offset.checked_add(4).ok_or_else(|| {
+                    ContextraError::Serialization("Replace removed count offset overflow".into())
+                })?;
+                if remaining.len() < count_end {
                     return Err(ContextraError::Serialization(
                         "Replace removed count truncated".into(),
                     ));
                 }
-                let removed_count_bytes = remaining.get(offset..offset + 4).ok_or_else(|| {
+                let removed_count_bytes = remaining.get(offset..count_end).ok_or_else(|| {
                     ContextraError::Serialization("removed_count bytes missing".into())
                 })?;
-                let removed_count =
+                let removed_count = u32_len_to_usize(
                     u32::from_le_bytes(removed_count_bytes.try_into().map_err(|_| {
                         ContextraError::Serialization("Invalid removed_count format".into())
-                    })?) as usize;
-                offset += 4;
+                    })?),
+                    "removed count",
+                )?;
+                offset = count_end;
 
                 let max_possible_removed = remaining.get(offset..).map_or(0, |r| r.len() / 4);
                 if removed_count > max_possible_removed {
@@ -628,31 +656,40 @@ impl ManifestEntry {
 
                 let mut removed = Vec::with_capacity(removed_count);
                 for _ in 0..removed_count {
-                    if remaining.len() < offset + 4 {
+                    let length_end = offset.checked_add(4).ok_or_else(|| {
+                        ContextraError::Serialization("Replace removed length offset overflow".into())
+                    })?;
+                    if remaining.len() < length_end {
                         return Err(ContextraError::Serialization(
                             "Replace removed path length truncated".into(),
                         ));
                     }
-                    let r_len_bytes = remaining.get(offset..offset + 4).ok_or_else(|| {
+                    let r_len_bytes = remaining.get(offset..length_end).ok_or_else(|| {
                         ContextraError::Serialization("r_len bytes missing".into())
                     })?;
-                    let r_len = u32::from_le_bytes(r_len_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid r_len format".into())
-                    })?) as usize;
-                    offset += 4;
-                    if remaining.len() < offset + r_len {
+                    let r_len = u32_len_to_usize(
+                        u32::from_le_bytes(r_len_bytes.try_into().map_err(|_| {
+                            ContextraError::Serialization("Invalid r_len format".into())
+                        })?),
+                        "removed path length",
+                    )?;
+                    offset = length_end;
+                    let r_end = offset.checked_add(r_len).ok_or_else(|| {
+                        ContextraError::Serialization("Replace removed path length overflow".into())
+                    })?;
+                    if remaining.len() < r_end {
                         return Err(ContextraError::Serialization(
                             "Replace removed path data truncated".into(),
                         ));
                     }
-                    let r_bytes = remaining.get(offset..offset + r_len).ok_or_else(|| {
+                    let r_bytes = remaining.get(offset..r_end).ok_or_else(|| {
                         ContextraError::Serialization("r_path bytes missing".into())
                     })?;
                     let r_str = std::str::from_utf8(r_bytes).map_err(|e| {
                         ContextraError::Serialization(format!("Invalid removed path UTF-8: {}", e))
                     })?;
                     removed.push(PathBuf::from(r_str));
-                    offset += r_len;
+                    offset = r_end;
                 }
 
                 if offset != remaining.len() {

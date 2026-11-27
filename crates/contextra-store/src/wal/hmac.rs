@@ -444,7 +444,7 @@ impl Wal {
         Ok(())
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) async fn load_or_create_wal_uuid(wal_path: &Path) -> Result<[u8; 16]> {
         Self::load_or_create_wal_uuid_with_gen(wal_path, None).await
     }

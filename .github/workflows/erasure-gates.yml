@@ -29,3 +29,17 @@ jobs:
         env:
           RUSTFLAGS: --cfg loom
         run: cargo test -p contextra-testkit --locked --release --test loom_erasure
+
+  release-feature-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure test-only store features stay out of release dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -e features -p contextra --locked)"
+          if rg -n 'feature "(test-hooks|fault-injection|memory-only-storage)"' <<<"$tree"; then
+            echo "A test-only contextra-store feature is enabled in the release dependency tree" >&2
+            exit 1
+          fi

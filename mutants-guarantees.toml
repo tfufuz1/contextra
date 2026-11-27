@@ -41,6 +41,16 @@
 #   cargo mutants --config mutants-guarantees.toml -p contextra-engine \
 #     -f "crates/contextra-engine/src/erasure/driver.rs" \
 #     -o target/mutants-g4-engine
+#
+# G5 (Manifest/Wahrheitsquelle): INV-M1..M5 und INV-C1. Rollover, Batch-Append,
+# torn-tail-Heilung, Orphan-Quarantaene und Katalog-Publikation muessen durch
+# Regressionstests abgesichert sein:
+#   cargo mutants --config mutants-guarantees.toml -p contextra-store \
+#     -f "crates/contextra-store/src/manifest/**" \
+#     -f "crates/contextra-store/src/lsm/recovery.rs" \
+#     -f "crates/contextra-store/src/lsm/ops/compaction.rs" \
+#     -f "crates/contextra-store/src/compaction/engine.rs" \
+#     -o target/mutants-g5-manifest-catalog
 
 exclude_globs = [
     "**/tests/**",

@@ -110,6 +110,16 @@ pub trait VfsFile: Send + Sync {
     /// Schreibt Datenblöcke; Persistenz erfordert nachfolgendes `sync_data` oder `sync_all`.
     fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize>;
 
+    /// Appends bytes at the current end of the file using positional I/O.
+    ///
+    /// Callers that need a multi-call append transaction must serialize access to this file
+    /// handle. The returned byte count may be smaller than `buf.len()` and must be handled
+    /// like the result of [`Self::write_at`].
+    fn append(&self, buf: &[u8]) -> std::io::Result<usize> {
+        let offset = self.len()?;
+        self.write_at(buf, offset)
+    }
+
     /// Truncates or extends the underlying file length to `len` bytes.
     ///
     /// # Fehler

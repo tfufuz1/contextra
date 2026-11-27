@@ -48,6 +48,67 @@ fn manifest_v2_batch_and_snapshot_frames_roundtrip() {
 }
 
 #[tokio::test]
+async fn manifest_append_batch_is_one_frame_and_validation_is_atomic() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("MANIFEST");
+    let manifest = Manifest::open(&path).await.expect("open manifest");
+    let batch = [
+        ManifestEntry::Add {
+            path: PathBuf::from("batch-a.sst"),
+            max_tx: 1,
+        },
+        ManifestEntry::WalCheckpoint { hmac: [0x42; 32] },
+    ];
+    manifest.append_batch(&batch).await.expect("append batch");
+
+    let bytes = tokio::fs::read(&path).await.expect("read manifest");
+    let snapshot_len = usize::try_from(u32::from_le_bytes(
+        bytes.get(5..9).expect("snapshot length").try_into().expect("u32"),
+    ))
+    .expect("snapshot size");
+    let batch_offset = 5usize + 4 + snapshot_len;
+    let batch_len = usize::try_from(u32::from_le_bytes(
+        bytes.get(batch_offset..batch_offset + 4)
+            .expect("batch length")
+            .try_into()
+            .expect("u32"),
+    ))
+    .expect("batch size");
+    let batch_frame = bytes
+        .get(batch_offset + 4..batch_offset + 4 + batch_len)
+        .expect("batch frame");
+    assert_eq!(batch_frame.get(4), Some(&1), "one Batch frame stores the entries");
+    assert_eq!(
+        super::entry::decode_v2_frame(batch_frame)
+            .expect("decode batch frame")
+            .len(),
+        2
+    );
+
+    let before = bytes.len();
+    let invalid_batch = [
+        ManifestEntry::Add {
+            path: PathBuf::from("batch-b.sst"),
+            max_tx: 2,
+        },
+        ManifestEntry::Remove {
+            path: PathBuf::from("missing.sst"),
+        },
+    ];
+    assert!(manifest.append_batch(&invalid_batch).await.is_err());
+    let after = tokio::fs::metadata(&path)
+        .await
+        .expect("manifest metadata")
+        .len();
+    assert_eq!(after, u64::try_from(before).expect("file size"));
+    assert!(!manifest
+        .state_snapshot()
+        .await
+        .live()
+        .contains_key(Path::new("batch-b.sst")));
+}
+
+#[tokio::test]
 async fn manifest_rollover_keeps_wal_hwm_and_dead_sstables() {
     let dir = tempdir().expect("tempdir");
     let path = dir.path().join("MANIFEST");
@@ -128,6 +189,45 @@ async fn manifest_load_propagates_vfs_read_errors() {
 }
 
 #[tokio::test]
+async fn manifest_open_truncates_torn_tail_before_next_append() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("MANIFEST");
+    let first = ManifestEntry::Add {
+        path: PathBuf::from("first.sst"),
+        max_tx: 1,
+    };
+    {
+        let manifest = Manifest::open(&path).await.expect("open manifest");
+        manifest.append(&first).await.expect("append first entry");
+    }
+
+    let mut torn_tail = 64u32.to_le_bytes().to_vec();
+    torn_tail.extend_from_slice(&[0x11, 0x22, 0x33]);
+    let mut file = tokio::fs::OpenOptions::new()
+        .append(true)
+        .open(&path)
+        .await
+        .expect("open manifest to simulate power loss");
+    tokio::io::AsyncWriteExt::write_all(&mut file, &torn_tail)
+        .await
+        .expect("write torn tail");
+    file.sync_all().await.expect("sync torn tail");
+    drop(file);
+
+    let manifest = Manifest::open(&path).await.expect("heal torn tail");
+    let second = ManifestEntry::Add {
+        path: PathBuf::from("second.sst"),
+        max_tx: 2,
+    };
+    manifest.append(&second).await.expect("append after healing");
+    drop(manifest);
+    let entries = Manifest::load(&path).await.expect("load healed manifest");
+    let state = super::state::ManifestState::from_entries(&entries).expect("reduce healed entries");
+    assert_eq!(state.live().get(Path::new("first.sst")), Some(&1));
+    assert_eq!(state.live().get(Path::new("second.sst")), Some(&2));
+}
+
+#[tokio::test]
 async fn manifest_rollover_post_rename_fault_poisons_handle() {
     let vfs = contextra_testkit::FaultVfs::new();
     let io = crate::io_seam::StoreIo::new(std::sync::Arc::new(vfs.clone()));
@@ -166,6 +266,43 @@ async fn manifest_rollover_post_rename_fault_poisons_handle() {
         .expect("load renamed snapshot");
     let state = super::state::ManifestState::from_entries(&entries).expect("reduce snapshot");
     assert_eq!(state.live().get(Path::new("kept.sst")), Some(&11));
+}
+
+#[tokio::test]
+async fn manifest_rollover_crash_vfs_preserves_previously_committed_state() {
+    use contextra_testkit::crash_vfs::{CrashPolicy, CrashSeed, CrashVfs};
+
+    for crash_offset in 1..=6 {
+        let vfs = CrashVfs::new(CrashSeed(0xC0FFEE));
+        let io = crate::io_seam::StoreIo::new(std::sync::Arc::new(vfs.clone()));
+        let dir = PathBuf::from("store");
+        io.create_dir_all(&dir).await.expect("create virtual store dir");
+        let path = dir.join("MANIFEST");
+        let manifest = Manifest::open_with_io(&path, None, io)
+            .await
+            .expect("open manifest on CrashVfs");
+        manifest
+            .append(&ManifestEntry::Add {
+                path: PathBuf::from("committed.sst"),
+                max_tx: 19,
+            })
+            .await
+            .expect("commit initial manifest state");
+
+        let crash_at = vfs.op_count() + crash_offset;
+        vfs.crash_after(crash_at);
+        let _ = manifest.rollover().await;
+        assert!(vfs.is_crashed(), "CrashVfs missed mutation {crash_at}");
+        drop(manifest);
+
+        let restarted = vfs.restart(CrashPolicy::DropUnsynced);
+        let restarted_io = crate::io_seam::StoreIo::new(std::sync::Arc::new(restarted));
+        let recovered = Manifest::open_with_io(&path, None, restarted_io)
+            .await
+            .expect("recover manifest after power cut");
+        let state = recovered.state_snapshot().await;
+        assert_eq!(state.live().get(Path::new("committed.sst")), Some(&19));
+    }
 }
 
 #[tokio::test]
@@ -255,6 +392,51 @@ async fn test_manifest_crc_corruption_detection() {
     assert!(
         loaded_res.is_err(),
         "Internal corruption in MANIFEST must return Err instead of silent degradation"
+    );
+}
+
+#[tokio::test]
+async fn manifest_rejects_complete_malformed_final_frame() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("MANIFEST");
+    let manifest = Manifest::open(&path).await.expect("open manifest");
+    manifest
+        .append(&ManifestEntry::Add {
+            path: PathBuf::from("valid.sst"),
+            max_tx: 1,
+        })
+        .await
+        .expect("append entry");
+    drop(manifest);
+
+    let mut bytes = tokio::fs::read(&path).await.expect("read manifest");
+    let snapshot_len = usize::try_from(u32::from_le_bytes(
+        bytes.get(5..9).expect("snapshot length").try_into().expect("u32"),
+    ))
+    .expect("snapshot size");
+    let frame_start = 5usize + 4 + snapshot_len;
+    let frame_len = usize::try_from(u32::from_le_bytes(
+        bytes.get(frame_start..frame_start + 4)
+            .expect("frame length")
+            .try_into()
+            .expect("u32"),
+    ))
+    .expect("frame size");
+    let payload_start = frame_start + 8;
+    let frame_end = frame_start + 4 + frame_len;
+    *bytes.get_mut(payload_start).expect("batch tag") = 99;
+    let crc = crc32fast::hash(bytes.get(payload_start..frame_end).expect("frame payload"));
+    bytes
+        .get_mut(frame_start + 4..payload_start)
+        .expect("frame CRC")
+        .copy_from_slice(&crc.to_le_bytes());
+    tokio::fs::write(&path, bytes)
+        .await
+        .expect("write malformed frame");
+
+    assert!(
+        Manifest::load(&path).await.is_err(),
+        "a complete malformed frame with a valid CRC is corruption even at EOF"
     );
 }
 
