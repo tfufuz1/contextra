@@ -1,8 +1,8 @@
 # Crate-Kopplungsbericht
 
-- Erzeugt: 2026-11-27 02:22
+- Erzeugt: 2026-11-27 17:37
 - Workspace-Root: `/home/freddy/Projekte/contextra`
-- Analysierte Crates: 19 · Komponenten-Tiefe: 1 · Zeilen (ohne Leerzeilen): 238.490
+- Analysierte Crates: 19 · Komponenten-Tiefe: 1 · Zeilen (ohne Leerzeilen): 255.324
 - Legende: **prod** = src/bin/build ohne `cfg(test)`; **dev** = tests/benches/examples/fuzz und `cfg(test)`-Code.
 - Hinweis: Textuelle Analyse ohne Compiler. Glob-Importe (`*`) sind nicht auflösbar. Siehe Kopf des Skripts für Grenzen.
 
@@ -10,25 +10,25 @@
 
 | Crate | Ring | Zeilen | Fan-out prod | Fan-in prod | Cargo-Deps intern (n/d/b) | Pub-Items | API-Lecks | Zyklus |
 |---|---|---:|---:|---:|---|---:|---:|---|
-| [contextra](#contextra) | 4 | 3352 | 3 | 1 | 3/0/0 | 25 | 14 | – |
+| [contextra](#contextra) | 4 | 3384 | 3 | 1 | 3/0/0 | 25 | 14 | – |
 | [contextra-bench](#contextra-bench) | tooling | 3936 | 3 | 0 | 7/1/0 | 49 | 1 | – |
-| [contextra-checkpoint](#contextra-checkpoint) | 1 | 8557 | 2 | 1 | 2/1/0 | 1 | 0 | – |
-| [contextra-crypto](#contextra-crypto) | 0 | 16231 | 2 | 2 | 2/1/0 | 110 | 10 | – |
-| [contextra-db](#contextra-db) | 3 | 11466 | 3 | 1 | 3/7/0 | 20 | 6 | – |
+| [contextra-checkpoint](#contextra-checkpoint) | 1 | 8593 | 3 | 1 | 2/1/0 | 1 | 0 | – |
+| [contextra-crypto](#contextra-crypto) | 0 | 16308 | 2 | 2 | 2/1/0 | 113 | 10 | – |
+| [contextra-db](#contextra-db) | 3 | 11467 | 3 | 1 | 3/7/0 | 20 | 6 | – |
 | [contextra-durable-fs](#contextra-durable-fs) | 0 | 2750 | 0 | 0 | 0/0/0 | 49 | 0 | – |
-| [contextra-engine](#contextra-engine) | 3 | 25640 | 9 | 1 | 9/2/0 | 97 | 33 | – |
+| [contextra-engine](#contextra-engine) | 3 | 27103 | 9 | 1 | 9/2/0 | 113 | 35 | – |
 | [contextra-graph](#contextra-graph) | 0 | 28667 | 2 | 1 | 2/0/0 | 138 | 22 | – |
-| [contextra-mcp](#contextra-mcp) | 4 | 7712 | 5 | 0 | 5/0/0 | 32 | 5 | – |
-| [contextra-mvcc](#contextra-mvcc) | 0 | 6532 | 1 | 4 | 2/1/0 | 22 | 0 | – |
-| [contextra-ports](#contextra-ports) | 0 | 6796 | 1 | 14 | 1/0/0 | 145 | 1 | – |
+| [contextra-mcp](#contextra-mcp) | 4 | 7887 | 5 | 0 | 5/0/0 | 32 | 5 | – |
+| [contextra-mvcc](#contextra-mvcc) | 0 | 7230 | 1 | 4 | 2/1/0 | 28 | 0 | – |
+| [contextra-ports](#contextra-ports) | 0 | 7563 | 1 | 14 | 1/0/0 | 143 | 1 | – |
 | [contextra-rank](#contextra-rank) | 0 | 7660 | 2 | 3 | 2/0/0 | 39 | 7 | – |
 | [contextra-simd](#contextra-simd) | 0 | 5137 | 1 | 0 | 1/0/0 | 35 | 1 | – |
-| [contextra-store](#contextra-store) | 1 | 48169 | 5 | 1 | 5/1/0 | 142 | 5 | – |
-| [contextra-sys](#contextra-sys) | 0 | 2321 | 0 | 2 | 0/0/0 | 29 | 0 | – |
-| [contextra-testkit](#contextra-testkit) | tooling | 4856 | 2 | 0 | 2/0/0 | 23 | 9 | – |
-| [contextra-text](#contextra-text) | 0 | 15219 | 2 | 1 | 2/0/0 | 78 | 8 | – |
-| [contextra-types](#contextra-types) | 0 | 8287 | 0 | 14 | 0/0/0 | 74 | 0 | – |
-| [contextra-vector](#contextra-vector) | 0 | 25202 | 4 | 1 | 4/0/0 | 100 | 9 | – |
+| [contextra-store](#contextra-store) | 1 | 54947 | 5 | 1 | 5/1/0 | 145 | 8 | – |
+| [contextra-sys](#contextra-sys) | 0 | 2361 | 0 | 2 | 0/0/0 | 30 | 0 | – |
+| [contextra-testkit](#contextra-testkit) | tooling | 9857 | 2 | 0 | 2/0/0 | 77 | 9 | – |
+| [contextra-text](#contextra-text) | 0 | 15659 | 2 | 1 | 2/0/0 | 81 | 8 | – |
+| [contextra-types](#contextra-types) | 0 | 9520 | 0 | 15 | 0/0/0 | 92 | 0 | – |
+| [contextra-vector](#contextra-vector) | 0 | 25295 | 4 | 1 | 4/0/0 | 101 | 9 | – |
 
 ## 2. Workspace-weite Auffälligkeiten
 
@@ -45,7 +45,6 @@
 | `contextra-bench` | `contextra-store` | normal | kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen) |
 | `contextra-bench` | `contextra-text` | normal | kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen) |
 | `contextra-bench` | `contextra-vector` | normal | kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen) |
-| `contextra-checkpoint` | `contextra-types` | normal | nur in Tests/Benches genutzt, aber als normale Abhängigkeit deklariert → dev-dependency? |
 | `contextra-checkpoint` | `contextra-mvcc` | – | genutzt, aber nicht in Cargo.toml deklariert (cfg-/Feature-Pfad oder Fehler) |
 | `contextra-db` | `contextra-testkit` | dev | kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen) |
 | `contextra-mvcc` | `contextra-types` | normal | nur in Tests/Benches genutzt, aber als normale Abhängigkeit deklariert → dev-dependency? |
@@ -57,22 +56,22 @@ Kanten im prod-Code mit höchstens 3 verschiedenen Symbolen. Reihenfolge: wenigs
 | Von | Nach | Symbole | Fundstellen | Dateien | Symbole (prod) |
 |---|---|---:|---:|---:|---|
 | `contextra-db` | `contextra-ports` | 1 | 1 | 1 | `QueryRewriter` |
+| `contextra-checkpoint` | `contextra-types` | 1 | 1 | 1 | `Seq` |
 | `contextra-checkpoint` | `contextra-mvcc` | 1 | 1 | 1 | `SnapshotRegistry` |
 | `contextra-mcp` | `contextra-rank` | 1 | 1 | 1 | `fusion::ProvenanceRecord` |
 | `contextra-bench` | `contextra-ports` | 1 | 1 | 1 | `VectorIndex` |
 | `contextra-bench` | `contextra-rank` | 1 | 1 | 1 | `RankError` |
-| `contextra-engine` | `contextra-mvcc` | 1 | 1 | 1 | `tx_buffer::TxBuffer` |
 | `contextra-vector` | `contextra-sys` | 1 | 2 | 2 | `mmap_readonly`×2 |
 | `contextra-rank` | `contextra-ports` | 1 | 2 | 1 | `Clock`×2 |
 | `contextra-mvcc` | `contextra-ports` | 1 | 3 | 1 | `MetricsSink`×3 |
 | `contextra-bench` | `contextra-types` | 2 | 2 | 1 | `Result`, `ContextraError::CapabilityUnsupported` |
-| `contextra-store` | `contextra-sys` | 2 | 3 | 2 | `mmap_readonly`×2, `set_restrictive_file_acl` |
 | `contextra-mcp` | `contextra-ports` | 2 | 3 | 1 | `plugin::PluginRegistry`×2, `EmbeddingProvider` |
 | `contextra-ports` | `contextra-types` | 2 | 3 | 3 | `RequestContext`×2, `ids::ErasureId` |
 | `contextra-mcp` | `contextra-crypto` | 2 | 4 | 1 | `CryptoKey`×3, `CryptoKey::try_new` |
 | `contextra-engine` | `contextra-text` | 2 | 4 | 3 | `inverted::InvertedIndex`×2, `Language`×2 |
-| `contextra-text` | `contextra-ports` | 2 | 8 | 5 | `StorageEngine`×6, `scanner`×2 |
+| `contextra-engine` | `contextra-mvcc` | 3 | 3 | 3 | `tx_buffer::TxBuffer`, `ReapPolicy`, `SnapshotRegistry` |
 | `contextra-engine` | `contextra-checkpoint` | 3 | 4 | 3 | `InstanceOrphanRegistry`×2, `InstanceOrphanRegistry::new`, `(crate)` |
+| `contextra-store` | `contextra-sys` | 3 | 5 | 4 | `available_space`×2, `mmap_readonly`×2, `set_restrictive_file_acl` |
 | `contextra-mcp` | `contextra-types` | 3 | 6 | 3 | `ContextraError`×4, `ContextraError::InvalidInput`, `ContextraError::NotFound` |
 
 **Nur in Tests/Benches/Beispielen** (für das Produkt irrelevant, aber sie koppeln den Test-Build):
@@ -80,8 +79,7 @@ Kanten im prod-Code mit höchstens 3 verschiedenen Symbolen. Reihenfolge: wenigs
 | Von | Nach | Fundstellen | Symbole |
 |---|---|---:|---|
 | `contextra-bench` | `contextra-sys` | 1 | `ensure_fd_limit` |
-| `contextra-checkpoint` | `contextra-testkit` | 3 | `InMemoryStorageEngine`×2, `FaultVfs` |
-| `contextra-checkpoint` | `contextra-types` | 13 | `TxId`×4, `Result`×3, `ContextraError`×2, `ContextraError::Internal`×2 … (+2) |
+| `contextra-checkpoint` | `contextra-testkit` | 4 | `InMemoryStorageEngine`×2, `FaultVfs`, `gates::AlwaysRestrictedGate` |
 | `contextra-crypto` | `contextra-testkit` | 5 | `mint_witness_for_tests`×4, `FaultVfs` |
 | `contextra-db` | `contextra-checkpoint` | 4 | `PersistentCheckpointStore`×2, `clear_all_orphaned_checkpoints`, `get_orphaned_checkpoints` |
 | `contextra-db` | `contextra-graph` | 13 | `CsrGraph`×9, `csr::CsrGraph`×2, `path_rag::PathRAGEngine`, `PathRAGEngine` |
@@ -98,7 +96,9 @@ Kanten im prod-Code mit höchstens 3 verschiedenen Symbolen. Reihenfolge: wenigs
 
 Symbole, die aus einem Nicht-Basis-Crate von mindestens 3 verschiedenen Crates im prod-Code importiert werden. Wer sie in ein schmales Basis-Crate verschiebt, kann viele Kanten kappen.
 
-Keine.
+| Quelle | Symbol | Nutzer | Crates |
+|---|---|---:|---|
+| `contextra-mvcc` | `SnapshotRegistry` | 3 | `contextra-checkpoint`, `contextra-engine`, `contextra-store` |
 
 ### 2.5 API-Lecks
 
@@ -111,8 +111,8 @@ Keine.
 | `contextra` | `collection_profile` | `const ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT` | `contextra-types` | `src/collection_profile.rs:63` |
 | `contextra` | `collection_profile` | `struct CollectionProfile` | `contextra-types` | `src/collection_profile.rs:82` |
 | `contextra` | `collection_profile` | `pub use contextra_types::types::domain::AutoExtractionMode` | `contextra-types` | `src/collection_profile.rs:34` |
-| `contextra` | `(crate-root)` | `fn open` | `contextra-types` | `src/lib.rs:127` |
-| `contextra` | `(crate-root)` | `fn open_with_config` | `contextra-types` | `src/lib.rs:159` |
+| `contextra` | `(crate-root)` | `fn open` | `contextra-types` | `src/lib.rs:132` |
+| `contextra` | `(crate-root)` | `fn open_with_config` | `contextra-types` | `src/lib.rs:164` |
 | `contextra` | `(crate-root)` | `pub use contextra_types::error::ContextraError` | `contextra-types` | `src/lib.rs:53` |
 | `contextra` | `(crate-root)` | `pub use contextra_types::DistanceMetric` | `contextra-types` | `src/lib.rs:55` |
 | `contextra` | `performance_profile` | `enum DurabilityMode` | `contextra-db` | `src/performance_profile.rs:37` |
@@ -133,33 +133,35 @@ Keine.
 | `contextra-crypto` | `kv_segment::store` | `type SpillHandler` | `contextra-types` | `src/kv_segment/store.rs:26` |
 | `contextra-db` | `(crate-root)` | `pub use contextra_engine` | `contextra-engine` | `src/lib.rs:72` |
 | `contextra-db` | `(crate-root)` | `pub use contextra_engine::DurabilityMode` | `contextra-engine` | `src/lib.rs:73` |
-| `contextra-db` | `(crate-root)` | `pub use contextra_engine::decay_controller::*` | `contextra-engine` | `src/lib.rs:89` |
-| `contextra-db` | `(crate-root)` | `pub use contextra_engine::fusion` | `contextra-engine` | `src/lib.rs:91` |
-| `contextra-db` | `(crate-root)` | `pub use contextra_types::DistanceMetric` | `contextra-types` | `src/lib.rs:120` |
+| `contextra-db` | `(crate-root)` | `pub use contextra_engine::decay_controller::*` | `contextra-engine` | `src/lib.rs:90` |
+| `contextra-db` | `(crate-root)` | `pub use contextra_engine::fusion` | `contextra-engine` | `src/lib.rs:92` |
+| `contextra-db` | `(crate-root)` | `pub use contextra_types::DistanceMetric` | `contextra-types` | `src/lib.rs:121` |
 | `contextra-db` | `multistep` | `pub use contextra_ports::QueryRewriter` | `contextra-ports` | `src/multistep.rs:28` |
 | `contextra-engine` | `background_workers::expiry_workers` | `fn start_decay_cleanup_worker` | `contextra-ports` | `src/background_workers/expiry_workers.rs:85` |
 | `contextra-engine` | `collection::crud::auto_extraction` | `pub use contextra_types::AutoExtractionMode` | `contextra-types` | `src/collection/crud/auto_extraction.rs:18` |
-| `contextra-engine` | `collection::maintenance` | `pub use contextra_graph::percolation::PercolationConfig` | `contextra-graph` | `src/collection/maintenance.rs:878` |
+| `contextra-engine` | `collection::maintenance` | `pub use contextra_graph::percolation::PercolationConfig` | `contextra-graph` | `src/collection/maintenance.rs:889` |
 | `contextra-engine` | `collection` | `fn compute_default_importance` | `contextra-types` | `src/collection/mod.rs:124` |
 | `contextra-engine` | `collection` | `struct Collection` | `contextra-store`, `contextra-vector` | `src/collection/mod.rs:272` |
 | `contextra-engine` | `collection::query_builder::scope` | `struct ScopeConstraint` | `contextra-types` | `src/collection/query_builder/scope.rs:19` |
 | `contextra-engine` | `collection::query_builder::strategy` | `enum SearchStrategy` | `contextra-types` | `src/collection/query_builder/strategy.rs:11` |
+| `contextra-engine` | `erasure::config` | `struct EraseOptions` | `contextra-types` | `src/erasure/config.rs:41` |
+| `contextra-engine` | `erasure` | `struct ErasureRuntimeInner` | `contextra-mvcc`, `contextra-types` | `src/erasure/mod.rs:37` |
 | `contextra-engine` | `extraction::open_ie` | `fn extract_triples` | `contextra-ports` | `src/extraction/open_ie.rs:80` |
 | `contextra-engine` | `fusion` | `fn weights_to_signal_factors` | `contextra-types` | `src/fusion.rs:16` |
 | `contextra-engine` | `fusion` | `fn fuse_search_results_with_strategy` | `contextra-types` | `src/fusion.rs:26` |
 | `contextra-engine` | `fusion` | `fn fuse_search_results_with_signal_strategies` | `contextra-types` | `src/fusion.rs:45` |
-| `contextra-engine` | `(crate-root)` | `type ConsolidationLauncher` | `contextra-store` | `src/lib.rs:95` |
-| `contextra-engine` | `(crate-root)` | `fn register_consolidation_launcher` | `contextra-store` | `src/lib.rs:112` |
-| `contextra-engine` | `(crate-root)` | `struct ContextraStats` | `contextra-ports` | `src/lib.rs:145` |
-| `contextra-engine` | `(crate-root)` | `struct ContextraConfig` | `contextra-ports`, `contextra-store`, `contextra-types` | `src/lib.rs:211` |
-| `contextra-engine` | `(crate-root)` | `type TenantCollectionMap` | `contextra-store`, `contextra-types` | `src/lib.rs:350` |
+| `contextra-engine` | `(crate-root)` | `type ConsolidationLauncher` | `contextra-store` | `src/lib.rs:97` |
+| `contextra-engine` | `(crate-root)` | `fn register_consolidation_launcher` | `contextra-store` | `src/lib.rs:114` |
+| `contextra-engine` | `(crate-root)` | `struct ContextraStats` | `contextra-ports` | `src/lib.rs:147` |
+| `contextra-engine` | `(crate-root)` | `struct ContextraConfig` | `contextra-ports`, `contextra-store`, `contextra-types` | `src/lib.rs:213` |
+| `contextra-engine` | `(crate-root)` | `type TenantCollectionMap` | `contextra-store`, `contextra-types` | `src/lib.rs:365` |
 | `contextra-engine` | `(crate-root)` | `pub use contextra_ports::TextEmbeddingEngine` | `contextra-ports` | `src/lib.rs:19` |
 | `contextra-engine` | `(crate-root)` | `pub use contextra_ports::VectorDeleteMode` | `contextra-ports` | `src/lib.rs:20` |
 | `contextra-engine` | `(crate-root)` | `pub use contextra_store::lsm::DurabilityMode` | `contextra-store` | `src/lib.rs:21` |
-| `contextra-engine` | `(crate-root)` | `pub use contextra_checkpoint` | `contextra-checkpoint` | `src/lib.rs:89` |
-| `contextra-engine` | `(crate-root)` | `pub use contextra_text::Language` | `contextra-text` | `src/lib.rs:90` |
-| `contextra-engine` | `(crate-root)` | `pub use contextra_ports::DriftStatusProvider` | `contextra-ports` | `src/lib.rs:161` |
-| `contextra-engine` | `(crate-root)` | `pub use contextra_types::DistanceMetric` | `contextra-types` | `src/lib.rs:385` |
+| `contextra-engine` | `(crate-root)` | `pub use contextra_checkpoint` | `contextra-checkpoint` | `src/lib.rs:91` |
+| `contextra-engine` | `(crate-root)` | `pub use contextra_text::Language` | `contextra-text` | `src/lib.rs:92` |
+| `contextra-engine` | `(crate-root)` | `pub use contextra_ports::DriftStatusProvider` | `contextra-ports` | `src/lib.rs:163` |
+| `contextra-engine` | `(crate-root)` | `pub use contextra_types::DistanceMetric` | `contextra-types` | `src/lib.rs:402` |
 | `contextra-engine` | `metrics_names` | `fn record_histogram_safe` | `contextra-ports` | `src/metrics_names.rs:33` |
 | `contextra-engine` | `metrics_names` | `fn record_gauge_safe` | `contextra-ports` | `src/metrics_names.rs:45` |
 | `contextra-engine` | `metrics_names` | `fn record_counter_safe` | `contextra-ports` | `src/metrics_names.rs:57` |
@@ -197,7 +199,7 @@ Keine.
 | `contextra-mcp` | `config` | `fn create_llm_text_generator` | `contextra-types` | `src/config.rs:377` |
 | `contextra-mcp` | `explain` | `struct ExplainResponse` | `contextra-rank` | `src/explain.rs:23` |
 | `contextra-mcp` | `server` | `struct McpServer` | `contextra`, `contextra-ports` | `src/server.rs:13` |
-| `contextra-ports` | `observer` | `struct ErasureEvent` | `contextra-types` | `src/observer.rs:48` |
+| `contextra-ports` | `observer` | `struct ErasureEvent` | `contextra-types` | `src/observer.rs:29` |
 | `contextra-rank` | `calibration::isotonic` | `trait Clock` | `contextra-ports` | `src/calibration/isotonic.rs:14` |
 | `contextra-rank` | `fusion::normalized` | `fn weights_to_signal_factors_types_compat` | `contextra-types` | `src/fusion/normalized.rs:197` |
 | `contextra-rank` | `local_types` | `struct DocId` | `contextra-types` | `src/local_types.rs:9` |
@@ -206,9 +208,12 @@ Keine.
 | `contextra-rank` | `local_types` | `struct SignalFusionStrategies` | `contextra-types` | `src/local_types.rs:183` |
 | `contextra-rank` | `local_types` | `struct FusionWeights` | `contextra-types` | `src/local_types.rs:238` |
 | `contextra-simd` | `metric` | `enum DistanceMetric` | `contextra-types` | `src/metric.rs:3` |
-| `contextra-store` | `lsm::engine` | `struct LsmStorage` | `contextra-mvcc` | `src/lsm/engine.rs:33` |
+| `contextra-store` | `lsm::engine` | `struct LsmStorage` | `contextra-mvcc` | `src/lsm/engine.rs:34` |
 | `contextra-store` | `lsm::observer` | `struct CommitContext` | `contextra-types` | `src/lsm/observer.rs:66` |
 | `contextra-store` | `lsm::tests` | `pub use contextra_types::TOMBSTONE_BIT` | `contextra-types` | `src/lsm/tests.rs:7` |
+| `contextra-store` | `scanner` | `fn lsm_scanners` | `contextra-ports` | `src/scanner/mod.rs:136` |
+| `contextra-store` | `scanner` | `fn lsm_scanners_with_handle` | `contextra-ports` | `src/scanner/mod.rs:142` |
+| `contextra-store` | `scanner` | `fn lsm_scanners_with_runtime` | `contextra-ports` | `src/scanner/mod.rs:151` |
 | `contextra-store` | `wal` | `struct WalConfig` | `contextra-crypto`, `contextra-ports` | `src/wal/mod.rs:373` |
 | `contextra-store` | `wal` | `pub use contextra_crypto::crypto::KeyManager` | `contextra-crypto` | `src/wal/mod.rs:343` |
 | `contextra-testkit` | `conformance::clock` | `fn run_clock_suite` | `contextra-ports` | `src/conformance/clock.rs:24` |
@@ -219,10 +224,10 @@ Keine.
 | `contextra-testkit` | `conformance::text` | `fn run_text_index_suite` | `contextra-ports` | `src/conformance/text.rs:30` |
 | `contextra-testkit` | `conformance::vector` | `fn run_vector_index_suite` | `contextra-ports` | `src/conformance/vector.rs:36` |
 | `contextra-testkit` | `conformance::vfs` | `fn run_vfs_suite` | `contextra-ports` | `src/conformance/vfs.rs:24` |
-| `contextra-testkit` | `(crate-root)` | `fn mint_witness_for_tests` | `contextra-ports` | `src/lib.rs:125` |
+| `contextra-testkit` | `(crate-root)` | `fn mint_witness_for_tests` | `contextra-ports` | `src/lib.rs:148` |
 | `contextra-text` | `inverted::purge` | `struct TextPurger` | `contextra-ports` | `src/inverted/purge.rs:94` |
-| `contextra-text` | `inverted::purge` | `fn text_purger` | `contextra-ports` | `src/inverted/purge.rs:493` |
-| `contextra-text` | `(crate-root)` | `struct Bm25Scorer` | `contextra-ports` | `src/lib.rs:93` |
+| `contextra-text` | `inverted::purge` | `fn text_purger` | `contextra-ports` | `src/inverted/purge.rs:494` |
+| `contextra-text` | `(crate-root)` | `struct Bm25Scorer` | `contextra-ports` | `src/lib.rs:97` |
 | `contextra-text` | `stream` | `struct Bm25CandidateStream` | `contextra-ports` | `src/stream.rs:42` |
 | `contextra-text` | `types` | `struct DocId` | `contextra-types` | `src/types.rs:5` |
 | `contextra-text` | `types` | `struct DocId` | `contextra-types` | `src/types.rs:11` |
@@ -242,56 +247,56 @@ Keine.
 
 | Von | Nach | prod Fundstellen | prod Symbole | dev Fundstellen | Cargo-Art |
 |---|---|---:|---:|---:|---|
-| `contextra-engine` | `contextra-types` | 227 | 50 | 178 | normal |
-| `contextra-vector` | `contextra-types` | 97 | 21 | 40 | normal? |
-| `contextra-checkpoint` | `contextra-ports` | 55 | 8 | 8 | normal |
-| `contextra-store` | `contextra-ports` | 54 | 17 | 149 | normal |
+| `contextra-engine` | `contextra-types` | 237 | 57 | 178 | normal |
+| `contextra-vector` | `contextra-types` | 104 | 25 | 40 | normal? |
+| `contextra-store` | `contextra-ports` | 87 | 31 | 170 | normal |
+| `contextra-checkpoint` | `contextra-ports` | 57 | 9 | 8 | normal |
+| `contextra-store` | `contextra-types` | 52 | 17 | 133 | normal |
+| `contextra-engine` | `contextra-ports` | 48 | 24 | 19 | normal |
 | `contextra-graph` | `contextra-types` | 46 | 13 | 60 | normal? |
-| `contextra-store` | `contextra-types` | 39 | 14 | 123 | normal |
 | `contextra-rank` | `contextra-types` | 38 | 17 | 0 | normal? |
 | `contextra-crypto` | `contextra-types` | 35 | 14 | 18 | normal |
-| `contextra-engine` | `contextra-ports` | 33 | 16 | 19 | normal |
 | `contextra-vector` | `contextra-ports` | 33 | 7 | 78 | normal? |
 | `contextra-graph` | `contextra-ports` | 29 | 20 | 44 | normal? |
-| `contextra-text` | `contextra-types` | 22 | 9 | 137 | normal? |
-| `contextra-engine` | `contextra-store` | 21 | 9 | 99 | normal |
+| `contextra-testkit` | `contextra-types` | 25 | 7 | 13 | normal |
+| `contextra-text` | `contextra-types` | 25 | 12 | 137 | normal? |
+| `contextra-engine` | `contextra-store` | 23 | 10 | 99 | normal |
+| `contextra-testkit` | `contextra-ports` | 22 | 17 | 9 | normal |
 | `contextra-engine` | `contextra-graph` | 20 | 16 | 75 | normal |
-| `contextra-testkit` | `contextra-types` | 20 | 4 | 10 | normal |
+| `contextra` | `contextra-types` | 19 | 12 | 21 | normal |
+| `contextra` | `contextra-db` | 15 | 6 | 1 | normal |
 | `contextra-engine` | `contextra-rank` | 14 | 6 | 2 | normal |
-| `contextra-testkit` | `contextra-ports` | 14 | 12 | 4 | normal |
-| `contextra` | `contextra-types` | 13 | 9 | 20 | normal |
+| `contextra-text` | `contextra-ports` | 14 | 5 | 87 | normal? |
 | `contextra-simd` | `contextra-types` | 13 | 6 | 0 | normal? |
-| `contextra-mcp` | `contextra` | 12 | 11 | 9 | normal |
+| `contextra-store` | `contextra-crypto` | 12 | 6 | 2 | normal |
+| `contextra-store` | `contextra-mvcc` | 11 | 6 | 7 | normal |
 | `contextra-vector` | `contextra-mvcc` | 11 | 8 | 0 | normal? |
-| `contextra` | `contextra-db` | 10 | 5 | 1 | normal |
-| `contextra-store` | `contextra-mvcc` | 10 | 6 | 7 | normal |
+| `contextra-mcp` | `contextra` | 10 | 9 | 9 | normal |
 | `contextra-engine` | `contextra-vector` | 9 | 4 | 117 | dev/normal |
 | `contextra` | `contextra-ports` | 8 | 6 | 9 | normal |
-| `contextra-text` | `contextra-ports` | 8 | 2 | 87 | normal? |
 | `contextra-crypto` | `contextra-ports` | 6 | 6 | 34 | normal |
+| `contextra-db` | `contextra-engine` | 6 | 6 | 0 | normal |
 | `contextra-mcp` | `contextra-types` | 6 | 3 | 4 | normal |
-| `contextra-db` | `contextra-engine` | 5 | 5 | 0 | normal |
-| `contextra-store` | `contextra-crypto` | 5 | 4 | 2 | normal |
+| `contextra-store` | `contextra-sys` | 5 | 3 | 4 | normal |
 | `contextra-db` | `contextra-types` | 4 | 4 | 40 | normal |
 | `contextra-engine` | `contextra-checkpoint` | 4 | 3 | 0 | normal |
 | `contextra-engine` | `contextra-text` | 4 | 2 | 68 | normal |
 | `contextra-mcp` | `contextra-crypto` | 4 | 2 | 3 | normal |
+| `contextra-engine` | `contextra-mvcc` | 3 | 3 | 3 | normal |
 | `contextra-mcp` | `contextra-ports` | 3 | 2 | 39 | normal |
 | `contextra-mvcc` | `contextra-ports` | 3 | 1 | 1 | normal |
-| `contextra-ports` | `contextra-types` | 3 | 2 | 0 | normal |
-| `contextra-store` | `contextra-sys` | 3 | 2 | 4 | normal |
+| `contextra-ports` | `contextra-types` | 3 | 2 | 17 | normal |
 | `contextra-bench` | `contextra-types` | 2 | 2 | 1 | normal |
 | `contextra-rank` | `contextra-ports` | 2 | 1 | 0 | normal? |
 | `contextra-vector` | `contextra-sys` | 2 | 1 | 0 | normal? |
 | `contextra-bench` | `contextra-ports` | 1 | 1 | 1 | normal |
 | `contextra-bench` | `contextra-rank` | 1 | 1 | 0 | normal |
 | `contextra-checkpoint` | `contextra-mvcc` | 1 | 1 | 0 | – |
+| `contextra-checkpoint` | `contextra-types` | 1 | 1 | 13 | normal |
 | `contextra-db` | `contextra-ports` | 1 | 1 | 9 | normal |
-| `contextra-engine` | `contextra-mvcc` | 1 | 1 | 3 | normal |
 | `contextra-mcp` | `contextra-rank` | 1 | 1 | 0 | normal |
 | `contextra-bench` | `contextra-sys` | 0 | 0 | 1 | dev |
-| `contextra-checkpoint` | `contextra-testkit` | 0 | 0 | 3 | dev |
-| `contextra-checkpoint` | `contextra-types` | 0 | 0 | 13 | normal |
+| `contextra-checkpoint` | `contextra-testkit` | 0 | 0 | 4 | dev |
 | `contextra-crypto` | `contextra-testkit` | 0 | 0 | 5 | dev |
 | `contextra-db` | `contextra-checkpoint` | 0 | 0 | 4 | dev |
 | `contextra-db` | `contextra-graph` | 0 | 0 | 13 | dev |
@@ -308,32 +313,33 @@ Keine.
 
 ### contextra
 
-- Pfad: `crates/contextra` · Zeilen: 3352 · Rust-Dateien: 22 · Ring: 4
+- Pfad: `crates/contextra` · Zeilen: 3384 · Rust-Dateien: 22 · Ring: 4
 - Interne Cargo-Abhängigkeiten: `contextra-db` (normal), `contextra-ports` (normal), `contextra-types` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
 | Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
 |---|---:|---:|---:|---|---|
-| `contextra-types` | 13 | 20 | 7 | `error::ContextraError`×4, `DistanceMetric`×2, `ContextraError::Internal`, `types::domain::AutoExtractionMode`, `types::domain`, `ContextraError`, `ContextraError::DurabilityConfig`, `error::Result`, `ScoredEntry` | `DocId`×2, `DocId::new`×2, `ContextraError::InvalidInput`, `ScoredDocument`, `DistanceMetric::Cosine` |
-| `contextra-db` | 10 | 1 | 2 | `DurabilityMode`×3, `DurabilityMode::Full`×2, `DurabilityMode::WalNoHmac`×2, `DurabilityMode::MemoryOnly`×2, `QueryRewriter` | – |
+| `contextra-types` | 19 | 21 | 7 | `error::ContextraError`×4, `ErasureProfile::Standard`×3, `DistanceMetric`×2, `ErasureProfile`×2, `ContextraError::Internal`, `types::domain::AutoExtractionMode`, `ErasureProfile::Regulated`, `types::domain`, `ContextraError`, `ContextraError::DurabilityConfig` … (+2) | `DocId`×2, `DocId::new`×2, `ContextraError::InvalidInput`, `ScoredDocument`, `DistanceMetric::Cosine` |
+| `contextra-db` | 15 | 1 | 3 | `ErasureConfig`×5, `DurabilityMode`×3, `DurabilityMode::Full`×2, `DurabilityMode::WalNoHmac`×2, `DurabilityMode::MemoryOnly`×2, `QueryRewriter` | – |
 | `contextra-ports` | 8 | 9 | 4 | `license::FeatureRing`×2, `license::LicenseGate`×2, `IdGen`, `license`, `license::VectorDeleteMode`, `license::LicenseError` | `BoxFuture`×3, `license::AuthorizedRing`, `license::OpenFastGate`, `license::LicenseError::NotActivated`, `SequentialIdGen` |
 
 **Pro Komponente**
 
-- `(crate-root)` (188 Zeilen)
+- `(crate-root)` (193 Zeilen)
   - → `contextra-types`: prod: `error::ContextraError`, `DistanceMetric`, `types::domain`
 - `agent_memory` (374 Zeilen)
   - → `contextra-ports`: prod: `IdGen`
   - → `contextra-types`: prod: `error::ContextraError`
 - `boot` (90 Zeilen)
   - → `contextra-types`: prod: `error::ContextraError`
-- `builder` (458 Zeilen)
+- `builder` (478 Zeilen)
+  - → `contextra-db`: prod: `ErasureConfig`×5
   - → `contextra-ports`: prod: `license::FeatureRing`, `license`
-  - → `contextra-types`: prod: `error::ContextraError`, `DistanceMetric`, `ContextraError::Internal`
-- `collection_profile` (186 Zeilen)
+  - → `contextra-types`: prod: `error::ContextraError`, `DistanceMetric`, `ErasureProfile`, `ContextraError::Internal`
+- `collection_profile` (192 Zeilen)
   - → `contextra-ports`: prod: `license::LicenseGate`
-  - → `contextra-types`: prod: `types::domain::AutoExtractionMode`
+  - → `contextra-types`: prod: `ErasureProfile::Standard`×3, `types::domain::AutoExtractionMode`, `ErasureProfile`, `ErasureProfile::Regulated`
 - `performance_profile` (294 Zeilen)
   - → `contextra-db`: prod: `DurabilityMode`×3, `DurabilityMode::Full`×2, `DurabilityMode::WalNoHmac`×2, `DurabilityMode::MemoryOnly`×2
   - → `contextra-ports`: prod: `license::FeatureRing`, `license::LicenseGate`, `license::VectorDeleteMode`, `license::LicenseError` · dev: `license::LicenseError`×2, `license::AuthorizedRing`, `license::OpenFastGate`, `license::LicenseError::NotActivated`
@@ -352,6 +358,8 @@ Keine.
 - `tests/agent_memory_idgen_test.rs` (83 Zeilen)
   - → `contextra-ports`: dev: `BoxFuture`, `SequentialIdGen`
   - → `contextra-types`: dev: `error::Result`
+- `tests/collection_profile_matrix.rs` (62 Zeilen)
+  - → `contextra-types`: dev: `ErasureProfile::Standard`
 - `tests/llm_query_rewriter.rs` (206 Zeilen)
   - → `contextra-db`: dev: `QueryRewriter`
   - → `contextra-types`: dev: `error::ContextraError`, `ScoredEntry`, `error::Result`
@@ -378,8 +386,8 @@ Keine.
 - `builder`
   - 1 enum, 1 struct, 1 trait
     - `enum EncryptionMode`
-    - `trait ContextraConfigExt` · Methoden: is_encrypted
-    - `struct ContextraBuilder` · 14 Methoden
+    - `trait ContextraConfigExt` · Methoden: is_encrypted, erasure_config, set_erasure_config
+    - `struct ContextraBuilder` · 16 Methoden
 - `collection_profile`
   - 2 const, 3 enum, 2 struct
     - `enum KvDeleteMode`
@@ -406,7 +414,7 @@ Keine.
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
-| `contextra-mcp` | `Contextra`×2, `chunker`, `chunker::MarkdownChunker::new`, `chunker::ChunkerConfig::default`, `collection_profile`, `collection_profile::DeploymentTier::EdgeMinimal`, `collection_profile::DeploymentTier::PowerUserLocal`, `collection_profile::DeploymentTier::EnterpriseShared`, `collection_profile::DeploymentTier::EnterpriseRegulated`, `collection_profile::AutoExtractionMode::Enabled` … (+1) | `collection_profile::DeploymentTier` |
+| `contextra-mcp` | `Contextra`×2, `chunker::MarkdownChunker::new`, `chunker::ChunkerConfig::default`, `collection_profile::DeploymentTier::EdgeMinimal`, `collection_profile::DeploymentTier::PowerUserLocal`, `collection_profile::DeploymentTier::EnterpriseShared`, `collection_profile::DeploymentTier::EnterpriseRegulated`, `collection_profile::AutoExtractionMode::Enabled`, `collection_profile::AutoExtractionMode::Disabled` | `collection_profile::DeploymentTier` |
 
 **Nach außen ungenutzte öffentliche Items (Heuristik, 24 von 25)**: `MemoryId`, `RelationId`, `Memory`, `AgentMemory`, `BootPhase`, `execute_boot_sequence`, `EncryptionMode`, `ContextraConfigExt`, `ContextraBuilder`, `KvDeleteMode`, `DEFAULT_AUTO_EXTRACTION_MODE`, `ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT`, `LsmTuning`, `CollectionProfile`, `CollectionProfileError`, `builder`, `open`, `open_with_config`, `DurabilityMode`, `DurabilityConfigError`, `PerformanceProfile`, `ResolvedProfileConfig`, `PerformanceProfileError`, `LlmQueryRewriter`
 
@@ -519,17 +527,17 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 ### contextra-checkpoint
 
-- Pfad: `crates/contextra-checkpoint` · Zeilen: 8557 · Rust-Dateien: 27 · Ring: 1
+- Pfad: `crates/contextra-checkpoint` · Zeilen: 8593 · Rust-Dateien: 27 · Ring: 1
 - Interne Cargo-Abhängigkeiten: `contextra-testkit` (dev), `contextra-ports` (normal), `contextra-types` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
 | Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
 |---|---:|---:|---:|---|---|
-| `contextra-ports` | 55 | 8 | 4 | `Clock`×20, `StorageEngine`×14, `Vfs`×7, `MetricsSink`×6, `BoxFuture`×3, `SystemClock`×2, `Checkpoint`×2, `CheckpointCoordinator` | – |
+| `contextra-ports` | 57 | 8 | 4 | `Clock`×20, `StorageEngine`×14, `Vfs`×7, `MetricsSink`×6, `BoxFuture`×3, `SystemClock`×2, `Checkpoint`×2, `ReadGate`×2, `CheckpointCoordinator` | – |
 | `contextra-mvcc` | 1 | 0 | 1 | `SnapshotRegistry` | – |
-| `contextra-testkit` | 0 | 3 | 0 | – | `InMemoryStorageEngine`×2, `FaultVfs` |
-| `contextra-types` | 0 | 13 | 0 | – | `TxId`×4, `Result`×3, `ContextraError`×2, `ContextraError::Internal`×2, `TxId::new` … (+1) |
+| `contextra-types` | 1 | 13 | 1 | `Seq` | `TxId`×4, `Result`×3, `ContextraError`×2, `ContextraError::Internal`×2, `TxId::new` … (+1) |
+| `contextra-testkit` | 0 | 4 | 0 | – | `InMemoryStorageEngine`×2, `FaultVfs`, `gates::AlwaysRestrictedGate` |
 
 **Pro Komponente**
 
@@ -543,8 +551,10 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 - `orphan` (845 Zeilen)
   - → `contextra-ports`: prod: `Clock`×8, `Vfs`×7, `SystemClock`, `StorageEngine`
   - → `contextra-testkit`: dev: `FaultVfs`
-- `store` (1674 Zeilen)
-  - → `contextra-ports`: prod: `StorageEngine`×7, `Clock`×3, `MetricsSink`×3, `Checkpoint`×2, `BoxFuture`, `CheckpointCoordinator` · dev: `CheckpointCoordinator`×5
+- `store` (1710 Zeilen)
+  - → `contextra-ports`: prod: `StorageEngine`×7, `Clock`×3, `MetricsSink`×3, `Checkpoint`×2, `ReadGate`×2, `BoxFuture`, `CheckpointCoordinator` · dev: `CheckpointCoordinator`×5
+  - → `contextra-testkit`: dev: `gates::AlwaysRestrictedGate`
+  - → `contextra-types`: prod: `Seq`
 - `examples/checkpoint_memvfs.rs` (34 Zeilen)
   - → `contextra-testkit`: dev: `InMemoryStorageEngine`
   - → `contextra-types`: dev: `TxId::new`, `TxId::INTERNAL_BASE`
@@ -579,12 +589,11 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 **Auffälligkeiten**
 
-- contextra-types: nur in Tests/Benches genutzt, aber als normale Abhängigkeit deklariert → dev-dependency?
 - contextra-mvcc: genutzt, aber nicht in Cargo.toml deklariert (cfg-/Feature-Pfad oder Fehler)
 
 ### contextra-crypto
 
-- Pfad: `crates/contextra-crypto` · Zeilen: 16231 · Rust-Dateien: 74 · Ring: 0
+- Pfad: `crates/contextra-crypto` · Zeilen: 16308 · Rust-Dateien: 75 · Ring: 0
 - Interne Cargo-Abhängigkeiten: `contextra-testkit` (dev), `contextra-ports` (normal), `contextra-types` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
@@ -719,12 +728,16 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `fn sign_deletion_proof_v3`
     - `fn verify_deletion_proof_v3`
     - `enum SignatureVersion` · 1 Methoden
+- `erasure_root`
+  - 1 enum, 1 struct
+    - `enum ErasureLabel` · 1 Methoden
+    - `struct ErasureRoot` · 2 Methoden
 - `error`
   - 1 enum, 1 type
     - `type Result`
     - `enum CryptoError` · 1 Methoden ⚠ fremd: `contextra-types`
 - `kdf`
-  - 10 const, 2 fn, 3 struct
+  - 10 const, 3 fn, 3 struct
     - `const KDF_HEADER_MAGIC`
     - `const KDF_HEADER_VERSION_1`
     - `const KDF_ID_ARGON2ID`
@@ -740,16 +753,14 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `struct DerivedKey`
     - `fn derive_key_argon2id`
     - `fn hkdf_expand`
+    - `fn ledger_mac`
 - `kv_cipher`
   - 1 const, 2 struct, 1 trait
     - `const CURRENT_KV_FORMAT_VERSION`
     - `struct EncryptedKvLayer` ⚠ fremd: `contextra-types`
     - `trait KvCipher` · Methoden: seal, open
-    - `struct KvSegmentCipher` · 6 Methoden
 - `kv_segment`
   - 1 const, 1 enum, 1 fn, 7 struct, 1 type
-    - `enum KvDeleteMode`
-    - `struct EvictionWorker` · 3 Methoden
 - `kv_shredding`
   - 1 const, 1 fn, 5 struct
 - `revocation_log`
@@ -760,7 +771,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
   - 1 fn
 - `wal_crypto`
   - 6 struct, 1 trait
-  - … 30 weitere Items nicht aufgelistet (`--max-items`)
+  - … 33 weitere Items nicht aufgelistet (`--max-items`)
 - Zusätzlich 9 `pub`-Items in privaten Modulen ohne Re-Export (nicht Teil der echten API).
 - Interne Re-Exporte (`pub use`): `DeletionProofKeyPair`, `hash_deleted_keys_length_prefixed`
 - ⚠ Re-Exporte **fremder Crates**: `contextra_types::ModelFingerprint`
@@ -769,21 +780,21 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
-| `contextra-store` | `wal_crypto`×2, `verify_wal_chain_completeness`, `wal_crypto::WalHmac`, `crypto::KeyManager` | – |
+| `contextra-store` | `ledger_mac`×5, `hkdf_expand`×2, `wal_crypto`×2, `verify_wal_chain_completeness`, `wal_crypto::WalHmac`, `crypto::KeyManager` | – |
 | `contextra-mcp` | `CryptoKey`×3, `CryptoKey::try_new` | `AuditChain` |
 
-**Nach außen ungenutzte öffentliche Items (Heuristik, 106 von 110)**: `REC_AAD`, `seal_record_with_nonce`, `seal_record_with_rng`, `seal_record`, `open_record`, `VolatileEncryptionKey`, `constant_time_compare`, `verify_tag_constant_time`, `Blake3Chain`, `DataClass`, `AuditChainEntry`, `AuditChainHeadSignature`, `AuditHeadAnchor`, `EncryptedCommitmentSalt`, `compute_record_commitment`, `UnitKey`, `Dek`, `Salt`, `DocTag`, `AncestorSalts`, `DEK_LABEL`, `DEK_SALT_LABEL`, `WRAP_AAD`, `derive_dek`, `wrap_dek`, `unwrap_dek`, `verify_proof_sequence`, `compute_wal_delete_receipt`, `DELETION_PROOF_KEY_PURPOSE`, `derive_deletion_proof_key_for_tenant` …
+**Nach außen ungenutzte öffentliche Items (Heuristik, 107 von 113)**: `REC_AAD`, `seal_record_with_nonce`, `seal_record_with_rng`, `seal_record`, `open_record`, `VolatileEncryptionKey`, `constant_time_compare`, `verify_tag_constant_time`, `Blake3Chain`, `DataClass`, `AuditChainEntry`, `AuditChainHeadSignature`, `AuditHeadAnchor`, `EncryptedCommitmentSalt`, `compute_record_commitment`, `UnitKey`, `Dek`, `Salt`, `DocTag`, `AncestorSalts`, `DEK_LABEL`, `DEK_SALT_LABEL`, `WRAP_AAD`, `derive_dek`, `wrap_dek`, `unwrap_dek`, `verify_proof_sequence`, `compute_wal_delete_receipt`, `DELETION_PROOF_KEY_PURPOSE`, `derive_deletion_proof_key_for_tenant` …
 
 ### contextra-db
 
-- Pfad: `crates/contextra-db` · Zeilen: 11466 · Rust-Dateien: 55 · Ring: 3
+- Pfad: `crates/contextra-db` · Zeilen: 11467 · Rust-Dateien: 55 · Ring: 3
 - Interne Cargo-Abhängigkeiten: `contextra-checkpoint` (dev), `contextra-graph` (dev), `contextra-rank` (dev), `contextra-store` (dev), `contextra-testkit` (dev), `contextra-text` (dev), `contextra-vector` (dev), `contextra-engine` (normal), `contextra-ports` (normal), `contextra-types` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
 | Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
 |---|---:|---:|---:|---|---|
-| `contextra-engine` | 5 | 0 | 1 | `(crate)`, `DurabilityMode`, `decay_controller::*`, `fusion`, `collection` | – |
+| `contextra-engine` | 6 | 0 | 1 | `(crate)`, `DurabilityMode`, `decay_controller::*`, `fusion`, `collection`, `erasure` | – |
 | `contextra-types` | 4 | 40 | 2 | `DistanceMetric`, `MAX_SEARCH_K`, `EntityId`, `EntityId::from_key` | `Result`×5, `TxId`×5, `FusionWeights`×3, `TenantId`×2, `DocId`×2 … (+15) |
 | `contextra-ports` | 1 | 9 | 1 | `QueryRewriter` | `GraphIndex`×3, `StorageEngine`×2, `EmbeddingError`, `VectorIndex`, `BoxFuture` … (+1) |
 | `contextra-checkpoint` | 0 | 4 | 0 | – | `PersistentCheckpointStore`×2, `clear_all_orphaned_checkpoints`, `get_orphaned_checkpoints` |
@@ -795,8 +806,8 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 **Pro Komponente**
 
-- `(crate-root)` (794 Zeilen)
-  - → `contextra-engine`: prod: `(crate)`, `DurabilityMode`, `decay_controller::*`, `fusion`, `collection`
+- `(crate-root)` (795 Zeilen)
+  - → `contextra-engine`: prod: `(crate)`, `DurabilityMode`, `decay_controller::*`, `fusion`, `collection`, `erasure`
   - → `contextra-rank`: dev: `IsotonicCalibrator::new`
   - → `contextra-types`: prod: `DistanceMetric` · dev: `TenantId`, `Result`, `ContextraError::InvalidInput`
 - `multistep` (403 Zeilen)
@@ -941,7 +952,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
-| `contextra` | `DurabilityMode`×3, `DurabilityMode::Full`×2, `DurabilityMode::WalNoHmac`×2, `DurabilityMode::MemoryOnly`×2, `QueryRewriter` | – |
+| `contextra` | `ErasureConfig`×5, `DurabilityMode`×3, `DurabilityMode::Full`×2, `DurabilityMode::WalNoHmac`×2, `DurabilityMode::MemoryOnly`×2, `QueryRewriter` | – |
 
 **Nach außen ungenutzte öffentliche Items (Heuristik, 20 von 20)**: `RerankDeadline`, `RerankPidController`, `DEFAULT_MAX_SUB_QUERIES`, `DEFAULT_RERANK_POOL_MULTIPLIER`, `MultiStepConfig`, `MultiStepResult`, `MultiStepEngine`, `DEFAULT_TARGET_LATENCY_MS`, `MIN_SCALING_FACTOR`, `MAX_SCALING_FACTOR`, `PidLatencyController`, `LatencyBudgetGuard`, `SignalModality`, `VaultChunk`, `VaultConfig`, `VolatileDrainReceipt`, `CommitReceipt`, `VaultError`, `VolatileContextVault`, `VaultChunkMetadata`
 
@@ -1038,27 +1049,27 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 ### contextra-engine
 
-- Pfad: `crates/contextra-engine` · Zeilen: 25640 · Rust-Dateien: 123 · Ring: 3
+- Pfad: `crates/contextra-engine` · Zeilen: 27103 · Rust-Dateien: 134 · Ring: 3
 - Interne Cargo-Abhängigkeiten: `contextra-testkit` (dev), `contextra-vector` (dev), `contextra-checkpoint` (normal), `contextra-graph` (normal), `contextra-mvcc` (normal), `contextra-ports` (normal), `contextra-rank` (normal), `contextra-store` (normal), `contextra-text` (normal), `contextra-types` (normal), `contextra-vector` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
 | Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
 |---|---:|---:|---:|---|---|
-| `contextra-types` | 227 | 178 | 34 | `ContextraError::invalid_input`×50, `EntityId`×15, `HybridQuery`×13, `Result`×11, `MAX_SEARCH_K`×11, `ContextraError::Internal`×9, `ImportanceScore::new`×8, `domain::MemoryLink`×7, `EntityId::from_key`×7, `ContextraError::Serialization`×6 … (+40) | `ContextraError::from`×10, `domain::LinkRelation::Elaborates`×2, `ContextraError::HnswConnectivityDegraded`, `FusionWeights::new`, `PprConfig::default` … (+7) |
-| `contextra-ports` | 33 | 19 | 16 | `MetricsSink`×9, `StorageEngine`×5, `Clock`×3, `VectorIndexStats`×2, `Reranker`×2, `DriftStatusProvider`×2, `VectorIndex`, `SystemClock::new`, `GraphIndex`, `license` … (+6) | `BoxFuture` |
-| `contextra-store` | 21 | 99 | 7 | `LsmStorage`×6, `SystemPressure`×3, `tenant_codec::TenantScopedStorage`×3, `tenant_codec::TenantScopedStorage::new`×3, `PressureLevel::Critical`×2, `PressureLevel::Normal`, `PressureLevel::Elevated`, `LsmConfig`, `lsm::DurabilityMode` | `lsm`×10 |
+| `contextra-types` | 237 | 178 | 40 | `ContextraError::invalid_input`×50, `EntityId`×15, `HybridQuery`×13, `Result`×11, `MAX_SEARCH_K`×11, `ContextraError::Internal`×9, `ImportanceScore::new`×8, `domain::MemoryLink`×7, `EntityId::from_key`×7, `ContextraError::Serialization`×6 … (+47) | `ContextraError::from`×10, `domain::LinkRelation::Elaborates`×2, `ContextraError::HnswConnectivityDegraded`, `FusionWeights::new`, `PprConfig::default` … (+7) |
+| `contextra-ports` | 48 | 19 | 24 | `MetricsSink`×9, `StorageEngine`×6, `erasure`×5, `Clock`×3, `VectorIndexStats`×2, `Reranker`×2, `DriftStatusProvider`×2, `ErasureLayer`×2, `observer`×2, `VectorIndex` … (+14) | – |
+| `contextra-store` | 23 | 99 | 9 | `LsmStorage`×7, `SystemPressure`×4, `tenant_codec::TenantScopedStorage`×3, `PressureLevel::Critical`×2, `tenant_codec::TenantScopedStorage::new`×2, `PressureLevel::Normal`, `PressureLevel::Elevated`, `LsmConfig`, `io_budget::StoreIoBudget`, `lsm::DurabilityMode` | `lsm`×10 |
 | `contextra-graph` | 20 | 75 | 7 | `hyperedge::HyperEdgeId`×2, `percolation::PercolationConfig`×2, `CsrGraph::load_from_storage`×2, `hyperedge::HyperEdge`×2, `cascade_invalidate_edges_for_superseded_doc`, `percolation::compute_percolation_health`, `percolation::should_trigger_rebonding`, `percolation::find_rebonding_candidates`, `CsrGraph`, `hyperedge::RoleId::new` … (+6) | `csr::CsrGraph`×15, `csr`, `CsrGraph::new` |
 | `contextra-rank` | 14 | 2 | 4 | `SearchResult`×8, `IsotonicCalibrator`×2, `fusion`, `fusion::fuse_search_results_with_strategy`, `fusion::fuse_search_results_with_signal_strategies`, `fusion::fuse_signals` | – |
 | `contextra-vector` | 9 | 117 | 8 | `HnswIndex`×4, `hnsw::HnswIndex`×3, `acorn::FilteredIndex`, `HnswConfig` | `hnsw::HnswConfig::default`, `hnsw::HnswIndex::try_new`, `acorn`, `HnswIndex::try_new` |
 | `contextra-checkpoint` | 4 | 0 | 3 | `InstanceOrphanRegistry`×2, `InstanceOrphanRegistry::new`, `(crate)` | – |
 | `contextra-text` | 4 | 68 | 3 | `inverted::InvertedIndex`×2, `Language`×2 | `Language::English`×63, `Language::German`×4 |
-| `contextra-mvcc` | 1 | 3 | 1 | `tx_buffer::TxBuffer` | `tx_buffer::IndexOp` |
+| `contextra-mvcc` | 3 | 3 | 3 | `tx_buffer::TxBuffer`, `ReapPolicy`, `SnapshotRegistry` | `tx_buffer::IndexOp` |
 | `contextra-testkit` | 0 | 1 | 0 | – | `InMemoryStorageEngine` |
 
 **Pro Komponente**
 
-- `(crate-root)` (368 Zeilen)
+- `(crate-root)` (384 Zeilen)
   - → `contextra-checkpoint`: prod: `(crate)`, `InstanceOrphanRegistry`
   - → `contextra-ports`: prod: `MetricsSink`×3, `license::LicenseGate`, `StorageEngine`, `TextEmbeddingEngine`, `VectorDeleteMode`, `DriftStatusProvider`, `VectorIndexStats`, `StorageStats`
   - → `contextra-rank`: prod: `IsotonicCalibrator`
@@ -1071,7 +1082,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 - `backends` (28 Zeilen)
   - → `contextra-store`: prod: `LsmStorage`
   - → `contextra-vector`: prod: `HnswIndex`
-- `background_workers` (1158 Zeilen)
+- `background_workers` (1193 Zeilen)
   - → `contextra-graph`: prod: `hyperedge::HyperEdgeId` · dev: `CsrGraph`×8, `hyperedge::HyperEdgeId`
   - → `contextra-mvcc`: prod: `tx_buffer::TxBuffer` · dev: `tx_buffer::TxBuffer`×2, `tx_buffer::IndexOp`
   - → `contextra-ports`: prod: `StorageEngine`×2, `VectorIndex`, `Clock`, `SystemClock::new`
@@ -1079,23 +1090,28 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
   - → `contextra-text`: dev: `Language::English`×8
   - → `contextra-types`: prod: `Result`×4, `TxId` · dev: `Result`×2, `ContextraError::HnswConnectivityDegraded`
   - → `contextra-vector`: prod: `hnsw::HnswIndex`×3 · dev: `HnswIndex`×8, `HnswConfig`×8, `hnsw::HnswConfig::default`, `hnsw::HnswIndex::try_new`
-- `collection` (11178 Zeilen)
+- `collection` (11192 Zeilen)
   - → `contextra-graph`: prod: `percolation::PercolationConfig`×2, `cascade_invalidate_edges_for_superseded_doc`, `percolation::compute_percolation_health`, `percolation::should_trigger_rebonding`, `percolation::find_rebonding_candidates`, `CsrGraph`, `hyperedge::HyperEdgeId`, `hyperedge::RoleId::new`, `hyperedge::HyperEdgeId::new`, `hyperedge::RoleBinding` … (+4) · dev: `CsrGraph`×40, `csr::CsrGraph`×15, `csr`, `percolation::PercolationConfig`
   - → `contextra-ports`: prod: `VectorIndexStats`, `GraphIndex`, `Reranker`, `StorageEngine` · dev: `StorageStats`×5, `StorageEngine`×3, `TextEmbeddingEngine`, `BoxFuture`
   - → `contextra-store`: prod: `SystemPressure`×3, `PressureLevel::Critical`×2, `PressureLevel::Normal`, `PressureLevel::Elevated`, `LsmStorage` · dev: `LsmStorage`×36, `LsmConfig`×35, `lsm`×10
   - → `contextra-text`: prod: `inverted::InvertedIndex`, `Language` · dev: `Language::English`×50, `Language::German`×4, `Language`
   - → `contextra-types`: prod: `ContextraError::invalid_input`×37, `HybridQuery`×12, `MAX_SEARCH_K`×11, `EntityId`×11, `ContextraError::Internal`×9, `ImportanceScore::new`×8, `domain::MemoryLink`×7, `EntityId::from_key`×7, `Entity::new`×6, `DecayFunction::None`×6 … (+34) · dev: `Result`×25, `ContextraError::InvalidInput`×15, `ContextraError::from`×10, `MAX_SEARCH_K`×4 … (+27)
   - → `contextra-vector`: prod: `HnswIndex`, `acorn::FilteredIndex` · dev: `HnswIndex`×44, `HnswConfig`×44
-- `contextra_impl` (1269 Zeilen)
+- `contextra_impl` (1305 Zeilen)
   - → `contextra-checkpoint`: prod: `InstanceOrphanRegistry`, `InstanceOrphanRegistry::new`
   - → `contextra-graph`: prod: `CsrGraph::load_from_storage`×2
   - → `contextra-ports`: prod: `MetricsSink`×3, `Reranker`, `license`, `NoopMetricsSink`, `DriftStatusProvider`
   - → `contextra-rank`: prod: `IsotonicCalibrator`
-  - → `contextra-store`: prod: `LsmStorage`×3, `tenant_codec::TenantScopedStorage::new`×3, `tenant_codec::TenantScopedStorage`×2, `LsmConfig`
+  - → `contextra-store`: prod: `LsmStorage`×3, `tenant_codec::TenantScopedStorage`×2, `tenant_codec::TenantScopedStorage::new`×2, `LsmConfig`
   - → `contextra-types`: prod: `ContextraError::invalid_input`×8, `EntityId`×4, `FusionWeights`×2, `ContextraError::PolicyViolation`×2, `ContextraError::Storage`×2, `ContextraError::Transaction`, `MemoryType`, `GraphTraversalStrategy`, `HybridQuery`, `Result` · dev: `Result`×3
   - → `contextra-vector`: prod: `HnswConfig`
 - `decay_controller` (172 Zeilen)
   - → `contextra-ports`: prod: `Clock`
+- `erasure` (1362 Zeilen)
+  - → `contextra-mvcc`: prod: `ReapPolicy`, `SnapshotRegistry`
+  - → `contextra-ports`: prod: `erasure`×5, `ErasureLayer`×2, `observer`×2, `scanner::WitnessLayer`, `StorageEngine`, `ErasureObserver`, `BoxFuture`, `scanner`, `SeededRng::new`
+  - → `contextra-store`: prod: `io_budget::StoreIoBudget`, `SystemPressure`, `LsmStorage`
+  - → `contextra-types`: prod: `TenantId`×2, `ErasureError`, `ErasureReason`, `AwaitLevel`, `ErasurePolicy`, `ErasureReason::UserRequest`, `AwaitLevel::default`, `ContextraError`, `ErasureId`
 - `export` (343 Zeilen)
   - → `contextra-types`: prod: `TxId::new` · dev: `DocId::from_key`×4
 - `extraction` (556 Zeilen)
@@ -1221,7 +1237,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `struct CommunityDetectionConfig`
     - `enum EmbeddingBackend`
     - `enum TenantPolicy`
-    - `struct ContextraConfig` · 3 Methoden ⚠ fremd: `contextra-ports`, `contextra-store`, `contextra-types`
+    - `struct ContextraConfig` · 4 Methoden ⚠ fremd: `contextra-ports`, `contextra-store`, `contextra-types`
     - `type TenantCollectionMap` ⚠ fremd: `contextra-store`, `contextra-types`
     - `struct Contextra` · 3 Methoden
 - `adapters`
@@ -1263,6 +1279,24 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `struct DecaySignalInputs`
     - `struct DecayControllerConfig`
     - `struct AdaptiveDecayController` · 11 Methoden
+- `erasure`
+  - 2 enum, 14 struct
+    - `struct KernelProgress`
+    - `struct TokenCancel`
+    - `struct EngineIoBudget` · 3 Methoden
+    - `struct ObserverFn`
+    - `struct EpochCache` · 6 Methoden
+    - `struct ErasureConfig`
+    - `struct EraseOptions` ⚠ fremd: `contextra-types`
+    - `struct JobSched`
+    - `enum DriveOutcome`
+    - `struct ErasureRuntimeInner` ⚠ fremd: `contextra-mvcc`, `contextra-types`
+    - `struct ErasureRuntime` · 3 Methoden
+    - `enum LayerOrder`
+    - `struct LayerRegistry` · 8 Methoden
+    - `struct ScopeResolverImpl` · 4 Methoden
+    - `struct EraseHandle`
+    - `struct ErasePlanSummary`
 - `export`
   - 1 const, 4 struct
     - `const SCHEMA_VERSION_V1`
@@ -1297,41 +1331,25 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `fn weights_to_signal_factors` ⚠ fremd: `contextra-types`
     - `fn fuse_search_results_with_strategy` ⚠ fremd: `contextra-types`
     - `fn fuse_search_results_with_signal_strategies` ⚠ fremd: `contextra-types`
-    - `fn fuse_signals`
 - `import`
   - 1 const, 1 struct
-    - `struct ImportSummary`
-    - `const MAX_IMPORT_COLLECTIONS`
 - `metrics_names`
   - 9 const, 3 fn
-    - `const COMMIT_LATENCY`
-    - `const REBUILD_DURATION`
-    - `const BACKPRESSURE_LEVEL`
-    - `const CHECKPOINT_DURATION`
-    - `const SEARCH_LATENCY_VECTOR`
-    - `const SEARCH_LATENCY_TEXT`
-    - `const SEARCH_LATENCY_GRAPH`
-    - `const INSERT_LATENCY`
-    - `const REAPER_DOCS_REAPED`
-    - `fn record_histogram_safe` ⚠ fremd: `contextra-ports`
-    - `fn record_gauge_safe` ⚠ fremd: `contextra-ports`
-    - `fn record_counter_safe` ⚠ fremd: `contextra-ports`
 - `orchestration`
   - 8 struct, 1 trait
-    - `struct EngineServiceContainer` · 4 Methoden
 - `temporal_filter`
   - 5 fn, 1 struct, 1 type
 - `transaction`
   - 1 enum, 1 struct
-  - … 17 weitere Items nicht aufgelistet (`--max-items`)
-- Zusätzlich 40 `pub`-Items in privaten Modulen ohne Re-Export (nicht Teil der echten API).
+  - … 33 weitere Items nicht aufgelistet (`--max-items`)
+- Zusätzlich 42 `pub`-Items in privaten Modulen ohne Re-Export (nicht Teil der echten API).
 - ⚠ Re-Exporte **fremder Crates**: `contextra_types::AutoExtractionMode`, `contextra_graph::percolation::PercolationConfig`, `contextra_ports::TextEmbeddingEngine`, `contextra_ports::VectorDeleteMode`, `contextra_store::lsm::DurabilityMode`, `contextra_checkpoint`, `contextra_text::Language`, `contextra_ports::DriftStatusProvider`, `contextra_types::DistanceMetric`
 
 **Eingehend (wer nutzt dieses Crate)**
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
-| `contextra-db` | `(crate)`, `DurabilityMode`, `decay_controller::*`, `fusion`, `collection` | – |
+| `contextra-db` | `(crate)`, `DurabilityMode`, `decay_controller::*`, `fusion`, `collection`, `erasure` | – |
 
 *Hinweis: Mindestens ein Crate importiert per Glob (`*`); ungenutzte Items sind deshalb nicht bestimmbar.*
 
@@ -1627,14 +1645,14 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 ### contextra-mcp
 
-- Pfad: `crates/contextra-mcp` · Zeilen: 7712 · Rust-Dateien: 30 · Ring: 4
+- Pfad: `crates/contextra-mcp` · Zeilen: 7887 · Rust-Dateien: 31 · Ring: 4
 - Interne Cargo-Abhängigkeiten: `contextra` (normal), `contextra-crypto` (normal), `contextra-ports` (normal), `contextra-rank` (normal), `contextra-types` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
 | Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
 |---|---:|---:|---:|---|---|
-| `contextra` | 12 | 9 | 4 | `Contextra`×2, `chunker`, `chunker::MarkdownChunker::new`, `chunker::ChunkerConfig::default`, `collection_profile`, `collection_profile::DeploymentTier::EdgeMinimal`, `collection_profile::DeploymentTier::PowerUserLocal`, `collection_profile::DeploymentTier::EnterpriseShared`, `collection_profile::DeploymentTier::EnterpriseRegulated`, `collection_profile::AutoExtractionMode::Enabled` … (+1) | `collection_profile::DeploymentTier` |
+| `contextra` | 10 | 9 | 4 | `Contextra`×2, `chunker::MarkdownChunker::new`, `chunker::ChunkerConfig::default`, `collection_profile::DeploymentTier::EdgeMinimal`, `collection_profile::DeploymentTier::PowerUserLocal`, `collection_profile::DeploymentTier::EnterpriseShared`, `collection_profile::DeploymentTier::EnterpriseRegulated`, `collection_profile::AutoExtractionMode::Enabled`, `collection_profile::AutoExtractionMode::Disabled` | `collection_profile::DeploymentTier` |
 | `contextra-types` | 6 | 4 | 3 | `ContextraError`×4, `ContextraError::InvalidInput`, `ContextraError::NotFound` | `TenantId::try_new`, `AutoExtractionMode`, `TenantId`, `MAX_SEARCH_K` |
 | `contextra-crypto` | 4 | 3 | 1 | `CryptoKey`×3, `CryptoKey::try_new` | `AuditChain` |
 | `contextra-ports` | 3 | 39 | 1 | `plugin::PluginRegistry`×2, `EmbeddingProvider` | `EmbeddingError`×17, `BoxFuture`×12, `Clock`×2 |
@@ -1655,20 +1673,20 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
   - → `contextra-ports`: dev: `Clock`×2
 - `protocol` (173 Zeilen)
   - → `contextra-types`: prod: `ContextraError`×2, `ContextraError::InvalidInput`, `ContextraError::NotFound`
-- `sandbox` (697 Zeilen)
+- `sandbox` (733 Zeilen)
   - → `contextra-crypto`: prod: `CryptoKey`×3, `CryptoKey::try_new` · dev: `CryptoKey::try_new`×2
   - → `contextra-types`: prod: `ContextraError`
-- `server` (139 Zeilen)
+- `server` (147 Zeilen)
   - → `contextra`: prod: `Contextra`
   - → `contextra-ports`: prod: `plugin::PluginRegistry`×2, `EmbeddingProvider`
-- `server_tools` (344 Zeilen)
-  - → `contextra`: prod: `chunker`, `chunker::MarkdownChunker::new`, `chunker::ChunkerConfig::default`
-- `tests` (872 Zeilen)
+- `server_tools` (345 Zeilen)
+  - → `contextra`: prod: `chunker::MarkdownChunker::new`, `chunker::ChunkerConfig::default`
+- `tests` (875 Zeilen)
   - → `contextra`: dev: `Contextra`
   - → `contextra-ports`: dev: `EmbeddingError`×2, `BoxFuture`, `EmbeddingProvider`
   - → `contextra-types`: dev: `TenantId::try_new`
-- `tools_crud` (171 Zeilen)
-  - → `contextra`: prod: `collection_profile`, `collection_profile::DeploymentTier::EdgeMinimal`, `collection_profile::DeploymentTier::PowerUserLocal`, `collection_profile::DeploymentTier::EnterpriseShared`, `collection_profile::DeploymentTier::EnterpriseRegulated`, `collection_profile::AutoExtractionMode::Enabled`, `collection_profile::AutoExtractionMode::Disabled`
+- `tools_crud` (172 Zeilen)
+  - → `contextra`: prod: `collection_profile::DeploymentTier::EdgeMinimal`, `collection_profile::DeploymentTier::PowerUserLocal`, `collection_profile::DeploymentTier::EnterpriseShared`, `collection_profile::DeploymentTier::EnterpriseRegulated`, `collection_profile::AutoExtractionMode::Enabled`, `collection_profile::AutoExtractionMode::Disabled`
 - `tests/campaign_j42_mcp_audit.rs` (56 Zeilen)
   - → `contextra`: dev: `collection_profile::DeploymentTier`
   - → `contextra-crypto`: dev: `AuditChain`
@@ -1686,7 +1704,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
   - → `contextra`: dev: `Contextra`
   - → `contextra-ports`: dev: `EmbeddingError`×2, `BoxFuture`, `EmbeddingProvider`
   - → `contextra-types`: dev: `TenantId`
-- `tests/tool_registry_classification.rs` (158 Zeilen)
+- `tests/tool_registry_classification.rs` (161 Zeilen)
   - → `contextra`: dev: `Contextra`
   - → `contextra-ports`: dev: `BoxFuture`×2, `EmbeddingError`×2, `EmbeddingProvider`
 - `tests/tools_crud_direct_tests.rs` (484 Zeilen)
@@ -1737,7 +1755,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `struct McpSandbox` · 8 Methoden
 - `server`
   - 1 struct
-    - `struct McpServer` · 7 Methoden ⚠ fremd: `contextra`, `contextra-ports`
+    - `struct McpServer` · 8 Methoden ⚠ fremd: `contextra`, `contextra-ports`
 - `validation`
   - 2 fn
     - `fn is_write_allowed_by_env`
@@ -1752,7 +1770,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 ### contextra-mvcc
 
-- Pfad: `crates/contextra-mvcc` · Zeilen: 6532 · Rust-Dateien: 24 · Ring: 0
+- Pfad: `crates/contextra-mvcc` · Zeilen: 7230 · Rust-Dateien: 24 · Ring: 0
 - Interne Cargo-Abhängigkeiten: `contextra-testkit` (dev), `contextra-ports` (normal), `contextra-types` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
@@ -1767,7 +1785,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 - `seq_log` (738 Zeilen)
   - → `contextra-testkit`: dev: `ManualClock`
-- `snapshot` (825 Zeilen)
+- `snapshot` (1520 Zeilen)
   - → `contextra-testkit`: dev: `ManualClock`
 - `ssi` (1069 Zeilen)
   - → `contextra-ports`: prod: `MetricsSink`×3
@@ -1800,10 +1818,16 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `enum SeqLogChange` · 2 Methoden
     - `struct SequenceLog` · 25 Methoden
 - `snapshot`
-  - 3 struct
+  - 1 enum, 8 struct
     - `struct SnapshotRegistryConfig`
-    - `struct SnapshotRegistry` · 29 Methoden
-    - `struct SnapshotGuard` · 2 Methoden
+    - `struct RegistrationId`
+    - `enum RegistrationKind`
+    - `struct RevokeReport`
+    - `struct Blocker`
+    - `struct ReapPolicy`
+    - `struct Reaped`
+    - `struct SnapshotRegistry` · 32 Methoden
+    - `struct SnapshotGuard` · 3 Methoden
 - `ssi`
   - 1 const, 3 struct, 1 trait
     - `const DEFAULT_MAX_TRACKED_COMMIT_KEYS`
@@ -1829,12 +1853,12 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
+| `contextra-store` | `SsiValidator`×4, `SnapshotRegistry`×2, `tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES`×2, `SequenceLogSsiValidator`, `IndexOp`, `SequenceLogSsiValidator::new_with_bounds` | `SnapshotRegistry::new` |
 | `contextra-vector` | `IndexOp::Insert`×2, `IndexOp::Delete`×2, `SequenceLog::new`×2, `SeqLogChange::Insert`, `SeqLogChange::Delete`, `TxBuffer`, `TxBuffer::new_with_config`, `SequenceLog` | – |
-| `contextra-store` | `SsiValidator`×4, `tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES`×2, `SnapshotRegistry`, `SequenceLogSsiValidator`, `IndexOp`, `SequenceLogSsiValidator::new_with_bounds` | `SnapshotRegistry::new` |
+| `contextra-engine` | `tx_buffer::TxBuffer`, `ReapPolicy`, `SnapshotRegistry` | `tx_buffer::IndexOp` |
 | `contextra-checkpoint` | `SnapshotRegistry` | – |
-| `contextra-engine` | `tx_buffer::TxBuffer` | `tx_buffer::IndexOp` |
 
-**Nach außen ungenutzte öffentliche Items (Heuristik, 15 von 22)**: `DEFAULT_MAX_PIN_DURATION`, `SeqLogEntry`, `SeqLogChange`, `SnapshotRegistryConfig`, `SnapshotGuard`, `DEFAULT_MAX_TRACKED_COMMIT_KEYS`, `ReadSet`, `PruningBlockerInfo`, `DEFAULT_SHARD_COUNT`, `DEFAULT_MAX_OPS_PER_TX`, `DEFAULT_MAX_READ_SET_KEYS`, `DEFAULT_MAX_TX_STAGED_BYTES`, `DEFAULT_MAX_TOTAL_STAGED_BYTES`, `TxBufferConfig`, `StagedOpSize`
+**Nach außen ungenutzte öffentliche Items (Heuristik, 20 von 28)**: `DEFAULT_MAX_PIN_DURATION`, `SeqLogEntry`, `SeqLogChange`, `SnapshotRegistryConfig`, `RegistrationId`, `RegistrationKind`, `RevokeReport`, `Blocker`, `Reaped`, `SnapshotGuard`, `DEFAULT_MAX_TRACKED_COMMIT_KEYS`, `ReadSet`, `PruningBlockerInfo`, `DEFAULT_SHARD_COUNT`, `DEFAULT_MAX_OPS_PER_TX`, `DEFAULT_MAX_READ_SET_KEYS`, `DEFAULT_MAX_TX_STAGED_BYTES`, `DEFAULT_MAX_TOTAL_STAGED_BYTES`, `TxBufferConfig`, `StagedOpSize`
 
 **Auffälligkeiten**
 
@@ -1842,23 +1866,27 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 ### contextra-ports
 
-- Pfad: `crates/contextra-ports` · Zeilen: 6796 · Rust-Dateien: 42 · Ring: 0
+- Pfad: `crates/contextra-ports` · Zeilen: 7563 · Rust-Dateien: 42 · Ring: 0
 - Interne Cargo-Abhängigkeiten: `contextra-types` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
 | Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
 |---|---:|---:|---:|---|---|
-| `contextra-types` | 3 | 0 | 3 | `RequestContext`×2, `ids::ErasureId` | – |
+| `contextra-types` | 3 | 17 | 3 | `RequestContext`×2, `ids::ErasureId` | `Timestamp`×5, `Seq`×4, `TargetKind`×4, `EraseTarget`×2, `ErasureError`×2 |
 
 **Pro Komponente**
 
-- `observer` (141 Zeilen)
+- `(crate-root)` (247 Zeilen)
+  - → `contextra-types`: dev: `Timestamp`×3, `Seq`×2, `TargetKind`×2, `EraseTarget` … (+1)
+- `observer` (112 Zeilen)
   - → `contextra-types`: prod: `ids::ErasureId`
 - `policy` (30 Zeilen)
   - → `contextra-types`: prod: `RequestContext`
-- `scanner` (483 Zeilen)
+- `scanner` (485 Zeilen)
   - → `contextra-types`: prod: `RequestContext`
+- `tests/erasure_ports.rs` (572 Zeilen)
+  - → `contextra-types`: dev: `Seq`×2, `Timestamp`×2, `TargetKind`×2, `EraseTarget` … (+1)
 
 **Öffentliche Schnittstelle** (erreichbar über `pub mod`-Kette oder `pub use`)
 
@@ -1870,14 +1898,6 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
   - 1 struct, 1 trait
     - `struct RequestId`
     - `trait AttentionExporter` · Methoden: export_attention_weights
-- `barrier`
-  - 4 struct, 2 trait
-    - `struct BarrierShared` · 1 Methoden
-    - `struct BarrierExclusive` · 1 Methoden
-    - `struct CompactionPermit` · 1 Methoden
-    - `struct PurgePermit` · 1 Methoden
-    - `trait CommitBarrier` · Methoden: shared, exclusive
-    - `trait PurgeBarrier` · Methoden: compaction, purge, purge_waiting
 - `checkpoint`
   - 2 trait
     - `trait Checkpoint` · Methoden: take_snapshot, restore
@@ -1903,9 +1923,9 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `fn assert_purger_contract`
     - `fn assert_vfs_file_contract`
     - `fn assert_read_gate_contract`
-    - `fn assert_keys_contract`
+    - `fn assert_seal_contract`
     - `fn assert_ledger_contract`
-    - `fn assert_erasure_layer_contract`
+    - `fn assert_erasure_contract`
     - `fn assert_egress_policy_contract`
     - `fn assert_visitor_methods`
 - `embedding`
@@ -1918,27 +1938,35 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `trait LlmTextGenerator` · Methoden: generate, generate_with_context
     - `trait LlmTextGeneratorStreaming` · Methoden: generate_stream
 - `erasure`
-  - 2 enum, 6 struct, 3 trait
-    - `struct LayerId` · 2 Methoden
-    - `enum EraseTarget`
-    - `struct LayerScope` · 4 Methoden
-    - `struct PurgeCx` · 1 Methoden
-    - `struct PurgeOutcome` · 1 Methoden
-    - `struct Armed`
-    - `struct Scanner` · 1 Methoden
-    - `enum KeyCoverage`
-    - `trait ErasureLayer` · Methoden: id, resolve, on_gate, purge, witness, key_coverage
-    - `trait StorageBackend`
-    - `trait ErasureTarget`
+  - 5 enum, 1 fn, 10 struct, 6 trait
+    - `enum KeyPattern` · 2 Methoden
+    - `enum Verdict`
+    - `struct KeyScope` · 4 Methoden
+    - `enum DocScope`
+    - `fn compute_plan_hash`
+    - `struct ResolvedScope` · 1 Methoden
+    - `enum IoClass`
+    - `enum PressureHint`
+    - `trait IoBudget` · Methoden: acquire, pressure
+    - `trait ProgressSink` · Methoden: record
+    - `trait Cancel` · Methoden: is_cancelled, cancelled
+    - `struct PurgeCx`
+    - `trait PrivilegedRead` · Methoden: get, scan_prefix
+    - `struct PurgeOutcome`
+    - `struct LayerError`
+    - `trait ErasureLayer` · Methoden: layer, on_gate, purge, scanner
+    - `struct EraseRequest`
+    - `struct AcceptReceipt`
+    - `struct GateReceipt`
+    - `struct SealReceipt`
+    - `struct JobView`
+    - `trait ErasureKernel` · Methoden: accept, publish_gate, purge_store, record_layer, seal, complete…
 - `gate`
-  - 3 enum, 3 struct, 1 trait
-    - `struct Seq` · 2 Methoden
-    - `struct KeyBuf` · 2 Methoden
-    - `enum KeyBound` · 1 Methoden
-    - `struct KeyRange` · 2 Methoden
-    - `enum GateDecision`
+  - 3 enum, 1 trait
+    - `enum GateDecision` · 1 Methoden
     - `enum RangeGate`
-    - `trait ReadGate` · Methoden: check, check_bound, variant_for_range, gated_seq, gate_epoch, covers…
+    - `enum DiscardRule`
+    - `trait ReadGate` · Methoden: is_active, epoch, check, check_version, check_prefix, discard_rule…
 - `graph`
   - 1 enum, 3 struct, 1 trait
     - `struct RoleId` · 2 Methoden
@@ -1955,25 +1983,21 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
   - 1 struct, 1 trait
     - `trait IdGen` · Methoden: next_id
     - `struct SequentialIdGen` · 1 Methoden
-- `keys`
-  - 1 enum, 4 struct, 2 trait
-    - `struct FileId` · 2 Methoden
-    - `enum FileKind`
-    - `struct FileKey` · 3 Methoden
-    - `struct SealCtx` · 1 Methoden
-    - `struct Envelope` · 2 Methoden
-    - `trait RecordSealer` · Methoden: seal, open, evict, make_slots_durable
-    - `trait FileKeyring` · Methoden: create, open, destroy
 - `kv`
   - 5 struct, 1 trait
     - `struct KvLayout`
     - `struct RopeConfig`
     - `struct PrefixKey`
     - `struct KvBlock`
+    - `struct KvPrefixHit`
+    - `trait KvPrefixStore` · Methoden: lookup, insert, evict
 - `kv_bridge_port`
   - 1 trait
+    - `trait KvBridgeStorage` · Methoden: get, put, commit
 - `ledger`
-  - 3 struct, 1 trait
+  - 4 struct, 2 trait
+    - `struct LedgerEntry`
+    - `struct LedgerDraft`
 - `license`
   - 3 enum, 2 struct, 1 trait
 - `lifecycle`
@@ -1983,7 +2007,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 - `observability`
   - 1 trait
 - `observer`
-  - 3 enum, 1 struct, 1 trait, 1 type
+  - 2 enum, 1 struct, 1 trait
 - `plugin`
   - 1 enum, 2 struct, 1 trait
 - `policy`
@@ -1998,6 +2022,8 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
   - 1 struct, 1 trait
 - `scanner`
   - 2 enum, 4 struct, 2 trait
+- `seal`
+  - 2 struct, 1 trait
 - `storage`
   - 1 const, 1 struct, 1 trait
 - `text_index`
@@ -2006,22 +2032,22 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
   - 1 struct, 2 trait
 - `vfs`
   - 1 enum, 1 struct, 2 trait
-  - … 65 weitere Items nicht aufgelistet (`--max-items`)
+  - … 63 weitere Items nicht aufgelistet (`--max-items`)
 - Zusätzlich 10 `pub`-Items in privaten Modulen ohne Re-Export (nicht Teil der echten API).
-- Interne Re-Exporte (`pub use`): `LayerWitness`, `QueryRewriter`, `Reranker`, `KvPrefixStore`, `TextEmbeddingEngine`
+- Interne Re-Exporte (`pub use`): `QueryRewriter`, `Reranker`, `KvPrefixStore`, `TextEmbeddingEngine`
 
 **Eingehend (wer nutzt dieses Crate)**
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
-| `contextra-checkpoint` | `Clock`×20, `StorageEngine`×14, `Vfs`×7, `MetricsSink`×6, `BoxFuture`×3, `SystemClock`×2, `Checkpoint`×2, `CheckpointCoordinator` | – |
-| `contextra-store` | `Clock`×11, `MetricsSink`×6, `MAX_SCAN_MERGE_ACCUMULATOR`×6, `StorageStats`×5, `scanner`×5, `SystemClock::new`×4, `Vfs`×3, `IdGen`×3, `ResourceTracker`×2, `StorageEngine`×2 … (+7) | `ResourceBudget`×28, `ResourceTracker::new`×27, `clock::SystemClock`, `storage::StorageEngine` |
-| `contextra-engine` | `MetricsSink`×9, `StorageEngine`×5, `Clock`×3, `VectorIndexStats`×2, `Reranker`×2, `DriftStatusProvider`×2, `VectorIndex`, `SystemClock::new`, `GraphIndex`, `license` … (+6) | `BoxFuture` |
+| `contextra-store` | `Clock`×13, `gate::ReadGate`×8, `MetricsSink`×6, `MAX_SCAN_MERGE_ACCUMULATOR`×6, `StorageStats`×5, `erasure`×5, `scanner`×5, `SystemClock::new`×4, `Vfs`×3, `BoxFuture`×3 … (+21) | `ResourceBudget`×28, `ResourceTracker::new`×27, `clock::SystemClock`×3, `erasure::KeyPattern` … (+7) |
+| `contextra-checkpoint` | `Clock`×20, `StorageEngine`×14, `Vfs`×7, `MetricsSink`×6, `BoxFuture`×3, `SystemClock`×2, `Checkpoint`×2, `ReadGate`×2, `CheckpointCoordinator` | – |
+| `contextra-engine` | `MetricsSink`×9, `StorageEngine`×6, `erasure`×5, `Clock`×3, `VectorIndexStats`×2, `Reranker`×2, `DriftStatusProvider`×2, `ErasureLayer`×2, `observer`×2, `VectorIndex` … (+14) | – |
 | `contextra-vector` | `Clock`×15, `MetricsSink`×6, `Rng`×4, `VectorIndex`×2, `scanner`×2, `NoopMetricsSink`×2, `SeededRng::new`×2 | `SeededRng`×5, `vector_index::VectorIndex`, `clock::SystemClock` |
 | `contextra-graph` | `BoxFuture`×5, `GraphIndex`×4, `StorageEngine`×2, `graph::HyperEdgeId::new`×2, `GraphIndex::personalized_page_rank_at`, `GraphIndex::rollback_to_tx`, `graph::RoleBinding`, `graph::HyperEdgeId`, `graph::GraphMutationError`, `graph::GraphMutationError::LockAcquisitionTimeout` … (+10) | `Result`×3, `graph_index::GraphIndex` |
-| `contextra-testkit` | `Clock`×2, `Vfs`×2, `GraphIndex`, `MetricsSink`, `Rng`, `StorageEngine`, `TextIndex`, `VectorIndex`, `scanner::WitnessLayer`, `scanner::ScanTechnique` … (+2) | `TextEmbeddingEngine` |
+| `contextra-testkit` | `Clock`×2, `erasure`×2, `scanner`×2, `Vfs`×2, `gate`×2, `gate::ReadGate`, `scanner::ScanTarget::new`, `GraphIndex`, `MetricsSink`, `Rng` … (+7) | `TextEmbeddingEngine`, `erasure::Cancel`, `BoxFuture`, `erasure::PurgeCx` |
+| `contextra-text` | `StorageEngine`×6, `scanner`×3, `gate::ReadGate`×2, `erasure::IoClass::Erase`×2, `erasure` | `BoxFuture`×50, `StorageStats`×35, `clock::SystemClock` |
 | `contextra` | `license::FeatureRing`×2, `license::LicenseGate`×2, `IdGen`, `license`, `license::VectorDeleteMode`, `license::LicenseError` | `BoxFuture`×3, `license::AuthorizedRing`, `license::OpenFastGate`, `license::LicenseError::NotActivated` … (+1) |
-| `contextra-text` | `StorageEngine`×6, `scanner`×2 | `BoxFuture`×50, `StorageStats`×35, `clock::SystemClock` |
 | `contextra-crypto` | `scanner::WitnessLayer`, `scanner::LayerWitness`, `Clock`, `scanner::ScanTechnique::NotMeasured`, `ScanTechnique`, `scanner` | `Result`×24, `SystemClock`×6, `scanner::ScanTechnique`×4 |
 | `contextra-mcp` | `plugin::PluginRegistry`×2, `EmbeddingProvider` | `EmbeddingError`×17, `BoxFuture`×12, `Clock`×2 |
 | `contextra-mvcc` | `MetricsSink`×3 | – |
@@ -2029,7 +2055,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 | `contextra-bench` | `VectorIndex` | `StorageEngine` |
 | `contextra-db` | `QueryRewriter` | `GraphIndex`×3, `StorageEngine`×2, `EmbeddingError`, `VectorIndex` … (+2) |
 
-**Nach außen ungenutzte öffentliche Items (Heuristik, 105 von 145)**: `RequestId`, `AttentionExporter`, `BarrierShared`, `BarrierExclusive`, `CompactionPermit`, `PurgePermit`, `CommitBarrier`, `PurgeBarrier`, `assert_checkpoint_contract`, `assert_checkpoint_coordinator_contract`, `assert_vector_index_contract`, `assert_attention_exporter_contract`, `assert_graph_index_contract`, `assert_lifecycle_contract`, `assert_embedding_contract`, `assert_observability_contract`, `assert_license_contract`, `assert_reranker_contract`, `assert_text_index_contract`, `assert_storage_engine_contract`, `assert_purger_contract`, `assert_vfs_file_contract`, `assert_read_gate_contract`, `assert_keys_contract`, `assert_ledger_contract`, `assert_erasure_layer_contract`, `assert_egress_policy_contract`, `assert_visitor_methods`, `ContextSegment`, `TextGenerator` …
+**Nach außen ungenutzte öffentliche Items (Heuristik, 90 von 143)**: `RequestId`, `AttentionExporter`, `assert_checkpoint_contract`, `assert_checkpoint_coordinator_contract`, `assert_vector_index_contract`, `assert_attention_exporter_contract`, `assert_graph_index_contract`, `assert_lifecycle_contract`, `assert_embedding_contract`, `assert_observability_contract`, `assert_license_contract`, `assert_reranker_contract`, `assert_text_index_contract`, `assert_storage_engine_contract`, `assert_purger_contract`, `assert_vfs_file_contract`, `assert_read_gate_contract`, `assert_seal_contract`, `assert_ledger_contract`, `assert_erasure_contract`, `assert_egress_policy_contract`, `assert_visitor_methods`, `ContextSegment`, `TextGenerator`, `LlmTextGeneratorStreaming`, `Verdict`, `KeyScope`, `DocScope`, `compute_plan_hash`, `ResolvedScope` …
 
 ### contextra-rank
 
@@ -2199,41 +2225,50 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 ### contextra-store
 
-- Pfad: `crates/contextra-store` · Zeilen: 48169 · Rust-Dateien: 234 · Ring: 1
+- Pfad: `crates/contextra-store` · Zeilen: 54947 · Rust-Dateien: 243 · Ring: 1
 - Interne Cargo-Abhängigkeiten: `contextra-testkit` (dev), `contextra-crypto` (normal), `contextra-mvcc` (normal), `contextra-ports` (normal), `contextra-sys` (normal), `contextra-types` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
 | Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
 |---|---:|---:|---:|---|---|
-| `contextra-ports` | 54 | 149 | 20 | `Clock`×11, `MetricsSink`×6, `MAX_SCAN_MERGE_ACCUMULATOR`×6, `StorageStats`×5, `scanner`×5, `SystemClock::new`×4, `Vfs`×3, `IdGen`×3, `ResourceTracker`×2, `StorageEngine`×2 … (+7) | `ResourceBudget`×28, `ResourceTracker::new`×27, `clock::SystemClock`, `storage::StorageEngine` |
-| `contextra-types` | 39 | 123 | 15 | `ContextraError::Storage`×8, `Result`×5, `ContextraError`×5, `TOMBSTONE_BIT`×4, `TxId`×4, `ContextraError::MemoryBudgetExceeded`×2, `ContextraError::Internal`×2, `TxId::new`×2, `TxId::INTERNAL_BASE`×2, `ContextraError::Sandbox` … (+4) | `CollectionId`×6, `DocId`×6, `ContextraError::InvalidInput`×2, `TenantId`, `*` |
-| `contextra-mvcc` | 10 | 7 | 6 | `SsiValidator`×4, `tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES`×2, `SnapshotRegistry`, `SequenceLogSsiValidator`, `IndexOp`, `SequenceLogSsiValidator::new_with_bounds` | `SnapshotRegistry::new` |
-| `contextra-crypto` | 5 | 2 | 5 | `wal_crypto`×2, `verify_wal_chain_completeness`, `wal_crypto::WalHmac`, `crypto::KeyManager` | – |
-| `contextra-sys` | 3 | 4 | 2 | `mmap_readonly`×2, `set_restrictive_file_acl` | `reopen_and_dup2`×2, `verify_file_acl_owner_only`, `set_fd_limit` |
+| `contextra-ports` | 87 | 170 | 28 | `Clock`×13, `gate::ReadGate`×8, `MetricsSink`×6, `MAX_SCAN_MERGE_ACCUMULATOR`×6, `StorageStats`×5, `erasure`×5, `scanner`×5, `SystemClock::new`×4, `Vfs`×3, `BoxFuture`×3 … (+21) | `ResourceBudget`×28, `ResourceTracker::new`×27, `clock::SystemClock`×3, `erasure::KeyPattern`, `erasure::Cancel` … (+6) |
+| `contextra-types` | 52 | 133 | 22 | `ContextraError::Storage`×8, `Seq`×7, `Result`×6, `ContextraError`×5, `TOMBSTONE_BIT`×4, `TxId`×4, `TxId::INTERNAL_BASE`×3, `TxId::new`×3, `ContextraError::MemoryBudgetExceeded`×2, `ContextraError::Internal`×2 … (+7) | `CollectionId`×7, `DocId`×7, `ErasureId`×3, `ContextraError::InvalidInput`×2, `ErasureException::OutOfScopeExternalCopies` … (+4) |
+| `contextra-crypto` | 12 | 2 | 7 | `ledger_mac`×5, `hkdf_expand`×2, `wal_crypto`×2, `verify_wal_chain_completeness`, `wal_crypto::WalHmac`, `crypto::KeyManager` | – |
+| `contextra-mvcc` | 11 | 7 | 7 | `SsiValidator`×4, `SnapshotRegistry`×2, `tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES`×2, `SequenceLogSsiValidator`, `IndexOp`, `SequenceLogSsiValidator::new_with_bounds` | `SnapshotRegistry::new` |
+| `contextra-sys` | 5 | 4 | 4 | `available_space`×2, `mmap_readonly`×2, `set_restrictive_file_acl` | `reopen_and_dup2`×2, `verify_file_acl_owner_only`, `set_fd_limit` |
 | `contextra-testkit` | 0 | 8 | 0 | – | `ManualClock`×4, `ReferenceModel`×4 |
 
 **Pro Komponente**
 
-- `compaction` (3432 Zeilen)
+- `compaction` (3433 Zeilen)
   - → `contextra-mvcc`: prod: `SnapshotRegistry` · dev: `SnapshotRegistry`
-  - → `contextra-ports`: prod: `StorageStats`×2, `ResourceTracker`×2, `Clock`×2, `Vfs`, `SystemClock::new`, `ContextraError::NotFound` · dev: `ResourceTracker::new`×27, `ResourceBudget`×27, `StorageEngine`×2
+  - → `contextra-ports`: prod: `StorageStats`×2, `ResourceTracker`×2, `Clock`×2, `gate::ReadGate`, `Vfs`, `SystemClock::new`, `ContextraError::NotFound` · dev: `ResourceTracker::new`×27, `ResourceBudget`×27, `StorageEngine`×2
   - → `contextra-types`: prod: `ContextraError::MemoryBudgetExceeded`×2, `ContextraError::Internal`×2, `ContextraError::Sandbox`, `Result`, `TOMBSTONE_BIT` · dev: `TxId::new`×3, `TOMBSTONE_BIT`×2, `ContextraError::MemoryBudgetExceeded`×2, `TxId`
+- `erasure` (5575 Zeilen)
+  - → `contextra-crypto`: prod: `ledger_mac`×5, `hkdf_expand`×2
+  - → `contextra-mvcc`: prod: `SnapshotRegistry`
+  - → `contextra-ports`: prod: `erasure`×4, `vfs`×2, `BoxFuture`×2, `ledger`×2, `scanner`×2, `Clock`×2, `gate::DiscardRule`, `gate`, `scanner::WitnessLayer`, `gate::ReadGate` … (+1) · dev: `erasure`, `erasure::KeyPattern`
+  - → `contextra-sys`: prod: `available_space`×2
+  - → `contextra-types`: prod: `Seq`, `ReinsertPolicy::AllowAfterSealed`, `ErasureError`, `ContextraError::NotFound`, `TxId::INTERNAL_BASE`, `TxId::new`, `Result` · dev: `ErasureId`, `ErasureException::OutOfScopeExternalCopies`
+- `io_budget` (302 Zeilen)
+  - → `contextra-ports`: prod: `clock::Clock`, `BoxFuture`, `erasure` · dev: `clock::SystemClock`
+  - → `contextra-types`: prod: `ErasureError`
 - `kv` (48 Zeilen)
   - → `contextra-types`: prod: `Result`
-- `lsm` (6598 Zeilen)
+- `lsm` (6752 Zeilen)
   - → `contextra-crypto`: prod: `verify_wal_chain_completeness`
   - → `contextra-mvcc`: prod: `SsiValidator`×4, `tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES`, `SequenceLogSsiValidator`, `IndexOp`, `SequenceLogSsiValidator::new_with_bounds` · dev: `tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES`
-  - → `contextra-ports`: prod: `Clock`×6, `MAX_SCAN_MERGE_ACCUMULATOR`×6, `MetricsSink`×5, `Vfs`×2, `StorageStats`×2, `StorageEngine`×2, `license::FeatureRing`, `license::FeatureRing::Sovereign`, `SystemClock::new`, `NoopMetricsSink` · dev: `Clock`
+  - → `contextra-ports`: prod: `gate::ReadGate`×6, `Clock`×6, `MAX_SCAN_MERGE_ACCUMULATOR`×6, `MetricsSink`×5, `ErasureKernel`×2, `Vfs`×2, `StorageStats`×2, `StorageEngine`×2, `gate::DiscardRule::MayDrop`×2, `license::FeatureRing` … (+4) · dev: `Clock`
   - → `contextra-testkit`: dev: `ManualClock`
-  - → `contextra-types`: prod: `ContextraError::Storage`×5, `TxId`×4, `ContextraError`, `ContextraError::DurabilityConfig`, `Result`, `TxId::new`, `ContextraError::NotFound`, `TxId::INTERNAL_BASE` · dev: `TOMBSTONE_BIT`
-- `memtable` (969 Zeilen)
+  - → `contextra-types`: prod: `Seq`×6, `ContextraError::Storage`×5, `TxId`×4, `ContextraError`, `ContextraError::DurabilityConfig`, `Result`, `TxId::new`, `TxId::INTERNAL_BASE` · dev: `TOMBSTONE_BIT`
+- `memtable` (1015 Zeilen)
   - → `contextra-mvcc`: prod: `tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES`
   - → `contextra-types`: dev: `TOMBSTONE_BIT`
-- `scanner` (1028 Zeilen)
-  - → `contextra-ports`: prod: `scanner`×5, `scanner::ScanTarget::new`, `scanner::ScanTechnique::Structural`, `SystemClock::new` · dev: `clock::SystemClock`, `StorageEngine`, `scanner`
-  - → `contextra-types`: prod: `ContextraError`×4, `ContextraError::Storage`×3, `Result`×2, `RequestContext::new`, `TenantId::new`, `TxId::new` · dev: `CollectionId`×6, `DocId`×6, `ContextraError`
-- `sstable` (3538 Zeilen)
+- `scanner` (1046 Zeilen)
+  - → `contextra-ports`: prod: `scanner`×3, `scanner::LayerScanner`, `scanner::ScanTarget::new`, `scanner::ScanTechnique::Structural`, `SystemClock::new` · dev: `BoxFuture`×3, `clock::SystemClock`, `StorageEngine`, `scanner` … (+9)
+  - → `contextra-types`: prod: `ContextraError`×4, `ContextraError::Storage`×3, `Result`×2, `RequestContext::new`, `TenantId::new`, `TxId::new` · dev: `CollectionId`×7, `DocId`×7, `ErasureError`×2, `ErasureId`×2 … (+3)
+- `sstable` (3600 Zeilen)
   - → `contextra-ports`: prod: `VfsFile`
   - → `contextra-types`: prod: `TOMBSTONE_BIT`×3, `TxId::INTERNAL_BASE` · dev: `ContextraError`
 - `system_pressure` (345 Zeilen)
@@ -2373,6 +2408,8 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 - `tests/encryption_test.rs` (106 Zeilen)
   - → `contextra-ports`: dev: `StorageEngine`
   - → `contextra-types`: dev: `TxId`
+- `tests/erasure_kernel_e2e.rs` (478 Zeilen)
+  - → `contextra-ports`: dev: `clock::SystemClock`, `erasure`, `scanner`, `vfs` … (+2)
 - `tests/fault_injection_recovery.rs` (120 Zeilen)
   - → `contextra-ports`: dev: `StorageEngine`
   - → `contextra-types`: dev: `TxId`
@@ -2553,11 +2590,20 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 - `engine`
   - 1 struct
     - `struct InMemoryStorageEngine` · 1 Methoden
+- `erasure`
+  - 3 struct
+    - `struct StoreErasureConfig` · 1 Methoden
+    - `struct BootReport`
+    - `struct StoreErasureKernel` · 3 Methoden
 - `fsync`
   - 3 fn
     - `fn sync_file`
     - `fn sync_parent_dir`
     - `fn fsync_parent_dir`
+- `io_budget`
+  - 2 struct
+    - `struct TokenBucket` · 6 Methoden
+    - `struct StoreIoBudget` · 1 Methoden
 - `io_seam`
   - 3 struct
     - `struct RealFs`
@@ -2569,16 +2615,17 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `struct OsKeyMaterialSource`
     - `struct StaticKeyMaterialSource` · 1 Methoden
 - `lsm`
-  - 17 const, 4 enum, 2 fn, 8 struct, 1 trait
+  - 19 const, 4 enum, 2 fn, 8 struct, 1 trait
     - `enum DurabilityMode` · 2 Methoden
     - `enum DurabilityConfigError`
     - `struct LsmConfig`
     - `enum StorageHealth` *(re-exportiert)*
-    - `struct LsmStorage` *(re-exportiert)* · 33 Methoden ⚠ fremd: `contextra-mvcc`
+    - `struct LsmStorage` *(re-exportiert)* · 36 Methoden ⚠ fremd: `contextra-mvcc`
     - `struct FlushPurgeFence` · 7 Methoden
     - `fn publish_visibility`
     - `fn load_snapshot_tx`
     - `const RANK_DOCUMENT_INTENT`
+    - `const RANK_ERASURE_KERNEL`
     - `const RANK_COMMIT_MUTEX`
     - `const RANK_FLUSH_MUTEX`
     - `const RANK_STATE_RWLOCK`
@@ -2588,6 +2635,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `const RANK_MANIFEST_MUTEX`
     - `const RANK_OBSERVER_REGISTRY`
     - `const RANK_BLOCK_CACHE`
+    - `const RANK_ERASURE_GATE`
     - `const MAX_KEY_SIZE`
     - `const MAX_VALUE_SIZE`
     - `const MAX_BATCH_SIZE`
@@ -2613,19 +2661,15 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `fn is_tombstone`
     - `fn is_valid_range_bounds`
     - `const RESERVED_PREFIXES`
-    - `struct MemTable` · 16 Methoden
+    - `struct MemTable` · 17 Methoden
 - `scanner`
-  - 6 fn, 7 struct
+  - 3 fn, 6 struct
     - `struct MemtableScanner` · 2 Methoden
     - `struct ResidualInspectionReport` · 1 Methoden
     - `struct StoreInspector` · 4 Methoden
-    - `fn lsm_scanners`
-    - `fn lsm_scanners_with_handle`
-    - `fn lsm_scanners_with_runtime`
-    - `fn lsm_purgers`
-    - `fn lsm_purgers_with_handle`
-    - `fn lsm_purgers_with_runtime`
-    - `struct LsmPurger` · 2 Methoden
+    - `fn lsm_scanners` ⚠ fremd: `contextra-ports`
+    - `fn lsm_scanners_with_handle` ⚠ fremd: `contextra-ports`
+    - `fn lsm_scanners_with_runtime` ⚠ fremd: `contextra-ports`
     - `struct ScannerRuntime` · 5 Methoden
     - `struct SstableScanner` · 2 Methoden
     - `struct WalScanner` · 2 Methoden
@@ -2634,9 +2678,6 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
     - `const BLOCK_CACHE_SHARDS` *(re-exportiert)*
     - `struct SieveCacheBackend` *(re-exportiert)*
     - `trait BlockCacheBackend` *(re-exportiert)* · Methoden: new, get, insert, len, is_empty, contains…
-    - `struct LruBlockCacheBackend` *(re-exportiert)*
-    - `struct QuickCacheBlockCacheBackend` *(re-exportiert)*
-    - `type BlockCacheShard` *(re-exportiert)*
 - `system_pressure`
   - 6 const, 1 enum, 2 struct, 1 trait
 - `tenant_codec`
@@ -2645,7 +2686,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
   - 1 struct, 2 trait
 - `wal`
   - 5 const, 5 enum, 2 fn, 7 static, 6 struct, 1 trait, 1 type
-  - … 62 weitere Items nicht aufgelistet (`--max-items`)
+  - … 65 weitere Items nicht aufgelistet (`--max-items`)
 - Zusätzlich 29 `pub`-Items in privaten Modulen ohne Re-Export (nicht Teil der echten API).
 - ⚠ Re-Exporte **fremder Crates**: `contextra_crypto::crypto::KeyManager`
 
@@ -2653,14 +2694,14 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
-| `contextra-engine` | `LsmStorage`×6, `SystemPressure`×3, `tenant_codec::TenantScopedStorage`×3, `tenant_codec::TenantScopedStorage::new`×3, `PressureLevel::Critical`×2, `PressureLevel::Normal`, `PressureLevel::Elevated`, `LsmConfig`, `lsm::DurabilityMode` | `lsm`×10 |
+| `contextra-engine` | `LsmStorage`×7, `SystemPressure`×4, `tenant_codec::TenantScopedStorage`×3, `PressureLevel::Critical`×2, `tenant_codec::TenantScopedStorage::new`×2, `PressureLevel::Normal`, `PressureLevel::Elevated`, `LsmConfig`, `io_budget::StoreIoBudget`, `lsm::DurabilityMode` | `lsm`×10 |
 | `contextra-db` | – | `LsmConfig`×3, `LsmStorage::new`×3, `lsm`, `LsmStorage` |
 
-**Nach außen ungenutzte öffentliche Items (Heuristik, 137 von 142)**: `WorkloadMetrics`, `WorkloadMetricsSnapshot`, `CompactionStrategy`, `AdaptiveCompactionPlan`, `AdaptiveCompactionPlanner`, `CostBasedAdaptivePlanner`, `CompactionConfig`, `CompactionEngine`, `MergeOperator`, `retain_key_versions`, `TtlMetadata`, `InMemoryStorageEngine`, `sync_file`, `sync_parent_dir`, `fsync_parent_dir`, `RealFs`, `RealFsFile`, `StoreIo`, `KeyMaterialSource`, `OsKeyMaterialSource`, `StaticKeyMaterialSource`, `DurabilityConfigError`, `StorageHealth`, `FlushPurgeFence`, `publish_visibility`, `load_snapshot_tx`, `RANK_DOCUMENT_INTENT`, `RANK_COMMIT_MUTEX`, `RANK_FLUSH_MUTEX`, `RANK_STATE_RWLOCK` …
+**Nach außen ungenutzte öffentliche Items (Heuristik, 139 von 145)**: `WorkloadMetrics`, `WorkloadMetricsSnapshot`, `CompactionStrategy`, `AdaptiveCompactionPlan`, `AdaptiveCompactionPlanner`, `CostBasedAdaptivePlanner`, `CompactionConfig`, `CompactionEngine`, `MergeOperator`, `retain_key_versions`, `TtlMetadata`, `InMemoryStorageEngine`, `StoreErasureConfig`, `BootReport`, `StoreErasureKernel`, `sync_file`, `sync_parent_dir`, `fsync_parent_dir`, `TokenBucket`, `RealFs`, `RealFsFile`, `StoreIo`, `KeyMaterialSource`, `OsKeyMaterialSource`, `StaticKeyMaterialSource`, `DurabilityConfigError`, `StorageHealth`, `FlushPurgeFence`, `publish_visibility`, `load_snapshot_tx` …
 
 ### contextra-sys
 
-- Pfad: `crates/contextra-sys` · Zeilen: 2321 · Rust-Dateien: 11 · Ring: 0
+- Pfad: `crates/contextra-sys` · Zeilen: 2361 · Rust-Dateien: 11 · Ring: 0
 - Interne Cargo-Abhängigkeiten: keine
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
@@ -2707,11 +2748,12 @@ Keine Importe aus anderen Workspace-Crates.
     - `struct SealedFile` · 4 Methoden
     - `struct SealedMap` · 5 Methoden
 - `posix`
-  - 4 fn
+  - 5 fn
     - `fn reopen_and_dup2`
     - `fn reopen_and_dup2`
     - `fn ensure_fd_limit`
     - `fn set_fd_limit`
+    - `fn available_space`
 - `vault`
   - 2 struct
     - `struct LockedRegions` · 7 Methoden
@@ -2721,34 +2763,39 @@ Keine Importe aus anderen Workspace-Crates.
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
-| `contextra-store` | `mmap_readonly`×2, `set_restrictive_file_acl` | `reopen_and_dup2`×2, `verify_file_acl_owner_only`, `set_fd_limit` |
+| `contextra-store` | `available_space`×2, `mmap_readonly`×2, `set_restrictive_file_acl` | `reopen_and_dup2`×2, `verify_file_acl_owner_only`, `set_fd_limit` |
 | `contextra-vector` | `mmap_readonly`×2 | – |
 | `contextra-bench` | – | `ensure_fd_limit` |
 
-**Nach außen ungenutzte öffentliche Items (Heuristik, 18 von 29)**: `durable_flush_file`, `durable_flush_dir`, `write_all_durable`, `DurableFile`, `Error`, `Result`, `MemLockPolicy`, `apply_dont_dump`, `mem_lock_typed`, `mem_lock_with_policy`, `mem_unlock`, `mem_lock`, `SealedReadOnly`, `Unsealed`, `SealedFile`, `SealedMap`, `LockedRegions`, `VaultBuffer`
+**Nach außen ungenutzte öffentliche Items (Heuristik, 18 von 30)**: `durable_flush_file`, `durable_flush_dir`, `write_all_durable`, `DurableFile`, `Error`, `Result`, `MemLockPolicy`, `apply_dont_dump`, `mem_lock_typed`, `mem_lock_with_policy`, `mem_unlock`, `mem_lock`, `SealedReadOnly`, `Unsealed`, `SealedFile`, `SealedMap`, `LockedRegions`, `VaultBuffer`
 
 ### contextra-testkit
 
-- Pfad: `crates/contextra-testkit` · Zeilen: 4856 · Rust-Dateien: 24 · Ring: tooling
+- Pfad: `crates/contextra-testkit` · Zeilen: 9857 · Rust-Dateien: 36 · Ring: tooling
 - Interne Cargo-Abhängigkeiten: `contextra-ports` (normal), `contextra-types` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
 | Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
 |---|---:|---:|---:|---|---|
-| `contextra-types` | 20 | 10 | 2 | `ContextraError::Io`×9, `Result`×8, `ContextraError::NotFound`×2, `TxId` | – |
-| `contextra-ports` | 14 | 4 | 11 | `Clock`×2, `Vfs`×2, `GraphIndex`, `MetricsSink`, `Rng`, `StorageEngine`, `TextIndex`, `VectorIndex`, `scanner::WitnessLayer`, `scanner::ScanTechnique` … (+2) | `TextEmbeddingEngine` |
+| `contextra-types` | 25 | 13 | 4 | `Result`×10, `ContextraError::Io`×9, `ContextraError::NotFound`×2, `ErasureError::Layer`, `TxId`, `witness::ScanMethod::Structural`, `ContextraError` | `*` |
+| `contextra-ports` | 22 | 9 | 14 | `Clock`×2, `erasure`×2, `scanner`×2, `Vfs`×2, `gate`×2, `gate::ReadGate`, `scanner::ScanTarget::new`, `GraphIndex`, `MetricsSink`, `Rng` … (+7) | `TextEmbeddingEngine`, `erasure::Cancel`, `BoxFuture`, `erasure::PurgeCx` |
 
 **Pro Komponente**
 
-- `(crate-root)` (124 Zeilen)
+- `(crate-root)` (142 Zeilen)
   - → `contextra-ports`: prod: `scanner::WitnessLayer`, `scanner::ScanTechnique`, `scanner::LayerWitness`, `scanner::mint_witness_for_testkit`
-- `conformance` (1486 Zeilen)
-  - → `contextra-ports`: prod: `Clock`, `GraphIndex`, `MetricsSink`, `Rng`, `StorageEngine`, `TextIndex`, `VectorIndex`, `Vfs`
-  - → `contextra-types`: prod: `TxId`
+- `conformance` (2048 Zeilen)
+  - → `contextra-ports`: prod: `Clock`, `gate::ReadGate`, `erasure`, `scanner`, `scanner::ScanTarget::new`, `GraphIndex`, `MetricsSink`, `Rng`, `StorageEngine`, `TextIndex` … (+2)
+  - → `contextra-types`: prod: `Result`, `ErasureError::Layer`, `TxId`
+- `erasure_mocks` (1018 Zeilen)
+  - → `contextra-ports`: prod: `erasure`, `gate`, `scanner`
+  - → `contextra-types`: prod: `witness::ScanMethod::Structural`, `ContextraError`, `Result`
 - `fault_vfs` (410 Zeilen)
   - → `contextra-ports`: prod: `Vfs` · dev: `Vfs`×2
   - → `contextra-types`: prod: `ContextraError::Io`×9, `Result`×8, `ContextraError::NotFound`×2 · dev: `Result`
+- `gates` (162 Zeilen)
+  - → `contextra-ports`: prod: `gate`
 - `manual_clock` (150 Zeilen)
   - → `contextra-ports`: prod: `Clock`
 - `mocks` (276 Zeilen)
@@ -2759,15 +2806,38 @@ Keine Importe aus anderen Workspace-Crates.
   - → `contextra-types`: dev: `TxId`
 - `tests/conformance_selftest.rs` (476 Zeilen)
   - → `contextra-types`: dev: `Result`×8
+- `tests/crash_vfs.rs` (362 Zeilen)
+  - → `contextra-types`: dev: `ContextraError`, `Result`
+- `tests/layer_conformance_selftest.rs` (173 Zeilen)
+  - → `contextra-ports`: dev: `erasure`, `scanner`, `erasure::Cancel`, `BoxFuture` … (+1)
+  - → `contextra-types`: dev: `*`
 
 **Öffentliche Schnittstelle** (erreichbar über `pub mod`-Kette oder `pub use`)
 
 - `(crate-root)`
   - 1 fn
     - `fn mint_witness_for_tests` ⚠ fremd: `contextra-ports`
+- `canary`
+  - 1 const, 1 fn, 3 struct
+    - `const VALUE_NEEDLE_LEN`
+    - `struct Canary` · 1 Methoden
+    - `struct ScanOpts`
+    - `struct Hit`
+    - `fn scan_tree`
 - `conformance`
-  - 8 fn, 1 struct, 1 type
+  - 1 enum, 17 fn, 1 struct, 1 trait, 1 type
     - `fn run_clock_suite` ⚠ fremd: `contextra-ports`
+    - `enum FaultSpec` · 1 Methoden
+    - `trait LayerFixture` · Methoden: new, layer, seed, scope, neighbor_docs, neighbor_digest…
+    - `fn c1_idempotence`
+    - `fn c2_resumption`
+    - `fn c3_scope_isolation`
+    - `fn c4_witness_honesty`
+    - `fn c5_fault_injection`
+    - `fn c6_cancel_safety`
+    - `fn c7_gate_respect`
+    - `fn k1_gate_idempotent`
+    - `fn k2_determinism`
     - `struct ConformanceFailure` · 1 Methoden
     - `type ConformanceResult`
     - `fn run_graph_index_suite` ⚠ fremd: `contextra-ports`
@@ -2777,10 +2847,56 @@ Keine Importe aus anderen Workspace-Crates.
     - `fn run_text_index_suite` ⚠ fremd: `contextra-ports`
     - `fn run_vector_index_suite` ⚠ fremd: `contextra-ports`
     - `fn run_vfs_suite` ⚠ fremd: `contextra-ports`
+- `crash_vfs`
+  - 3 enum, 3 fn, 10 struct
+    - `struct CrashSeed`
+    - `enum OpKind`
+    - `struct OpRecord`
+    - `fn path_hash`
+    - `enum ErrKind`
+    - `enum CrashPolicy`
+    - `struct FileState`
+    - `struct TreeSnapshot` · 1 Methoden
+    - `struct CrashVfs` · 14 Methoden
+    - `struct Scenario` · 1 Methoden
+    - `struct CrashPoint`
+    - `struct CrashLoopConfig`
+    - `struct CrashReport`
+    - `struct CrashLoopFailure`
+    - `fn for_each_crash_point_with`
+    - `fn for_each_crash_point`
+- `erasure_mocks`
+  - 1 const, 1 enum, 1 fn, 6 struct
+    - `struct MockPrivilegedRead` · 3 Methoden
+    - `struct MockProgressSink` · 3 Methoden
+    - `struct ManualIoBudget` · 4 Methoden
+    - `const MOCK_QUARANTINE_ATTEMPTS`
+    - `struct MockErasureKernel` · 2 Methoden
+    - `enum Defect`
+    - `struct MockLayer`
+    - `struct MockLayerFixture` · 1 Methoden
+    - `fn mock_fixture`
+- `erasure_model`
+  - 2 enum, 1 fn, 4 struct, 1 trait, 1 type
+    - `struct DocRecord`
+    - `struct ObjRef`
+    - `enum Op`
+    - `enum Entry`
+    - `type Inventory`
+    - `trait SystemUnderTest` · Methoden: inventory, visible
+    - `struct ModelDiff`
+    - `fn kv_key`
+    - `struct ErasureModel` · 8 Methoden
 - `fault_vfs`
   - 2 struct
     - `struct FaultConfig`
     - `struct FaultVfs` · 10 Methoden
+- `gates`
+  - 1 enum, 3 struct
+    - `struct AlwaysOpenGate`
+    - `struct AlwaysRestrictedGate`
+    - `enum GateCall`
+    - `struct RecordingGate` · 2 Methoden
 - `in_memory_graph`
   - 1 struct
     - `struct InMemoryGraphIndex` · 1 Methoden
@@ -2804,47 +2920,50 @@ Keine Importe aus anderen Workspace-Crates.
 - `reference_model`
   - 1 enum, 1 struct
     - `enum RefOp`
-    - `struct ReferenceModel` · 13 Methoden
+    - `struct ReferenceModel` · 15 Methoden
 - Interne Re-Exporte (`pub use`): `InMemoryGraphIndex`, `InMemoryStorageEngine`, `InMemoryTextIndex`, `InMemoryVectorIndex`, `ManualClock`, `*`
 
 **Eingehend (wer nutzt dieses Crate)**
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
-| `contextra-checkpoint` | – | `InMemoryStorageEngine`×2, `FaultVfs` |
+| `contextra-checkpoint` | – | `InMemoryStorageEngine`×2, `FaultVfs`, `gates::AlwaysRestrictedGate` |
 | `contextra-crypto` | – | `mint_witness_for_tests`×4, `FaultVfs` |
 | `contextra-engine` | – | `InMemoryStorageEngine` |
 | `contextra-mvcc` | – | `ManualClock`×6 |
 | `contextra-store` | – | `ManualClock`×4, `ReferenceModel`×4 |
 
-**Nach außen ungenutzte öffentliche Items (Heuristik, 18 von 23)**: `run_clock_suite`, `ConformanceFailure`, `ConformanceResult`, `run_graph_index_suite`, `run_metrics_sink_suite`, `run_rng_suite`, `run_storage_engine_suite`, `run_text_index_suite`, `run_vector_index_suite`, `run_vfs_suite`, `FaultConfig`, `InMemoryGraphIndex`, `InMemoryTextIndex`, `InMemoryVectorIndex`, `MockEmbedder`, `MetricEvent`, `TestMetricsSink`, `RefOp`
+**Nach außen ungenutzte öffentliche Items (Heuristik, 71 von 77)**: `VALUE_NEEDLE_LEN`, `Canary`, `ScanOpts`, `Hit`, `scan_tree`, `run_clock_suite`, `FaultSpec`, `LayerFixture`, `c1_idempotence`, `c2_resumption`, `c3_scope_isolation`, `c4_witness_honesty`, `c5_fault_injection`, `c6_cancel_safety`, `c7_gate_respect`, `k1_gate_idempotent`, `k2_determinism`, `ConformanceFailure`, `ConformanceResult`, `run_graph_index_suite`, `run_metrics_sink_suite`, `run_rng_suite`, `run_storage_engine_suite`, `run_text_index_suite`, `run_vector_index_suite`, `run_vfs_suite`, `CrashSeed`, `OpKind`, `OpRecord`, `path_hash` …
 
 ### contextra-text
 
-- Pfad: `crates/contextra-text` · Zeilen: 15219 · Rust-Dateien: 62 · Ring: 0
+- Pfad: `crates/contextra-text` · Zeilen: 15659 · Rust-Dateien: 64 · Ring: 0
 - Interne Cargo-Abhängigkeiten: `contextra-ports` (normal/optional via types-compat), `contextra-types` (normal/optional via types-compat)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
 | Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
 |---|---:|---:|---:|---|---|
-| `contextra-types` | 22 | 137 | 2 | `ContextraError`×3, `ContextraError::InvalidInput`×3, `ContextraError::Storage`×3, `DocId`×3, `ScoredDocument`×3, `ContextraError::Text`×2, `ContextraError::Io`×2, `DocId::new`×2, `ContextraError::Internal` | `Result`×67, `TOMBSTONE_BIT`×57, `TxId`×7, `TxId::new`×2, `ContextraError::CapabilityUnsupported`×2 … (+1) |
-| `contextra-ports` | 8 | 87 | 5 | `StorageEngine`×6, `scanner`×2 | `BoxFuture`×50, `StorageStats`×35, `clock::SystemClock` |
+| `contextra-types` | 25 | 137 | 4 | `ContextraError`×3, `ContextraError::InvalidInput`×3, `ContextraError::Storage`×3, `DocId`×3, `ScoredDocument`×3, `ContextraError::Text`×2, `ContextraError::Io`×2, `DocId::new`×2, `Seq`, `Seq::new` … (+2) | `Result`×67, `TOMBSTONE_BIT`×57, `TxId`×7, `TxId::new`×2, `ContextraError::CapabilityUnsupported`×2 … (+1) |
+| `contextra-ports` | 14 | 87 | 7 | `StorageEngine`×6, `scanner`×3, `gate::ReadGate`×2, `erasure::IoClass::Erase`×2, `erasure` | `BoxFuture`×50, `StorageStats`×35, `clock::SystemClock` |
 
 **Pro Komponente**
 
-- `(crate-root)` (318 Zeilen)
+- `(crate-root)` (322 Zeilen)
   - → `contextra-ports`: prod: `StorageEngine`×3 · dev: `BoxFuture`
+- `erasure` (280 Zeilen)
+  - → `contextra-ports`: prod: `erasure::IoClass::Erase`×2, `gate::ReadGate`, `erasure`, `scanner`
+  - → `contextra-types`: prod: `Seq`, `Seq::new`
 - `error` (65 Zeilen)
   - → `contextra-types`: prod: `ContextraError`×3, `ContextraError::InvalidInput`×3, `ContextraError::Storage`×3, `ContextraError::Text`×2, `ContextraError::Io`×2, `ContextraError::Internal`
-- `inverted` (2842 Zeilen)
-  - → `contextra-ports`: prod: `scanner`×2, `StorageEngine` · dev: `StorageStats`×3
-  - → `contextra-types`: dev: `TOMBSTONE_BIT`×6, `ContextChunk`
+- `inverted` (2971 Zeilen)
+  - → `contextra-ports`: prod: `scanner`×2, `gate::ReadGate`, `StorageEngine` · dev: `StorageStats`×3
+  - → `contextra-types`: prod: `TenantId` · dev: `TOMBSTONE_BIT`×6, `ContextChunk`
 - `stream` (162 Zeilen)
   - → `contextra-ports`: prod: `StorageEngine`
 - `types` (114 Zeilen)
   - → `contextra-types`: prod: `DocId`×3, `ScoredDocument`×3, `DocId::new`×2
-- `wand` (814 Zeilen)
+- `wand` (824 Zeilen)
   - → `contextra-ports`: prod: `StorageEngine` · dev: `StorageStats`×2, `BoxFuture`
   - → `contextra-types`: dev: `TxId`×7, `TOMBSTONE_BIT`×6, `TxId::new`×2
 - `tests/alloc_profiler.rs` (569 Zeilen)
@@ -2923,13 +3042,18 @@ Keine Importe aus anderen Workspace-Crates.
     - `static MEDICAL_COMPOUND_STEMS`
     - `static MEDICAL_PROTECTED_TERMS`
     - `trait DomainVocabulary` · Methoden: compound_stems, protected_terms, domain_id
+- `erasure`
+  - 2 struct, 1 trait
+    - `trait TextTxSource` · Methoden: begin, rollback, register_collapse
+    - `struct TextErasureConfig`
+    - `struct TextErasure` · 1 Methoden
 - `error`
   - 1 enum, 1 type
     - `enum TextError`
     - `type Result`
 - `inverted`
   - 1 enum, 2 fn, 5 struct
-    - `struct InvertedIndex` *(re-exportiert)* · 14 Methoden
+    - `struct InvertedIndex` *(re-exportiert)* · 15 Methoden
     - `struct BM25MorphIndex` *(re-exportiert)* · 2 Methoden
     - `struct PurgeReport` · 3 Methoden
     - `struct TextPurger` · 5 Methoden ⚠ fremd: `contextra-ports`
@@ -2959,7 +3083,7 @@ Keine Importe aus anderen Workspace-Crates.
     - `struct PostingBlockInfo`
     - `struct Posting` · 2 Methoden
     - `struct PostingList` · 10 Methoden
-    - `struct ResidentPostingIndex` · 7 Methoden
+    - `struct ResidentPostingIndex` · 8 Methoden
 - `stream`
   - 1 const, 1 struct
     - `const DEFAULT_STREAM_BATCH_SIZE`
@@ -2993,7 +3117,7 @@ Keine Importe aus anderen Workspace-Crates.
   - 1 fn, 2 struct
     - `struct BoundedTopK` · 4 Methoden
     - `struct WandSearchResult`
-    - `fn block_max_wand_search` ⚠ fremd: `contextra-ports`
+  - … 1 weitere Items nicht aufgelistet (`--max-items`)
 - Zusätzlich 9 `pub`-Items in privaten Modulen ohne Re-Export (nicht Teil der echten API).
 
 **Eingehend (wer nutzt dieses Crate)**
@@ -3003,11 +3127,11 @@ Keine Importe aus anderen Workspace-Crates.
 | `contextra-engine` | `inverted::InvertedIndex`×2, `Language`×2 | `Language::English`×63, `Language::German`×4 |
 | `contextra-db` | – | `Language::English`×6, `Language`×2, `bm25::score_term`, `inverted::InvertedIndex` |
 
-**Nach außen ungenutzte öffentliche Items (Heuristik, 76 von 78)**: `BM25_K1`, `BM25_B`, `BM25`, `score_term_with_params`, `FieldId`, `FieldWeight`, `BM25F`, `score_term_bm25f`, `Error`, `Result`, `Clock`, `Rng`, `DocKey`, `Epoch`, `LegalDomainVocabulary`, `get_legal_compound_stems`, `get_legal_protected_terms`, `LEGAL_COMPOUND_STEMS`, `LEGAL_PROTECTED_TERMS`, `MedicalDomainVocabulary`, `get_medical_compound_stems`, `get_medical_protected_terms`, `MEDICAL_COMPOUND_STEMS`, `MEDICAL_PROTECTED_TERMS`, `DomainVocabulary`, `TextError`, `Result`, `BM25MorphIndex`, `PurgeReport`, `TextPurger` …
+**Nach außen ungenutzte öffentliche Items (Heuristik, 79 von 81)**: `BM25_K1`, `BM25_B`, `BM25`, `score_term_with_params`, `FieldId`, `FieldWeight`, `BM25F`, `score_term_bm25f`, `Error`, `Result`, `Clock`, `Rng`, `DocKey`, `Epoch`, `LegalDomainVocabulary`, `get_legal_compound_stems`, `get_legal_protected_terms`, `LEGAL_COMPOUND_STEMS`, `LEGAL_PROTECTED_TERMS`, `MedicalDomainVocabulary`, `get_medical_compound_stems`, `get_medical_protected_terms`, `MEDICAL_COMPOUND_STEMS`, `MEDICAL_PROTECTED_TERMS`, `DomainVocabulary`, `TextTxSource`, `TextErasureConfig`, `TextErasure`, `TextError`, `Result` …
 
 ### contextra-types
 
-- Pfad: `crates/contextra-types` · Zeilen: 8287 · Rust-Dateien: 37 · Ring: 0
+- Pfad: `crates/contextra-types` · Zeilen: 9520 · Rust-Dateien: 39 · Ring: 0
 - Interne Cargo-Abhängigkeiten: keine
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
@@ -3020,6 +3144,26 @@ Keine Importe aus anderen Workspace-Crates.
 
 **Öffentliche Schnittstelle** (erreichbar über `pub mod`-Kette oder `pub use`)
 
+- `erasure`
+  - 12 enum, 6 struct
+    - `enum TargetKind`
+    - `enum EraseTarget` · 5 Methoden
+    - `enum ErasureReason`
+    - `enum ErasureProfile`
+    - `enum ReinsertPolicy`
+    - `enum CheckpointTaintPolicy`
+    - `enum AwaitLevel`
+    - `struct ErasurePolicy`
+    - `struct Guarantee` · 3 Methoden
+    - `enum ErasureException`
+    - `enum ErasureState` · 4 Methoden
+    - `enum LayerState`
+    - `struct LayerStatus`
+    - `struct ErasureStatus`
+    - `struct Cursor` · 2 Methoden
+    - `struct LayerProgress`
+    - `enum LayerErrorKind`
+    - `enum ErasureError` · 1 Methoden
 - `error`
   - 3 enum, 1 struct, 1 type
     - `enum HnswDeletionError`
@@ -3034,12 +3178,12 @@ Keine Importe aus anderen Workspace-Crates.
   - 1 const, 7 struct
     - `const MAX_REF_LEN`
     - `struct DocRef`
-    - `struct ErasureId` · 2 Methoden
+    - `struct ErasureId` · 4 Methoden
     - `struct FileId` · 2 Methoden
     - `struct StoreId` · 2 Methoden
     - `struct GateId` · 2 Methoden
     - `struct Seq` · 2 Methoden
-    - `struct Timestamp` · 2 Methoden
+    - `struct Timestamp` · 4 Methoden
 - `model_fingerprint`
   - 1 struct
     - `struct ModelFingerprint` · 1 Methoden
@@ -3100,20 +3244,9 @@ Keine Importe aus anderen Workspace-Crates.
     - `enum GraphTraversalStrategy`
     - `struct FusionWeights` · 5 Methoden
     - `struct ContextChunk` · 3 Methoden
-    - `struct ContextWindow`
-    - `enum Signal`
-    - `enum OnSignalFailure`
-    - `struct QueryRewriteOutput` · 3 Methoden
-    - `struct ScoredEntry`
-    - `struct HybridQuery` · 1 Methoden
-    - `type QueryOptions`
-    - `struct HybridQueryBuilder` · 17 Methoden
-    - `type QueryOptionsBuilder`
 - `witness`
   - 1 enum, 2 struct
-    - `enum ScanMethod`
-    - `struct RequestContext` · 1 Methoden
-    - `struct SagaRecord` · 1 Methoden
+  - … 12 weitere Items nicht aufgelistet (`--max-items`)
 - Zusätzlich 1 `pub`-Items in privaten Modulen ohne Re-Export (nicht Teil der echten API).
 - Interne Re-Exporte (`pub use`): `TenantScoped`
 
@@ -3121,35 +3254,35 @@ Keine Importe aus anderen Workspace-Crates.
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
-| `contextra-engine` | `ContextraError::invalid_input`×50, `EntityId`×15, `HybridQuery`×13, `Result`×11, `MAX_SEARCH_K`×11, `ContextraError::Internal`×9, `ImportanceScore::new`×8, `domain::MemoryLink`×7, `EntityId::from_key`×7, `ContextraError::Serialization`×6 … (+40) | `ContextraError::from`×10, `domain::LinkRelation::Elaborates`×2, `ContextraError::HnswConnectivityDegraded`, `FusionWeights::new` … (+8) |
-| `contextra-vector` | `ContextraError::invalid_input`×21, `MAX_SEARCH_K`×15, `Result`×9, `ContextraError::Index`×7, `DocId`×6, `ContextraError::HnswConnectivityDegraded`×5, `DistanceMetric`×5, `TxId`×4, `ScoredDocument`×4, `ContextraError`×3 … (+11) | `TxId::new` |
+| `contextra-engine` | `ContextraError::invalid_input`×50, `EntityId`×15, `HybridQuery`×13, `Result`×11, `MAX_SEARCH_K`×11, `ContextraError::Internal`×9, `ImportanceScore::new`×8, `domain::MemoryLink`×7, `EntityId::from_key`×7, `ContextraError::Serialization`×6 … (+47) | `ContextraError::from`×10, `domain::LinkRelation::Elaborates`×2, `ContextraError::HnswConnectivityDegraded`, `FusionWeights::new` … (+8) |
+| `contextra-vector` | `ContextraError::invalid_input`×21, `MAX_SEARCH_K`×15, `Result`×9, `ContextraError::Index`×7, `DocId`×6, `ContextraError::HnswConnectivityDegraded`×5, `DistanceMetric`×5, `TxId`×4, `ScoredDocument`×4, `ContextraError`×3 … (+15) | `TxId::new` |
+| `contextra-store` | `ContextraError::Storage`×8, `Seq`×7, `Result`×6, `ContextraError`×5, `TOMBSTONE_BIT`×4, `TxId`×4, `TxId::INTERNAL_BASE`×3, `TxId::new`×3, `ContextraError::MemoryBudgetExceeded`×2, `ContextraError::Internal`×2 … (+7) | `CollectionId`×7, `DocId`×7, `ErasureId`×3, `ContextraError::InvalidInput`×2 … (+5) |
 | `contextra-graph` | `EntityId`×18, `ContextraError::InvalidInput`×5, `Result`×5, `ContextraError`×3, `TxId`×3, `Edge`×2, `Edge::new`×2, `PprConfig`×2, `ContextraError::Internal`×2, `MemoryLink` … (+3) | `Entity::new`×10, `TlHfdParams::default`×4, `PprAlgorithm::Auto`×4, `Entity`×2 … (+1) |
-| `contextra-store` | `ContextraError::Storage`×8, `Result`×5, `ContextraError`×5, `TOMBSTONE_BIT`×4, `TxId`×4, `ContextraError::MemoryBudgetExceeded`×2, `ContextraError::Internal`×2, `TxId::new`×2, `TxId::INTERNAL_BASE`×2, `ContextraError::Sandbox` … (+4) | `CollectionId`×6, `DocId`×6, `ContextraError::InvalidInput`×2, `TenantId` … (+1) |
 | `contextra-rank` | `DocId`×4, `SignalFusionStrategies`×4, `ContextraError::invalid_input`×3, `FusionWeights`×3, `FusionStrategy`×3, `OnSignalFailure`×3, `ContextraError`×2, `ContextChunk`×2, `ConfigFingerprint`×2, `FusionStrategy::Rrf`×2 … (+7) | – |
 | `contextra-crypto` | `TenantId`×8, `Result`×7, `ScanMethod::FeatureDisabled`×3, `ContextraError::Crypto`×3, `TenantScoped`×2, `ScanMethod::Structural`×2, `ScanMethod::NotMeasured`×2, `ContextraError`×2, `RequestContext`, `SagaRecord` … (+4) | `ContextraError::Io`×4, `ContextraError::NotFound` |
-| `contextra-text` | `ContextraError`×3, `ContextraError::InvalidInput`×3, `ContextraError::Storage`×3, `DocId`×3, `ScoredDocument`×3, `ContextraError::Text`×2, `ContextraError::Io`×2, `DocId::new`×2, `ContextraError::Internal` | `Result`×67, `TOMBSTONE_BIT`×57, `TxId`×7, `TxId::new`×2 … (+2) |
-| `contextra-testkit` | `ContextraError::Io`×9, `Result`×8, `ContextraError::NotFound`×2, `TxId` | – |
-| `contextra` | `error::ContextraError`×4, `DistanceMetric`×2, `ContextraError::Internal`, `types::domain::AutoExtractionMode`, `types::domain`, `ContextraError`, `ContextraError::DurabilityConfig`, `error::Result`, `ScoredEntry` | `DocId`×2, `DocId::new`×2, `ContextraError::InvalidInput`, `ScoredDocument` … (+1) |
+| `contextra-testkit` | `Result`×10, `ContextraError::Io`×9, `ContextraError::NotFound`×2, `ErasureError::Layer`, `TxId`, `witness::ScanMethod::Structural`, `ContextraError` | `*` |
+| `contextra-text` | `ContextraError`×3, `ContextraError::InvalidInput`×3, `ContextraError::Storage`×3, `DocId`×3, `ScoredDocument`×3, `ContextraError::Text`×2, `ContextraError::Io`×2, `DocId::new`×2, `Seq`, `Seq::new` … (+2) | `Result`×67, `TOMBSTONE_BIT`×57, `TxId`×7, `TxId::new`×2 … (+2) |
+| `contextra` | `error::ContextraError`×4, `ErasureProfile::Standard`×3, `DistanceMetric`×2, `ErasureProfile`×2, `ContextraError::Internal`, `types::domain::AutoExtractionMode`, `ErasureProfile::Regulated`, `types::domain`, `ContextraError`, `ContextraError::DurabilityConfig` … (+2) | `DocId`×2, `DocId::new`×2, `ContextraError::InvalidInput`, `ScoredDocument` … (+1) |
 | `contextra-simd` | `ContextraError::invalid_input`×3, `DistanceMetric`×3, `DistanceMetric::Cosine`×2, `DistanceMetric::Euclidean`×2, `DistanceMetric::DotProduct`×2, `ContextraError` | – |
 | `contextra-mcp` | `ContextraError`×4, `ContextraError::InvalidInput`, `ContextraError::NotFound` | `TenantId::try_new`, `AutoExtractionMode`, `TenantId`, `MAX_SEARCH_K` |
 | `contextra-db` | `DistanceMetric`, `MAX_SEARCH_K`, `EntityId`, `EntityId::from_key` | `Result`×5, `TxId`×5, `FusionWeights`×3, `TenantId`×2 … (+16) |
-| `contextra-ports` | `RequestContext`×2, `ids::ErasureId` | – |
+| `contextra-ports` | `RequestContext`×2, `ids::ErasureId` | `Timestamp`×5, `Seq`×4, `TargetKind`×4, `EraseTarget`×2 … (+1) |
 | `contextra-bench` | `Result`, `ContextraError::CapabilityUnsupported` | `TxId` |
-| `contextra-checkpoint` | – | `TxId`×4, `Result`×3, `ContextraError`×2, `ContextraError::Internal`×2 … (+2) |
+| `contextra-checkpoint` | `Seq` | `TxId`×4, `Result`×3, `ContextraError`×2, `ContextraError::Internal`×2 … (+2) |
 | `contextra-mvcc` | – | `TxId`×5, `DocId`, `types` |
 
 *Hinweis: Mindestens ein Crate importiert per Glob (`*`); ungenutzte Items sind deshalb nicht bestimmbar.*
 
 ### contextra-vector
 
-- Pfad: `crates/contextra-vector` · Zeilen: 25202 · Rust-Dateien: 127 · Ring: 0
+- Pfad: `crates/contextra-vector` · Zeilen: 25295 · Rust-Dateien: 128 · Ring: 0
 - Interne Cargo-Abhängigkeiten: `contextra-mvcc` (normal/optional via ports-compat), `contextra-ports` (normal/optional via ports-compat), `contextra-sys` (normal/optional via ports-compat), `contextra-types` (normal/optional via ports-compat)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
 | Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
 |---|---:|---:|---:|---|---|
-| `contextra-types` | 97 | 40 | 16 | `ContextraError::invalid_input`×21, `MAX_SEARCH_K`×15, `Result`×9, `ContextraError::Index`×7, `DocId`×6, `ContextraError::HnswConnectivityDegraded`×5, `DistanceMetric`×5, `TxId`×4, `ScoredDocument`×4, `ContextraError`×3 … (+11) | `TxId::new` |
+| `contextra-types` | 104 | 40 | 17 | `ContextraError::invalid_input`×21, `MAX_SEARCH_K`×15, `Result`×9, `ContextraError::Index`×7, `DocId`×6, `ContextraError::HnswConnectivityDegraded`×5, `DistanceMetric`×5, `TxId`×4, `ScoredDocument`×4, `ContextraError`×3 … (+15) | `TxId::new` |
 | `contextra-ports` | 33 | 78 | 7 | `Clock`×15, `MetricsSink`×6, `Rng`×4, `VectorIndex`×2, `scanner`×2, `NoopMetricsSink`×2, `SeededRng::new`×2 | `SeededRng`×5, `vector_index::VectorIndex`, `clock::SystemClock` |
 | `contextra-mvcc` | 11 | 0 | 3 | `IndexOp::Insert`×2, `IndexOp::Delete`×2, `SequenceLog::new`×2, `SeqLogChange::Insert`, `SeqLogChange::Delete`, `TxBuffer`, `TxBuffer::new_with_config`, `SequenceLog` | – |
 | `contextra-sys` | 2 | 0 | 2 | `mmap_readonly`×2 | – |
@@ -3168,10 +3301,10 @@ Keine Importe aus anderen Workspace-Crates.
   - → `contextra-types`: dev: `DistanceMetric`
 - `error` (97 Zeilen)
   - → `contextra-types`: prod: `ContextraError`×3, `ContextraError::Index`×3, `ContextraError::invalid_input`×2, `ContextraError::HnswConnectivityDegraded`×2, `ContextraError::GraphRepairFailed`×2, `ContextraError::Io`×2, `HnswDeletionError::VerificationFailed`, `ContextraError::capability_unsupported`, `ContextraError::InvalidInput`, `ContextraError::CapabilityUnsupported`
-- `hnsw` (6344 Zeilen)
+- `hnsw` (6436 Zeilen)
   - → `contextra-mvcc`: prod: `IndexOp::Insert`×2, `IndexOp::Delete`×2, `SequenceLog::new`×2, `SeqLogChange::Insert`, `SeqLogChange::Delete`, `TxBuffer`, `TxBuffer::new_with_config`, `SequenceLog`
   - → `contextra-ports`: prod: `Clock`×15, `MetricsSink`×6, `Rng`×4, `scanner`×2, `NoopMetricsSink`×2, `SeededRng::new`×2 · dev: `Rng`×3, `SeededRng::new`×3, `MetricsSink`×2, `VectorIndex`
-  - → `contextra-types`: prod: `MAX_SEARCH_K`×6, `ContextraError::Index`×4, `Result`×3, `ContextraError::HnswConnectivityDegraded`×3, `DocId`×2, `ContextraError::Conflict`×2, `DistanceMetric` · dev: `DistanceMetric`
+  - → `contextra-types`: prod: `MAX_SEARCH_K`×6, `ContextraError::Index`×4, `Result`×3, `ContextraError::HnswConnectivityDegraded`×3, `LayerErrorKind::Permanent`×3, `DocId`×2, `ContextraError::Conflict`×2, `LayerErrorKind::Retryable`×2, `LayerErrorKind`, `LayerErrorKind::Cancelled` … (+1) · dev: `DistanceMetric`
 - `persistence` (1140 Zeilen)
   - → `contextra-ports`: dev: `VectorIndex`×3
   - → `contextra-sys`: prod: `mmap_readonly`
@@ -3397,7 +3530,7 @@ Keine Importe aus anderen Workspace-Crates.
     - `fn new_fixed_hashset`
     - `fn new_fixed_hashmap`
 - `hnsw`
-  - 2 const, 1 enum, 2 fn, 12 struct, 1 trait, 1 type
+  - 2 const, 1 enum, 2 fn, 13 struct, 1 trait, 1 type
     - `struct AdaptiveEfPolicy` · 2 Methoden
     - `struct AdaptiveEfStats`
     - `struct AdaptiveEfStateMachine` · 6 Methoden
@@ -3409,6 +3542,7 @@ Keine Importe aus anderen Workspace-Crates.
     - `struct MonotonicCounterClock` · 2 Methoden
     - `struct DeletionStats`
     - `trait GhostFreeVectorIndex` · Methoden: remove_with_graph_repair
+    - `struct HnswErasure` · 1 Methoden
     - `struct HnswPurger` · 1 Methoden
     - `fn hnsw_purger`
     - `struct HnswScanner` · 2 Methoden
@@ -3425,14 +3559,13 @@ Keine Importe aus anderen Workspace-Crates.
 - `persistence`
   - 1 fn, 2 struct
     - `fn write_atomic`
-    - `struct MmapIndex` *(re-exportiert)* · 5 Methoden
 - `quantize`
   - 3 const, 1 struct
 - `quantize_rabitq`
   - 1 struct
 - `types`
   - 2 const, 1 enum, 7 struct, 4 trait
-  - … 20 weitere Items nicht aufgelistet (`--max-items`)
+  - … 21 weitere Items nicht aufgelistet (`--max-items`)
 - Zusätzlich 31 `pub`-Items in privaten Modulen ohne Re-Export (nicht Teil der echten API).
 
 **Eingehend (wer nutzt dieses Crate)**
@@ -3442,5 +3575,5 @@ Keine Importe aus anderen Workspace-Crates.
 | `contextra-engine` | `HnswIndex`×4, `hnsw::HnswIndex`×3, `acorn::FilteredIndex`, `HnswConfig` | `hnsw::HnswConfig::default`, `hnsw::HnswIndex::try_new`, `acorn`, `HnswIndex::try_new` |
 | `contextra-db` | – | `HnswConfig`×2, `HnswIndex`, `HnswIndex::try_new` |
 
-**Nach außen ungenutzte öffentliche Items (Heuristik, 99 von 100)**: `compute_gamma_edge_budget`, `AcornError`, `NaiveReferenceIndex`, `DEFAULT_VECTOR_STREAM_BATCH_SIZE`, `VectorCandidateStream`, `to_u32`, `u32_to_usize`, `u64_to_usize`, `u64_to_u32`, `to_u8`, `to_u64`, `f32_to_usize`, `f64_to_usize`, `TaskHandle`, `ComputePool`, `Error`, `Result`, `Clock`, `Rng`, `ExternalId`, `Metric`, `ScoredPoint`, `DistanceFn`, `Index`, `Maintain`, `BlockTransform`, `DiskAnnIndex`, `CosineSimilarityPartsU8`, `DistanceKernel`, `ScalarKernel` …
+**Nach außen ungenutzte öffentliche Items (Heuristik, 100 von 101)**: `compute_gamma_edge_budget`, `AcornError`, `NaiveReferenceIndex`, `DEFAULT_VECTOR_STREAM_BATCH_SIZE`, `VectorCandidateStream`, `to_u32`, `u32_to_usize`, `u64_to_usize`, `u64_to_u32`, `to_u8`, `to_u64`, `f32_to_usize`, `f64_to_usize`, `TaskHandle`, `ComputePool`, `Error`, `Result`, `Clock`, `Rng`, `ExternalId`, `Metric`, `ScoredPoint`, `DistanceFn`, `Index`, `Maintain`, `BlockTransform`, `DiskAnnIndex`, `CosineSimilarityPartsU8`, `DistanceKernel`, `ScalarKernel` …
 

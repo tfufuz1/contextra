@@ -11,13 +11,13 @@
 | Kennzahl | Wert |
 |---|---|
 | Analysierte Fach-Crates (`crates/*`) | 17 |
-| Extrahierte öffentliche Symbole gesamt | **3288** |
-| — davon Public Traits (Schnittstellen im engeren Sinn) | 110 |
-| — davon Public Structs | 533 |
-| — davon Public Enums | 131 |
-| — davon Public Funktionen | 2300 |
+| Extrahierte öffentliche Symbole gesamt | **3541** |
+| — davon Public Traits (Schnittstellen im engeren Sinn) | 114 |
+| — davon Public Structs | 588 |
+| — davon Public Enums | 156 |
+| — davon Public Funktionen | 2461 |
 | — davon Typ-Aliase | 45 |
-| — davon Konstanten | 169 |
+| — davon Konstanten | 177 |
 
 ---
 
@@ -90,9 +90,11 @@ pub mod schema;
 pub mod tenant_scope;
 pub mod tombstone;
 pub mod types;
+pub mod erasure;
 pub mod ids;
 pub mod refs;
 pub mod witness;
+pub use erasure::{ AwaitLevel, CheckpointTaintPolicy, Cursor, EraseTarget, ErasureError, ErasureException, ErasurePolicy, ErasureProfile, ErasureReason, ErasureState, ErasureStatus, Guarantee, LayerErrorKind, LayerProgress, LayerState, LayerStatus, ReinsertPolicy, TargetKind, };
 pub use ids::{ErasureId, FileId, GateId, Seq, StoreId, Timestamp};
 pub use refs::{CollectionRef, DocKey, OperatorRef, SubjectRef, TenantRef, MAX_REF_LEN};
 pub use error::{ContextraError, HnswDeletionError, Result};
@@ -128,7 +130,7 @@ pub trait TombstoneSemanticsCheck {
 }
 ```
 
-### Öffentliche Datentypen — Structs (44)
+### Öffentliche Datentypen — Structs (50)
 
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
@@ -137,6 +139,7 @@ pub trait TombstoneSemanticsCheck {
 | `ContextChunk` | `{ /// Document identifier associated with this chunk. pub doc_id: DocId, /// Text content of the chunk. pub content: String, /// Computed relevance score. pub re… }` | — | `src/types/saos.rs` |
 | `ContextWindow` | `{ /// List of included context chunks. pub chunks: Vec<ContextChunk>, /// Total aggregated token count. pub total_tokens: usize, /// Indicates whether context ch… }` | — | `src/types/saos.rs` |
 | `ContextraErrorDto` | `{ /// Stable string identifier for the error variant (e.g. `"NotFound"`, `"PolicyViolation"`). pub kind: String, /// Human-readable error message. pub message: S… }` | — | `src/error_dto.rs` |
+| `Cursor` | `(tuple/unit)` | Undurchsichtiger Wiederaufnahmepunkt eines Layers. Maximal 256 Byte (Journal-Limit). | `src/erasure.rs` |
 | `DocId` | `(tuple/unit)` | — | `src/types/domain/ids.rs` |
 | `DocId` | `(tuple/unit)` | — | `src/types/domain/ids.rs` |
 | `DocRef` | `{ /// Optionaler Betroffener (Subject). pub subject: Option<SubjectRef>, /// Eindeutiger Dokumentenschlüssel innerhalb des Clusters. pub key: DocKey, }` | Eindeutige Dokumentenadresse: Betroffener ist unveränderlicher Teil der Identität (SPEC 7.2, D-70). | `src/ids.rs` |
@@ -145,12 +148,17 @@ pub trait TombstoneSemanticsCheck {
 | `Entity` | `{ /// Unique entity ID. pub id: EntityId, /// Canonical human-readable name. pub name: Arc<str>, /// Categorical entity type. pub entity_type: Arc<str>, /// Flex… }` | — | `src/types/domain/misc.rs` |
 | `EntityId` | `(tuple/unit)` | — | `src/types/domain/ids.rs` |
 | `ErasureId` | `(tuple/unit)` | 16-Byte Lösch-Identifikator (SPEC 7.4, TY-09). | `src/ids.rs` |
+| `ErasurePolicy` | `{ /// Umgang mit betroffenen Checkpoints. pub checkpoint: CheckpointTaintPolicy, /// Umgang mit erneuten Schreibzugriffen. pub reinsert: ReinsertPolicy, /// SLA-… }` | Richtlinienparameter für einen Löschauftrag. | `src/erasure.rs` |
+| `ErasureStatus` | `{ /// Auftrags-ID. pub id: ErasureId, /// Aktueller Zustand im Zustandsautomaten. pub state: ErasureState, /// Erreichte Garantie. pub reached: Guarantee, /// St… }` | Öffentlicher Statusbericht eines Löschauftrags (ohne Schlüssel, Namen oder Terme). | `src/erasure.rs` |
 | `FileId` | `(tuple/unit)` | 16-Byte Dateikennung (SPEC F.1). | `src/ids.rs` |
 | `FusionWeights` | `{ vector: f32, text: f32, graph: f32, /// Reserved for future metadata-signal fusion; currently always 0.0. Do not expose a public constructor parameter for this… }` | — | `src/types/saos.rs` |
 | `GateId` | `(tuple/unit)` | 16-Byte Gate-Kennung für ReadGate-Einträge (SPEC F.9). | `src/ids.rs` |
+| `Guarantee` | `{ /// G1: Lesezugriff durch aktives Gate blockiert. pub gated: bool, /// G3: Physische Bereinigung und Verifikation abgeschlossen. pub purged: bool, /// G2: Kryp… }` | Erreichte Garantien eines Löschauftrags. Invariante: `purged ⇒ gated` und `crypto_erased ⇒ gated`. | `src/erasure.rs` |
 | `HybridQuery` | `{ /// Optional full-text query string. pub text_query: Option<String>, /// Optional vector query embedding. pub vector_query: Option<Vec<f32>>, /// Optional star… }` | — | `src/types/saos.rs` |
 | `HybridQueryBuilder` | `{ text_query: Option<String>, vector_query: Option<Vec<f32>>, graph_start_node: Option<String>, graph_strategy: Option<GraphTraversalStrategy>, fusion_weights: O… }` | — | `src/types/saos.rs` |
 | `ImportanceScore` | `(tuple/unit)` | — | `src/types/importance.rs` |
+| `LayerProgress` | `{ /// Wiederaufnahmepunkt (`None` = Layer abgeschlossen). pub cursor: Option<Cursor>, /// Anzahl bearbeiteter Einheiten. pub units_done: u64, /// Anzahl freigege… }` | Fortschrittsbericht eines Layers während der Bereinigung. | `src/erasure.rs` |
+| `LayerStatus` | `{ /// Logischer Name des Layers. pub layer: String, /// Aktueller Zustand des Layers. pub state: LayerState, /// Aktuelle Versuchsnummer. pub attempt: u32, /// O… }` | Status eines einzelnen Layers in [`ErasureStatus`]. | `src/erasure.rs` |
 | `MemoryImportance` | `{ /// Base LLM or heuristic evaluation score. pub base_score: ImportanceScore, /// Recency decay function strategy. pub decay: DecayFunction, /// Transaction ID… }` | — | `src/types/importance.rs` |
 | `MemoryLink` | `{ /// The target document ID. pub target: DocId, /// The type of relationship. pub relation: LinkRelation, /// The transaction ID when this link was created. pub… }` | — | `src/types/domain/misc.rs` |
 | `ModelFingerprint` | `{ /// SHA-256 hash digest over model weight blob and quantization tier string. pub hash: [u8; 32], /// Model identifier or filename (e.g. "llama-3.2-3b-instruct"… }` | Identifiziert eine Modelldatei und deren Quantisierungsstufe eindeutig. | `src/model_fingerprint.rs` |
@@ -177,29 +185,41 @@ pub trait TombstoneSemanticsCheck {
 | `TxId` | `(tuple/unit)` | — | `src/types/domain/ids.rs` |
 | `WorkflowState` | `{ /// Associated transaction. pub tx: TxId, /// Agent memory graph state footprint (BLAKE3 hash digest). #[serde(with = "hex")] pub graph_hash: [u8; 32], }` | — | `src/types/domain/misc.rs` |
 
-### Öffentliche Datentypen — Enums (20)
+### Öffentliche Datentypen — Enums (32)
 
 | Enum | Varianten | Beschreibung | Datei |
 |---|---|---|---|
 | `AutoExtractionMode` | `/// Automatic entity extraction is enabled. Enabled, /// Automatic entity extraction is disabled. Disabled,` | — | `src/types/domain/misc.rs` |
+| `AwaitLevel` | `/// Auftrag wurde akzeptiert und geplant. Accepted, /// Read-Gate ist aktiv (G1). #[default] Gated, /// Physische Bereinigung und Verifikation abgeschlossen (G3). Purged,` | Erwartete Synchronisationsstufe beim Warten auf einen Löschauftrag. | `src/erasure.rs` |
 | `BudgetStrategy` | `/// Konservativ: 80% des Limits als sicherer Puffer (Standard) Conservative, /// Aggressiv: 95% des Limits nutzen Aggressive, /// Exakt: Angabe des verfügbaren Fensters direkt Exact(usize),` | — | `src/types/budget.rs` |
 | `CacheDirective` | `/// Segment is explicitly pinned in memory until TTL expiration or explicit release. Pin { /// Optional maximum duration for which the segment remains pinned. `None` indicates indefinite pinning. ttl…` | — | `src/error.rs` |
+| `CheckpointTaintPolicy` | `/// Betroffene Checkpoints verwerfen. #[default] Drop, /// Betroffene Checkpoints ohne die gelöschten Daten neu schreiben. Rewrite, /// Checkpoint unter Legal-Hold belassen. LegalHold,` | Richtlinie für Checkpoints, die von einer Löschung betroffen sind. | `src/erasure.rs` |
 | `ContextraError` | `// ═══ Core & Logic ═══ /// Internal engine logic error. #[error("Internal error: {0}")] Internal(String), /// Invalid user or API argument input. #[error("Invalid input: {0}")] InvalidInput(String),…` | — | `src/error.rs` |
 | `DecayFunction` | `/// No recency decay (factor remains 1.0). #[default] None, /// Exponential decay measured in `TxId` distance (not wall-clock time). Exponential { /// Half-life in transaction count. half_life_tx: u6…` | — | `src/types/importance.rs` |
 | `DistanceMetric` | `/// Cosine distance (`1.0 - cos(angle)`). #[default] Cosine, /// Euclidean (L2) distance. Euclidean, /// Dot product distance (negated inner product for f32). DotProduct,` | — | `src/types/domain/document.rs` |
 | `DocIdWidth` | `/// 64-bit DocId format (8-byte BLAKE3 truncation). Bit64 = 64, /// 128-bit DocId format (16-byte BLAKE3 truncation, ADR-082). Bit128 = 128,` | Gibt die von einer Schemaversion erwartete oder erzeugte Bitbreite einer `DocId` an. | `src/schema.rs` |
+| `EraseTarget` | `/// Einzelnes Dokument innerhalb einer Collection eines Mandanten. Document { /// Mandanten-ID. tenant: TenantId, /// Name der Collection. collection: String, /// Dokumentenschlüssel. key: String, },…` | Zielspezifikation eines Löschauftrags. Implementiert manuelles `Debug` ohne Namens- oder Schlüsselinhalt (`[REDACTED]`). | `src/erasure.rs` |
+| `ErasureError` | `/// Ungültiges Löschziel. #[error("invalid erase target: {0}")] InvalidTarget(&'static str), /// Ungültiger Cursor (z. B. > 256 Byte). #[error("invalid cursor")] InvalidCursor, /// Idempotenzkonflikt…` | Fehlertyp der Löschkette. | `src/erasure.rs` |
+| `ErasureException` | `/// Externe Kopien (Backups, Exporte, Replikate, Client-Caches, LLM-Anbieter) außerhalb des Scopes. OutOfScopeExternalCopies, /// Checkpoint steht unter Legal-Hold. LegalHold { /// Bezeichner des bet…` | Dokumentierte Ausnahme oder Einschränkung einer Löschgarantie. | `src/erasure.rs` |
+| `ErasureProfile` | `/// Standardprofil. #[default] Standard, /// Reguliertes Profil mit verschärften Nachweis- und Zeitvorgaben. Regulated,` | Konfigurationsprofil für das Garantie- und Betriebsverhalten einer Löschung. | `src/erasure.rs` |
+| `ErasureReason` | `/// Löschung auf Nutzeranfrage. UserRequest, /// Löschung aufgrund gesetzlicher Anordnung. LegalRequest, /// Ablauf der Aufbewahrungsfrist. RetentionExpiry, /// Manuelle Betreiberaktion. OperatorActi…` | Strukturierter Löschgrund ohne Freitext (Vermeidung personenbezogener Daten im Ledger). | `src/erasure.rs` |
+| `ErasureState` | `/// Auftrag eingegangen. Requested, /// Löschplan durabel erstellt. Planned, /// Gate wird aufgebaut. Gating, /// Gate ist aktiv und durabel markiert. Gated, /// Kryptografische Schlüssel werden vern…` | Zustandsautomat eines Löschauftrags. | `src/erasure.rs` |
 | `FilterExpr` | `/// Exact match: field == value Eq { /// Target metadata field name. field: String, /// Expected field value. value: serde_json::Value, }, /// Not equal: field != value Ne { /// Target metadata field…` | — | `src/types/filter.rs` |
 | `FusionStrategy` | `/// Reciprocal Rank Fusion (default strategy per ADR-003). /// Robust against score scale mismatch and partial signal degradation. #[default] Rrf, /// Score-normalized fusion (CombSUM / Z-Score). ///…` | — | `src/types/saos.rs` |
 | `GraphTraversalStrategy` | `/// Multi-hop BFS traversal with hop score decay (default max_hops = 3). Hops { /// Maximum traversal hop depth. max_hops: usize, }, /// Personalized PageRank power iteration starting from seed nodes…` | — | `src/types/saos.rs` |
 | `HnswDeletionError` | `/// Target node with doc_id not found in graph. #[error("Node for doc_id {0:?} not found in HNSW index")] NodeNotFound(DocId), /// Graph repair resulted in a disconnected graph component. #[error("Gr…` | — | `src/error.rs` |
+| `LayerErrorKind` | `/// Vorübergehender Fehler; erneuter Versuch sinnvoll. Retryable, /// Dauerhafter Fehler. Permanent, /// Journal oder Zustand vergiftet. Poisoned, /// Mandanten- oder Scope-Verletzung. ScopeViolation…` | Fehlerklassifikation für die Retry-Politik von Layern. | `src/erasure.rs` |
+| `LayerState` | `/// Ausstehend. Pending, /// Gate im Layer aktiv. Gated, /// Physische Bereinigung läuft. Purging, /// Physische Bereinigung abgeschlossen. Purged, /// Verifikation abgeschlossen. Verified, /// Fehlg…` | Zustand eines einzelnen Layers innerhalb eines Löschauftrags. | `src/erasure.rs` |
 | `LinkRelation` | `/// Target memory provides more detail or context. Elaborates, /// Target memory contradicts this memory. Contradicts, /// Target memory supersedes this memory, replacing its context. Supersedes, ///…` | — | `src/types/domain/misc.rs` |
 | `ManifestSchemaVersion` | `/// Schema Version 1 (v0.x legacy 64-bit DocId layout). #[default] V1 = 1, /// Schema Version 2 (ADR-082 128-bit DocId layout). V2 = 2,` | Schema-Versionskennung für SSTable- und WAL-Manifeste. | `src/schema.rs` |
 | `MemoryType` | `/// Episodisches Gedächtnis: Erlebnisse, Unterhaltungen, zeitlich verankerte Ereignisse. /// Retrieval: Zeitliche Nähe und Relevanz zur aktuellen Session. /// Decay: Hohe Recency-Decay-Rate (Informat…` | — | `src/types/domain/misc.rs` |
 | `OnSignalFailure` | `/// Abort hybrid search and return an error on signal failure (Default per Spec Teil 6.5 P1). #[default] Fail, /// Degrade search gracefully using remaining active signals and report failed signals i…` | — | `src/types/saos.rs` |
 | `PprAlgorithm` | `/// Auto heuristic dispatch based on seed count (ForwardPush for <= 100 seeds, DensePowerIteration otherwise). #[default] Auto, /// Dense power-iteration algorithm (matrix-vector multiplication over…` | — | `src/types/domain/misc.rs` |
+| `ReinsertPolicy` | `/// Erneutes Einfügen wird abgelehnt. #[default] Deny, /// Erneutes Einfügen ist erst nach Erreichen von `Sealed` zulässig. AllowAfterSealed,` | Richtlinie zur Behandlung erneuter Einfügungen unter demselben Schlüssel. | `src/erasure.rs` |
 | `RetrievalStrategy` | `/// Vektorbasiertes semantisches Signal. Vector, /// Textbasiertes lexikalisches/sparse Signal. Text, /// Graphbasiertes Beziehungs-Signal. Graph, /// Hybrides Verbund-Signal. Hybrid, /// Nutzt LeanR…` | Semantische Retrieval-Strategie für Signal-Fusion (§8/§9). | `src/retrieval_strategy.rs` |
 | `ScanMethod` | `/// Direct structural scan of storage files, indices, or tables. Structural, /// Layer was not measured during this execution with specified reason. NotMeasured(String), /// Layer measurement is disa…` | — | `src/witness.rs` |
 | `Signal` | `/// Dense vector embedding search signal. Vector, /// Lexical full-text search signal. Text, /// Graph traversal / PageRank signal. Graph,` | — | `src/types/saos.rs` |
+| `TargetKind` | `/// Löschung eines einzelnen Dokuments. Document, /// Betroffenen-Löschung (alle Dokumente eines Subjekts, ADR-E). Subject, /// Löschung einer gesamten Collection. Collection, /// Löschung eines gesa…` | Zieltyp eines Löschauftrags zur Klassifikation der Hierarchieebene. | `src/erasure.rs` |
 | `TenantScopeViolation` | `/// Raised when unpacking a `TenantScoped<T>` value with an expected `TenantId` that differs /// from the value's actual bound `TenantId`. #[error("tenant scope mismatch: expected {expected:?}, got {…` | — | `src/tenant_scope.rs` |
 
 ### Typ-Aliase (3)
@@ -210,7 +230,7 @@ pub trait TombstoneSemanticsCheck {
 | `QueryOptionsBuilder` | `type QueryOptionsBuilder= HybridQueryBuilder` | Alias for [`HybridQueryBuilder`] representing a query options builder for hybrid retrieval operations (Spec Teil 6.5). |
 | `Result` | `type Result<T> = std::result::Result<T, ContextraError>` | — |
 
-### Konstanten (15)
+### Konstanten (17)
 
 | Konstante | Typ | Beschreibung |
 |---|---|---|
@@ -223,17 +243,32 @@ pub trait TombstoneSemanticsCheck {
 | `MAX` | `Self` | Maximum possible `DocId` value (`u64::MAX`). |
 | `MAX` | `Self` | Maximum possible `DocId` value (`u128::MAX`). |
 | `MAX_COLLECTION_SEQUENCE` | `u64` | Upper bound of the Collection-sequenced transaction ID range (`10^12`). Transaction allocation sequences managed by `Collection::allocate_tx()` opera… |
+| `MAX_LEN` | `usize` | Maximale Bytelänge eines Cursors im Journal. |
 | `MAX_REF_LEN` | `usize` | Maximale Bytelänge für Referenz-Strings / Byte-Identifier. |
 | `MAX_SEARCH_K` | `usize` | — |
 | `MIN` | `Self` | Minimum possible `DocId` value (`0`). Note: `DocId(0)` is conventionally treated as a sentinel/null value by the MCP layer (`contextra-mcp/src/lib.rs… |
 | `MIN` | `Self` | Minimum possible `DocId` value (`0`). |
+| `NONE` | `Self` | Keine Garantie erreicht (`G0`). |
 | `SYSTEM` | `Self` | SYSTEM tenant identifier (`0`). |
 | `TOMBSTONE_BIT` | `u64` | — |
 
-### Öffentliche Funktionen (127)
+### Öffentliche Funktionen (140)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
+| `pub fn as_bytes(&self) -> &[u8]` | Liefert die inneren Bytes als Slice. | `src/erasure.rs` |
+| `pub fn can_transition_to(&self, next: &ErasureState) -> bool` | Prüft gemäß Übergangsmatrix (§5), ob der Übergang nach `next` erlaubt ist. Reine Funktion ohne I/O. | `src/erasure.rs` |
+| `pub fn canonical_bytes(&self) -> Vec<u8>` | Erzeugt eine kanonische, injektive Byte-Repräsentation für Journal und Ledger. Format: `[tag: u8][tenant: u64 LE][...]` mit längenpräfigier… | `src/erasure.rs` |
+| `pub fn gate_active(&self) -> bool` | Liefert `true`, wenn das Read-Gate in diesem Zustand aktiv ist. | `src/erasure.rs` |
+| `pub fn is_terminal(&self) -> bool` | Liefert `true`, wenn der Zustand ein Endzustand ist (nur `Completed`). | `src/erasure.rs` |
+| `pub fn kind(&self) -> TargetKind` | Liefert die zugehörige [`TargetKind`]-Variante. | `src/erasure.rs` |
+| `pub fn kind(&self) -> LayerErrorKind` | Ordnet den Fehler einer [`LayerErrorKind`]-Kategorie für die Retry-Politik zu. | `src/erasure.rs` |
+| `pub fn label(&self) -> &'static str` | Liefert das kanonische Garantie-Label (`"G0"`, `"G1"`, `"G1+G3"`, `"G1+G2"`, `"G1+G2+G3"`). | `src/erasure.rs` |
+| `pub fn new(b: Vec<u8>) -> Result<Self, ErasureError>` | Erzeugt einen geprüften [`Cursor`]. # Fehler Liefert [`ErasureError::InvalidCursor`], wenn `b.len() > Self::MAX_LEN`. # Crash Reine Längenp… | `src/erasure.rs` |
+| `pub fn reached(&self) -> Guarantee` | Liefert die durch diesen Zustand mindestens erreichte [`Guarantee`]. | `src/erasure.rs` |
+| `pub fn target_hash(&self, key: &[u8; 32]) -> [u8` | Berechnet den keyed BLAKE3-Hash über [`Self::canonical_bytes`]. `key` ist der 32-Byte-Log-Schlüssel. | `src/erasure.rs` |
+| `pub fn tenant(&self) -> TenantId` | Liefert die Mandanten-ID des Ziels. | `src/erasure.rs` |
+| `pub fn validate(&self) -> Result<(), ErasureError>` | Führt eine reine Syntaxprüfung des Ziels ohne I/O durch. # Fehler Liefert [`ErasureError::InvalidTarget`], wenn Collection-Name oder Schlüs… | `src/erasure.rs` |
 | `pub fn capability_unsupported( capability: impl Into<String>, reason: impl Into<String>, ) -> Self` | — | `src/error.rs` |
 | `pub fn checksum_mismatch(path: impl Into<String>, block_id: u64) -> Self` | — | `src/error.rs` |
 | `pub fn cross_device_link( source_path: impl Into<String>, target_path: impl Into<String>, ) -> Self` | — | `src/error.rs` |
@@ -412,13 +447,12 @@ pub mod index;
 pub mod inference;
 pub mod policy;
 pub mod contract_tests;
-pub mod barrier;
 pub mod erasure;
 pub mod gate;
-pub mod keys;
 pub mod ledger;
 pub mod observer;
 pub mod report_signer;
+pub mod seal;
 pub use contextra_types::{ error, ids, model_fingerprint, refs, tenant_scope, types, witness, CollectionRef, ConfigFingerprint, ContextChunk, ContextWindow, ContextraError, DocId, DocKey, EntityId, ErasureId, FileId, GateId, ModelFingerprint, OperatorRef, QueryRewriteOutput, RequestContext, RerankResult, ResourceBudget, ResourceTracker, Result, RetrievalStrategy, SagaRecord, ScanMethod, ScoredEntry, Seq, StoreId, SubjectRef, TenantId, TenantRef, TenantScopeViolation, TenantScoped, Timestamp, TokenBudget, TxId, WorkflowState, MAX_REF_LEN, };
 pub use attention::*;
 pub use checkpoint::*;
@@ -444,13 +478,12 @@ pub use text_index::*;
 pub use vector_index::*;
 pub use vfs::*;
 pub use metrics::{ HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricSnapshot, NoopMetricsSink, };
-pub use barrier::{ BarrierExclusive, BarrierShared, CommitBarrier, CompactionPermit, PurgeBarrier, PurgePermit, };
-pub use erasure::{ EraseTarget as PortEraseTarget, ErasureLayer, ErasureTarget, LayerScope, PurgeCx, PurgeOutcome, StorageBackend, };
-pub use gate::{GateDecision, KeyBound, KeyRange, RangeGate, ReadGate};
-pub use keys::{Envelope, FileKey, FileKeyring, FileKind, RecordSealer, SealCtx};
-pub use ledger::{LedgerEntry, LedgerSink, RangeSet};
-pub use observer::{ErasureEvent, ErasureObserver, ObservedPhase, TargetKind};
+pub use erasure::{ compute_plan_hash, AcceptReceipt, Cancel, DocScope, EraseRequest, ErasureKernel, ErasureLayer, GateReceipt, IoBudget, IoClass, JobView, KeyPattern, KeyScope, LayerError, PressureHint, PrivilegedRead, ProgressSink, PurgeCx, PurgeOutcome, ResolvedScope, SealReceipt, Verdict, };
+pub use gate::{DiscardRule, GateDecision, RangeGate, ReadGate};
+pub use ledger::{ LedgerAnchor, LedgerDraft, LedgerEntry, LedgerHead, LedgerSink, LedgerVerification, };
+pub use observer::{ErasureEvent, ErasureObserver, ObservedPhase, ObserverError, TargetKind};
 pub use report_signer::ReportSigner;
+pub use seal::{Envelope, RecordSealer, SealCtx};
 ```
 
 ### Feature-Flags
@@ -461,8 +494,9 @@ pub use report_signer::ReportSigner;
 | `conformance` | `["contract-tests"]` |
 | `contract-tests` | `[]` |
 | `testkit` | `[]` |
+| `stage2` | `[]` |
 
-### Schnittstellen — Public Traits (46)
+### Schnittstellen — Public Traits (47)
 
 **`AttentionExporter`** — *Port implemented by inference backends (Ring 2) to export attention weights from the latest prefill step to the KV-cache eviction worker (Ring 1).* (`src/attention.rs`)
 
@@ -477,6 +511,28 @@ pub trait AttentionExporter : Send + Sync {
     /// # Crash
     /// Reiner flüchtiger RAM-Statusabruf ohne I/O oder persistente Mutation.
     fn export_attention_weights(&self, request_id: RequestId) -> Option<Vec<f32>>;
+}
+```
+
+**`Cancel`** — *Cancellation token port decoupled from `tokio_util` (WP-02 §4.3, O-P1).* (`src/erasure.rs`)
+
+```rust
+pub trait Cancel : Send + Sync {
+/// Returns `true` if cancellation has been requested.
+    ///
+    /// # Fehler
+    /// Keine; synchroner Zustandscheck.
+    /// # Crash
+    /// Reiner RAM-Zugriff ohne Mutation.
+    fn is_cancelled(&self) -> bool;
+
+    /// Completes when cancellation is requested.
+    ///
+    /// # Fehler
+    /// Keine; wartet kooperativ bis zum Abbruch.
+    /// # Crash
+    /// Keine persistente Mutation.
+    fn cancelled(&self) -> BoxFuture<'_, ()>;
 }
 ```
 
@@ -554,30 +610,6 @@ pub trait Clock : Send + Sync + 'static {
     /// # Crash
     /// Reiner Statusabruf ohne persistente Mutation.
     fn monotonic_nanos(&self) -> u64;
-}
-```
-
-**`CommitBarrier`** — *Barrier trait managing commit phases and exclusive gate operations (SPEC §11.3, D-57, D-78, L-7).* (`src/barrier.rs`)
-
-```rust
-pub trait CommitBarrier : Send + Sync {
-/// Acquires a shared permit for standard group commit operations.
-    ///
-    /// # Fehler
-    /// Unfehlbar; wartet asynchron auf Commit-Freigabe.
-    ///
-    /// # Crash
-    /// Reines Synchronisations-Token im RAM; cancel-safe.
-    fn shared(&self) -> BoxFuture<'_, BarrierShared>;
-
-    /// Acquires an exclusive permit for gate group transitions.
-    ///
-    /// # Fehler
-    /// Unfehlbar; blockiert nachfolgende Commits exklusiv.
-    ///
-    /// # Crash
-    /// Exklusiver Token-Inhaber; cancel-safe.
-    fn exclusive(&self) -> BoxFuture<'_, BarrierExclusive>;
 }
 ```
 
@@ -671,69 +703,173 @@ pub trait EmbeddingProvider : Send + Sync + 'static {
 }
 ```
 
-**`ErasureLayer`** — *Primary trait for storage and index subsystems participating in the erasure saga. Follows SPEC §8.2 verbatim. # Invariants - **PO-05 (Read-only witness)**: `witness` accepts only `&Scanner<Armed>` and performs no mutations. - **PO-05 (Idempotency)**: `purge`…* (`src/erasure.rs`)
+**`ErasureKernel`** — *Kernel port implemented by the primary storage engine (`contextra-store`).* (`src/erasure.rs`)
+
+```rust
+pub trait ErasureKernel : Send + Sync {
+/// Accepts and durably plans an erasure job. Idempotent over `(req.id, plan.plan_hash)`.
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError::IdempotencyConflict`] bei abweichendem `plan_hash`,
+    /// sowie [`ErasureError::InvalidTarget`] oder Journal-Fehler.
+    /// # Crash
+    /// Persistiert den Plan durabel im Journal; vor Persistierung kein Zustandswechsel.
+    fn accept<'a>(
+        &'a self,
+        req: &'a EraseRequest,
+        plan: &'a ResolvedScope,
+    ) -> BoxFuture<'a, Result<AcceptReceipt, ErasureError>>;
+
+    /// Durably records `Gated` and publishes the active [`ReadGate`] snapshot.
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError::NotFound`], [`ErasureError::InvalidTransition`] oder Journal-Fehler.
+    /// # Crash
+    /// Kehrt erst nach durabler `Gated`-Markierung und Gate-Veröffentlichung zurück.
+    fn publish_gate<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<GateReceipt, ErasureError>>;
+
+    /// Executes resumable physical purge on the primary store layers (Memtable, SSTables, WAL).
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError`] bei Abbruch, I/O- oder Zustandsfehlern.
+    /// # Crash
+    /// Idempotent und über `cx.cursor` wiederaufnehmbar.
+    fn purge_store<'a>(
+        &'a self,
+        id: ErasureId,
+        cx: &'a PurgeCx<'a>,
+    ) -> BoxFuture<'a, Result<PurgeOutcome, ErasureError>>;
+
+    /// Durably records progress for a participating layer.
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError`] bei ungültiger ID, Übergang oder Journal-Fehlern.
+    /// # Crash
+    /// Persistiert Fortschritt im Journal vor Rückkehr.
+    fn record_layer<'a>(
+        &'a self,
+        id: ErasureId,
+        layer: &'a WitnessLayer,
+        p: &'a LayerProgress,
+    ) -> BoxFuture<'a, Result<(), ErasureError>>;
+
+    /// Seals the job after collecting witnesses from all expected layers.
+    /// Missing layers are recorded as `NotMeasured` and downgrade the guarantee (I-6).
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError`] bei ungültigem Zustand oder Journal-Fehlern.
+    /// # Crash
+    /// Persistiert `Sealed` und Garantienachweis durabel.
+    fn seal<'a>(
+        &'a self,
+        id: ErasureId,
+        w: &'a [LayerWitness],
+    ) -> BoxFuture<'a, Result<SealReceipt, ErasureError>>;
+
+    /// Transitions a `Sealed` job with zero remaining units across all witnesses to `Completed`,
+    /// releasing the gate lifetime (I-9).
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError::InvalidTransition`], falls nicht `Sealed` oder `remaining > 0`.
+    /// # Crash
+    /// Persistiert `Completed` durabel vor Gate-Freigabe.
+    fn complete<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<(), ErasureError>>;
+
+    /// Records a failure transition for a job or specific layer.
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError`] bei unbekannter ID oder Journal-Fehlern.
+    /// # Crash
+    /// Persistiert den Fehler- bzw. Quarantänezustand durabel.
+    fn fail<'a>(
+        &'a self,
+        id: ErasureId,
+        layer: Option<&'a WitnessLayer>,
+        kind: LayerErrorKind,
+    ) -> BoxFuture<'a, Result<ErasureState, ErasureError>>;
+
+    /// Returns views of all non-terminal jobs.
+    ///
+    /// # Fehler
+    /// Keine; synchroner Statusabruf.
+    /// # Crash
+    /// Reiner Lesezugriff auf den Kernelzustand.
+    fn open_jobs(&self) -> Vec<JobView>;
+
+    /// Returns the public status of a job if known.
+    ///
+    /// # Fehler
+    /// Keine; synchroner Statusabruf.
+    /// # Crash
+    /// Reiner Lesezugriff auf den Kernelzustand.
+    fn status(&self, id: ErasureId) -> Option<ErasureStatus>;
+
+    /// Returns a scoped [`PrivilegedRead`] handle for the active job.
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError::NotFound`] oder [`ErasureError::InvalidTransition`] nach `Sealed`.
+    /// # Crash
+    /// Reine Handle-Erzeugung ohne Seiteneffekte.
+    fn privileged_reader(&self, id: ErasureId) -> Result<Arc<dyn PrivilegedRead>, ErasureError>;
+
+    /// Returns the store's active [`ReadGate`].
+    ///
+    /// # Fehler
+    /// Keine; synchroner Handle-Abruf.
+    /// # Crash
+    /// Reiner RAM-Zugriff ohne Mutation.
+    fn gate(&self) -> Arc<dyn ReadGate>;
+
+    /// Returns the store-internal verification scanners (Memtable, SSTables, WAL).
+    ///
+    /// # Fehler
+    /// Keine; synchroner Handle-Abruf.
+    /// # Crash
+    /// Reiner RAM-Zugriff ohne Mutation.
+    fn store_scanners(&self) -> Vec<Arc<dyn LayerScanner>>;
+}
+```
+
+**`ErasureLayer`** — *Contract implemented by every secondary storage/index layer participating in erasure.* (`src/erasure.rs`)
 
 ```rust
 pub trait ErasureLayer : Send + Sync {
-/// Returns the unique layer identifier.
+/// Returns the layer identifier.
     ///
     /// # Fehler
-    /// Keine; statische Identifikator-Abfrage.
-    ///
-    /// # Crash
-    /// Reiner Statusabruf ohne persistente Seiteneffekte.
-    fn id(&self) -> LayerId;
-
-    /// Resolves the concrete scope affected by the erase target before gating.
-    ///
-    /// # Fehler
-    /// Liefert einen Fehler-String falls das EraseTarget im Layer nicht aufgelöst werden kann.
-    ///
-    /// # Crash
-    /// Reiner Berechnungsschritt vor dem Gating; modifiziert keine Daten auf Festplatte.
-    fn resolve(&self, t: &EraseTarget) -> BoxFuture<'_, Result<LayerScope, String>>;
-
-    /// Immediate actions prior to gating (e.g. vector surrogate marking).
-    ///
-    /// # Fehler
-    /// Liefert einen Fehler-String falls Vorbereitungsmaßnahmen vor dem Gate fehlschlagen.
-    ///
-    /// # Crash
-    /// Bereitet RAM-Zustand vor; persistente Markierung erfolgt im Gruppen-Commit.
-    fn on_gate(&self, s: &LayerScope) -> BoxFuture<'_, Result<(), String>>;
-
-    /// Executes the physical purge for the given scope within the operational context.
-    ///
-    /// Must be idempotent and repeatable (PO-05).
-    ///
-    /// # Fehler
-    /// Liefert Fehler bei I/O- oder Kompaktionsfehlern während des physischen Löschens.
-    ///
-    /// # Crash
-    /// Idempotent (PO-05). Jeder Teilschritt ist wiederholbar. fsync-Fehler führen zu Poisoning.
-    fn purge(&self, s: &LayerScope, cx: &PurgeCx) -> BoxFuture<'_, Result<PurgeOutcome, String>>;
-
-    /// Verifies residue and produces a witness. Read-only (PO-05).
-    ///
-    /// # Fehler
-    /// Liefert Fehler falls Residuen des gelöschten Umfangs gefunden werden oder I/O fehlschlägt.
-    ///
-    /// # Crash
-    /// Reiner Lesezugriff (PO-05); modifiziert niemals persistenten Zustand.
-    fn witness(
-        &self,
-        s: &LayerScope,
-        sc: &Scanner<Armed>,
-    ) -> BoxFuture<'_, Result<LayerWitness, String>>;
-
-    /// Reports the key coverage classification (full | unlinked | none).
-    ///
-    /// # Fehler
-    /// Keine; statische Klassifikationsabfrage.
-    ///
+    /// Keine; statische Schichtabfrage.
     /// # Crash
     /// Reiner Statusabruf ohne Mutation.
-    fn key_coverage(&self) -> KeyCoverage;
+    fn layer(&self) -> WitnessLayer;
+
+    /// Performs fast (< 10 ms), idempotent RAM masking and cache eviction without file I/O.
+    ///
+    /// # Fehler
+    /// Liefert [`LayerError`] falls In-Memory-Maskierung fehlschlägt.
+    /// # Crash
+    /// Reine RAM-Operation; bei Neustart wird `on_gate` aus dem durablen Journal erneut angestoßen.
+    fn on_gate<'a>(&'a self, s: &'a ResolvedScope) -> BoxFuture<'a, Result<(), LayerError>>;
+
+    /// Performs resumable physical purge using `cx.cursor`. Partial failures must return `Err`.
+    /// Must never call `block_on`.
+    ///
+    /// # Fehler
+    /// Liefert [`LayerError`] bei I/O-, Abbruch- oder Teilfehlern.
+    /// # Crash
+    /// Idempotent und über den zuletzt persistierten `Cursor` wiederaufnehmbar.
+    fn purge<'a>(
+        &'a self,
+        s: &'a ResolvedScope,
+        cx: &'a PurgeCx<'a>,
+    ) -> BoxFuture<'a, Result<PurgeOutcome, LayerError>>;
+
+    /// Returns the layer's verification scanner.
+    ///
+    /// # Fehler
+    /// Keine; Referenzabruf.
+    /// # Crash
+    /// Reiner Zugriffsabruf ohne Seiteneffekte.
+    fn scanner(&self) -> &dyn LayerScanner;
 }
 ```
 
@@ -754,47 +890,6 @@ pub trait ErasureObserver : Send + Sync + 'static {
         &self,
         ev: ErasureEvent,
     ) -> BoxFuture<'static, std::result::Result<(), ObserverError>>;
-}
-```
-
-**`ErasureTarget`** — *Generisches Erasure-Target für Bereinigungsanweisungen.* (`src/erasure.rs`)
-
-```rust
-pub trait ErasureTarget : Send + Sync + 'static {
-
-}
-```
-
-**`FileKeyring`** — *File keyring interface managing per-file cryptographic keys (SPEC §4.1, §8.2, D-85, PO-06). # Contract (PO-06) `destroy` zeroes the key slot, executes `sync_data`, and verifies the key's non-presence via a read-check; failure leaves the slot in `Pending` requ…* (`src/keys.rs`)
-
-```rust
-pub trait FileKeyring : Send + Sync {
-/// Allocates and records a new file key for the given kind and ID.
-    ///
-    /// # Fehler
-    /// Liefert Fehler falls Slot-Erzeugung oder CSPRNG fehlschlägt.
-    ///
-    /// # Crash
-    /// Persistiert Slot vor Dateierzeugung (I-9b).
-    fn create(&self, kind: FileKind, id: FileId) -> BoxFuture<'_, Result<FileKey, String>>;
-
-    /// Opens and retrieves the file key for the given ID.
-    ///
-    /// # Fehler
-    /// Liefert Fehler falls Dateischlüssel fehlt oder vernichtet wurde.
-    ///
-    /// # Crash
-    /// Reines Laden des Dateischlüssels aus dem Tresor.
-    fn open(&self, id: FileId) -> BoxFuture<'_, Result<FileKey, String>>;
-
-    /// Securely destroys the file key slot (PO-06).
-    ///
-    /// # Fehler
-    /// Liefert Fehler falls Slot-Nullung oder Sync fehlschlägt.
-    ///
-    /// # Crash
-    /// Nullt Slot, führt sync_data aus und prüft Fehlen; bei fsync-Fehler verbleibt Slot in Pending (PO-06, D-55).
-    fn destroy(&self, id: FileId) -> BoxFuture<'_, Result<(), String>>;
 }
 ```
 
@@ -1114,6 +1209,29 @@ pub trait IdGen : Send + Sync + 'static {
 }
 ```
 
+**`IoBudget`** — *Cooperative I/O budget port for throttling background purge and compaction.* (`src/erasure.rs`)
+
+```rust
+pub trait IoBudget : Send + Sync {
+/// Waits cooperatively (clock-based) until `bytes` are granted. Must be cancel-safe.
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError::Cancelled`] bei Abbruch oder Budget-Fehler.
+    /// # Crash
+    /// Reine Ratenbegrenzung im RAM; keine persistente Mutation.
+    fn acquire<'a>(&'a self, class: IoClass, bytes: u64)
+        -> BoxFuture<'a, Result<(), ErasureError>>;
+
+    /// Returns the current I/O pressure hint.
+    ///
+    /// # Fehler
+    /// Keine; synchroner Statusabruf.
+    /// # Crash
+    /// Reiner RAM-Zugriff ohne Mutation.
+    fn pressure(&self) -> PressureHint;
+}
+```
+
 **`KvBridgeStorage`** — *Abstrahiertes Persistence-Interface für KV-Bridge Tier-2 Spill-over operations. Implementierbar von Ring-1 Storage Engines (`contextra-store::LsmStorage`) oder Test-Mocks.* (`src/kv_bridge_port.rs`)
 
 ```rust
@@ -1196,36 +1314,49 @@ pub trait LayerScanner : Send + Sync {
 }
 ```
 
-**`LedgerSink`** — *Durable audit ledger sink located outside the primary data directory (SPEC §4.2, §11.8).* (`src/ledger.rs`)
+**`LedgerAnchor`** — *External anchor port for publishing ledger head commitments (e.g. remote log or HSM).* (`src/ledger.rs`)
+
+```rust
+pub trait LedgerAnchor : Send + Sync {
+/// Publishes the current [`LedgerHead`] to an external anchor.
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError`] falls die Verankerung fehlschlägt.
+    /// # Crash
+    /// Idempotente Veröffentlichung des aktuellen Kopfes.
+    fn publish<'a>(&'a self, h: &'a LedgerHead) -> BoxFuture<'a, Result<(), ErasureError>>;
+}
+```
+
+**`LedgerSink`** — *Append-only durable audit ledger sink (WP-02 §4.7).* (`src/ledger.rs`)
 
 ```rust
 pub trait LedgerSink : Send + Sync {
-/// Appends a new verified erasure entry to the ledger.
+/// Appends a verified erasure entry to the ledger.
+    /// Idempotent over `(e.erasure_id_hmac, e.plan_hash)`.
     ///
     /// # Fehler
-    /// Liefert Fehler bei Schreib- oder MAC-Validierungsfehlern.
-    ///
+    /// Liefert [`ErasureError::LedgerCorrupt`] oder [`ErasureError::Io`] bei
+    /// Integritäts- bzw. Schreibfehlern.
     /// # Crash
-    /// Schreibt dauerhaft in das Ledger-Log; fsync stellt Dauerhaftigkeit sicher.
-    fn append(&self, e: &LedgerEntry) -> Result<(), String>;
+    /// Schreibt append-only und stellt Dauerhaftigkeit vor Rückkehr via `fsync` sicher.
+    fn append<'a>(&'a self, e: LedgerDraft) -> BoxFuture<'a, Result<LedgerEntry, ErasureError>>;
 
-    /// Reads all entries recorded in the ledger for verification or auditing.
+    /// Returns the current ledger head.
     ///
     /// # Fehler
-    /// Liefert Fehler bei I/O- oder Integritätsbrüchen der Hashkette.
-    ///
+    /// Liefert [`ErasureError::LedgerCorrupt`] oder [`ErasureError::Io`] bei Lesefehlern.
     /// # Crash
-    /// Reiner Lesezugriff zur Audit-Prüfung.
-    fn read_all(&self) -> Result<Vec<LedgerEntry>, String>;
+    /// Reiner Lesezugriff ohne Mutation.
+    fn head<'a>(&'a self) -> BoxFuture<'a, Result<LedgerHead, ErasureError>>;
 
-    /// Prunes entries older than the specified retention threshold.
+    /// Verifies the full hash and MAC chain of the ledger.
     ///
     /// # Fehler
-    /// Liefert Fehler bei I/O-Fehlern beim Kürzen.
-    ///
+    /// Liefert [`ErasureError::LedgerCorrupt`] bei Kettenbruch oder [`ErasureError::Io`].
     /// # Crash
-    /// Kürzt veraltete Ledger-Einträge atomar.
-    fn prune(&self, older_than: Timestamp) -> Result<usize, String>;
+    /// Reiner Lese- und Prüfzugriff ohne Mutation.
+    fn verify<'a>(&'a self) -> BoxFuture<'a, Result<LedgerVerification, ErasureError>>;
 }
 ```
 
@@ -1385,38 +1516,50 @@ pub trait PluginManifest : Send + Sync {
 }
 ```
 
-**`PurgeBarrier`** — *Barrier trait managing LSM compaction and physical purge mutual exclusion (SPEC §11.3, §11.4, I-16, L-7).* (`src/barrier.rs`)
+**`PrivilegedRead`** — *Privileged read port bypassing the active [`ReadGate`] exclusively for the active purger. Implementations must enforce that every accessed key satisfies `ResolvedScope.keys.contains`, returning `ErasureError::Layer { kind: LayerErrorKind::ScopeViolation, .. }…* (`src/erasure.rs`)
 
 ```rust
-pub trait PurgeBarrier : Send + Sync {
-/// Acquires a shared permit for compaction.
+pub trait PrivilegedRead : Send + Sync {
+/// Reads a raw key bypassing the gate, subject to scope verification.
     ///
     /// # Fehler
-    /// Unfehlbar; wartet auf Purge-Freigabe.
-    ///
+    /// Liefert [`ErasureError::Layer`] mit [`LayerErrorKind::ScopeViolation`] bei Scope-Verstoß
+    /// oder nach `Sealed`, sowie I/O-Fehler bei Speicherproblemen.
     /// # Crash
-    /// Kooperative Kompaktions-Sperre im RAM.
-    fn compaction(&self) -> BoxFuture<'_, CompactionPermit>;
+    /// Reiner Lesezugriff ohne Seiteneffekte.
+    fn get<'a>(&'a self, raw_key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>, ErasureError>>;
 
-    /// Acquires an exclusive permit for physical purging.
+    /// Scans up to `limit` (capped at 1024) key-value pairs under `prefix` after `after`.
     ///
     /// # Fehler
-    /// Unfehlbar; exklusiver Purge-Zugriff.
-    ///
+    /// Liefert [`ErasureError::Layer`] mit [`LayerErrorKind::ScopeViolation`] bei Scope-Verstoß
+    /// oder nach `Sealed`, sowie I/O-Fehler bei Speicherproblemen.
     /// # Crash
-    /// Erzwingt Abbruch kooperativer Kompaktionen; cancel-safe.
-    fn purge(&self) -> BoxFuture<'_, PurgePermit>;
+    /// Reiner Lesezugriff ohne Seiteneffekte.
+    fn scan_prefix<'a>(
+        &'a self,
+        prefix: &'a [u8],
+        after: Option<&'a [u8]>,
+        limit: usize,
+    ) -> BoxFuture<'a, Result<Vec<(Bytes, Bytes)>, ErasureError>>;
+}
+```
 
-    /// Queries whether an exclusive purge operation is waiting for access.
-    ///
-    /// Background compactions inspect this periodically to cooperatively yield or abort.
+**`ProgressSink`** — *Durable write-ahead progress sink implemented by the erasure kernel.* (`src/erasure.rs`)
+
+```rust
+pub trait ProgressSink : Send + Sync {
+/// Records durable progress for a layer during purge execution.
     ///
     /// # Fehler
-    /// Keine; nicht-blockierende atomare Abfrage.
-    ///
+    /// Liefert [`ErasureError`] bei Journal- oder Persistierungsfehlern.
     /// # Crash
-    /// Reiner RAM-Zustandsprüfer.
-    fn purge_waiting(&self) -> bool;
+    /// Write-Ahead-Protokollierung; ein Crash vor Rückkehr lässt den vorherigen Cursor aktiv.
+    fn record<'a>(
+        &'a self,
+        layer: &'a WitnessLayer,
+        p: &'a LayerProgress,
+    ) -> BoxFuture<'a, Result<(), ErasureError>>;
 }
 ```
 
@@ -1479,109 +1622,81 @@ pub trait QueryRewriter : Send + Sync {
 }
 ```
 
-**`ReadGate`** — *Synchronous, memory-only read gate port interface (SPEC §4.2, §11.3, PO-07). # Invariants - **PO-07**: `ReadGate` is synchronous, performs zero I/O, and executes in $O(\log n)$ time.* (`src/gate.rs`)
+**`ReadGate`** — *Synchronous, memory-only read gate port interface (WP-02 §4.1, G-6). # Invariants - Synchronous, zero I/O, panic-free, and allocation-free on the `Open` fast path. - **Fail-closed (G-6):** This trait intentionally defines **no default methods**. Every impleme…* (`src/gate.rs`)
 
 ```rust
 pub trait ReadGate : Send + Sync {
-/// Checks point status of an individual key.
+/// Returns `false` if no gates are active (fast path: all checks return `Open`).
+    /// Implementations should use a single `Relaxed` atomic load.
     ///
     /// # Fehler
-    /// Synchron, keine I/O, panikfrei; liefert GateDecision.
-    ///
+    /// Keine; synchroner atomarer Zustandscheck.
     /// # Crash
-    /// Reiner RAM-Lookup in O(log n); keine Zustandsänderung.
-    fn check(&self, k: &KeyBuf) -> GateDecision;
+    /// Reiner RAM-Zugriff ohne Mutation.
+    fn is_active(&self) -> bool;
 
-    /// Checks boundary status of a file or partition block for compaction or scans.
-    ///
-    /// # Fehler
-    /// Synchron, keine I/O; liefert GateDecision.
-    ///
-    /// # Crash
-    /// Reiner RAM-Lookup; keine Seiteneffekte.
-    fn check_bound(&self, b: &KeyBound) -> GateDecision;
-
-    /// Evaluates range policy for compaction (I-18: Erased may be dropped, Restricted never).
-    ///
-    /// # Fehler
-    /// Synchron, keine I/O; liefert RangeGate.
-    ///
-    /// # Crash
-    /// Reiner RAM-Lookup für Kompaktions-Entscheidungen.
-    fn variant_for_range(&self, r: &KeyRange) -> RangeGate;
-
-    /// Retrieves the sequence number at which the key was gated, if any (Restore-Guard, commit rejection).
-    ///
-    /// # Fehler
-    /// Synchron, liefert `Option<Seq>`.
-    ///
-    /// # Crash
-    /// Reiner RAM-Lookup; keine Mutation.
-    fn gated_seq(&self, k: &KeyBuf) -> Option<Seq>;
-
-    /// Returns the monotonic gate epoch counter (SPEC §11.3, D-120, I-21).
-    ///
-    /// Incremented before key destruction to allow linearized read verification.
+    /// Returns the strictly monotonic gate epoch counter (`Acquire` load).
     ///
     /// # Fehler
     /// Keine; synchroner atomarer Abruf.
     /// # Crash
     /// Reiner RAM-Zugriff ohne Mutation.
-    fn gate_epoch(&self) -> u64 {
-        0
-    }
+    fn epoch(&self) -> u64;
 
-    /// Evaluates whether a 16-byte `KeyBuf` is covered by an active gate (Erased or Restricted) (SPEC I-2).
-    ///
-    /// Used by replay filters and commit leader phase.
+    /// Evaluates the gate decision for a raw key as seen by `LsmStorage`
+    /// (`t:{tenant}:` + collection key).
     ///
     /// # Fehler
-    /// Keine; synchroner ram-basierter Lookup.
+    /// Keine; synchron, panikfrei, ohne I/O.
     /// # Crash
-    /// Reiner RAM-Zugriff ohne Mutation.
-    fn covers(&self, k: &KeyBuf) -> bool {
-        match self.check(k) {
-            GateDecision::Erased | GateDecision::Restricted => true,
-            GateDecision::Open => false,
-        }
-    }
+    /// Reiner RAM-Lookup ohne Seiteneffekte.
+    fn check(&self, raw_key: &[u8]) -> GateDecision;
 
-    /// Evaluates point gate status of a canonical 78-byte raw key (SPEC 9.1, D-123).
+    /// Version-aware gate check: `Erased { up_to }` blocks only `version_seq <= up_to`.
     ///
     /// # Fehler
-    /// Keine; synchroner ram-basierter Lookup.
+    /// Keine; synchron, panikfrei, ohne I/O.
     /// # Crash
-    /// Reiner RAM-Zugriff ohne Mutation.
-    fn check_raw(&self, _raw: &[u8; 78]) -> GateDecision {
-        GateDecision::Open
-    }
+    /// Reiner RAM-Lookup ohne Seiteneffekte.
+    fn check_version(&self, raw_key: &[u8], version_seq: Seq) -> GateDecision;
 
-    /// Evaluates whether a canonical 78-byte raw key is covered by an active gate (SPEC I-2, I-21, D-123).
+    /// Evaluates whether an entire prefix range is open, partial, or entirely blocked.
     ///
     /// # Fehler
-    /// Keine; synchroner ram-basierter Lookup.
+    /// Keine; synchron, panikfrei, ohne I/O.
     /// # Crash
-    /// Reiner RAM-Zugriff ohne Mutation.
-    fn covers_raw(&self, raw: &[u8; 78]) -> bool {
-        match self.check_raw(raw) {
-            GateDecision::Erased | GateDecision::Restricted => true,
-            GateDecision::Open => false,
-        }
-    }
+    /// Reiner RAM-Lookup ohne Seiteneffekte.
+    fn check_prefix(&self, prefix: &[u8]) -> RangeGate;
 
-    /// Retrieves the sequence number at which a 78-byte raw key was gated, if any.
+    /// Evaluates whether a key version may be discarded during compaction or flush.
     ///
     /// # Fehler
-    /// Keine; synchroner ram-basierter Lookup.
+    /// Keine; synchron, panikfrei, ohne I/O.
     /// # Crash
-    /// Reiner RAM-Zugriff ohne Mutation.
-    fn gated_seq_raw(&self, _raw: &[u8; 78]) -> Option<Seq> {
-        None
-    }
+    /// Reiner RAM-Lookup ohne Seiteneffekte.
+    fn discard_rule(&self, raw_key: &[u8], version_seq: Seq) -> DiscardRule;
+
+    /// Document-level gate check for secondary indices.
+    /// `collection` is passed without internal prefix (e.g. `"default"`, `"docs"`).
+    ///
+    /// # Fehler
+    /// Keine; synchron, panikfrei, ohne I/O.
+    /// # Crash
+    /// Reiner RAM-Lookup ohne Seiteneffekte.
+    fn check_doc(&self, tenant: TenantId, collection: &str, doc: DocId) -> GateDecision;
+
+    /// Returns the sequence number at which `raw_key` was gated, if any
+    /// (used for write rejection and diagnostics).
+    ///
+    /// # Fehler
+    /// Keine; synchron, panikfrei, ohne I/O.
+    /// # Crash
+    /// Reiner RAM-Lookup ohne Mutation.
+    fn gated_seq(&self, raw_key: &[u8]) -> Option<Seq>;
 }
 ```
 
-**`RecordSealer`** — *Record sealer contract for crypto envelope management (SPEC §4.2, D-53).* (`src/keys.rs`)
+**`RecordSealer`** — *Record sealer contract for crypto envelope management (Stage 2, WP-11).* (`src/seal.rs`)
 
 ```rust
 pub trait RecordSealer : Send + Sync {
@@ -1595,7 +1710,7 @@ pub trait RecordSealer : Send + Sync {
     fn seal<'a>(
         &'a self,
         ctx: &'a SealCtx,
-        key: &'a KeyBuf,
+        key: &'a [u8],
         plain: &'a [u8],
     ) -> BoxFuture<'a, Result<Envelope, String>>;
 
@@ -1606,25 +1721,24 @@ pub trait RecordSealer : Send + Sync {
     ///
     /// # Crash
     /// Reiner kryptografischer Entschlüsselungszugriff ohne Seiteneffekte.
-    fn open<'a>(&'a self, key: &'a KeyBuf, env: &'a [u8])
-        -> BoxFuture<'a, Result<Vec<u8>, String>>;
+    fn open<'a>(&'a self, key: &'a [u8], env: &'a [u8]) -> BoxFuture<'a, Result<Vec<u8>, String>>;
 
-    /// Evicts key range from DEK cache, zeroizing RAM keys (D-79).
+    /// Evicts key scope from DEK cache, zeroizing RAM keys.
     ///
     /// # Fehler
     /// Synchrone Operation ohne Fehlerzustände.
     ///
     /// # Crash
     /// Entfernt und nullt Schlüsselmaterial flüchtig im RAM.
-    fn evict(&self, scope: &KeyRange);
+    fn evict(&self, scope: &KeyScope);
 
-    /// Forces persistence of vault slots (`sync_data`) before WAL frame flush (I-9, L-9).
+    /// Forces persistence of vault slots (`sync_data`) before WAL frame flush.
     ///
     /// # Fehler
     /// Liefert Fehler bei I/O- oder fsync-Fehlern.
     ///
     /// # Crash
-    /// Erzwingt Slot-Dauerhaftigkeit via sync_data; bei fsync-Fehler tritt Poisoning ein (I-9, L-9).
+    /// Erzwingt Slot-Dauerhaftigkeit via sync_data; bei fsync-Fehler tritt Poisoning ein.
     fn make_slots_durable(&self) -> BoxFuture<'_, Result<(), String>>;
 }
 ```
@@ -1751,14 +1865,6 @@ pub trait SegmentSynthesizer : Send + Sync {
     /// # Crash
     /// Reiner Statusabruf ohne persistente Mutation.
     fn model_id(&self) -> &str;
-}
-```
-
-**`StorageBackend`** — *Generisches Storage-Backend für modulare Datenzugriffe im Löschkern.* (`src/erasure.rs`)
-
-```rust
-pub trait StorageBackend : Send + Sync + 'static {
-
 }
 ```
 
@@ -2586,34 +2692,33 @@ pub trait VfsFile : Send + Sync {
 }
 ```
 
-### Öffentliche Datentypen — Structs (55)
+### Öffentliche Datentypen — Structs (51)
 
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
-| `Armed` | `(tuple/unit)` | Phantom state for an armed scanner verifying deletion residue. | `src/erasure.rs` |
+| `AcceptReceipt` | `{ /// Job identifier. pub id: ErasureId, /// `true` if an identical `(id, plan_hash)` job already existed. pub existing: bool, }` | Receipt returned by [`ErasureKernel::accept`]. | `src/erasure.rs` |
 | `AuthorizedRing` | `{ ring: FeatureRing, }` | Token representing an authorized feature ring granting access to engine features (§15). `AuthorizedRing` cannot be directly instantiated outside of t… | `src/license.rs` |
-| `BarrierExclusive` | `{ _token: Option<Arc<()>>, }` | RAII token guard representing an exclusive gate phase permit. | `src/barrier.rs` |
-| `BarrierShared` | `{ _token: Option<Arc<()>>, }` | RAII token guard representing a shared commit phase permit. | `src/barrier.rs` |
-| `CompactionPermit` | `{ _token: Option<Arc<()>>, }` | RAII token guard representing a compaction permit. | `src/barrier.rs` |
 | `ContextSegment` | `{ /// Unique identifier for the chunk. pub chunk_id: u64, /// Text content of the segment. pub text: &'a str, /// Optional model fingerprint reference. pub model… }` | Representation of a context segment passed to context-aware text generation. | `src/embedding.rs` |
-| `Envelope` | `{ payload: Vec<u8>, }` | Sealed record envelope containing encrypted ciphertext and tag. | `src/keys.rs` |
+| `Envelope` | `{ payload: Vec<u8>, }` | Sealed record envelope containing encrypted ciphertext and tag. | `src/seal.rs` |
+| `EraseRequest` | `{ /// Unique job identifier. pub id: ErasureId, /// Target specification. pub target: EraseTarget, /// Structured reason without PII. pub reason: ErasureReason,… }` | Request to initiate an erasure job on the kernel. | `src/erasure.rs` |
 | `ErasureEvent` | `{ /// Unique identifier of the erasure operation. pub id: ErasureId, /// Kind of target affected. pub target_kind: TargetKind, /// Current phase reached. pub pha… }` | Event published to an [`ErasureObserver`] upon reaching an erasure lifecycle phase (SPEC D-118). | `src/observer.rs` |
-| `FileId` | `(tuple/unit)` | Unique identifier for a durable storage file or SSTable. | `src/keys.rs` |
-| `FileKey` | `{ raw: Vec<u8>, file_id: FileId, }` | Wrapper around a cryptographic file key with zeroizing on drop and masked debug display (PO-08). | `src/keys.rs` |
+| `GateReceipt` | `{ /// Job identifier. pub id: ErasureId, /// Sequence watermark at which the gate became active. pub gated_seq: Seq, /// Monotonic gate epoch after publication.… }` | Receipt returned by [`ErasureKernel::publish_gate`]. | `src/erasure.rs` |
 | `GraphIndexStats` | `{ /// Number of active nodes (Entities). pub num_entities: usize, /// Number of active edges. pub num_edges: usize, /// Total bytes allocated by CSR representati… }` | Statistics for the GraphIndex layer. | `src/graph_index.rs` |
 | `GroundingAssessment` | `{ /// Raw or calibrated confidence score in [0.0, 1.0] indicating attribution quality. pub score: f32, /// Indicates whether the grounding score meets the requir… }` | Result of a post-hoc grounding / attribution validation check. | `src/lifecycle.rs` |
 | `HistogramSnapshot` | `{ /// Sum of all observed values. pub sum: f64, /// Total count of observations. pub count: u64, /// Minimum observed value (None if empty). pub min: Option<f64>… }` | Snapshot of a recorded histogram metric. | `src/metrics.rs` |
 | `HyperEdgeId` | `(tuple/unit)` | — | `src/graph.rs` |
 | `InMemoryMetricsSink` | `{ counters: RwLock<BTreeMap<MetricKey, Arc<AtomicU64>>>, gauges: RwLock<BTreeMap<MetricKey, f64>>, histograms: RwLock<BTreeMap<MetricKey, HistogramState>>, }` | Production-ready local thread-safe implementation of [`MetricsSink`]. Stores metrics strictly in-process with no external network exports (privacy-pr… | `src/metrics.rs` |
-| `KeyBuf` | `(tuple/unit)` | Fixed or bounded key buffer for storage operations (SPEC §8.1). | `src/gate.rs` |
-| `KeyRange` | `{ /// Lower boundary inclusive. pub start: KeyBuf, /// Upper boundary exclusive. pub end: KeyBuf, }` | Half-open key range `[start, end)` for scan and compaction boundaries. | `src/gate.rs` |
+| `JobView` | `{ /// Job identifier. pub id: ErasureId, /// Current state machine state. pub state: ErasureState, /// Resolved erasure scope. pub scope: Arc<ResolvedScope>, ///… }` | Snapshot view of an open erasure job for recovery and orchestration. | `src/erasure.rs` |
+| `KeyScope` | `{ rules: Vec<(KeyPattern, Verdict)>, }` | Canonical rule-based key scope using longest-match-wins semantics (WP-02 §4.2, Index §3.1). - Longest matching pattern wins. - For equal byte length,… | `src/erasure.rs` |
 | `KvBlock` | `{ /// Block sequence identifier. pub block_id: u64, /// Encrypted or raw block tensor bytes. #[serde( serialize_with = "serialize_bytes", deserialize_with = "des… }` | Represents an exported KV block segment. | `src/kv.rs` |
 | `KvLayout` | `{ /// Number of transformer layers. pub n_layer: u32, /// Number of KV heads. pub n_kv_head: u32, /// Dimension per head. pub head_dim: u32, /// Data type repres… }` | KV cache layer and dimensions layout configuration. | `src/kv.rs` |
 | `KvPrefixHit` | `{ /// Number of tokens matched by the prefix. pub matched_tokens: usize, /// Extracted KV blocks for the matched prefix. pub blocks: Vec<KvBlock>, }` | Represents a prefix match hit in the KV store. | `src/kv.rs` |
-| `LayerId` | `(tuple/unit)` | Layer identifier representing a specific subsystem participating in erasure (e.g. store, text, vector). | `src/erasure.rs` |
-| `LayerScope` | `{ /// Opaque scope identifier or token. scope_id: [u8; 16], /// Segment or file identifiers affected. affected_units: Vec<u64>, }` | Scope resolved by an erasure layer prior to gating (SPEC §8.2, D-96). Records the concrete file sets, segment IDs, or key intervals that this layer m… | `src/erasure.rs` |
+| `LayerError` | `{ /// Retry classification. pub kind: LayerErrorKind, /// Layer that produced the error. pub layer: WitnessLayer, /// Static diagnostic detail (must never contai… }` | Structured error returned by an [`ErasureLayer`] implementation. | `src/erasure.rs` |
 | `LayerWitness` | `{ layer: WitnessLayer, scanned: u64, remaining: u64, technique: ScanTechnique, method: ScanMethod, digest: [u8; 32], measured_at: u64, }` | Verifiziertes Messergebnis eines Storage-Scanners (SPEC §12.7.4). Unter INV-WITNESS-MINT-1 kann ein `LayerWitness` ausschließlich in `ScanSession::fi… | `src/scanner/witness.rs` |
-| `LedgerEntry` | `{ /// Commitment hash over the target erasure definition. pub commitment: [u8; 32], /// Key ranges covered by this erasure. pub range_set: RangeSet, /// Sequence… }` | A tamper-evident entry in the erasure ledger (SPEC §4.2, §11.8, F.9). Contains `(commitment, range_set, gated_seq, completed_at)` along with `chain_h… | `src/ledger.rs` |
+| `LedgerDraft` | `{ /// Keyed HMAC-BLAKE3 of the erasure job ID. pub erasure_id_hmac: [u8; 32], /// Achieved erasure guarantee. pub guarantee: Guarantee, /// BLAKE3 root over per-… }` | Draft payload submitted to [`LedgerSink::append`]; the sink assigns `index`, `prev_hash`, and `entry_mac`. | `src/ledger.rs` |
+| `LedgerEntry` | `{ /// Monotonic zero-based entry index in the ledger. pub index: u64, /// Keyed HMAC-BLAKE3 of the erasure job ID. pub erasure_id_hmac: [u8; 32], /// Achieved er… }` | A tamper-evident, append-only entry in the erasure ledger (WP-02 §4.7). | `src/ledger.rs` |
+| `LedgerHead` | `{ /// Index of the latest entry (or `0` with zero hash if empty). pub index: u64, /// Hash / MAC of the latest entry. pub hash: [u8; 32], }` | Current head pointer of the append-only erasure ledger. | `src/ledger.rs` |
+| `LedgerVerification` | `{ /// `true` if every entry's chain hash and MAC verified cleanly. pub valid: bool, /// Total number of entries verified. pub entries_checked: u64, /// Verified… }` | Result of verifying the integrity of the entire ledger chain. | `src/ledger.rs` |
 | `MemVfs` | `{ files: RwLock<BTreeMap<PathBuf, Vec<u8>>>, dirs: RwLock<BTreeMap<PathBuf, ()>>, }` | In-memory VFS reference implementation used strictly for contract self-testing. | `src/contract_tests.rs` |
 | `MetricKey` | `{ /// Metric identifier (e.g. `lsm_commit_total`). pub name: String, /// Sorted label key-value pairs. pub labels: Vec<(String, String)>, }` | Key identifying a metric by name and sorted key-value labels. | `src/metrics.rs` |
 | `MetricSnapshot` | `{ /// Counter metrics (accumulated values). pub counters: BTreeMap<MetricKey, u64>, /// Gauge metrics (last recorded f64 values). pub gauges: BTreeMap<MetricKey,… }` | In-memory snapshot of all metrics collected by [`InMemoryMetricsSink`]. | `src/metrics.rs` |
@@ -2622,94 +2727,89 @@ pub trait VfsFile : Send + Sync {
 | `PluginCapability` | `{ /// Unique plugin name. pub name: &'static str, /// Plugin version tuple (major, minor, patch). pub version: (u32, u32, u32), /// Architecture ring in which th… }` | Capability descriptor for a plugin. | `src/plugin.rs` |
 | `PluginRegistry` | `{ active: BTreeMap<String, PluginCapability>, active_conflicts: BTreeMap<String, Vec<String>>, gate: Arc<dyn LicenseGate>, }` | Registry managing plugin activations, license gating, and dependency resolution. | `src/plugin.rs` |
 | `PrefixKey` | `{ /// Target model fingerprint. pub model: ModelFingerprint, /// SHA256/BLAKE3 hash of the tokenizer vocabulary. pub tokenizer_hash: [u8; 32], /// KV tensor memo… }` | Key identifying a model KV cache prefix structure. | `src/kv.rs` |
-| `PurgeCx` | `{ /// Budget limit or deadline in milliseconds. pub deadline_ms: u64, }` | Context passed into [`ErasureLayer::purge`] providing operational bounds and budgets. | `src/erasure.rs` |
-| `PurgeOutcome` | `{ /// Number of records or items successfully removed. pub purged_count: u64, /// Number of bytes freed or compacted. pub bytes_reclaimed: u64, }` | Outcome of a layer purge execution (SPEC §8.2, WP-3.1). | `src/erasure.rs` |
-| `PurgePermit` | `{ _token: Option<Arc<()>>, }` | RAII token guard representing an exclusive purge permit. | `src/barrier.rs` |
+| `PurgeCx` | `{ /// Identifier of the active erasure job. pub erasure_id: ErasureId, /// Deterministic clock source. pub clock: &'a dyn Clock, /// Cooperative cancellation sig… }` | Execution context passed to layer purgers. | `src/erasure.rs` |
+| `PurgeOutcome` | `{ /// Progress snapshot (`cursor == None` indicates layer completion). pub progress: LayerProgress, /// Units durably committed during this invocation. pub units… }` | Result of a resumable layer purge tick. | `src/erasure.rs` |
 | `PurgeStats` | `{ /// Anzahl physisch bereinigter Einheiten. pub purged_units: u64, /// Anzahl freigegebener Bytes. pub bytes_freed: u64, }` | Statistiken über bereinigte Einheiten. | `src/scanner/layer.rs` |
-| `RangeSet` | `{ ranges: Vec<(KeyBuf, KeyBuf)>, }` | Set of key ranges or tokens included in an erasure ledger entry. | `src/ledger.rs` |
 | `ReportSignature` | `{ /// Signer identifier (u8: 0 = internal, 1 = operator / HSM). pub signer_id: SignerId, /// Base64url-encoded signature string without padding (RFC 4648 §5, SPE… }` | Digital signature over canonical report bytes (SPEC F.10). | `src/report_signer.rs` |
 | `RequestId` | `(tuple/unit)` | Unique identifier for an inference request within a process. | `src/attention.rs` |
+| `ResolvedScope` | `{ /// Unique erasure job identifier. pub id: ErasureId, /// Target kind classification. pub target_kind: TargetKind, /// Canonical key scope rules. pub keys: Key… }` | Fully resolved erasure plan shared across the kernel and all storage layers. | `src/erasure.rs` |
 | `RoleBinding` | `{ /// The role assigned to the entity in the hyperedge. pub role: RoleId, /// The bound entity. pub entity: EntityId, }` | Binding of an entity to a specific role within an n-ary hyperedge. | `src/graph.rs` |
 | `RoleId` | `(tuple/unit)` | — | `src/graph.rs` |
 | `RopeConfig` | `{ /// Base frequency. pub base: f32, /// Optional frequency scaling factor. pub scaling: Option<f32>, }` | Rotary position embedding (RoPE) configuration. | `src/kv.rs` |
 | `ScanSession` | `{ layer: WitnessLayer, target: ScanTarget, technique: ScanTechnique, scanned: u64, remaining: u64, control_matches: u64, unit_hashes: Vec<[u8; 32]>, }` | Laufende Scan-Session zur kontrollierten Erzeugung eines `LayerWitness`. | `src/scanner/session.rs` |
 | `ScanTarget` | `{ /// Bezeichner des Scan-Ziels (z. B. Tenant, Collection, Path). pub target_id: String, /// BLAKE3 Hash des Scan-Ziels. pub target_hash: [u8; 32], }` | Zielbeschreibung des Scans inklusive Hash. | `src/scanner/layer.rs` |
-| `Scanner` | `{ _state: PhantomData<State>, }` | Residue scanner type passed to [`ErasureLayer::witness`]. Must be purely read-only (PO-05). | `src/erasure.rs` |
-| `SealCtx` | `{ /// Epoch sequence or slot identifier. pub epoch: u64, }` | Sealing context containing metadata and epoch tokens for envelope creation. | `src/keys.rs` |
+| `SealCtx` | `{ /// Epoch sequence or slot identifier. pub epoch: u64, }` | Sealing context containing metadata and epoch tokens for envelope creation. | `src/seal.rs` |
+| `SealReceipt` | `{ /// Job identifier. pub id: ErasureId, /// Achieved guarantee level (downgraded if any layer is `NotMeasured`). pub guarantee: Guarantee, /// Documented except… }` | Receipt returned by [`ErasureKernel::seal`]. | `src/erasure.rs` |
 | `SeededRng` | `{ state: AtomicU64, }` | A fast, deterministic 64-bit pseudorandom number generator using SplitMix64 with atomic state transitions (`AtomicU64`). Lock-free and thread-safe wi… | `src/rng.rs` |
-| `Seq` | `(tuple/unit)` | Monotonic sequence number for transactions and gate markers. | `src/gate.rs` |
 | `SequentialIdGen` | `{ next: AtomicU64, }` | A thread-safe ID generator that produces monotonically increasing 64-bit IDs. Wraps around safely on integer overflow (`u64::MAX` -> `0`) via atomic… | `src/id_gen.rs` |
 | `StorageStats` | `{ /// Number of SSTable segments. pub num_segments: usize, /// Total size of all SSTables in bytes. pub total_size_bytes: u64, /// Total size of memtables in byt… }` | Statistics for the storage engine. | `src/storage.rs` |
 | `SystemClock` | `{ start_instant: Instant, }` | Standard production implementation of [`Clock`] backed by [`SystemTime`] and [`Instant`]. | `src/clock.rs` |
 | `TextIndexStats` | `{ /// Total number of documents indexed. pub num_documents: usize, /// Total number of tokens across all documents. pub num_tokens: usize, /// Estimated memory u… }` | Statistics for a text index. | `src/text_index.rs` |
-| `Timestamp` | `(tuple/unit)` | Discrete point in time measured in epoch milliseconds or nanoseconds. | `src/ledger.rs` |
 | `VectorIndexStats` | `{ /// Number of active (non-deleted) vectors. pub num_vectors: usize, /// Estimated memory usage in bytes. pub memory_usage_bytes: usize, /// Number of HNSW laye… }` | Statistics for a vector index. | `src/vector_index.rs` |
 | `VfsOpenOptions` | `{ /// Opens the file with read access. pub read: bool, /// Opens the file with write access. pub write: bool, /// Creates a new file if it does not exist. pub cr… }` | Options configuring how a file is opened via [`Vfs::open`]. | `src/vfs.rs` |
 
-### Öffentliche Datentypen — Enums (20)
+### Öffentliche Datentypen — Enums (21)
 
 | Enum | Varianten | Beschreibung | Datei |
 |---|---|---|---|
+| `DiscardRule` | `/// Version must be retained (e.g. `Open` or `Restricted`). Keep, /// Version is erased within the active scope and may be physically dropped. MayDrop,` | Discard rule for compaction and flush operations. | `src/gate.rs` |
+| `DocScope` | `/// Explicit set of document IDs within a collection. Set { /// Tenant ID. tenant: TenantId, /// Collection name without internal prefix. collection: String, /// Sorted set of document IDs. docs: BTr…` | Document-level scope for secondary indices (text, vector, graph). | `src/erasure.rs` |
 | `EgressDecision` | `/// Request is permitted to leave without modification. Allow, /// Request is permitted but payload must be redacted or sanitized. Redact(String), /// Request is denied. Deny(String),` | Egress evaluation decision. | `src/policy.rs` |
 | `EmbeddingError` | `/// Provider is unreachable or unavailable. #[error("Provider unavailable: {0}")] Unavailable(String), /// Computation failed during embedding generation. #[error("Embedding failed: {0}")] Computatio…` | Error types encountered during embedding operations. | `src/embedding.rs` |
-| `EraseTarget` | `/// Target a specific key or document identifier prefix. KeyRange { /// Lower key bound inclusive. start: Vec<u8>, /// Upper key bound exclusive. end: Vec<u8>, }, /// Target a discrete set of documen…` | Target of an erasure request specifying what needs to be erased. | `src/erasure.rs` |
 | `FeatureRing` | `/// Fast ring (open source core). Fast, /// Sovereign ring (enterprise data sovereignty). Sovereign, /// Compliance ring (strict auditability and regulatory rules). Compliance,` | Feature-Ring gemäß Spec §15. | `src/license.rs` |
-| `FileKind` | `/// SSTable data file. SSTable, /// Write-Ahead-Log (WAL) file. Wal, /// Inverted index segment. TextSegment, /// Vector HNSW segment. VectorSegment, /// General auxiliary file. Auxiliary,` | Kind of file managed by [`FileKeyring`] (SPEC §8.2, D-85). | `src/keys.rs` |
-| `GateDecision` | `/// Key or boundary is open for reading. Open, /// Key or boundary has been erased. Access must be blocked immediately. Erased, /// Key or boundary is temporarily restricted (e.g. pending gate sequen…` | Gate decision for point queries or file boundaries (SPEC §4.2, §11.3). | `src/gate.rs` |
+| `GateDecision` | `/// Key or document is open for reading. Open, /// Key or document is temporarily restricted (e.g. pending gate sequence); never discard. Restricted, /// Key or document has been erased. Access must…` | Gate decision for point queries and document lookups. | `src/gate.rs` |
 | `GraphMutationError` | `/// Lock acquisition timed out during concurrent mutation. #[error("Lock acquisition timed out: {0}")] LockAcquisitionTimeout(String), /// Duplicate hyperedge ID provided. #[error("Duplicate hyperedg…` | Error variants for graph mutation operations. | `src/graph.rs` |
-| `KeyBound` | `/// Exact key match boundary. Exact(KeyBuf), /// Unbounded lower boundary. UnboundedLower, /// Unbounded upper boundary. UnboundedUpper,` | Boundary key used for compaction or range scanning. | `src/gate.rs` |
-| `KeyCoverage` | `/// Layer maintains full key separation and slot-zeroing capability. Full, /// Layer holds keys unlinked from the main vault hierarchy. Unlinked, /// Layer maintains no direct key slots (relies entir…` | Key coverage capability of a layer (SPEC §8.2, D-69). | `src/erasure.rs` |
+| `IoClass` | `/// Foreground user queries and writes (highest priority). Interactive, /// Background physical erasure. Erase, /// Background LSM compaction. Compaction,` | I/O scheduling class for budget arbitration. | `src/erasure.rs` |
+| `KeyPattern` | `/// Matches any key starting with the given byte prefix. Prefix(Vec<u8>), /// Matches only the exact byte sequence. Exact(Vec<u8>),` | Pattern matching raw storage keys in a [`KeyScope`]. | `src/erasure.rs` |
 | `LicenseError` | `/// No valid activation found for the requested feature ring. #[error("no valid activation found for feature ring {0:?}")] NotActivated(FeatureRing), /// Activation signature verification failed. #[e…` | Fehlerklasse für Lizenz-/Aktivierungsprüfung — crate-lokal, an der Grenze in `ContextraError` konvertierbar (P6-konform, siehe Spec §17). | `src/license.rs` |
 | `ObservedPhase` | `/// Read-gate is established; all future reads will see target as erased. Gated, /// Physical purge and verification complete. Completed, /// Access restriction policy is activated (D-116). Restricte…` | Observed lifecycle phase of an erasure operation (SPEC D-118). | `src/observer.rs` |
 | `ObserverError` | `/// Delivery failed due to transient network or backend error. #[error("transient delivery failure: {0}")] Transient(String), /// Delivery rejected permanently by the receiver. #[error("permanent del…` | Error returned by an [`ErasureObserver`] during notification delivery (SPEC D-118). | `src/observer.rs` |
 | `PluginError` | `/// Dependency cycle or unresolvable missing dependency detected among plugins. #[error("dependency cycle detected among plugins: {0:?}")] DependencyCycle(Vec<String>), /// Conflicting plugins reques…` | Errors during plugin registration, activation, or dependency resolution. | `src/plugin.rs` |
-| `RangeGate` | `/// Range contains erased data: records may be safely discarded. ContainsErased, /// Range is restricted: records must never be discarded until release. RestrictedNeverDiscard, /// Entire range is co…` | Decision variant for range operations during compaction (SPEC §4.2, I-18). | `src/gate.rs` |
+| `PressureHint` | `/// Normal load. Normal, /// Elevated load; background work should throttle. Elevated, /// Critical load; `Erase` and `Compaction` pause while `Interactive` continues. Critical,` | System I/O pressure signal for cooperative throttling. | `src/erasure.rs` |
+| `RangeGate` | `/// Entire prefix range is open for reading. EntirelyOpen, /// Prefix range contains both open and blocked keys; per-key checks required. Partial, /// Entire prefix range is blocked; scan can short-c…` | Gate decision for a prefix or range scan. | `src/gate.rs` |
 | `ScanTechnique` | `/// Direkter struktureller Scan. Structural, /// Scan über entschlüsselte Ansicht. DecryptedView, /// Index-Introspektion. IndexIntrospection, /// Nadel-Scan (Needle Scan). NeedleScan, /// Schicht wu…` | Angewandte Methode/Technik während der Verifikation. | `src/scanner/layer.rs` |
 | `SignerError` | `/// Signing key unavailable or corrupted. #[error("signing key unavailable: {0}")] KeyUnavailable(String), /// Hardware security module or external signature provider error. #[error("external signer…` | Error class for report signing operations (SPEC D-130, 7.5). | `src/report_signer.rs` |
-| `TargetKind` | `/// Single document erasure. Document, /// Subject-level erasure (all documents belonging to a subject). Subject, /// Collection-level erasure. Collection, /// Tenant-level erasure. Tenant, /// Docum…` | Target kind indicating which hierarchy level was targeted (SPEC D-118, P13). | `src/observer.rs` |
 | `VectorDeleteMode` | `/// Synchronous graph repair during vector deletion. SynchronousRepair, /// Asynchronous background graph repair during vector deletion. BackgroundRepair,` | Vector deletion mode for vector index maintenance (§15). | `src/license.rs` |
+| `Verdict` | `/// Keys matching this pattern are included in the erasure scope. In, /// Keys matching this pattern are excluded from the erasure scope. Out,` | Scope inclusion verdict for a [`KeyPattern`]. | `src/erasure.rs` |
 | `VerifiedVia` | `/// Read bypassed page cache via Direct I/O (`O_DIRECT` or `F_NOCACHE`). Direct, /// Read performed after page cache eviction hint (`posix_fadvise(POSIX_FADV_DONTNEED)`). CacheDropped, /// Read perfo…` | Method via which medium verification was performed (SPEC D-113). | `src/vfs.rs` |
 | `WitnessLayer` | `/// LSM Memtable LsmMemtable, /// SsTable Dateien über alle Level SsTableAllLevels, /// HNSW Vektorgraph-Index HnswIndex, /// Write-Ahead-Log Segmente WalAllSegments, /// Compressed Sparse Row Graph…` | Identifikator für die physische Storage-Schicht. | `src/scanner/layer.rs` |
 
-### Typ-Aliase (4)
+### Typ-Aliase (3)
 
 | Alias | Definition | Beschreibung |
 |---|---|---|
 | `BoxFuture` | `type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>` | Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible. |
 | `BoxStream` | `type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> + Send + 'a>>` | Type alias for a pinned, heap-allocated `Stream` that is `Send` and dyn-compatible. |
 | `SignerId` | `type SignerId= u8` | Signer ID per SPEC F.10 (0 = internal/derived K_sign, 1 = operator signer). |
-| `Timestamp` | `type Timestamp= u64` | Type representing a millisecond or microsecond timestamp (SPEC D-118). |
 
-### Konstanten (1)
+### Konstanten (3)
 
 | Konstante | Typ | Beschreibung |
 |---|---|---|
+| `MAX_BYTES` | `usize` | Maximum total pattern byte length permitted in a single [`KeyScope`] (1 MiB). |
+| `MAX_RULES` | `usize` | Maximum number of rules permitted in a single [`KeyScope`]. |
 | `MAX_SCAN_MERGE_ACCUMULATOR` | `usize` | Harte Obergrenze für die Anzahl distinkter Keys, die eine StorageEngine- Implementierung während eines einzelnen scan()/scan_prefix_bounded()-Aufrufs… |
 
-### Öffentliche Funktionen (82)
+### Öffentliche Funktionen (73)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
-| `pub fn new(token: Option<Arc<()>>) -> Self` | Creates a new `BarrierShared` token. | `src/barrier.rs` |
-| `pub fn new(token: Option<Arc<()>>) -> Self` | Creates a new `BarrierExclusive` token. | `src/barrier.rs` |
-| `pub fn new(token: Option<Arc<()>>) -> Self` | Creates a new `CompactionPermit` token. | `src/barrier.rs` |
-| `pub fn new(token: Option<Arc<()>>) -> Self` | Creates a new `PurgePermit` token. | `src/barrier.rs` |
 | `pub fn new() -> Self` | Creates a new [`SystemClock`] using the current [`Instant`] as the monotonic baseline. | `src/clock.rs` |
 | `pub fn assert_attention_exporter_contract<T: AttentionExporter>(t: &T, req: RequestId)` | Verifies that [`AttentionExporter`] methods can be invoked. | `src/conformance.rs` |
 | `pub fn assert_checkpoint_contract<T: Checkpoint>(t: &T, tx: TxId, state: &WorkflowState)` | Verifies that [`Checkpoint`] methods can be invoked in generic contexts. | `src/conformance.rs` |
 | `pub async fn assert_checkpoint_coordinator_contract<T: CheckpointCoordinator>( t: &T, tx: TxId, metadata: serde_json::Value, )` | Verifies that [`CheckpointCoordinator`] methods can be invoked in generic contexts. | `src/conformance.rs` |
 | `pub fn assert_egress_policy_contract<T: crate::policy::EgressPolicy>( t: &T, ctx: &RequestContext, payload: &str, )` | Verifies dynamic object-safety and evaluation conformance of [`crate::policy::EgressPolicy`]. | `src/conformance.rs` |
 | `pub fn assert_embedding_contract< T: EmbeddingProvider + LlmTextGeneratorStreaming + TextEmbeddingEngine + LlmTextGenerator + TextGenerator, >( t: &T, tenant: TenantId, seg: &[ContextSegment], )` | Verifies that [`EmbeddingProvider`], [`LlmTextGeneratorStreaming`], [`LlmTextGenerator`], and [`TextGenerator`] can be invoked. | `src/conformance.rs` |
-| `pub fn assert_erasure_layer_contract<E: crate::erasure::ErasureLayer>( e: &E, target: &crate::erasure::EraseTarget, scope: &crate::erasure::LayerScope, )` | Verifies that [`crate::erasure::ErasureLayer`] methods can be invoked. | `src/conformance.rs` |
+| `pub fn assert_erasure_contract< E: crate::erasure::ErasureLayer, K: crate::erasure::ErasureKernel, >( e: &E, k: &K, scope: &crate::erasure::ResolvedScope, cx: &crate::erasure::PurgeCx<'_>, req: &crate::erasure::EraseRequest, id: crate::ErasureId, )` | Verifies that [`crate::erasure::ErasureLayer`] and [`crate::erasure::ErasureKernel`] methods can be invoked. | `src/conformance.rs` |
 | `pub fn assert_graph_index_contract<T: GraphIndex + CommunityResolver>( t: &T, tx: TxId, e1: EntityId, e2: EntityId, )` | Verifies that [`GraphIndex`] and [`CommunityResolver`] methods can be invoked. | `src/conformance.rs` |
-| `pub fn assert_keys_contract<S: crate::keys::RecordSealer, K: crate::keys::FileKeyring>( s: &S, k: &K, file_id: &crate::keys::FileId, ctx: &crate::keys::SealCtx, key: &crate::gate::KeyBuf, )` | Verifies that [`crate::keys::RecordSealer`] and [`crate::keys::FileKeyring`] methods can be invoked. | `src/conformance.rs` |
-| `pub fn assert_ledger_contract<L: crate::ledger::LedgerSink>(l: &L)` | Verifies that [`crate::ledger::LedgerSink`] methods can be invoked. | `src/conformance.rs` |
+| `pub fn assert_ledger_contract< L: crate::ledger::LedgerSink, A: crate::ledger::LedgerAnchor, >( l: &L, a: &A, draft: crate::ledger::LedgerDraft, head: &crate::ledger::LedgerHead, )` | Verifies that [`crate::ledger::LedgerSink`] and [`crate::ledger::LedgerAnchor`] methods can be invoked. | `src/conformance.rs` |
 | `pub fn assert_license_contract<T: LicenseGate>(t: &T, ring: FeatureRing)` | Verifies that [`LicenseGate`] methods can be invoked. | `src/conformance.rs` |
 | `pub fn assert_lifecycle_contract< T: GroundingValidator + ResponseGroundingValidator + ContextPreparer, >( t: &T, chunks: &[ContextChunk], assessment: &GroundingAssessment, budget: &TokenBudget, )` | Verifies that [`GroundingValidator`], [`ResponseGroundingValidator`], and [`ContextPreparer`] can be invoked. | `src/conformance.rs` |
 | `pub fn assert_observability_contract<T: DriftStatusProvider>(t: &T)` | Verifies that [`DriftStatusProvider`] methods can be invoked. | `src/conformance.rs` |
 | `pub fn assert_purger_contract<T: Purger>(t: &T, ctx: &RequestContext, target: &ScanTarget)` | Verifies that [`Purger`] methods can be invoked. | `src/conformance.rs` |
-| `pub fn assert_read_gate_contract<G: crate::gate::ReadGate>( g: &G, b: &crate::gate::KeyBound, r: &crate::gate::KeyRange, k: &crate::gate::KeyBuf, )` | Verifies that [`crate::gate::ReadGate`] methods can be invoked in generic contexts. | `src/conformance.rs` |
+| `pub fn assert_read_gate_contract<G: crate::gate::ReadGate>( g: &G, raw_key: &[u8], seq: crate::Seq, tenant: TenantId, doc: DocId, )` | Verifies that [`crate::gate::ReadGate`] methods can be invoked in generic contexts. | `src/conformance.rs` |
 | `pub fn assert_reranker_contract<T: Reranker>(t: &T, results: &[RerankResult])` | Verifies that [`Reranker`] methods can be invoked. | `src/conformance.rs` |
+| `pub fn assert_seal_contract<S: crate::seal::RecordSealer>( s: &S, ctx: &crate::seal::SealCtx, key: &[u8], scope: &crate::erasure::KeyScope, )` | Verifies that [`crate::seal::RecordSealer`] methods can be invoked under `stage2`. | `src/conformance.rs` |
 | `pub fn assert_storage_engine_contract<T: StorageEngine>( t: &T, key: &[u8], val: &[u8], tx: TxId, )` | Verifies that [`StorageEngine`] methods can be invoked. | `src/conformance.rs` |
 | `pub fn assert_text_index_contract<T: TextIndex + SegmentSynthesizer>(t: &T)` | Verifies that [`SegmentSynthesizer`] methods can be invoked. | `src/conformance.rs` |
 | `pub async fn assert_vector_index_contract<T: VectorIndex + HybridSearchProvider>( t: &T, doc: DocId, )` | Verifies that [`VectorIndex`] and [`HybridSearchProvider`] methods can be invoked. | `src/conformance.rs` |
@@ -2728,23 +2828,16 @@ pub trait VfsFile : Send + Sync {
 | `pub fn new(chunk_id: u64, text: &'a str) -> Self` | Creates a new `ContextSegment` with default optional metadata set to `None`. | `src/embedding.rs` |
 | `pub fn with_fingerprint(mut self, fingerprint: &'a ModelFingerprint) -> Self` | Builder method to set the model fingerprint. | `src/embedding.rs` |
 | `pub fn with_rope_offset(mut self, offset: usize) -> Self` | Builder method to set the RoPE offset. | `src/embedding.rs` |
-| `pub fn affected_units(&self) -> &[u64]` | Returns affected units count. | `src/erasure.rs` |
-| `pub fn as_bytes(&self) -> &[u8` | Returns a slice of raw bytes. | `src/erasure.rs` |
-| `pub fn new(scope_id: [u8; 16], affected_units: Vec<u64>) -> Self` | Creates a new `LayerScope` with specific units. | `src/erasure.rs` |
-| `pub fn scope_id(&self) -> &[u8` | Returns the unique scope ID. | `src/erasure.rs` |
-| `pub fn as_bytes(&self) -> &[u8` | Returns raw bytes slice. | `src/gate.rs` |
-| `pub fn contains(&self, key: &KeyBuf) -> bool` | Returns `true` if `key` falls within `[start, end)`. | `src/gate.rs` |
+| `pub fn bytes(&self) -> &[u8]` | Returns the underlying pattern bytes. | `src/erasure.rs` |
+| `pub fn compute_plan_hash( target: &EraseTarget, keys: &KeyScope, docs: &[DocScope], unprovenanced: u64, ) -> [u8` | Computes the canonical BLAKE3 `plan_hash` for an erasure plan (WP-02 §5). Format: `BLAKE3(b"ctx-erase-plan-v1" || target.canonical_bytes()… | `src/erasure.rs` |
+| `pub fn contains(&self, raw_key: &[u8]) -> bool` | Evaluates whether `raw_key` belongs to this scope. | `src/erasure.rs` |
+| `pub fn could_overlap_range(&self, min: &[u8], max: &[u8]) -> bool` | Conservative range overlap test for SSTable `[min, max]` key envelopes. False positives are permitted; false negatives are forbidden. | `src/erasure.rs` |
+| `pub fn matches(&self, raw_key: &[u8]) -> bool` | Returns `true` if `raw_key` matches this pattern. | `src/erasure.rs` |
+| `pub fn new(mut rules: Vec<(KeyPattern, Verdict)>) -> Result<Self, ErasureError>` | Constructs a validated, canonically sorted and deduplicated [`KeyScope`]. # Fehler Liefert [`ErasureError::InvalidTarget`], wenn die Regela… | `src/erasure.rs` |
+| `pub fn new( id: ErasureId, target_kind: TargetKind, target: &EraseTarget, keys: KeyScope, mut docs: Vec<DocScope>, unprovenanced: u64, ) -> Self` | Creates a [`ResolvedScope`] and computes its canonical [`Self::plan_hash`]. | `src/erasure.rs` |
+| `pub fn rules(&self) -> &[(KeyPattern, Verdict)]` | Returns the canonically sorted rules slice. | `src/erasure.rs` |
 | `pub fn new(role: RoleId, entity: EntityId) -> Self` | Creates a new `RoleBinding`. | `src/graph.rs` |
 | `pub fn new(start: u64) -> Self` | Creates a new [`SequentialIdGen`] starting at `start`. | `src/id_gen.rs` |
-| `pub fn as_bytes(&self) -> &[u8]` | Returns a reference to the raw secret bytes. | `src/keys.rs` |
-| `pub fn file_id(&self) -> FileId` | Associated file ID. | `src/keys.rs` |
-| `pub fn new(raw: Vec<u8>, file_id: FileId) -> Self` | Creates a new `FileKey`. | `src/keys.rs` |
-| `pub fn new(payload: Vec<u8>) -> Self` | Creates a new envelope. | `src/keys.rs` |
-| `pub fn payload(&self) -> &[u8]` | Returns payload bytes. | `src/keys.rs` |
-| `pub fn compute_chained( commitment: [u8; 32], range_set: RangeSet, gated_seq: Seq, completed_at: Timestamp, prev_hash: [u8; 32], ledger_mac: [u8; 32], ) -> Self` | Constructs a ledger entry and computes its chained BLAKE3 hash from the prior entry hash. | `src/ledger.rs` |
-| `pub fn new(ranges: Vec<(KeyBuf, KeyBuf)>) -> Self` | Creates a range set from intervals. | `src/ledger.rs` |
-| `pub fn ranges(&self) -> &[(KeyBuf, KeyBuf)]` | Returns the slice of ranges. | `src/ledger.rs` |
-| `pub fn verify_chain_hash(&self, prev_hash: &[u8; 32]) -> bool` | Verifies the entry's chain hash against the supplied previous block hash. | `src/ledger.rs` |
 | `pub fn ring(&self) -> FeatureRing` | Returns the authorized [`FeatureRing`]. | `src/license.rs` |
 | `pub fn new(name: impl Into<String>, labels: &[(&str, &str)]) -> Self` | Creates a new normalized [`MetricKey`]. | `src/metrics.rs` |
 | `pub fn new() -> Self` | Creates a new empty [`InMemoryMetricsSink`]. | `src/metrics.rs` |
@@ -2770,6 +2863,8 @@ pub trait VfsFile : Send + Sync {
 | `pub fn scanned(&self) -> u64` | Gibt die Anzahl der während der Verifikation gescannten Einheiten zurück. | `src/scanner/witness.rs` |
 | `pub fn technique(&self) -> &ScanTechnique` | Gibt die angewandte Scantechnik zurück. | `src/scanner/witness.rs` |
 | `pub fn witness_layer(&self) -> &WitnessLayer` | Gibt die gescannte Storage-Schicht als &WitnessLayer zurück. | `src/scanner/witness.rs` |
+| `pub fn new(payload: Vec<u8>) -> Self` | Creates a new envelope. | `src/seal.rs` |
+| `pub fn payload(&self) -> &[u8]` | Returns payload bytes. | `src/seal.rs` |
 | `pub fn read_only() -> Self` | Creates options configured for read-only access. | `src/vfs.rs` |
 | `pub fn write_create() -> Self` | Creates options configured for write-only access, creating the file if missing. | `src/vfs.rs` |
 
@@ -2796,7 +2891,7 @@ pub mod ssi;
 pub mod tx_buffer;
 pub use contextra_types::{ error::{self, ContextraError, Result}, tombstone::{SeqBitTombstone, TombstoneSemanticsCheck}, types::{self, DocId, TenantId, TxId, TOMBSTONE_BIT}, };
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
-pub use snapshot::{SnapshotGuard, SnapshotRegistry};
+pub use snapshot::{ Blocker, ReapPolicy, Reaped, RegistrationId, RegistrationKind, RevokeReport, SnapshotGuard, SnapshotRegistry, SnapshotRegistryConfig, };
 pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
 pub use tx_buffer::{IndexOp, TxBuffer};
 ```
@@ -2831,26 +2926,32 @@ pub trait StagedOpSize {
 }
 ```
 
-### Öffentliche Datentypen — Structs (10)
+### Öffentliche Datentypen — Structs (15)
 
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
+| `Blocker` | `{ /// Sequenznummer der blockierenden Registrierung. pub seq: u64, /// Art der Registrierung (`Guard` oder `Pin`). pub kind: RegistrationKind, /// Zugeordneter M… }` | Beschreibung einer aktiven Registrierung, die ein Gate-Ende oder eine Kompaktierung blockiert. Enthält ausschließlich Metadaten (Sequenz, Art, option… | `src/snapshot.rs` |
 | `PruningBlockerInfo` | `{ /// Kleinste Sequenznummer, die noch unbereinigt im Register liegt. pub min_unpruned_seq: u64, /// Aktueller `pruned_through`-Wasserstand. pub pruned_through_s… }` | Diagnoseinformationen über aktive Snapshots oder Sequenznummern, die das Pruning im Validator blockieren. Wird erzeugt, wenn der Speicher für Commit-… | `src/ssi.rs` |
 | `ReadSet` | `{ /// Zuordnung von gelesenen Schlüsseln (Bytefolgen) zur zugehörigen Snapshot-Sequenznummer. keys: AHashMap<Vec<u8>, u64>, /// Zuordnung von Scan-Präfixen zu de… }` | Protokolliert gelesene Einzelschlüssel, Präfixe und deren jeweilige Snapshot-Sequenznummer für SSI. ### Speicher- und Risikoanalyse: Der Speicherbeda… | `src/ssi.rs` |
+| `ReapPolicy` | `{ /// Maximales Alter eines `Pin`, bevor er bereinigt wird. pub max_pin_age: Duration, /// Optionales maximales Alter eines `Guard` (`None` = Guards nie bereinig… }` | Altersrichtlinie für [`SnapshotRegistry::reap_expired`]. Standardwerte: `max_pin_age = 7 Tage`, `max_guard_age = None` (lebende Guards werden standar… | `src/snapshot.rs` |
+| `Reaped` | `{ /// Sequenznummer der bereinigten Registrierung. pub seq: u64, /// Art der bereinigten Registrierung (`Guard` oder `Pin`). pub kind: RegistrationKind, /// Zuge… }` | Berichtseintrag für eine durch [`SnapshotRegistry::reap_expired`] entfernte Registrierung. # Fehler / # Crash Reiner Werttyp ohne fehlbare Operatione… | `src/snapshot.rs` |
+| `RegistrationId` | `(tuple/unit)` | Eindeutige, nicht wiederverwendete Kennung einer Registrierung (Guard oder Pin). Wird pro [`SnapshotRegistry`] strikt monoton ab `1` vergeben und bes… | `src/snapshot.rs` |
+| `RevokeReport` | `{ /// Anzahl der widerrufenen Registrierungen (`Guard` und `Pin`) des Mandanten. pub revoked: usize, /// Anzahl mandantenloser Registrierungen im Bereich, die be… }` | Bericht über einen mandantenbezogenen Snapshot-Entzug durch [`SnapshotRegistry::revoke_covering_report`]. Enthält ausschließlich Zähler und Sequenznu… | `src/snapshot.rs` |
 | `SeqLogEntry` | `{ /// Eindeutige Kennung des Dokuments. pub doc_id: DocId, /// Logische Sequenznummer, bei der dieser Dokumenteintrag eingefügt wurde. pub insert_seq: u64, /// L… }` | Ein versionierter Protokolleintrag für die Snapshot-Isolation (`_at`-Familie). Jeder Eintrag repräsentiert die Lebensspanne einer Dokumentversion: vo… | `src/seq_log.rs` |
 | `SequenceLog` | `{ /// Liste aller historischen Dokumentversionen. entries: Vec<SeqLogEntry>, /// Zuordnung von gepinnter Sequenznummer zu Liste von Erstellungs-Zeitstempeln (in… }` | Verwaltet das chronologische Sequenz-Protokoll und Sichtbarkeitsfilter für Indexstrukturen. ### Funktionsweise: `SequenceLog` speichert alle Einfüge-… | `src/seq_log.rs` |
 | `SequenceLogSsiValidator` | `{ committed_writes: Arc<RwLock<CommittedWrites>>, sequence_log: Option<Arc<RwLock<SequenceLog>>>, snapshot_registry: Option<Arc<SnapshotRegistry>>, pruned_throug… }` | Referenz-Implementierung von [`SsiValidator`] auf Basis von [`SequenceLog`] und In-Memory-Commit-Tracking. Arbeitet vollständig ohne Festplatten-I/O… | `src/ssi.rs` |
-| `SnapshotGuard` | `{ registry: Arc<SnapshotRegistry>, seq_no: u64, created_at: Option<u64>, tenant: Option<TenantId>, }` | RAII-Guard (Resource Acquisition Is Initialization) für einen aktiven Lese-Snapshot. Hält einen Snapshot in der [`SnapshotRegistry`] gepinnt, solange… | `src/snapshot.rs` |
-| `SnapshotRegistry` | `{ active: Mutex<BTreeMap<u64, Vec<SnapshotMeta>>>, min_active_seqno: AtomicU64, clock: Arc<dyn Clock>, config: SnapshotRegistryConfig, }` | Zentrale Registrierung für aktive Lese-Snapshots im System. | `src/snapshot.rs` |
+| `SnapshotGuard` | `{ registry: Arc<SnapshotRegistry>, id: RegistrationId, seq_no: u64, tenant: Option<TenantId>, revoked: Arc<AtomicBool>, }` | RAII-Guard (Resource Acquisition Is Initialization) für einen aktiven Lese-Snapshot. Hält einen Snapshot in der [`SnapshotRegistry`] gepinnt, solange… | `src/snapshot.rs` |
+| `SnapshotRegistry` | `{ active: Mutex<BTreeMap<u64, Vec<SnapshotMeta>>>, min_active_seqno: AtomicU64, next_id: AtomicU64, clock: Arc<dyn Clock>, config: SnapshotRegistryConfig, }` | Zentrale Registrierung für aktive Lese-Snapshots im System. ### Synchronisationsstrategie: - `active`: Ein sortierter `BTreeMap`, geschützt durch ein… | `src/snapshot.rs` |
 | `SnapshotRegistryConfig` | `{ /// Maximale Anzahl gleichzeitig aktiver Snapshots (Default: 100.000). pub max_active_snapshots: usize, /// Maximales Alter eines Snapshots (Default: 300 s / 5… }` | Konfigurationsoptionen für die [`SnapshotRegistry`]. | `src/snapshot.rs` |
 | `TxBuffer` | `{ shards: Vec<RwLock<TxShard<T>>>, key_shards: Vec<RwLock<KeyShard>>, tx_timeout: Duration, config: TxBufferConfig, global_staged_bytes: AtomicUsize, clock: Arc<… }` | Verwaltet gepufferte Transaktionen, deren Staging-Operationen und ReadSets. ### Synchronisations- und Sperrstrategie: Jeder Shard besitzt ein eigenes… | `src/tx_buffer.rs` |
 | `TxBufferConfig` | `{ /// Timeout-Dauer, nach der verwaiste (inaktive) Transaktionen automatisch abgeräumt werden. pub tx_timeout: Duration, /// Maximale empfohlene Anzahl gleichzei… }` | Konfigurationsoptionen für den [`TxBuffer`]. | `src/tx_buffer.rs` |
 
-### Öffentliche Datentypen — Enums (2)
+### Öffentliche Datentypen — Enums (3)
 
 | Enum | Varianten | Beschreibung | Datei |
 |---|---|---|---|
 | `IndexOp` | `/// Einfügen eines Dokuments mit Nutzlast (z. B. Einbettungs-Vektoren oder Schlüssel-Werte). Insert { /// Kennung des Dokuments. doc_id: DocId, /// Assoziierte Nutzdaten. data: T, }, /// Entfernen ei…` | Eine im Puffer vorgemerkte Operation auf einem Index. | `src/tx_buffer.rs` |
+| `RegistrationKind` | `/// RAII-geschützter Lese-Snapshot ([`SnapshotGuard`]). Guard, /// Dauerhaft gepinnte Sequenznummer (z. B. für Checkpoints oder Backups). Pin,` | Art einer aktiven Snapshot-Registrierung in der [`SnapshotRegistry`]. # Fehler / # Crash Reiner Aufzählungstyp ohne fehlbare Operationen. | `src/snapshot.rs` |
 | `SeqLogChange` | `/// Einfügen eines Dokuments zu einer bestimmten Sequenznummer. Insert { /// Eindeutige Kennung des Dokuments. doc_id: DocId, /// Sequenznummer des Einfügens. seq: u64, }, /// Löschen eines Dokuments…` | Repräsentiert eine historische Änderung (Einfügen oder Löschen) im Sequenz-Log für Delta-Replays. Wird von Abfragen wie [`SequenceLog::changes_since`… | `src/seq_log.rs` |
 
 ### Konstanten (8)
@@ -2866,7 +2967,7 @@ pub trait StagedOpSize {
 | `DEFAULT_SHARD_COUNT` | `usize` | Standardanzahl an Partitionen (Shards) im Transaktionspuffer (64 Shards). |
 | `STAGING_ENTRY_OVERHEAD_BYTES` | `usize` | Fester Speicher-Overhead pro gepufferter Operation (32 Bytes). |
 
-### Öffentliche Funktionen (136)
+### Öffentliche Funktionen (140)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
@@ -2898,8 +2999,10 @@ pub trait StagedOpSize {
 | `pub fn with_clock(clock: Arc<dyn Clock>) -> Self` | Erstellt ein neues, leeres `SequenceLog` mit einer benutzerdefinierten Implementierung des [`Clock`]-Ports (z. B. `ManualClock` in determin… | `src/seq_log.rs` |
 | `pub fn with_max_pin_duration(mut self, duration: Duration) -> Self` | Konfiguriert die maximale Pin-Dauer als Fluent-Builder und gibt `self` zurück. | `src/seq_log.rs` |
 | `pub fn with_time_fn<F>(time_fn: F) -> Self where F: Fn() -> u64 + Send + Sync + 'static,` | Erstellt ein `SequenceLog` mit einer anpassbaren Zeitstempel-Closure (State-Passing per `Fn() -> u64`). | `src/seq_log.rs` |
+| `pub fn blockers_up_to(&self, up_to: u64, limit: usize) -> Vec<Blocker>` | Liefert alle aktiven Registrierungen mit `seq <= up_to`, aufsteigend nach Sequenz. Höchstens `limit` Einträge. Dient der Gate-Ende-Prüfung… | `src/snapshot.rs` |
 | `pub fn clock(&self) -> &Arc<dyn Clock>` | Liefert eine Referenz auf den aktiven Zeitport ([`Clock`]). | `src/snapshot.rs` |
 | `pub fn config(&self) -> SnapshotRegistryConfig` | Liefert die aktuelle Konfiguration der Registry. | `src/snapshot.rs` |
+| `pub fn is_revoked(&self) -> bool` | Prüft, ob dieser Snapshot durch [`SnapshotRegistry::revoke_covering`] oder [`SnapshotRegistry::reap_expired`] widerrufen wurde (`Acquire`-L… | `src/snapshot.rs` |
 | `pub fn longest_active_pin(&self) -> Option<(u64, Duration)>` | Findet den am längsten aktiven Snapshot bezogen auf die aktuelle Systemuhr. | `src/snapshot.rs` |
 | `pub fn longest_active_pin_at(&self, now_nanos: u64) -> Option<(u64, Duration)>` | Findet den am längsten aktiven Snapshot bezüglich des Nanosekunden-Zeitstempels `now_nanos`. Liefert `Some((seq_no, duration))` oder `None`… | `src/snapshot.rs` |
 | `pub fn min_active_seqno(&self) -> u64` | Liefert die kleinste Sequenznummer aller derzeit aktiven Snapshots (`u64::MAX`, falls keine aktiv). | `src/snapshot.rs` |
@@ -2909,15 +3012,17 @@ pub trait StagedOpSize {
 | `pub fn oldest_active_snapshot(&self) -> Option<u64>` | Liefert die Untergrenze für Garbage Collection (älteste aktive Snapshot-Sequenz). Entspricht dem Vertrag für Store-Kompaktierung und ist äq… | `src/snapshot.rs` |
 | `pub fn pin(&self, seq_no: u64)` | Dauerhaftes Pinnen einer Sequenznummer (z. B. für SAOS Checkpoints oder Backups), ohne einen RAII-Guard zu halten. Muss manuell über [`Snap… | `src/snapshot.rs` |
 | `pub fn pin_at(&self, seq_no: u64, at_nanos: u64)` | Pinnt eine Sequenznummer zu einem expliziten Zeitstempel. | `src/snapshot.rs` |
-| `pub fn pin_for_tenant(&self, tenant: TenantId, seq_no: u64)` | Pinnt eine Sequenznummer zu einem spezifischen Zeitstempel. Pinnt eine Sequenznummer für einen Mandanten bezogen auf die aktuelle Systemuhr. | `src/snapshot.rs` |
+| `pub fn pin_for_tenant(&self, tenant: TenantId, seq_no: u64)` | Pinnt eine Sequenznummer für einen Mandanten bezogen auf die aktuelle Systemuhr. | `src/snapshot.rs` |
 | `pub fn pin_for_tenant_at(&self, tenant: TenantId, seq_no: u64, at_nanos: u64)` | Pinnt eine Sequenznummer für einen Mandanten zu einem expliziten Zeitstempel. | `src/snapshot.rs` |
-| `pub fn reap_expired_pins(&self, max_pin_duration: Duration) -> Vec<u64>` | Bereinigt alle überalterten Snapshot-Pins bezogen auf die aktuelle Uhrzeit. | `src/snapshot.rs` |
-| `pub fn reap_expired_pins_at(&self, max_pin_duration: Duration, now_nanos: u64) -> Vec<u64>` | Bereinigt und entfernt alle aktiven Snapshot-Pins, die älter als `max_pin_duration` sind. ### Ablauf: 1. Berechne Schwellenwert in Nanoseku… | `src/snapshot.rs` |
+| `pub fn reap_expired(&self, policy: ReapPolicy, now_nanos: u64) -> Vec<Reaped>` | Bereinigt überalterte Registrierungen gemäß [`ReapPolicy`] bezogen auf `now_nanos`. - `Pin`-Registrierungen älter als `policy.max_pin_age`… | `src/snapshot.rs` |
+| `pub fn reap_expired_pins(&self, max_pin_duration: Duration) -> Vec<u64>` | Bereinigt alle überalterten Snapshot-Pins und Guards bezogen auf die aktuelle Uhrzeit (ohne Bericht, nur Tests; neue Aufrufer nutzen [`Snap… | `src/snapshot.rs` |
+| `pub fn reap_expired_pins_at(&self, max_pin_duration: Duration, now_nanos: u64) -> Vec<u64>` | Bereinigt und entfernt alle aktiven Snapshot-Pins und Guards, die älter als `max_pin_duration` sind (ohne Bericht, nur Tests; neue Aufrufer… | `src/snapshot.rs` |
 | `pub fn register(self: &Arc<Self>, seq_no: u64) -> SnapshotGuard` | Registriert einen Lese-Snapshot und liefert einen RAII-Guard ([`SnapshotGuard`]) zurück. Sobald der Guard den Gültigkeitsbereich verlässt (… | `src/snapshot.rs` |
 | `pub fn register_at(self: &Arc<Self>, seq_no: u64, at_nanos: u64) -> SnapshotGuard` | Registriert einen Lese-Snapshot mit explizitem Zeitstempel ohne Mandantenzuordnung. | `src/snapshot.rs` |
 | `pub fn register_for_tenant(self: &Arc<Self>, tenant: TenantId, seq_no: u64) -> SnapshotGuard` | Registriert einen Lese-Snapshot für einen bestimmten Mandanten. | `src/snapshot.rs` |
 | `pub fn register_for_tenant_at( self: &Arc<Self>, tenant: TenantId, seq_no: u64, at_nanos: u64, ) -> SnapshotGuard` | Registriert einen Lese-Snapshot für einen bestimmten Mandanten mit explizitem Zeitstempel. | `src/snapshot.rs` |
-| `pub fn revoke_covering( &self, tenant: TenantId, range: std::ops::Range<u64>, gated_seq: u64, ) -> usize` | Widerruft Snapshots im Bereich für einen Mandanten (Tenant-Isolation). | `src/snapshot.rs` |
+| `pub fn revoke_covering( &self, tenant: TenantId, range: std::ops::Range<u64>, gated_seq: u64, ) -> usize` | Widerruft alle Registrierungen (`Guard` und `Pin`) des Mandanten im Bereich `seq ∈ range ∧ seq <= gated_seq`. Mandantenlose Registrierungen… | `src/snapshot.rs` |
+| `pub fn revoke_covering_report( &self, tenant: TenantId, range: std::ops::Range<u64>, gated_seq: u64, ) -> RevokeReport` | Widerruft alle Registrierungen (`Guard` und `Pin`) des Mandanten im Bereich `seq ∈ range ∧ seq <= gated_seq` und liefert einen [`RevokeRepo… | `src/snapshot.rs` |
 | `pub fn seq_no(&self) -> u64` | Liefert die Sequenznummer, die durch diesen Guard geschützt wird. | `src/snapshot.rs` |
 | `pub fn set_config(&mut self, config: SnapshotRegistryConfig)` | Setzt eine neue Konfiguration für die Registry. | `src/snapshot.rs` |
 | `pub fn tenant(&self) -> Option<TenantId>` | Liefert den zugeordneten Mandanten, falls angegeben. | `src/snapshot.rs` |
@@ -2925,7 +3030,7 @@ pub trait StagedOpSize {
 | `pub fn try_register_at(self: &Arc<Self>, seq_no: u64, at_nanos: u64) -> Result<SnapshotGuard>` | Versucht, einen Lese-Snapshot zu einem expliziten Nanosekunden-Zeitstempel zu registrieren. | `src/snapshot.rs` |
 | `pub fn try_register_for_tenant( self: &Arc<Self>, tenant: TenantId, seq_no: u64, ) -> Result<SnapshotGuard>` | Versucht, einen Lese-Snapshot für einen bestimmten Mandanten zu registrieren. | `src/snapshot.rs` |
 | `pub fn try_register_for_tenant_at( self: &Arc<Self>, tenant: Option<TenantId>, seq_no: u64, at_nanos: u64, ) -> Result<SnapshotGuard>` | Versucht, einen Lese-Snapshot für einen Mandanten zu einem expliziten Zeitstempel zu registrieren. | `src/snapshot.rs` |
-| `pub fn unpin(&self, seq_no: u64)` | Hebt einen dauerhaften Pin auf und bereinigt den minimal aktiven Wasserstand. | `src/snapshot.rs` |
+| `pub fn unpin(&self, seq_no: u64)` | Hebt die älteste [`RegistrationKind::Pin`]-Registrierung für `seq_no` auf und aktualisiert den minimal aktiven Wasserstand. Berührt niemals… | `src/snapshot.rs` |
 | `pub fn with_clock(clock: Arc<dyn Clock>) -> Self` | Erstellt eine neue Snapshot-Registry mit benutzerdefiniertem [`Clock`]-Port (für Tests). | `src/snapshot.rs` |
 | `pub fn with_clock_and_config(clock: Arc<dyn Clock>, config: SnapshotRegistryConfig) -> Self` | Erstellt eine neue Snapshot-Registry mit benutzerdefiniertem [`Clock`]-Port und Konfiguration. | `src/snapshot.rs` |
 | `pub fn with_time_fn<F>(time_fn: F) -> Self where F: Fn() -> u64 + Send + Sync + 'static,` | Erstellt eine neue Snapshot-Registry mit einer Zeitstempel-Closure (State-Passing per `Fn() -> u64`). | `src/snapshot.rs` |
@@ -3043,7 +3148,7 @@ pub use durability::{durable_flush_dir, durable_flush_file, write_all_durable, D
 pub use error::{Error, Result};
 pub use mlock::{ apply_dont_dump, mem_lock, mem_lock_typed, mem_lock_with_policy, mem_unlock, MemLockPolicy, };
 pub use mmap::{mmap_readonly, SealedFile, SealedMap, SealedReadOnly, Unsealed};
-pub use posix::{ensure_fd_limit, reopen_and_dup2, set_fd_limit};
+pub use posix::{available_space, ensure_fd_limit, reopen_and_dup2, set_fd_limit};
 pub use vault::{LockedRegions, VaultBuffer};
 ```
 
@@ -3072,7 +3177,7 @@ pub use vault::{LockedRegions, VaultBuffer};
 |---|---|---|
 | `Result` | `type Result<T> = std::result::Result<T, Error>` | Spezifischer Result-Typ für `contextra-sys`. |
 
-### Öffentliche Funktionen (53)
+### Öffentliche Funktionen (54)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
@@ -3110,6 +3215,7 @@ pub use vault::{LockedRegions, VaultBuffer};
 | `pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap>` | Erstellt eine unveränderliche Nur-Lese-Speicherabbildung (Read-Only Memory Map) für eine geöffnete Datei. | `src/mmap.rs` |
 | `pub fn new_verified(file: File, expected_len: u64) -> io::Result<Self>` | Erstellt eine versiegelte Dateireferenz nach erfolgreicher Integritäts- und Prüfsummenverifikation. | `src/mmap.rs` |
 | `pub fn verified_len(&self) -> u64` | Gibt die verifizierte Dateilänge in Bytes zurück. | `src/mmap.rs` |
+| `pub fn available_space(path: &Path) -> std::io::Result<u64>` | Ermittelt den für unprivilegierte Prozesse verfügbaren freien Speicherplatz (in Bytes) auf dem Dateisystem, das `path` (bzw. dessen existie… | `src/posix.rs` |
 | `pub fn ensure_fd_limit(min_fds: u64) -> bool` | Stellt sicher, dass das weiche Limit für offene Dateideskriptoren (`RLIMIT_NOFILE`) mindestens `min_fds` beträgt. | `src/posix.rs` |
 | `pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Result<()>` | Öffnet den Pfad `path` mit den angegebenen POSIX-Flags (z. B. `O_RDONLY`) und ersetzt atomar `target_fd` via `dup2`. | `src/posix.rs` |
 | `pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::Result<()>` | Fallback für Nicht-Linux-Systeme, auf denen `reopen_and_dup2` nicht unterstützt wird. | `src/posix.rs` |
@@ -3265,6 +3371,7 @@ pub mod dek;
 pub mod deletion_proof;
 pub mod ed25519_proof;
 pub mod error;
+pub mod erasure_root;
 pub mod kdf;
 pub mod kv_cipher;
 pub mod kv_segment;
@@ -3275,7 +3382,7 @@ pub mod wal_completeness;
 pub mod wal_crypto;
 pub use aead::*;
 pub use dek::{derive_dek, AncestorSalts, Dek, UnitKey};
-pub use kdf::hkdf_expand;
+pub use kdf::{hkdf_expand, ledger_mac};
 pub use secret::SecretKey;
 pub use audit_chain::{ compute_record_commitment, AuditChain, AuditChainEntry, AuditChainHeadSignature, DataClass, EncryptedCommitmentSalt, };
 pub use crypto::KeyManager as CryptoKey;
@@ -3283,6 +3390,7 @@ pub use crypto::KeyManager;
 pub use deletion_proof::{ CustodyLevel, DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope, LayerCleanupProof, SigningKeyHandle, };
 pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
+pub use erasure_root::{ErasureLabel, ErasureRoot};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
 pub use kv_cipher::KvSegmentCipher;
 pub use kv_cipher::{EncryptedKvLayer, KvCipher, ModelFingerprint};
@@ -3352,7 +3460,7 @@ pub trait LayerWitnessExt {
 }
 ```
 
-### Öffentliche Datentypen — Structs (46)
+### Öffentliche Datentypen — Structs (47)
 
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
@@ -3373,6 +3481,7 @@ pub trait LayerWitnessExt {
 | `EncryptedRecordPayload` | `{ /// Unique identifier for the record. pub record_id: u64, /// Shred group identifier to which this record belongs. pub group_id: u64, /// AES-256-GCM-SIV encry… }` | Container for an encrypted record payload under Envelope Encryption. | `src/kv_shredding.rs` |
 | `EncryptedSegmentPayload` | `{ /// Encrypted KV layer container from contextra-crypto. Zeroized on drop. pub layer: EncryptedKvLayer, }` | Encrypted layer representation stored inside a KvSegment when encryption is active. | `src/kv_segment/segment.rs` |
 | `EncryptedWal` | `{ kms: Arc<dyn KmsProvider>, }` | Encrypted WAL chunk provider that handles transparent encryption/decryption of WAL payloads via KMS. # Invariants - Delegates encryption and key mana… | `src/wal_crypto.rs` |
+| `ErasureRoot` | `(tuple/unit)` | Zeroizing root key material. It cannot be cloned, formatted with its bytes, or serialized. | `src/erasure_root.rs` |
 | `EvictionWorker` | `{ sender: parking_lot::Mutex<mpsc::Sender<EvictionCommand>>, handle: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>, }` | Hintergrund-Worker für die Speicherfreigabe nach dem Least-Recently-Used-Prinzip (LRU). | `src/kv_segment/eviction_worker.rs` |
 | `GraphRepairAttestation` | `{ /// Document ID whose neighborhood pointers were repaired. pub doc_id: DocId, /// Verified confirmation that no ghost pointers remain. pub verified_no_ghost_po… }` | Attestation confirming synchronous neighborhood graph repair for vector deletions. | `src/deletion_proof/types.rs` |
 | `GroupKek` | `(tuple/unit)` | Group Key Encryption Key (KEK) - 256 bits, zeroized on drop. | `src/kv_shredding.rs` |
@@ -3403,7 +3512,7 @@ pub trait LayerWitnessExt {
 | `WalEntrySnapshot` | `{ pub tx_id: u64, pub seq_no: u64, pub op_type: u8, // 0: Put, 1: Delete, 2: TxEnd pub key: Vec<u8>, pub value: Vec<u8>, pub checksum: [u8; 32], pub prev_hmac: [… }` | Immutable snapshot of a WAL entry used for cryptographic integrity verification. # Invariants - Captures entry fields (`seq_no`, `op_type`, `key`, `v… | `src/wal_crypto.rs` |
 | `WalHmac` | `{ mac: Hmac<Sha256>, }` | Stateful wrapper around HMAC-SHA256 initialized with WAL domain separation. # Invariants - Initialized with `b"contextra-wal-v1"` domain separation s… | `src/wal_crypto.rs` |
 
-### Öffentliche Datentypen — Enums (13)
+### Öffentliche Datentypen — Enums (14)
 
 | Enum | Varianten | Beschreibung | Datei |
 |---|---|---|---|
@@ -3413,6 +3522,7 @@ pub trait LayerWitnessExt {
 | `DeletionLayer` | `/// In-memory memtable records cleared. LsmMemtable, /// Persistent SSTable files purged across all LSM levels. SsTableAllLevels, /// HNSW graph nodes and tombstone references purged. HnswIndex, ///…` | Layer-explizite Coverage-Deklaration. | `src/deletion_proof/types.rs` |
 | `DeletionProofError` | `/// Ungültiger Ed25519 VerifyingKey (32 Bytes). #[error("invalid verifying key: {0}")] InvalidVerifyingKey(String), /// Ungültige Ed25519 Signatur (64 Bytes) oder Fehlschlag bei der Verifikation. #[e…` | Fehlerzustände bei der Verifikation von Ed25519-Attestationsbeweisen. | `src/ed25519_proof.rs` |
 | `DeletionScope` | `/// Individual document deletion. Document { /// DocId of target document. doc_id: DocId, /// TenantId of owning tenant. tenant_id: TenantId, }, /// Collection-wide deletion. Collection { /// Collect…` | Target scope for physical deletion. | `src/deletion_proof/types.rs` |
+| `ErasureLabel` | `/// Authentication key for the erasure ledger. LedgerMac, /// Encryption key for the erasure journal. ErasureLog, /// Key used to wrap a salt vault generation. VaultEpoch, /// Per-job key, with the e…` | Domain separating labels for keys derived from an erasure root. | `src/erasure_root.rs` |
 | `ExcludedScope` | `/// Wissen in Zusammenfassungen die als LLM-Fine-Tuning-Input dienten. ConsolidatedAndDistilled, /// LLM-Modellparameter (arXiv:2505.16831 — Unlearning Isn't Deletion). LlmParameterMemory,` | Explizite Nicht-Abdeckung — maschinenlesbar für Audit-Systeme. | `src/deletion_proof/types.rs` |
 | `KvDeleteMode` | `TombstoneOnly, CryptoShred,` | Mode specifying KV segment deletion behavior. INVARIANTE : Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für -Segmente möglich, niemals… | `src/kv_segment/delete_mode.rs` |
 | `RevocationTarget` | `/// Shredding Group ID (z. B. für `KeyRegistry`) Group(u64), /// Key Encryption Key (KEK) Identifier Kek(String), /// Data Encryption Key (DEK) Identifier Dek(String), /// Specific Record Identifier…` | Das Ziel eines Widerruf-Eintrags im Log (Group ID, KEK ID, DEK ID oder Record ID). | `src/revocation_log.rs` |
@@ -3455,7 +3565,7 @@ pub trait LayerWitnessExt {
 | `REC_AAD` | `&[u8]` | — |
 | `WRAP_AAD` | `&[u8]` | — |
 
-### Öffentliche Funktionen (197)
+### Öffentliche Funktionen (200)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
@@ -3506,7 +3616,7 @@ pub trait LayerWitnessExt {
 | `pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self>` | Creates a new KeyManager by deriving a key from a passphrase using HKDF-SHA256. # WARNHINWEIS Diese Funktion nutzt HKDF-SHA256 und setzt vo… | `src/crypto.rs` |
 | `pub fn try_new_random_salt(passphrase: &str) -> Result<(Self, [u8` | Creates a new KeyManager with a cryptographically secure random salt. | `src/crypto.rs` |
 | `pub fn try_new_with_kdf(passphrase: &str, header: &KdfHeader) -> Result<Self>` | Creates a new KeyManager using Argon2id password-based key derivation. Nutzt Argon2id mit den im [`KdfHeader`] definierten Kostenparametern… | `src/crypto.rs` |
-| `pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek` | Derives a DEK using AncestorSalts and DocTag. | `src/dek.rs` |
+| `pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Result<Dek>` | Derives a DEK using AncestorSalts and DocTag. | `src/dek.rs` |
 | `pub fn expose_secret(&self) -> &[u8` | — | `src/dek.rs` |
 | `pub fn expose_secret(&self) -> &[u8` | — | `src/dek.rs` |
 | `pub fn new(bytes: [u8; 32]) -> Self` | — | `src/dek.rs` |
@@ -3549,11 +3659,14 @@ pub trait LayerWitnessExt {
 | `pub fn verify_deletion_proof_v3( verifying_key_bytes: &[u8; 32], proof_payload: &[u8], signature: &[u8; 64], ) -> Result<(), DeletionProofError>` | Verifiziert eine Ed25519-Signatur eines Version-3-Attestationsbeweises rein funktional. Diese Funktion benötigt keine Contextra-internen Zu… | `src/ed25519_proof.rs` |
 | `pub fn verifying_key(&self) -> &ed25519_dalek::VerifyingKey` | Gibt eine Referenz auf den Verifikationsschlüssel zurück. | `src/ed25519_proof.rs` |
 | `pub fn verifying_key_bytes(&self) -> [u8` | Gibt die 32-Byte-Repräsentation des öffentlichen Verifikationsschlüssels zurück. | `src/ed25519_proof.rs` |
+| `pub fn derive(&self, label: ErasureLabel, context: &[u8]) -> Result<SecretKey<32>>` | Derives a domain-separated key using HKDF-SHA256. # Errors Returns the KDF error if the root is invalid or HKDF expansion fails. # Crash sa… | `src/erasure_root.rs` |
+| `pub fn from_bytes(bytes: [u8; 32]) -> Self` | Wraps root material supplied by the caller. | `src/erasure_root.rs` |
 | `pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self` | Helper to construct a `WalCorruption` error. | `src/error.rs` |
 | `pub fn derive_key_argon2id(passphrase: &str, header: &KdfHeader) -> Result<DerivedKey>` | Leitet einen kryptographisch starken Schlüssel mittels Argon2id aus einer Passphrase ab. # Ablauf der Argon2id-Schlüsselableitung: 1. Passp… | `src/kdf.rs` |
 | `pub fn from_bytes(bytes: &[u8]) -> Result<Self>` | Parst einen `KdfHeader` aus Binärdaten. Panic-Freiheit (total function) bei beliebigen Byte-Eingaben. | `src/kdf.rs` |
 | `pub fn generate_default() -> Result<Self>` | Erstellt einen neuen `KdfHeader` v1 mit zufälligem 32-Byte-Salt und OWASP-Standardparametern. | `src/kdf.rs` |
 | `pub fn hkdf_expand(prk: &[u8], info: &[u8], out: &mut [u8]) -> Result<()>` | HKDF-SHA256 expand. | `src/kdf.rs` |
+| `pub fn ledger_mac(key: &[u8], bytes: &[u8]) -> Result<[u8` | Computes an HMAC-SHA256 authentication tag for erasure ledger entries (WP-10 §11.1). | `src/kdf.rs` |
 | `pub fn new(m_cost_kib: u32, t_cost: u32, p_cost: u32) -> Result<Self>` | Erstellt neue `KdfParams` mit Validierung der Untergrenzen. | `src/kdf.rs` |
 | `pub fn new(params: KdfParams, salt: Vec<u8>) -> Result<Self>` | Erstellt einen `KdfHeader` v1 mit vorgegebenen Parametern und Salt. | `src/kdf.rs` |
 | `pub fn new_for_test(m_cost_kib: u32, t_cost: u32, p_cost: u32) -> Self` | Erstellt `KdfParams` mit kleineren Kostenparametern ausschließlich für Testzwecke. | `src/kdf.rs` |
@@ -3694,6 +3807,7 @@ pub mod fixed_hasher;
 pub mod partial_rebuild;
 pub mod quantize_rabitq;
 pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
+pub use hnsw::erasure::HnswErasure;
 pub use compute_pool::ComputePool;
 pub use contract::{ BlockTransform, Clock as ContractClock, DistanceFn, Error as ContractError, ExternalId, Index as ContractIndex, Maintain as ContractMaintain, Metric as ContractMetric, Result as ContractResult, Rng as ContractRng, ScoredPoint, };
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
@@ -3970,7 +4084,7 @@ pub trait Rng : Send + Sync {
 }
 ```
 
-### Öffentliche Datentypen — Structs (53)
+### Öffentliche Datentypen — Structs (54)
 
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
@@ -3995,6 +4109,7 @@ pub trait Rng : Send + Sync {
 | `HnswCompactStats` | `{ /// Anzahl physisch bereinigter Tombstones. pub purged_docs: usize, /// Anzahl verbliebener aktiver Dokumente. pub active_docs: usize, }` | Statistiken über den Kompaktierungsvorgang des HNSW-Vektorindex. | `src/hnsw/vector_index_impl.rs` |
 | `HnswConfig` | `{ /// Vector dimensionality. pub dimension: usize, /// Maximum number of elements. pub max_elements: usize, /// Number of connections per element (M parameter).… }` | — | `src/hnsw/config.rs` |
 | `HnswConfigBuilder` | `{ config: HnswConfig, }` | Builder for HnswConfig with resource limit enforcements to prevent OOM. | `src/hnsw/config.rs` |
+| `HnswErasure` | `{ index: Arc<HnswIndex>, scanner: HnswScanner, }` | HNSW participant in the erasure protocol. | `src/hnsw/erasure.rs` |
 | `HnswHeader` | `{ magic: u32, version: u16, dimension: u32, m: u32, metric: u8, quantized: u8, q_min: f32, // Legacy v1 field q_max: f32, // Legacy v1 field node_count: u64, ent… }` | The header of an HNSW persistent file. | `src/persistence/header.rs` |
 | `HnswHotCore` | `{ pub nodes: RwLock<Vec<HnswNode>>, #[cfg(not(feature = "docid-128"))] pub doc_to_node: RwLock<BTreeMap<u64, usize>>, #[cfg(feature = "docid-128")] pub doc_to_no… }` | — | `src/hnsw/types.rs` |
 | `HnswIndexCore` | `{ pub hot: HnswHotCore, pub cold: HnswColdCore, }` | The core implementation of the HNSW index. | `src/hnsw/types.rs` |
@@ -4076,7 +4191,7 @@ pub trait Rng : Send + Sync {
 | `SYSTEM` | `Self` | Transaktion 0 (System/Baseline). |
 | `TOMBSTONE_BIT` | `u64` | Bitmaske für Tombstone-Markierung in Sequenznummern. |
 
-### Öffentliche Funktionen (261)
+### Öffentliche Funktionen (262)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
@@ -4209,6 +4324,7 @@ pub trait Rng : Send + Sync {
 | `pub async fn search_adaptive_with_stats( &self, query: &[f32], k: usize, policy: &AdaptiveEfPolicy, filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>, ) -> Result<(Vec<ScoredDocument>, AdaptiveEfStats)>` | Performs an adaptive search (Ada-ef) returning scored documents along with execution statistics. | `src/hnsw/core_search.rs` |
 | `pub fn remove(&self, doc_id: DocId) -> Result<bool>` | O(1) Tombstone-Löschung gemäß VETO-F02 und INV-VEC-ZEROIZE-1. Markiert den Knoten deterministisch als gelöscht, nullt den Vektorspeicher im… | `src/hnsw/deletion.rs` |
 | `pub fn remove_with_repair(&mut self, id: &u64) -> Result<bool>` | Removes a document from the vector index by its 64-bit ID. Executes tombstone insertion, immediate slot zeroization (`INV-VEC-ZEROIZE-1`),… | `src/hnsw/deletion.rs` |
+| `pub fn new(index: Arc<HnswIndex>) -> Self` | Creates an erasure layer for an index. | `src/hnsw/erasure.rs` |
 | `pub fn hnsw_purger(index: Arc<HnswIndex>) -> Arc<dyn Purger>` | Erzeugt einen `Arc<dyn Purger>` für einen HNSW Index. | `src/hnsw/purge.rs` |
 | `pub fn new(index: Arc<HnswIndex>) -> Self` | Erzeugt einen neuen `HnswPurger`. | `src/hnsw/purge.rs` |
 | `pub fn has_residual(&self) -> bool` | Gibt an, ob noch irgendwelche Restspuren (ID, Vektorbytes, Kanten, Staging) existieren. | `src/hnsw/scanner.rs` |
@@ -4354,7 +4470,7 @@ pub trait Rng : Send + Sync {
 | **Zweck** | BM25/BM25F-Volltextindexierung und deutsche Kompositazerlegung. |
 | **Unsafe-Code** | Nein (`#![forbid(unsafe_code)]`) |
 | **Interne Abhängigkeiten** | `contextra-ports`, `contextra-types` |
-| **Externe Abhängigkeiten (Auswahl)** | `bincode`, `blake3`, `bytes`, `futures`, `itoa`, `parking_lot`, `regex`, `serde`, `serde_json`, `thiserror`, `tracing`, `unicode-segmentation` |
+| **Externe Abhängigkeiten (Auswahl)** | `bincode`, `blake3`, `bytes`, `futures`, `itoa`, `parking_lot`, `regex`, `serde`, `serde_json`, `thiserror`, `tokio`, `tracing`, `unicode-segmentation` |
 
 ### Modul- und Re-Export-Oberfläche (lib.rs)
 
@@ -4366,6 +4482,7 @@ pub mod traits;
 pub mod types;
 pub mod bm25;
 pub mod domain;
+pub mod erasure;
 pub mod inverted;
 pub mod morphology;
 pub mod posting_list;
@@ -4380,6 +4497,7 @@ pub use types::{DocId as LocalDocId, TextHit, MAX_SEARCH_K as LOCAL_MAX_SEARCH_K
 pub use bm25::{score_term_bm25f, FieldId, FieldWeight, BM25, BM25F};
 pub use domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
 pub use inverted::{ text_purger, text_scanner, BM25MorphIndex, InvertedIndex, Language, PurgeReport, TextPurger, TextScanner, };
+pub use erasure::{TextErasure, TextErasureConfig, TextTxSource};
 pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};
 pub use posting_list::{Posting, PostingList, ResidentPostingIndex};
 pub use stream::{Bm25CandidateStream, DEFAULT_STREAM_BATCH_SIZE};
@@ -4401,7 +4519,7 @@ pub use tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 | `bm25f` | `[]` |
 | `docid-128` | `[]` |
 
-### Schnittstellen — Public Traits (9)
+### Schnittstellen — Public Traits (10)
 
 **`Analyzer`** — *Trait für vollständige Textanalyse-Pipelines (`Tokenizer -> Filter* -> Stemmer`). Garantiert den identischen Ergebnisvertrag für Dokumenten-Indexierung und Abfrage.* (`src/tokenizer.rs`)
 
@@ -4493,6 +4611,17 @@ fn next_u64(&mut self) -> u64;
 }
 ```
 
+**`TextTxSource`** — *Liefert Transaktions-IDs; Commit und Rollback bleiben beim Storage-Port.* (`src/erasure.rs`)
+
+```rust
+pub trait TextTxSource : Send + Sync {
+fn begin<'a>(&'a self) -> BoxFuture<'a, Result<TxId>>;
+    fn rollback<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<()>>;
+    /// Registers posting-key version collapse after the commit sequence is known.
+    fn register_collapse<'a>(&'a self, keys: Vec<Vec<u8>>, seq: contextra_types::Seq) -> BoxFuture<'a, Result<()>>;
+}
+```
+
 **`TokenFilter`** — *Trait für Token-Filter in einer Analyse-Pipeline.* (`src/tokenizer.rs`)
 
 ```rust
@@ -4513,7 +4642,7 @@ pub trait Tokenizer : Send + Sync {
 }
 ```
 
-### Öffentliche Datentypen — Structs (38)
+### Öffentliche Datentypen — Structs (40)
 
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
@@ -4534,7 +4663,7 @@ pub trait Tokenizer : Send + Sync {
 | `GermanCompoundSplitter` | `{ /// Minimum component length for splitting. min_component_len: usize, /// Maximum decomposition depth (number of segments). max_depth: usize, /// Trie data str… }` | Deutscher Komposita-Zerleger basierend auf Dynamischer Programmierung und Fugenanalyse. # Funktionsweise & Algorithmus 1. **Eingebettetes Wörterbuch*… | `src/morphology/compound_splitter.rs` |
 | `GermanMorphTokenizer` | `{ splitter: Arc<crate::morphology::GermanCompoundSplitter>, }` | Deutscher Tokenizer mit morphologischer Zerlegung von Wortzusammensetzungen. | `src/tokenizer.rs` |
 | `IndexSnapshot` | `{ /// Opake, monotone Epochenmarke dieses Snapshots. pub epoch: Epoch, /// Invertiertes Wörterbuch mit sortierten Posting-Listen. pub postings: BTreeMap<String,… }` | Unveränderlicher Snapshot des Index für lock-freie, konsistente Lesezugriffe. | `src/memory_index.rs` |
-| `InvertedIndex` | `{ storage: Arc<S>, prefix: Vec<u8>, tokenizer: Arc<dyn Tokenizer>, pub(crate) total_docs: Arc<AtomicU64>, pub(crate) total_tokens: Arc<AtomicU64>, pub(crate) avg… }` | Persistenter invertierter Index über einer Kollektion im Storage-Backend. # Nebenläufigkeit & Sperrhierarchie: 1. `commit_lock` (`parking_lot::Mutex`… | `src/inverted/index_struct.rs` |
+| `InvertedIndex` | `{ storage: Arc<S>, prefix: Vec<u8>, namespace: String, tokenizer: Arc<dyn Tokenizer>, pub(crate) total_docs: Arc<AtomicU64>, pub(crate) total_tokens: Arc<AtomicU… }` | Persistenter invertierter Index über einer Kollektion im Storage-Backend. # Nebenläufigkeit & Sperrhierarchie: 1. `commit_lock` (`parking_lot::Mutex`… | `src/inverted/index_struct.rs` |
 | `KeyInspection` | `{ /// Ob der Schlüssel in den aktiven Dokumentlängen vorkommt. pub in_doc_lengths: bool, /// Ob der Schlüssel aktuell als Tombstone markiert ist. pub is_tombston… }` | Prüfergebnis einer Schlüssel-Inspektion (Feature `inspect`). | `src/memory_index.rs` |
 | `LegalDomainVocabulary` | `(tuple/unit)` | Deutsches Juristisches Fachvokabular zur Anbindung an [`DomainVocabulary`]. | `src/domain/legal_de.rs` |
 | `MedicalDomainVocabulary` | `(tuple/unit)` | Deutsches Medizinisches Fachvokabular zur Anbindung an [`DomainVocabulary`]. | `src/domain/medical_de.rs` |
@@ -4546,10 +4675,12 @@ pub trait Tokenizer : Send + Sync {
 | `PostingList` | `{ postings: Vec<Posting>, blocks: Vec<PostingBlockInfo>, }` | Zusammenhängende, nach DocId sortierte Posting-Liste für einen Begriff. | `src/posting_list.rs` |
 | `PurgeReport` | `{ /// Anzahl erfolgreich physisch gelöschter Einheiten. pub units_purged: u64, /// Anzahl fehlgeschlagener Einheiten während der Ausführung. pub units_failed: u6… }` | Detaillierter Ausführungsbericht eines Purge-Laufs mit Einheiten, freigegebenem Speicher und Fehlern. | `src/inverted/purge.rs` |
 | `ResidentPostingIndex` | `{ index: RwLock<BTreeMap<String, Arc<PostingList>>>, }` | Speicherresidenter Lese-Cache für Posting-Listen mit RCU-Verwaltung. | `src/posting_list.rs` |
+| `TextErasure` | `{ index: Arc<InvertedIndex<S>>, tx: Arc<dyn TextTxSource>, cfg: TextErasureConfig, gate: Arc<dyn ReadGate>, scanner: TextScanner<S>, erased_docs: RwLock<Arc<BTre… }` | ErasureLayer für genau einen Collection-Textindex. | `src/erasure.rs` |
+| `TextErasureConfig` | `{ /// Maximale Zahl Terme pro Transaktion. pub terms_per_tx: usize, /// Dictionary-Fallback, wenn der Forward-Index bereits entfernt wurde. pub fallback_dictiona… }` | Begrenzungen für Textindex-Purge-Ticks. | `src/erasure.rs` |
 | `TextHit` | `{ /// Eindeutige ID des Dokuments. pub doc_id: DocId, /// Berechneter BM25-Relevanz-Score. pub score: f32, }` | Ergebnisdokument mit Relevanz-Score für BM25-Suchen. | `src/types.rs` |
 | `TextIndexMetadata` | `{ /// Gesamtzahl der aktiven Dokumente im Index. pub total_docs: u64, /// Gesamtzahl aller indizierten Token über alle Dokumente. pub total_tokens: u64, /// Fest… }` | Konsolidierte Metadaten des Textindex zur persistenten Speicherung im Schlüssel `meta:stats`. | `src/inverted/types.rs` |
 | `TextPurger` | `{ index: Arc<InvertedIndex<S>>, }` | Physischer Purger für den Textindex zur Bereinigung von Storage und Metadaten. | `src/inverted/purge.rs` |
-| `TextScanner` | `{ index: Arc<InvertedIndex<S>>, target: Arc<parking_lot::Mutex<Option<ScanTarget>>>, }` | Scanner zur Feststellung verbleibender Restdaten im Textindex. | `src/inverted/scanner.rs` |
+| `TextScanner` | `{ index: Arc<InvertedIndex<S>>, target: Arc<parking_lot::Mutex<Option<ScanTarget>>>, erasure_scope: Arc<parking_lot::RwLock<Option<(BTreeSet<DocId>, BTreeSet<Str… }` | Scanner zur Feststellung verbleibender Restdaten im Textindex. | `src/inverted/scanner.rs` |
 | `Token` | `{ /// Normalisierter Termwert. pub term: String, /// Start-Byte-Offset im Originaltext (auf gültiger Zeichengrenze). pub start_offset: usize, /// End-Byte-Offset… }` | Repräsentiert ein strukturiertes Token aus der Textanalyse-Pipeline. Ein Token umfasst den extrahierten Term, Byte-Offsets in den Originaltext (stets… | `src/tokenizer.rs` |
 | `TokenReductionMetrics` | `{ /// Anzahl ursprünglicher Token vor der morphologischen Zerlegung. pub original_tokens: usize, /// Anzahl resultierender Token nach Zerlegung von Komposita. pu… }` | Metriken zur Erfassung der Token-Expansions- und Zerlegungswirkung. | `src/morphology/metrics.rs` |
 | `Trie` | `{ root: TrieNode, }` | Präfixbaum (Trie) für schnelle O(m)-Wörterbuchabfragen (m = Wortlänge). | `src/morphology/trie.rs` |
@@ -4593,7 +4724,7 @@ pub trait Tokenizer : Send + Sync {
 | `MAX_TEXT_BYTES` | `usize` | Maximale Textgröße pro Dokument (10 MiB) zur Begrenzung von Speicherverbrauch und DoS-Schutz. |
 | `POSTING_LIST_V2_MAGIC` | `&[u8` | Magische Bytes für das kompakte V2-Posting-Listen-Format (`PL\x02\x00`). |
 
-### Öffentliche Funktionen (120)
+### Öffentliche Funktionen (123)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
@@ -4609,6 +4740,7 @@ pub trait Tokenizer : Send + Sync {
 | `pub fn get_legal_protected_terms() -> &'static [&'static str]` | Liefert den statischen Slice aller juristischen geschützten Begriffe. | `src/domain/legal_de.rs` |
 | `pub fn get_medical_compound_stems() -> &'static [&'static str]` | Liefert den statischen Slice aller medizinischen Komposita-Wortstämme. | `src/domain/medical_de.rs` |
 | `pub fn get_medical_protected_terms() -> &'static [&'static str]` | Liefert den statischen Slice aller medizinischen geschützten Fachbegriffe. | `src/domain/medical_de.rs` |
+| `pub fn new(index: Arc<InvertedIndex<S>>, tx: Arc<dyn TextTxSource>, cfg: TextErasureConfig, gate: Arc<dyn ReadGate>) -> Self` | Erzeugt eine Schicht für einen Collection-Index. | `src/erasure.rs` |
 | `pub fn commit_lock(&self) -> &parking_lot::Mutex<()>` | Accessor for single-writer commit lock. | `src/inverted/index_struct.rs` |
 | `pub async fn compact_terms(&self, tx: TxId) -> Result<u64>` | Kompaktiert Terme und bereinigt verwaiste Metadaten im Inverted Index (Maintenance / Compaction API). Führt eine vollständige Bereinigung v… | `src/inverted/index_struct.rs` |
 | `pub async fn delete_document(&self, tx: TxId, doc_id: DocId) -> Result<()>` | Löscht ein Dokument logisch aus dem Index und markiert alle Terme mit Tombstones. | `src/inverted/index_struct.rs` |
@@ -4618,6 +4750,7 @@ pub trait Tokenizer : Send + Sync {
 | `pub fn prefix(&self) -> &[u8]` | Accessor for index storage prefix bytes. | `src/inverted/index_struct.rs` |
 | `pub async fn resolve_tombstones(&self, tx: TxId) -> Result<u64>` | — | `src/inverted/index_struct.rs` |
 | `pub async fn rewrite_posting_lists(&self, tx: TxId, terms: &[&str]) -> Result<usize>` | Schreibt Postinglisten für gegebene Terme neu (Maintenance / Rewrite API). Konsolidiert unkomprimierte und komprimierte Batches, bereinigt… | `src/inverted/index_struct.rs` |
+| `pub fn scope_keys_for(&self, doc_id: DocId) -> Vec<Vec<u8>>` | Exact storage keys owned by `doc_id` (`dl:` document length, `fw:` forward index). Used by the erase resolver; postings (`i:`/`plb:`) are p… | `src/inverted/index_struct.rs` |
 | `pub async fn search_bm25( &self, query: &str, k: usize, max_seq: Option<u64>, ) -> Result<Vec<(DocId, f32)>>` | Führt eine Volltextsuche mit BM25 aus. | `src/inverted/index_struct.rs` |
 | `pub async fn search_bm25_at( &self, query: &str, k: usize, max_seq: Option<u64>, ) -> Result<Vec<(DocId, f32)>>` | Führt eine Volltextsuche mit BM25 zu einer bestimmten MVCC-Snapshot-Sequenznummer aus. | `src/inverted/index_struct.rs` |
 | `pub fn storage(&self) -> &Arc<S>` | Accessor for underlying storage engine. | `src/inverted/index_struct.rs` |
@@ -4687,6 +4820,7 @@ pub trait Tokenizer : Send + Sync {
 | `pub fn remove(&self, doc_id: DocId) -> Self` | Entfernt ein Posting per Copy-On-Write (RCU). | `src/posting_list.rs` |
 | `pub fn remove_posting_from_terms(&self, terms: &[String], doc_id: DocId)` | Entfernt eine Dokument-ID aus den Posting-Listen mehrerer Begriffe per RCU. | `src/posting_list.rs` |
 | `pub fn remove_terms(&self, terms: &[String])` | Entfernt die angegebenen Begriffe aus dem Cache (z. B. bei Rollback). | `src/posting_list.rs` |
+| `pub fn terms(&self) -> Vec<String>` | Snapshot of resident dictionary terms for witness scans and scoped cache eviction. | `src/posting_list.rs` |
 | `pub fn upsert(&self, posting: Posting) -> Self` | Fügt ein Posting per Copy-On-Write (RCU) ein oder aktualisiert einen bestehenden Eintrag. | `src/posting_list.rs` |
 | `pub fn upsert_posting(&self, term: &str, posting: Posting)` | Fügt ein einzelnes Posting per RCU (Copy-On-Write) in die Posting-Liste des Begriffs ein. | `src/posting_list.rs` |
 | `pub fn is_exhausted(&self) -> bool` | Prüft, ob der Stream vollständig erschöpft ist (keine gepufferten oder nachladbaren Elemente mehr). | `src/stream.rs` |
@@ -5695,7 +5829,9 @@ pub trait ConformalCalibrator {
 ```rust
 pub mod compaction;
 pub mod engine;
+pub mod erasure;
 pub mod fsync;
+pub mod io_budget;
 pub mod key_source;
 pub mod lsm;
 pub mod manifest;
@@ -5714,6 +5850,7 @@ pub use lsm::{ CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntry
 pub use manifest::{Manifest, ManifestEntry};
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
+pub use erasure::{BootReport, StoreErasureConfig, StoreErasureKernel};
 pub use io_seam::{RealFs, RealFsFile, StoreIo};
 ```
 
@@ -5780,6 +5917,9 @@ pub trait BlockCacheBackend : Send + Sync {
 
     /// Returns the capacity limit in bytes.
     fn capacity_bytes(&self) -> usize;
+
+    /// Evicts all cached blocks belonging to `file_id`.
+    fn evict_file(&self, file_id: u64);
 }
 ```
 
@@ -5985,7 +6125,7 @@ pub trait WalObserver : Send + Sync {
 }
 ```
 
-### Öffentliche Datentypen — Structs (50)
+### Öffentliche Datentypen — Structs (54)
 
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
@@ -5994,6 +6134,7 @@ pub trait WalObserver : Send + Sync {
 | `BlockBuilder` | `{ data: BytesMut, offsets: Vec<u32>, pub(super) block_size: usize, key_hashes: Vec<(u64, u64)>, v3_bloom: [u64; 4], format_version: u16, }` | A builder for SSTable data blocks (Format v4 default, supports v3). | `src/sstable/builder.rs` |
 | `BlockCache` | `{ shards: Vec<BlockCacheShard>, hash_builder: ahash::RandomState, hits: std::sync::atomic::AtomicU64, misses: std::sync::atomic::AtomicU64, }` | — | `src/sstable/block_cache.rs` |
 | `BloomFilter` | `{ pub(super) bits: Vec<u64>, pub(super) num_hashes: usize, pub(super) num_bits: usize, }` | SPECCED: Speichereffizienter Bloom-Filter für SSTable-Pre-Checks. Ziel: False-Positive-Rate p ≤ 0.01. Formel: m = -n * ln(p) / (ln(2)^2) ≈ 9.6 * n Ha… | `src/sstable/bloom.rs` |
+| `BootReport` | `{ /// `true`, wenn das Journal korrupt war und der Store im Fail-Closed-Modus gestartet ist. pub fail_closed: bool, /// Anzahl offener (nicht-terminaler) Aufträg… }` | Startbericht des Erasure-Kernels nach Recovery (§5.4). | `src/erasure/mod.rs` |
 | `CommitContext` | `{ pub tx_id: TxId, pub origin: WriteOrigin, pub durable: bool, }` | Context describing a committed transaction passed to observers. | `src/lsm/observer.rs` |
 | `CommitGuard` | `{ pub(super) _lock: &'a tokio::sync::MutexGuard<'a, ()>, }` | Proof that `commit_mutex` is currently held by the calling task. Can only be constructed while holding the mutex guard. | `src/lsm/guard.rs` |
 | `CommittedBatch` | `{ pub entries: Vec<WalEntryRef<'a>>, pub origin: WriteOrigin, }` | Batch of committed WAL entries passed to observers. | `src/lsm/observer.rs` |
@@ -6006,9 +6147,8 @@ pub trait WalObserver : Send + Sync {
 | `KvSegmentStore` | `{ segments: std::collections::BTreeMap<u64, KvSegment>, }` | Speicherbereich für KV-Segmente. | `src/kv/mod.rs` |
 | `LruBlockCacheBackend` | `{ state: RwLock<LruBlockCacheState>, }` | Standard strict-LRU block cache backend using `parking_lot::RwLock<LruCache>` with byte-based capacity. | `src/sstable/block_cache.rs` |
 | `LsmConfig` | `{ /// Path to the data directory. pub path: PathBuf, /// Maximum size of the memtable before flushing to disk. pub memtable_size_limit: usize, /// Maximum RAM us… }` | Configuration for the LSM storage engine. | `src/lsm/config.rs` |
-| `LsmPurger` | `{ // Felder bleiben für den Ersatz in WP-4 erhalten. #[allow(dead_code)] storage: Arc<LsmStorage>, #[allow(dead_code)] runtime: ScannerRuntime, }` | Purger für LSM Storage Engine. Gesperrt, siehe Modul-Dokumentation. | `src/scanner/purge.rs` |
-| `LsmState` | `{ pub(super) memtable: Arc<MemTable>, pub(super) immutable_memtables: Vec<Arc<MemTable>>, }` | — | `src/lsm/guard.rs` |
-| `LsmStorage` | `{ pub(super) config: LsmConfig, pub(super) key_manager: Option<Arc<KeyManager>>, pub(super) state: RwLock<LsmState>, /// SSTables stored separately for shared ac… }` | Primaere Schnittstelle fuer den LSM-Baum mit get, put, delete und scan. | `src/lsm/engine.rs` |
+| `LsmState` | `{ pub(crate) memtable: Arc<MemTable>, pub(crate) immutable_memtables: Vec<Arc<MemTable>>, }` | — | `src/lsm/guard.rs` |
+| `LsmStorage` | `{ pub(super) config: LsmConfig, pub(super) key_manager: Option<Arc<KeyManager>>, pub(super) state: Arc<RwLock<LsmState>>, /// SSTables stored separately for shar… }` | Primaere Schnittstelle fuer den LSM-Baum mit get, put, delete und scan. | `src/lsm/engine.rs` |
 | `Manifest` | `{ pub(super) path: PathBuf, pub(super) file: tokio::sync::Mutex<tokio::fs::File>, pub(super) _dir_lock: Option<DirLock>, pub(super) is_poisoned: AtomicBool, }` | — | `src/manifest/core.rs` |
 | `MemTable` | `{ /// Sharded storage: each shard holds a disjoint subset of keys. /// Shard selection is deterministic via `shard_for()`. shards: [MemTableShard; SHARD_COUNT],… }` | — | `src/memtable.rs` |
 | `MemtableScanner` | `{ storage: Arc<LsmStorage>, runtime: ScannerRuntime, }` | Scanner für die `LsmMemtable`-Schicht. | `src/scanner/memtable.rs` |
@@ -6028,11 +6168,15 @@ pub trait WalObserver : Send + Sync {
 | `SstableScanner` | `{ storage: Arc<LsmStorage>, runtime: ScannerRuntime, }` | Scanner für die `SsTableAllLevels`-Schicht. | `src/scanner/sstable.rs` |
 | `SstableStream` | `{ pub(super) reader: Arc<SstableReader>, pub(super) block_idx: usize, pub(super) entry_idx: usize, pub(super) current_block: Option<Bytes>, pub(super) num_offset… }` | — | `src/sstable/stream.rs` |
 | `StaticKeyMaterialSource` | `{ key_stream: std::sync::Arc<parking_lot::Mutex<Vec<u8>>>, }` | Fixed deterministic key material source for reproducible testing and fault simulation. | `src/key_source.rs` |
+| `StoreErasureConfig` | `{ /// Ablageverzeichnis für Journal und Pending-Delete-Liste (`<data_dir>/erasure`). pub dir: PathBuf, /// Optionaler Pfad für das Audit-Ledger (`None` = Profil… }` | Konfiguration für den [`StoreErasureKernel`] (§3.1). Besitzt bewusst kein `Default`, da `dir` explizit vom Datenpfad abgeleitet werden muss. | `src/erasure/mod.rs` |
+| `StoreErasureKernel` | `{ cfg: StoreErasureConfig, health: Arc<parking_lot::RwLock<crate::lsm::engine::StorageHealth>>, clock: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::Clock>>>,… }` | Zentraler Erasure-Kernel des `contextra-store` (Ring 1). Implementiert [`ports::ErasureKernel`]. | `src/erasure/mod.rs` |
 | `StoreIo` | `{ vfs: Arc<dyn Vfs>, }` | Central Store I/O abstraction (`StoreIo`) wrapping `Arc<dyn Vfs>`. | `src/io_seam.rs` |
+| `StoreIoBudget` | `{ state: Arc<Mutex<SharedBucketState>>, clock: Arc<dyn Clock>, pressure_rx: watch::Receiver<SystemPressure>, max_io_bytes_per_second: u64, erase_io_share: f32, }` | Zentrales kooperatives I/O-Budget je Store (`ports::IoBudget`). # Fehler `acquire` liefert [`ErasureError::Cancelled`], wenn die Abbruchbedingung ein… | `src/io_budget.rs` |
 | `SystemPressure` | `{ pub wal_queue_depth: usize, pub scheduler_queue_depth: f32, // 0.0–1.0 (Tokio global scheduler queue depth ratio) pub blocking_util: f32, // 0.0–1.0 (Blocking… }` | — | `src/system_pressure.rs` |
 | `SystemPressureMonitor` | `{ pressure_tx: tokio::sync::watch::Sender<SystemPressure>, pub pressure_rx: tokio::sync::watch::Receiver<SystemPressure>, sampling_interval: Duration, pub(crate)… }` | — | `src/system_pressure.rs` |
 | `TenantKeyCodec` | `{ tenant_id: TenantId, /// Vorberechnetes Scan-Präfix ohne Allokation im Hot-Path. scan_prefix_cache: Vec<u8>, }` | Encodes LSM storage keys with tenant isolation prefixes. | `src/tenant_codec.rs` |
 | `TenantScopedStorage` | `{ inner: S, codec: TenantKeyCodec, }` | Tenant-aware `StorageEngine` wrapper implementing strict key-level isolation (INV-TENANT-2). | `src/tenant_codec.rs` |
+| `TokenBucket` | `{ bytes_written: u64, last_reset_nanos: u64, max_bps: u64, clock: Arc<dyn Clock>, }` | Deterministischer Token-Bucket für I/O-Ratenbegrenzung. Kapselt die exakte Arithmetik aus der Compaction-Schleife (`compaction/engine.rs`), sodass be… | `src/io_budget.rs` |
 | `WalEntry` | `{ /// The operation performed. pub op: WalOp, /// Sequence number assigned to the operation. pub seq_no: u64, /// HMAC of the current entry (includes previous HM… }` | A single entry in the Write-Ahead Log. | `src/wal/encode.rs` |
 | `WalEntryRef` | `{ pub entry: &'a WalEntry, }` | Lightweight view reference into a `WalEntry`. | `src/lsm/observer.rs` |
 | `WalFlusherConfig` | `{ /// Maximum time to wait for additional messages after receiving the first, /// before issuing `sync_all()`. Set to 0 to disable (immediate flush). /// /// Typ… }` | Configuration for the WAL background flusher actor. Controls how aggressively the flusher coalesces concurrent writes into a single `sync_all()` call… | `src/wal/flusher.rs` |
@@ -6050,7 +6194,7 @@ pub trait WalObserver : Send + Sync {
 | `LegacyKeyStatus` | `/// A standard, secure integrity key (e.g. from `.wal_integrity_key` or `KeyManager`) is in use. Standard, /// The legacy obfuscated key is active and requires migration. LegacyActive,` | Status indicating whether a WAL segment or key configuration uses the obfuscated legacy key. | `src/wal/hmac.rs` |
 | `ManifestEntry` | `/// A new SSTable file was created and fully fsynced. Add { path: PathBuf, max_tx: u64 }, /// An SSTable file was removed or superseded. Remove { path: PathBuf }, /// A transaction rollback operation…` | An entry in the SSTable manifest log. | `src/manifest/entry.rs` |
 | `PressureLevel` | `Normal, Elevated, // Warnung: System unter Last Critical, // Backpressure aktiv: neue Inserts verlangsamen` | — | `src/system_pressure.rs` |
-| `StorageHealth` | `Healthy, FlushFailing,` | Health status of the storage engine. | `src/lsm/engine.rs` |
+| `StorageHealth` | `Healthy, FlushFailing, JournalPoisoned,` | Health status of the storage engine. | `src/lsm/engine.rs` |
 | `WalOp` | `/// Inserts or updates a key-value pair. Put { tx_id: TxId, key: Vec<u8>, value: Vec<u8>, }, /// Deletes a key. Delete { tx_id: TxId, key: Vec<u8> }, /// Transaction outcome marker (committed / abort…` | — | `src/wal/encode.rs` |
 | `WalParseError` | `#[error("WAL entry too short for CRC header")] HeaderTooShort, #[error("CRC mismatch: stored={stored:#010x}, computed={computed:#010x}")] CrcMismatch { stored: u32, computed: u32 }, #[error("WAL payl…` | Typed parsing errors encountered when decoding WAL entries from raw bytes. | `src/wal/encode.rs` |
 | `WalVersion` | `V1, // Legacy: kein HMAC V2, // Current: HMAC ohne tx_id V3, // New: HMAC mit tx_id` | — | `src/wal/encode.rs` |
@@ -6064,7 +6208,7 @@ pub trait WalObserver : Send + Sync {
 | `BlockCacheShard` | `type BlockCacheShard= QuickCacheBlockCacheBackend` | — |
 | `WalSeq` | `type WalSeq= u64` | — |
 
-### Konstanten (26)
+### Konstanten (28)
 
 | Konstante | Typ | Beschreibung |
 |---|---|---|
@@ -6077,6 +6221,8 @@ pub trait WalObserver : Send + Sync {
 | `RANK_BLOCK_CACHE` | `u32` | Rang 950: SSTable-Block-Cache-Sperre (`SieveCacheBackend::state`). |
 | `RANK_COMMIT_MUTEX` | `u32` | Rang 200: Globaler Commit-Mutex des Stores (`commit_mutex`), entspricht Commit-Barriere. |
 | `RANK_DOCUMENT_INTENT` | `u32` | Rang 100: Transaktionale Absichtssperren auf Dokument-/Schlüsselebene (`intent_locks`). |
+| `RANK_ERASURE_GATE` | `u32` | Rang 960: Erasure-Gate-Snapshot-Sperre (`StoreGate::snap`). |
+| `RANK_ERASURE_KERNEL` | `u32` | Rang 150: Erasure-Kernel-Zustandsmutex (`StoreErasureKernel::state`). |
 | `RANK_FLUSH_MUTEX` | `u32` | Rang 300: Flush-Mutex des Stores (`flush_mutex`), serialisiert Flush-Vorgänge. |
 | `RANK_MANIFEST_MUTEX` | `u32` | Rang 800: Manifest-Append-Sperre (`Manifest::file`). |
 | `RANK_MEMTABLE_SHARDS` | `u32` | Rang 700: MemTable-Shards (`MemTable::shards`), atomare RAM-Modifikationen. |
@@ -6095,7 +6241,7 @@ pub trait WalObserver : Send + Sync {
 | `WAL_V2_HEADER` | `[u8` | Magic header for V2 batch-encrypted WAL files (`b"MFW2"`). |
 | `WAL_V3_HEADER` | `[u8` | Magic header for V3 WAL files (`b"MFW3"`). |
 
-### Öffentliche Funktionen (299)
+### Öffentliche Funktionen (346)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
@@ -6124,9 +6270,50 @@ pub trait WalObserver : Send + Sync {
 | `pub fn with_vfs(mut self, vfs: Arc<dyn Vfs>) -> Self` | Configures a custom VFS implementation for compaction file operations. | `src/compaction/engine.rs` |
 | `pub fn retain_key_versions<T, F>(entries: Vec<T>, get_seq: F, floor_seq: u64) -> Vec<T> where F: Fn(&T) -> u64,` | Filters a sequence of entries for a SINGLE key (sorted by raw sequence DESCENDING) according to MVCC retention rules given a `floor` sequen… | `src/compaction/retention.rs` |
 | `pub fn new() -> Self` | Creates a new, empty in-memory storage engine. | `src/engine/memory_only.rs` |
+| `pub fn decide(&self, key: &[u8], raw_seq: u64, _tombstone: bool) -> Decision` | Reine, I/O-freie Entscheidungsfunktion (§7.2). Reihenfolge: `DropKeys` vor `CollapseVersions`. | `src/erasure/filter.rs` |
+| `pub fn new(jobs: Arc<GateSnapshot>, collapse: Arc<CollapseMap>) -> Self` | — | `src/erasure/filter.rs` |
+| `pub fn check_version(&self, raw_key: &[u8], version_seq: Seq) -> GateDecision` | — | `src/erasure/gate.rs` |
+| `pub fn discard_rule(&self, raw_key: &[u8], version_seq: Seq) -> DiscardRule` | — | `src/erasure/gate.rs` |
+| `pub fn from_jobs(epoch: u64, mut jobs: Vec<Arc<JobGate>>) -> Self` | — | `src/erasure/gate.rs` |
+| `pub fn install_snapshot(&self, mut build: impl FnMut(&GateSnapshot, u64) -> GateSnapshot) -> u64` | Atomarer Snapshot-Tausch unter Rang 960. Liefert die neue Epoche zurück. | `src/erasure/gate.rs` |
+| `pub fn is_fail_closed(&self) -> bool` | — | `src/erasure/gate.rs` |
+| `pub fn new() -> Self` | — | `src/erasure/gate.rs` |
+| `pub fn set_fail_closed(&self)` | Aktiviert den Fail-Closed-Modus bei korruptem Journal (I-7, §5.4). | `src/erasure/gate.rs` |
+| `pub fn snapshot(&self) -> Arc<GateSnapshot>` | — | `src/erasure/gate.rs` |
+| `pub fn with_upserted_job(&self, new_epoch: u64, job: JobGate) -> Self` | — | `src/erasure/gate.rs` |
+| `pub fn without_job(&self, new_epoch: u64, id: ErasureId) -> Self` | — | `src/erasure/gate.rs` |
+| `pub async fn append_batch(&mut self, records: &[JournalRecord]) -> Result<(), ErasureError>` | Schreibt alle Records als einen zusammenhängenden Puffer + `sync_data` (Write-Ahead, I-2). Bei jedem I/O- oder `sync_data`-Fehler wird `poi… | `src/erasure/journal.rs` |
+| `pub async fn compact(&mut self, records: &[JournalRecord]) -> Result<(), ErasureError>` | Führt eine atomare Journal-Verdichtung (Rollover) durch (§5.5). Schreibt `journal.new` mit allen Records der offenen Aufträge und nur `Summ… | `src/erasure/journal.rs` |
+| `pub fn completed_since_compact(&self) -> u64` | — | `src/erasure/journal.rs` |
+| `pub fn has_space_for(&self, estimated_bytes: u64) -> bool` | Prüft, ob vorab genug Platz (oder Reserve) für einen Eintrag vorhanden ist (§4.2). | `src/erasure/journal.rs` |
+| `pub fn is_poisoned(&self) -> bool` | — | `src/erasure/journal.rs` |
+| `pub fn offset(&self) -> u64` | — | `src/erasure/journal.rs` |
+| `pub async fn open( io: StoreIo, dir: PathBuf, reserve_bytes: u64, max_plan_bytes: u32, ) -> Result<JournalOpenResult, ErasureError>` | Öffnet oder erstellt `<dir>/journal.log` und liest alle gültigen Frames (§5.4). | `src/erasure/journal.rs` |
+| `pub fn poison(&self)` | — | `src/erasure/journal.rs` |
+| `pub fn is_corrupt(&self) -> bool` | — | `src/erasure/ledger.rs` |
+| `pub async fn open( io: StoreIo, ledger_dir: PathBuf, ledger_key: [u8; 32], anchor: Option<Arc<dyn LedgerAnchor>>, ) -> Result<Self, ErasureError>` | Öffnet oder initialisiert `<ledger_dir>/ledger.log` und prüft die gesamte Kette. | `src/erasure/ledger.rs` |
+| `pub fn publish_anchor_best_effort(&self, head: LedgerHead)` | — | `src/erasure/ledger.rs` |
+| `pub fn for_data_dir(data_dir: &Path) -> Self` | Erzeugt eine Standardkonfiguration für das angegebene Store-Datenverzeichnis. | `src/erasure/mod.rs` |
+| `pub fn pending_delete_notify(&self) -> Arc<tokio::sync::Notify>` | Liefert ein `Notify`-Handle, das benachrichtigt wird, wenn Pending-Delete-Einträge verbleiben (§8). # Fehler Keine; reiner Handle-Zugriff.… | `src/erasure/mod.rs` |
+| `pub fn pending_delete_remaining(&self) -> u64` | Liefert die aktuelle Anzahl ausstehender Pending-Delete-Pfade (§8). # Fehler Keine; atomarer Lesezugriff (`Acquire`). # Crash Keine Seitene… | `src/erasure/mod.rs` |
+| `pub async fn register_collapse( &self, id: ErasureId, entries: Vec<(Vec<u8>, u64)>, ) -> Result<(), ErasureError>` | Registriert Version-Collapse-Einträge (A-1) durabel im Journal und RAM (§7.2). # Fehler Liefert [`ErasureError::JournalPoisoned`], [`Erasur… | `src/erasure/mod.rs` |
+| `pub async fn drain_pending(&self) -> Result<u32, ErasureError>` | Versucht, alle aktuell in der Liste stehenden Dateien physisch zu entfernen. | `src/erasure/pending.rs` |
+| `pub fn notify_handle(&self) -> Arc<Notify>` | — | `src/erasure/pending.rs` |
+| `pub async fn open( io: StoreIo, erasure_dir: &Path, data_dir: PathBuf, retry_limit: u32, ) -> Result<Self, ErasureError>` | Öffnet oder initialisiert die Pending-Delete-Liste. | `src/erasure/pending.rs` |
+| `pub fn remaining(&self) -> u64` | — | `src/erasure/pending.rs` |
+| `pub async fn remove_after_commit(&self, paths: &[PathBuf]) -> Result<u32, ErasureError>` | Fügt Pfade atomar zur Liste hinzu, löscht sie physisch, synchronisiert das Verzeichnis und entfernt erledigte Pfade wieder aus der Liste (§… | `src/erasure/pending.rs` |
+| `pub fn new(deps: StoreDeps, scope: Arc<ResolvedScope>, sealed: Arc<AtomicBool>) -> Self` | — | `src/erasure/purge_lsm.rs` |
+| `pub fn new(layer: WitnessLayer, deps: StoreDeps) -> Self` | — | `src/erasure/purge_lsm.rs` |
 | `pub async fn fsync_parent_dir(path: &Path) -> Result<()>` | Alias for `sync_parent_dir` for backward compatibility across storage modules. | `src/fsync.rs` |
 | `pub async fn sync_file(path: &Path) -> Result<()>` | Performs fsync on a single file at `path`. # Errors Returns `ContextraError::Storage` on Unix if opening or syncing fails. Returns `Context… | `src/fsync.rs` |
 | `pub async fn sync_parent_dir(path: &Path) -> Result<()>` | Performs fsync on the parent directory of `path`. Directory fsync is required on POSIX filesystems to guarantee that newly created files or… | `src/fsync.rs` |
+| `pub async fn charge(&mut self, bytes: u64)` | Verbucht `bytes` asynchron und wartet bei Bedarf kooperativ. | `src/io_budget.rs` |
+| `pub fn charge_step(&mut self, bytes: u64) -> Option<Duration>` | Verbucht `bytes` und liefert eine optionale Wartezeit zurück, falls das Budget überschritten wurde. Hält keine Locks über `.await`; der Auf… | `src/io_budget.rs` |
+| `pub fn charge_step_with_limit(&mut self, bytes: u64, effective_bps: u64) -> Option<Duration>` | Wie [`Self::charge_step`], jedoch mit einem dynamischen effektiven Limit `effective_bps`. | `src/io_budget.rs` |
+| `pub fn new(max_bps: u64, clock: Arc<dyn Clock>) -> Self` | Erzeugt einen neuen Token-Bucket mit `max_bps` (0 = unbegrenzt). | `src/io_budget.rs` |
+| `pub fn new( max_io_bytes_per_second: u64, erase_io_share: f32, clock: Arc<dyn Clock>, pressure_rx: watch::Receiver<SystemPressure>, ) -> Self` | Erzeugt ein neues `StoreIoBudget`. `max_io_bytes_per_second == 0` bedeutet unbegrenzten Durchsatz (nur Druckkopplung greift). | `src/io_budget.rs` |
+| `pub fn on_sleep_complete(&mut self)` | Aktualisiert den Token-Bucket nach Ablauf einer Wartezeit. | `src/io_budget.rs` |
+| `pub fn on_sleep_complete_with_limit(&mut self, effective_bps: u64)` | Aktualisiert den Token-Bucket nach Ablauf einer Wartezeit mit effektivem Limit. | `src/io_budget.rs` |
 | `pub async fn create_dir_all(&self, path: &Path) -> Result<()>` | Creates directories along `path`. | `src/io_seam.rs` |
 | `pub async fn exists(&self, path: &Path) -> Result<bool>` | Checks if a file exists. | `src/io_seam.rs` |
 | `pub fn file(&self) -> &std::fs::File` | Returns a reference to the inner file. | `src/io_seam.rs` |
@@ -6160,6 +6347,9 @@ pub trait WalObserver : Send + Sync {
 | `pub async fn close(&self) -> Result<()>` | Gracefully closes the storage engine, stopping background tasks and flushing active memtable to disk. # Errors Gibt `ContextraError::Storag… | `src/lsm/engine.rs` |
 | `pub fn data_path(&self) -> &std::path::Path` | Returns the data directory path. | `src/lsm/engine.rs` |
 | `pub fn deregister_observer(&self, observer: &Arc<dyn WalObserver>)` | Deregisters an observer matching the provided `Arc` reference via pointer equality. | `src/lsm/engine.rs` |
+| `pub fn erasure_boot_report(&self) -> crate::erasure::BootReport` | Liefert den Boot-Bericht des Erasure-Kernels (§5.4). | `src/lsm/engine.rs` |
+| `pub fn erasure_kernel(&self) -> Arc<dyn contextra_ports::ErasureKernel>` | Liefert den primären Erasure-Kernel dieses Stores (K-24, §3). | `src/lsm/engine.rs` |
+| `pub fn erasure_pending_delete_notify(&self) -> Arc<tokio::sync::Notify>` | Notify handle fired while pending-delete paths remain (Löschkette §8). | `src/lsm/engine.rs` |
 | `pub async fn get_at_seq_tracked( &self, tx_id: TxId, key: &[u8], snapshot_seq: u64, ) -> Result<Option<Bytes>>` | Performs a tracked read for transaction `tx_id` at an explicit `snapshot_seq`. Registers the read key in `TxBuffer` at `snapshot_seq` and r… | `src/lsm/engine.rs` |
 | `pub async fn get_tracked(&self, tx_id: TxId, key: &[u8]) -> Result<Option<Bytes>>` | Performs a tracked read for transaction `tx_id`. Evaluates `snapshot_seq = next_seq_no - 1` ONCE (K2), registers the read key in `TxBuffer`… | `src/lsm/engine.rs` |
 | `pub fn has_observers(&self) -> bool` | Returns true if at least one observer is registered. | `src/lsm/engine.rs` |
@@ -6254,6 +6444,7 @@ pub trait WalObserver : Send + Sync {
 | `pub fn iter_latest(&self) -> Vec<(Bytes, Bytes, u64, u64)>` | Iterates over only the latest version of each key in sorted key order. Returns (Key, Value, SeqNo, TxId). | `src/memtable.rs` |
 | `pub fn new() -> Self` | Creates a new empty MemTable with `SHARD_COUNT` independent shards. | `src/memtable.rs` |
 | `pub fn put(&self, key: Bytes, value: Bytes, seq_no: u64, tx_id: u64)` | Inserts a key-value pair with a sequence number and transaction ID. ## Concurrent Sequence Invariant Sequence numbers pre-allocated to conc… | `src/memtable.rs` |
+| `pub fn retain<F>(&self, mut drop: F) -> (u64, u64) where F: FnMut(&[u8], u64, bool) -> bool,` | Entfernt alle Versionen, für die `drop(key, raw_seq, tombstone)` `true` liefert (§7.1). Gibt `(entfernte_versionen, freigegebene_bytes)` zu… | `src/memtable.rs` |
 | `pub fn rollback(&self, tx_id: u64)` | Removes all entries associated with the specified transaction ID from the MemTable. | `src/memtable.rs` |
 | `pub fn scan_prefix_into( &self, prefix: &[u8], seq_no: u64, max_tx: TxId, target: &mut BTreeMap<Bytes, (Bytes, u64)>, )` | Scans entries matching a key prefix into `target` according to MVCC visibility rules. Iterates over each shard's range starting at `prefix`… | `src/memtable.rs` |
 | `pub fn scan_prefix_into_matching<F>( &self, prefix: &[u8], seq_no: u64, max_tx: TxId, target: &mut BTreeMap<Bytes, (Bytes, u64)>, predicate: F, ) where F: Fn(&[u8], u64, u64) -> bool,` | Scans entries matching a key prefix into `target` with an additional matching predicate. | `src/memtable.rs` |
@@ -6265,8 +6456,6 @@ pub trait WalObserver : Send + Sync {
 | `pub fn tx_range(&self) -> (u64, u64)` | Returns the transaction ID range covered by this MemTable. | `src/memtable.rs` |
 | `pub fn new(storage: Arc<LsmStorage>) -> Self` | Erzeugt einen neuen `MemtableScanner` mit implizit erfasster Laufzeit. | `src/scanner/memtable.rs` |
 | `pub fn with_runtime(storage: Arc<LsmStorage>, runtime: ScannerRuntime) -> Self` | Erzeugt einen neuen `MemtableScanner` mit expliziter `ScannerRuntime`. | `src/scanner/memtable.rs` |
-| `pub fn new(storage: Arc<LsmStorage>) -> Self` | Erzeugt einen neuen `LsmPurger` mit implizit erfasster Laufzeit. | `src/scanner/purge.rs` |
-| `pub fn with_runtime(storage: Arc<LsmStorage>, runtime: ScannerRuntime) -> Self` | Erzeugt einen neuen `LsmPurger` mit expliziter `ScannerRuntime`. | `src/scanner/purge.rs` |
 | `pub fn block_on<F, T>(&self, future: F) -> Result<T> where F: Future<Output = Result<T>> + Send, T: Send,` | Führt ein Future synchron aus. Strategie: 1. Kein Handle vorhanden: Sofortiger Fehler `ContextraError::Storage`. 2. Multi-Thread Runtime: A… | `src/scanner/runtime.rs` |
 | `pub fn capture() -> Self` | Erfasst das aktuelle Tokio-Runtime-Handle aus dem Aufrufkontext. | `src/scanner/runtime.rs` |
 | `pub fn empty() -> Self` | Erstellt eine leere `ScannerRuntime` (führt bei Port-Aufruf zu einem typisierten Fehler). | `src/scanner/runtime.rs` |
@@ -6280,6 +6469,7 @@ pub trait WalObserver : Send + Sync {
 | `pub fn create_block_cache(capacity_mb: usize) -> Arc<BlockCache>` | Creates a new block cache instance with default shard count. Capacity is in MB (assuming 4KB blocks). | `src/sstable/block_cache.rs` |
 | `pub fn create_block_cache_with_shards(capacity_mb: usize, num_shards: usize) -> Arc<BlockCache>` | Creates a new block cache instance with configurable shard count. Capacity is in MB. | `src/sstable/block_cache.rs` |
 | `pub fn current_bytes(&self) -> usize` | Returns current memory usage in bytes across all shards. | `src/sstable/block_cache.rs` |
+| `pub fn evict_file(&self, file_id: u64)` | Evicts all cached blocks belonging to `file_id` across all shards. | `src/sstable/block_cache.rs` |
 | `pub fn get(&self, file_id: u64, offset: u64) -> Option<Bytes>` | — | `src/sstable/block_cache.rs` |
 | `pub fn hit_ratio(&self) -> f64` | Returns the cache hit ratio (0.0 .. 1.0). | `src/sstable/block_cache.rs` |
 | `pub fn hits(&self) -> u64` | Returns the total number of cache hits recorded. | `src/sstable/block_cache.rs` |
@@ -6320,6 +6510,9 @@ pub trait WalObserver : Send + Sync {
 | `pub fn set_format_version(&mut self, version: u16)` | Explicitly configures the SSTable format version to write (default: 4). | `src/sstable/builder.rs` |
 | `pub fn with_block_size(mut self, size: usize) -> Self` | Sets the target block size for data blocks. | `src/sstable/builder.rs` |
 | `pub fn with_bloom_fpr(mut self, expected_keys: usize, fpr: f64) -> Self` | Sets the whole-SSTable bloom filter parameters. | `src/sstable/builder.rs` |
+| `pub fn with_max_seq_override(mut self, max_seq: u64) -> Self` | Überschreibt `max_seq` im Trailer (Positionstreue bei Erase-Compaction, §7.3.4). | `src/sstable/builder.rs` |
+| `pub fn with_max_tx_override(mut self, max_tx: u64) -> Self` | Überschreibt `max_tx_id` im Trailer (Positionstreue bei Erase-Compaction, §7.3.4). | `src/sstable/builder.rs` |
+| `pub fn file_id(&self) -> u64` | Returns the internal cache file identifier for this SSTable. | `src/sstable/reader.rs` |
 | `pub fn file_path(&self) -> &Path` | — | `src/sstable/reader.rs` |
 | `pub fn first_key(&self) -> &Bytes` | — | `src/sstable/reader.rs` |
 | `pub async fn get(&self, key: &[u8]) -> Result<Option<(Bytes, u64, u64)>>` | Retrieves a value from the SSTable by key. | `src/sstable/reader.rs` |
@@ -6521,7 +6714,7 @@ pub trait SnapshotPinner : Send + Sync {
 |---|---|---|
 | `PinId` | `type PinId= u64` | Typ-Alias für Sequenznummern, die als gepinnte Checkpoint-Identifikatoren verwaltet werden. |
 
-### Öffentliche Funktionen (108)
+### Öffentliche Funktionen (109)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
@@ -6632,6 +6825,7 @@ pub trait SnapshotPinner : Send + Sync {
 | `pub async fn shutdown(&self) -> Result<()>` | Führt einen expliziten Flush der Orphan-Registry beim Herunterfahren durch. | `src/store.rs` |
 | `pub fn skipped_rollback_count(&self) -> u64` | Liefert die Anzahl übersprungener Rollbacks. | `src/store.rs` |
 | `pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self` | Setzt den Zeitgeber für den `PersistentCheckpointStore`. # Composition Root Der Composition Root setzt per `with_clock` eine injizierte Uhr… | `src/store.rs` |
+| `pub fn with_gate(mut self, gate: Arc<dyn contextra_ports::ReadGate>) -> Self` | Installs the engine read gate for checkpoint restore protection. | `src/store.rs` |
 | `pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self` | Konfiguriert den Store mit einer Metrik-Senke. | `src/store.rs` |
 
 
@@ -6661,6 +6855,7 @@ pub mod backends;
 pub mod background_workers;
 pub mod chunker;
 pub mod collection;
+pub mod erasure;
 pub mod decay_controller;
 pub mod export;
 pub mod extraction;
@@ -6769,7 +6964,7 @@ pub trait WorkflowStep : Send + Sync {
 }
 ```
 
-### Öffentliche Datentypen — Structs (48)
+### Öffentliche Datentypen — Structs (62)
 
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
@@ -6796,9 +6991,17 @@ pub trait WorkflowStep : Send + Sync {
 | `DeferredHyperedgeQueue` | `{ inner: Mutex<VecDeque<HyperEdgeId>>, }` | Thread-safe FIFO queue for storing hyperedges whose cascade invalidation was deferred to the background worker due to fan-out limits (H5 / AK-6). | `src/background_workers/hyperedge_worker.rs` |
 | `Document` | `{ pub id: String, pub metadata: Option<Value>, }` | Repräsentiert ein Dokument mit eindeutiger ID, Text, Vektoreinbettung und Metadaten. | `src/lib.rs` |
 | `Draft` | `(tuple/unit)` | — | `src/orchestration/mod.rs` |
+| `EngineIoBudget` | `{ normal: StoreIoBudget, boosted: StoreIoBudget, boost: AtomicBool, }` | `IoBudget` used by the erasure worker. | `src/erasure/budget.rs` |
 | `EngineServiceContainer` | `{ storage: Arc<S>, vector_index: Arc<V>, text_index: Arc<T>, }` | Service-Container für Dependency Injection in State-Machines und Orchestratoren. | `src/orchestration/mod.rs` |
 | `EntityExtractionConfig` | `{ /// Ob Entitätsextraktion aktiviert ist pub enabled: bool, /// Maximale Anzahl von LLM-Aufrufen pro Zyklus / Extraktionsdurchlauf pub max_llm_calls_per_cycle:… }` | Konfiguration für die automatische Entitätsextraktion. | `src/extraction/types.rs` |
 | `EntityExtractionConfig` | `{ pub enabled: bool, pub max_llm_calls_per_cycle: usize, pub min_confidence: f32, }` | Dokumentation für `EntityExtractionConfig` im Rahmen der Collection- und Suchabstraktion. | `src/collection/crud/auto_extraction.rs` |
+| `EpochCache` | `{ map: Mutex<BTreeMap<K, (u64, V)>>, }` | Cache whose entries are only valid for the gate epoch they were inserted under. | `src/erasure/caches.rs` |
+| `EraseHandle` | `{ /// Job identifier; use with `Contextra::erase_status`. pub id: ErasureId, /// Guarantee reached at the time of return (G1 at least, G3 for `AwaitLevel::Purged… }` | Handle returned by `Contextra::erase`. | `src/erasure/types.rs` |
+| `EraseOptions` | `{ pub reason: contextra_types::ErasureReason, pub await_level: contextra_types::AwaitLevel, pub policy: Option<contextra_types::ErasurePolicy>, }` | Per-request policy. Defaults to waiting until the read gate is durably active. | `src/erasure/config.rs` |
+| `ErasePlanSummary` | `{ /// Number of key rules in the resolved scope. pub rules: u32, /// Number of explicitly named documents (0 for collection/tenant scopes). pub docs: u64, /// Gr… }` | Counts-only summary of an erase plan. Never contains keys (I-12). | `src/erasure/types.rs` |
+| `ErasureConfig` | `{ pub coalesce_window: Duration, pub sla: Duration, pub erase_io_share: f32, pub max_units_per_tick: usize, pub retry_backoff: (Duration, Duration), pub quaranti… }` | Scheduling and retry limits for background physical erasure. | `src/erasure/config.rs` |
+| `ErasureRuntime` | `{ inner: Arc<ErasureRuntimeInner>, worker: parking_lot::Mutex<Option<JoinHandle<()>>>, }` | Owner handle: starts and stops the worker. | `src/erasure/mod.rs` |
+| `ErasureRuntimeInner` | `{ /// Kernel port of the store (K-24). pub kernel: Arc<dyn ErasureKernel>, /// Registered secondary layers. pub registry: parking_lot::RwLock<LayerRegistry>, ///… }` | Shared state of the erasure subsystem. Held behind an `Arc` by the worker and the API. | `src/erasure/mod.rs` |
 | `Executing` | `(tuple/unit)` | — | `src/orchestration/mod.rs` |
 | `ExportCollectionV1` | `{ /// Name der Collection pub name: String, /// Liste aller Memory-Einträge pub memories: Vec<ExportMemoryV1>, /// Liste aller direkten Graph-Relationen pub rela… }` | Export-Repräsentation einer einzelnen Collection. | `src/export.rs` |
 | `ExportDocumentV1` | `{ /// Pflichtfeld für Schema-Migrationen (MUSS "1.0" sein) pub schema_version: String, /// UTC-Zeitstempel der Export-Erstellung (ISO-8601 String) #[serde(defaul… }` | Wurzel-Dokument für den Export aller DB-Collections. | `src/export.rs` |
@@ -6808,29 +7011,37 @@ pub trait WorkflowStep : Send + Sync {
 | `Failed` | `(tuple/unit)` | — | `src/orchestration/mod.rs` |
 | `HybridQueryBuilder` | `{ pub(super) collection: &'a Collection<S, V>, pub(super) text: Option<String>, pub(super) vector: Option<Vec<f32>>, pub(super) k: Option<usize>, pub(super) weig… }` | Fluent query builder for unifying vector, text, graph, and hybrid search operations. | `src/collection/query_builder/builder.rs` |
 | `ImportSummary` | `{ /// Anzahl erfolgreich importierter oder aktualisierter Memory-Einträge pub imported_memories: usize, /// Anzahl übersprungener Memory-Einträge pub skipped_mem… }` | Zusammenfassung eines Import-Vorgangs. | `src/import.rs` |
+| `JobSched` | `{ /// When the worker first saw the job (start of the coalescing window). pub first_seen: u64, /// Earliest time of the next attempt (backoff), `0` = immediately… }` | Scheduling state of one open job (monotonic nanoseconds of the engine clock). | `src/erasure/driver.rs` |
+| `KernelProgress` | `{ /// Kernel receiving the progress records. pub kernel: Arc<dyn ErasureKernel>, /// Job the progress belongs to. pub id: ErasureId, }` | `ProgressSink` that persists layer progress through the kernel (write-ahead). | `src/erasure/adapters.rs` |
+| `LayerRegistry` | `{ layers: BTreeMap<(LayerOrder, String), Arc<dyn ErasureLayer>>, }` | Ordered, collection-scoped registry. Replacing a registration is atomic. | `src/erasure/registry.rs` |
 | `MarkdownChunker` | `{ config: ChunkerConfig, }` | A deterministic chunker for markdown files respecting structural blocks (headings, code blocks, tables, paragraphs) and UTF-8 safety. | `src/chunker/mod.rs` |
+| `ObserverFn` | `(tuple/unit)` | Closure-backed [`ErasureObserver`]. The closure must be fast and non-blocking. | `src/erasure/caches.rs` |
 | `OpenIeExtractor` | `(tuple/unit)` | Implementierung des OpenIE-Extraktors hinter `EntityExtractor`. | `src/extraction/mod.rs` |
 | `OrphanCleanupBackoffConfig` | `{ /// Initial cooldown duration after the first failed rebuild attempt. pub base_delay: Duration, /// Maximum cooldown cap between rebuild attempts. pub max_dela… }` | Configuration parameters for HNSW index rebuild backoff and failure escalation. | `src/background_workers/config.rs` |
 | `PercolationResult` | `{ pub health: Option<f32>, pub rebonding_triggered: bool, pub new_edges_added: usize, }` | — | `src/collection/maintenance.rs` |
 | `Prepared` | `(tuple/unit)` | — | `src/orchestration/mod.rs` |
 | `RuleBasedExtractor` | `(tuple/unit)` | Regelbasierter Entitäts- und Relationsextraktor. | `src/extraction/rule_based.rs` |
 | `ScopeConstraint` | `{ /// Explicit set of allowed document IDs (BTreeSet guarantees deterministic ordering). pub allowed_doc_ids: BTreeSet<DocId>, /// Gamma augmentation factor for… }` | Scoping constraint defining an explicit hard-boundary set of allowed document IDs for predicate-agnostic vector search (ACORN-Hard-Boundary, Spec §5.… | `src/collection/query_builder/scope.rs` |
+| `ScopeResolverImpl` | `(tuple/unit)` | Pure scope resolver helpers. All generated patterns are physical tenant keys, matching the raw-key view used by the store's erasure kernel. | `src/erasure/resolver.rs` |
 | `SignalWeights` | `{ /// Weight for vector similarity signal. pub vector: f32, /// Weight for BM25 text match signal. pub text: f32, /// Weight for graph traversal signal. pub grap… }` | Custom weights for vector, text, and graph signals in hybrid search. | `src/collection/query_builder/weights.rs` |
 | `StoredDocument` | `{ pub id: String, pub embedding: Vec<f32>, pub metadata: Option<serde_json::Value>, }` | Dokumentation für `StoredDocument` im Rahmen der Collection- und Suchabstraktion. | `src/collection/mod.rs` |
 | `StoredDocumentMeta` | `{ pub id: String, pub metadata: Option<serde_json::Value>, }` | Leichtgewichtige Metadaten (für doc_key, key_type=1) — KEIN Embedding. Wird für DocId-basierte Hydration nach HNSW/BM25-Suche verwendet. | `src/collection/mod.rs` |
+| `TokenCancel` | `(tuple/unit)` | `Cancel` port backed by a `tokio_util` token. | `src/erasure/adapters.rs` |
 | `ValidityWindow` | `{ /// Start of transaction validity (system time / MVCC). pub tx_valid_from: Option<TxId>, /// End of transaction validity (system time / MVCC, exclusive upper b… }` | Extracted bi-temporal validity window representation for a document or search candidate. | `src/temporal_filter.rs` |
 | `WorkflowContext` | `{ data: std::collections::HashMap<String, String>, }` | Dynamischer Workflow-Kontext zur Übergabe von Zwischenergebnissen zwischen Schritten. | `src/orchestration/mod.rs` |
 | `WorkflowState` | `{ workflow_id: String, steps: Vec<Box<dyn WorkflowStep>>, context: WorkflowContext, completed_steps: usize, error: Option<ContextraError>, _state: PhantomData<St… }` | Typestate-basierte State Machine für Workflows. | `src/orchestration/mod.rs` |
 
-### Öffentliche Datentypen — Enums (8)
+### Öffentliche Datentypen — Enums (10)
 
 | Enum | Varianten | Beschreibung | Datei |
 |---|---|---|---|
 | `CommitIntent` | `/// Transaction is in the "Prepared" state. Stored DocIds assist recovery. /// `stages_completed` tracks progress: /// 0 = Intent written, /// 1 = Storage (LSM) committed, /// 2 = Indices (Vector, Te…` | Status of a multi-index transaction during the 2-phase commit. | `src/transaction/intent.rs` |
+| `DriveOutcome` | `/// Job reached `Completed`. Completed, /// Sealed, waiting for remaining tainted checkpoints / legal hold. Waiting, /// Retry after the given delay (backoff with jitter). Retry(Duration), /// Cancel…` | Result of one `drive_job` call. | `src/erasure/driver.rs` |
 | `EmbeddingBackend` | `Onnx { model_name: String, cache_dir: Option<std::path::PathBuf>, }, None,` | Wählbares Backend zur Berechnung von Text-Embeddings. | `src/lib.rs` |
 | `ExtractorMode` | `#[default] OpenIe, RuleBased,` | Modus der Entitätsextraktion (LLM-basiertes OpenIE oder regelbasiert). | `src/extraction/types.rs` |
 | `ExtractorMode` | `OpenIe, RuleBased,` | Dokumentation für `ExtractorMode` im Rahmen der Collection- und Suchabstraktion. | `src/collection/crud/auto_extraction.rs` |
 | `FilterOp` | `/// Equal to Eq, /// Not equal to Ne, /// Greater than Gt, /// Greater than or equal to Gte, /// Less than Lt, /// Less than or equal to Lte, /// In a set of values In, /// Not in a set of values Not…` | Vergleichsoperationen für Metadaten-Prädikatfilter (z. B. Gleichheit, Größer, Kleiner, Inklusion). | `src/filter.rs` |
+| `LayerOrder` | `Text = 10, Graph = 20, Vector = 30, Checkpoint = 40,` | Stable purge order required by the engine's cross-layer dependencies. Text needs the privileged `fw:` reads, graph needs the provenance index in the… | `src/erasure/registry.rs` |
 | `MetadataFilter` | `/// A single condition on a metadata field. Condition { field: String, #[allow(deprecated)] op: FilterOp, value: Value, }, /// Logical AND of multiple filters. And(Vec<MetadataFilter>), /// Logical O…` | — | `src/filter.rs` |
 | `SearchStrategy` | `/// Reciprocal Rank Fusion (default fusion strategy per ADR-003). Rrf, /// Score-normalized fusion (CombSUM / Z-Score). ScoreNormalized, /// Multi-hop BFS graph traversal strategy. Hops { /// Maximum…` | Strategy for hybrid search and graph signal traversal. | `src/collection/query_builder/strategy.rs` |
 | `TenantPolicy` | `/// Non-tenant collection access (`collection(...)`) is allowed (Default / Admin / Single-tenant path). #[default] Optional, /// Non-tenant collection access is forbidden; callers MUST use tenant-sco…` | Tenant isolation enforcement policy. | `src/lib.rs` |
@@ -6878,12 +7089,14 @@ pub trait WorkflowStep : Send + Sync {
 | `SEARCH_LATENCY_TEXT` | `&str` | Reserved metric name for text signal search latency observations. |
 | `SEARCH_LATENCY_VECTOR` | `&str` | Reserved metric name for vector signal search latency observations. |
 
-### Öffentliche Funktionen (319)
+### Öffentliche Funktionen (355)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
 | `pub fn new(storage: Arc<S>, namespace: &str) -> Self` | Creates a new `Bm25Scorer` with the given storage and namespace. | `src/adapters/text.rs` |
 | `pub fn calculate_rebuild_cooldown( consecutive_failures: u32, base_delay: Duration, max_delay: Duration, ) -> Duration` | Helper calculating exponential backoff cooldown given consecutive failures. | `src/background_workers/config.rs` |
+| `pub async fn erasure_worker_loop(rt: Arc<ErasureRuntimeInner>, cancel: CancellationToken)` | Worker body (spawned by `ErasureRuntime::start` on the engine's task tracker). | `src/background_workers/erasure_worker.rs` |
+| `pub fn start_erasure_worker(rt: Arc<ErasureRuntimeInner>, cancel: CancellationToken) -> JoinHandle<()>` | Spawns the worker as a free-standing task (tests, embedders without a task tracker). | `src/background_workers/erasure_worker.rs` |
 | `pub fn start_decay_cleanup_worker<S: StorageEngine, V: VectorIndex>( collection: Arc<Collection<S, V>>, decay_config: DecayControllerConfig, interval: Duration, cancel_token: tokio_util::sync::CancellationToken, ) -> tokio::task::JoinHandle<()>` | Starts a background task for decay-controller-driven importance-score eviction. Nur aktiv wenn `background-maintenance` Feature-Flag gesetz… | `src/background_workers/expiry_workers.rs` |
 | `pub fn start_expiry_cleanup_worker<S: StorageEngine>( collection: Arc<Collection<S>>, interval: Duration, cancel_token: tokio_util::sync::CancellationToken, ) -> tokio::task::JoinHandle<()>` | Starts a background task to periodically clean up expired documents with TTL. | `src/background_workers/expiry_workers.rs` |
 | `pub fn start_expiry_reaper<S: StorageEngine>( collection: Arc<Collection<S>>, interval: Duration, cancel_token: tokio_util::sync::CancellationToken, ) -> tokio::task::JoinHandle<()>` | Deprecated legacy alias for `start_expiry_cleanup_worker`. | `src/background_workers/expiry_workers.rs` |
@@ -6946,7 +7159,7 @@ pub trait WorkflowStep : Send + Sync {
 | `pub fn sorted_unique_shards<'a>( keys: impl IntoIterator<Item = &'a str>, shard_count: usize, hasher: &ahash::RandomState, ) -> Vec<usize>` | Pure, synchronous function to map string keys to unique shard indices in ascending order. Deduplicates shard indices to prevent self-deadlo… | `src/collection/kv_lock.rs` |
 | `pub fn try_lock_for<'a>(&'a self, key: &str) -> Option<KeyGuard<'a>>` | Dokumentation für `try_lock_for` im Rahmen der Collection- und Suchabstraktion. | `src/collection/kv_lock.rs` |
 | `pub fn try_lock_shard<'a>(&'a self, idx: usize) -> Option<KeyGuard<'a>>` | Dokumentation für `try_lock_shard` im Rahmen der Collection- und Suchabstraktion. | `src/collection/kv_lock.rs` |
-| `pub async fn drop_collection(&self) -> Result<()>` | Removes all data belonging to this collection from storage. | `src/collection/maintenance.rs` |
+| `pub async fn drop_collection(&self) -> Result<()>` | Validates that this collection may be dropped. Physical removal is **not** done here any more (K-44): tombstoning prefixes left HNSW, graph… | `src/collection/maintenance.rs` |
 | `pub async fn evict_decayed_chunks( &self, decay_controller: &AdaptiveDecayController, max_per_tick: usize, ) -> Result<usize>` | Führt einen Importance-Score-Sweep via Adaptive Decay Controller durch. Evictet Chunks deren effective_score unter eviction_threshold liegt… | `src/collection/maintenance.rs` |
 | `pub async fn get_communities_batch( &self, entity_ids: &[EntityId], ) -> Result<std::collections::HashMap<EntityId, u64>>` | Retrieves community assignments for a batch of entity IDs in a single operation. | `src/collection/maintenance.rs` |
 | `pub async fn get_community(&self, entity_id: EntityId) -> Result<Option<u64>>` | Retrieves the persisted community ID for a given entity. | `src/collection/maintenance.rs` |
@@ -7069,6 +7282,7 @@ pub trait WorkflowStep : Send + Sync {
 | `pub async fn collection_with_language( &self, name: &str, language: Language, ) -> Result<Arc<Collection<LsmStorage>>>` | Retrieves or creates an un-tenanted [`Collection`] handle with specified language (Admin / Single-Tenant path). # Errors Returns [`Contextr… | `src/contextra_impl/collections.rs` |
 | `pub async fn collection_with_language_and_tenant( &self, name: &str, language: Language, tenant_id: TenantId, ) -> Result<Arc<Collection<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>>>` | Öffnet oder erstellt eine Collection mit Sprachkonfiguration für einen Mandanten. | `src/contextra_impl/collections.rs` |
 | `pub async fn drop_collection( &self, name: &str, tenant_id: TenantId, ) -> Result<()>` | Dokumentation für `drop_collection` im Rahmen der Transaktions- und Facade-Orchestrierung. Führt die rein mechanische Löschung einer Collec… | `src/contextra_impl/collections.rs` |
+| `pub async fn drop_collection_with_erasure( &self, name: &str, tenant_id: TenantId, ) -> Result<crate::erasure::EraseHandle>` | Drops a collection through the durable erasure pipeline and returns its G1 handle. | `src/contextra_impl/collections.rs` |
 | `pub async fn list_collections(&self) -> Result<Vec<String>>` | Dokumentation für `list_collections` im Rahmen der Transaktions- und Facade-Orchestrierung. | `src/contextra_impl/collections.rs` |
 | `pub async fn list_collections_for_tenant(&self, tenant_id: TenantId) -> Result<Vec<String>>` | Dokumentation für `list_collections_for_tenant` im Rahmen der Transaktions- und Facade-Orchestrierung. | `src/contextra_impl/collections.rs` |
 | `pub async fn create_snapshot(&self) -> Result<u64>` | Dokumentation für `create_snapshot` im Rahmen der Transaktions- und Facade-Orchestrierung. | `src/contextra_impl/crud.rs` |
@@ -7129,6 +7343,38 @@ pub trait WorkflowStep : Send + Sync {
 | `pub fn system_temperature(&self, inputs: &DecaySignalInputs) -> f32` | Berechnet die aktuelle Systemtemperatur basierend auf Tombstone-Verhältnis und Abfragelast. | `src/decay_controller.rs` |
 | `pub fn with_clock(config: DecayControllerConfig, clock: Arc<dyn Clock>) -> Self` | Erstellt eine neue Instanz des `AdaptiveDecayController` mit injizierter Clock (B11). | `src/decay_controller.rs` |
 | `pub fn with_defaults() -> Self` | Initialisiert den Controller mit den Standardwerten der Spezifikation. | `src/decay_controller.rs` |
+| `pub async fn erase( &self, target: EraseTarget, opts: EraseOptions, ) -> Result<EraseHandle, ContextraError>` | Starts an erase job. Returns once the read gate is durably active (G1); `AwaitLevel::Purged` additionally waits until the physical purge is… | `src/erasure/api.rs` |
+| `pub async fn erase_dry_run(&self, target: EraseTarget) -> Result<ErasePlanSummary, ContextraError>` | Same planner as `erase`, no effect. Returns counts only, never keys. | `src/erasure/api.rs` |
+| `pub async fn erase_status(&self, id: ErasureId) -> Result<ErasureStatus, ContextraError>` | Current status of a job. Unknown id → `NotFound`. | `src/erasure/api.rs` |
+| `pub fn register_erasure_layer( &self, order: super::registry::LayerOrder, tenant: contextra_types::TenantId, collection: &str, layer: Arc<dyn contextra_ports::ErasureLayer>, )` | Registers a secondary erasure layer for a tenant collection (text, graph, vector, checkpoint). Registrations are deterministic and replace… | `src/erasure/api.rs` |
+| `pub fn register_erasure_observer(&self, observer: Arc<dyn contextra_ports::ErasureObserver>)` | Registers an observer that is notified (detached, never blocking) on `Gated`/`Completed`. | `src/erasure/api.rs` |
+| `pub fn new( max_io_bytes_per_second: u64, erase_io_share: f32, clock: Arc<dyn Clock>, pressure_rx: tokio::sync::watch::Receiver<contextra_store::SystemPressure>, ) -> Self` | Creates the budget. `max_io_bytes_per_second == 0` means unlimited rate (pressure only). | `src/erasure/budget.rs` |
+| `pub fn set_sla_boost(&self, on: bool)` | Switches to the doubled erase share (SLA at 80 %). `Critical` pressure is still honoured. | `src/erasure/budget.rs` |
+| `pub fn sla_boost(&self) -> bool` | Returns whether the SLA boost is active. | `src/erasure/budget.rs` |
+| `pub fn clear(&self)` | Evicts everything (called on `Gated`/`Completed`). | `src/erasure/caches.rs` |
+| `pub fn get(&self, key: &K, current_epoch: u64) -> Option<V>` | Returns the value only if it was inserted under `current_epoch`; stale entries are dropped and reported as a miss. | `src/erasure/caches.rs` |
+| `pub fn insert(&self, key: K, epoch: u64, value: V)` | Inserts a value created under `epoch`. | `src/erasure/caches.rs` |
+| `pub fn is_empty(&self) -> bool` | Whether the cache is empty. | `src/erasure/caches.rs` |
+| `pub fn len(&self) -> usize` | Number of cached entries. | `src/erasure/caches.rs` |
+| `pub fn new() -> Self` | Creates an empty cache. | `src/erasure/caches.rs` |
+| `pub async fn accept_and_gate( self: &Arc<Self>, req: &EraseRequest, plan: &ResolvedScope, ) -> Result<GateReceipt, ErasureError>` | G1 path, runs in the caller's context and is never throttled: `accept` → `publish_gate` → observers → RAM masking. | `src/erasure/driver.rs` |
+| `pub async fn drive_job(self: &Arc<Self>, job: &JobView) -> DriveOutcome` | Drives one job as far as it can go in this call. Resumable from any state. | `src/erasure/driver.rs` |
+| `pub async fn run_pass(self: &Arc<Self>) -> Option<Duration>` | One worker pass. Returns how long the worker may sleep (`None` = until notified). | `src/erasure/driver.rs` |
+| `pub fn inner(&self) -> &Arc<ErasureRuntimeInner>` | Shared state (API, tests, layer registration). | `src/erasure/mod.rs` |
+| `pub async fn start( storage: &Arc<LsmStorage>, registry: LayerRegistry, cfg: ErasureConfig, rng: Option<Arc<dyn Rng>>, cancel: CancellationToken, tracker: &TaskTracker, ) -> Self` | Builds and starts the runtime (Spezifikation §11). 1. Kernel from the store. 2. Observers are registered by the caller via [`Self::inner`].… | `src/erasure/mod.rs` |
+| `pub async fn stop(&self)` | Stops accepting jobs and ends the worker. Progress is durable; unfinished jobs resume on the next start. | `src/erasure/mod.rs` |
+| `pub fn collection_key(tenant: TenantId, collection: &str) -> String` | Canonical registry key of a tenant collection (the registry is keyed per tenant). | `src/erasure/registry.rs` |
+| `pub fn expected_layers(&self) -> Vec<WitnessLayer>` | Witness layers of the registered layers (order preserved, duplicates removed). | `src/erasure/registry.rs` |
+| `pub fn is_empty(&self) -> bool` | Whether no layer is registered. | `src/erasure/registry.rs` |
+| `pub fn layers_for(&self, scope: &ResolvedScope) -> Vec<(LayerOrder, Arc<dyn ErasureLayer>)>` | Layers participating in `scope`, in purge order. A tenant scope selects every layer of that tenant; collection and document scopes select t… | `src/erasure/registry.rs` |
+| `pub fn len(&self) -> usize` | Number of registered layers. | `src/erasure/registry.rs` |
+| `pub fn ordered(&self) -> Vec<Arc<dyn ErasureLayer>>` | All layers in deterministic `(order, collection)` order. | `src/erasure/registry.rs` |
+| `pub fn register( &mut self, order: LayerOrder, collection: impl Into<String>, layer: Arc<dyn ErasureLayer>, )` | Registers (or atomically replaces) a layer. | `src/erasure/registry.rs` |
+| `pub fn remove_collection(&mut self, collection: &str)` | Removes every layer registered for `collection` (registry key, see [`Self::collection_key`]). | `src/erasure/registry.rs` |
+| `pub fn collection( id: ErasureId, tenant: TenantId, collection: &str, ) -> Result<ResolvedScope, ErasureError>` | — | `src/erasure/resolver.rs` |
+| `pub fn document( id: ErasureId, tenant: TenantId, collection: &str, key: &str, user_key: Vec<u8>, doc_key: Vec<u8>, reverse_value: &[u8], ) -> Result<ResolvedScope, ErasureError>` | — | `src/erasure/resolver.rs` |
+| `pub fn document_with_extras( id: ErasureId, tenant: TenantId, collection: &str, key: &str, user_key: Vec<u8>, doc_key: Vec<u8>, reverse_value: &[u8], extra_keys: Vec<Vec<u8>>, unprovenanced: u64, ) -> Result<ResolvedScope, ErasureError>` | Document scope including text rows, relation rows and the graph provenance row. `extra_keys` are collection-logical exact keys (no tenant p… | `src/erasure/resolver.rs` |
+| `pub fn tenant(id: ErasureId, tenant: TenantId) -> Result<ResolvedScope, ErasureError>` | — | `src/erasure/resolver.rs` |
 | `pub async fn export_memories(&self) -> Result<ExportCollectionV1>` | Exportiert alle Memories und Graph-Relationen der Collection in das ExportCollectionV1 Schema. | `src/export.rs` |
 | `pub fn create_extractor(mode: ExtractorMode) -> Box<dyn EntityExtractor>` | Erstellt eine Instanz des konfigurierten Extraktors. | `src/extraction/mod.rs` |
 | `pub async fn extract_triples_for_config( text: &str, generator: Option<&dyn LlmTextGenerator>, config: &EntityExtractionConfig, ) -> Result<Vec<ExtractedTriple>>` | Hilfsfunktion zur Ausführung der Extraktion basierend auf der Standard-Konfiguration (OpenIE). | `src/extraction/mod.rs` |
@@ -7151,6 +7397,7 @@ pub trait WorkflowStep : Send + Sync {
 | `pub fn license_gate(&self) -> Arc<dyn LicenseGate>` | Returns a reference to the attached [`LicenseGate`]. | `src/lib.rs` |
 | `pub fn register_consolidation_launcher<F>(_f: F) where F: Fn( Arc<Collection<LsmStorage>>, std::time::Duration, usize, tokio_util::sync::CancellationToken, ) -> tokio::task::JoinHandle<()> + Send + Sync + 'static,` | — | `src/lib.rs` |
 | `pub fn with_consolidation_launcher(mut self, launcher: ConsolidationLauncher) -> Self` | Konfiguriert den optionalen Konsolidierungs-Launcher auf dem Builder. | `src/lib.rs` |
+| `pub fn with_erasure(mut self, cfg: crate::erasure::ErasureConfig) -> Self` | Configures the erasure chain (profile values are set by the facade). | `src/lib.rs` |
 | `pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self` | Konfiguriert die Metrik-Senke zur Erfassung von Systemmetriken. | `src/lib.rs` |
 | `pub fn with_tenant_policy(mut self, policy: TenantPolicy) -> Self` | Konfiguriert die Mandantenisolations- und Zugriffspolicy. | `src/lib.rs` |
 | `pub fn record_counter_safe( sink: &dyn contextra_ports::MetricsSink, name: &str, value: u64, labels: &[(&str, &str)], )` | Helper to record a counter metric best-effort without allowing panics to propagate. | `src/metrics_names.rs` |
@@ -7240,6 +7487,7 @@ pub use contextra_engine::DurabilityMode;
 pub use contextra_engine::{ background_workers, chunker, export, filter, import, temporal_filter, transaction, CommunityDetectionConfig, ExportCollectionV1, ExportDocumentV1, ExportMemoryV1, ExportRelationV1, ImportSummary, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1, };
 pub use advanced::*;
 pub use prelude::*;
+pub use contextra_engine::erasure::{EraseHandle, EraseOptions, ErasePlanSummary, ErasureConfig};
 pub use contextra_engine::decay_controller::*;
 pub use contextra_engine::fusion;
 pub use volatile_vault::*;
@@ -7378,6 +7626,8 @@ pub use contextra_types::types::domain::{DocId, ScoredDocument};
 pub use contextra_types::DistanceMetric;
 pub use performance_profile::{DurabilityConfigError, DurabilityMode, PerformanceProfile};
 pub use query_rewriter::LlmQueryRewriter;
+pub use contextra_db::{EraseHandle, EraseOptions, ErasePlanSummary, ErasureConfig};
+pub use contextra_types::{ AwaitLevel, CheckpointTaintPolicy, EraseTarget, ErasureException, ErasureId, ErasurePolicy, ErasureProfile, ErasureReason, ErasureState, ErasureStatus, Guarantee, ReinsertPolicy, };
 ```
 
 ### Feature-Flags
@@ -7395,6 +7645,10 @@ pub use query_rewriter::LlmQueryRewriter;
 pub trait ContextraConfigExt {
 /// Returns `true` if storage encryption is configured with a non-empty passphrase.
     fn is_encrypted(&self) -> bool;
+    /// Returns the durable erasure configuration.
+    fn erasure_config(&self) -> &contextra_db::ErasureConfig;
+    /// Replaces the durable erasure configuration.
+    fn set_erasure_config(&mut self, config: contextra_db::ErasureConfig);
 }
 ```
 
@@ -7403,7 +7657,7 @@ pub trait ContextraConfigExt {
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
 | `AgentMemory` | `{ engine: Arc<Contextra>, id_gen: Option<Arc<dyn IdGen>>, }` | High-Level-Fassade für die Verwaltung des Agentengedächtnisses. Bietet die Kernoperationen: - `remember`: Speichern von Texten und Metadaten. - `reca… | `src/agent_memory.rs` |
-| `CollectionProfile` | `{ pub performance: PerformanceProfile, pub kv_delete_mode: KvDeleteMode, pub lsm_tuning: LsmTuning, pub auto_extraction: AutoExtractionMode, }` | Vollständiges Profil zur Konfiguration einer Collection. Bündelt Performance-, Persistenz- und Datenschutzaspekte für eine Sammlung. | `src/collection_profile.rs` |
+| `CollectionProfile` | `{ pub performance: PerformanceProfile, pub kv_delete_mode: KvDeleteMode, pub lsm_tuning: LsmTuning, pub auto_extraction: AutoExtractionMode, /// Erasure guarante… }` | Vollständiges Profil zur Konfiguration einer Collection. Bündelt Performance-, Persistenz- und Datenschutzaspekte für eine Sammlung. | `src/collection_profile.rs` |
 | `ContextraBuilder` | `{ storage_path: PathBuf, config: ContextraConfig, encryption_mode: Option<EncryptionMode>, encryption_error: Option<String>, explicit_user_config: bool, embedder… }` | Ein Builder zur flexiblen Konfiguration und Instanziierung der Datenbank [`Contextra`]. `ContextraBuilder` fungiert als primärer Einstiegspunkt (Comp… | `src/builder.rs` |
 | `LlmQueryRewriter` | `{ generator: Arc<dyn LlmTextGenerator>, max_subqueries: usize, max_context_results: usize, max_snippet_chars: usize, }` | LLM-unterstützter Abfrage-Umformulierer für iteratives oder mehrstufiges Retrieval (Multi-Step Retrieval). Sendet den aktuellen Suchkontext an ein LL… | `src/query_rewriter.rs` |
 | `LsmTuning` | `{ pub memtable_size_limit: u64, pub max_ram_mb: u32, pub group_commit_window_micros: u32, pub block_cache_shards: u16, }` | Feineinstellungsparameter für die LSM-Speicher-Engine (Log-Structured Merge-Tree). Regelt Speicherbudgets und Flush-Frequenzen, um Systemressourcen o… | `src/collection_profile.rs` |
@@ -7433,7 +7687,7 @@ pub trait ContextraConfigExt {
 | `DEFAULT_AUTO_EXTRACTION_MODE` | `AutoExtractionMode` | Standardmodus für die automatische LLM-gestützte Metadaten-/Entitäten-Extraktion bei Standard-Tiers. Standardmäßig aktiviert (`AutoExtractionMode::En… |
 | `ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT` | `AutoExtractionMode` | Standardmodus für `EnterpriseRegulated`. In EnterpriseRegulated wird kein Dokumenttext automatisch an ein Extraktions-LLM gegeben, solange der Betrei… |
 
-### Öffentliche Funktionen (42)
+### Öffentliche Funktionen (44)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
@@ -7451,6 +7705,8 @@ pub trait ContextraConfigExt {
 | `pub fn with_id_gen(mut self, id_gen: Arc<dyn IdGen>) -> Self` | Injiziert oder aktualisiert den ID-Generator nachträglich (Builder-Muster). | `src/agent_memory.rs` |
 | `pub fn execute_boot_sequence( path: &Path, dimension: usize, passphrase_configured: bool, empty_passphrase: bool, ) -> Result<(), ContextraError>` | Führt die normativen Startphasen B0 bis B9 in fester Reihenfolge aus. | `src/boot.rs` |
 | `pub async fn build(self) -> Result<Contextra, ContextraError>` | Baut und initialisiert die [`Contextra`]-Datenbankinstanz asynchron. # Ablauf von `build`: 1. **Vorabprüfung**: Prüfe, ob frühere Fehler (z… | `src/builder.rs` |
+| `pub fn erasure_config(mut self, config: contextra_db::ErasureConfig) -> Self` | Configures durable erasure scheduling and checkpoint policy. | `src/builder.rs` |
+| `pub fn erasure_profile(mut self, profile: contextra_types::ErasureProfile) -> Self` | Selects the erasure guarantee profile. | `src/builder.rs` |
 | `pub fn is_encrypted(&self) -> bool` | Prüft, ob der Builder aktuell auf verschlüsselten Modus mit Passphrase eingestellt ist. | `src/builder.rs` |
 | `pub fn new(dimension: usize) -> Self` | Erzeugt einen neuen `ContextraBuilder` mit der angegebenen Vektordimension. # Parameter - `dimension`: Anzahl der Dimensionen für Vektoren… | `src/builder.rs` |
 | `pub fn with_config(mut self, mut config: ContextraConfig) -> Self` | Überschreibt die Konfiguration vollständig mit einer bestehenden [`ContextraConfig`]. Überträgt auch eventuell in `config` enthaltene Passp… | `src/builder.rs` |
@@ -7507,6 +7763,7 @@ pub mod server;
 pub mod server_dispatch;
 pub mod server_tools;
 pub mod tools_crud;
+pub mod tools_erase;
 pub mod validation;
 pub use config::*;
 pub use explain::{ExplainRequest, ExplainResponse};
@@ -7553,7 +7810,7 @@ pub use validation::{is_write_allowed_by_env, validate_collection_name};
 |---|---|---|---|
 | `McpError` | `#[error("{0}")] ParseError(String), #[error("{0}")] InvalidRequest(String), #[error("{0}")] MethodNotFound(String), #[error("{0}")] InvalidParams(String), #[error("{0}")] InternalError(String),` | MCP Error representation matching standard JSON-RPC 2.0 error codes. | `src/protocol.rs` |
 | `QuarantinePolicy` | `/// Verdächtige Texte werden durch einen neutralen Platzhalter ersetzt (Default). #[default] Strict, /// **WARNUNG (UNSICHER)**: Text wird unverändert durchgereicht, lediglich das Flag /// `suspiciou…` | Konfigurierbare Quarantäne-Policy für die Prompt-Injection-Behandlung. **SICHERHEITSHINWEIS & HEURISTIK-LIMITATION**: Pattern-Matching und Normalisie… | `src/prompt_injection/policy.rs` |
-| `ToolCategory` | `/// Read-only Datenbankoperationen (immer erlaubt). DatabaseRead, /// Schreibende Datenbankoperationen (erfordern explizite Freigabe). DatabaseWrite, /// Externe Code-Ausführung (höchste Risikostufe,…` | Erlaubte MCP-Tool-Kategorien (Whitelist-Prinzip). | `src/sandbox.rs` |
+| `ToolCategory` | `/// Read-only Datenbankoperationen (immer erlaubt). DatabaseRead, /// Schreibende Datenbankoperationen (erfordern explizite Freigabe). DatabaseWrite, /// Destructive erasure operation, separately cla…` | Erlaubte MCP-Tool-Kategorien (Whitelist-Prinzip). | `src/sandbox.rs` |
 
 ### Konstanten (10)
 
@@ -7570,7 +7827,7 @@ pub use validation::{is_write_allowed_by_env, validate_collection_name};
 | `MAX_VOLATILE_RESULTS` | `usize` | Maximale Anzahl von volatilen Ergebnissen pro Sandbox-Session. |
 | `TOOL_REGISTRY` | `&[ToolDefinition]` | Single Source of Truth für MCP-Tool-Registrierung, Discovery (`tools/list`) und -Klassifizierung. ## Tool-Kategorie-Tabelle | Werkzeug | Kategorie |… |
 
-### Öffentliche Funktionen (71)
+### Öffentliche Funktionen (72)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
@@ -7636,6 +7893,7 @@ pub use validation::{is_write_allowed_by_env, validate_collection_name};
 | `pub fn validate_tool_call(&self, method: &str, _params: &Value) -> Result<()>` | Validiert ob ein Tool-Call erlaubt ist. HINWEIS: Unbekannte Tool-Namen (die nicht in `TOOL_REGISTRY` gelistet sind) werden sofort per `try_… | `src/sandbox.rs` |
 | `pub fn new( db: Arc<Contextra>, embedder: Arc<dyn EmbeddingProvider>, ) -> Result<Self, ContextraError>` | — | `src/server.rs` |
 | `pub async fn run_stdio(self: Arc<Self>) -> Result<(), Box<dyn std::error::Error>>` | Startet den MCP stdio-Loop. Liest zeilenweise von stdin, dispatcht JSON-RPC-Requests und schreibt Antworten als einzelne JSON-Zeile nach st… | `src/server.rs` |
+| `pub fn with_erase_enabled(mut self, enabled: bool) -> Self` | Enables the destructive erase tools for this server instance. | `src/server.rs` |
 | `pub fn with_injection_guard(mut self, injection_guard: Arc<PromptInjectionGuard>) -> Self` | — | `src/server.rs` |
 | `pub fn with_plugin_registry( mut self, registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>, ) -> Self` | — | `src/server.rs` |
 | `pub fn with_sandbox( db: Arc<Contextra>, embedder: Arc<dyn EmbeddingProvider>, sandbox: Arc<McpSandbox>, ) -> Self` | — | `src/server.rs` |
@@ -7662,12 +7920,17 @@ pub use validation::{is_write_allowed_by_env, validate_collection_name};
 
 ### Architekturbeschreibung
 
-# Crate `contextra-testkit`  Deterministische Test-Utilities, Mocks, In-Memory-Referenzimplementierungen und Konformitätsprüfsuiten für das Contextra-System.  ## Ring & Architektur-Einordnung - **Ring:** Werkzeug / Tooling (außerhalb der numerischen Ringe 0 bis 4). - **Klasse:** Werkzeug (`—`). - **Sicherheits-Invariante (INV-EMBED-1):** `contextra-testkit` darf ausschließlich als `[dev-dependencies]` in Produktions-Crates eingebunden werden und niemals in Release-Binaries oder produktiven Abhängigkeiten landen. - **Unsafe-Code:** Ausdrücklich verboten über `#![forbid(unsafe_code)]`.  ## Bereitgestellte Hauptkomponenten - [`ManualClock`]: Deterministische, manuell steuerbare Uhr (implementiert `Clock`-Port). - [`FaultVfs`]: Virtuelles Dateisystem mit kontrollierter Fehlerinjektion für I/O- und fsync-Fehler. - [`InMemoryStorageEngine`]: Transaktionale In-Memory-Speicher-Engine mit Rollback-Unterstützung. - [`InMemoryVectorIndex`]: In-Memory-Vektorindex mit Cosine-Distanzberechnung. - [`InMemoryTextIndex`]: In-Memory-Volltextindex (BM25-ähnlich). - [`InMemoryGraphIndex`]: In-Memory-Graphindex für Kanten- und Knotentraversierung. - [`ReferenceModel`]: Referenzmodell zur Validierung von MVCC-Isolationsstufen (Multi-Version Concurrency Control). - [`mocks`]: Mocks für Embedder und Metriken (`MockEmbedder`, `TestMetricsSink`). - [`conformance`]: Standardisierte Konformitätstests für Ports (Clock, RNG, Storage, Vector, etc.).  ## Abhängigkeiten - **Normal:** `contextra-ports`, `contextra-types`, `bytes`, `parking_lot`, `tracing`. - **Wird eingebunden von:** `contextra`, `contextra-checkpoint`, `contextra-crypto`, `contextra-db`, `contextra-engine`, `contextra-graph`, `contextra-mvcc`, `contextra-store`.
+# Crate `contextra-testkit`  Deterministische Test-Utilities, Mocks, In-Memory-Referenzimplementierungen und Konformitätsprüfsuiten für das Contextra-System.  ## Ring & Architektur-Einordnung - **Ring:** Werkzeug / Tooling (außerhalb der numerischen Ringe 0 bis 4). - **Klasse:** Werkzeug (`—`). - **Sicherheits-Invariante (INV-EMBED-1):** `contextra-testkit` darf ausschließlich als `[dev-dependencies]` in Produktions-Crates eingebunden werden und niemals in Release-Binaries oder produktiven Abhängigkeiten landen. - **Unsafe-Code:** Ausdrücklich verboten über `#![forbid(unsafe_code)]`.  ## Bereitgestellte Hauptkomponenten - [`ManualClock`]: Deterministische, manuell steuerbare Uhr (implementiert `Clock`-Port). - [`FaultVfs`]: Virtuelles Dateisystem mit kontrollierter Fehlerinjektion für I/O- und fsync-Fehler. - [`InMemoryStorageEngine`]: Transaktionale In-Memory-Speicher-Engine mit Rollback-Unterstützung. - [`InMemoryVectorIndex`]: In-Memory-Vektorindex mit Cosine-Distanzberechnung. - [`InMemoryTextIndex`]: In-Memory-Volltextindex (BM25-ähnlich). - [`InMemoryGraphIndex`]: In-Memory-Graphindex für Kanten- und Knotentraversierung. - [`ReferenceModel`]: Referenzmodell zur Validierung von MVCC-Isolationsstufen (Multi-Version Concurrency Control). - [`mocks`]: Mocks für Embedder und Metriken (`MockEmbedder`, `TestMetricsSink`). - [`conformance`]: Standardisierte Konformitätstests für Ports (Clock, RNG, Storage, Vector, etc.).  ## Löschkette (Feature `erasure-conformance`) `crash_vfs`, `gates`, `erasure_mocks`, `conformance::erasure_layer`, `erasure_model`, `canary`.  ## Abhängigkeiten - **Normal:** `contextra-ports`, `contextra-types`, `bytes`, `parking_lot`, `tracing`. - **Wird eingebunden von:** `contextra`, `contextra-checkpoint`, `contextra-crypto`, `contextra-db`, `contextra-engine`, `contextra-graph`, `contextra-mvcc`, `contextra-store`.
 
 ### Modul- und Re-Export-Oberfläche (lib.rs)
 
 ```rust
 pub mod conformance;
+pub mod crash_vfs;
+pub mod gates;
+pub mod erasure_mocks;
+pub mod canary;
+pub mod erasure_model;
 pub mod fault_vfs;
 pub mod in_memory_graph;
 pub mod in_memory_store;
@@ -7705,40 +7968,144 @@ pub use reference_model::{RefOp, ReferenceModel};
 | `testkit` | `[]` |
 | `erasure-conformance` | `[]` |
 
-### Öffentliche Datentypen — Structs (11)
+### Schnittstellen — Public Traits (2)
+
+**`LayerFixture`** — *Fixture-Vertrag einer zu prüfenden Schicht. Gegenüber 13 §5.1 sind `neighbor_docs`, `state_digest`, `foreign_key` und `direct_blocked_reads` ergänzt: ohne sie sind C1/C2, C3 und C7 nicht prüfbar.* (`src/conformance/erasure_layer.rs`)
+
+```rust
+pub trait LayerFixture : Send + Sync {
+/// Geprüfte Schicht.
+    type Layer: ErasureLayer;
+    /// Neue Fixture über `vfs`.
+    fn new(vfs: CrashVfs) -> Self;
+    /// Die Schicht.
+    fn layer(&self) -> &Self::Layer;
+    /// Füllt Scope-Dokumente und Nachbarn deterministisch.
+    fn seed(&self, n_scope: usize, n_neighbor: usize);
+    /// Aufgelöster Scope. Muss die Scope-Dokumente als [`DocScope::Set`] führen.
+    fn scope(&self) -> ResolvedScope;
+    /// Nachbardokumente.
+    fn neighbor_docs(&self) -> Vec<DocId>;
+    /// Kanonischer Digest aller Zustände außerhalb des Scopes.
+    fn neighbor_digest(&self) -> [u8; 32];
+    /// Kanonischer Digest des gesamten durablen Schichtzustands.
+    fn state_digest(&self) -> [u8; 32];
+    /// Setzt ein Restobjekt des Scopes absichtlich zurück.
+    fn plant_residue(&self);
+    /// Fehlerinjektion.
+    fn inject_fault(&self, f: FaultSpec);
+    /// Scope-prüfender Reader.
+    fn reader(&self) -> Arc<dyn PrivilegedRead>;
+    /// Existierender Schlüssel außerhalb des Scopes.
+    fn foreign_key(&self) -> Vec<u8>;
+    /// Gate der Fixture.
+    fn gate(&self) -> Arc<dyn ReadGate>;
+    /// Suchpfad der Schicht.
+    fn is_visible(&self, doc: DocId) -> bool;
+    /// Zugriffe der Schicht auf gesperrte Schlüssel am Reader vorbei.
+    fn direct_blocked_reads(&self) -> u64;
+}
+```
+
+**`SystemUnderTest`** — *System unter Test (Implementierung im jeweiligen E2E-Test, O-X4).* (`src/erasure_model.rs`)
+
+```rust
+pub trait SystemUnderTest {
+/// **Alles**, was in irgendeiner Schicht noch auffindbar ist, inklusive Historie.
+    fn inventory(&self) -> Result<Inventory, String>;
+    /// Über den Suchpfad aktuell sichtbare Dokumente.
+    fn visible(&self, tenant: TenantId) -> Result<BTreeSet<(String, DocId)>, String>;
+}
+```
+
+### Öffentliche Datentypen — Structs (37)
 
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
+| `AlwaysOpenGate` | `(tuple/unit)` | Gate ohne aktive Sperren. | `src/gates.rs` |
+| `AlwaysRestrictedGate` | `(tuple/unit)` | Fail-closed-Gate: alles `Restricted`, nichts darf verworfen werden. | `src/gates.rs` |
+| `Canary` | `{ /// 48 eindeutige Bytes (druckbares ASCII, auch als Text-/Term-Inhalt verwendbar). pub value_needle: Vec<u8>, /// Eindeutiger Dokumentschlüssel. pub key_needle… }` | Nadeln eines Canary-Dokuments. | `src/canary.rs` |
 | `ConformanceFailure` | `{ /// Name der ausgeführten Suite (z. B. "StorageEngine", "VectorIndex", "Clock"). pub suite_name: &'static str, /// Name des spezifischen fehlgeschlagenen Testf… }` | Repräsentiert einen aufgetretenen Fehler während einer Konformitätsprüfung. **Zweck:** Enthält den Suitenamen, den konkreten Testfall und eine mensch… | `src/conformance/failure.rs` |
+| `CrashLoopConfig` | `{ /// Seed jedes Laufs. pub seed: CrashSeed, /// Maximale Anzahl Läufe; darüber seed-gezogene Stichprobe. pub max_points: usize, }` | Konfiguration der Crash-Schleife. | `src/crash_vfs.rs` |
+| `CrashLoopFailure` | `{ /// Crashpunkt; `None` für den Referenzlauf ohne Crash. pub point: Option<(u64, CrashPolicy)>, /// Ursache. pub message: String, }` | Verstoß in der Crash-Schleife. | `src/crash_vfs.rs` |
+| `CrashPoint` | `{ /// Anzahl der vor dem Absturz ausgeführten Operationen. pub n: u64, /// Angewandte Neustart-Politik. pub policy: CrashPolicy, /// Operationsprotokoll bis zum… }` | Beschreibung eines geprüften Crashpunkts. | `src/crash_vfs.rs` |
+| `CrashReport` | `{ /// Operationen des ungestörten Laufs. pub total_ops: u64, /// Geprüfte `(n, policy)`-Paare. pub runs: usize, /// `true`, wenn nur eine Stichprobe lief. pub sa… }` | Ergebnis einer vollständig bestandenen Crash-Schleife. | `src/crash_vfs.rs` |
+| `CrashSeed` | `(tuple/unit)` | Startwert aller seed-gesteuerten Entscheidungen. | `src/crash_vfs.rs` |
+| `CrashVfs` | `{ state: Arc<Mutex<State>>, }` | Deterministisches In-Memory-Dateisystem mit Absturzsimulation. `Clone` teilt den Zustand. | `src/crash_vfs.rs` |
+| `DocRecord` | `{ /// Nutzerschlüssel. pub key: String, /// Körper. pub body: Vec<u8>, /// Embedding-Rohbytes. pub embedding: Vec<u8>, /// Indexierte Terme. pub terms: BTreeSet<… }` | Inhalt eines Dokuments. | `src/erasure_model.rs` |
+| `ErasureModel` | `{ kv: ReferenceModel, docs: BTreeMap<DocKey, DocRecord>, postings: BTreeMap<(TenantId, String, String), BTreeSet<DocId>>, graph: BTreeMap<ObjRef, BTreeSet<(Strin… }` | Sollzustand über alle Schichten. KV-Historie baut auf [`ReferenceModel`] auf. | `src/erasure_model.rs` |
 | `FaultConfig` | `{ /// Schreiboperationen nach dieser Anzahl erfolgreicher Schreibvorgänge fehlschlagen lassen. pub fail_writes_after: Option<usize>, /// Sync- bzw. Flush-Operati… }` | Konfiguration für deterministische Fehlerinjektion in [`FaultVfs`]. **Zweck:** Ermöglicht Test-Cases die exakte Vorgabe von Fehlerbedingungen, beispi… | `src/fault_vfs.rs` |
 | `FaultVfs` | `{ /// In-Memory Dateispeicher: Pfad -> Dateibytes. files: Arc<RwLock<BTreeMap<PathBuf, Vec<u8>>>>, /// Anzahl der versuchten Leseoperationen. read_count: Arc<Ato… }` | Simuliertes In-Memory-Dateisystem mit deterministischer Fehlerinjektion. **Zweck:** Dient als I/O-Testunterlage für Speichermodule (z. B. WAL und LSM… | `src/fault_vfs.rs` |
+| `FileState` | `{ /// Inhalt, falls der Name durabel ist. pub durable: Option<Vec<u8>>, /// Inhalt, falls der Name flüchtig sichtbar ist. pub volatile: Option<Vec<u8>>, }` | Inhalt eines Pfades in beiden Zuständen (`None` = Name existiert dort nicht). | `src/crash_vfs.rs` |
+| `Hit` | `{ /// Datei (bei Namenstreffern der Pfad selbst). pub path: PathBuf, /// Byteposition im Inhalt; `None` = Treffer im Dateinamen oder Linkziel. pub offset: Option… }` | Fundstelle. | `src/canary.rs` |
 | `InMemoryGraphIndex` | `{ entities: Arc<RwLock<EntityMap>>, edges: Arc<RwLock<EdgeMap>>, staged: Arc<RwLock<StagedGraphTxMap>>, last_tx: Arc<RwLock<TxId>>, }` | Thread-sichere In-Memory-Referenzimplementierung von [`GraphIndex`] für Tests. **Zweck:** Ermöglicht Wissensgraph- und Beziehungstests ohne externe G… | `src/in_memory_graph.rs` |
 | `InMemoryStorageEngine` | `{ /// Bestätigter globaler Datenbestand. data: Arc<RwLock<StoreDataMap>>, /// Unbestätigte Staging-Puffer nach Transaktions-ID geordnet. staged: Arc<RwLock<Stage… }` | Thread-sichere In-Memory-Implementierung von `StorageEngine` für Tests. **Zweck:** Ermöglicht Unit- und Integrationstests von Engines und Abfrageschi… | `src/in_memory_store.rs` |
 | `InMemoryTextIndex` | `{ /// Bestätigter Dokumentendatenbestand. data: Arc<RwLock<TextMap>>, /// Unbestätigte Transaktionsänderungen. staged: Arc<RwLock<StagedTextTxMap>>, /// ID der l… }` | Thread-sichere In-Memory-Referenzimplementierung von [`TextIndex`] für Tests. **Zweck:** Ermöglicht Volltext- und Stichwortsuchen in Tests ohne exter… | `src/in_memory_text.rs` |
 | `InMemoryVectorIndex` | `{ /// Erwartete Dimension der Vektoren. dim: usize, /// Bestätigter Vektordatenbestand. data: Arc<RwLock<VectorMap>>, /// Unbestätigte Staging-Änderungen nach Tr… }` | Thread-sichere Referenzimplementierung von [`VectorIndex`] für Tests. **Zweck:** Ermöglicht semantische Vektorsuchen in Unit- und Integrationstests,… | `src/in_memory_vector.rs` |
 | `ManualClock` | `{ /// Nanosekunden seit UNIX_EPOCH (1970-01-01 00:00:00 UTC). nanos: AtomicU64, }` | Thread-sichere, manuell vorstellbare Uhr für reproduzierbare Tests. **Zweck:** Ermöglicht deterministische zeitabhängige Tests ohne Abhängigkeit von… | `src/manual_clock.rs` |
+| `ManualIoBudget` | `{ remaining: Mutex<Option<u64>>, pressure: Mutex<PressureHint>, log: Mutex<Vec<(IoClass, u64)>>, }` | Manuell gesteuertes I/O-Budget; wartet nie, sondern meldet `Busy`. | `src/erasure_mocks.rs` |
 | `MockEmbedder` | `{ /// Ziel-Dimensionalität der generierten Embeddings. pub dim: usize, /// Fester Ausgabevektor für reproduzierbare Assertions in Tests. pub fixed_output: Option… }` | Deterministischer Mock-Embedding-Provider für Testläufe. **Zweck:** Ermöglicht semantische Vektortests ohne teure oder nicht-deterministische externe… | `src/mocks.rs` |
+| `MockErasureKernel` | `{ state: Arc<Mutex<KernelState>>, expected_layers: Vec<WitnessLayer>, reader_data: Arc<Mutex<BTreeMap<Vec<u8>, Bytes>>>, }` | In-Memory-Kernel, der ausschließlich erlaubte Zustandsübergänge zulässt. Das Gate bleibt ab `publish_gate` bis `Completed` gesetzt, auch über `Failed… | `src/erasure_mocks.rs` |
+| `MockLayer` | `(tuple/unit)` | Referenzschicht: ein Dokument je Datei in [`CrashVfs`]. | `src/erasure_mocks.rs` |
+| `MockLayerFixture` | `{ layer: MockLayer, reader: Arc<MockPrivilegedRead>, }` | [`LayerFixture`] um [`MockLayer`]; `D` wählt den Defekt zur Übersetzungszeit. | `src/erasure_mocks.rs` |
+| `MockPrivilegedRead` | `{ scope: KeyScope, data: Mutex<BTreeMap<Vec<u8>, Bytes>>, violations: AtomicU64, }` | Scope-prüfender Reader über einer In-Memory-Tabelle. | `src/erasure_mocks.rs` |
+| `MockProgressSink` | `{ records: Mutex<Vec<(WitnessLayer, LayerProgress)>>, fail_after: Mutex<Option<usize>>, }` | Zeichnet Fortschrittsmeldungen auf. | `src/erasure_mocks.rs` |
+| `ModelDiff` | `{ /// Im Modell, aber nicht im System (beschädigte Nachbarn, Verlust). pub missing: Inventory, /// Im System, aber nicht im Modell (Wiederaufleben, Löschrest). p… }` | Abweichung zwischen Modell und System. | `src/erasure_model.rs` |
+| `ObjRef` | `{ /// Mandant. pub tenant: TenantId, /// Objektname. pub name: String, }` | Graphobjekt, mandantengebunden. | `src/erasure_model.rs` |
+| `OpRecord` | `{ /// Operationsart. pub kind: OpKind, /// FNV-1a-Hash des Pfades (bei `rename`/`link`: Zielpfad), siehe [`path_hash`]. pub path_hash: u64, }` | Protokolleintrag einer ausgeführten Operation. | `src/crash_vfs.rs` |
+| `RecordingGate` | `{ inner: Arc<dyn ReadGate>, calls: Arc<Mutex<Vec<GateCall>>>, }` | Zeichnet jeden Aufruf auf und delegiert an ein inneres Gate. `Clone` teilt das Protokoll. | `src/gates.rs` |
 | `ReferenceModel` | `{ /// Versionshistorie: Schlüssel -> Liste von (Sequenznummer, Optionaler Wert). #[allow(clippy::type_complexity)] history: BTreeMap<Vec<u8>, Vec<(u64, Option<Ve… }` | Deterministic, std-only MVCC reference model for Contextra store verification. **Zweck:** Bietet eine überprüfbare "Ground Truth" für Transaktionsiso… | `src/reference_model.rs` |
+| `ScanOpts` | `{ /// Dokumentiert die Absicht; dateigestützte Mappings sind Dateiinhalt und werden /// ohnehin gelesen. Anonymer Speicher (Heap, Swap) wird **nie** durchsucht.… }` | Optionen des Scans. | `src/canary.rs` |
+| `Scenario` | `{ run: Box<dyn FnOnce() -> std::result::Result<(), String>>, }` | Ausführbares Szenario. Fehler sind nach dem Crashpunkt erwartet, Panics nie. | `src/crash_vfs.rs` |
 | `TestMetricsSink` | `{ /// Mutex-geschützte Liste aller eingegangenen Ereignisse. events: std::sync::Arc<std::sync::Mutex<Vec<MetricEvent>>>, }` | In-Memory-Implementierung von [`contextra_ports::MetricsSink`] für Tests. **Zweck:** Fängt alle Metrik-Aufrufe ab und speichert sie chronologisch in… | `src/mocks.rs` |
+| `TreeSnapshot` | `{ /// Pfad → Zustände. pub files: BTreeMap<PathBuf, FileState>, }` | Abbild aller Dateien. | `src/crash_vfs.rs` |
 
-### Öffentliche Datentypen — Enums (2)
+### Öffentliche Datentypen — Enums (10)
 
 | Enum | Varianten | Beschreibung | Datei |
 |---|---|---|---|
+| `CrashPolicy` | `/// Nur Durables überlebt. DropUnsynced, /// Ungesyncte Schreibvorgänge überleben bis zu einem seed-gewählten Präfix je Datei. TornTail { /// Sektorgröße (1 = byte-genau, 512, 4096). sector: u32, },…` | Verhalten beim Neustart. | `src/crash_vfs.rs` |
+| `Defect` | `/// Korrekte Schicht. #[default] None, /// C1: committet bei jedem Lauf erneut Einheiten. RecountsOnRerun, /// C2: überspringt beim Fortsetzen mit Cursor ein Dokument. SkipsOnResume, /// C3: veränder…` | Absichtlicher Fehler in [`MockLayer`]; jede Variante muss genau von der Suite erkannt werden. | `src/erasure_mocks.rs` |
+| `Entry` | `/// KV-Version (`None` = Tombstone), inklusive Historie. Version { /// KV-Schlüssel, siehe [`kv_key`]. key: Vec<u8>, /// Sequenznummer. seq: u64, /// Wert. value: Option<Vec<u8>>, }, /// Aktuell sich…` | Ein beobachtbarer Eintrag in irgendeiner Schicht. | `src/erasure_model.rs` |
+| `ErrKind` | `/// `ENOSPC`. NoSpace, /// `EIO`. Io, /// `EROFS`. ReadOnly,` | Injizierbare Fehlerart. | `src/crash_vfs.rs` |
+| `FaultSpec` | `/// Transienter I/O-Fehler. Io, /// Korrupte Daten. Corrupt, /// Zeitüberschreitung (z. B. Lock). Timeout, /// Der Scanner findet seine Positivkontrolle nicht. BrokenScanner,` | Zu injizierender Fehler. | `src/conformance/erasure_layer.rs` |
+| `GateCall` | `/// `is_active`. IsActive, /// `epoch`. Epoch, /// `check`. Check(Vec<u8>), /// `check_version`. CheckVersion(Vec<u8>, Seq), /// `check_prefix`. CheckPrefix(Vec<u8>), /// `discard_rule`. DiscardRule(…` | Protokollierter Gate-Aufruf. | `src/gates.rs` |
 | `MetricEvent` | `/// Inkrement-Ereignis eines monotonen Zählers (Counter). Counter { /// Name der Metrik. name: String, /// Um wie viel der Zähler erhöht wurde. value: u64, /// Schlüssel-Wert-Labels (Tags) zur Dimens…` | Ein einzelnes aufgezeichnetes Metrik-Ereignis aus [`TestMetricsSink`]. **Zweck:** Dient in Test-Assertions der genauen Überprüfung, ob Instrumentieru… | `src/mocks.rs` |
+| `Op` | `/// Anlegen oder vollständig ersetzen. Insert { /// Mandant. tenant: TenantId, /// Collection. collection: String, /// Dokument-ID. doc: DocId, /// Inhalt. record: DocRecord, }, /// Ersetzt ein vorha…` | Modelloperation. | `src/erasure_model.rs` |
+| `OpKind` | `/// Datei oder Verzeichnis angelegt. Create, /// `write_at`. Write, /// `set_len` (auch `truncate` beim Öffnen). SetLen, /// `rename`. Rename, /// `remove_file` / `unlink`. Remove, /// `sync_data`. S…` | Art einer gezählten Operation. | `src/crash_vfs.rs` |
 | `RefOp` | `/// Inserts or overwrites a key-value pair. Put { key: Vec<u8>, value: Vec<u8> }, /// Marks a key as deleted (tombstone). Delete { key: Vec<u8> },` | Operation for batch execution on the reference model. | `src/reference_model.rs` |
 
-### Typ-Aliase (1)
+### Typ-Aliase (2)
 
 | Alias | Definition | Beschreibung |
 |---|---|---|
 | `ConformanceResult` | `type ConformanceResult= Result<(), ConformanceFailure>` | Spezialisierter Result-Typ für Konformitätsläufe: `Ok(())` oder `Err(ConformanceFailure)`. |
+| `Inventory` | `type Inventory= BTreeSet<Entry>` | Vollständiger Bestand eines Systems. |
 
-### Öffentliche Funktionen (48)
+### Konstanten (2)
+
+| Konstante | Typ | Beschreibung |
+|---|---|---|
+| `MOCK_QUARANTINE_ATTEMPTS` | `u32` | Versuche, nach denen ein Auftrag in Quarantäne geht. |
+| `VALUE_NEEDLE_LEN` | `usize` | Länge der Wertnadel in Bytes. |
+
+### Öffentliche Funktionen (106)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
+| `pub fn from_seed(seed: u64, doc_id: u64) -> Self` | Deterministisch aus `seed`; `doc_id` ist die vom System vergebene ID. Kleine `doc_id`s ergeben kurze Dezimalnadeln mit zufälligen Treffern;… | `src/canary.rs` |
+| `pub fn scan_tree(root: &Path, needles: &[&[u8]], opts: ScanOpts) -> io::Result<Vec<Hit>>` | Durchsucht `root` rekursiv (Inhalte, Namen, Linkziele). Symlinks werden nicht verfolgt. # Errors Fehlende Wurzel, nicht lesbare Einträge, S… | `src/canary.rs` |
 | `pub fn run_clock_suite<C: Clock>(clock: &C) -> ConformanceResult` | Führt die vollständige Konformitätsprüfung für eine [`Clock`]-Implementierung durch. **Ablauf:** 1. Ruft zweimal hintereinander `monotonic_… | `src/conformance/clock.rs` |
+| `pub async fn c1_idempotence<F: LayerFixture>(make: impl Fn(CrashVfs) -> F) -> ConformanceResult` | C1: Idempotenz. | `src/conformance/erasure_layer.rs` |
+| `pub async fn c2_resumption<F: LayerFixture>(make: impl Fn(CrashVfs) -> F) -> ConformanceResult` | C2: Wiederaufnahme von jedem Cursor, auch in einer Fixture ohne Vorgeschichte im RAM. | `src/conformance/erasure_layer.rs` |
+| `pub async fn c3_scope_isolation<F: LayerFixture>( make: impl Fn(CrashVfs) -> F, ) -> ConformanceResult` | C3: Scope-Isolation. | `src/conformance/erasure_layer.rs` |
+| `pub async fn c4_witness_honesty<F: LayerFixture>( make: impl Fn(CrashVfs) -> F, ) -> ConformanceResult` | C4: Witness-Ehrlichkeit. | `src/conformance/erasure_layer.rs` |
+| `pub async fn c5_fault_injection<F: LayerFixture>( make: impl Fn(CrashVfs) -> F, ) -> ConformanceResult` | C5: Fehlerinjektion. | `src/conformance/erasure_layer.rs` |
+| `pub async fn c6_cancel_safety<F: LayerFixture>(make: impl Fn(CrashVfs) -> F) -> ConformanceResult` | C6: Abbruchsicherheit — kooperativ (Token) und durch Verwerfen des Futures. | `src/conformance/erasure_layer.rs` |
+| `pub async fn c7_gate_respect<F: LayerFixture>(make: impl Fn(CrashVfs) -> F) -> ConformanceResult` | C7: Gate-Respekt. | `src/conformance/erasure_layer.rs` |
+| `pub fn expected_error(self) -> (LayerErrorKind, &'static str)` | Erwartete Klassifikation (Spezifikation 06 §5.5) mit Detailtext. | `src/conformance/erasure_layer.rs` |
+| `pub async fn k1_gate_idempotent<F: LayerFixture>( make: impl Fn(CrashVfs) -> F, ) -> ConformanceResult` | K1: `on_gate` ist idempotent und kurz. | `src/conformance/erasure_layer.rs` |
+| `pub async fn k2_determinism<F: LayerFixture>(make: impl Fn(CrashVfs) -> F) -> ConformanceResult` | K2: Zwei Läufe liefern identische Cursorfolgen und Endzustände. | `src/conformance/erasure_layer.rs` |
 | `pub fn new( suite_name: &'static str, test_case: &'static str, details: impl Into<String>, ) -> Self` | Erstellt eine neue [`ConformanceFailure`]-Instanz. | `src/conformance/failure.rs` |
 | `pub async fn run_graph_index_suite<F, Fut, G>(factory: F) -> ConformanceResult where F: Fn() -> Fut, Fut: Future<Output = G>, G: GraphIndex,` | Führt die vollständige Konformitätsprüfung für eine [`GraphIndex`]-Implementierung durch. **Parameter:** - `factory`: Asynchrone Closure, d… | `src/conformance/graph.rs` |
 | `pub fn run_metrics_sink_suite<M: MetricsSink>(sink: &M) -> ConformanceResult` | Führt die vollständige Konformitätsprüfung für eine [`MetricsSink`]-Implementierung durch. **Ablauf:** 1. Ruft in einem geschützten Block (… | `src/conformance/metrics.rs` |
@@ -7747,6 +8114,48 @@ pub use reference_model::{RefOp, ReferenceModel};
 | `pub async fn run_text_index_suite<F, Fut, T>(factory: F) -> ConformanceResult where F: Fn() -> Fut, Fut: Future<Output = T>, T: TextIndex,` | Führt die vollständige Konformitätsprüfung für eine [`TextIndex`]-Implementierung durch. **Parameter:** - `factory`: Asynchrone Closure, di… | `src/conformance/text.rs` |
 | `pub async fn run_vector_index_suite<F, Fut, V>(factory: F) -> ConformanceResult where F: Fn() -> Fut, Fut: Future<Output = V>, V: VectorIndex,` | Führt die vollständige Konformitätsprüfung für eine [`VectorIndex`]-Implementierung durch. **Parameter:** - `factory`: Asynchrone Closure,… | `src/conformance/vector.rs` |
 | `pub fn run_vfs_suite<V: Vfs>(vfs: &V) -> ConformanceResult` | Führt die umfassende Konformitätsprüfsuite gegen eine gegebene [`Vfs`]-Instanz aus. **Geprüfte Verträge:** 1. `non_existent_read_fails`: Ni… | `src/conformance/vfs.rs` |
+| `pub fn crash_after(&self, n: u64)` | Absturz **nach** der n-ten Operation (sie wird noch ausgeführt). `0` = sofort. | `src/crash_vfs.rs` |
+| `pub fn crash_before(&self, n: u64)` | Absturz **vor** der n-ten Operation (1-basiert; sie wird nicht ausgeführt). | `src/crash_vfs.rs` |
+| `pub fn fail_sync(&self, path_prefix: &Path, after: u64, errno: ErrKind)` | Syncs unter `path_prefix` schlagen nach `after` erfolgreichen dauerhaft fehl. | `src/crash_vfs.rs` |
+| `pub fn fail_write(&self, path_prefix: &Path, after: u64, errno: ErrKind)` | Schreibende Operationen (`create`, `write_at`, `set_len`, `write_atomic`) unter `path_prefix` schlagen nach `after` erfolgreichen dauerhaft… | `src/crash_vfs.rs` |
+| `pub fn find(&self, needle: &[u8]) -> Vec<PathBuf>` | Pfade, deren durabler oder flüchtiger Inhalt `needle` enthält. | `src/crash_vfs.rs` |
+| `pub fn for_each_crash_point<F>( setup: impl Fn(&CrashVfs) -> Scenario, policies: &[CrashPolicy], check: F, ) -> std::result::Result<CrashReport, CrashLoopFailure> where F: Fn(&CrashVfs, CrashPoint) -> std::result::Result<(), String>,` | Bricht das Szenario nach jeder Operation `n ∈ 0..=N` unter jeder Politik ab, startet neu und ruft `check` (Wiederaufnahme und Endzustandspr… | `src/crash_vfs.rs` |
+| `pub fn for_each_crash_point_with<F>( config: &CrashLoopConfig, setup: impl Fn(&CrashVfs) -> Scenario, policies: &[CrashPolicy], check: F, ) -> std::result::Result<CrashReport, CrashLoopFailure> where F: Fn(&CrashVfs, CrashPoint) -> std::result::Result<(), Str…` | [`for_each_crash_point`] mit expliziter Konfiguration. | `src/crash_vfs.rs` |
+| `pub fn is_crashed(&self) -> bool` | `true`, sobald der Crashpunkt erreicht wurde. | `src/crash_vfs.rs` |
+| `pub fn last_ops(&self) -> Vec<OpRecord>` | Vollständiges Operationsprotokoll in Ausführungsreihenfolge. | `src/crash_vfs.rs` |
+| `pub fn link(&self, from: &Path, to: &Path) -> io::Result<()>` | Testhilfe: Hardlink (zwei Namen, ein Inode). Nicht Teil des `Vfs`-Ports. | `src/crash_vfs.rs` |
+| `pub fn mark(&self, name: &str)` | Benannter Marker am aktuellen Op-Zähler (nur für Szenario-Code, nie für Code unter Test). | `src/crash_vfs.rs` |
+| `pub fn marks(&self) -> Vec<(String, u64)>` | Gesetzte Marker als `(Name, Op-Zähler)`. | `src/crash_vfs.rs` |
+| `pub fn new(seed: CrashSeed) -> Self` | Leeres, nicht abgestürztes Dateisystem. | `src/crash_vfs.rs` |
+| `pub fn new(run: impl FnOnce() -> std::result::Result<(), String> + 'static) -> Self` | Verpackt den Szenariokörper. | `src/crash_vfs.rs` |
+| `pub fn op_count(&self) -> u64` | Anzahl ausgeführter mutierender Operationen. | `src/crash_vfs.rs` |
+| `pub fn path_hash(path: &Path) -> u64` | Deterministischer Pfad-Hash für [`OpRecord`]. | `src/crash_vfs.rs` |
+| `pub fn restart(&self, policy: CrashPolicy) -> CrashVfs` | Zustand nach Neustart gemäß `policy` als frisches Dateisystem. `self` bleibt unverändert. | `src/crash_vfs.rs` |
+| `pub fn seed(&self) -> CrashSeed` | Seed dieser Instanz. | `src/crash_vfs.rs` |
+| `pub fn snapshot_tree(&self) -> TreeSnapshot` | Alle Dateien mit durablem und flüchtigem Inhalt (auch nach einem Crash lesbar). | `src/crash_vfs.rs` |
+| `pub fn fail_after(&self, n: usize)` | Ab der `n+1`-ten Meldung schlägt `record` fehl. | `src/erasure_mocks.rs` |
+| `pub fn insert(&self, key: impl Into<Vec<u8>>, value: impl Into<Bytes>)` | Legt einen Eintrag an. | `src/erasure_mocks.rs` |
+| `pub fn insert_data(&self, key: impl Into<Vec<u8>>, value: impl Into<Bytes>)` | Daten, die [`ErasureKernel::privileged_reader`] sichtbar macht. | `src/erasure_mocks.rs` |
+| `pub fn log(&self) -> Vec<(IoClass, u64)>` | Bewilligte Anforderungen. | `src/erasure_mocks.rs` |
+| `pub fn mock_fixture(defect: Defect) -> MockLayerFixture` | Frische Referenz-Fixture mit festem Seed. | `src/erasure_mocks.rs` |
+| `pub fn new(scope: KeyScope) -> Self` | Leerer Reader für `scope`. | `src/erasure_mocks.rs` |
+| `pub fn new() -> Self` | Leerer Sink. | `src/erasure_mocks.rs` |
+| `pub fn new(expected_layers: Vec<WitnessLayer>) -> Self` | Kernel, der bei `seal` für jede Schicht in `expected_layers` einen Witness verlangt. | `src/erasure_mocks.rs` |
+| `pub fn records(&self) -> Vec<(WitnessLayer, LayerProgress)>` | Angenommene Meldungen. | `src/erasure_mocks.rs` |
+| `pub fn set_pressure(&self, hint: PressureHint)` | Setzt den Druckhinweis. | `src/erasure_mocks.rs` |
+| `pub fn set_remaining(&self, bytes: Option<u64>)` | Setzt die Restbytes (`None` = unbegrenzt). | `src/erasure_mocks.rs` |
+| `pub fn unlimited() -> Self` | Unbegrenztes Budget. | `src/erasure_mocks.rs` |
+| `pub fn violations(&self) -> u64` | Anzahl abgewiesener Zugriffe. | `src/erasure_mocks.rs` |
+| `pub fn with_defect(vfs: CrashVfs, defect: Defect) -> Self` | Fixture mit gewähltem Defekt. | `src/erasure_mocks.rs` |
+| `pub fn apply(&mut self, op: Op)` | Wendet eine Operation an. | `src/erasure_model.rs` |
+| `pub fn assert_matches<S: SystemUnderTest>(&self, sut: &S) -> Result<(), ModelDiff>` | Vergleicht Bestand und Sichtbarkeit aller bekannten und der angegebenen Mandanten. | `src/erasure_model.rs` |
+| `pub fn erase(&mut self, target: &EraseTarget)` | Entfernt das Ziel physisch aus **allen** Schichten, inklusive Historie. Checkpoints, die zum Zeitpunkt ihrer Erstellung ein betroffenes Dok… | `src/erasure_model.rs` |
+| `pub fn expected_visible(&self, tenant: TenantId) -> BTreeSet<(String, DocId)>` | Aktuell sichtbare Dokumente eines Mandanten. | `src/erasure_model.rs` |
+| `pub fn get_at_seq( &self, tenant: TenantId, collection: &str, doc: DocId, seq: u64, ) -> Option<Vec<u8>>` | Wert zum Stand `seq` (Zeitreise). | `src/erasure_model.rs` |
+| `pub fn inventory(&self) -> Inventory` | Soll-Bestand. | `src/erasure_model.rs` |
+| `pub fn kv_key(tenant: TenantId, collection: &str, doc: DocId) -> Vec<u8>` | Kollisionsfreier KV-Schlüssel eines Dokuments (längenpräfigierte Collection). | `src/erasure_model.rs` |
+| `pub fn new() -> Self` | Leeres Modell. | `src/erasure_model.rs` |
+| `pub fn seq(&self) -> u64` | Aktuelle Sequenz. | `src/erasure_model.rs` |
 | `pub fn new() -> Self` | Erstellt eine neue, leere [`FaultVfs`]-Instanz ohne aktive Fehlerregeln. | `src/fault_vfs.rs` |
 | `pub fn read_count(&self) -> usize` | Liefert die Anzahl der bisher versuchten Leseoperationen. | `src/fault_vfs.rs` |
 | `pub fn read_file(&self, path: &Path) -> io::Result<Vec<u8>>` | Liest Bytes vom angegebenen Pfad unter Berücksichtigung der Fehlerrichtlinien. **Fehlerbehandlung:** Liefert einen Lesefehler bei injiziert… | `src/fault_vfs.rs` |
@@ -7757,6 +8166,8 @@ pub use reference_model::{RefOp, ReferenceModel};
 | `pub fn trigger_crash(&self)` | Simuliert einen abrupten Systemabsturz (Power-Cut). Nach diesem Aufruf schlagen alle folgenden Schreib-, Lese- und Sync-Operationen mit `Er… | `src/fault_vfs.rs` |
 | `pub fn write_count(&self) -> usize` | Liefert die Anzahl der bisher versuchten Schreiboperationen. | `src/fault_vfs.rs` |
 | `pub fn write_file(&self, path: &Path, data: &[u8]) -> io::Result<()>` | Schreibt Bytes an den angegebenen Pfad unter Berücksichtigung der Fehlerrichtlinien. **Fehlerbehandlung:** Schlägt fehl, falls ein Crash ak… | `src/fault_vfs.rs` |
+| `pub fn calls(&self) -> Vec<GateCall>` | Bisherige Aufrufe in Reihenfolge. | `src/gates.rs` |
+| `pub fn new(inner: Arc<dyn ReadGate>) -> Self` | Umhüllt `inner`. | `src/gates.rs` |
 | `pub fn new() -> Self` | Erstellt einen neuen, leeren `InMemoryGraphIndex`. | `src/in_memory_graph.rs` |
 | `pub fn new() -> Self` | Erstellt eine neue, leere In-Memory-Speicher-Engine. | `src/in_memory_store.rs` |
 | `pub fn new() -> Self` | Erstellt einen neuen, leeren `InMemoryTextIndex`. | `src/in_memory_text.rs` |
@@ -7776,6 +8187,7 @@ pub use reference_model::{RefOp, ReferenceModel};
 | `pub fn commit(&mut self) -> u64` | Commits all pending operations under a new sequence number. Returns the sequence number assigned to this commit batch. **Ablauf:** 1. Ist d… | `src/reference_model.rs` |
 | `pub fn commit_batch(&mut self, ops: Vec<RefOp>) -> u64` | Appends `ops` to pending buffer and commits them under a new sequence number. | `src/reference_model.rs` |
 | `pub fn delete(&mut self, key: &[u8])` | Stages a `Delete` operation in uncommitted pending buffer. | `src/reference_model.rs` |
+| `pub fn erase_key(&mut self, key: &[u8])` | Entfernt einen Schlüssel physisch: gesamte Historie und vorgemerkte Schreibvorgänge. Anders als [`Self::delete`] ist danach auch jede Zeitr… | `src/reference_model.rs` |
 | `pub fn get_at(&self, key: &[u8], seq: u64) -> Option<Vec<u8>>` | Retrieves the value of `key` as visible at `seq`. Returns `Some(value)` if key exists and was active (not deleted) at `seq`, `None` otherwi… | `src/reference_model.rs` |
 | `pub fn get_latest(&self, key: &[u8]) -> Option<Vec<u8>>` | Gets the latest committed value for `key`. | `src/reference_model.rs` |
 | `pub fn new() -> Self` | Creates a new empty reference model initialized at sequence number 0. | `src/reference_model.rs` |
@@ -7786,6 +8198,7 @@ pub use reference_model::{RefOp, ReferenceModel};
 | `pub fn scan_range_at( &self, start: Bound<&[u8]>, end: Bound<&[u8]>, seq: u64, ) -> Vec<(Vec<u8>, Vec<u8>)>` | Scans key range `[start, end]` (using `Bound`) and returns visible pairs at `seq`. | `src/reference_model.rs` |
 | `pub fn snapshot_map_at(&self, seq: u64) -> BTreeMap<Vec<u8>, Vec<u8>>` | Returns a full snapshot map of latest visible key-values at `seq`. | `src/reference_model.rs` |
 | `pub fn snapshot_seq(&self) -> u64` | Returns the current high water mark sequence number. | `src/reference_model.rs` |
+| `pub fn versions(&self) -> impl Iterator<Item = (&[u8], u64, Option<&[u8]>)>` | Alle committeten Versionen als `(Schlüssel, Sequenz, Wert)`. | `src/reference_model.rs` |
 
 
 ---
