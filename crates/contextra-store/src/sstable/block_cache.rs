@@ -143,6 +143,21 @@ impl BlockCacheBackend for SieveCacheBackend {
     fn capacity_bytes(&self) -> usize {
         self.state.read().capacity_bytes
     }
+
+    fn evict_file(&self, file_id: u64) {
+        let mut s = self.state.write();
+        let keys_to_remove: Vec<(u64, u64)> = s
+            .map
+            .keys()
+            .filter(|(fid, _)| *fid == file_id)
+            .copied()
+            .collect();
+        for k in keys_to_remove {
+            if let Some(node) = s.map.remove(&k) {
+                s.current_bytes = s.current_bytes.saturating_sub(node.value.len());
+            }
+        }
+    }
 }
 
 pub trait BlockCacheBackend: Send + Sync {
@@ -175,6 +190,9 @@ pub trait BlockCacheBackend: Send + Sync {
 
     /// Returns the capacity limit in bytes.
     fn capacity_bytes(&self) -> usize;
+
+    /// Evicts all cached blocks belonging to `file_id`.
+    fn evict_file(&self, file_id: u64);
 }
 
 struct LruBlockCacheState {
@@ -241,6 +259,20 @@ impl BlockCacheBackend for LruBlockCacheBackend {
     #[inline]
     fn contains(&self, key: &(u64, u64)) -> bool {
         self.state.read().cache.contains(key)
+    }
+
+    fn evict_file(&self, file_id: u64) {
+        let mut s = self.state.write();
+        let keys_to_remove: Vec<(u64, u64)> = s
+            .cache
+            .iter()
+            .filter_map(|(k, _)| if k.0 == file_id { Some(*k) } else { None })
+            .collect();
+        for k in keys_to_remove {
+            if let Some(val) = s.cache.pop(&k) {
+                s.current_bytes = s.current_bytes.saturating_sub(val.len());
+            }
+        }
     }
 }
 
@@ -309,6 +341,10 @@ impl BlockCacheBackend for QuickCacheBlockCacheBackend {
     #[inline]
     fn capacity_bytes(&self) -> usize {
         self.cache.capacity() as usize
+    }
+
+    fn evict_file(&self, file_id: u64) {
+        self.cache.retain(|k, _| k.0 != file_id);
     }
 }
 
@@ -440,6 +476,13 @@ impl BlockCache {
     /// Returns total configured byte capacity across all shards.
     pub fn total_capacity_bytes(&self) -> usize {
         self.shards.iter().map(|s| s.capacity_bytes()).sum()
+    }
+
+    /// Evicts all cached blocks belonging to `file_id` across all shards.
+    pub fn evict_file(&self, file_id: u64) {
+        for shard in &self.shards {
+            shard.evict_file(file_id);
+        }
     }
 }
 

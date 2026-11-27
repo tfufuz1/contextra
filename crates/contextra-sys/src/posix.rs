@@ -114,6 +114,47 @@ pub fn set_fd_limit(limit: u64) -> bool {
     }
 }
 
+/// Ermittelt den für unprivilegierte Prozesse verfügbaren freien Speicherplatz (in Bytes)
+/// auf dem Dateisystem, das `path` (bzw. dessen existierendes Elternverzeichnis) enthält.
+pub fn available_space(path: &Path) -> std::io::Result<u64> {
+    #[cfg(unix)]
+    {
+        use std::ffi::CString;
+        use std::mem::MaybeUninit;
+        use std::os::unix::ffi::OsStrExt;
+
+        let mut probe = path;
+        while !probe.exists() {
+            match probe.parent() {
+                Some(p) if !p.as_os_str().is_empty() => probe = p,
+                _ => break,
+            }
+        }
+        let path_c = CString::new(probe.as_os_str().as_bytes())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
+
+        let mut stat = MaybeUninit::<libc::statvfs>::uninit();
+        // SAFETY: `path_c` ist ein gültiger nullterminierter C-String, `stat` ein gültiger Zeiger auf `libc::statvfs`.
+        let rc = unsafe { libc::statvfs(path_c.as_ptr(), stat.as_mut_ptr()) };
+        if rc != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        // SAFETY: `statvfs` war erfolgreich (rc == 0) und hat die Struktur initialisiert.
+        let stat = unsafe { stat.assume_init() };
+        let frsize = if stat.f_frsize > 0 {
+            stat.f_frsize as u64
+        } else {
+            stat.f_bsize as u64
+        };
+        Ok((stat.f_bavail as u64).saturating_mul(frsize))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Ok(u64::MAX)
+    }
+}
+
 // ANCHOR[contextra-sys:POSIX-TESTS-001]
 #[cfg(test)]
 mod tests {

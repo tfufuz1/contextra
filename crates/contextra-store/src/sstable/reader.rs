@@ -264,6 +264,11 @@ impl SstableReader {
         &self.file_path
     }
 
+    /// Returns the internal cache file identifier for this SSTable.
+    pub fn file_id(&self) -> u64 {
+        self.file_id
+    }
+
     /// Opens an existing SSTable file for reading.
     pub async fn open(path: impl AsRef<Path>, block_cache: Arc<BlockCache>) -> Result<Self> {
         Self::open_with_vfs(path, block_cache, None, Arc::new(RealFs)).await

@@ -317,3 +317,13 @@ pub fn hkdf_expand(prk: &[u8], info: &[u8], out: &mut [u8]) -> Result<()> {
         .map_err(|_| CryptoError::Crypto("hkdf expand failed".into()))?;
     Ok(())
 }
+
+/// Computes an HMAC-SHA256 authentication tag for erasure ledger entries (WP-10 §11.1).
+pub fn ledger_mac(key: &[u8], bytes: &[u8]) -> Result<[u8; 32]> {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    let mut mac = Hmac::<Sha256>::new_from_slice(key)
+        .map_err(|e| CryptoError::Crypto(format!("ledger_mac key init failed: {e}")))?;
+    mac.update(bytes);
+    Ok(mac.finalize().into_bytes().into())
+}

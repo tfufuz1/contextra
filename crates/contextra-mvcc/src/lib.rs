@@ -89,6 +89,9 @@ pub mod ssi;
 pub mod tx_buffer;
 
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
-pub use snapshot::{SnapshotGuard, SnapshotRegistry};
+pub use snapshot::{
+    Blocker, ReapPolicy, Reaped, RegistrationId, RegistrationKind, RevokeReport, SnapshotGuard,
+    SnapshotRegistry, SnapshotRegistryConfig,
+};
 pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
 pub use tx_buffer::{IndexOp, TxBuffer};

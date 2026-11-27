@@ -46,6 +46,9 @@
 /// Rang 100: Transaktionale Absichtssperren auf Dokument-/Schlüsselebene (`intent_locks`).
 pub const RANK_DOCUMENT_INTENT: u32 = 100;
 
+/// Rang 150: Erasure-Kernel-Zustandsmutex (`StoreErasureKernel::state`).
+pub const RANK_ERASURE_KERNEL: u32 = 150;
+
 /// Rang 200: Globaler Commit-Mutex des Stores (`commit_mutex`), entspricht Commit-Barriere.
 pub const RANK_COMMIT_MUTEX: u32 = 200;
 
@@ -72,3 +75,6 @@ pub const RANK_OBSERVER_REGISTRY: u32 = 900;
 
 /// Rang 950: SSTable-Block-Cache-Sperre (`SieveCacheBackend::state`).
 pub const RANK_BLOCK_CACHE: u32 = 950;
+
+/// Rang 960: Erasure-Gate-Snapshot-Sperre (`StoreGate::snap`).
+pub const RANK_ERASURE_GATE: u32 = 960;

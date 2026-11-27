@@ -65,5 +65,5 @@ pub use mlock::{
     apply_dont_dump, mem_lock, mem_lock_typed, mem_lock_with_policy, mem_unlock, MemLockPolicy,
 };
 pub use mmap::{mmap_readonly, SealedFile, SealedMap, SealedReadOnly, Unsealed};
-pub use posix::{ensure_fd_limit, reopen_and_dup2, set_fd_limit};
+pub use posix::{available_space, ensure_fd_limit, reopen_and_dup2, set_fd_limit};
 pub use vault::{LockedRegions, VaultBuffer};

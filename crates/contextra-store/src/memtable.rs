@@ -344,6 +344,57 @@ impl MemTable {
         }
     }
 
+    /// Entfernt alle Versionen, für die `drop(key, raw_seq, tombstone)` `true` liefert (§7.1).
+    ///
+    /// Gibt `(entfernte_versionen, freigegebene_bytes)` zurück.
+    /// Nimmt je Shard kurz den Schreib-Lock (Rang 700), niemals über `.await`.
+    pub fn retain<F>(&self, mut drop: F) -> (u64, u64)
+    where
+        F: FnMut(&[u8], u64, bool) -> bool,
+    {
+        let mut dropped_count = 0u64;
+        let mut total_freed_size = 0usize;
+        let mut new_min_tx = u64::MAX;
+        let mut new_max_tx = 0u64;
+        let mut has_entries = false;
+
+        for shard in &self.shards {
+            let mut entries = shard.entries.write();
+            entries.retain(|key, versions| {
+                versions.retain(|(seq, val, tx)| {
+                    let raw_seq = *seq & !TOMBSTONE_BIT;
+                    let tombstone = (*seq & TOMBSTONE_BIT) != 0;
+                    if drop(key.as_ref(), raw_seq, tombstone) {
+                        dropped_count = dropped_count.saturating_add(1);
+                        total_freed_size = total_freed_size
+                            .saturating_add(key.len() + val.len() + STAGING_ENTRY_OVERHEAD_BYTES);
+                        false
+                    } else {
+                        new_min_tx = new_min_tx.min(*tx);
+                        new_max_tx = new_max_tx.max(*tx);
+                        has_entries = true;
+                        true
+                    }
+                });
+                !versions.is_empty()
+            });
+        }
+
+        if total_freed_size > 0 {
+            self.saturating_sub_size(total_freed_size);
+        }
+
+        if !has_entries {
+            self.min_tx.store(u64::MAX, Ordering::Release);
+            self.max_tx.store(0, Ordering::Release);
+        } else {
+            self.min_tx.store(new_min_tx, Ordering::Release);
+            self.max_tx.store(new_max_tx, Ordering::Release);
+        }
+
+        (dropped_count, total_freed_size as u64)
+    }
+
     /// Retrieves the latest value and sequence number by key.
     pub fn get(&self, key: &[u8]) -> Option<(Bytes, u64)> {
         let shard_idx = Self::shard_for(key);

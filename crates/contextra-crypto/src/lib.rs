@@ -62,7 +62,7 @@ pub mod wal_crypto;
 
 pub use aead::*;
 pub use dek::{derive_dek, AncestorSalts, Dek, UnitKey};
-pub use kdf::hkdf_expand;
+pub use kdf::{hkdf_expand, ledger_mac};
 pub use secret::SecretKey;
 
 pub use audit_chain::{

@@ -223,6 +223,8 @@ pub struct SstableBuilder {
     max_tx_id: u64,
     min_seq: u64,
     max_seq: u64,
+    max_seq_override: Option<u64>,
+    max_tx_override: Option<u64>,
     format_version: u16,
     poisoned: bool,
     finished: bool,
@@ -292,6 +294,8 @@ impl SstableBuilder {
             max_tx_id: 0,
             min_seq: u64::MAX,
             max_seq: 0,
+            max_seq_override: None,
+            max_tx_override: None,
             format_version: 4,
             poisoned: false,
             finished: false,
@@ -301,6 +305,18 @@ impl SstableBuilder {
     /// Sets the target block size for data blocks.
     pub fn with_block_size(mut self, size: usize) -> Self {
         self.set_block_size(size);
+        self
+    }
+
+    /// Überschreibt `max_seq` im Trailer (Positionstreue bei Erase-Compaction, §7.3.4).
+    pub fn with_max_seq_override(mut self, max_seq: u64) -> Self {
+        self.max_seq_override = Some(max_seq & !TOMBSTONE_BIT);
+        self
+    }
+
+    /// Überschreibt `max_tx_id` im Trailer (Positionstreue bei Erase-Compaction, §7.3.4).
+    pub fn with_max_tx_override(mut self, max_tx: u64) -> Self {
+        self.max_tx_override = Some(max_tx);
         self
     }
 
@@ -535,6 +551,13 @@ impl SstableBuilder {
         let bloom_write_len = u64::try_from(bloom_to_write.len())
             .map_err(|_| ContextraError::Storage("Bloom bytes length overflow".into()))?;
         self.offset += bloom_write_len;
+
+        if let Some(ov_seq) = self.max_seq_override {
+            self.max_seq = self.max_seq.max(ov_seq);
+        }
+        if let Some(ov_tx) = self.max_tx_override {
+            self.max_tx_id = self.max_tx_id.max(ov_tx);
+        }
 
         // Write trailer: [min_tx][max_tx][min_seq][max_seq][bloom_offset][index_offset][version=4][magic]
         // This is 54 bytes.
