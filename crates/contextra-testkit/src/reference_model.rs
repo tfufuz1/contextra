@@ -238,6 +238,25 @@ impl ReferenceModel {
         }
         map
     }
+
+    /// Entfernt einen Schlüssel physisch: gesamte Historie und vorgemerkte Schreibvorgänge.
+    ///
+    /// Anders als [`Self::delete`] ist danach auch jede Zeitreise leer (Erase, nicht Retire).
+    pub fn erase_key(&mut self, key: &[u8]) {
+        self.history.remove(key);
+        self.pending_writes.retain(|op| match op {
+            RefOp::Put { key: k, .. } | RefOp::Delete { key: k } => k != key,
+        });
+    }
+
+    /// Alle committeten Versionen als `(Schlüssel, Sequenz, Wert)`.
+    pub fn versions(&self) -> impl Iterator<Item = (&[u8], u64, Option<&[u8]>)> {
+        self.history.iter().flat_map(|(k, versions)| {
+            versions
+                .iter()
+                .map(move |(seq, v)| (k.as_slice(), *seq, v.as_deref()))
+        })
+    }
 }
 
 #[cfg(test)]

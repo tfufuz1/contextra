@@ -24,6 +24,32 @@ macro_rules! assert_conformance {
     };
 }
 
+/// Erzeugt für eine [`crate::conformance::erasure_layer::LayerFixture`] die Tests C1–C7,
+/// K1 und K2 als einzelne `#[tokio::test]`s. Der Aufrufer braucht `tokio` als Dev-Dependency.
+#[cfg(feature = "erasure-conformance")]
+#[macro_export]
+macro_rules! assert_layer_conformance {
+    ($fixture:ty) => {
+        $crate::assert_layer_conformance!(@cases $fixture;
+            c1_idempotence, c2_resumption, c3_scope_isolation, c4_witness_honesty,
+            c5_fault_injection, c6_cancel_safety, c7_gate_respect, k1_gate_idempotent,
+            k2_determinism);
+    };
+    (@cases $fixture:ty; $($case:ident),+) => {
+        $(
+            #[tokio::test]
+            async fn $case() {
+                $crate::assert_conformance!(
+                    $crate::conformance::erasure_layer::$case(
+                        <$fixture as $crate::conformance::erasure_layer::LayerFixture>::new,
+                    )
+                    .await
+                );
+            }
+        )+
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use crate::conformance::failure::ConformanceFailure;
