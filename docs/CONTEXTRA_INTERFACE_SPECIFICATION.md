@@ -11,11 +11,11 @@
 | Kennzahl | Wert |
 |---|---|
 | Analysierte Fach-Crates (`crates/*`) | 17 |
-| Extrahierte öffentliche Symbole gesamt | **3325** |
+| Extrahierte öffentliche Symbole gesamt | **3288** |
 | — davon Public Traits (Schnittstellen im engeren Sinn) | 110 |
-| — davon Public Structs | 543 |
-| — davon Public Enums | 145 |
-| — davon Public Funktionen | 2313 |
+| — davon Public Structs | 533 |
+| — davon Public Enums | 131 |
+| — davon Public Funktionen | 2300 |
 | — davon Typ-Aliase | 45 |
 | — davon Konstanten | 169 |
 
@@ -90,11 +90,9 @@ pub mod schema;
 pub mod tenant_scope;
 pub mod tombstone;
 pub mod types;
-pub mod erasure;
 pub mod ids;
 pub mod refs;
 pub mod witness;
-pub use erasure::*;
 pub use ids::{ErasureId, FileId, GateId, Seq, StoreId, Timestamp};
 pub use refs::{CollectionRef, DocKey, OperatorRef, SubjectRef, TenantRef, MAX_REF_LEN};
 pub use error::{ContextraError, HnswDeletionError, Result};
@@ -130,17 +128,15 @@ pub trait TombstoneSemanticsCheck {
 }
 ```
 
-### Öffentliche Datentypen — Structs (54)
+### Öffentliche Datentypen — Structs (44)
 
 | Struct | Felder / Form | Beschreibung | Datei |
 |---|---|---|---|
-| `Armed` | `(tuple/unit)` | — | `src/erasure.rs` |
 | `CollectionId` | `(tuple/unit)` | — | `src/types/domain/ids.rs` |
 | `ConfigFingerprint` | `{ /// LLM-Modell-ID (z.B. "llama-3.2-3b-instruct") pub model_id: String, /// Quantisierungsgrad als String: "Q4_K_M", "Q8_0", "F16", "BF16". /// EXPLIZIT Teil de… }` | — | `src/types/domain/misc.rs` |
 | `ContextChunk` | `{ /// Document identifier associated with this chunk. pub doc_id: DocId, /// Text content of the chunk. pub content: String, /// Computed relevance score. pub re… }` | — | `src/types/saos.rs` |
 | `ContextWindow` | `{ /// List of included context chunks. pub chunks: Vec<ContextChunk>, /// Total aggregated token count. pub total_tokens: usize, /// Indicates whether context ch… }` | — | `src/types/saos.rs` |
 | `ContextraErrorDto` | `{ /// Stable string identifier for the error variant (e.g. `"NotFound"`, `"PolicyViolation"`). pub kind: String, /// Human-readable error message. pub message: S… }` | — | `src/error_dto.rs` |
-| `ControlEvidence` | `(tuple/unit)` | — | `src/erasure.rs` |
 | `DocId` | `(tuple/unit)` | — | `src/types/domain/ids.rs` |
 | `DocId` | `(tuple/unit)` | — | `src/types/domain/ids.rs` |
 | `DocRef` | `{ /// Optionaler Betroffener (Subject). pub subject: Option<SubjectRef>, /// Eindeutiger Dokumentenschlüssel innerhalb des Clusters. pub key: DocKey, }` | Eindeutige Dokumentenadresse: Betroffener ist unveränderlicher Teil der Identität (SPEC 7.2, D-70). | `src/ids.rs` |
@@ -148,17 +144,13 @@ pub trait TombstoneSemanticsCheck {
 | `Embedding` | `{ /// Raw vector data elements. pub data: Vec<f32>, }` | — | `src/types/domain/document.rs` |
 | `Entity` | `{ /// Unique entity ID. pub id: EntityId, /// Canonical human-readable name. pub name: Arc<str>, /// Categorical entity type. pub entity_type: Arc<str>, /// Flex… }` | — | `src/types/domain/misc.rs` |
 | `EntityId` | `(tuple/unit)` | — | `src/types/domain/ids.rs` |
-| `EraseReceipt` | `{ /// Eindeutige Kennung des Löschvorgangs. pub id: ErasureId, /// Status des Vorgangs. pub status: ErasureStatus, /// Zeitstempel der Sperrung im Gate. pub gate… }` | — | `src/erasure.rs` |
-| `EraseRequest` | `{ /// Löschziel. pub target: EraseTarget, /// Timing (sofort oder gebündelt). pub timing: Timing, /// Aufbewahrungs-Attestierung. pub retention: RetentionAttesta… }` | — | `src/erasure.rs` |
-| `ErasureId` | `(tuple/unit)` | — | `src/ids.rs` |
+| `ErasureId` | `(tuple/unit)` | 16-Byte Lösch-Identifikator (SPEC 7.4, TY-09). | `src/ids.rs` |
 | `FileId` | `(tuple/unit)` | 16-Byte Dateikennung (SPEC F.1). | `src/ids.rs` |
 | `FusionWeights` | `{ vector: f32, text: f32, graph: f32, /// Reserved for future metadata-signal fusion; currently always 0.0. Do not expose a public constructor parameter for this… }` | — | `src/types/saos.rs` |
-| `GateId` | `(tuple/unit)` | — | `src/ids.rs` |
+| `GateId` | `(tuple/unit)` | 16-Byte Gate-Kennung für ReadGate-Einträge (SPEC F.9). | `src/ids.rs` |
 | `HybridQuery` | `{ /// Optional full-text query string. pub text_query: Option<String>, /// Optional vector query embedding. pub vector_query: Option<Vec<f32>>, /// Optional star… }` | — | `src/types/saos.rs` |
 | `HybridQueryBuilder` | `{ text_query: Option<String>, vector_query: Option<Vec<f32>>, graph_start_node: Option<String>, graph_strategy: Option<GraphTraversalStrategy>, fusion_weights: O… }` | — | `src/types/saos.rs` |
 | `ImportanceScore` | `(tuple/unit)` | — | `src/types/importance.rs` |
-| `LayerId` | `(tuple/unit)` | — | `src/erasure.rs` |
-| `LayerWitness` | `{ layer: LayerId, class: MeasureClass, method_id: u16, files: u64, bytes: u64, duration: Duration, hash: [u8; 32], }` | — | `src/erasure.rs` |
 | `MemoryImportance` | `{ /// Base LLM or heuristic evaluation score. pub base_score: ImportanceScore, /// Recency decay function strategy. pub decay: DecayFunction, /// Transaction ID… }` | — | `src/types/importance.rs` |
 | `MemoryLink` | `{ /// The target document ID. pub target: DocId, /// The type of relationship. pub relation: LinkRelation, /// The transaction ID when this link was created. pub… }` | — | `src/types/domain/misc.rs` |
 | `ModelFingerprint` | `{ /// SHA-256 hash digest over model weight blob and quantization tier string. pub hash: [u8; 32], /// Model identifier or filename (e.g. "llama-3.2-3b-instruct"… }` | Identifiziert eine Modelldatei und deren Quantisierungsstufe eindeutig. | `src/model_fingerprint.rs` |
@@ -167,12 +159,9 @@ pub trait TombstoneSemanticsCheck {
 | `RequestContext` | `{ /// Tenant identifier for authorization and scope isolation. pub tenant_id: crate::TenantId, /// Transaction ID allocated for the operation. pub tx_id: crate::… }` | — | `src/witness.rs` |
 | `RerankResult` | `{ /// Rank position after reranking (0-based). pub index: usize, /// Original index in the input candidate array. pub original_index: usize, /// Raw model output… }` | — | `src/types/domain/document.rs` |
 | `Reservation` | `{ budget: &'a TokenBudget, amount: usize, settled: AtomicBool, }` | — | `src/types/budget.rs` |
-| `Residue` | `{ /// Anzahl gefundener Treffer / Rückstände. pub matches: u64, }` | — | `src/erasure.rs` |
 | `ResourceBudget` | `{ /// Maximum allowed memory usage in bytes. pub memory_limit: u64, }` | — | `src/types/budget.rs` |
 | `ResourceTracker` | `{ /// The configured budget. budget: ResourceBudget, /// Current memory usage in bytes. memory_used: std::sync::atomic::AtomicU64, }` | — | `src/types/budget.rs` |
-| `RetentionAttestation` | `{ /// Aufbewahrungscode. pub code: RetentionCode, /// Opake Betreiberkennung (nicht im Klartext im Bericht). pub attested_by: OperatorRef, /// Zeitstempel der At… }` | — | `src/erasure.rs` |
 | `SagaRecord` | `{ /// BLAKE3 hash of deleted keys. pub deleted_keys_hash: [u8; 32], }` | — | `src/witness.rs` |
-| `Scanner` | `{ layer: LayerId, class: MeasureClass, method_id: u16, files: u64, bytes: u64, _state: S, }` | — | `src/erasure.rs` |
 | `ScoredDocument` | `{ /// Identifier of the scored document. pub doc_id: DocId, /// Relevance or similarity score. pub score: f32, }` | — | `src/types/domain/document.rs` |
 | `ScoredEntry` | `{ /// Unique result identifier. pub id: String, /// Combined final score after signal fusion. pub final_score: f32, /// Associated entry metadata. pub metadata:… }` | — | `src/types/saos.rs` |
 | `Seq` | `(tuple/unit)` | Streng monoton steigende Sequenznummer (SPEC 8.7, I-12, TY-08). | `src/ids.rs` |
@@ -186,10 +175,9 @@ pub trait TombstoneSemanticsCheck {
 | `TlHfdParams` | `{ /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1). #[serde(default = "default_tl_hfd_sigma")] pub sigma: f32, /// Seed injec… }` | — | `src/types/domain/misc.rs` |
 | `TokenBudget` | `{ /// Maximum total token limit. pub limit: usize, /// Strategy for calculating usable context window. pub strategy: BudgetStrategy, /// Reserved tokens for syst… }` | — | `src/types/budget.rs` |
 | `TxId` | `(tuple/unit)` | — | `src/types/domain/ids.rs` |
-| `Unarmed` | `(tuple/unit)` | — | `src/erasure.rs` |
 | `WorkflowState` | `{ /// Associated transaction. pub tx: TxId, /// Agent memory graph state footprint (BLAKE3 hash digest). #[serde(with = "hex")] pub graph_hash: [u8; 32], }` | — | `src/types/domain/misc.rs` |
 
-### Öffentliche Datentypen — Enums (34)
+### Öffentliche Datentypen — Enums (20)
 
 | Enum | Varianten | Beschreibung | Datei |
 |---|---|---|---|
@@ -200,33 +188,19 @@ pub trait TombstoneSemanticsCheck {
 | `DecayFunction` | `/// No recency decay (factor remains 1.0). #[default] None, /// Exponential decay measured in `TxId` distance (not wall-clock time). Exponential { /// Half-life in transaction count. half_life_tx: u6…` | — | `src/types/importance.rs` |
 | `DistanceMetric` | `/// Cosine distance (`1.0 - cos(angle)`). #[default] Cosine, /// Euclidean (L2) distance. Euclidean, /// Dot product distance (negated inner product for f32). DotProduct,` | — | `src/types/domain/document.rs` |
 | `DocIdWidth` | `/// 64-bit DocId format (8-byte BLAKE3 truncation). Bit64 = 64, /// 128-bit DocId format (16-byte BLAKE3 truncation, ADR-082). Bit128 = 128,` | Gibt die von einer Schemaversion erwartete oder erzeugte Bitbreite einer `DocId` an. | `src/schema.rs` |
-| `EraseMode` | `/// Vollständige physische Bereinigung und Schlüsselvernichtung. Erase, /// Einschränkung der Verarbeitung. Restrict,` | — | `src/erasure.rs` |
-| `EraseTarget` | `/// Einzelnes Dokument. Document { /// Mandanten-Referenz. tenant: TenantRef, /// Collection-Referenz. collection: CollectionRef, /// Dokument-Referenz (inklusive Subject). doc: DocRef, }, /// Betrof…` | — | `src/erasure.rs` |
-| `ErasureStatus` | `/// Auftrag empfangen und validiert. Requested, /// Im Gate persistiert, Lesepfade gesperrt. Gated, /// Schlüssel in Keyslots dauerhaft vernichtet. KeyDestroyed, /// Physisches Umschreiben und Berein…` | — | `src/erasure.rs` |
 | `FilterExpr` | `/// Exact match: field == value Eq { /// Target metadata field name. field: String, /// Expected field value. value: serde_json::Value, }, /// Not equal: field != value Ne { /// Target metadata field…` | — | `src/types/filter.rs` |
 | `FusionStrategy` | `/// Reciprocal Rank Fusion (default strategy per ADR-003). /// Robust against score scale mismatch and partial signal degradation. #[default] Rrf, /// Score-normalized fusion (CombSUM / Z-Score). ///…` | — | `src/types/saos.rs` |
-| `GateVariant` | `/// Klasse P: Physisch gelöscht und gesperrt. Erased, /// Einschränkung der Verarbeitung aktiv. Restricted,` | — | `src/erasure.rs` |
 | `GraphTraversalStrategy` | `/// Multi-hop BFS traversal with hop score decay (default max_hops = 3). Hops { /// Maximum traversal hop depth. max_hops: usize, }, /// Personalized PageRank power iteration starting from seed nodes…` | — | `src/types/saos.rs` |
 | `HnswDeletionError` | `/// Target node with doc_id not found in graph. #[error("Node for doc_id {0:?} not found in HNSW index")] NodeNotFound(DocId), /// Graph repair resulted in a disconnected graph component. #[error("Gr…` | — | `src/error.rs` |
-| `KeyCoverage` | `/// Vollständige kryptografische Unlesbarkeit aller Records/Payloads. Full, /// Struktur sichtbar, aber Verknüpfung unlesbar gemacht. Unlinked, /// Keine Schlüsselvernichtung auf dieser Schichtebene.…` | — | `src/erasure.rs` |
 | `LinkRelation` | `/// Target memory provides more detail or context. Elaborates, /// Target memory contradicts this memory. Contradicts, /// Target memory supersedes this memory, replacing its context. Supersedes, ///…` | — | `src/types/domain/misc.rs` |
 | `ManifestSchemaVersion` | `/// Schema Version 1 (v0.x legacy 64-bit DocId layout). #[default] V1 = 1, /// Schema Version 2 (ADR-082 128-bit DocId layout). V2 = 2,` | Schema-Versionskennung für SSTable- und WAL-Manifeste. | `src/schema.rs` |
-| `MeasureClass` | `/// MK1: Logische/funktionale Prüfung. Mk1, /// MK2: Speicherebenen-Rohdatenprüfung. Mk2, /// MK3: Physische Medieninspektion. Mk3,` | — | `src/erasure.rs` |
 | `MemoryType` | `/// Episodisches Gedächtnis: Erlebnisse, Unterhaltungen, zeitlich verankerte Ereignisse. /// Retrieval: Zeitliche Nähe und Relevanz zur aktuellen Session. /// Decay: Hohe Recency-Decay-Rate (Informat…` | — | `src/types/domain/misc.rs` |
 | `OnSignalFailure` | `/// Abort hybrid search and return an error on signal failure (Default per Spec Teil 6.5 P1). #[default] Fail, /// Degrade search gracefully using remaining active signals and report failed signals i…` | — | `src/types/saos.rs` |
-| `PendingReason` | `/// I/O-Fehler bei der Schichtbearbeitung. Io, /// SLA-Zeitfenster überschritten. SlaExceeded, /// Eine Schicht ist fehlgeschlagen. LayerFailed(LayerId), /// Nachweis/Zeuge fehlt noch. WitnessMissing…` | — | `src/erasure.rs` |
-| `Phase` | `/// Intent-Registrierung. Intent, /// Gate-Setzung. Gate, /// Schlüsselvernichtung. KeyDestroy, /// Physisches Bereinigen. Purge, /// Unabhängige Nachweismessung. Verify, /// Dokument-Ersetzung (D-11…` | — | `src/erasure.rs` |
 | `PprAlgorithm` | `/// Auto heuristic dispatch based on seed count (ForwardPush for <= 100 seeds, DensePowerIteration otherwise). #[default] Auto, /// Dense power-iteration algorithm (matrix-vector multiplication over…` | — | `src/types/domain/misc.rs` |
-| `RefusalReason` | `/// Gesetzliche Aufbewahrungspflicht steht der Bereinigung entgegen. RetentionObligation, /// Unzulässige Parameterkombination. InvalidParameters,` | — | `src/erasure.rs` |
-| `ResidualRisk` | `/// Flash-Remanenz auf FTL-Ebene. FlashRemanence, /// CoW-Dateisysteme oder Dateisystemjournale. FsJournalOrCow, /// Reste verpackter Schlüsselkopien. WrappedKeyRemanence, /// Reste in freigegebenen…` | — | `src/erasure.rs` |
-| `RetentionCode` | `/// Es besteht keine Aufbewahrungspflicht. NoObligation, /// Aufbewahrungspflicht bestand und ist abgelaufen. ObligationExpired, /// Aufbewahrungspflicht besteht aktiv. ObligationActive, /// Rechtsan…` | — | `src/erasure.rs` |
 | `RetrievalStrategy` | `/// Vektorbasiertes semantisches Signal. Vector, /// Textbasiertes lexikalisches/sparse Signal. Text, /// Graphbasiertes Beziehungs-Signal. Graph, /// Hybrides Verbund-Signal. Hybrid, /// Nutzt LeanR…` | Semantische Retrieval-Strategie für Signal-Fusion (§8/§9). | `src/retrieval_strategy.rs` |
-| `RiskCondition` | `/// Bedingung trifft immer zu. Always, /// Trifft zu bei CoW-Dateisystemen oder Journaling. CowOrJournaling, /// Trifft zu bis zum nächsten Kompaktions- und Purge-Durchlauf. UntilPurgeComplete,` | — | `src/erasure.rs` |
 | `ScanMethod` | `/// Direct structural scan of storage files, indices, or tables. Structural, /// Layer was not measured during this execution with specified reason. NotMeasured(String), /// Layer measurement is disa…` | — | `src/witness.rs` |
-| `ScanMethod` | `/// MK1: Logische Scanmethode (z. B. Iteration über Indexeinträge). Mk1, /// MK2: Physische Scanmethode auf Block-/Dateiebene. Mk2, /// MK3: Rohmedien-Inspektion. Mk3,` | — | `src/erasure.rs` |
 | `Signal` | `/// Dense vector embedding search signal. Vector, /// Lexical full-text search signal. Text, /// Graph traversal / PageRank signal. Graph,` | — | `src/types/saos.rs` |
 | `TenantScopeViolation` | `/// Raised when unpacking a `TenantScoped<T>` value with an expected `TenantId` that differs /// from the value's actual bound `TenantId`. #[error("tenant scope mismatch: expected {expected:?}, got {…` | — | `src/tenant_scope.rs` |
-| `Timing` | `/// Sofortige Ausführung im Vordergrund. Now, /// Gebündelte Ausführung im Batch-Fenster. Batched,` | — | `src/erasure.rs` |
 
 ### Typ-Aliase (3)
 
@@ -256,23 +230,10 @@ pub trait TombstoneSemanticsCheck {
 | `SYSTEM` | `Self` | SYSTEM tenant identifier (`0`). |
 | `TOMBSTONE_BIT` | `u64` | — |
 
-### Öffentliche Funktionen (140)
+### Öffentliche Funktionen (127)
 
 | Signatur | Beschreibung | Datei |
 |---|---|---|
-| `pub fn arm(self, _ev: ControlEvidence) -> Scanner<Armed>` | Einzige Brücke nach Armed; erfordert Positivkontrollbeleg (TY-10). | `src/erasure.rs` |
-| `pub fn bytes(&self) -> u64` | Liefert die Anzahl geprüfter Bytes. | `src/erasure.rs` |
-| `pub fn class(&self) -> MeasureClass` | Liefert die Messklasse (MK1-MK3). | `src/erasure.rs` |
-| `pub fn condition(&self) -> RiskCondition` | Statische Bedingung für Audit- und Verifikationswerkzeuge (AR-4). | `src/erasure.rs` |
-| `pub fn duration(&self) -> Duration` | Liefert die Scandauer. | `src/erasure.rs` |
-| `pub fn files(&self) -> u64` | Liefert die Anzahl geprüfter Dateien. | `src/erasure.rs` |
-| `pub fn finish( self, matches: u64, duration: Duration, hash: [u8; 32], ) -> Result<LayerWitness, Residue>` | Schließt die Messung ab. matches != 0 => Err(Residue). LayerWitness wird ausschließlich bei matches == 0 ausgegeben (TY-10, I-19, D-72). | `src/erasure.rs` |
-| `pub fn hash(&self) -> &[u8` | Liefert den kryptografischen Hash des Prüflaufs. | `src/erasure.rs` |
-| `pub fn id(&self) -> &'static str` | Feste Identifikator-Zeichenkette nach SPEC Anhang D. | `src/erasure.rs` |
-| `pub fn layer(&self) -> LayerId` | Liefert die Schicht-ID. | `src/erasure.rs` |
-| `pub fn method_id(&self) -> u16` | Liefert die Methoden-ID. | `src/erasure.rs` |
-| `pub fn new(layer: LayerId, class: MeasureClass, method_id: u16) -> Self` | Erzeugt einen neuen unbewaffneten Scanner. | `src/erasure.rs` |
-| `pub fn record(&mut self, files: u64, bytes: u64)` | Zeichnet geprüfte Dateien und Bytes auf. | `src/erasure.rs` |
 | `pub fn capability_unsupported( capability: impl Into<String>, reason: impl Into<String>, ) -> Self` | — | `src/error.rs` |
 | `pub fn checksum_mismatch(path: impl Into<String>, block_id: u64) -> Self` | — | `src/error.rs` |
 | `pub fn cross_device_link( source_path: impl Into<String>, target_path: impl Into<String>, ) -> Self` | — | `src/error.rs` |
@@ -446,7 +407,6 @@ pub mod text_index;
 pub mod vector_index;
 pub mod vfs;
 pub mod env;
-pub mod erasure_legacy;
 pub mod fs;
 pub mod index;
 pub mod inference;
@@ -3421,10 +3381,10 @@ pub trait LayerWitnessExt {
 | `KdfParams` | `{ pub m_cost_kib: u32, pub t_cost: u32, pub p_cost: u32, }` | Konfiguration der Argon2id KDF-Kostenparameter. | `src/kdf.rs` |
 | `KeyManager` | `{ key: VolatileEncryptionKey, cipher_cache: OnceLock<Aes256GcmSiv>, nonce_prefix: [u8; 4], nonce_counter: AtomicU64, }` | Zentraler kryptographischer Schlüsselmanager für symmetrische Verschlüsselung. Hält den Master-Key im RAM, leitet per HKDF-Expand datei- und mandante… | `src/crypto.rs` |
 | `KeyRegistry` | `{ groups: RwLock<AHashMap<u64, GroupEntry>>, revoked_groups: RwLock<AHashSet<u64>>, pub revocation_log: Option<std::sync::Arc<RevocationLog>>, }` | In-memory thread-safe registry for envelope KV crypto-shredding keys. | `src/kv_shredding.rs` |
-| `KvSegment` | `{ #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten pub tenant_id: TenantId, #[zeroize(skip)] pub segment_id: u64, /// Versionsnummer der HKDF-Schlüsse… }` | — | `src/kv_segment/segment.rs` |
+| `KvSegment` | `{ #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten pub tenant_id: TenantId, #[zeroize(skip)] pub segment_id: u64, /// Versionsnummer der HKDF-Schlüsse… }` | Repräsentiert ein einzelnes Datensegment mit automatischer Speicherbereinigung. | `src/kv_segment/segment.rs` |
 | `KvSegmentCipher` | `{ key_manager: KeyManager, registry: KeyRegistry, }` | Chiffre für segmentweise verschlüsselte KV-Einträge. | `src/kv_cipher.rs` |
 | `KvSegmentConfig` | `{ /// Delete mode specifying whether segments are tombstone-only or crypto-shredded. pub delete_mode: KvDeleteMode, }` | Configuration for KV segment storage and shredding behavior. | `src/kv_segment/manager.rs` |
-| `KvSegmentManager` | `{ config: KvSegmentConfig, registry: Arc<KeyRegistry>, master_key: Option<Arc<KeyManager>>, }` | — | `src/kv_segment/manager.rs` |
+| `KvSegmentManager` | `{ config: KvSegmentConfig, registry: Arc<KeyRegistry>, master_key: Option<Arc<KeyManager>>, }` | Manager for KV segment encryption, decryption, and crypto-shredding. | `src/kv_segment/manager.rs` |
 | `KvSegmentPayload` | `{ /// Group ID corresponding to the sub-key in . pub group_id: u64, /// Physical payload stored on disk (ciphertext or raw plaintext). pub payload: Vec<u8>, ///… }` | Representation of a written KV segment (encrypted or raw payload with group_id and nonce). | `src/kv_segment/manager.rs` |
 | `LayerCleanupProof` | `{ pub(crate) layer: DeletionLayer, pub(crate) _private: (), }` | Beweis, dass ein bestimmter DeletionLayer physisch bereinigt wurde. | `src/deletion_proof/types.rs` |
 | `LayerWitnessMeasurement` | `{ /// Layer that was measured. pub layer: DeletionLayer, /// Applied scan technique. #[serde(with = "scan_technique_serde")] pub technique: ScanTechnique, /// Nu… }` | Measurement details for a single witnessed layer in V5 proof. | `src/deletion_proof/types.rs` |
@@ -3435,7 +3395,7 @@ pub trait LayerWitnessExt {
 | `Secret` | `{ inner: T, }` | Dynamically-sized secret container that is wiped on drop and never printed. | `src/secret.rs` |
 | `SecretKey` | `{ bytes: [u8; N], }` | Fixed-size secret key that is wiped on drop and never printed. | `src/secret.rs` |
 | `SubKey` | `(tuple/unit)` | Sub-key or KEK bytes (256 bits) zeroized on drop. | `src/kv_shredding.rs` |
-| `TenantIsolatedKvStore` | `{ /// 32 cache-line-gepaddete RwLock-Shards. Box<[_]> für flexible Shard-Anzahl. shards: Box<[Shard]>, shard_count: usize, /// Globaler Offset für Shard-Rotation… }` | — | `src/kv_segment/store.rs` |
+| `TenantIsolatedKvStore` | `{ /// 32 cache-line-gepaddete RwLock-Shards. Box<[_]> für flexible Shard-Anzahl. shards: Box<[Shard]>, shard_count: usize, /// Globaler Offset für Shard-Rotation… }` | Tenant-isolierter KV-Segment-Store. INV-TENANT-Analogon für KV-Bridge: Ein Tenant kann niemals Segmente eines anderen Tenants lesen. Strukturell erzw… | `src/kv_segment/store.rs` |
 | `UncoveredLayer` | `{ /// Layer that was not covered in measurement. pub layer: DeletionLayer, /// Justification why layer was not covered for the given scope. pub reason: String, }` | Uncovered layer explanation for scope. | `src/deletion_proof/types.rs` |
 | `UnitKey` | `(tuple/unit)` | Key representing a storage or tenant unit. | `src/dek.rs` |
 | `VerificationResult` | `{ /// `true` if all cryptographic checks, signatures, and chain continuities passed. pub is_valid: bool, /// Detailed error reason if `is_valid` is `false`. pub… }` | Structured outcome of third-party deletion proof verification. | `src/deletion_proof/verifier.rs` |
@@ -3454,7 +3414,7 @@ pub trait LayerWitnessExt {
 | `DeletionProofError` | `/// Ungültiger Ed25519 VerifyingKey (32 Bytes). #[error("invalid verifying key: {0}")] InvalidVerifyingKey(String), /// Ungültige Ed25519 Signatur (64 Bytes) oder Fehlschlag bei der Verifikation. #[e…` | Fehlerzustände bei der Verifikation von Ed25519-Attestationsbeweisen. | `src/ed25519_proof.rs` |
 | `DeletionScope` | `/// Individual document deletion. Document { /// DocId of target document. doc_id: DocId, /// TenantId of owning tenant. tenant_id: TenantId, }, /// Collection-wide deletion. Collection { /// Collect…` | Target scope for physical deletion. | `src/deletion_proof/types.rs` |
 | `ExcludedScope` | `/// Wissen in Zusammenfassungen die als LLM-Fine-Tuning-Input dienten. ConsolidatedAndDistilled, /// LLM-Modellparameter (arXiv:2505.16831 — Unlearning Isn't Deletion). LlmParameterMemory,` | Explizite Nicht-Abdeckung — maschinenlesbar für Audit-Systeme. | `src/deletion_proof/types.rs` |
-| `KvDeleteMode` | `TombstoneOnly, CryptoShred,` | — | `src/kv_segment/delete_mode.rs` |
+| `KvDeleteMode` | `TombstoneOnly, CryptoShred,` | Mode specifying KV segment deletion behavior. INVARIANTE : Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für -Segmente möglich, niemals… | `src/kv_segment/delete_mode.rs` |
 | `RevocationTarget` | `/// Shredding Group ID (z. B. für `KeyRegistry`) Group(u64), /// Key Encryption Key (KEK) Identifier Kek(String), /// Data Encryption Key (DEK) Identifier Dek(String), /// Specific Record Identifier…` | Das Ziel eines Widerruf-Eintrags im Log (Group ID, KEK ID, DEK ID oder Record ID). | `src/revocation_log.rs` |
 | `SignatureVersion` | `/// HMAC-SHA256 legacy scope-only signature (version 1) V1 = 1, /// HMAC-SHA256 scope + layer coverage signature (version 2) V2 = 2, /// Ed25519 asymmetric signature with length-prefixed key hashes (…` | `SignatureVersion`-Enum für typsichere Versionierung von DeletionProof-Signaturen. Referenz: Befund v17 Teil 10.1 & INVARIANTE INV-DELETION-1 (die ph… | `src/ed25519_proof.rs` |
 | `SigningKeyHandle` | `/// Symmetric HMAC key slice. Hmac(&'a [u8]), /// Ed25519 signing key reference. Ed25519(&'a ed25519_dalek::SigningKey),` | Handle to the key used for signing deletion proofs. | `src/deletion_proof/types.rs` |
@@ -4039,8 +3999,8 @@ pub trait Rng : Send + Sync {
 | `HnswHotCore` | `{ pub nodes: RwLock<Vec<HnswNode>>, #[cfg(not(feature = "docid-128"))] pub doc_to_node: RwLock<BTreeMap<u64, usize>>, #[cfg(feature = "docid-128")] pub doc_to_no… }` | — | `src/hnsw/types.rs` |
 | `HnswIndexCore` | `{ pub hot: HnswHotCore, pub cold: HnswColdCore, }` | The core implementation of the HNSW index. | `src/hnsw/types.rs` |
 | `HnswNode` | `{ pub(super) doc_id: DocId, pub(super) vector: VectorData, pub(super) max_layer: usize, pub(super) committed_tx: u64, }` | A node in the HNSW graph. | `src/hnsw/types.rs` |
-| `HnswPurger` | `{ index: Arc<HnswIndex>, }` | — | `src/hnsw/purge.rs` |
-| `HnswScanner` | `{ index: Arc<HnswIndex>, }` | — | `src/hnsw/scanner.rs` |
+| `HnswPurger` | `{ index: Arc<HnswIndex>, }` | Neutrale Bereinigungs- und Wartungsroutine für Vektorknoten. Als Wartungsprimitiv implementiert. | `src/hnsw/purge.rs` |
+| `HnswScanner` | `{ index: Arc<HnswIndex>, }` | Neutrale Scan- und Validierungsroutine für Vektorknoten. Als Prüfprimitiv implementiert. | `src/hnsw/scanner.rs` |
 | `InjectedDistanceKernel` | `{ pub distance_fn: D, }` | Dynamic adapter enabling any injected [`DistanceFn`] to be used as a [`DistanceKernel`]. | `src/distance.rs` |
 | `MmapIndex` | `{ pub mmap: std::sync::Arc<memmap2::Mmap>, pub header: HnswHeader, pub path: Option<std::path::PathBuf>, }` | A reader for memory-mapped HNSW indices. | `src/persistence/mmap.rs` |
 | `MonotonicCounterClock` | `{ nanos: AtomicU64, }` | Deterministic monotonic counter clock for HNSW vector index. Implements [`Clock`] without any reference to system wall-clock or non-deterministic OS… | `src/hnsw/clock.rs` |
@@ -4249,10 +4209,10 @@ pub trait Rng : Send + Sync {
 | `pub async fn search_adaptive_with_stats( &self, query: &[f32], k: usize, policy: &AdaptiveEfPolicy, filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>, ) -> Result<(Vec<ScoredDocument>, AdaptiveEfStats)>` | Performs an adaptive search (Ada-ef) returning scored documents along with execution statistics. | `src/hnsw/core_search.rs` |
 | `pub fn remove(&self, doc_id: DocId) -> Result<bool>` | O(1) Tombstone-Löschung gemäß VETO-F02 und INV-VEC-ZEROIZE-1. Markiert den Knoten deterministisch als gelöscht, nullt den Vektorspeicher im… | `src/hnsw/deletion.rs` |
 | `pub fn remove_with_repair(&mut self, id: &u64) -> Result<bool>` | Removes a document from the vector index by its 64-bit ID. Executes tombstone insertion, immediate slot zeroization (`INV-VEC-ZEROIZE-1`),… | `src/hnsw/deletion.rs` |
-| `pub fn hnsw_purger(index: Arc<HnswIndex>) -> Arc<dyn Purger>` | — | `src/hnsw/purge.rs` |
+| `pub fn hnsw_purger(index: Arc<HnswIndex>) -> Arc<dyn Purger>` | Erzeugt einen `Arc<dyn Purger>` für einen HNSW Index. | `src/hnsw/purge.rs` |
 | `pub fn new(index: Arc<HnswIndex>) -> Self` | Erzeugt einen neuen `HnswPurger`. | `src/hnsw/purge.rs` |
 | `pub fn has_residual(&self) -> bool` | Gibt an, ob noch irgendwelche Restspuren (ID, Vektorbytes, Kanten, Staging) existieren. | `src/hnsw/scanner.rs` |
-| `pub fn hnsw_scanner(index: Arc<HnswIndex>) -> Arc<dyn LayerScanner>` | — | `src/hnsw/scanner.rs` |
+| `pub fn hnsw_scanner(index: Arc<HnswIndex>) -> Arc<dyn LayerScanner>` | Erzeugt einen `Arc<dyn LayerScanner>` für einen HNSW Index. | `src/hnsw/scanner.rs` |
 | `pub fn inspect_residual(&self, doc_id: DocId) -> ResidualReport` | Lesende Inspektionssicht: Prüft, ob `doc_id` noch in Slots, Kanten oder Puffern vorkommt. | `src/hnsw/scanner.rs` |
 | `pub fn new(index: Arc<HnswIndex>) -> Self` | Erzeugt einen neuen `HnswScanner`. | `src/hnsw/scanner.rs` |
 | `pub fn scan_units(&self, session: &mut ScanSession, _ctx: &RequestContext) -> Result<()>` | Führt den Schicht-Scan für den HNSW-Index aus. | `src/hnsw/scanner.rs` |
@@ -4562,7 +4522,7 @@ pub trait Tokenizer : Send + Sync {
 | `BM25F` | `{ pub k1: f32, pub field_weights: Vec<FieldWeight>, cached_weights: Vec<(FieldId, f32, f32)>, }` | Konfiguration für feldgewichtetes BM25F-Scoring (§11.3). | `src/bm25.rs` |
 | `BM25MorphIndex` | `{ inner: InvertedIndex<S>, tokenizer: Arc<dyn MorphologicalTokenizer>, }` | Invertierter Index mit morphologischer Zerlegung für deutsche Volltextsuche. | `src/inverted/morph_index.rs` |
 | `Bm25CandidateStream` | `{ index: &'a InvertedIndex<S>, query: String, max_seq: Option<u64>, batch_size: usize, buffer: VecDeque<(DocId, f32)>, seen: BTreeSet<DocId>, fetched_k: usize, y… }` | Asynchroner Pull-Stream zum bedarfsgerechten Nachladen von BM25-Kandidaten. # Kandidaten-Sortierung & Determinismus Ergebnisse werden strikt determin… | `src/stream.rs` |
-| `Bm25Scorer` | `{ index: InvertedIndex<S>, }` | — | `src/lib.rs` |
+| `Bm25Scorer` | `{ index: InvertedIndex<S>, }` | Berechnet Begriffsgewichte und wendet die Standard-BM25-Relevanzbewertung an. `Bm25Scorer` fungiert als primäre Integrationsfassade für den Port [`Te… | `src/lib.rs` |
 | `BoundedTopK` | `{ heap: BinaryHeap<Bm25Candidate>, capacity: usize, }` | Begrenzter Min-Heap zur effizienten Verwaltung der K besten Treffer. | `src/wand.rs` |
 | `CompactStats` | `{ /// Anzahl physisch bereinigter Tombstones. pub purged_docs: usize, /// Anzahl verbliebener aktiver Dokumente. pub active_docs: usize, }` | Statistiken über den Kompaktierungsvorgang. | `src/memory_index.rs` |
 | `DefaultTokenizer` | `(tuple/unit)` | Standard-Tokenizer basierend auf Unicode-Wortgrenzen und generischen Stoppwörtern. | `src/tokenizer.rs` |
@@ -4584,12 +4544,12 @@ pub trait Tokenizer : Send + Sync {
 | `Posting` | `{ /// Dokument-ID des Eintrags. pub doc_id: DocIdRaw, /// Termfrequenz (Häufigkeit des Terms in diesem Dokument). pub tf: u32, /// Gesamtlänge des Dokuments in T… }` | Kompakte Repräsentation eines einzelnen Vorkommens (Posting) im Index. 8-Byte ausgerichtet (`repr(C, align(8))`) für optimale CPU-Cacheline-Ausnutzun… | `src/posting_list.rs` |
 | `PostingBlockInfo` | `{ /// Höchste Dokument-ID in diesem Block (ermöglicht schnelles Überspringen). pub max_doc_id: DocIdRaw, /// Maximale Termfrequenz innerhalb dieses Blocks. pub m… }` | Metadaten eines 64er-Posting-Blocks zur Berechnung oberer BM25-Schranken in Block-Max WAND. | `src/posting_list.rs` |
 | `PostingList` | `{ postings: Vec<Posting>, blocks: Vec<PostingBlockInfo>, }` | Zusammenhängende, nach DocId sortierte Posting-Liste für einen Begriff. | `src/posting_list.rs` |
-| `PurgeReport` | `{ /// Anzahl erfolgreich physisch gelöschter Einheiten. pub units_purged: u64, /// Anzahl fehlgeschlagener Einheiten während der Ausführung. pub units_failed: u6… }` | — | `src/inverted/purge.rs` |
+| `PurgeReport` | `{ /// Anzahl erfolgreich physisch gelöschter Einheiten. pub units_purged: u64, /// Anzahl fehlgeschlagener Einheiten während der Ausführung. pub units_failed: u6… }` | Detaillierter Ausführungsbericht eines Purge-Laufs mit Einheiten, freigegebenem Speicher und Fehlern. | `src/inverted/purge.rs` |
 | `ResidentPostingIndex` | `{ index: RwLock<BTreeMap<String, Arc<PostingList>>>, }` | Speicherresidenter Lese-Cache für Posting-Listen mit RCU-Verwaltung. | `src/posting_list.rs` |
 | `TextHit` | `{ /// Eindeutige ID des Dokuments. pub doc_id: DocId, /// Berechneter BM25-Relevanz-Score. pub score: f32, }` | Ergebnisdokument mit Relevanz-Score für BM25-Suchen. | `src/types.rs` |
 | `TextIndexMetadata` | `{ /// Gesamtzahl der aktiven Dokumente im Index. pub total_docs: u64, /// Gesamtzahl aller indizierten Token über alle Dokumente. pub total_tokens: u64, /// Fest… }` | Konsolidierte Metadaten des Textindex zur persistenten Speicherung im Schlüssel `meta:stats`. | `src/inverted/types.rs` |
-| `TextPurger` | `{ index: Arc<InvertedIndex<S>>, }` | — | `src/inverted/purge.rs` |
-| `TextScanner` | `{ index: Arc<InvertedIndex<S>>, target: Arc<parking_lot::Mutex<Option<ScanTarget>>>, }` | — | `src/inverted/scanner.rs` |
+| `TextPurger` | `{ index: Arc<InvertedIndex<S>>, }` | Physischer Purger für den Textindex zur Bereinigung von Storage und Metadaten. | `src/inverted/purge.rs` |
+| `TextScanner` | `{ index: Arc<InvertedIndex<S>>, target: Arc<parking_lot::Mutex<Option<ScanTarget>>>, }` | Scanner zur Feststellung verbleibender Restdaten im Textindex. | `src/inverted/scanner.rs` |
 | `Token` | `{ /// Normalisierter Termwert. pub term: String, /// Start-Byte-Offset im Originaltext (auf gültiger Zeichengrenze). pub start_offset: usize, /// End-Byte-Offset… }` | Repräsentiert ein strukturiertes Token aus der Textanalyse-Pipeline. Ein Token umfasst den extrahierten Term, Byte-Offsets in den Originaltext (stets… | `src/tokenizer.rs` |
 | `TokenReductionMetrics` | `{ /// Anzahl ursprünglicher Token vor der morphologischen Zerlegung. pub original_tokens: usize, /// Anzahl resultierender Token nach Zerlegung von Komposita. pu… }` | Metriken zur Erfassung der Token-Expansions- und Zerlegungswirkung. | `src/morphology/metrics.rs` |
 | `Trie` | `{ root: TrieNode, }` | Präfixbaum (Trie) für schnelle O(m)-Wörterbuchabfragen (m = Wortlänge). | `src/morphology/trie.rs` |
@@ -4604,7 +4564,7 @@ pub trait Tokenizer : Send + Sync {
 | `Language` | `/// Englischer Standard-Tokenizer (Unicode-Wortgrenzen + Stoppwortfilterung). #[default] English, /// Deutscher morphologischer Tokenizer (Komposita-Zerlegung + Umlaut-Normalisierung). German, /// Be…` | Unterstützte Sprachen und Tokenisierungsstrategien für den invertierten Index. Steuert, welcher Tokenizer für die Dokumentenindizierung und Suchabfra… | `src/inverted/types.rs` |
 | `NormalizationPolicy` | `/// Nur Unicode Lowercasing. #[default] Lowercase, /// NFKC-Normalisierung (Ligaturen auflösen, ZWJ/Formatzeichen entfernen, Fullwidth normalisieren) + Lowercasing. Nfkc, /// Spezifische deutsche Uml…` | Konfigurierbare Normalisierungsrichtlinie für Textanalyse. | `src/tokenizer.rs` |
 | `OverflowPolicy` | `/// Überschüssige Eingaben oder Token werden deterministisch abgeschnitten. #[default] Truncate, /// Eine Überschreitung führt zu einem Fail-Closed Fehler. Error,` | Strategie bei Überschreitung konfigurierter Kapazitätsgrenzen. | `src/tokenizer.rs` |
-| `ParsedTextTarget` | `Document(DocId), Collection(String),` | — | `src/inverted/scanner.rs` |
+| `ParsedTextTarget` | `Document(DocId), Collection(String),` | Geparstes Zielobjekt (Dokument-ID oder Kollektion) für den Scanner. | `src/inverted/scanner.rs` |
 | `TextError` | `/// Ungültige Eingabedaten (z. B. leere/ungültige Abfrage, ungültige Scoring-Parameter). #[error("ungültige Eingabedaten: {0}")] InvalidInput(String), /// Fehler bei Textanalyse, Regex oder Tokenisie…` | Typisierter Fehler für Volltextindexierung, Tokenisierung und Scoring. | `src/error.rs` |
 
 ### Typ-Aliase (5)
@@ -4672,13 +4632,13 @@ pub trait Tokenizer : Send + Sync {
 | `pub fn purge_collection_report(&self, tx: TxId, namespace: &str) -> PurgeReport` | Fast-path purge for an entire collection namespace (`__txt:{collection}:`), returning a `PurgeReport`. | `src/inverted/purge.rs` |
 | `pub fn purge_document(&self, tx: TxId, doc_id: DocId) -> Result<PurgeStats>` | Purges a single document from the inverted index and recalculates corpus statistics. | `src/inverted/purge.rs` |
 | `pub fn purge_document_report(&self, tx: TxId, doc_id: DocId) -> PurgeReport` | Purges a single document from the inverted index and recalculates corpus statistics, returning a detailed `PurgeReport`. | `src/inverted/purge.rs` |
-| `pub fn text_purger<S: StorageEngine + 'static>(index: Arc<InvertedIndex<S>>) -> Arc<dyn Purger>` | — | `src/inverted/purge.rs` |
+| `pub fn text_purger<S: StorageEngine + 'static>(index: Arc<InvertedIndex<S>>) -> Arc<dyn Purger>` | Erzeugt eine instanziierte Implementierung des [`Purger`]-Ports für den Textindex. | `src/inverted/purge.rs` |
 | `pub fn to_purge_stats(&self) -> Result<PurgeStats>` | Konvertiert den Bericht in [`PurgeStats`] oder liefert einen Fehler bei Teilabbrüchen. | `src/inverted/purge.rs` |
 | `pub fn new(index: Arc<InvertedIndex<S>>) -> Self` | Erzeugt einen neuen `TextScanner` für den übergebenen invertierten Index. | `src/inverted/scanner.rs` |
 | `pub fn new_with_target(index: Arc<InvertedIndex<S>>, target: ScanTarget) -> Self` | Erzeugt einen neuen `TextScanner` mit vorab konfiguriertem Scan-Ziel. | `src/inverted/scanner.rs` |
 | `pub fn parse(target_id: &str) -> Self` | Parses a target ID string into document ID or collection namespace. | `src/inverted/scanner.rs` |
 | `pub fn set_target(&self, target: ScanTarget)` | Weist dem Scanner ein neues Zielobjekt zu. | `src/inverted/scanner.rs` |
-| `pub fn text_scanner<S: StorageEngine + 'static>( index: Arc<InvertedIndex<S>>, ) -> Arc<dyn LayerScanner>` | — | `src/inverted/scanner.rs` |
+| `pub fn text_scanner<S: StorageEngine + 'static>( index: Arc<InvertedIndex<S>>, ) -> Arc<dyn LayerScanner>` | Erzeugt eine instanziierte Implementierung des [`LayerScanner`]-Ports für den Textindex. | `src/inverted/scanner.rs` |
 | `pub fn with_target(self, target: ScanTarget) -> Self` | Konfiguriert das Scan-Ziel im Builder-Muster. | `src/inverted/scanner.rs` |
 | `pub fn from_iso(code: &str) -> Self` | Parst einen ISO-639-1 Sprachcode ("de", "de-AT", "en", "en-US"). Bewertet nur das primäre Subtag vor dem ersten Bindestrich. Unbekannte Cod… | `src/inverted/types.rs` |
 | `pub fn new(storage: std::sync::Arc<S>, namespace: &str) -> Self` | Erzeugt eine neue `Bm25Scorer`-Instanz über der angegebenen Speicher-Engine. # Ablauf 1. Übernahme der Referenz auf die `StorageEngine`. 2.… | `src/lib.rs` |
@@ -5080,7 +5040,7 @@ pub trait ShadowSink<T> : Send + Sync {
 | `FaultVfs` | `{ files: Arc<RwLock<BTreeMap<std::path::PathBuf, Vec<u8>>>>, failing: Arc<parking_lot::Mutex<bool>>, }` | Simple in-memory fault-injecting VFS double for crash simulation tests. | `src/test_doubles.rs` |
 | `GraphInner` | `{ pub(crate) id_map: HashMap<EntityId, InternalIndex>, pub(crate) reverse_map: Vec<EntityId>, pub(crate) entities: Vec<Entity>, pub(crate) communities: HashMap<E… }` | — | `src/csr/inner/mod.rs` |
 | `GraphPath` | `{ /// Knoten-Sequenz vom Start zum Ziel. pub nodes: Vec<EntityId>, /// Kantengewichte entlang des Pfades (len = nodes.len() - 1). pub edge_weights: Vec<f32>, ///… }` | — | `src/path_rag/mod.rs` |
-| `GraphPurger` | `{ graph: Arc<CsrGraph>, }` | — | `src/purger.rs` |
+| `GraphPurger` | `{ graph: Arc<CsrGraph>, }` | Purger-Implementierung für [`CsrGraph`]. | `src/purger.rs` |
 | `GraphStats` | `{ /// Number of active/committed nodes \|V\|. pub node_count: usize, /// Number of directed edges \|E\|. pub edge_count: usize, /// Average outgoing degree \|E\| / \|V\|… }` | — | `src/ppr/cost.rs` |
 | `HyperEdge` | `{ /// Eindeutige ID der Hyperkante. pub id: HyperEdgeId, /// Prädikat/Typ der Hyperkante. pub predicate: EdgeType, /// Liste der Teilnehmer mit ihren Rollen. ///… }` | — | `src/hyperedge.rs` |
 | `HyperEdgeCandidate` | `{ /// Canonical sorted list of participating entity IDs. pub participants: Vec<EntityId>, /// Number of distinct documents in which this exact entity combination… }` | — | `src/hyperedge_suggest.rs` |
@@ -5382,7 +5342,7 @@ pub trait ShadowSink<T> : Send + Sync {
 | `pub fn compute_pagerank<G: GraphProvider>( graph: &G, damping: f32, max_iter: usize, tol: f32, ) -> HashMap<EntityId, f32>` | Generic PageRank computation executing against any `GraphProvider`. | `src/provider.rs` |
 | `pub fn detect_communities_on_provider<G: GraphProvider>( graph: &G, config: &crate::community::CommunityDetectionConfig, ) -> Result<Vec<crate::community::CommunityAssignment>>` | Generic Community Detection on any `GraphProvider`. | `src/provider.rs` |
 | `pub fn new() -> Self` | — | `src/provider.rs` |
-| `pub fn graph_purger(graph: Arc<CsrGraph>) -> Arc<dyn Purger>` | — | `src/purger.rs` |
+| `pub fn graph_purger(graph: Arc<CsrGraph>) -> Arc<dyn Purger>` | Erzeugt einen `Arc<dyn Purger>` für einen gegebenen [`CsrGraph`]. | `src/purger.rs` |
 | `pub fn new(graph: Arc<CsrGraph>) -> Self` | Erzeugt einen neuen [`GraphPurger`]. | `src/purger.rs` |
 | `pub fn active_head(&self) -> RwLockReadGuard<'_, NodeIdx>` | — | `src/session_dag.rs` |
 | `pub fn active_head(&self) -> RwLockReadGuard<'_, NodeIdx>` | — | `src/session_dag.rs` |
@@ -5453,7 +5413,7 @@ pub trait ShadowSink<T> : Send + Sync {
 
 ### Architekturbeschreibung
 
-# Contextra Rank (`contextra-rank`)  **Ring:** Ring 0 (Ranking & Kalibrierung / Kernlogik) **Klasse:** Rand `[R]` **Reifegrad:** Experimentell / Aktiv (Kern v1)  ## Zweck des Crates Dieses Crate implementiert Methoden zur Fusion, Kalibrierung und Erklärung von Retrieval-Ergebnissen im Contextra-System. Dazu gehören: - **4-Signal-Fusion:** Verknüpfung von Vektor-, Text- (BM25), Graph- und Rerank-Scores mittels reziproker Rangfusion (RRF = Reciprocal Rank Fusion) und score-basierter Normalisierung. - **Kalibrierung:** Umwandlung von Roh-Scores in Wahrscheinlichkeiten via Platt-Scaling (logistische Regression) und Isotonische Regression (PAVA = Pool-Adjacent Violators Algorithm). - **Konforme Prädiktion:** Finite-Sample-Abdeckungsgarantien und adaptive Schwellenwertanpassung bei Verteilungsverschiebung (Covariate Shift). - **Drift-Erkennung:** Überwachung von Score-Verteilungen zur Laufzeit. - **Erklärbarkeit (Explainability):** Umwandlung maschinenlesbarer Herkunftsnachweise (`ProvenanceRecord`) in strukturierte und deutschsprachige Erklärungen. - **DiBud (Discrete Budgeted):** Jederzeit abbrechbare Streaming-Fusion unter Zeit- und Kanalbudgets.  ## Einbindung und Abhängigkeiten - **Konsumiert (Ring 0):** `contextra-types` (Domain-Typen), `contextra-ports` (Hardware-Abstraktionen). - **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`, `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-infer-onnx`, `contextra-mcp`, `contextra-py`.
+# Contextra Rank (`contextra-rank`)  **Ring:** Ring 0 (Ranking & Kalibrierung / Kernlogik) **Klasse:** Rand `[R]` **Reifegrad:** Experimentell / Aktiv (Kern v1)  ## Zweck des Crates Dieses Crate implementiert Methoden zur Fusion, Kalibrierung und Erklärung von Retrieval-Ergebnissen im Contextra-System. Dazu gehören: - **4-Signal-Fusion:** Verknüpfung von Vektor-, Text- (BM25), Graph- und Rerank-Scores mittels reziproker Rangfusion (RRF = Reciprocal Rank Fusion) und score-basierter Normalisierung. - **Kalibrierung:** Umwandlung von Roh-Scores in Wahrscheinlichkeiten via Platt-Scaling (logistische Regression) und Isotonische Regression (PAVA = Pool-Adjacent Violators Algorithm). - **Konforme Prädiktion:** Finite-Sample-Abdeckungsgarantien und adaptive Schwellenwertanpassung bei Verteilungsverschiebung (Covariate Shift). - **Drift-Erkennung:** Überwachung von Score-Verteilungen zur Laufzeit. - **Erklärbarkeit (Explainability):** Umwandlung maschinenlesbarer Herkunftsnachweise (`ProvenanceRecord`) in strukturierte und deutschsprachige Erklärungen. - **DiBud (Discrete Budgeted):** Jederzeit abbrechbare Streaming-Fusion unter Zeit- und Kanalbudgets.  ## Einbindung und Abhängigkeiten - **Konsumiert (Ring 0):** `contextra-types` (Domain-Typen), `contextra-ports` (Hardware-Abstraktionen). - **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`, `contextra-mcp`.
 
 ### Modul- und Re-Export-Oberfläche (lib.rs)
 
@@ -5728,7 +5688,7 @@ pub trait ConformalCalibrator {
 
 ### Architekturbeschreibung
 
-# contextra-store (Ring 1)  Die Crate `contextra-store` implementiert das persistente LSM-Tree-Speichertriebwerk (Log-Structured Merge-tree) für die Contextra-Plattform. Sie stellt die primäre Datenspeicherebene bereit und bietet atomare Schreibvorgänge, Konsistenz über Snapshots sowie Ausfallsicherheit durch Write-Ahead-Logging (WAL).  ## Architektur & Datenpfad - **Client / Transaktion:** Sendet atomare Schreiboperationen (Put, Delete) über Transaktionspuffer. - **WAL (Write-Ahead-Log):** Persistiert alle Mutationen sequentiell auf Festplatte inklusive CRC32C- und HMAC-SHA256-Integritätsprüfung, bevor sie im RAM bestätigt werden. - **MemTable:** Haltebereich im Arbeitsspeicher (geschardete BTreeMap), der schnelle Suchen und Einfügungen bei geordneten Sequenznummern ermöglicht. - **Flush & SSTable:** Bei Erreichen von Größenschwellen wird die aktive MemTable eingefroren und asynchron als unveränderliche SSTable (Sorted String Table, Format V4 Standard) auf Platte geschrieben. - **Compaction:** Hintergrundprozess, der SSTables hierarchisch (Leveled / Adaptive) zusammenführt, Tombstones bereinigt und Lese- sowie Speicherverstärkung minimiert.  ## Sicherheitsinvariante Die gesamte Crate erzwingt `#![forbid(unsafe_code)]` in Produktion. Es existieren keinerlei `unsafe`-Blöcke im Produktionscode.  ## Ring-Hierarchie & Abhängigkeiten - **Ring 1 / Klasse B:** Kernkomponente des Storage-Bundles (`types`, `ports`, `mvcc`, `crypto`, `sys`, `store`). - **Eingehende Abhängigkeiten:** Wird genutzt von `contextra-engine`, `contextra-db`, `contextra-checkpoint`, `contextra-agent` und der übergeordneten Fassade `contextra`. - **Ausgehende Abhängigkeiten:** Nutzt `contextra-types`, `contextra-ports`, `contextra-crypto`, `contextra-sys`, `contextra-mvcc`.
+# contextra-store (Ring 1)  Die Crate `contextra-store` implementiert das persistente LSM-Tree-Speichertriebwerk (Log-Structured Merge-tree) für die Contextra-Plattform. Sie stellt die primäre Datenspeicherebene bereit und bietet atomare Schreibvorgänge, Konsistenz über Snapshots sowie Ausfallsicherheit durch Write-Ahead-Logging (WAL).  ## Architektur & Datenpfad - **Client / Transaktion:** Sendet atomare Schreiboperationen (Put, Delete) über Transaktionspuffer. - **WAL (Write-Ahead-Log):** Persistiert alle Mutationen sequentiell auf Festplatte inklusive CRC32C- und HMAC-SHA256-Integritätsprüfung, bevor sie im RAM bestätigt werden. - **MemTable:** Haltebereich im Arbeitsspeicher (geschardete BTreeMap), der schnelle Suchen und Einfügungen bei geordneten Sequenznummern ermöglicht. - **Flush & SSTable:** Bei Erreichen von Größenschwellen wird die aktive MemTable eingefroren und asynchron als unveränderliche SSTable (Sorted String Table, Format V4 Standard) auf Platte geschrieben. - **Compaction:** Hintergrundprozess, der SSTables hierarchisch (Leveled / Adaptive) zusammenführt, Tombstones bereinigt und Lese- sowie Speicherverstärkung minimiert.  ## Sicherheitsinvariante Die gesamte Crate erzwingt `#![forbid(unsafe_code)]` in Produktion. Es existieren keinerlei `unsafe`-Blöcke im Produktionscode.  ## Ring-Hierarchie & Abhängigkeiten - **Ring 1 / Klasse B:** Kernkomponente des Storage-Bundles (`types`, `ports`, `mvcc`, `crypto`, `sys`, `store`). - **Eingehende Abhängigkeiten:** Wird genutzt von `contextra-engine`, `contextra-db`, `contextra-checkpoint` und der übergeordneten Fassade `contextra`. - **Ausgehende Abhängigkeiten:** Nutzt `contextra-types`, `contextra-ports`, `contextra-crypto`, `contextra-sys`, `contextra-mvcc`.
 
 ### Modul- und Re-Export-Oberfläche (lib.rs)
 
@@ -5839,7 +5799,7 @@ pub trait MergeOperator : Send + Sync {
 /// Merges two raw byte values for the same key.
     ///
     /// # Fail-Safe Requirement
-    /// Implementations running untrusted guest code (e.g. WASM via `contextra-sandbox`) MUST
+    /// Implementations running untrusted guest code (e.g. WASM-Sandboxes) MUST
     /// implement fail-safe handling: if execution fails (e.g. fuel exhaustion or trap),
     /// the caller or operator must swallow the error for that single entry, log a `tracing::warn!`,
     /// and retain both original versions in the compacted SSTable without aborting the overall compaction.
@@ -6046,7 +6006,7 @@ pub trait WalObserver : Send + Sync {
 | `KvSegmentStore` | `{ segments: std::collections::BTreeMap<u64, KvSegment>, }` | Speicherbereich für KV-Segmente. | `src/kv/mod.rs` |
 | `LruBlockCacheBackend` | `{ state: RwLock<LruBlockCacheState>, }` | Standard strict-LRU block cache backend using `parking_lot::RwLock<LruCache>` with byte-based capacity. | `src/sstable/block_cache.rs` |
 | `LsmConfig` | `{ /// Path to the data directory. pub path: PathBuf, /// Maximum size of the memtable before flushing to disk. pub memtable_size_limit: usize, /// Maximum RAM us… }` | Configuration for the LSM storage engine. | `src/lsm/config.rs` |
-| `LsmPurger` | `{ storage: Arc<LsmStorage>, runtime: ScannerRuntime, }` | Purger für LSM Storage Engine. | `src/scanner/purge.rs` |
+| `LsmPurger` | `{ // Felder bleiben für den Ersatz in WP-4 erhalten. #[allow(dead_code)] storage: Arc<LsmStorage>, #[allow(dead_code)] runtime: ScannerRuntime, }` | Purger für LSM Storage Engine. Gesperrt, siehe Modul-Dokumentation. | `src/scanner/purge.rs` |
 | `LsmState` | `{ pub(super) memtable: Arc<MemTable>, pub(super) immutable_memtables: Vec<Arc<MemTable>>, }` | — | `src/lsm/guard.rs` |
 | `LsmStorage` | `{ pub(super) config: LsmConfig, pub(super) key_manager: Option<Arc<KeyManager>>, pub(super) state: RwLock<LsmState>, /// SSTables stored separately for shared ac… }` | Primaere Schnittstelle fuer den LSM-Baum mit get, put, delete und scan. | `src/lsm/engine.rs` |
 | `Manifest` | `{ pub(super) path: PathBuf, pub(super) file: tokio::sync::Mutex<tokio::fs::File>, pub(super) _dir_lock: Option<DirLock>, pub(super) is_poisoned: AtomicBool, }` | — | `src/manifest/core.rs` |
@@ -7702,7 +7662,7 @@ pub use validation::{is_write_allowed_by_env, validate_collection_name};
 
 ### Architekturbeschreibung
 
-# Crate `contextra-testkit`  Deterministische Test-Utilities, Mocks, In-Memory-Referenzimplementierungen und Konformitätsprüfsuiten für das Contextra-System.  ## Ring & Architektur-Einordnung - **Ring:** Werkzeug / Tooling (außerhalb der numerischen Ringe 0 bis 4). - **Klasse:** Werkzeug (`—`). - **Sicherheits-Invariante (INV-EMBED-1):** `contextra-testkit` darf ausschließlich als `[dev-dependencies]` in Produktions-Crates eingebunden werden und niemals in Release-Binaries oder produktiven Abhängigkeiten landen. - **Unsafe-Code:** Ausdrücklich verboten über `#![forbid(unsafe_code)]`.  ## Bereitgestellte Hauptkomponenten - [`ManualClock`]: Deterministische, manuell steuerbare Uhr (implementiert `Clock`-Port). - [`FaultVfs`]: Virtuelles Dateisystem mit kontrollierter Fehlerinjektion für I/O- und fsync-Fehler. - [`InMemoryStorageEngine`]: Transaktionale In-Memory-Speicher-Engine mit Rollback-Unterstützung. - [`InMemoryVectorIndex`]: In-Memory-Vektorindex mit Cosine-Distanzberechnung. - [`InMemoryTextIndex`]: In-Memory-Volltextindex (BM25-ähnlich). - [`InMemoryGraphIndex`]: In-Memory-Graphindex für Kanten- und Knotentraversierung. - [`ReferenceModel`]: Referenzmodell zur Validierung von MVCC-Isolationsstufen (Multi-Version Concurrency Control). - [`mocks`]: Mocks für Embedder und Metriken (`MockEmbedder`, `TestMetricsSink`). - [`conformance`]: Standardisierte Konformitätstests für Ports (Clock, RNG, Storage, Vector, etc.).  ## Abhängigkeiten - **Normal:** `contextra-ports`, `contextra-types`, `bytes`, `parking_lot`, `tracing`. - **Wird eingebunden von:** `contextra`, `contextra-agent`, `contextra-checkpoint`, `contextra-cognition`, `contextra-crypto`, `contextra-db`, `contextra-engine`, `contextra-graph`, `contextra-mvcc`, `contextra-privacy`, `contextra-store`.
+# Crate `contextra-testkit`  Deterministische Test-Utilities, Mocks, In-Memory-Referenzimplementierungen und Konformitätsprüfsuiten für das Contextra-System.  ## Ring & Architektur-Einordnung - **Ring:** Werkzeug / Tooling (außerhalb der numerischen Ringe 0 bis 4). - **Klasse:** Werkzeug (`—`). - **Sicherheits-Invariante (INV-EMBED-1):** `contextra-testkit` darf ausschließlich als `[dev-dependencies]` in Produktions-Crates eingebunden werden und niemals in Release-Binaries oder produktiven Abhängigkeiten landen. - **Unsafe-Code:** Ausdrücklich verboten über `#![forbid(unsafe_code)]`.  ## Bereitgestellte Hauptkomponenten - [`ManualClock`]: Deterministische, manuell steuerbare Uhr (implementiert `Clock`-Port). - [`FaultVfs`]: Virtuelles Dateisystem mit kontrollierter Fehlerinjektion für I/O- und fsync-Fehler. - [`InMemoryStorageEngine`]: Transaktionale In-Memory-Speicher-Engine mit Rollback-Unterstützung. - [`InMemoryVectorIndex`]: In-Memory-Vektorindex mit Cosine-Distanzberechnung. - [`InMemoryTextIndex`]: In-Memory-Volltextindex (BM25-ähnlich). - [`InMemoryGraphIndex`]: In-Memory-Graphindex für Kanten- und Knotentraversierung. - [`ReferenceModel`]: Referenzmodell zur Validierung von MVCC-Isolationsstufen (Multi-Version Concurrency Control). - [`mocks`]: Mocks für Embedder und Metriken (`MockEmbedder`, `TestMetricsSink`). - [`conformance`]: Standardisierte Konformitätstests für Ports (Clock, RNG, Storage, Vector, etc.).  ## Abhängigkeiten - **Normal:** `contextra-ports`, `contextra-types`, `bytes`, `parking_lot`, `tracing`. - **Wird eingebunden von:** `contextra`, `contextra-checkpoint`, `contextra-crypto`, `contextra-db`, `contextra-engine`, `contextra-graph`, `contextra-mvcc`, `contextra-store`.
 
 ### Modul- und Re-Export-Oberfläche (lib.rs)
 
