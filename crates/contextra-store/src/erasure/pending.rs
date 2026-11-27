@@ -33,6 +33,14 @@ struct PendingState {
 }
 
 impl PendingDelete {
+    fn is_safe_relative(path: &Path) -> bool {
+        !path.as_os_str().is_empty()
+            && !path.is_absolute()
+            && path.components().all(|component| {
+                matches!(component, std::path::Component::Normal(_))
+            })
+    }
+
     /// Öffnet oder initialisiert die Pending-Delete-Liste.
     pub async fn open(
         io: StoreIo,
@@ -80,21 +88,8 @@ impl PendingDelete {
         Arc::clone(&self.notify)
     }
 
-    fn to_relative(&self, path: &Path) -> String {
-        if let Ok(rel) = path.strip_prefix(&self.data_dir) {
-            rel.to_string_lossy().into_owned()
-        } else {
-            path.to_string_lossy().into_owned()
-        }
-    }
-
-    fn to_absolute(&self, rel_or_abs: &str) -> PathBuf {
-        let p = Path::new(rel_or_abs);
-        if p.is_absolute() {
-            p.to_path_buf()
-        } else {
-            self.data_dir.join(p)
-        }
+    fn to_absolute(&self, relative: &str) -> PathBuf {
+        self.data_dir.join(relative)
     }
 
     fn encode(entries: &BTreeSet<String>) -> Result<Vec<u8>, ErasureError> {
@@ -150,7 +145,18 @@ impl PendingDelete {
             let pbytes = r.read_bytes(len)?;
             let s = std::str::from_utf8(pbytes)
                 .map_err(|_| ErasureError::Io("invalid utf-8 in pending-delete".into()))?;
+            let path = Path::new(s);
+            if !Self::is_safe_relative(path) {
+                return Err(ErasureError::Io(
+                    "pending-delete.list contains an unsafe path".into(),
+                ));
+            }
             set.insert(s.to_string());
+        }
+        if !r.is_empty() {
+            return Err(ErasureError::Io(
+                "pending-delete.list contains trailing bytes".into(),
+            ));
         }
         Ok(set)
     }
@@ -161,10 +167,24 @@ impl PendingDelete {
         if paths.is_empty() {
             return Ok(0);
         }
+        let mut relative_paths = Vec::with_capacity(paths.len());
+        for path in paths {
+            let relative = path.strip_prefix(&self.data_dir).map_err(|_| {
+                ErasureError::InvalidTarget(
+                    "pending-delete path must reside inside the store data directory",
+                )
+            })?;
+            if !Self::is_safe_relative(relative) {
+                return Err(ErasureError::InvalidTarget(
+                    "pending-delete path must be a safe relative path",
+                ));
+            }
+            relative_paths.push(relative.to_string_lossy().into_owned());
+        }
         {
             let mut st = self.state.lock().await;
-            for p in paths {
-                st.entries.insert(self.to_relative(p));
+            for relative in relative_paths {
+                st.entries.insert(relative);
             }
             let encoded = Self::encode(&st.entries)?;
             self.io
@@ -251,6 +271,14 @@ impl PendingDelete {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pending_paths_must_be_safe_and_store_relative() {
+        assert!(PendingDelete::is_safe_relative(Path::new("sst-1.sst")));
+        assert!(!PendingDelete::is_safe_relative(Path::new("../outside")));
+        assert!(!PendingDelete::is_safe_relative(Path::new("/outside")));
+        assert!(!PendingDelete::is_safe_relative(Path::new("")));
+    }
 
     #[tokio::test]
     async fn test_pending_delete_roundtrip_and_not_found() {

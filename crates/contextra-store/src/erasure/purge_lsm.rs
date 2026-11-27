@@ -787,8 +787,14 @@ pub(crate) fn collect_temp_file_paths(
     let mut out = Vec::new();
     for rec in records {
         if let JournalRecord::TempFile { path, .. } = rec {
-            if seen.insert(path.clone()) {
-                out.push(data_dir.join(path));
+            let relative = Path::new(path);
+            let safe = !relative.as_os_str().is_empty()
+                && !relative.is_absolute()
+                && relative
+                    .components()
+                    .all(|component| matches!(component, std::path::Component::Normal(_)));
+            if safe && path.ends_with(".erase.tmp") && seen.insert(path.clone()) {
+                out.push(data_dir.join(relative));
             }
         }
     }

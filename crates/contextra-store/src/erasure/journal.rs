@@ -1391,6 +1391,10 @@ impl Journal {
         self.poisoned.load(Ordering::Acquire)
     }
 
+    pub fn poison(&self) {
+        self.poisoned.store(true, Ordering::Release);
+    }
+
     pub fn offset(&self) -> u64 {
         self.offset
     }

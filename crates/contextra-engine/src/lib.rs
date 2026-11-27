@@ -37,6 +37,8 @@ pub mod background_workers;
 pub mod chunker;
 pub mod collection;
 #[cfg(not(loom))]
+pub mod erasure;
+#[cfg(not(loom))]
 pub mod decay_controller;
 #[cfg(not(loom))]
 pub mod export;

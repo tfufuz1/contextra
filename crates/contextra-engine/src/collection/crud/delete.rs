@@ -11,7 +11,7 @@ use contextra_types::{DocId, EntityId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Deletes a document from the collection by its ID.
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(level = "trace", skip(self, id))]
     pub async fn delete(&self, id: &str) -> Result<()> {
         let _guard = self.kv_locks.lock_for(id).await;
         let mut db_tx = self.begin_transaction()?;
