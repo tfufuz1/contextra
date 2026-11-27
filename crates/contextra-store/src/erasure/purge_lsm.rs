@@ -141,8 +141,7 @@ pub(crate) async fn erase_compact_tick(
             let name = sst
                 .file_path()
                 .file_name()
-                .map(|n| n.to_string_lossy())
-                .unwrap_or_default();
+                .map_or(std::borrow::Cow::Borrowed(""), |n| n.to_string_lossy());
             name.as_ref() > after_name.as_str()
         });
     }
@@ -271,7 +270,7 @@ pub(crate) async fn erase_compact_tick(
             if committed {
                 deps.block_cache.evict_file(sst.file_id());
                 let uuid_sidecar = PathBuf::from(format!("{}.uuid", old_path.display()));
-                let _ = pending
+                pending
                     .remove_after_commit(&[old_path, uuid_sidecar])
                     .await?;
                 units_committed = units_committed.saturating_add(1);
@@ -334,7 +333,7 @@ pub(crate) async fn erase_compact_tick(
 
         deps.block_cache.evict_file(sst.file_id());
         let uuid_sidecar = PathBuf::from(format!("{}.uuid", old_path.display()));
-        let _ = pending
+        pending
             .remove_after_commit(&[old_path, uuid_sidecar])
             .await?;
 
@@ -500,7 +499,7 @@ pub(crate) async fn erase_wal_cut(
     }
     let _trunc = old_wal.truncate_lock.lock().await;
     if !paths_to_delete.is_empty() {
-        let _ = pending.remove_after_commit(&paths_to_delete).await?;
+        pending.remove_after_commit(&paths_to_delete).await?;
     }
     drop(_trunc);
 

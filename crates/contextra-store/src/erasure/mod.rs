@@ -483,7 +483,9 @@ impl StoreErasureKernel {
     }
 
     pub(crate) fn attach_deps(&self, deps: StoreDeps) {
-        let _ = self.deps.set(deps);
+        if self.deps.set(deps).is_err() {
+            tracing::warn!("erasure kernel store deps already attached");
+        }
     }
 
     fn deps_ref(&self) -> Result<&StoreDeps, ErasureError> {
@@ -1058,11 +1060,12 @@ impl ErasureKernel for StoreErasureKernel {
             if target_kind == TargetKind::Tenant {
                 for ds in docs {
                     if let DocScope::Tenant { tenant } = ds {
-                        let _ = deps.snapshot_registry.revoke_covering(
+                        let revoked = deps.snapshot_registry.revoke_covering(
                             tenant,
                             0..gated_seq.saturating_add(1),
                             gated_seq,
                         );
+                        tracing::debug!(%tenant, revoked, "revoked tenant snapshots on gate publish");
                     }
                 }
             }
@@ -1087,7 +1090,7 @@ impl ErasureKernel for StoreErasureKernel {
                 return Err(ErasureError::Cancelled);
             }
 
-            let (scope, attempt, need_purge_start) = {
+            let (scope, attempt) = {
                 let mut ks = self.state.lock().await;
                 if ks.journal.is_poisoned() {
                     return Err(ErasureError::JournalPoisoned);
@@ -1124,9 +1127,8 @@ impl ErasureKernel for StoreErasureKernel {
                     }
                     self.refresh_caches(&ks);
                 }
-                (scope, attempt, need_start)
+                (scope, attempt)
             };
-            let _ = need_purge_start;
 
             let deps = self.deps_ref()?;
             let collapse = self.collapse_snapshot();
@@ -1198,8 +1200,7 @@ impl ErasureKernel for StoreErasureKernel {
             let cursor_bytes = p
                 .cursor
                 .as_ref()
-                .map(|c| c.as_bytes().to_vec())
-                .unwrap_or_default();
+                .map_or_else(Vec::new, |c| c.as_bytes().to_vec());
             let rec = JournalRecord::LayerProgress {
                 id,
                 layer: layer.clone(),
@@ -1523,7 +1524,9 @@ impl ErasureKernel for StoreErasureKernel {
                     ks.jobs.remove(&cid);
                 }
                 compact_records.extend(ks.summary_records.clone());
-                let _ = ks.journal.compact(&compact_records).await;
+                if let Err(e) = ks.journal.compact(&compact_records).await {
+                    tracing::warn!(error = %e, "erasure journal compaction failed");
+                }
             }
 
             let new_collapse = ks.rebuild_collapse_map();

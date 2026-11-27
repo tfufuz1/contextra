@@ -341,6 +341,8 @@ async fn test_gate_enforcement_hooks_h1_to_h10() {
     assert_eq!(other_scan[0].1, b"other_v1");
 
     // H-5: Replay nach Restart behält Gate und Datenisolation
+    storage.wait_shutdown().await;
+    drop(kernel);
     drop(storage);
     let storage2 = LsmStorage::open(LsmConfig {
         path: dir.path().to_path_buf(),
