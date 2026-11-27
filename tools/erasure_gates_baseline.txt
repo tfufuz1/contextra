@@ -1,0 +1,11 @@
+# Altlasten bei Einführung der Gates (2026-11-27). Darf nur schrumpfen.
+G-2 crates/contextra-crypto/src/dek.rs 1
+G-3 crates/contextra-engine/src/collection/crud/insert.rs 5
+G-3 crates/contextra-engine/src/collection/crud/kv.rs 3
+G-3 crates/contextra-engine/src/collection/crud/read.rs 2
+G-3 crates/contextra-engine/src/collection/crud/update.rs 1
+G-3 crates/contextra-engine/src/contextra_impl/crud.rs 10
+G-3 crates/contextra-text/src/inverted/index_struct.rs 1
+# Mit der Engine-Loeschkette (PR #6090) nach main gelangt; offene Pruefung.
+G-2 crates/contextra-engine/src/erasure/driver.rs 5
+G-2 crates/contextra-engine/src/erasure/mod.rs 1

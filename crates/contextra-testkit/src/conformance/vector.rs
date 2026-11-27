@@ -271,6 +271,8 @@ where
     {
         let index = factory().await;
         let tx = TxId::new(60);
+        // `.into()` ist nur ohne Feature `docid-128` eine Identität.
+        #[allow(clippy::useless_conversion)]
         let high_doc_id = DocId::new((u64::MAX - 1).into());
         let _ = index.insert(tx, high_doc_id, &[0.5, 0.5, 0.0]).await;
         let _ = index.commit(tx).await;

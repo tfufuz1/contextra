@@ -22,6 +22,9 @@
 //! - [`mocks`]: Mocks für Embedder und Metriken (`MockEmbedder`, `TestMetricsSink`).
 //! - [`conformance`]: Standardisierte Konformitätstests für Ports (Clock, RNG, Storage, Vector, etc.).
 //!
+//! ## Löschkette (Feature `erasure-conformance`)
+//! `crash_vfs`, `gates`, `erasure_mocks`, `conformance::erasure_layer`, `erasure_model`, `canary`.
+//!
 //! ## Abhängigkeiten
 //! - **Normal:** `contextra-ports`, `contextra-types`, `bytes`, `parking_lot`, `tracing`.
 //! - **Wird eingebunden von:** `contextra`, `contextra-checkpoint`, `contextra-crypto`,
@@ -37,6 +40,26 @@
 // ANCHOR[contextra-testkit:MOD-CONFORMANCE-001]
 /// Modul mit standardisierten Konformitätsprüfsuiten für Contextra-Port-Traits.
 pub mod conformance;
+
+/// Absturzfähiges Dateisystem und systematische Crash-Schleife.
+#[cfg(feature = "erasure-conformance")]
+pub mod crash_vfs;
+
+/// Test-Implementierungen des `ReadGate`-Ports.
+#[cfg(feature = "erasure-conformance")]
+pub mod gates;
+
+/// Mocks der Löschkette (Kernel, Referenzschicht, Reader, Budget).
+#[cfg(feature = "erasure-conformance")]
+pub mod erasure_mocks;
+
+/// Nadeln und fail-closed Verzeichnisscan für Löschnachweise.
+#[cfg(feature = "erasure-conformance")]
+pub mod canary;
+
+/// Referenzmodell über alle Schichten.
+#[cfg(feature = "erasure-conformance")]
+pub mod erasure_model;
 
 // ANCHOR[contextra-testkit:MOD-FAULT-VFS-001]
 /// Virtuelles Dateisystem mit deterministischer Fehlerinjektion (I/O- und fsync-Failures).

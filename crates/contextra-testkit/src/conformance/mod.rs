@@ -37,6 +37,9 @@
 pub mod clock;
 
 // ANCHOR[contextra-testkit:CONF-MOD-FAILURE-001]
+/// Konformanzsuite C1–C7 für `ErasureLayer`.
+#[cfg(feature = "erasure-conformance")]
+pub mod erasure_layer;
 /// Typen zur detaillierten Erfassung von Konformitätsfehlschlägen.
 pub mod failure;
 

@@ -25,9 +25,13 @@ parking_lot = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+proptest = "1.4"
 criterion = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
+
+[target.'cfg(loom)'.dev-dependencies]
+loom = "0.7"
 
 [[bench]]
 name = "testkit_bench"

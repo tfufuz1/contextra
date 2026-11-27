@@ -1,0 +1,31 @@
+name: Erasure-Gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gate-Selbsttest (Rot/Grün)
+        run: python3 tools/erasure_gates.py --self-test
+      - name: Erasure-Gates
+        run: python3 tools/erasure_gates.py
+
+  testkit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rust-toolchain.toml legt 1.89.0 fest; rustup installiert sie beim ersten Aufruf.
+      - name: Testkit
+        run: cargo test -p contextra-testkit --locked
+      - name: Loom-Modelle
+        env:
+          RUSTFLAGS: --cfg loom
+        run: cargo test -p contextra-testkit --locked --release --test loom_erasure

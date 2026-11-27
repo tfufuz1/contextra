@@ -25,6 +25,22 @@
 #     -f "crates/contextra-crypto/src/wal_crypto.rs" \
 #     -f "crates/contextra-crypto/src/wal_completeness.rs" \
 #     -o target/mutants-g3
+#
+# G4 (Loeschkette: Gate, Erase-Filter, Zustandsfolge, KeyScope). Ziel: Score 100 % —
+# jeder ueberlebende Mutant ist ein fehlender Test (docs/erasure/13 §10).
+# Ein Lauf je Crate, da die Dateien in drei Crates liegen:
+#   cargo mutants --config mutants-guarantees.toml -p contextra-store \
+#     -f "crates/contextra-store/src/erasure/gate.rs" \
+#     -f "crates/contextra-store/src/erasure/filter.rs" \
+#     -f "crates/contextra-store/src/erasure/purge_lsm.rs" \
+#     -o target/mutants-g4-store
+#   cargo mutants --config mutants-guarantees.toml -p contextra-ports \
+#     -f "crates/contextra-ports/src/erasure.rs" \
+#     -F "KeyScope::contains|KeyScope::could_overlap_range" \
+#     -o target/mutants-g4-ports
+#   cargo mutants --config mutants-guarantees.toml -p contextra-engine \
+#     -f "crates/contextra-engine/src/erasure/driver.rs" \
+#     -o target/mutants-g4-engine
 
 exclude_globs = [
     "**/tests/**",
