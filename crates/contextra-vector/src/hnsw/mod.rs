@@ -19,6 +19,7 @@ pub mod adaptive_ef;
 pub mod arena;
 pub mod clock;
 pub mod deletion;
+pub mod erasure;
 pub mod purge;
 pub mod scanner;
 pub mod sq8_bias;

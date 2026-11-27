@@ -59,6 +59,7 @@ pub mod partial_rebuild;
 pub mod quantize_rabitq;
 
 pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
+pub use hnsw::erasure::HnswErasure;
 pub use compute_pool::ComputePool;
 pub use contract::{
     BlockTransform, Clock as ContractClock, DistanceFn, Error as ContractError, ExternalId,
