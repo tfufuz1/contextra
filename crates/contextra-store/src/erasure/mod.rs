@@ -926,7 +926,7 @@ impl ErasureKernel for StoreErasureKernel {
             let r_req = JournalRecord::Requested {
                 id: req.id,
                 target_hash,
-                reason: req.reason.clone(),
+                reason: req.reason,
                 policy: req.policy.clone(),
                 ts: now,
             };

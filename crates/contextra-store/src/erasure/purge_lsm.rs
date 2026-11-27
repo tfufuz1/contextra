@@ -317,7 +317,9 @@ pub(crate) async fn erase_compact_tick(
                     })
                     .await
                     .map_err(|e| ErasureError::Io(e.to_string()))?;
-                ssts[pos] = new_reader;
+                if let Some(slot) = ssts.get_mut(pos) {
+                    *slot = new_reader;
+                }
                 true
             } else {
                 false

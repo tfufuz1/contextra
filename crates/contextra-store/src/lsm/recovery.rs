@@ -128,7 +128,26 @@ impl LsmStorage {
             .clone()
             .unwrap_or_else(|| crate::io_seam::StoreIo::new(Arc::clone(&vfs)));
 
-        let dir_lock = DirLock::acquire(&config.path, config.durability_mode)?;
+        let dir_lock = match DirLock::acquire(&config.path, config.durability_mode) {
+            Ok(lock) => lock,
+            Err(ContextraError::Storage(ref msg))
+                if msg == "Datenverzeichnis bereits in Benutzung" =>
+            {
+                let mut acquired = None;
+                for _ in 0..10 {
+                    tokio::task::yield_now().await;
+                    if let Ok(lock) = DirLock::acquire(&config.path, config.durability_mode) {
+                        acquired = Some(lock);
+                        break;
+                    }
+                }
+                match acquired {
+                    Some(lock) => lock,
+                    None => DirLock::acquire(&config.path, config.durability_mode)?,
+                }
+            }
+            Err(e) => return Err(e),
+        };
 
         let salt_path = config.path.join("SALT");
         let salt = match vfs.read(&salt_path) {
