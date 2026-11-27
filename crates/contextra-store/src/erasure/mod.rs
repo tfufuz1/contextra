@@ -379,8 +379,20 @@ impl StoreErasureKernel {
 
         let gate = Arc::new(StoreGate::new());
 
-        if j_open.corrupt {
-            // I-7: Fail-Closed-Modus!
+        // Zustandsautomat aus den gelesenen Journal-Records rekonstruieren (§5.4.3)
+        let mut jobs: BTreeMap<ErasureId, Job> = BTreeMap::new();
+        let mut summary_records = Vec::new();
+        let mut invalid_state_history = false;
+        for rec in &j_open.records {
+            if Self::apply_record_to_jobs(&mut jobs, &mut summary_records, rec).is_err() {
+                invalid_state_history = true;
+                break;
+            }
+        }
+
+        if j_open.corrupt || invalid_state_history {
+            // I-7: Unlesbare oder unzulässige Journal-Historie fail-closed behandeln.
+            j_open.journal.poison();
             gate.set_fail_closed();
             *health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
             let ks = KernelState {
@@ -411,13 +423,6 @@ impl StoreErasureKernel {
                 pending_deleted: 0,
             };
             return Ok((kernel, report));
-        }
-
-        // Zustandsautomat aus den gelesenen Journal-Records rekonstruieren (§5.4.3)
-        let mut jobs: BTreeMap<ErasureId, Job> = BTreeMap::new();
-        let mut summary_records = Vec::new();
-        for rec in &j_open.records {
-            Self::apply_record_to_jobs(&mut jobs, &mut summary_records, rec)?;
         }
 
         // Temp-Dateien aus TempFile-Frames über Pending-Delete bereinigen (§5.4.7, CP-15)
@@ -767,7 +772,7 @@ impl StoreErasureKernel {
                     if let Some(job) = ks.jobs.get_mut(id) {
                         job.gated_seq = Some(Seq(last_applied_seq));
                         job.gated_at = Some(now);
-                        job.state = ErasureState::Gated;
+                        job.transition_to(ErasureState::Gated)?;
                         job.guarantee_reached = Guarantee {
                             gated: true,
                             purged: false,
@@ -986,9 +991,9 @@ impl ErasureKernel for StoreErasureKernel {
                 return Err(e);
             }
 
-            let job = Job {
+            let mut job = Job {
                 id: req.id,
-                state: ErasureState::Planned,
+                state: ErasureState::Requested,
                 plan: Arc::new(plan.clone()),
                 policy: req.policy.clone(),
                 expected_layers,
@@ -1010,6 +1015,7 @@ impl ErasureKernel for StoreErasureKernel {
                 sealed_flag: Arc::new(AtomicBool::new(false)),
                 raw_records: vec![r_req, r_plan],
             };
+            job.transition_to(ErasureState::Planned)?;
             ks.jobs.insert(req.id, job);
             self.refresh_caches(&ks);
 
@@ -1080,7 +1086,7 @@ impl ErasureKernel for StoreErasureKernel {
             if let Some(job_mut) = ks.jobs.get_mut(&id) {
                 job_mut.gated_seq = Some(Seq(gated_seq));
                 job_mut.gated_at = Some(now);
-                job_mut.state = ErasureState::Gated;
+                job_mut.transition_to(ErasureState::Gated)?;
                 job_mut.guarantee_reached = Guarantee {
                     gated: true,
                     purged: false,
@@ -1159,7 +1165,7 @@ impl ErasureKernel for StoreErasureKernel {
                     }
                     if let Some(job_mut) = ks.jobs.get_mut(&id) {
                         job_mut.purge_started = true;
-                        job_mut.state = ErasureState::Purging;
+                        job_mut.transition_to(ErasureState::Purging)?;
                         job_mut.raw_records.push(rec);
                         let jg = job_mut.to_job_gate();
                         self.gate
@@ -1275,7 +1281,7 @@ impl ErasureKernel for StoreErasureKernel {
                 keys_destroyed,
                 holds,
                 attempt,
-                _existing_state,
+                current_state,
             ) = {
                 let ks = self.state.lock().await;
                 if ks.journal.is_poisoned() {
@@ -1426,21 +1432,28 @@ impl ErasureKernel for StoreErasureKernel {
             if ks.journal.is_poisoned() {
                 return Err(ErasureError::JournalPoisoned);
             }
-            if let Err(e) = ks.journal.append_batch(&[r_ver.clone(), r_seal.clone()]).await {
+            if ks.jobs.get(&id).map(|job| &job.state) != Some(&current_state) {
+                return Err(ErasureError::InvalidTransition);
+            }
+            let records = if matches!(current_state, ErasureState::Purging) {
+                vec![r_ver.clone(), r_seal.clone()]
+            } else {
+                vec![r_seal.clone()]
+            };
+            if let Err(e) = ks.journal.append_batch(&records).await {
                 *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
 
             if let Some(job_mut) = ks.jobs.get_mut(&id) {
-                job_mut.state = ErasureState::Sealed;
+                job_mut.transition_to(ErasureState::Sealed)?;
                 job_mut.sealed_at = Some(now);
                 job_mut.sealed_flag.store(true, Ordering::Release);
                 job_mut.ledger_index = ledger_index;
                 job_mut.guarantee_reached = guarantee;
                 job_mut.exceptions = exceptions.clone();
                 job_mut.layer_remaining = remaining_map;
-                job_mut.raw_records.push(r_ver);
-                job_mut.raw_records.push(r_seal);
+                job_mut.raw_records.extend(records);
                 let jg = job_mut.to_job_gate();
                 self.gate
                     .install_snapshot(|s, ep| s.with_upserted_job(ep, jg.clone()));
@@ -1506,7 +1519,7 @@ impl ErasureKernel for StoreErasureKernel {
             }
 
             if let Some(job_mut) = ks.jobs.get_mut(&id) {
-                job_mut.state = ErasureState::Completed;
+                job_mut.transition_to(ErasureState::Completed)?;
                 job_mut.raw_records.push(comp_rec);
             }
 
@@ -1642,7 +1655,10 @@ impl ErasureKernel for StoreErasureKernel {
 
             if let Some(job_mut) = ks.jobs.get_mut(&id) {
                 job_mut.attempt = next_attempt;
-                job_mut.state = new_state.clone();
+                job_mut.transition_to(failed_state)?;
+                if matches!(&new_state, ErasureState::Quarantined { .. }) {
+                    job_mut.transition_to(new_state.clone())?;
+                }
                 if let Some(l) = layer {
                     job_mut.layer_attempts.insert(layer_map_key(l), next_attempt);
                 }
