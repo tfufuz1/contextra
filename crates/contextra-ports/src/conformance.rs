@@ -187,47 +187,77 @@ pub mod check {
     /// Verifies that [`crate::gate::ReadGate`] methods can be invoked in generic contexts.
     pub fn assert_read_gate_contract<G: crate::gate::ReadGate>(
         g: &G,
-        b: &crate::gate::KeyBound,
-        r: &crate::gate::KeyRange,
-        k: &crate::gate::KeyBuf,
+        raw_key: &[u8],
+        seq: crate::Seq,
+        tenant: TenantId,
+        doc: DocId,
     ) {
-        let _ = g.check_bound(b);
-        let _ = g.variant_for_range(r);
-        let _ = g.gate_epoch();
-        let _ = g.covers(k);
-        let raw = [0u8; 78];
-        let _ = g.covers_raw(&raw);
-        let _ = g.gated_seq_raw(&raw);
+        let _ = g.is_active();
+        let _ = g.epoch();
+        let _ = g.check(raw_key);
+        let _ = g.check_version(raw_key, seq);
+        let _ = g.check_prefix(raw_key);
+        let _ = g.discard_rule(raw_key, seq);
+        let _ = g.check_doc(tenant, "default", doc);
+        let _ = g.gated_seq(raw_key);
     }
 
-    /// Verifies that [`crate::keys::RecordSealer`] and [`crate::keys::FileKeyring`] methods can be invoked.
-    pub fn assert_keys_contract<S: crate::keys::RecordSealer, K: crate::keys::FileKeyring>(
+    /// Verifies that [`crate::seal::RecordSealer`] methods can be invoked under `stage2`.
+    #[cfg(feature = "stage2")]
+    pub fn assert_seal_contract<S: crate::seal::RecordSealer>(
         s: &S,
-        k: &K,
-        file_id: &crate::keys::FileId,
-        ctx: &crate::keys::SealCtx,
-        key: &crate::gate::KeyBuf,
+        ctx: &crate::seal::SealCtx,
+        key: &[u8],
+        scope: &crate::erasure::KeyScope,
     ) {
         drop(s.seal(ctx, key, b"plain"));
+        drop(s.open(key, b"env"));
+        s.evict(scope);
         drop(s.make_slots_durable());
-        drop(k.destroy(*file_id));
     }
 
-    /// Verifies that [`crate::ledger::LedgerSink`] methods can be invoked.
-    pub fn assert_ledger_contract<L: crate::ledger::LedgerSink>(l: &L) {
-        drop(l.read_all());
-        drop(l.prune(crate::ledger::Timestamp(0)));
-    }
-
-    /// Verifies that [`crate::erasure::ErasureLayer`] methods can be invoked.
-    pub fn assert_erasure_layer_contract<E: crate::erasure::ErasureLayer>(
-        e: &E,
-        target: &crate::erasure::EraseTarget,
-        scope: &crate::erasure::LayerScope,
+    /// Verifies that [`crate::ledger::LedgerSink`] and [`crate::ledger::LedgerAnchor`] methods can be invoked.
+    pub fn assert_ledger_contract<
+        L: crate::ledger::LedgerSink,
+        A: crate::ledger::LedgerAnchor,
+    >(
+        l: &L,
+        a: &A,
+        draft: crate::ledger::LedgerDraft,
+        head: &crate::ledger::LedgerHead,
     ) {
-        drop(e.resolve(target));
+        drop(l.append(draft));
+        drop(l.head());
+        drop(l.verify());
+        drop(a.publish(head));
+    }
+
+    /// Verifies that [`crate::erasure::ErasureLayer`] and [`crate::erasure::ErasureKernel`] methods can be invoked.
+    pub fn assert_erasure_contract<
+        E: crate::erasure::ErasureLayer,
+        K: crate::erasure::ErasureKernel,
+    >(
+        e: &E,
+        k: &K,
+        scope: &crate::erasure::ResolvedScope,
+        cx: &crate::erasure::PurgeCx<'_>,
+        req: &crate::erasure::EraseRequest,
+        id: crate::ErasureId,
+    ) {
+        let _ = e.layer();
         drop(e.on_gate(scope));
-        let _ = e.key_coverage();
+        drop(e.purge(scope, cx));
+        let _ = e.scanner();
+        drop(k.accept(req, scope));
+        drop(k.publish_gate(id));
+        drop(k.purge_store(id, cx));
+        drop(k.seal(id, &[]));
+        drop(k.complete(id));
+        let _ = k.open_jobs();
+        let _ = k.status(id);
+        let _ = k.privileged_reader(id);
+        let _ = k.gate();
+        let _ = k.store_scanners();
     }
 
     /// Verifies dynamic object-safety and evaluation conformance of [`crate::policy::EgressPolicy`].

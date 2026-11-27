@@ -1,211 +1,180 @@
-//! ReadGate port definitions and contracts (SPEC §4.2, §11.3, PO-04, PO-07).
+//! ReadGate v2 port definitions and fail-closed contracts (WP-02 §4.1, G-6).
 //!
-//! Provides the synchronous gate interface [`ReadGate`] used on the hot read and commit paths.
+//! Provides the synchronous, allocation-free (on the `Open` fast path) gate interface
+//! [`ReadGate`] used on the hot read, scan, write, and compaction paths.
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::sync::Arc;
 
 /// Re-export canonical monotonic sequence number from `contextra-types`.
-pub use contextra_types::Seq;
+pub use contextra_types::{DocId, Seq, TenantId};
 
-/// Fixed or bounded key buffer for storage operations (SPEC §8.1).
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct KeyBuf(pub [u8; 16]);
-
-impl KeyBuf {
-    /// Creates a new `KeyBuf` from raw bytes.
-    pub const fn new(raw: [u8; 16]) -> Self {
-        Self(raw)
-    }
-
-    /// Returns raw bytes slice.
-    pub fn as_bytes(&self) -> &[u8; 16] {
-        &self.0
-    }
-}
-
-impl fmt::Debug for KeyBuf {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Redact user content (PO-08)
-        write!(f, "KeyBuf([REDACTED])")
-    }
-}
-
-/// Boundary key used for compaction or range scanning.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub enum KeyBound {
-    /// Exact key match boundary.
-    Exact(KeyBuf),
-    /// Unbounded lower boundary.
-    UnboundedLower,
-    /// Unbounded upper boundary.
-    UnboundedUpper,
-}
-
-impl KeyBound {
-    /// Creates an exact key boundary.
-    pub const fn exact(key: KeyBuf) -> Self {
-        Self::Exact(key)
-    }
-}
-
-impl fmt::Debug for KeyBound {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Exact(_) => write!(f, "KeyBound::Exact([REDACTED])"),
-            Self::UnboundedLower => write!(f, "KeyBound::UnboundedLower"),
-            Self::UnboundedUpper => write!(f, "KeyBound::UnboundedUpper"),
-        }
-    }
-}
-
-/// Half-open key range `[start, end)` for scan and compaction boundaries.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct KeyRange {
-    /// Lower boundary inclusive.
-    pub start: KeyBuf,
-    /// Upper boundary exclusive.
-    pub end: KeyBuf,
-}
-
-impl KeyRange {
-    /// Creates a new key range.
-    pub const fn new(start: KeyBuf, end: KeyBuf) -> Self {
-        Self { start, end }
-    }
-
-    /// Returns `true` if `key` falls within `[start, end)`.
-    pub fn contains(&self, key: &KeyBuf) -> bool {
-        key >= &self.start && key < &self.end
-    }
-}
-
-impl fmt::Debug for KeyRange {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "KeyRange {{ [REDACTED] }}")
-    }
-}
-
-/// Gate decision for point queries or file boundaries (SPEC §4.2, §11.3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Gate decision for point queries and document lookups.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum GateDecision {
-    /// Key or boundary is open for reading.
+    /// Key or document is open for reading.
     Open,
-    /// Key or boundary has been erased. Access must be blocked immediately.
-    Erased,
-    /// Key or boundary is temporarily restricted (e.g. pending gate sequence).
+    /// Key or document is temporarily restricted (e.g. pending gate sequence); never discard.
     Restricted,
+    /// Key or document has been erased. Access must be blocked immediately.
+    Erased,
 }
 
-/// Decision variant for range operations during compaction (SPEC §4.2, I-18).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+impl GateDecision {
+    /// Returns `true` if access is blocked (`Restricted` or `Erased`).
+    pub const fn is_blocked(self) -> bool {
+        !matches!(self, Self::Open)
+    }
+}
+
+/// Gate decision for a prefix or range scan.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RangeGate {
-    /// Range contains erased data: records may be safely discarded.
-    ContainsErased,
-    /// Range is restricted: records must never be discarded until release.
-    RestrictedNeverDiscard,
-    /// Entire range is completely open.
+    /// Entire prefix range is open for reading.
     EntirelyOpen,
+    /// Prefix range contains both open and blocked keys; per-key checks required.
+    Partial,
+    /// Entire prefix range is blocked; scan can short-circuit.
+    EntirelyBlocked,
 }
 
-/// Synchronous, memory-only read gate port interface (SPEC §4.2, §11.3, PO-07).
+/// Discard rule for compaction and flush operations.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum DiscardRule {
+    /// Version must be retained (e.g. `Open` or `Restricted`).
+    Keep,
+    /// Version is erased within the active scope and may be physically dropped.
+    MayDrop,
+}
+
+/// Synchronous, memory-only read gate port interface (WP-02 §4.1, G-6).
 ///
 /// # Invariants
-/// - **PO-07**: `ReadGate` is synchronous, performs zero I/O, and executes in $O(\log n)$ time.
+/// - Synchronous, zero I/O, panic-free, and allocation-free on the `Open` fast path.
+/// - **Fail-closed (G-6):** This trait intentionally defines **no default methods**.
+///   Every implementer must explicitly implement every method.
+/// - Unloadable or unknown gate state must return `Restricted` for all queries (I-7).
+///
+/// # Doctests (Compile-Fail Checks)
+///
+/// `TST-PORTS-01`: Implementing `ReadGate` without all methods must fail to compile:
+/// ```compile_fail
+/// use contextra_ports::gate::ReadGate;
+/// struct IncompleteGate;
+/// impl ReadGate for IncompleteGate {}
+/// ```
 pub trait ReadGate: Send + Sync {
-    /// Checks point status of an individual key.
+    /// Returns `false` if no gates are active (fast path: all checks return `Open`).
+    /// Implementations should use a single `Relaxed` atomic load.
     ///
     /// # Fehler
-    /// Synchron, keine I/O, panikfrei; liefert GateDecision.
-    ///
+    /// Keine; synchroner atomarer Zustandscheck.
     /// # Crash
-    /// Reiner RAM-Lookup in O(log n); keine Zustandsänderung.
-    fn check(&self, k: &KeyBuf) -> GateDecision;
+    /// Reiner RAM-Zugriff ohne Mutation.
+    fn is_active(&self) -> bool;
 
-    /// Checks boundary status of a file or partition block for compaction or scans.
-    ///
-    /// # Fehler
-    /// Synchron, keine I/O; liefert GateDecision.
-    ///
-    /// # Crash
-    /// Reiner RAM-Lookup; keine Seiteneffekte.
-    fn check_bound(&self, b: &KeyBound) -> GateDecision;
-
-    /// Evaluates range policy for compaction (I-18: Erased may be dropped, Restricted never).
-    ///
-    /// # Fehler
-    /// Synchron, keine I/O; liefert RangeGate.
-    ///
-    /// # Crash
-    /// Reiner RAM-Lookup für Kompaktions-Entscheidungen.
-    fn variant_for_range(&self, r: &KeyRange) -> RangeGate;
-
-    /// Retrieves the sequence number at which the key was gated, if any (Restore-Guard, commit rejection).
-    ///
-    /// # Fehler
-    /// Synchron, liefert `Option<Seq>`.
-    ///
-    /// # Crash
-    /// Reiner RAM-Lookup; keine Mutation.
-    fn gated_seq(&self, k: &KeyBuf) -> Option<Seq>;
-
-    /// Returns the monotonic gate epoch counter (SPEC §11.3, D-120, I-21).
-    ///
-    /// Incremented before key destruction to allow linearized read verification.
+    /// Returns the strictly monotonic gate epoch counter (`Acquire` load).
     ///
     /// # Fehler
     /// Keine; synchroner atomarer Abruf.
     /// # Crash
     /// Reiner RAM-Zugriff ohne Mutation.
-    fn gate_epoch(&self) -> u64 {
-        0
-    }
+    fn epoch(&self) -> u64;
 
-    /// Evaluates whether a 16-byte `KeyBuf` is covered by an active gate (Erased or Restricted) (SPEC I-2).
-    ///
-    /// Used by replay filters and commit leader phase.
+    /// Evaluates the gate decision for a raw key as seen by `LsmStorage`
+    /// (`t:{tenant}:` + collection key).
     ///
     /// # Fehler
-    /// Keine; synchroner ram-basierter Lookup.
+    /// Keine; synchron, panikfrei, ohne I/O.
     /// # Crash
-    /// Reiner RAM-Zugriff ohne Mutation.
-    fn covers(&self, k: &KeyBuf) -> bool {
-        match self.check(k) {
-            GateDecision::Erased | GateDecision::Restricted => true,
-            GateDecision::Open => false,
-        }
-    }
+    /// Reiner RAM-Lookup ohne Seiteneffekte.
+    fn check(&self, raw_key: &[u8]) -> GateDecision;
 
-    /// Evaluates point gate status of a canonical 78-byte raw key (SPEC 9.1, D-123).
+    /// Version-aware gate check: `Erased { up_to }` blocks only `version_seq <= up_to`.
     ///
     /// # Fehler
-    /// Keine; synchroner ram-basierter Lookup.
+    /// Keine; synchron, panikfrei, ohne I/O.
     /// # Crash
-    /// Reiner RAM-Zugriff ohne Mutation.
-    fn check_raw(&self, _raw: &[u8; 78]) -> GateDecision {
-        GateDecision::Open
-    }
+    /// Reiner RAM-Lookup ohne Seiteneffekte.
+    fn check_version(&self, raw_key: &[u8], version_seq: Seq) -> GateDecision;
 
-    /// Evaluates whether a canonical 78-byte raw key is covered by an active gate (SPEC I-2, I-21, D-123).
+    /// Evaluates whether an entire prefix range is open, partial, or entirely blocked.
     ///
     /// # Fehler
-    /// Keine; synchroner ram-basierter Lookup.
+    /// Keine; synchron, panikfrei, ohne I/O.
     /// # Crash
-    /// Reiner RAM-Zugriff ohne Mutation.
-    fn covers_raw(&self, raw: &[u8; 78]) -> bool {
-        match self.check_raw(raw) {
-            GateDecision::Erased | GateDecision::Restricted => true,
-            GateDecision::Open => false,
-        }
-    }
+    /// Reiner RAM-Lookup ohne Seiteneffekte.
+    fn check_prefix(&self, prefix: &[u8]) -> RangeGate;
 
-    /// Retrieves the sequence number at which a 78-byte raw key was gated, if any.
+    /// Evaluates whether a key version may be discarded during compaction or flush.
     ///
     /// # Fehler
-    /// Keine; synchroner ram-basierter Lookup.
+    /// Keine; synchron, panikfrei, ohne I/O.
     /// # Crash
-    /// Reiner RAM-Zugriff ohne Mutation.
-    fn gated_seq_raw(&self, _raw: &[u8; 78]) -> Option<Seq> {
-        None
+    /// Reiner RAM-Lookup ohne Seiteneffekte.
+    fn discard_rule(&self, raw_key: &[u8], version_seq: Seq) -> DiscardRule;
+
+    /// Document-level gate check for secondary indices.
+    /// `collection` is passed without internal prefix (e.g. `"default"`, `"docs"`).
+    ///
+    /// # Fehler
+    /// Keine; synchron, panikfrei, ohne I/O.
+    /// # Crash
+    /// Reiner RAM-Lookup ohne Seiteneffekte.
+    fn check_doc(&self, tenant: TenantId, collection: &str, doc: DocId) -> GateDecision;
+
+    /// Returns the sequence number at which `raw_key` was gated, if any
+    /// (used for write rejection and diagnostics).
+    ///
+    /// # Fehler
+    /// Keine; synchron, panikfrei, ohne I/O.
+    /// # Crash
+    /// Reiner RAM-Lookup ohne Mutation.
+    fn gated_seq(&self, raw_key: &[u8]) -> Option<Seq>;
+}
+
+impl<T: ReadGate + ?Sized> ReadGate for Arc<T> {
+    fn is_active(&self) -> bool {
+        (**self).is_active()
+    }
+
+    fn epoch(&self) -> u64 {
+        (**self).epoch()
+    }
+
+    fn check(&self, raw_key: &[u8]) -> GateDecision {
+        (**self).check(raw_key)
+    }
+
+    fn check_version(&self, raw_key: &[u8], version_seq: Seq) -> GateDecision {
+        (**self).check_version(raw_key, version_seq)
+    }
+
+    fn check_prefix(&self, prefix: &[u8]) -> RangeGate {
+        (**self).check_prefix(prefix)
+    }
+
+    fn discard_rule(&self, raw_key: &[u8], version_seq: Seq) -> DiscardRule {
+        (**self).discard_rule(raw_key, version_seq)
+    }
+
+    fn check_doc(&self, tenant: TenantId, collection: &str, doc: DocId) -> GateDecision {
+        (**self).check_doc(tenant, collection, doc)
+    }
+
+    fn gated_seq(&self, raw_key: &[u8]) -> Option<Seq> {
+        (**self).gated_seq(raw_key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gate_decision_is_blocked() {
+        assert!(!GateDecision::Open.is_blocked());
+        assert!(GateDecision::Restricted.is_blocked());
+        assert!(GateDecision::Erased.is_blocked());
     }
 }

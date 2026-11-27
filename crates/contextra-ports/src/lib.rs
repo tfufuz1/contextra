@@ -156,6 +156,16 @@ mod dyn_safety {
     fn _assert_dyn_query_rewriter(_: Option<&dyn QueryRewriter>) {}
     fn _assert_dyn_layer_scanner(_: Option<&dyn LayerScanner>) {}
     fn _assert_dyn_purger(_: Option<&dyn Purger>) {}
+    fn _assert_dyn_read_gate(_: Option<&dyn ReadGate>) {}
+    fn _assert_dyn_erasure_layer(_: Option<&dyn ErasureLayer>) {}
+    fn _assert_dyn_erasure_kernel(_: Option<&dyn ErasureKernel>) {}
+    fn _assert_dyn_ledger_sink(_: Option<&dyn LedgerSink>) {}
+    fn _assert_dyn_ledger_anchor(_: Option<&dyn LedgerAnchor>) {}
+    fn _assert_dyn_io_budget(_: Option<&dyn IoBudget>) {}
+    fn _assert_dyn_progress_sink(_: Option<&dyn ProgressSink>) {}
+    fn _assert_dyn_cancel(_: Option<&dyn Cancel>) {}
+    fn _assert_dyn_privileged_read(_: Option<&dyn PrivilegedRead>) {}
+    fn _assert_dyn_erasure_observer(_: Option<&dyn ErasureObserver>) {}
     fn _assert_dyn_vfs(_: Option<&dyn Vfs>) {}
     fn _assert_dyn_egress_policy(_: Option<&dyn crate::policy::EgressPolicy>) {}
 
@@ -187,6 +197,14 @@ mod dyn_safety {
             TypeId::of::<crate::observer::TargetKind>(),
             TypeId::of::<contextra_types::TargetKind>()
         );
+        assert_eq!(
+            TypeId::of::<crate::erasure::EraseTarget>(),
+            TypeId::of::<contextra_types::EraseTarget>()
+        );
+        assert_eq!(
+            TypeId::of::<crate::erasure::ErasureError>(),
+            TypeId::of::<contextra_types::ErasureError>()
+        );
     }
 
     #[test]
@@ -207,28 +225,39 @@ mod dyn_safety {
         _assert_dyn_query_rewriter(None);
         _assert_dyn_layer_scanner(None);
         _assert_dyn_purger(None);
+        _assert_dyn_read_gate(None);
+        _assert_dyn_erasure_layer(None);
+        _assert_dyn_erasure_kernel(None);
+        _assert_dyn_ledger_sink(None);
+        _assert_dyn_ledger_anchor(None);
+        _assert_dyn_io_budget(None);
+        _assert_dyn_progress_sink(None);
+        _assert_dyn_cancel(None);
+        _assert_dyn_privileged_read(None);
+        _assert_dyn_erasure_observer(None);
         _assert_dyn_vfs(None);
         _assert_dyn_egress_policy(None);
     }
 }
 
-pub mod barrier;
 pub mod erasure;
 pub mod gate;
-pub mod keys;
 pub mod ledger;
 pub mod observer;
 pub mod report_signer;
+#[cfg(feature = "stage2")]
+pub mod seal;
 
-pub use barrier::{
-    BarrierExclusive, BarrierShared, CommitBarrier, CompactionPermit, PurgeBarrier, PurgePermit,
-};
 pub use erasure::{
-    EraseTarget as PortEraseTarget, ErasureLayer, ErasureTarget, LayerScope, PurgeCx, PurgeOutcome,
-    StorageBackend,
+    compute_plan_hash, AcceptReceipt, Cancel, DocScope, EraseRequest, ErasureKernel, ErasureLayer,
+    GateReceipt, IoBudget, IoClass, JobView, KeyPattern, KeyScope, LayerError, PressureHint,
+    PrivilegedRead, ProgressSink, PurgeCx, PurgeOutcome, ResolvedScope, SealReceipt, Verdict,
 };
-pub use gate::{GateDecision, KeyBound, KeyRange, RangeGate, ReadGate};
-pub use keys::{Envelope, FileKey, FileKeyring, FileKind, RecordSealer, SealCtx};
-pub use ledger::{LedgerEntry, LedgerSink, RangeSet};
-pub use observer::{ErasureEvent, ErasureObserver, ObservedPhase, TargetKind};
+pub use gate::{DiscardRule, GateDecision, RangeGate, ReadGate};
+pub use ledger::{
+    LedgerAnchor, LedgerDraft, LedgerEntry, LedgerHead, LedgerSink, LedgerVerification,
+};
+pub use observer::{ErasureEvent, ErasureObserver, ObservedPhase, ObserverError, TargetKind};
 pub use report_signer::ReportSigner;
+#[cfg(feature = "stage2")]
+pub use seal::{Envelope, RecordSealer, SealCtx};

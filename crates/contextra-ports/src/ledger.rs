@@ -1,164 +1,125 @@
-//! Ledger sink port definitions and contracts (SPEC §4.2, §11.8, PO-04, PO-08).
+//! Ledger sink v2 port definitions and contracts (WP-02 §4.7).
 //!
-//! Provides durable audit tracking of completed purges outside the primary data directory.
+//! Provides append-only, tamper-evident audit tracking of completed erasures.
 
-use crate::gate::KeyBuf;
-pub use contextra_types::{Seq, Timestamp};
+use crate::BoxFuture;
+pub use contextra_types::{ErasureError, ErasureException, Guarantee, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Set of key ranges or tokens included in an erasure ledger entry.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RangeSet {
-    ranges: Vec<(KeyBuf, KeyBuf)>,
-}
-
-impl RangeSet {
-    /// Creates an empty range set.
-    pub const fn empty() -> Self {
-        Self { ranges: Vec::new() }
-    }
-
-    /// Creates a range set from intervals.
-    pub fn new(ranges: Vec<(KeyBuf, KeyBuf)>) -> Self {
-        Self { ranges }
-    }
-
-    /// Returns the slice of ranges.
-    pub fn ranges(&self) -> &[(KeyBuf, KeyBuf)] {
-        &self.ranges
-    }
-}
-
-impl fmt::Debug for RangeSet {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RangeSet(count={})", self.ranges.len())
-    }
-}
-
-/// A tamper-evident entry in the erasure ledger (SPEC §4.2, §11.8, F.9).
-///
-/// Contains `(commitment, range_set, gated_seq, completed_at)` along with
-/// `chain_hash` and `ledger_mac`.
+/// A tamper-evident, append-only entry in the erasure ledger (WP-02 §4.7).
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LedgerEntry {
-    /// Commitment hash over the target erasure definition.
-    pub commitment: [u8; 32],
-    /// Key ranges covered by this erasure.
-    pub range_set: RangeSet,
-    /// Sequence at which the gate was closed.
-    pub gated_seq: Seq,
-    /// Timestamp when erasure and witness checks were finalized.
+    /// Monotonic zero-based entry index in the ledger.
+    pub index: u64,
+    /// Keyed HMAC-BLAKE3 of the erasure job ID.
+    pub erasure_id_hmac: [u8; 32],
+    /// Achieved erasure guarantee.
+    pub guarantee: Guarantee,
+    /// BLAKE3 root over per-layer witness digests in canonical order.
+    pub layers_root: [u8; 32],
+    /// Documented exceptions affecting the guarantee.
+    pub exceptions: Vec<ErasureException>,
+    /// BLAKE3 hash of the canonical erasure plan.
+    pub plan_hash: [u8; 32],
+    /// Policy schema version.
+    pub policy_version: u32,
+    /// UTC timestamp when the erasure was finalized.
     pub completed_at: Timestamp,
-    /// Chained BLAKE3 hash incorporating previous entry digest.
-    pub chain_hash: [u8; 32],
-    /// Authentication code / MAC protecting integrity.
-    pub ledger_mac: [u8; 32],
-}
-
-impl LedgerEntry {
-    /// Creates a new ledger entry with explicit fields.
-    pub const fn new(
-        commitment: [u8; 32],
-        range_set: RangeSet,
-        gated_seq: Seq,
-        completed_at: Timestamp,
-        chain_hash: [u8; 32],
-        ledger_mac: [u8; 32],
-    ) -> Self {
-        Self {
-            commitment,
-            range_set,
-            gated_seq,
-            completed_at,
-            chain_hash,
-            ledger_mac,
-        }
-    }
-
-    /// Constructs a ledger entry and computes its chained BLAKE3 hash from the prior entry hash.
-    pub fn compute_chained(
-        commitment: [u8; 32],
-        range_set: RangeSet,
-        gated_seq: Seq,
-        completed_at: Timestamp,
-        prev_hash: [u8; 32],
-        ledger_mac: [u8; 32],
-    ) -> Self {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&prev_hash);
-        hasher.update(&commitment);
-        hasher.update(&gated_seq.as_u64().to_le_bytes());
-        hasher.update(&completed_at.as_u64().to_le_bytes());
-        for (start, end) in range_set.ranges() {
-            hasher.update(start.as_bytes());
-            hasher.update(end.as_bytes());
-        }
-        let chain_hash = *hasher.finalize().as_bytes();
-
-        Self {
-            commitment,
-            range_set,
-            gated_seq,
-            completed_at,
-            chain_hash,
-            ledger_mac,
-        }
-    }
-
-    /// Verifies the entry's chain hash against the supplied previous block hash.
-    pub fn verify_chain_hash(&self, prev_hash: &[u8; 32]) -> bool {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(prev_hash);
-        hasher.update(&self.commitment);
-        hasher.update(&self.gated_seq.as_u64().to_le_bytes());
-        hasher.update(&self.completed_at.as_u64().to_le_bytes());
-        for (start, end) in self.range_set.ranges() {
-            hasher.update(start.as_bytes());
-            hasher.update(end.as_bytes());
-        }
-        let computed = hasher.finalize();
-        computed.as_bytes() == &self.chain_hash
-    }
+    /// Hash of the preceding ledger entry (`[0; 32]` for index 0).
+    pub prev_hash: [u8; 32],
+    /// HMAC over all fields including `prev_hash`.
+    pub entry_mac: [u8; 32],
 }
 
 impl fmt::Debug for LedgerEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Redact any possible user content (PO-08)
-        write!(
-            f,
-            "LedgerEntry {{ gated_seq: {:?}, completed_at: {:?}, chain_hash: {:02x?} }}",
-            self.gated_seq, self.completed_at, self.chain_hash
-        )
+        f.debug_struct("LedgerEntry")
+            .field("index", &self.index)
+            .field("guarantee", &self.guarantee)
+            .field("exceptions_count", &self.exceptions.len())
+            .field("policy_version", &self.policy_version)
+            .field("completed_at", &self.completed_at)
+            .finish()
     }
 }
 
-/// Durable audit ledger sink located outside the primary data directory (SPEC §4.2, §11.8).
+/// Draft payload submitted to [`LedgerSink::append`]; the sink assigns
+/// `index`, `prev_hash`, and `entry_mac`.
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct LedgerDraft {
+    /// Keyed HMAC-BLAKE3 of the erasure job ID.
+    pub erasure_id_hmac: [u8; 32],
+    /// Achieved erasure guarantee.
+    pub guarantee: Guarantee,
+    /// BLAKE3 root over per-layer witness digests in canonical order.
+    pub layers_root: [u8; 32],
+    /// Documented exceptions affecting the guarantee.
+    pub exceptions: Vec<ErasureException>,
+    /// BLAKE3 hash of the canonical erasure plan.
+    pub plan_hash: [u8; 32],
+    /// Policy schema version.
+    pub policy_version: u32,
+    /// UTC timestamp when the erasure was finalized.
+    pub completed_at: Timestamp,
+}
+
+/// Current head pointer of the append-only erasure ledger.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct LedgerHead {
+    /// Index of the latest entry (or `0` with zero hash if empty).
+    pub index: u64,
+    /// Hash / MAC of the latest entry.
+    pub hash: [u8; 32],
+}
+
+/// Result of verifying the integrity of the entire ledger chain.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct LedgerVerification {
+    /// `true` if every entry's chain hash and MAC verified cleanly.
+    pub valid: bool,
+    /// Total number of entries verified.
+    pub entries_checked: u64,
+    /// Verified head pointer.
+    pub head: LedgerHead,
+}
+
+/// Append-only durable audit ledger sink (WP-02 §4.7).
 pub trait LedgerSink: Send + Sync {
-    /// Appends a new verified erasure entry to the ledger.
+    /// Appends a verified erasure entry to the ledger.
+    /// Idempotent over `(e.erasure_id_hmac, e.plan_hash)`.
     ///
     /// # Fehler
-    /// Liefert Fehler bei Schreib- oder MAC-Validierungsfehlern.
-    ///
+    /// Liefert [`ErasureError::LedgerCorrupt`] oder [`ErasureError::Io`] bei
+    /// Integritäts- bzw. Schreibfehlern.
     /// # Crash
-    /// Schreibt dauerhaft in das Ledger-Log; fsync stellt Dauerhaftigkeit sicher.
-    fn append(&self, e: &LedgerEntry) -> Result<(), String>;
+    /// Schreibt append-only und stellt Dauerhaftigkeit vor Rückkehr via `fsync` sicher.
+    fn append<'a>(&'a self, e: LedgerDraft) -> BoxFuture<'a, Result<LedgerEntry, ErasureError>>;
 
-    /// Reads all entries recorded in the ledger for verification or auditing.
+    /// Returns the current ledger head.
     ///
     /// # Fehler
-    /// Liefert Fehler bei I/O- oder Integritätsbrüchen der Hashkette.
-    ///
+    /// Liefert [`ErasureError::LedgerCorrupt`] oder [`ErasureError::Io`] bei Lesefehlern.
     /// # Crash
-    /// Reiner Lesezugriff zur Audit-Prüfung.
-    fn read_all(&self) -> Result<Vec<LedgerEntry>, String>;
+    /// Reiner Lesezugriff ohne Mutation.
+    fn head<'a>(&'a self) -> BoxFuture<'a, Result<LedgerHead, ErasureError>>;
 
-    /// Prunes entries older than the specified retention threshold.
+    /// Verifies the full hash and MAC chain of the ledger.
     ///
     /// # Fehler
-    /// Liefert Fehler bei I/O-Fehlern beim Kürzen.
-    ///
+    /// Liefert [`ErasureError::LedgerCorrupt`] bei Kettenbruch oder [`ErasureError::Io`].
     /// # Crash
-    /// Kürzt veraltete Ledger-Einträge atomar.
-    fn prune(&self, older_than: Timestamp) -> Result<usize, String>;
+    /// Reiner Lese- und Prüfzugriff ohne Mutation.
+    fn verify<'a>(&'a self) -> BoxFuture<'a, Result<LedgerVerification, ErasureError>>;
+}
+
+/// External anchor port for publishing ledger head commitments (e.g. remote log or HSM).
+pub trait LedgerAnchor: Send + Sync {
+    /// Publishes the current [`LedgerHead`] to an external anchor.
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError`] falls die Verankerung fehlschlägt.
+    /// # Crash
+    /// Idempotente Veröffentlichung des aktuellen Kopfes.
+    fn publish<'a>(&'a self, h: &'a LedgerHead) -> BoxFuture<'a, Result<(), ErasureError>>;
 }

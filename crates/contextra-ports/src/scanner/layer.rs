@@ -84,6 +84,7 @@ pub enum ScanTechnique {
 }
 
 /// Zielbeschreibung des Scans inklusive Hash.
+#[deprecated(note = "Ersetzt durch ResolvedScope (WP-02); nach WP-6..8 entfernen")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ScanTarget {
     /// Bezeichner des Scan-Ziels (z. B. Tenant, Collection, Path).
@@ -112,6 +113,7 @@ pub struct PurgeStats {
 }
 
 /// Trait für physische Bereinigungsaktionen (Purger) einer Schicht.
+#[deprecated(note = "Ersetzt durch ErasureLayer (WP-02); nach WP-6..8 entfernen")]
 pub trait Purger: Send + Sync {
     /// Führt die physische Bereinigung für das gegebene Ziel aus.
     ///
