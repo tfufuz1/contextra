@@ -39,7 +39,7 @@ use contextra_ports::ledger::{LedgerAnchor, LedgerDraft, LedgerSink};
 use contextra_ports::scanner::{LayerScanner, LayerWitness, ScanTechnique, WitnessLayer};
 use contextra_ports::BoxFuture;
 use contextra_types::{
-    Cursor, ErasureError, ErasureException, ErasureId, ErasurePolicy, ErasureReason,
+    Cursor, ErasureError, ErasureException, ErasureId, ErasurePolicy,
     ErasureState, ErasureStatus, Guarantee, LayerErrorKind, LayerProgress, LayerState,
     LayerStatus, Seq, TargetKind, Timestamp,
 };
@@ -120,8 +120,6 @@ pub(crate) struct Job {
     pub id: ErasureId,
     pub state: ErasureState,
     pub plan: Arc<ResolvedScope>,
-    pub target_hash: [u8; 32],
-    pub reason: ErasureReason,
     pub policy: ErasurePolicy,
     pub expected_layers: Vec<WitnessLayer>,
     pub gated_seq: Option<Seq>,
@@ -287,8 +285,6 @@ impl KernelState {
 /// Implementiert [`ports::ErasureKernel`].
 pub struct StoreErasureKernel {
     cfg: StoreErasureConfig,
-    data_dir: PathBuf,
-    io: crate::io_seam::StoreIo,
     health: Arc<parking_lot::RwLock<crate::lsm::engine::StorageHealth>>,
     clock: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::Clock>>>,
     deps: OnceLock<StoreDeps>,
@@ -299,6 +295,7 @@ pub struct StoreErasureKernel {
     /// Synchroner Snapshot für `open_jobs()` und `status()` ohne `.await` auf Rang 150.
     status_cache: Arc<parking_lot::RwLock<BTreeMap<ErasureId, ErasureStatus>>>,
     open_views_cache: Arc<parking_lot::RwLock<Vec<JobView>>>,
+    sealed_flags_cache: Arc<parking_lot::RwLock<BTreeMap<ErasureId, Arc<AtomicBool>>>>,
     global_collapse: Arc<parking_lot::RwLock<Arc<CollapseMap>>>,
     erasure_log_key: [u8; 32],
 }
@@ -386,8 +383,6 @@ impl StoreErasureKernel {
             };
             let kernel = Self {
                 cfg,
-                data_dir,
-                io,
                 health,
                 clock,
                 deps: OnceLock::new(),
@@ -397,6 +392,7 @@ impl StoreErasureKernel {
                 state: Arc::new(Mutex::new(ks)),
                 status_cache: Arc::new(parking_lot::RwLock::new(BTreeMap::new())),
                 open_views_cache: Arc::new(parking_lot::RwLock::new(Vec::new())),
+                sealed_flags_cache: Arc::new(parking_lot::RwLock::new(BTreeMap::new())),
                 global_collapse: Arc::new(parking_lot::RwLock::new(Arc::new(CollapseMap::new()))),
                 erasure_log_key,
             };
@@ -455,11 +451,14 @@ impl StoreErasureKernel {
             .filter(|j| !j.state.is_terminal())
             .map(Job::to_job_view)
             .collect();
+        let sealed_flags: BTreeMap<ErasureId, Arc<AtomicBool>> = ks
+            .jobs
+            .iter()
+            .map(|(id, j)| (*id, Arc::clone(&j.sealed_flag)))
+            .collect();
 
         let kernel = Self {
             cfg,
-            data_dir,
-            io,
             health,
             clock,
             deps: OnceLock::new(),
@@ -469,6 +468,7 @@ impl StoreErasureKernel {
             state: Arc::new(Mutex::new(ks)),
             status_cache: Arc::new(parking_lot::RwLock::new(status_map)),
             open_views_cache: Arc::new(parking_lot::RwLock::new(open_views)),
+            sealed_flags_cache: Arc::new(parking_lot::RwLock::new(sealed_flags)),
             global_collapse: Arc::new(parking_lot::RwLock::new(collapse_arc)),
             erasure_log_key,
         };
@@ -500,8 +500,8 @@ impl StoreErasureKernel {
         match rec {
             JournalRecord::Requested {
                 id,
-                target_hash,
-                reason,
+                target_hash: _,
+                reason: _,
                 policy,
                 ts,
             } => {
@@ -516,8 +516,6 @@ impl StoreErasureKernel {
                         plan_hash: [0u8; 32],
                         unprovenanced: 0,
                     }),
-                    target_hash: *target_hash,
-                    reason: reason.clone(),
                     policy: policy.clone(),
                     expected_layers: Vec::new(),
                     gated_seq: None,
@@ -769,8 +767,34 @@ impl StoreErasureKernel {
         Arc::clone(&self.global_collapse)
     }
 
+    /// Liefert ein `Notify`-Handle, das benachrichtigt wird, wenn Pending-Delete-Einträge verbleiben (§8).
+    ///
+    /// # Fehler
+    /// Keine; reiner Handle-Zugriff.
+    /// # Crash
+    /// Keine Seiteneffekte.
+    pub fn pending_delete_notify(&self) -> Arc<tokio::sync::Notify> {
+        self.pending.notify_handle()
+    }
+
+    /// Liefert die aktuelle Anzahl ausstehender Pending-Delete-Pfade (§8).
+    ///
+    /// # Fehler
+    /// Keine; atomarer Lesezugriff (`Acquire`).
+    /// # Crash
+    /// Keine Seiteneffekte.
+    pub fn pending_delete_remaining(&self) -> u64 {
+        self.pending.remaining()
+    }
+
     /// Registriert Version-Collapse-Einträge (A-1) durabel im Journal und RAM (§7.2).
-    pub(crate) async fn register_collapse(
+    ///
+    /// # Fehler
+    /// Liefert [`ErasureError::JournalPoisoned`], [`ErasureError::NotFound`] oder
+    /// [`ErasureError::InvalidTransition`] bzw. [`ErasureError::Io`] bei Schreibfehlern.
+    /// # Crash
+    /// Write-Ahead-Protokollierung; unvollständige Batches bleiben ohne RAM-Übernahme.
+    pub async fn register_collapse(
         &self,
         id: ErasureId,
         entries: Vec<(Vec<u8>, u64)>,
@@ -829,6 +853,12 @@ impl StoreErasureKernel {
             .map(Job::to_job_view)
             .collect();
         *self.open_views_cache.write() = views;
+        let flags: BTreeMap<ErasureId, Arc<AtomicBool>> = ks
+            .jobs
+            .iter()
+            .map(|(id, j)| (*id, Arc::clone(&j.sealed_flag)))
+            .collect();
+        *self.sealed_flags_cache.write() = flags;
     }
 
     fn default_expected_layers() -> Vec<WitnessLayer> {
@@ -927,8 +957,6 @@ impl ErasureKernel for StoreErasureKernel {
                 id: req.id,
                 state: ErasureState::Planned,
                 plan: Arc::new(plan.clone()),
-                target_hash,
-                reason: req.reason.clone(),
                 policy: req.policy.clone(),
                 expected_layers,
                 gated_seq: None,
@@ -1606,7 +1634,12 @@ impl ErasureKernel for StoreErasureKernel {
         ) {
             return Err(ErasureError::InvalidTransition);
         }
-        let sealed_flag = Arc::new(AtomicBool::new(false));
+        let sealed_flag = self
+            .sealed_flags_cache
+            .read()
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| Arc::new(AtomicBool::new(false)));
         Ok(Arc::new(StorePrivilegedReader::new(
             deps,
             Arc::clone(&view.scope),

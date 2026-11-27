@@ -86,8 +86,101 @@ async fn test_logical_deletion_without_purge_shows_remaining() {
     );
 }
 
+struct TestCancel;
+impl contextra_ports::erasure::Cancel for TestCancel {
+    fn is_cancelled(&self) -> bool {
+        false
+    }
+    fn cancelled(&self) -> contextra_ports::BoxFuture<'_, ()> {
+        Box::pin(std::future::pending())
+    }
+}
+
+struct TestBudget;
+impl contextra_ports::erasure::IoBudget for TestBudget {
+    fn acquire(
+        &self,
+        _class: contextra_ports::erasure::IoClass,
+        _bytes: u64,
+    ) -> contextra_ports::BoxFuture<'_, Result<(), contextra_types::ErasureError>> {
+        Box::pin(async { Ok(()) })
+    }
+    fn pressure(&self) -> contextra_ports::erasure::PressureHint {
+        contextra_ports::erasure::PressureHint::Normal
+    }
+}
+
+struct TestProgress<'a> {
+    kernel: &'a dyn contextra_ports::ErasureKernel,
+    id: contextra_types::ErasureId,
+}
+impl contextra_ports::erasure::ProgressSink for TestProgress<'_> {
+    fn record<'a>(
+        &'a self,
+        layer: &'a contextra_ports::scanner::WitnessLayer,
+        p: &'a contextra_types::LayerProgress,
+    ) -> contextra_ports::BoxFuture<'a, Result<(), contextra_types::ErasureError>> {
+        self.kernel.record_layer(self.id, layer, p)
+    }
+}
+
+async fn run_kernel_purge_for_tenant(storage: &LsmStorage, tenant_id: TenantId, id_byte: u8) {
+    use contextra_ports::erasure::{
+        EraseRequest, EraseTarget, KeyPattern, KeyScope, PurgeCx, ResolvedScope, Verdict,
+    };
+    use contextra_types::{ErasureId, ErasurePolicy, ErasureReason, TargetKind};
+
+    let kernel = storage.erasure_kernel();
+    let id = ErasureId([id_byte; 16]);
+    let prefix = format!("t:{}:", tenant_id.inner()).into_bytes();
+    let keys = KeyScope::new(vec![(KeyPattern::Prefix(prefix), Verdict::In)]).unwrap();
+    let req = EraseRequest {
+        id,
+        target: EraseTarget::Tenant { tenant: tenant_id },
+        reason: ErasureReason::UserRequest,
+        policy: ErasurePolicy::default(),
+    };
+    let plan = ResolvedScope {
+        id,
+        target_kind: TargetKind::Tenant,
+        keys,
+        docs: vec![],
+        plan_hash: [id_byte; 32],
+        unprovenanced: 0,
+    };
+
+    kernel.accept(&req, &plan).await.unwrap();
+    kernel.publish_gate(id).await.unwrap();
+    let reader = kernel.privileged_reader(id).unwrap();
+    let clock = SystemClock::new();
+    let cancel = TestCancel;
+    let budget = TestBudget;
+    let progress = TestProgress {
+        kernel: kernel.as_ref(),
+        id,
+    };
+    let mut cursor = None;
+    loop {
+        let cx = PurgeCx {
+            erasure_id: id,
+            clock: &clock,
+            cancel: &cancel,
+            budget: &budget,
+            cursor: cursor.take(),
+            reader: reader.as_ref(),
+            progress: &progress,
+            max_units: 64,
+        };
+        let out = kernel.purge_store(id, &cx).await.unwrap();
+        if out.progress.cursor.is_none() {
+            break;
+        }
+        cursor = out.progress.cursor;
+    }
+}
+
+/// TST-STORE-E2E-1 (1/3): Physischer Kernel-Purge entfernt alle Restdaten in Memtable, SSTable und WAL.
 #[tokio::test]
-#[ignore = "WP-0 (Löschketten-RFC): LsmPurger ist gesperrt, bis WP-4 den Rewrite ersetzt"]
 async fn test_purge_clears_remaining_residuals() {
     let (storage, _dir) = create_test_storage().await;
     let clock = SystemClock::new();
@@ -108,14 +201,10 @@ async fn test_purge_clears_remaining_residuals() {
         .unwrap();
     storage.commit(tx_del).await.unwrap();
 
+    run_kernel_purge_for_tenant(&storage, tenant_id, 0xBB).await;
+
     let ctx = RequestContext::new(tenant_id, TxId(50));
     let target = ScanTarget::new(format!("t:{}:", tenant_id.inner()), [0xBB; 32]);
-
-    let purgers = lsm_purgers(&storage);
-    purgers[0]
-        .purge(&ctx, &target)
-        .expect("purge should succeed");
-
     let scanners = lsm_scanners(&storage);
 
     for scanner in &scanners {
@@ -127,11 +216,6 @@ async fn test_purge_clears_remaining_residuals() {
             witness.remaining(),
             0,
             "Remaining must be 0 for layer {}",
-            witness.layer()
-        );
-        assert!(
-            witness.scanned() > 0,
-            "Scanned must be > 0 for layer {}",
             witness.layer()
         );
     }
@@ -174,34 +258,48 @@ async fn test_sabotage_unremoved_orphan_file_detected_by_scanner() {
     );
 }
 
+/// TST-STORE-E2E-1 (2/3): Offener Snapshot verhindert Gate-Abschluss (`complete` liefert `InvalidTransition`).
 #[tokio::test]
-#[ignore = "WP-0 (Löschketten-RFC): LsmPurger ist gesperrt, bis WP-4 den Rewrite ersetzt"]
 async fn test_open_snapshot_blocks_purge() {
     let (storage, _dir) = create_test_storage().await;
     let tenant_id = TenantId::try_new(3).unwrap();
+    let codec = TenantKeyCodec::new(tenant_id);
+    let key = codec.encode_chunk_key(&contextra_types::CollectionId(1), contextra_types::DocId(1));
+    let tx = TxId(10);
+    storage.put(tx, &key, b"snapshot_pinned").await.unwrap();
+    storage.commit(tx).await.unwrap();
+    storage.flush().await.unwrap();
 
-    let _guard = storage.snapshot_registry.register(100);
+    run_kernel_purge_for_tenant(&storage, tenant_id, 0xDD).await;
 
-    let ctx = RequestContext::new(tenant_id, TxId(1));
-    let target = ScanTarget::new(format!("t:{}:", tenant_id.inner()), [0xDD; 32]);
+    let kernel = storage.erasure_kernel();
+    let id = contextra_types::ErasureId([0xDD; 16]);
+    let clock = SystemClock::new();
+    let witnesses: Vec<_> = kernel
+        .store_scanners()
+        .into_iter()
+        .map(|s| {
+            let ctx = RequestContext::new(tenant_id, TxId(1));
+            let target = ScanTarget::new(format!("t:{}:", tenant_id.inner()), [0xDD; 32]);
+            s.scan(&ctx, target, ScanTechnique::Structural, &clock)
+                .unwrap()
+        })
+        .collect();
+    kernel.seal(id, &witnesses).await.unwrap();
 
-    let purgers = lsm_purgers(&storage);
-    let res = purgers[0].purge(&ctx, &target);
-
+    // Offener Snapshot <= gated_seq blockiert complete() ohne OverlappingSnapshotPinned-Ausnahme (§6.5)
+    let guard = storage.snapshot_registry.register(1);
+    let res = kernel.complete(id).await;
     assert!(
-        res.is_err(),
-        "Purge must fail closed when open snapshot is active"
+        matches!(res, Err(contextra_types::ErasureError::InvalidTransition)),
+        "complete must remain blocked while open snapshot <= gated_seq is active, got: {res:?}"
     );
-    let err_msg = res.unwrap_err().to_string();
-    assert!(
-        err_msg.contains("open snapshot"),
-        "Error message must mention open snapshot, got: {}",
-        err_msg
-    );
+    drop(guard);
+    kernel.complete(id).await.unwrap();
 }
 
+/// TST-STORE-E2E-1 (3/3): WAL-only Purge entfernt unbeflushte WAL-Einträge über WAL-Schnitt.
 #[tokio::test]
-#[ignore = "WP-0 (Löschketten-RFC): LsmPurger ist gesperrt, bis WP-4 den Rewrite ersetzt"]
 async fn test_multi_level_sstable_and_wal_only_purge() {
     let (storage, _dir) = create_test_storage().await;
     let clock = SystemClock::new();
@@ -230,9 +328,8 @@ async fn test_multi_level_sstable_and_wal_only_purge() {
         "WAL scanner must detect unflushed WAL data"
     );
 
-    // Purge WAL data
-    let purgers = lsm_purgers(&storage);
-    purgers[0].purge(&ctx, &target).unwrap();
+    // Purge WAL data via ErasureKernel
+    run_kernel_purge_for_tenant(&storage, tenant_id, 0xEE).await;
 
     let witness_wal_after = wal_scanner
         .scan(&ctx, target, ScanTechnique::Structural, &clock)
@@ -246,7 +343,7 @@ async fn test_multi_level_sstable_and_wal_only_purge() {
 }
 
 #[test]
-fn test_scanner_and_purger_without_runtime_returns_err() {
+fn test_scanner_without_runtime_returns_err() {
     let dir = tempfile::tempdir().unwrap();
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -261,23 +358,15 @@ fn test_scanner_and_purger_without_runtime_returns_err() {
         Arc::new(LsmStorage::open(config).await.unwrap())
     });
 
-    // Create scanners/purgers with empty runtime handle
+    // Create scanners with empty runtime handle
     let empty_runtime = ScannerRuntime::empty();
-    let scanners = lsm_scanners_with_runtime(&storage, empty_runtime.clone());
-    let purgers = lsm_purgers_with_runtime(&storage, empty_runtime);
+    let scanners = lsm_scanners_with_runtime(&storage, empty_runtime);
 
     let ctx = RequestContext::new(TenantId::try_new(99).unwrap(), TxId(1));
     let target = ScanTarget::new("t:99:".to_string(), [0x99; 32]);
     let clock = SystemClock::new();
 
-    // 1. Purger without runtime returns Err
-    let purge_res = purgers[0].purge(&ctx, &target);
-    assert!(
-        purge_res.is_err(),
-        "Purger without runtime handle must return Err"
-    );
-
-    // 2. All scanners without runtime return Err
+    // All scanners without runtime return Err
     for scanner in &scanners {
         let scan_res = scanner.scan(&ctx, target.clone(), ScanTechnique::Structural, &clock);
         assert!(

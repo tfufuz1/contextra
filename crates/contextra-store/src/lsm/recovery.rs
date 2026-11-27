@@ -47,94 +47,38 @@ pub(crate) async fn write_salt_atomically(
     salt_path: &std::path::Path,
     buf: &[u8; 32],
 ) -> Result<()> {
-    let parent = salt_path
-        .parent()
-        .ok_or_else(|| ContextraError::Storage("Invalid salt path parent".into()))?;
-
-    let pid = std::process::id();
-
-    const MAX_ATTEMPTS: usize = 100;
-    let mut attempt = 0;
-    let mut tmp_path;
-    let file = loop {
-        attempt += 1;
-        let counter = next_temp_file_counter();
-        tmp_path = parent.join(format!("SALT.tmp.{}.{}", pid, counter));
-
-        match tokio::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmp_path)
-            .await
-        {
-            Ok(f) => break f,
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                if attempt >= MAX_ATTEMPTS {
-                    return Err(ContextraError::Storage(format!(
-                        "Exhausted {} attempts trying to create temporary SALT file {:?}",
-                        MAX_ATTEMPTS, tmp_path
-                    )));
-                }
-                continue;
-            }
-            Err(e) => {
-                return Err(ContextraError::Storage(format!(
-                    "Failed to create temp SALT file: {}",
-                    e
-                )));
-            }
-        }
-    };
-
-    let buf_copy = *buf;
-    let write_res: Result<()> = async {
-        let mut std_file = file.into_std().await;
-
-        tokio::task::spawn_blocking(move || -> Result<()> {
-            use std::io::Write;
-            std_file.write_all(&buf_copy).map_err(|e| {
-                ContextraError::Storage(format!("Failed to write SALT bytes: {}", e))
-            })?;
-            std_file.sync_all().map_err(|e| {
-                ContextraError::Storage(format!("Failed to sync temp SALT file: {}", e))
-            })?;
-            Ok(())
-        })
-        .await
-        .map_err(|e| ContextraError::Storage(format!("Join error during SALT write: {}", e)))??;
-
-        tokio::fs::rename(&tmp_path, salt_path).await.map_err(|e| {
-            ContextraError::Storage(format!("Failed to rename temp SALT file: {}", e))
-        })?;
-
-        crate::util::fsync_parent_dir(salt_path).await?;
-        Ok(())
-    }
-    .await;
-
-    if write_res.is_err() {
-        if let Err(e) = tokio::fs::remove_file(&tmp_path).await {
-            if e.kind() != std::io::ErrorKind::NotFound {
-                tracing::warn!("Failed to remove temporary SALT file {:?}: {}", tmp_path, e);
-            }
-        }
-    }
-
-    write_res
+    let io = crate::io_seam::StoreIo::default();
+    write_salt_atomically_with_io(&io, salt_path, buf).await
 }
 
-pub(super) async fn directory_is_pristine(path: &std::path::Path) -> Result<bool> {
-    let mut entries = tokio::fs::read_dir(path).await.map_err(|e| {
+pub(crate) async fn write_salt_atomically_with_io(
+    store_io: &crate::io_seam::StoreIo,
+    salt_path: &std::path::Path,
+    buf: &[u8; 32],
+) -> Result<()> {
+    store_io
+        .write_atomic(salt_path, buf.to_vec())
+        .await
+        .map_err(|e| ContextraError::Storage(format!("Failed to write SALT file: {e}")))?;
+    if let Some(parent) = salt_path.parent() {
+        store_io.sync_dir(parent).await?;
+    }
+    Ok(())
+}
+
+pub(super) async fn directory_is_pristine(
+    store_io: &crate::io_seam::StoreIo,
+    path: &std::path::Path,
+) -> Result<bool> {
+    let entries = store_io.read_dir(path).await.map_err(|e| {
         ContextraError::Storage(format!("Failed to read data dir for pristine check: {e}"))
     })?;
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| {
-        ContextraError::Storage(format!(
-            "Failed to read directory entry for pristine check: {e}"
-        ))
-    })? {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
+    for entry_path in entries {
+        let name_str = entry_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
         if name_str.starts_with("wal-")
             || name_str == "wal.log"
             || name_str.ends_with(".sst")
@@ -179,6 +123,11 @@ impl LsmStorage {
             vfs.sync_dir(parent)?;
         }
 
+        let store_io = config
+            .vfs
+            .clone()
+            .unwrap_or_else(|| crate::io_seam::StoreIo::new(Arc::clone(&vfs)));
+
         let dir_lock = DirLock::acquire(&config.path, config.durability_mode)?;
 
         let salt_path = config.path.join("SALT");
@@ -193,13 +142,13 @@ impl LsmStorage {
                 buf
             }
             Err(ContextraError::NotFound(_)) => {
-                if !directory_is_pristine(&config.path).await? {
+                if !directory_is_pristine(&store_io, &config.path).await? {
                     return Err(ContextraError::Storage(
                         "SALT file missing in non-pristine database directory".into(),
                     ));
                 }
                 let buf = generate_crypto_salt()?;
-                write_salt_atomically(&salt_path, &buf).await?;
+                write_salt_atomically_with_io(&store_io, &salt_path, &buf).await?;
                 buf.to_vec()
             }
             Err(e) => {
@@ -215,27 +164,26 @@ impl LsmStorage {
 
         let mut max_wal_id: Option<u64> = None;
         let mut wal_files = Vec::new();
-        let mut entries = tokio::fs::read_dir(&config.path)
+        let dir_entries = store_io
+            .read_dir(&config.path)
             .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to read data dir: {}", e)))?;
+            .map_err(|e| ContextraError::Storage(format!("Failed to read data dir: {e}")))?;
 
-        while let Some(entry) = entries
-            .next_entry()
-            .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to read directory entry: {e}")))?
-        {
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
+        for entry_path in dir_entries {
+            let name_str = entry_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("");
             if name_str.starts_with("wal-") && name_str.ends_with(".log") {
                 if let Ok(seq_component) = name_str[4..name_str.len() - 4].parse::<u128>() {
-                    wal_files.push((seq_component, entry.path()));
+                    wal_files.push((seq_component, entry_path.clone()));
                     match u64::try_from(seq_component) {
                         Ok(id) => {
                             max_wal_id = Some(max_wal_id.unwrap_or(id).max(id));
                         }
                         Err(_) => {
                             tracing::warn!(
-                                path = ?entry.path(),
+                                path = ?entry_path,
                                 seq_component = seq_component,
                                 "WAL filename sequence component overflows u64; ignoring from max_wal_id calculation"
                             );
@@ -243,7 +191,7 @@ impl LsmStorage {
                     }
                 }
             } else if name_str == "wal.log" {
-                wal_files.push((0, entry.path()));
+                wal_files.push((0, entry_path));
                 max_wal_id = Some(max_wal_id.unwrap_or(0));
             }
         }
@@ -253,7 +201,7 @@ impl LsmStorage {
         });
 
         let manifest_path = config.path.join("MANIFEST");
-        let manifest_exists = manifest_path.exists();
+        let manifest_exists = store_io.exists(&manifest_path).await?;
         #[allow(clippy::type_complexity)]
         let (valid_manifest_sstables, dead_manifest_sstables, manifest_hwm): (
             Option<std::collections::HashSet<std::path::PathBuf>>,
@@ -276,10 +224,6 @@ impl LsmStorage {
         let clock_arc: Arc<dyn contextra_ports::Clock> =
             Arc::new(contextra_ports::SystemClock::new());
         let clock_lock = Arc::new(parking_lot::RwLock::new(Arc::clone(&clock_arc)));
-        let store_io = config
-            .vfs
-            .clone()
-            .unwrap_or_else(|| crate::io_seam::StoreIo::new(Arc::clone(&vfs)));
         let erasure_cfg = crate::erasure::StoreErasureConfig::for_data_dir(&config.path);
         let key_source = crate::key_source::OsKeyMaterialSource;
         let (erasure_kernel, erasure_boot_report) =
@@ -446,15 +390,13 @@ impl LsmStorage {
         let tx_buffer = TxBuffer::new_with_config(16, config.tx_timeout);
 
         let mut pending_rollbacks = Vec::new();
-        let mut entries = tokio::fs::read_dir(&config.path)
+        let mut sst_files = Vec::new();
+        let dir_entries = store_io
+            .read_dir(&config.path)
             .await
             .map_err(|e| ContextraError::Storage(format!("Failed to read data dir: {e}")))?;
-        while let Some(entry) = entries
-            .next_entry()
-            .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to read directory entry: {e}")))?
-        {
-            let path = entry.path();
+
+        for path in dir_entries {
             let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if file_name.starts_with("rollback-") && file_name.ends_with(".intent") {
                 let hex_part = &file_name[9..file_name.len() - 7];
@@ -468,22 +410,7 @@ impl LsmStorage {
                         pending_rollbacks.push(target_tx);
                     }
                 }
-            }
-        }
-        pending_rollbacks.sort_unstable();
-
-        let mut sst_files = Vec::new();
-        let mut entries = tokio::fs::read_dir(&config.path)
-            .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to read data dir: {e}")))?;
-        while let Some(entry) = entries
-            .next_entry()
-            .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to read directory entry: {e}")))?
-        {
-            let path = entry.path();
-            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if file_name.ends_with(".tmp")
+            } else if file_name.ends_with(".tmp")
                 || path.extension().is_some_and(|ext| ext == "tmp")
                 || file_name.starts_with("SALT.tmp.")
                 || file_name.starts_with("MANIFEST.new.")
@@ -516,6 +443,7 @@ impl LsmStorage {
                 }
             }
         }
+        pending_rollbacks.sort_unstable();
         sst_files.sort();
 
         let block_cache = create_block_cache_with_shards(64, config.block_cache_shards);
@@ -662,11 +590,9 @@ impl LsmStorage {
             sstables: Arc::clone(&sstables),
             wal: Arc::clone(&wal_lock),
             snapshot_registry: Arc::clone(&snapshot_registry),
-            compaction_engine: Arc::clone(&compaction_engine),
             manifest: Arc::clone(&manifest),
             block_cache: Arc::clone(&block_cache),
             budget: Arc::clone(&resource_tracker),
-            health: Arc::clone(&health),
             next_seq_no: Arc::clone(&next_seq_no),
             last_committed_tx: Arc::clone(&last_committed_tx),
             last_applied_seq: Arc::clone(&last_applied_seq),
@@ -675,7 +601,6 @@ impl LsmStorage {
             pending_sealed_wals: Arc::clone(&pending_sealed_wals),
             flush_counter: Arc::clone(&flush_counter),
             segment_counter: Arc::clone(&segment_counter),
-            clock: Arc::clone(&clock_lock),
         });
 
         let storage = Self {
@@ -772,6 +697,17 @@ impl LsmStorage {
                 target_tx
             );
         }
+
+        let boot_seq = storage
+            .last_applied_seq
+            .load(std::sync::atomic::Ordering::Acquire);
+        storage
+            .erasure
+            .finalize_boot_gates(boot_seq)
+            .await
+            .map_err(|e| {
+                ContextraError::Storage(format!("Failed to finalize erasure boot gates: {e}"))
+            })?;
 
         Ok(storage)
     }

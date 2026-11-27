@@ -10,7 +10,6 @@
 #![forbid(unsafe_code)]
 
 pub mod memtable;
-pub mod purge;
 pub mod runtime;
 pub mod sstable;
 pub mod wal;
@@ -19,13 +18,12 @@ pub mod wal;
 mod tests;
 
 pub use memtable::MemtableScanner;
-pub use purge::LsmPurger;
 pub use runtime::ScannerRuntime;
 pub use sstable::SstableScanner;
 pub use wal::WalScanner;
 
 use crate::lsm::LsmStorage;
-use contextra_ports::scanner::{LayerScanner, Purger};
+use contextra_ports::scanner::LayerScanner;
 use std::sync::Arc;
 use tokio::runtime::Handle;
 
@@ -165,28 +163,4 @@ pub fn lsm_scanners_with_runtime(
         )),
         Arc::new(WalScanner::with_runtime(Arc::clone(storage), runtime)),
     ]
-}
-
-/// Erzeugt den LSM-Storage-Purger für eine gegebene LsmStorage-Instanz.
-/// Erfasst das aktuelle Tokio-Runtime-Handle via `ScannerRuntime::capture()`.
-pub fn lsm_purgers(storage: &Arc<LsmStorage>) -> Vec<Arc<dyn Purger>> {
-    let runtime = ScannerRuntime::capture();
-    lsm_purgers_with_runtime(storage, runtime)
-}
-
-/// Erzeugt den LSM-Storage-Purger für eine gegebene LsmStorage-Instanz mit explizitem Tokio-Runtime-Handle.
-pub fn lsm_purgers_with_handle(storage: &Arc<LsmStorage>, handle: Handle) -> Vec<Arc<dyn Purger>> {
-    let runtime = ScannerRuntime::with_handle(handle);
-    lsm_purgers_with_runtime(storage, runtime)
-}
-
-/// Erzeugt den LSM-Storage-Purger mit einer spezifischen `ScannerRuntime`.
-pub fn lsm_purgers_with_runtime(
-    storage: &Arc<LsmStorage>,
-    runtime: ScannerRuntime,
-) -> Vec<Arc<dyn Purger>> {
-    vec![Arc::new(LsmPurger::with_runtime(
-        Arc::clone(storage),
-        runtime,
-    ))]
 }

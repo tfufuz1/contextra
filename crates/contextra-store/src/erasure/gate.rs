@@ -384,7 +384,7 @@ impl StoreGate {
     /// Atomarer Snapshot-Tausch unter Rang 960. Liefert die neue Epoche zurück.
     pub fn install_snapshot(&self, mut build: impl FnMut(&GateSnapshot, u64) -> GateSnapshot) -> u64 {
         let mut guard = self.snap.write();
-        let next_epoch = self.epoch.load(Ordering::Acquire).saturating_add(1);
+        let next_epoch = guard.epoch.saturating_add(1);
         let new_snap = Arc::new(build(&guard, next_epoch));
         let has_jobs = !new_snap.jobs.is_empty() || self.fail_closed.load(Ordering::Acquire);
         *guard = new_snap;

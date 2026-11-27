@@ -1,13 +1,12 @@
 //! Physisches Entfernen im LSM-Store: MemTable-Retain, Erase-Compaction, WAL-Schnitt,
 //! PrivilegedRead und Store-Scanner (§7).
 
-use crate::compaction::{retain_key_versions, CompactionEngine};
+use crate::compaction::retain_key_versions;
 use crate::erasure::filter::{CollapseMap, Decision, EraseFilter};
 use crate::erasure::gate::StoreGate;
 use crate::erasure::journal::JournalRecord;
 use crate::erasure::pending::PendingDelete;
 use crate::io_seam::StoreIo;
-use crate::lsm::engine::StorageHealth;
 use crate::lsm::guard::LsmState;
 use crate::manifest::{Manifest, ManifestEntry};
 use crate::memtable::MemTable;
@@ -15,7 +14,6 @@ use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::{KeyManager, Wal};
 use bytes::Bytes;
 use contextra_mvcc::SnapshotRegistry;
-use contextra_ports::clock::Clock;
 use contextra_ports::erasure::{
     IoClass, KeyPattern, PrivilegedRead, PurgeCx, ResolvedScope, Verdict,
 };
@@ -40,11 +38,9 @@ pub(crate) struct StoreDeps {
     pub sstables: Arc<RwLock<Vec<Arc<SstableReader>>>>,
     pub wal: Arc<RwLock<Arc<Wal>>>,
     pub snapshot_registry: Arc<SnapshotRegistry>,
-    pub compaction_engine: Arc<CompactionEngine>,
     pub manifest: Arc<Manifest>,
     pub block_cache: Arc<BlockCache>,
     pub budget: Arc<ResourceTracker>,
-    pub health: Arc<parking_lot::RwLock<StorageHealth>>,
     pub next_seq_no: Arc<AtomicU64>,
     pub last_committed_tx: Arc<AtomicU64>,
     pub last_applied_seq: Arc<AtomicU64>,
@@ -53,7 +49,6 @@ pub(crate) struct StoreDeps {
     pub pending_sealed_wals: Arc<Mutex<Vec<(PathBuf, [u8; 32])>>>,
     pub flush_counter: Arc<AtomicU64>,
     pub segment_counter: Arc<AtomicU64>,
-    pub clock: Arc<parking_lot::RwLock<Arc<dyn Clock>>>,
 }
 
 /// Entfernt alle vom `EraseFilter` verworfenen Versionen aus der aktiven und allen
@@ -705,6 +700,7 @@ impl LayerScanner for KernelStoreScanner {
             .to_vec();
         // Positivkontrolle (Canary)
         session.record_control_match();
+        session.record_unit(*blake3::hash(b"ctx-erasure-control-canary").as_bytes(), false);
 
         match self.layer {
             WitnessLayer::LsmMemtable => {
