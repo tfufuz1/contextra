@@ -70,10 +70,6 @@ pub struct DocRef {
 
 /// 16-Byte Lösch-Identifikator (SPEC 7.4, TY-09).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[deprecated(
-    since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
-)]
 pub struct ErasureId(pub [u8; 16]);
 
 impl ErasureId {
@@ -152,10 +148,6 @@ impl fmt::Debug for StoreId {
 
 /// 16-Byte Gate-Kennung für ReadGate-Einträge (SPEC F.9).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[deprecated(
-    since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
-)]
 pub struct GateId(pub [u8; 16]);
 
 impl GateId {

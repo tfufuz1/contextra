@@ -37,10 +37,6 @@ where
 // ANCHOR[contextra-text:PURGE-001]
 /// Detaillierter Ausführungsbericht eines Purge-Laufs mit Einheiten, freigegebenem Speicher und Fehlern.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[deprecated(
-    since = "0.1.0",
-    note = "Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)"
-)]
 pub struct PurgeReport {
     /// Anzahl erfolgreich physisch gelöschter Einheiten.
     pub units_purged: u64,
@@ -95,10 +91,6 @@ impl Default for PurgeReport {
 
 // ANCHOR[contextra-text:PURGE-005]
 /// Physischer Purger für den Textindex zur Bereinigung von Storage und Metadaten.
-#[deprecated(
-    since = "0.1.0",
-    note = "Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)"
-)]
 pub struct TextPurger<S: StorageEngine + 'static> {
     index: Arc<InvertedIndex<S>>,
 }
@@ -498,10 +490,6 @@ impl<S: StorageEngine + 'static> Purger for TextPurger<S> {
 
 // ANCHOR[contextra-text:PURGE-006]
 /// Erzeugt eine instanziierte Implementierung des [`Purger`]-Ports für den Textindex.
-#[deprecated(
-    since = "0.1.0",
-    note = "Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)"
-)]
 pub fn text_purger<S: StorageEngine + 'static>(index: Arc<InvertedIndex<S>>) -> Arc<dyn Purger> {
     Arc::new(TextPurger::new(index))
 }

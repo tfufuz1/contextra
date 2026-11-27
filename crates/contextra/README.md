@@ -13,7 +13,6 @@ Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; SPEC §4.4, §4.5, `capa
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` und Zero-Panic-Doktrin im Produktionscode.
 - **Optionale Features:**
   - `embedded` (Standard): Minimaler lokaler Betrieb ohne Inferenz.
-  - `candle`: Lokale Inferenz via `contextra-infer-candle`.
 
 ## Baukasten-Nutzung
 

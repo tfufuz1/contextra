@@ -6,13 +6,13 @@
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
 
 // FILE-CONTEXT
-// ZWECK: Adaptive Decay Controller — WP 2.2: Typen aus contextra-adapt hierher kopiert (archiviert).
-// INVARIANTEN: Identische Logik wie contextra-adapt/src/decay_controller.rs (ADR-016).
+// ZWECK: Adaptive Decay Controller — WP 2.2: Typen hierher kopiert (ursprünglich aus einer entfernten Crate).
+// INVARIANTEN: Logik entspricht der ursprünglichen Implementierung (ADR-016).
 // NICHT-OFFENSICHTLICH: Kein SystemTime — elapsed_tx = TxId-Differenz (deterministisch).
 
 //! Adaptive Decay Controller (Cache-Eviction mit Time-Weighted Decay) (F-01).
 //!
-//! Kopiert aus contextra-adapt (archiviert in WP 2.1), um die Kante zu entfernen.
+//! Kopiert aus einer entfernten Crate (archiviert in WP 2.1), um die Kante zu entfernen.
 //! ADR-016: TxId-Differenz statt SystemTime (deterministisch, replay-safe).
 
 use contextra_ports::Clock;

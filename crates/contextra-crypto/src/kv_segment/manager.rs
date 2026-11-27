@@ -39,10 +39,6 @@ pub struct KvSegmentPayload {
 
 /// Manager for KV segment encryption, decryption, and crypto-shredding.
 #[derive(Debug)]
-#[deprecated(
-    since = "0.1.0",
-    note = "KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden."
-)]
 pub struct KvSegmentManager {
     config: KvSegmentConfig,
     registry: Arc<KeyRegistry>,

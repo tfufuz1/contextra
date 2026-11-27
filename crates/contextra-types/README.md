@@ -24,7 +24,7 @@ python3 tools/export_crate.py contextra-types --out /tmp/export-contextra-types
   - `auto-extraction-opt-out`: Kompatibilitätsfeature für Metadaten-Extraktion.
 - **Determinismus:** Keine Systemzeit (`SystemTime::now`), kein Thread-Zufall (`thread_rng`), keine I/O-Operationen.
 - **Zero-Panic:** Panics und unvollständige Fehlerbehandlung in Konstruktoren und Konvertierungen sind eliminiert.
-- **Löschentkopplung (§6 / D-E1):** Löschdomänen-Typen (`erasure.rs`, `witness.rs`) sind als deprecated markiert (Migration nach `contextra-erasure`).
+- **Löschtypen:** `witness.rs` (`ScanMethod`, `SagaRecord`) ist die kanonische Definition. Der frühere Typensatz `erasure.rs` wurde entfernt.
 
 ## Nicht-Ziele
 - Keine Implementierung von Speicher-Engines, Indizes oder Löschprotokollen.

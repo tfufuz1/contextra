@@ -18,8 +18,7 @@
 //! - **Ring:** Ring 0 (Kern / Foundation)
 //! - **Abhängigkeiten (ausgehend):** `contextra-ports`, `contextra-types`
 //! - **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`,
-//!   `contextra-infer-candle`, `contextra-kvcache`, `contextra-mcp`, `contextra-privacy`,
-//!   `contextra-store`, `contextra-vector`.
+//!   `contextra-mcp`, `contextra-store`, `contextra-vector`.
 //!
 //! ## Hauptaufgaben
 //! 1. **AEAD-Blockverschlüsselung:** Authentifizierte Verschlüsselung via AES-256-GCM-SIV
@@ -46,32 +45,16 @@ pub mod audit_chain;
 pub mod crypto;
 pub mod dek;
 #[cfg(feature = "legacy-erasure")]
-#[deprecated(
-    since = "0.1.0",
-    note = "Lösch- und Attestationslogik migriert nach contextra-erasure (SPEC §6.2)"
-)]
 pub mod deletion_proof;
 #[cfg(feature = "legacy-erasure")]
-#[deprecated(
-    since = "0.1.0",
-    note = "Ed25519 Proof Typen migrieren nach contextra-erasure (SPEC §6.2)"
-)]
 pub mod ed25519_proof;
 pub mod error;
 pub mod kdf;
 pub mod kv_cipher;
 pub mod kv_segment;
 #[cfg(feature = "legacy-erasure")]
-#[deprecated(
-    since = "0.1.0",
-    note = "KV-Shredding Logik migriert nach contextra-erasure (SPEC §6.2)"
-)]
 pub mod kv_shredding;
 #[cfg(feature = "legacy-erasure")]
-#[deprecated(
-    since = "0.1.0",
-    note = "RevocationLog migriert nach contextra-erasure (SPEC §6.2)"
-)]
 pub mod revocation_log;
 pub mod secret;
 pub mod wal_completeness;

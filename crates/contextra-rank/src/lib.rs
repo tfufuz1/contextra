@@ -24,8 +24,7 @@
 //! ## Einbindung und Abhängigkeiten
 //! - **Konsumiert (Ring 0):** `contextra-types` (Domain-Typen), `contextra-ports` (Hardware-Abstraktionen).
 //! - **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`,
-//!   `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-infer-onnx`,
-//!   `contextra-mcp`, `contextra-py`.
+//!   `contextra-mcp`.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

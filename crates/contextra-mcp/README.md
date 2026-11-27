@@ -9,9 +9,6 @@ Model Context Protocol (MCP) Server über stdio/JSON-RPC 2.0 für Contextra.
 - **Deterministische Puffergrenzen:** Bounded RPC Message Size (`MAX_RPC_BYTES`).
 
 ## Features
-- `candle`: Optionales Inferenz-Backend via `contextra-infer-candle`
-- `ollama`: Optionales Loopback-Backend via `contextra-infer-ollama`
-- `onnx`: Optionales ONNX-Runtime-Backend via `contextra-infer-onnx`
 - `test-utils`: Hilfsmittel für Tests
 
 ## Verfügbare Tools

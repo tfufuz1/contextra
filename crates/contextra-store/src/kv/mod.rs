@@ -1,7 +1,7 @@
 //! # Key-Value Segmentspeicher für contextra-store (Ring 1)
 //!
 //! Reiner KV-Segmentspeicher ohne Krypto-/Shredding-/Vernichtungssemantik.
-//! Vernichtungs- und Nachweislogik liegt außerhalb des Storage-Kerns in `contextra-erasure`.
+//! Vernichtungs- und Nachweislogik gehört nicht in diesen Speicherkern; siehe `contextra-crypto`.
 
 use contextra_types::Result;
 

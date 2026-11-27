@@ -21,7 +21,7 @@
 //! - **Normal**: `contextra-ports`, `contextra-types`, sowie Hilfs-Bibliotheken (`bincode`, `blake3`,
 //!   `bytes`, `futures`, `itoa`, `parking_lot`, `regex`, `serde`, `serde_json`, `thiserror`, `tracing`,
 //!   `unicode-segmentation`).
-//! - **Wird genutzt von**: `contextra-engine`, `contextra-db`, `contextra-router`, `contextra-agent`
+//! - **Wird genutzt von**: `contextra-engine`, `contextra-db`
 //!   sowie Benchmarks (`contextra-bench`).
 //!
 //! # Haupttypen
@@ -91,10 +91,6 @@ use contextra_types::{DocId, Result, ScoredDocument, TxId};
 /// - `S`: Implementierung von [`contextra_ports::StorageEngine`], über welche
 ///   Posting-Listen und Dokument-Längen persistent abgelegt werden.
 #[cfg(feature = "types-compat")]
-#[deprecated(
-    since = "0.1.0",
-    note = "Ports-Anbindung gehört in contextra-erasure-adapters / contextra-ports Adapter"
-)]
 pub struct Bm25Scorer<S: contextra_ports::StorageEngine> {
     index: InvertedIndex<S>,
 }

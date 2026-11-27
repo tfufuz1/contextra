@@ -52,4 +52,4 @@ assert!(calibrated_prob >= 0.0 && calibrated_prob <= 1.0);
 - **Nicht-Ziele:**
   - Keine eigene Vektorsuche oder Indexhaltung (gehört in `contextra-vector` / `contextra-text`).
   - Keine I/O- oder Persistenzoperationen.
-  - Keine Lösch- oder DSGVO-Logik (gehört in `contextra-erasure`).
+  - Keine Lösch- oder DSGVO-Logik (gehört nicht in dieses Crate).

@@ -81,7 +81,7 @@ pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 /// Duplicating the literal 1000 anywhere else in the workspace is prohibited — always import this constant.
 ///
 /// This cap is applied at the orchestration layer (contextra-db) before forwarding `k`
-/// to vector and lexical sub-searches. All upstream layers (contextra-mcp, contextra-py)
+/// to vector and lexical sub-searches. All upstream layers (contextra-mcp)
 /// MUST reference this constant — never duplicate the literal `1000`.
 ///
 /// # DECISION-REF
