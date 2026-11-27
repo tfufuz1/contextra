@@ -14,7 +14,7 @@ pub struct EraseHandle {
 }
 
 /// Counts-only summary of an erase plan. Never contains keys (I-12).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct ErasePlanSummary {
     /// Number of key rules in the resolved scope.
     pub rules: u32,

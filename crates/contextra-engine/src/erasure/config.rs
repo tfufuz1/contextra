@@ -38,9 +38,19 @@ impl Default for ErasureConfig {
 }
 
 /// Per-request policy. Defaults to waiting until the read gate is durably active.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct EraseOptions {
     pub reason: contextra_types::ErasureReason,
     pub await_level: contextra_types::AwaitLevel,
     pub policy: Option<contextra_types::ErasurePolicy>,
+}
+
+impl Default for EraseOptions {
+    fn default() -> Self {
+        Self {
+            reason: contextra_types::ErasureReason::UserRequest,
+            await_level: contextra_types::AwaitLevel::default(),
+            policy: None,
+        }
+    }
 }

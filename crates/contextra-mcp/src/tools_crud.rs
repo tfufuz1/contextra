@@ -1,8 +1,6 @@
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
-// Deployment tier
-use contextra::collection_profile;
 use serde_json::{json, Value};
 
 impl McpServer {

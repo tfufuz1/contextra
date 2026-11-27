@@ -2,8 +2,6 @@ use crate::io::MAX_SEARCH_QUERY_BYTES;
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
-// Chunker types
-use contextra::chunker;
 use contextra_types::{DocId, MAX_SEARCH_K};
 use serde_json::{json, Value};
 
