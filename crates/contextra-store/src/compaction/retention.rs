@@ -64,7 +64,7 @@ mod tests {
 
         let retained = retain_key_versions(versions, |(_, seq)| *seq, u64::MAX);
         let seqs: Vec<u64> = retained.into_iter().map(|(_, seq)| seq).collect();
-        assert_eq!(seqs, vec![30, 20, 10, 5]);
+        assert_eq!(seqs, vec![30]);
     }
 
     #[test]

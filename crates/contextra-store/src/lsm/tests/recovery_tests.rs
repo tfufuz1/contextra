@@ -723,7 +723,7 @@ async fn test_wal_discovery_mixed_filenames() {
                     tx_id: tx1,
                     committed: true,
                 },
-                1,
+                2,
             ),
         ])
         .await
@@ -742,14 +742,14 @@ async fn test_wal_discovery_mixed_filenames() {
                     key: b"k2".to_vec(),
                     value: b"v2".to_vec(),
                 },
-                2,
+                3,
             ),
             (
                 WalOp::TxEnd {
                     tx_id: tx2,
                     committed: true,
                 },
-                2,
+                4,
             ),
         ])
         .await
@@ -770,14 +770,14 @@ async fn test_wal_discovery_mixed_filenames() {
                     key: b"k3".to_vec(),
                     value: b"v3".to_vec(),
                 },
-                3,
+                5,
             ),
             (
                 WalOp::TxEnd {
                     tx_id: tx3,
                     committed: true,
                 },
-                3,
+                6,
             ),
         ])
         .await
@@ -898,7 +898,7 @@ async fn test_uncommitted_transaction_discarded_on_open_recovery() {
                         tx_id: tx1,
                         committed: true,
                     },
-                    1,
+                    2,
                 ),
             ])
             .await
@@ -913,7 +913,7 @@ async fn test_uncommitted_transaction_discarded_on_open_recovery() {
                     key: b"uncommitted_key".to_vec(),
                     value: b"uncommitted_val".to_vec(),
                 },
-                2,
+                3,
             )])
             .await
             .expect("batch 2");
@@ -979,7 +979,7 @@ async fn test_aborted_transaction_discarded_on_open_recovery() {
                         tx_id: tx1,
                         committed: true,
                     },
-                    1,
+                    2,
                 ),
             ])
             .await
@@ -995,14 +995,14 @@ async fn test_aborted_transaction_discarded_on_open_recovery() {
                         key: b"aborted_key".to_vec(),
                         value: b"aborted_val".to_vec(),
                     },
-                    2,
+                    3,
                 ),
                 (
                     WalOp::TxEnd {
                         tx_id: tx2,
                         committed: false,
                     },
-                    2,
+                    4,
                 ),
             ])
             .await

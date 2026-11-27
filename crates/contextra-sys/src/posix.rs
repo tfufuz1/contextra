@@ -141,11 +141,13 @@ pub fn available_space(path: &Path) -> std::io::Result<u64> {
         }
         // SAFETY: `statvfs` war erfolgreich (rc == 0) und hat die Struktur initialisiert.
         let stat = unsafe { stat.assume_init() };
+        #[allow(clippy::unnecessary_cast)]
         let frsize = if stat.f_frsize > 0 {
             stat.f_frsize as u64
         } else {
             stat.f_bsize as u64
         };
+        #[allow(clippy::unnecessary_cast)]
         Ok((stat.f_bavail as u64).saturating_mul(frsize))
     }
     #[cfg(not(unix))]
