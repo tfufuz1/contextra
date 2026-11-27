@@ -79,7 +79,6 @@ fn test_durability_mode_feature_gate_matrix() {
     );
 }
 
-
 #[test]
 fn test_durability_mode_validate_durability_neutral_matrix() {
     use DurabilityMode::*;
@@ -102,7 +101,8 @@ fn test_durability_mode_validate_durability_neutral_matrix() {
                             Err(DurabilityConfigError::IncompatibleCombination {
                                 mode: WalNoHmac,
                                 feature: "integrity-chain",
-                                reason: "no HMAC integrity chain to anchor the proof or audit trail",
+                                reason:
+                                    "no HMAC integrity chain to anchor the proof or audit trail",
                             })
                         );
                     }

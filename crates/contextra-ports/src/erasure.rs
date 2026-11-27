@@ -658,7 +658,10 @@ pub trait ErasureKernel: Send + Sync {
     /// Liefert [`ErasureError::NotFound`], [`ErasureError::InvalidTransition`] oder Journal-Fehler.
     /// # Crash
     /// Kehrt erst nach durabler `Gated`-Markierung und Gate-Veröffentlichung zurück.
-    fn publish_gate<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<GateReceipt, ErasureError>>;
+    fn publish_gate<'a>(
+        &'a self,
+        id: ErasureId,
+    ) -> BoxFuture<'a, Result<GateReceipt, ErasureError>>;
 
     /// Executes resumable physical purge on the primary store layers (Memtable, SSTables, WAL).
     ///

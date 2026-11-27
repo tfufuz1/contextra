@@ -74,12 +74,14 @@ impl Wal {
 
     /// Replays the WAL using the stream reader (`BufReader`).
     pub async fn replay_stream(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
-        let metadata = crate::wal::fs::metadata(&self.path)
+        let file_size = self
+            .io
+            .len(&self.path)
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
         let mut entries = Vec::new();
         let version = self
-            .scan_entries_with_callback(metadata.len(), |seq, entry, pos| {
+            .scan_entries_with_callback(file_size, |seq, entry, pos| {
                 entries.push((seq, entry, pos));
                 true
             })
@@ -144,8 +146,21 @@ impl Wal {
         &self,
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        let std_file = std::fs::File::open(&self.path)
-            .map_err(|e| ContextraError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
+        let Some(std_file) = self
+            .io
+            .open_mmap_source(&self.path)
+            .map_err(|e| ContextraError::Storage(format!("Failed to open WAL for mmap: {e}")))?
+        else {
+            // Kein echtes Dateisystem (z. B. CrashVfs): komplett über den Port lesen.
+            let bytes = self.io.read(&self.path).await.map_err(|e| {
+                ContextraError::Storage(format!("Failed to read WAL through VFS: {e}"))
+            })?;
+            let file_size = bytes.len() as u64;
+            if file_size == 0 {
+                return Ok((Vec::new(), WalVersion::V1));
+            }
+            return self.parse_mmap_slice_with_sink(&bytes, file_size, sink);
+        };
         let metadata = std_file
             .metadata()
             .map_err(|e| ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}")))?;
@@ -203,10 +218,14 @@ impl Wal {
             return Ok(WalVersion::V1);
         }
 
+        if !self.io.supports_mmap() {
+            return self.scan_entries_with_callback(file_size, callback).await;
+        }
+
         #[allow(clippy::type_complexity)]
         let mmap_res = (|| -> Result<(WalVersion, Vec<(u64, WalEntry, u64)>)> {
-            let std_file = std::fs::File::open(&self.path).map_err(|e| {
-                ContextraError::Storage(format!("Failed to open WAL file for mmap: {e}"))
+            let std_file = self.io.open_mmap_source(&self.path)?.ok_or_else(|| {
+                ContextraError::Storage("mmap source unavailable for this VFS".into())
             })?;
             let mmap = contextra_sys::mmap_readonly(&std_file).map_err(|e| {
                 ContextraError::Storage(format!(
@@ -246,7 +265,7 @@ impl Wal {
         }
     }
 
-        #[allow(deprecated)]
+    #[allow(deprecated)]
     fn verify_entry_snapshot(
         &self,
         snapshot: &WalEntrySnapshot,
@@ -327,8 +346,8 @@ impl Wal {
             return Ok(version);
         }
 
-                let integrity_key = self.get_integrity_key()?;
-                let mut verifier = IntegrityVerifier::new(&integrity_key);
+        let integrity_key = self.get_integrity_key()?;
+        let mut verifier = IntegrityVerifier::new(&integrity_key);
         let mut using_legacy_key = false;
 
         // Detect version from header
@@ -427,7 +446,7 @@ impl Wal {
             let chunk_start_pos = pos;
             pos += (4 + len) as u64;
 
-                        {
+            {
                 if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some()
                 {
                     let km = match self.key_manager.as_ref() {
@@ -673,53 +692,49 @@ impl Wal {
                     }
                 }
             }
-
-
         }
 
         Ok(version)
     }
 }
 
-pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> Result<bool> {
+pub(crate) async fn recover_from_bak_if_present(
+    io: &crate::io_seam::StoreIo,
+    wal_path: &std::path::Path,
+) -> Result<bool> {
     for suffix in &["v1.bak", "v2.bak"] {
         let bak_path = PathBuf::from(format!("{}.{}", wal_path.display(), suffix));
-        if !crate::wal::fs::try_exists(&bak_path).await.unwrap_or(false) {
+        if !io.exists(&bak_path).await? {
             continue;
         }
-        let wal_len = crate::wal::fs::metadata(wal_path)
-            .await
-            .map(|m| m.len())
-            .unwrap_or(0);
-        let bak_len = match crate::wal::fs::metadata(&bak_path).await {
-            Ok(m) => m.len(),
-            Err(_) => continue,
+        let wal_len = match io.len(wal_path).await {
+            Ok(len) => len,
+            Err(ContextraError::NotFound(_)) => 0,
+            Err(e) => return Err(e),
         };
+        let bak_len = io.len(&bak_path).await?;
         if wal_len == 0 && bak_len > 0 {
             // Reguläre WAL ist leer, aber ein nicht-leeres Backup existiert:
             // sehr wahrscheinlich ein Crash zwischen set_len(0) und dem Schreiben
             // des neuen V3-Contents. Backup wiederherstellen.
-            match crate::wal::fs::rename(&bak_path, wal_path).await {
-                Ok(()) => {}
-                Err(_) => {
-                    // Cross-Device-Fallback: copy + remove statt rename.
-                    crate::wal::fs::copy(&bak_path, wal_path)
-                        .await
-                        .map_err(|e| {
-                            ContextraError::Storage(format!("WAL backup recovery copy failed: {e}"))
-                        })?;
-                    let _ = crate::wal::fs::remove_file(&bak_path).await;
+            if io.rename(&bak_path, wal_path).await.is_ok() {
+                io.sync_parent_dir(wal_path).await?;
+            } else {
+                // Fallback: durable copy + remove statt rename.
+                io.copy_durable(&bak_path, wal_path).await.map_err(|e| {
+                    ContextraError::Storage(format!("WAL backup recovery copy failed: {e}"))
+                })?;
+                if let Err(e) = io.remove_file(&bak_path).await {
+                    tracing::warn!(
+                        bak_path = ?bak_path,
+                        error = %e,
+                        "Failed to remove WAL backup after recovery copy"
+                    );
                 }
             }
-            if let Ok(f) = crate::wal::fs::OpenOptions::new()
-                .write(true)
-                .open(wal_path)
-                .await
-            {
-                f.sync_all().await.map_err(|e| {
-                    ContextraError::Storage(format!("WAL recovery sync_all failed: {e}"))
-                })?;
-            }
+            io.sync_file(wal_path).await.map_err(|e| {
+                ContextraError::Storage(format!("WAL recovery sync_all failed: {e}"))
+            })?;
             return Ok(true);
         }
     }

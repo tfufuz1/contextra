@@ -1,38 +1,19 @@
 //! Central module for file and directory synchronization operations.
 
-use contextra_types::{ContextraError, Result};
+use crate::io_seam::StoreIo;
+use contextra_types::Result;
 use std::path::Path;
 
-/// Performs fsync on a single file at `path`.
+/// Performs fsync on a single file at `path` through the real filesystem seam.
 ///
 /// # Errors
 /// Returns `ContextraError::Storage` on Unix if opening or syncing fails.
 /// Returns `ContextraError::Io` with `ErrorKind::Unsupported` on Windows (E20).
 pub async fn sync_file(path: &Path) -> Result<()> {
-    #[cfg(not(windows))]
-    {
-        let file = crate::wal::fs::File::open(path).await.map_err(|e| {
-            ContextraError::Storage(format!(
-                "File open failed for fsync on {}: {e}",
-                path.display()
-            ))
-        })?;
-        file.sync_all().await.map_err(|e| {
-            ContextraError::Storage(format!("File fsync failed for {}: {e}", path.display()))
-        })?;
-        Ok(())
-    }
-    #[cfg(windows)]
-    {
-        let _ = path;
-        Err(ContextraError::Io(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "Windows file sync is unsupported under E20",
-        )))
-    }
+    StoreIo::default().sync_file(path).await
 }
 
-/// Performs fsync on the parent directory of `path`.
+/// Performs fsync on the parent directory of `path` through the real filesystem seam.
 ///
 /// Directory fsync is required on POSIX filesystems to guarantee that newly created files or
 /// directory entries are durably persisted to disk.
@@ -41,39 +22,7 @@ pub async fn sync_file(path: &Path) -> Result<()> {
 /// Returns `ContextraError::Storage` on Unix if opening or syncing fails.
 /// Returns `ContextraError::Io` with `ErrorKind::Unsupported` on Windows (E20).
 pub async fn sync_parent_dir(path: &Path) -> Result<()> {
-    #[cfg(not(windows))]
-    {
-        let parent = path.parent().unwrap_or_else(|| Path::new(""));
-        let dir_path = if parent.as_os_str().is_empty() {
-            Path::new(".")
-        } else {
-            parent
-        };
-
-        let dir = crate::wal::fs::File::open(dir_path).await.map_err(|e| {
-            ContextraError::Storage(format!(
-                "Directory open failed for fsync on {}: {e}",
-                dir_path.display()
-            ))
-        })?;
-
-        dir.sync_all().await.map_err(|e| {
-            ContextraError::Storage(format!(
-                "Directory fsync failed for {}: {e}",
-                dir_path.display()
-            ))
-        })?;
-
-        Ok(())
-    }
-    #[cfg(windows)]
-    {
-        let _ = path;
-        Err(ContextraError::Io(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "Windows directory sync is unsupported under E20",
-        )))
-    }
+    StoreIo::default().sync_parent_dir(path).await
 }
 
 /// Alias for `sync_parent_dir` for backward compatibility across storage modules.

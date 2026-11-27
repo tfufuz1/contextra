@@ -5,7 +5,6 @@
 use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 use super::{PoisonCause, Wal, WalEntry, WalVersion, WAL_V3_HEADER};
 
@@ -153,11 +152,25 @@ fn encode_encrypted_rewrite_chunks(
     Ok(total_bytes)
 }
 
+/// Typisierte Ursache eines fehlgeschlagenen WAL-Appends.
+///
+/// Leitet die [`PoisonCause`] aus dem Typ ab, statt aus Fehlertext oder geteiltem
+/// Zustand (`Cell`/String-Match). `Torn` markiert einen Teil-Schreibvorgang, bei dem
+/// ein halber Frame im WAL zurückbleiben kann.
+#[derive(Debug)]
+enum AppendFailure {
+    /// Teilschreibung: das WAL kann einen unvollständigen Frame enthalten.
+    #[cfg(feature = "fault-injection")]
+    Torn(ContextraError),
+    /// Schreib- oder Flush-Fehler ohne bekannten Teil-Frame.
+    Failed(ContextraError),
+}
+
 impl Wal {
     /// Enables background flusher actor for processing WAL I/O commands sequentially.
     pub(crate) fn enable_flusher_with_config(
         &self,
-        mut file: crate::wal::fs::File,
+        mut file: crate::wal::WalFile,
         config: WalFlusherConfig,
     ) -> Result<()> {
         if config.queue_capacity == 0 {
@@ -173,6 +186,7 @@ impl Wal {
 
         let (tx, mut rx) = tokio::sync::mpsc::channel::<WalCommand>(config.queue_capacity);
         let path = self.path.clone();
+        let io = self.io.clone();
         let header_written = Arc::clone(&self.header_written);
         let size = Arc::clone(&self.size);
         let last_hmac = Arc::clone(&self.last_hmac);
@@ -294,15 +308,14 @@ impl Wal {
                             .load(std::sync::atomic::Ordering::Acquire)
                             && size_before == 0;
 
-                        let simulated_partial_write = std::cell::Cell::new(false);
-                        let write_res: Result<()> = async {
+                        let write_res: std::result::Result<(), AppendFailure> = async {
                             if write_header {
                                 file.write_all(&WAL_V3_HEADER).await.map_err(|e| {
-                                    ContextraError::Storage(format!(
+                                    AppendFailure::Failed(ContextraError::Storage(format!(
                                         "WAL flusher header write failed for {}: {}",
                                         path.display(),
                                         e
-                                    ))
+                                    )))
                                 })?;
                             }
 
@@ -316,7 +329,6 @@ impl Wal {
                                 )
                                 .is_ok()
                             {
-                                simulated_partial_write.set(true);
                                 let partial_bytes = crate::wal::FAIL_APPEND_AFTER_PARTIAL_BYTES
                                     .swap(0, std::sync::atomic::Ordering::SeqCst);
                                 let cut = (partial_bytes as usize).min(batch_payload.len());
@@ -338,35 +350,35 @@ impl Wal {
                                     .store(0, std::sync::atomic::Ordering::SeqCst);
                                 crate::wal::FAIL_APPEND_PARTIAL_ONCE
                                     .store(false, std::sync::atomic::Ordering::SeqCst);
-                                return Err(ContextraError::Storage(
+                                return Err(AppendFailure::Torn(ContextraError::Storage(
                                     "Simulated WAL append partial write failure (FAIL_APPEND_PARTIAL_ONCE)".into(),
-                                ));
+                                )));
                             }
 
                             file.write_all(&batch_payload).await.map_err(|e| {
-                                ContextraError::Storage(format!(
+                                AppendFailure::Failed(ContextraError::Storage(format!(
                                     "WAL flusher write failed for {}: {}",
                                     path.display(),
                                     e
-                                ))
+                                )))
                             })?;
                             file.flush().await.map_err(|e| {
-                                ContextraError::Storage(format!(
+                                AppendFailure::Failed(ContextraError::Storage(format!(
                                     "WAL flusher flush failed for {}: {}",
                                     path.display(),
                                     e
-                                ))
+                                )))
                             })?;
 
                             Ok(())
                         }
                         .await;
 
-                        if let Err(write_err) = write_res {
-                            let cause = if simulated_partial_write.get() {
-                                PoisonCause::TornWrite
-                            } else {
-                                PoisonCause::WriteFailed
+                        if let Err(failure) = write_res {
+                            let (cause, write_err) = match failure {
+                                #[cfg(feature = "fault-injection")]
+                                AppendFailure::Torn(err) => (PoisonCause::TornWrite, err),
+                                AppendFailure::Failed(err) => (PoisonCause::WriteFailed, err),
                             };
                             let _ = poison_state.compare_exchange(
                                 0,
@@ -582,7 +594,7 @@ impl Wal {
                                 );
                                 let candidate_path = path.with_file_name(sealed_name);
 
-                                match crate::wal::fs::try_exists(&candidate_path).await {
+                                match io.exists(&candidate_path).await {
                                     Ok(true) => {
                                         seq = WAL_SEAL_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                     }
@@ -597,7 +609,7 @@ impl Wal {
                                 }
                             };
 
-                            crate::wal::fs::rename(&path, &sealed_path)
+                            io.rename(&path, &sealed_path)
                                 .await
                                 .map_err(|e| {
                                     ContextraError::Storage(format!(
@@ -608,7 +620,7 @@ impl Wal {
                                     ))
                                 })?;
 
-                            if let Err(e) = crate::util::fsync_parent_dir(&sealed_path).await {
+                            if let Err(e) = io.sync_parent_dir(&sealed_path).await {
                                 let _ = poison_state.compare_exchange(
                                     0,
                                     PoisonCause::FsyncFailed.to_u8(),
@@ -618,24 +630,12 @@ impl Wal {
                                 return Err(e);
                             }
 
-                            let mut perms = crate::wal::fs::metadata(&sealed_path)
-                                .await
-                                .map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "WAL metadata nach seal fehlgeschlagen: {}",
-                                        e
-                                    ))
-                                })?
-                                .permissions();
-                            perms.set_readonly(true);
-                            crate::wal::fs::set_permissions(&sealed_path, perms)
-                                .await
-                                .map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "WAL set_readonly fehlgeschlagen: {}",
-                                        e
-                                    ))
-                                })?;
+                            io.set_readonly(&sealed_path).await.map_err(|e| {
+                                ContextraError::Storage(format!(
+                                    "WAL set_readonly fehlgeschlagen: {}",
+                                    e
+                                ))
+                            })?;
 
                             Ok(sealed_path)
                         }

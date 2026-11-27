@@ -238,7 +238,10 @@ async fn test_journal_sync_failure_poisons_kernel_and_keeps_gate_active() {
     let t2 = TenantId::try_new(11).unwrap();
     let (req2, plan2) = tenant_plan(t2, 0x22);
     let err = kernel.accept(&req2, &plan2).await.unwrap_err();
-    assert!(matches!(err, ErasureError::Io(_) | ErasureError::JournalPoisoned));
+    assert!(matches!(
+        err,
+        ErasureError::Io(_) | ErasureError::JournalPoisoned
+    ));
 
     // Danach liefert jede mutierende Methode JournalPoisoned, auch wenn sync wieder geht
     fail_flag.store(false, Ordering::Release);
@@ -314,10 +317,7 @@ async fn test_gate_enforcement_hooks_h1_to_h10() {
     );
 
     // H-4: scan_prefix und scan_range liefern nichts für t_erased
-    let prefix_res = storage
-        .scan_prefix(c_erased.scan_prefix())
-        .await
-        .unwrap();
+    let prefix_res = storage.scan_prefix(c_erased.scan_prefix()).await.unwrap();
     assert!(prefix_res.is_empty());
 
     let mut end_range = c_erased.scan_prefix().to_vec();
@@ -333,10 +333,7 @@ async fn test_gate_enforcement_hooks_h1_to_h10() {
     assert!(range_res.is_empty());
 
     // Nachbar-Tenant bleibt voll lesbar
-    let other_scan = storage
-        .scan_prefix(c_other.scan_prefix())
-        .await
-        .unwrap();
+    let other_scan = storage.scan_prefix(c_other.scan_prefix()).await.unwrap();
     assert_eq!(other_scan.len(), 1);
     assert_eq!(other_scan[0].1, b"other_v1");
 
@@ -418,7 +415,10 @@ async fn test_e2e_erasure_lifecycle_and_canary_t_del_1() {
 
     // 1. In SSTable flushen
     storage.put(TxId(1), &kv1, canary).await.unwrap();
-    storage.put(TxId(1), &kn1, b"neighbor_intact").await.unwrap();
+    storage
+        .put(TxId(1), &kn1, b"neighbor_intact")
+        .await
+        .unwrap();
     storage.commit(TxId(1)).await.unwrap();
     storage.flush().await.unwrap();
 
@@ -432,7 +432,10 @@ async fn test_e2e_erasure_lifecycle_and_canary_t_del_1() {
     kernel.publish_gate(req.id).await.unwrap();
 
     let priv_reader = kernel.privileged_reader(req.id).unwrap();
-    assert_eq!(priv_reader.get(&kv1).await.unwrap(), Some(canary.to_vec().into()));
+    assert_eq!(
+        priv_reader.get(&kv1).await.unwrap(),
+        Some(canary.to_vec().into())
+    );
     // ScopeViolation bei fremdem Tenant
     let scope_err = priv_reader.get(&kn1).await.unwrap_err();
     assert!(matches!(scope_err, ErasureError::Layer { .. }));
@@ -528,9 +531,6 @@ async fn test_concurrent_commits_with_gate_and_wal_cut() {
     drive_purge_to_end(&storage, req.id).await;
 
     // Alle safe-Schlüssel sind noch vollständig lesbar
-    let safe_scan = storage
-        .scan_prefix(c_safe.scan_prefix())
-        .await
-        .unwrap();
+    let safe_scan = storage.scan_prefix(c_safe.scan_prefix()).await.unwrap();
     assert_eq!(safe_scan.len(), 10);
 }

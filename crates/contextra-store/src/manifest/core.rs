@@ -9,9 +9,9 @@
 // HOTSPOTS: load, reconstruct_valid_sstables, append_batch
 // `Replace` enthält kein gespeichertes Rank-Feld; die interne Recovery-Reihenfolge wird aus der Operationsfolge rekonstruiert.
 
-use contextra_types::{ContextraError, Result};
 use crate::io_seam::append_file::{AppendFile, IoFault};
 use contextra_ports::VfsOpenOptions;
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -35,13 +35,12 @@ async fn append_durable(
         .map_err(|error| IoFault::TaskFailed(error.to_string()))?
 }
 
-async fn truncate_durable(
-    file: Arc<parking_lot::Mutex<AppendFile>>,
-    len: u64,
-) -> Result<()> {
+async fn truncate_durable(file: Arc<parking_lot::Mutex<AppendFile>>, len: u64) -> Result<()> {
     tokio::task::spawn_blocking(move || file.lock().truncate_durable(len))
         .await
-        .map_err(|error| ContextraError::Storage(format!("Manifest truncate task failed: {error}")))?
+        .map_err(|error| {
+            ContextraError::Storage(format!("Manifest truncate task failed: {error}"))
+        })?
         .map_err(ContextraError::Io)
 }
 
@@ -154,9 +153,10 @@ fn parse_manifest_bytes(data: &[u8]) -> Result<(Vec<ManifestEntry>, usize, u8)> 
             .get(len_end..frame_end)
             .ok_or_else(|| ContextraError::Storage("MANIFEST frame range invalid".into()))?;
         if version == 2 {
-            let frame_tag = raw.get(4).copied().ok_or_else(|| {
-                ContextraError::Storage("MANIFEST v2 frame tag missing".into())
-            })?;
+            let frame_tag = raw
+                .get(4)
+                .copied()
+                .ok_or_else(|| ContextraError::Storage("MANIFEST v2 frame tag missing".into()))?;
             if (entry_pos == 5 && frame_tag != 2) || (entry_pos != 5 && frame_tag == 2) {
                 return Err(ContextraError::Storage(format!(
                     "MANIFEST snapshot must be exactly the first frame (offset {})",
@@ -175,7 +175,8 @@ fn parse_manifest_bytes(data: &[u8]) -> Result<(Vec<ManifestEntry>, usize, u8)> 
             Err(error) if pos == data.len() && has_crc_mismatch(raw) => {
                 tracing::warn!(
                     "MANIFEST final-frame CRC error at EOF offset {}; discarding torn tail: {}",
-                    entry_pos, error
+                    entry_pos,
+                    error
                 );
                 pos = entry_pos;
                 break;
@@ -239,9 +240,7 @@ impl Manifest {
         };
         let (file, is_new) = match io.open_async(&path, create_new).await {
             Ok(file) => (file, true),
-            Err(ContextraError::Io(error))
-                if error.kind() == std::io::ErrorKind::AlreadyExists =>
-            {
+            Err(ContextraError::Io(error)) if error.kind() == std::io::ErrorKind::AlreadyExists => {
                 let options = VfsOpenOptions {
                     read: true,
                     write: true,
@@ -256,7 +255,9 @@ impl Manifest {
             Ok::<_, ContextraError>((file, len))
         })
         .await
-        .map_err(|error| ContextraError::Storage(format!("Manifest metadata task failed: {error}")))??;
+        .map_err(|error| {
+            ContextraError::Storage(format!("Manifest metadata task failed: {error}"))
+        })??;
         let file = Arc::new(parking_lot::Mutex::new(AppendFile::new(file, file_len)));
 
         if !is_new && file_len < 5 {
@@ -300,12 +301,13 @@ impl Manifest {
         let current_bytes = read_append_file(Arc::clone(&file)).await?;
         let (entries, valid_offset, version) = parse_manifest_bytes(&current_bytes)?;
         let state = ManifestState::from_entries(&entries)?;
-        let actual_len = u64::try_from(current_bytes.len()).map_err(|_| {
-            ContextraError::Storage("MANIFEST length is not representable".into())
-        })?;
-        if actual_len > u64::try_from(valid_offset).map_err(|_| {
-            ContextraError::Storage("MANIFEST valid offset is not representable".into())
-        })? {
+        let actual_len = u64::try_from(current_bytes.len())
+            .map_err(|_| ContextraError::Storage("MANIFEST length is not representable".into()))?;
+        if actual_len
+            > u64::try_from(valid_offset).map_err(|_| {
+                ContextraError::Storage("MANIFEST valid offset is not representable".into())
+            })?
+        {
             truncate_durable(
                 Arc::clone(&file),
                 u64::try_from(valid_offset).map_err(|_| {
@@ -386,13 +388,14 @@ impl Manifest {
                 }
                 ContextraError::Storage(format!(
                     "MANIFEST append failed for {}: {}",
-                    self.path.display(), error
+                    self.path.display(),
+                    error
                 ))
             })?;
         *state = next_state;
         drop(state);
-        let should_rollover = self.file.lock().committed_len()
-            >= super::DEFAULT_ROLLOVER_THRESHOLD_BYTES;
+        let should_rollover =
+            self.file.lock().committed_len() >= super::DEFAULT_ROLLOVER_THRESHOLD_BYTES;
         drop(_operation);
         if should_rollover {
             if let Err(error) = self

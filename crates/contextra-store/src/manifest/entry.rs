@@ -9,11 +9,11 @@
 // HOTSPOTS: to_bytes, from_bytes
 // v1-Reader-Kompatibilität: Das reservierte Rank-Wort wird gelesen und verworfen. Im Modell und im v2-Format gibt es kein Rank-Feld.
 
-use contextra_types::{ContextraError, Result};
 use super::MAX_MANIFEST_ENTRY_SIZE;
+use contextra_types::{ContextraError, Result};
+use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::borrow::Borrow;
 
 /// Validated, path-free SSTable identity used by manifest state.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -26,7 +26,9 @@ impl SstName {
             .and_then(|name| name.to_str())
             .ok_or_else(|| ContextraError::Serialization("SST name is not valid UTF-8".into()))?;
         if !name.ends_with(".sst") || name.contains('/') || name.contains('\\') {
-            return Err(ContextraError::Serialization(format!("Invalid SST name: {name}")));
+            return Err(ContextraError::Serialization(format!(
+                "Invalid SST name: {name}"
+            )));
         }
         Ok(Self(name.to_owned()))
     }
@@ -47,9 +49,8 @@ impl Borrow<Path> for SstName {
 }
 
 fn checked_u32_len(len: usize, field: &str) -> Result<u32> {
-    u32::try_from(len).map_err(|_| {
-        ContextraError::Serialization(format!("Manifest {field} exceeds u32 length"))
-    })
+    u32::try_from(len)
+        .map_err(|_| ContextraError::Serialization(format!("Manifest {field} exceeds u32 length")))
 }
 
 fn u32_len_to_usize(len: u32, field: &str) -> Result<usize> {
@@ -83,7 +84,11 @@ fn encode_v2_entry(entry: &ManifestEntry, out: &mut Vec<u8>) -> Result<()> {
             encode_name(path, out)?;
             out.extend_from_slice(&max_tx.to_le_bytes());
         }
-        ManifestEntry::Replace { removed, added, added_max_tx } => {
+        ManifestEntry::Replace {
+            removed,
+            added,
+            added_max_tx,
+        } => {
             out.push(2);
             out.extend_from_slice(&checked_u32_len(removed.len(), "removed count")?.to_le_bytes());
             for path in removed {
@@ -117,7 +122,9 @@ fn finish_v2_frame(tag: u8, body: Vec<u8>) -> Result<Vec<u8>> {
         .checked_add(4)
         .ok_or_else(|| ContextraError::Serialization("Manifest frame length overflow".into()))?;
     if frame_len > MAX_MANIFEST_ENTRY_SIZE as usize {
-        return Err(ContextraError::Serialization("Manifest frame exceeds max size".into()));
+        return Err(ContextraError::Serialization(
+            "Manifest frame exceeds max size".into(),
+        ));
     }
     let frame_len = checked_u32_len(frame_len, "frame")?;
     let mut crc_payload = Vec::with_capacity(payload_len);
@@ -182,30 +189,33 @@ fn take<'a>(data: &'a [u8], pos: &mut usize, len: usize) -> Result<&'a [u8]> {
 }
 
 fn take_u16(data: &[u8], pos: &mut usize) -> Result<u16> {
-    Ok(u16::from_le_bytes(take(data, pos, 2)?.try_into().map_err(|_| {
-        ContextraError::Serialization("Invalid u16 in manifest frame".into())
-    })?))
+    Ok(u16::from_le_bytes(take(data, pos, 2)?.try_into().map_err(
+        |_| ContextraError::Serialization("Invalid u16 in manifest frame".into()),
+    )?))
 }
 
 fn take_u32(data: &[u8], pos: &mut usize) -> Result<u32> {
-    Ok(u32::from_le_bytes(take(data, pos, 4)?.try_into().map_err(|_| {
-        ContextraError::Serialization("Invalid u32 in manifest frame".into())
-    })?))
+    Ok(u32::from_le_bytes(take(data, pos, 4)?.try_into().map_err(
+        |_| ContextraError::Serialization("Invalid u32 in manifest frame".into()),
+    )?))
 }
 
 fn take_u64(data: &[u8], pos: &mut usize) -> Result<u64> {
-    Ok(u64::from_le_bytes(take(data, pos, 8)?.try_into().map_err(|_| {
-        ContextraError::Serialization("Invalid u64 in manifest frame".into())
-    })?))
+    Ok(u64::from_le_bytes(take(data, pos, 8)?.try_into().map_err(
+        |_| ContextraError::Serialization("Invalid u64 in manifest frame".into()),
+    )?))
 }
 
 fn take_name(data: &[u8], pos: &mut usize) -> Result<std::path::PathBuf> {
     let len = usize::from(take_u16(data, pos)?);
     let bytes = take(data, pos, len)?;
-    let name = std::str::from_utf8(bytes)
-        .map_err(|error| ContextraError::Serialization(format!("Invalid SST name UTF-8: {error}")))?;
+    let name = std::str::from_utf8(bytes).map_err(|error| {
+        ContextraError::Serialization(format!("Invalid SST name UTF-8: {error}"))
+    })?;
     if !name.ends_with(".sst") || name.contains('/') || name.contains('\\') {
-        return Err(ContextraError::Serialization(format!("Invalid SST name: {name}")));
+        return Err(ContextraError::Serialization(format!(
+            "Invalid SST name: {name}"
+        )));
     }
     Ok(std::path::PathBuf::from(name))
 }
@@ -247,9 +257,9 @@ fn decode_v2_entry(data: &[u8], pos: &mut usize) -> Result<ManifestEntry> {
             target_tx: take_u64(data, pos)?,
         }),
         5 => Ok(ManifestEntry::WalCheckpoint {
-            hmac: take(data, pos, 32)?.try_into().map_err(|_| {
-                ContextraError::Serialization("Invalid WAL HWM size".into())
-            })?,
+            hmac: take(data, pos, 32)?
+                .try_into()
+                .map_err(|_| ContextraError::Serialization("Invalid WAL HWM size".into()))?,
         }),
         _ => Err(ContextraError::Serialization(format!(
             "Unknown v2 manifest entry tag {tag}"
@@ -259,21 +269,28 @@ fn decode_v2_entry(data: &[u8], pos: &mut usize) -> Result<ManifestEntry> {
 
 pub(crate) fn decode_v2_frame(raw: &[u8]) -> Result<Vec<ManifestEntry>> {
     if raw.len() < 5 {
-        return Err(ContextraError::Serialization("v2 manifest frame too short".into()));
+        return Err(ContextraError::Serialization(
+            "v2 manifest frame too short".into(),
+        ));
     }
-    let stored_crc = u32::from_le_bytes(raw.get(..4).ok_or_else(|| {
-        ContextraError::Serialization("Missing v2 manifest CRC".into())
-    })?.try_into().map_err(|_| ContextraError::Serialization("Invalid v2 manifest CRC".into()))?);
-    let payload = raw.get(4..).ok_or_else(|| {
-        ContextraError::Serialization("Missing v2 manifest payload".into())
-    })?;
+    let stored_crc = u32::from_le_bytes(
+        raw.get(..4)
+            .ok_or_else(|| ContextraError::Serialization("Missing v2 manifest CRC".into()))?
+            .try_into()
+            .map_err(|_| ContextraError::Serialization("Invalid v2 manifest CRC".into()))?,
+    );
+    let payload = raw
+        .get(4..)
+        .ok_or_else(|| ContextraError::Serialization("Missing v2 manifest payload".into()))?;
     if crc32fast::hash(payload) != stored_crc {
-        return Err(ContextraError::Serialization("v2 manifest CRC mismatch".into()));
+        return Err(ContextraError::Serialization(
+            "v2 manifest CRC mismatch".into(),
+        ));
     }
     let mut pos = 1usize;
-    let tag = *payload.first().ok_or_else(|| {
-        ContextraError::Serialization("Missing v2 manifest frame tag".into())
-    })?;
+    let tag = *payload
+        .first()
+        .ok_or_else(|| ContextraError::Serialization("Missing v2 manifest frame tag".into()))?;
     let mut entries = Vec::new();
     match tag {
         1 => {
@@ -330,9 +347,9 @@ pub(crate) fn decode_v2_frame(raw: &[u8]) -> Result<Vec<ManifestEntry>> {
                     target_tx: take_u64(payload, &mut pos)?,
                 });
             }
-            let has_hwm = *take(payload, &mut pos, 1)?.first().ok_or_else(|| {
-                ContextraError::Serialization("Missing snapshot HWM flag".into())
-            })?;
+            let has_hwm = *take(payload, &mut pos, 1)?
+                .first()
+                .ok_or_else(|| ContextraError::Serialization("Missing snapshot HWM flag".into()))?;
             match has_hwm {
                 0 => {}
                 1 => entries.push(ManifestEntry::WalCheckpoint {
@@ -340,13 +357,23 @@ pub(crate) fn decode_v2_frame(raw: &[u8]) -> Result<Vec<ManifestEntry>> {
                         ContextraError::Serialization("Invalid snapshot HWM".into())
                     })?,
                 }),
-                _ => return Err(ContextraError::Serialization("Invalid snapshot HWM flag".into())),
+                _ => {
+                    return Err(ContextraError::Serialization(
+                        "Invalid snapshot HWM flag".into(),
+                    ))
+                }
             }
         }
-        _ => return Err(ContextraError::Serialization(format!("Unknown v2 manifest frame tag {tag}"))),
+        _ => {
+            return Err(ContextraError::Serialization(format!(
+                "Unknown v2 manifest frame tag {tag}"
+            )))
+        }
     }
     if pos != payload.len() {
-        return Err(ContextraError::Serialization("Trailing bytes in v2 manifest frame".into()));
+        return Err(ContextraError::Serialization(
+            "Trailing bytes in v2 manifest frame".into(),
+        ));
     }
     Ok(entries)
 }
@@ -380,14 +407,16 @@ impl ManifestEntry {
                 payload.extend_from_slice(&max_tx.to_le_bytes());
                 let path_str = path.to_string_lossy();
                 let path_bytes = path_str.as_bytes();
-                payload.extend_from_slice(&checked_u32_len(path_bytes.len(), "path")?.to_le_bytes());
+                payload
+                    .extend_from_slice(&checked_u32_len(path_bytes.len(), "path")?.to_le_bytes());
                 payload.extend_from_slice(path_bytes);
             }
             ManifestEntry::Remove { path } => {
                 payload.push(1u8); // op_tag = 1
                 let path_str = path.to_string_lossy();
                 let path_bytes = path_str.as_bytes();
-                payload.extend_from_slice(&checked_u32_len(path_bytes.len(), "path")?.to_le_bytes());
+                payload
+                    .extend_from_slice(&checked_u32_len(path_bytes.len(), "path")?.to_le_bytes());
                 payload.extend_from_slice(path_bytes);
             }
             ManifestEntry::RollbackComplete { target_tx } => {
@@ -405,13 +434,19 @@ impl ManifestEntry {
                 payload.extend_from_slice(&0u64.to_le_bytes());
                 let added_str = added.to_string_lossy();
                 let added_bytes = added_str.as_bytes();
-                payload.extend_from_slice(&checked_u32_len(added_bytes.len(), "added path")?.to_le_bytes());
+                payload.extend_from_slice(
+                    &checked_u32_len(added_bytes.len(), "added path")?.to_le_bytes(),
+                );
                 payload.extend_from_slice(added_bytes);
-                payload.extend_from_slice(&checked_u32_len(removed.len(), "removed count")?.to_le_bytes());
+                payload.extend_from_slice(
+                    &checked_u32_len(removed.len(), "removed count")?.to_le_bytes(),
+                );
                 for p in removed {
                     let p_str = p.to_string_lossy();
                     let p_bytes = p_str.as_bytes();
-                    payload.extend_from_slice(&checked_u32_len(p_bytes.len(), "removed path")?.to_le_bytes());
+                    payload.extend_from_slice(
+                        &checked_u32_len(p_bytes.len(), "removed path")?.to_le_bytes(),
+                    );
                     payload.extend_from_slice(p_bytes);
                 }
             }
@@ -435,9 +470,13 @@ impl ManifestEntry {
         let crc = crc32fast::hash(&payload);
 
         let capacity = usize::try_from(total_payload_size)
-            .map_err(|_| ContextraError::Serialization("Manifest entry size is not representable".into()))?
+            .map_err(|_| {
+                ContextraError::Serialization("Manifest entry size is not representable".into())
+            })?
             .checked_add(4)
-            .ok_or_else(|| ContextraError::Serialization("Manifest entry capacity overflow".into()))?;
+            .ok_or_else(|| {
+                ContextraError::Serialization("Manifest entry capacity overflow".into())
+            })?;
         let mut buf = Vec::with_capacity(capacity);
         buf.extend_from_slice(&total_payload_size.to_le_bytes());
         buf.extend_from_slice(&crc.to_le_bytes());
@@ -594,9 +633,9 @@ impl ManifestEntry {
                         ContextraError::Serialization("Invalid added_max_tx format".into())
                     })?);
                 // v1 persisted a reserved rank field; consume it for compatibility, then discard it.
-                remaining
-                    .get(8..16)
-                    .ok_or_else(|| ContextraError::Serialization("reserved rank bytes missing".into()))?;
+                remaining.get(8..16).ok_or_else(|| {
+                    ContextraError::Serialization("reserved rank bytes missing".into())
+                })?;
                 let added_path_len_bytes = remaining.get(16..20).ok_or_else(|| {
                     ContextraError::Serialization("added_path_len bytes missing".into())
                 })?;
@@ -615,12 +654,9 @@ impl ManifestEntry {
                         "Replace added path data truncated".into(),
                     ));
                 }
-                let added_path_bytes =
-                    remaining
-                        .get(offset..added_path_end)
-                        .ok_or_else(|| {
-                            ContextraError::Serialization("added_path bytes missing".into())
-                        })?;
+                let added_path_bytes = remaining.get(offset..added_path_end).ok_or_else(|| {
+                    ContextraError::Serialization("added_path bytes missing".into())
+                })?;
                 let added_str = std::str::from_utf8(added_path_bytes).map_err(|e| {
                     ContextraError::Serialization(format!("Invalid added path UTF-8: {}", e))
                 })?;
@@ -657,7 +693,9 @@ impl ManifestEntry {
                 let mut removed = Vec::with_capacity(removed_count);
                 for _ in 0..removed_count {
                     let length_end = offset.checked_add(4).ok_or_else(|| {
-                        ContextraError::Serialization("Replace removed length offset overflow".into())
+                        ContextraError::Serialization(
+                            "Replace removed length offset overflow".into(),
+                        )
                     })?;
                     if remaining.len() < length_end {
                         return Err(ContextraError::Serialization(

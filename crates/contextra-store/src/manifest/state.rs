@@ -46,7 +46,8 @@ impl ManifestState {
                 for key in removed_names {
                     if self.live.remove(&key).is_none() {
                         return Err(ContextraError::Storage(format!(
-                            "Manifest Replace references non-live SSTable {:?}", key
+                            "Manifest Replace references non-live SSTable {:?}",
+                            key
                         )));
                     }
                     self.dead.insert(key);
@@ -76,11 +77,6 @@ impl ManifestState {
     }
 
     pub(crate) fn snapshot_frame(&self) -> Result<Vec<u8>> {
-        super::entry::encode_snapshot_frame(
-            &self.live,
-            &self.dead,
-            &self.rollbacks,
-            self.wal_hwm,
-        )
+        super::entry::encode_snapshot_frame(&self.live, &self.dead, &self.rollbacks, self.wal_hwm)
     }
 }

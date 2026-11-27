@@ -6,7 +6,6 @@ use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result, TxId};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use super::legacy_integrity_key;
 use super::{
@@ -19,7 +18,7 @@ use super::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS, FAIL_APPEND_FOR_TX};
 
 #[allow(deprecated, clippy::too_many_arguments)]
 pub(crate) async fn do_scan_entries_with_callback<F>(
-    file: &mut super::fs::File,
+    file: &mut super::WalFile,
     file_size: u64,
     path: &Path,
     _key_manager: Option<&super::KeyManager>,
@@ -35,7 +34,8 @@ where
         .await
         .map_err(|e| ContextraError::Storage(format!("WAL replay seek failed: {}", e)))?;
 
-    let mut reader = tokio::io::BufReader::new(file);
+    // WalFile puffert Lesezugriffe selbst (kein BufReader nötig).
+    let reader = file;
 
     let mut entries_count = 0u64;
     let mut pos = 0u64;
@@ -75,13 +75,11 @@ where
                 pos = 4;
             } else {
                 reader
-                    .get_mut()
                     .seek(std::io::SeekFrom::Start(0))
                     .await
                     .map_err(|e| {
                         ContextraError::Storage(format!("WAL replay seek failed: {}", e))
                     })?;
-                reader = tokio::io::BufReader::new(reader.into_inner());
                 pos = 0;
             }
         }
@@ -920,10 +918,11 @@ impl Wal {
     }
 
     pub async fn find_tx_offset(&self, target_tx_id: TxId) -> Result<(u64, [u8; 32])> {
-        let metadata = crate::wal::fs::metadata(&self.path)
+        let file_size = self
+            .io
+            .len(&self.path)
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        let file_size = metadata.len();
 
         let mut last_offset = 0u64;
         let mut last_hmac = [0u8; 32];
@@ -976,29 +975,41 @@ pub(crate) fn set_restrictive_file_acl(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io_seam::StoreIo;
+    use crate::wal::WalFile;
+    use contextra_ports::VfsOpenOptions;
     use tempfile::tempdir;
-    use tokio::io::AsyncWriteExt;
 
     #[tokio::test]
     async fn test_do_scan_entries_with_callback_v3_without_key_manager() {
         let dir = tempdir().expect("tempdir creation failed");
         let file_path = dir.path().join("test_v3.wal");
 
+        let io = StoreIo::default();
         {
-            let mut file = super::super::fs::File::create(&file_path)
-                .await
-                .expect("file create failed");
+            let create = VfsOpenOptions {
+                read: true,
+                write: true,
+                create_new: true,
+                append: true,
+                ..Default::default()
+            };
+            let mut file = WalFile::new(
+                io.open_async(&file_path, create)
+                    .await
+                    .expect("file create failed"),
+            );
             file.write_all(&WAL_V3_HEADER)
                 .await
                 .expect("write header failed");
             file.flush().await.expect("flush failed");
         }
 
-        let mut file = super::super::fs::OpenOptions::new()
-            .read(true)
-            .open(&file_path)
-            .await
-            .expect("open read failed");
+        let mut file = WalFile::new(
+            io.open_async(&file_path, VfsOpenOptions::read_only())
+                .await
+                .expect("open read failed"),
+        );
 
         let fallback_key = [1u8; 32];
         let mut scanned_entries = Vec::new();

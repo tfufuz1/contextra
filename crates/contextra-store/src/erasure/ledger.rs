@@ -2,9 +2,7 @@
 //!
 //! Datei `<ledger_path>/ledger.log` außerhalb des Datenverzeichnisses.
 
-use crate::erasure::journal::{
-    decode_exceptions, encode_exceptions, ByteReader,
-};
+use crate::erasure::journal::{decode_exceptions, encode_exceptions, ByteReader};
 use crate::io_seam::StoreIo;
 use contextra_ports::ledger::{
     LedgerAnchor, LedgerDraft, LedgerEntry, LedgerHead, LedgerSink, LedgerVerification,
@@ -184,30 +182,30 @@ impl StoreLedger {
             let io_c = io.clone();
             let path_c = path.clone();
             let dir_c = ledger_dir.clone();
-            let file = tokio::task::spawn_blocking(move || -> Result<Box<dyn VfsFile>, ErasureError> {
-                let opts = VfsOpenOptions {
-                    read: true,
-                    write: true,
-                    create: true,
-                    ..Default::default()
-                };
-                let f = io_c
-                    .open(&path_c, &opts)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                let mut hdr = [0u8; LEDGER_HEADER_LEN];
-                hdr[..8].copy_from_slice(LEDGER_MAGIC);
-                hdr[8..10].copy_from_slice(&LEDGER_VERSION.to_le_bytes());
-                f.write_at(&hdr, 0)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                f.sync_all()
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                io_c.vfs()
-                    .sync_dir(&dir_c)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                Ok(f)
-            })
-            .await
-            .map_err(|e| ErasureError::Io(e.to_string()))??;
+            let file =
+                tokio::task::spawn_blocking(move || -> Result<Box<dyn VfsFile>, ErasureError> {
+                    let opts = VfsOpenOptions {
+                        read: true,
+                        write: true,
+                        create: true,
+                        ..Default::default()
+                    };
+                    let f = io_c
+                        .open(&path_c, &opts)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    let mut hdr = [0u8; LEDGER_HEADER_LEN];
+                    hdr[..8].copy_from_slice(LEDGER_MAGIC);
+                    hdr[8..10].copy_from_slice(&LEDGER_VERSION.to_le_bytes());
+                    f.write_at(&hdr, 0)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    f.sync_all().map_err(|e| ErasureError::Io(e.to_string()))?;
+                    io_c.vfs()
+                        .sync_dir(&dir_c)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    Ok(f)
+                })
+                .await
+                .map_err(|e| ErasureError::Io(e.to_string()))??;
 
             return Ok(Self {
                 io,
@@ -235,17 +233,18 @@ impl StoreLedger {
 
         let io_c = io.clone();
         let path_c = path.clone();
-        let file = tokio::task::spawn_blocking(move || -> Result<Box<dyn VfsFile>, ErasureError> {
-            let opts = VfsOpenOptions {
-                read: true,
-                write: true,
-                ..Default::default()
-            };
-            io_c.open(&path_c, &opts)
-                .map_err(|e| ErasureError::Io(e.to_string()))
-        })
-        .await
-        .map_err(|e| ErasureError::Io(e.to_string()))??;
+        let file =
+            tokio::task::spawn_blocking(move || -> Result<Box<dyn VfsFile>, ErasureError> {
+                let opts = VfsOpenOptions {
+                    read: true,
+                    write: true,
+                    ..Default::default()
+                };
+                io_c.open(&path_c, &opts)
+                    .map_err(|e| ErasureError::Io(e.to_string()))
+            })
+            .await
+            .map_err(|e| ErasureError::Io(e.to_string()))??;
 
         Ok(Self {
             io,
@@ -310,11 +309,17 @@ impl StoreLedger {
         };
 
         while pos < bytes.len() {
-            let Some(len_bytes) = bytes.get(pos..pos + 4).and_then(|s| <[u8; 4]>::try_from(s).ok()) else {
+            let Some(len_bytes) = bytes
+                .get(pos..pos + 4)
+                .and_then(|s| <[u8; 4]>::try_from(s).ok())
+            else {
                 return (entries, head, pos as u64, true);
             };
             let body_len = u32::from_le_bytes(len_bytes) as usize;
-            let Some(crc_bytes) = bytes.get(pos + 4..pos + 8).and_then(|s| <[u8; 4]>::try_from(s).ok()) else {
+            let Some(crc_bytes) = bytes
+                .get(pos + 4..pos + 8)
+                .and_then(|s| <[u8; 4]>::try_from(s).ok())
+            else {
                 return (entries, head, pos as u64, true);
             };
             let expected_crc = u32::from_le_bytes(crc_bytes);
@@ -337,7 +342,9 @@ impl StoreLedger {
                 return (entries, head, pos as u64, true);
             }
 
-            let without_mac = payload.get(..payload.len().saturating_sub(32)).unwrap_or(&[]);
+            let without_mac = payload
+                .get(..payload.len().saturating_sub(32))
+                .unwrap_or(&[]);
             let Ok(expected_mac) = contextra_crypto::ledger_mac(ledger_key, without_mac) else {
                 return (entries, head, pos as u64, true);
             };
@@ -507,7 +514,10 @@ mod tests {
         raw[last] ^= 0x01;
         std::fs::write(&log_path, &raw).unwrap();
 
-        assert!(matches!(ledger.verify().await, Err(ErasureError::LedgerCorrupt)));
+        assert!(matches!(
+            ledger.verify().await,
+            Err(ErasureError::LedgerCorrupt)
+        ));
         assert!(ledger.is_corrupt());
     }
 }

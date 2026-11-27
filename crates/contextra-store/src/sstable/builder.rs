@@ -351,8 +351,7 @@ impl SstableBuilder {
             ContextraError::Storage("SstableBuilder file handle already closed".into())
         })?;
         while written < buf.len() {
-            let res = file
-                .write_at(&buf[written..], offset.saturating_add(written as u64));
+            let res = file.write_at(&buf[written..], offset.saturating_add(written as u64));
             match res {
                 Ok(0) => {
                     self.poisoned = true;

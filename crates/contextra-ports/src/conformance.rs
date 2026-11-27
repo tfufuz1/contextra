@@ -217,10 +217,7 @@ pub mod check {
     }
 
     /// Verifies that [`crate::ledger::LedgerSink`] and [`crate::ledger::LedgerAnchor`] methods can be invoked.
-    pub fn assert_ledger_contract<
-        L: crate::ledger::LedgerSink,
-        A: crate::ledger::LedgerAnchor,
-    >(
+    pub fn assert_ledger_contract<L: crate::ledger::LedgerSink, A: crate::ledger::LedgerAnchor>(
         l: &L,
         a: &A,
         draft: crate::ledger::LedgerDraft,

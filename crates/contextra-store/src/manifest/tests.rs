@@ -24,24 +24,37 @@ fn manifest_v2_batch_and_snapshot_frames_roundtrip() {
     let frame = encoded.get(4..).expect("frame payload");
     let decoded = super::entry::decode_v2_frame(frame).expect("decode batch");
     assert_eq!(decoded[0], batch[0]);
-    assert_eq!(decoded[1], ManifestEntry::Replace {
-        removed: vec![PathBuf::from("old.sst")],
-        added: PathBuf::from("new.sst"),
-        added_max_tx: 23,
-    });
+    assert_eq!(
+        decoded[1],
+        ManifestEntry::Replace {
+            removed: vec![PathBuf::from("old.sst")],
+            added: PathBuf::from("new.sst"),
+            added_max_tx: 23,
+        }
+    );
     assert_eq!(decoded[2], batch[2]);
 
     let state = super::state::ManifestState::from_entries(&[
-        ManifestEntry::Add { path: PathBuf::from("live.sst"), max_tx: 22 },
-        ManifestEntry::Add { path: PathBuf::from("dead.sst"), max_tx: 21 },
-        ManifestEntry::Remove { path: PathBuf::from("dead.sst") },
+        ManifestEntry::Add {
+            path: PathBuf::from("live.sst"),
+            max_tx: 22,
+        },
+        ManifestEntry::Add {
+            path: PathBuf::from("dead.sst"),
+            max_tx: 21,
+        },
+        ManifestEntry::Remove {
+            path: PathBuf::from("dead.sst"),
+        },
         ManifestEntry::RollbackComplete { target_tx: 9 },
         ManifestEntry::WalCheckpoint { hmac: [0x37; 32] },
-    ]).expect("reduce state");
+    ])
+    .expect("reduce state");
     let snapshot = state.snapshot_frame().expect("encode snapshot");
     let decoded = super::entry::decode_v2_frame(snapshot.get(4..).expect("snapshot payload"))
         .expect("decode snapshot");
-    let restored = super::state::ManifestState::from_entries(&decoded).expect("restore snapshot state");
+    let restored =
+        super::state::ManifestState::from_entries(&decoded).expect("restore snapshot state");
     assert_eq!(restored.live(), state.live());
     assert_eq!(restored.dead(), state.dead());
     assert_eq!(restored.wal_hwm(), state.wal_hwm());
@@ -63,12 +76,17 @@ async fn manifest_append_batch_is_one_frame_and_validation_is_atomic() {
 
     let bytes = tokio::fs::read(&path).await.expect("read manifest");
     let snapshot_len = usize::try_from(u32::from_le_bytes(
-        bytes.get(5..9).expect("snapshot length").try_into().expect("u32"),
+        bytes
+            .get(5..9)
+            .expect("snapshot length")
+            .try_into()
+            .expect("u32"),
     ))
     .expect("snapshot size");
     let batch_offset = 5usize + 4 + snapshot_len;
     let batch_len = usize::try_from(u32::from_le_bytes(
-        bytes.get(batch_offset..batch_offset + 4)
+        bytes
+            .get(batch_offset..batch_offset + 4)
             .expect("batch length")
             .try_into()
             .expect("u32"),
@@ -77,7 +95,11 @@ async fn manifest_append_batch_is_one_frame_and_validation_is_atomic() {
     let batch_frame = bytes
         .get(batch_offset + 4..batch_offset + 4 + batch_len)
         .expect("batch frame");
-    assert_eq!(batch_frame.get(4), Some(&1), "one Batch frame stores the entries");
+    assert_eq!(
+        batch_frame.get(4),
+        Some(&1),
+        "one Batch frame stores the entries"
+    );
     assert_eq!(
         super::entry::decode_v2_frame(batch_frame)
             .expect("decode batch frame")
@@ -117,12 +139,21 @@ async fn manifest_rollover_keeps_wal_hwm_and_dead_sstables() {
     let dead = PathBuf::from("dead.sst");
     let manifest = Manifest::open(&path).await.expect("open manifest");
     for entry in [
-        ManifestEntry::Add { path: live.clone(), max_tx: 7 },
-        ManifestEntry::Add { path: dead.clone(), max_tx: 5 },
+        ManifestEntry::Add {
+            path: live.clone(),
+            max_tx: 7,
+        },
+        ManifestEntry::Add {
+            path: dead.clone(),
+            max_tx: 5,
+        },
         ManifestEntry::Remove { path: dead.clone() },
         ManifestEntry::WalCheckpoint { hmac: hwm },
     ] {
-        manifest.append(&entry).await.expect("append manifest entry");
+        manifest
+            .append(&entry)
+            .await
+            .expect("append manifest entry");
     }
     manifest.rollover().await.expect("rollover");
 
@@ -219,7 +250,10 @@ async fn manifest_open_truncates_torn_tail_before_next_append() {
         path: PathBuf::from("second.sst"),
         max_tx: 2,
     };
-    manifest.append(&second).await.expect("append after healing");
+    manifest
+        .append(&second)
+        .await
+        .expect("append after healing");
     drop(manifest);
     let entries = Manifest::load(&path).await.expect("load healed manifest");
     let state = super::state::ManifestState::from_entries(&entries).expect("reduce healed entries");
@@ -260,10 +294,16 @@ async fn manifest_rollover_post_rename_fault_poisons_handle() {
     vfs.reset_counters();
     vfs.set_config(contextra_testkit::FaultConfig::default());
     let recovered = Manifest::open_with_io(&path, None, io).await;
-    assert!(recovered.is_ok(), "renamed snapshot must be readable after restart");
-    let entries = Manifest::load_with_io(&path, crate::io_seam::StoreIo::new(std::sync::Arc::new(vfs)))
-        .await
-        .expect("load renamed snapshot");
+    assert!(
+        recovered.is_ok(),
+        "renamed snapshot must be readable after restart"
+    );
+    let entries = Manifest::load_with_io(
+        &path,
+        crate::io_seam::StoreIo::new(std::sync::Arc::new(vfs)),
+    )
+    .await
+    .expect("load renamed snapshot");
     let state = super::state::ManifestState::from_entries(&entries).expect("reduce snapshot");
     assert_eq!(state.live().get(Path::new("kept.sst")), Some(&11));
 }
@@ -276,7 +316,9 @@ async fn manifest_rollover_crash_vfs_preserves_previously_committed_state() {
         let vfs = CrashVfs::new(CrashSeed(0xC0FFEE));
         let io = crate::io_seam::StoreIo::new(std::sync::Arc::new(vfs.clone()));
         let dir = PathBuf::from("store");
-        io.create_dir_all(&dir).await.expect("create virtual store dir");
+        io.create_dir_all(&dir)
+            .await
+            .expect("create virtual store dir");
         let path = dir.join("MANIFEST");
         let manifest = Manifest::open_with_io(&path, None, io)
             .await
@@ -315,16 +357,21 @@ async fn manifest_v1_is_migrated_with_backup_to_v2_snapshot() {
     };
     let mut legacy = b"MFMN\x01".to_vec();
     legacy.extend_from_slice(&entry.to_bytes().expect("encode v1 entry"));
-    tokio::fs::write(&path, &legacy).await.expect("write v1 manifest");
+    tokio::fs::write(&path, &legacy)
+        .await
+        .expect("write v1 manifest");
 
     let manifest = Manifest::open(&path).await.expect("migrate v1 manifest");
-    let bytes = tokio::fs::read(&path).await.expect("read migrated manifest");
+    let bytes = tokio::fs::read(&path)
+        .await
+        .expect("read migrated manifest");
     assert_eq!(bytes.get(..5), Some(b"CMAN\x02".as_slice()));
     assert!(tokio::fs::try_exists(dir.path().join("MANIFEST.v1.bak"))
         .await
         .expect("check backup"));
     let entries = Manifest::load(&path).await.expect("load migrated entries");
-    let state = super::state::ManifestState::from_entries(&entries).expect("reduce migrated entries");
+    let state =
+        super::state::ManifestState::from_entries(&entries).expect("reduce migrated entries");
     assert_eq!(state.live().get(Path::new("legacy.sst")), Some(&42));
     drop(manifest);
 }
@@ -381,7 +428,8 @@ async fn test_manifest_crc_corruption_detection() {
 
     // Corrupt the first batch while a later frame remains; mid-file CRC errors fail closed.
     let mut file_bytes = tokio::fs::read(&manifest_path).await.expect("read file");
-    let snapshot_len = u32::from_le_bytes(file_bytes[5..9].try_into().expect("snapshot length")) as usize;
+    let snapshot_len =
+        u32::from_le_bytes(file_bytes[5..9].try_into().expect("snapshot length")) as usize;
     let first_batch_offset = 5 + 4 + snapshot_len;
     file_bytes[first_batch_offset + 9] ^= 0xFF;
     tokio::fs::write(&manifest_path, file_bytes)
@@ -411,12 +459,17 @@ async fn manifest_rejects_complete_malformed_final_frame() {
 
     let mut bytes = tokio::fs::read(&path).await.expect("read manifest");
     let snapshot_len = usize::try_from(u32::from_le_bytes(
-        bytes.get(5..9).expect("snapshot length").try_into().expect("u32"),
+        bytes
+            .get(5..9)
+            .expect("snapshot length")
+            .try_into()
+            .expect("u32"),
     ))
     .expect("snapshot size");
     let frame_start = 5usize + 4 + snapshot_len;
     let frame_len = usize::try_from(u32::from_le_bytes(
-        bytes.get(frame_start..frame_start + 4)
+        bytes
+            .get(frame_start..frame_start + 4)
             .expect("frame length")
             .try_into()
             .expect("u32"),
@@ -729,10 +782,7 @@ async fn test_manifest_rollover_restart_recovery() {
             manifest.append(entry).await.expect("append entry");
         }
 
-        let rolled = manifest
-            .maybe_rollover(1)
-            .await
-            .expect("rollover");
+        let rolled = manifest.maybe_rollover(1).await.expect("rollover");
         assert!(rolled);
     }
 
@@ -780,7 +830,9 @@ async fn test_manifest_poisoning_on_fsync_failure() {
     assert!(!manifest.is_poisoned());
 
     // Manually trigger poison state to simulate fsync failure (INV-FSYNC-1)
-    manifest.is_poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+    manifest
+        .is_poisoned
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     assert!(manifest.is_poisoned());
 
     let entry = ManifestEntry::Add {
@@ -788,7 +840,10 @@ async fn test_manifest_poisoning_on_fsync_failure() {
         max_tx: 99,
     };
     let err = manifest.append(&entry).await;
-    assert!(err.is_err(), "Poisoned manifest must reject append operations");
+    assert!(
+        err.is_err(),
+        "Poisoned manifest must reject append operations"
+    );
     let err_msg = err.unwrap_err().to_string();
     assert!(
         err_msg.contains("poisoned") && err_msg.contains("INV-FSYNC-1"),

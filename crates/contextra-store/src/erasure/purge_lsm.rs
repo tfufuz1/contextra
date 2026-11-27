@@ -54,10 +54,7 @@ pub(crate) struct StoreDeps {
 
 /// Entfernt alle vom `EraseFilter` verworfenen Versionen aus der aktiven und allen
 /// unveränderlichen MemTables und gibt das Speicherbudget frei (§7.1).
-pub(crate) async fn purge_memtables(
-    deps: &StoreDeps,
-    filter: &EraseFilter,
-) -> (u64, u64) {
+pub(crate) async fn purge_memtables(deps: &StoreDeps, filter: &EraseFilter) -> (u64, u64) {
     let (active, immutables) = {
         let st = deps.state.read().await;
         (Arc::clone(&st.memtable), st.immutable_memtables.clone())
@@ -66,7 +63,8 @@ pub(crate) async fn purge_memtables(
     let mut total_dropped = 0u64;
     let mut total_freed = 0u64;
 
-    let (d, f) = active.retain(|k, raw_seq, tomb| filter.decide(k, raw_seq, tomb) == Decision::Drop);
+    let (d, f) =
+        active.retain(|k, raw_seq, tomb| filter.decide(k, raw_seq, tomb) == Decision::Drop);
     total_dropped = total_dropped.saturating_add(d);
     total_freed = total_freed.saturating_add(f);
 
@@ -261,7 +259,9 @@ pub(crate) async fn erase_compact_tick(
                 .position(|current| Arc::ptr_eq(current, sst));
             let committed = if let Some(pos) = pos {
                 deps.manifest
-                    .append(&ManifestEntry::Remove { path: old_path.clone() })
+                    .append(&ManifestEntry::Remove {
+                        path: old_path.clone(),
+                    })
                     .await
                     .map_err(|e| ErasureError::Io(e.to_string()))?;
                 deps.sstables.write().await.remove(pos);
@@ -436,9 +436,9 @@ pub(crate) async fn erase_wal_cut(
         if !key_map.is_empty() {
             let count = deps.segment_counter.fetch_add(1, Ordering::Relaxed);
             let seq = deps.next_seq_no.load(Ordering::Relaxed);
-            let sst_path = deps
-                .data_dir
-                .join(format!("sst-{:020}-{:06}.sst", seq, count % 1_000_000));
+            let sst_path =
+                deps.data_dir
+                    .join(format!("sst-{:020}-{:06}.sst", seq, count % 1_000_000));
 
             let mut builder = SstableBuilder::create_with_vfs(
                 &sst_path,
@@ -707,13 +707,20 @@ impl LayerScanner for KernelStoreScanner {
         self.layer.clone()
     }
 
-    fn scan_units(&self, session: &mut ScanSession, ctx: &RequestContext) -> contextra_types::Result<()> {
+    fn scan_units(
+        &self,
+        session: &mut ScanSession,
+        ctx: &RequestContext,
+    ) -> contextra_types::Result<()> {
         let target_prefix = crate::tenant_codec::TenantKeyCodec::new(ctx.tenant_id)
             .scan_prefix()
             .to_vec();
         // Positivkontrolle (Canary)
         session.record_control_match();
-        session.record_unit(*blake3::hash(b"ctx-erasure-control-canary").as_bytes(), false);
+        session.record_unit(
+            *blake3::hash(b"ctx-erasure-control-canary").as_bytes(),
+            false,
+        );
 
         match self.layer {
             WitnessLayer::LsmMemtable => {
@@ -773,8 +780,8 @@ impl LayerScanner for KernelStoreScanner {
                 };
                 if let Ok(bytes) = self.deps.io.vfs().read(&wal_path) {
                     let needle = target_prefix.as_slice();
-                    let found = !needle.is_empty()
-                        && bytes.windows(needle.len()).any(|w| w == needle);
+                    let found =
+                        !needle.is_empty() && bytes.windows(needle.len()).any(|w| w == needle);
                     let hash = *blake3::hash(&bytes).as_bytes();
                     session.record_unit(hash, found);
                 }
@@ -791,10 +798,7 @@ pub(crate) fn build_filter(gate: &StoreGate, collapse: &Arc<CollapseMap>) -> Era
 }
 
 /// Hilfsfunktion zur Prüfung auf nicht-relatives `data_dir` für Temp-Dateien.
-pub(crate) fn collect_temp_file_paths(
-    data_dir: &Path,
-    records: &[JournalRecord],
-) -> Vec<PathBuf> {
+pub(crate) fn collect_temp_file_paths(data_dir: &Path, records: &[JournalRecord]) -> Vec<PathBuf> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::new();
     for rec in records {

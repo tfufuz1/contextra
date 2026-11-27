@@ -29,7 +29,11 @@ struct OutputGuard {
 
 impl OutputGuard {
     fn new(vfs: Arc<dyn Vfs>, path: PathBuf) -> Self {
-        Self { vfs, path, armed: true }
+        Self {
+            vfs,
+            path,
+            armed: true,
+        }
     }
 
     fn commit(&mut self) {
@@ -711,8 +715,9 @@ impl CompactionEngine {
                 // Apply memory backpressure to prevent Compaction from OOMing the system
                 if !self.budget.has_memory_capacity() {
                     let wait_start_nanos = self.clock.monotonic_nanos();
-                    let max_wait_nanos = u64::try_from(self.config.max_backpressure_wait.as_nanos())
-                        .unwrap_or(u64::MAX);
+                    let max_wait_nanos =
+                        u64::try_from(self.config.max_backpressure_wait.as_nanos())
+                            .unwrap_or(u64::MAX);
                     while !self.budget.has_memory_capacity() {
                         let wait_elapsed_nanos = self
                             .clock

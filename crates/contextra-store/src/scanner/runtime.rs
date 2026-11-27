@@ -64,7 +64,8 @@ impl ScannerRuntime {
     {
         let handle = self.handle.as_ref().ok_or_else(|| {
             ContextraError::Storage(
-                "Kein Tokio-Runtime-Handle für ScannerRuntime verfügbar (Zero-Panic-Doktrin)".into(),
+                "Kein Tokio-Runtime-Handle für ScannerRuntime verfügbar (Zero-Panic-Doktrin)"
+                    .into(),
             )
         })?;
 

@@ -13,9 +13,9 @@ use super::runtime::ScannerRuntime;
 use crate::lsm::LsmStorage;
 use crate::sstable::{SstableBuilder, SstableReader};
 use crate::tenant_codec::TenantKeyCodec;
+use ahash::AHashSet;
 use contextra_ports::scanner::{LayerScanner, ScanSession, WitnessLayer};
 use contextra_types::{RequestContext, Result};
-use ahash::AHashSet;
 use std::sync::Arc;
 
 /// Scanner für die `SsTableAllLevels`-Schicht.
@@ -45,7 +45,11 @@ impl SstableScanner {
 
         self.runtime.block_on(async {
             let temp_dir = std::env::temp_dir();
-            let canary_path = temp_dir.join(format!("canary_{}_{}.sst", std::process::id(), crate::lsm::recovery::next_temp_file_counter()));
+            let canary_path = temp_dir.join(format!(
+                "canary_{}_{}.sst",
+                std::process::id(),
+                crate::lsm::recovery::next_temp_file_counter()
+            ));
             let canary_key = b"t:canary:1:chunk:1";
             let canary_val = b"canary_val";
 

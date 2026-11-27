@@ -75,11 +75,14 @@ impl DurabilityMode {
         deletion_proof_active: bool,
         feature_ring: contextra_ports::license::FeatureRing,
     ) -> Result<(), DurabilityConfigError> {
-        let require_persistence =
-            feature_ring == contextra_ports::license::FeatureRing::Sovereign;
+        let require_persistence = feature_ring == contextra_ports::license::FeatureRing::Sovereign;
         self.validate_durability(deletion_proof_active, require_persistence)
             .map_err(|err| match err {
-                DurabilityConfigError::IncompatibleCombination { mode, feature, reason } => {
+                DurabilityConfigError::IncompatibleCombination {
+                    mode,
+                    feature,
+                    reason,
+                } => {
                     if feature == "integrity-chain" {
                         DurabilityConfigError::IncompatibleCombination {
                             mode,
@@ -93,7 +96,11 @@ impl DurabilityMode {
                             reason: "no persistence layer exists to prove deletion from",
                         }
                     } else {
-                        DurabilityConfigError::IncompatibleCombination { mode, feature, reason }
+                        DurabilityConfigError::IncompatibleCombination {
+                            mode,
+                            feature,
+                            reason,
+                        }
                     }
                 }
             })
