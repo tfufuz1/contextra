@@ -12,6 +12,7 @@
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
 mod config;
+mod erasure_worker;
 mod expiry_workers;
 mod hyperedge_worker;
 mod orphan_workers;
@@ -19,6 +20,7 @@ mod orphan_workers;
 #[cfg(test)]
 mod tests;
 
+pub use erasure_worker::{erasure_worker_loop, start_erasure_worker};
 pub use config::{calculate_rebuild_cooldown, OrphanCleanupBackoffConfig, OrphanCleanupIndex};
 #[cfg(feature = "background-maintenance")]
 #[allow(deprecated)]

@@ -138,6 +138,16 @@ impl<S: StorageEngine> InvertedIndex<S> {
         k
     }
 
+    /// Exact storage keys owned by `doc_id` (`dl:` document length, `fw:` forward index).
+    ///
+    /// Used by the erase resolver; postings (`i:`/`plb:`) are purged by the text layer.
+    pub fn scope_keys_for(&self, doc_id: DocId) -> Vec<Vec<u8>> {
+        vec![
+            self.key_with_id("dl:", doc_id.inner()),
+            self.key_with_id("fw:", doc_id.inner()),
+        ]
+    }
+
     pub(crate) fn key_with_id(&self, type_prefix: &str, id: impl Into<u128>) -> Vec<u8> {
         let mut itoa_buf = itoa::Buffer::new();
         let id_str = itoa_buf.format(id.into());

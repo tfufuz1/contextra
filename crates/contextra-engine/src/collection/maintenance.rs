@@ -847,29 +847,40 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(map)
     }
 
-    /// Removes all data belonging to this collection from storage.
+    /// Validates that this collection may be dropped.
+    ///
+    /// Physical removal is **not** done here any more (K-44): tombstoning prefixes left HNSW,
+    /// graph, checkpoints and `__col_idx` untouched. `Contextra::drop_collection` runs the
+    /// durable erase chain (`erase(EraseTarget::Collection)`) instead.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn drop_collection(&self) -> Result<()> {
-        let _guard = self.consolidation_guard.clone().lock_owned().await;
-        let prefix = if self.name == "default" {
+        if self.name == "default" {
             return Err(contextra_types::ContextraError::invalid_input(
                 "Cannot drop default collection",
             ));
-        } else {
-            self.prefix.clone()
-        };
-
-        let tx = self.allocate_tx()?;
-
-        // 1. Clean collection data (user keys, docs, rels, intents)
-        self.storage.delete_prefix(tx, &prefix).await?;
-
-        // 2. Clean text index namespace (FIND-DB-002)
-        let txt_prefix = format!("__txt:{}:", self.name).into_bytes();
-        self.storage.delete_prefix(tx, &txt_prefix).await?;
-
-        self.storage.commit(tx).await?;
+        }
         Ok(())
+    }
+
+    /// Raw (collection-logical) keys of a single document that belong in its erase scope
+    /// besides user/doc key: text `dl:`/`fw:` rows and relation rows referencing the
+    /// document key. Postings (`i:`/`plb:`) and graph objects are handled by their layers.
+    pub(crate) async fn erasure_extra_document_keys(
+        &self,
+        key: &str,
+        doc_id: DocId,
+    ) -> Result<Vec<Vec<u8>>> {
+        let mut out = self.text_index.scope_keys_for(doc_id);
+        let rel_prefix = self.namespaced_key(b"", 2);
+        let from_pat = format!("{key}:");
+        let to_pat = format!(":{key}");
+        for (k, _) in self.storage.scan_prefix(&rel_prefix).await? {
+            let body = &k[rel_prefix.len().min(k.len())..];
+            if body.starts_with(from_pat.as_bytes()) || body.ends_with(to_pat.as_bytes()) {
+                out.push(k);
+            }
+        }
+        Ok(out)
     }
 }
 

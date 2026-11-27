@@ -125,6 +125,17 @@ impl Contextra {
             .clone()
             .unwrap_or_else(|| Arc::new(contextra_ports::NoopMetricsSink));
 
+        // Durable erasure chain: open jobs get RAM masking before any traffic (§11).
+        let erasure = crate::erasure::ErasureRuntime::start(
+            &storage,
+            crate::erasure::LayerRegistry::default(),
+            config.erasure.clone(),
+            None,
+            cancel_token.clone(),
+            &task_tracker,
+        )
+        .await;
+
         let db = Self {
             storage,
             next_tx,
@@ -142,6 +153,7 @@ impl Contextra {
             router: parking_lot::RwLock::new(None),
             calibrator: parking_lot::RwLock::new(None),
             metrics_sink: parking_lot::RwLock::new(metrics_sink),
+            erasure,
         };
 
         db.initialize_collections().await?;
@@ -445,6 +457,8 @@ impl Contextra {
     // ANCHOR[contextra-engine:LFC-003]
     /// Wartet asynchron auf den geordneten Stopp aller Worker.
     pub async fn wait_shutdown(&self) {
+        // Erasure first: stop the worker, accept no new jobs; progress is durable.
+        self.erasure.stop().await;
         self.shutdown();
         self.task_tracker.close();
         self.task_tracker.wait().await;

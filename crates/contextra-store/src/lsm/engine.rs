@@ -132,6 +132,11 @@ impl LsmStorage {
         Arc::clone(&self.erasure) as Arc<dyn contextra_ports::ErasureKernel>
     }
 
+    /// Notify handle fired while pending-delete paths remain (Löschkette §8).
+    pub fn erasure_pending_delete_notify(&self) -> Arc<tokio::sync::Notify> {
+        self.erasure.pending_delete_notify()
+    }
+
     /// Liefert den Boot-Bericht des Erasure-Kernels (§5.4).
     pub fn erasure_boot_report(&self) -> crate::erasure::BootReport {
         self.erasure_boot_report

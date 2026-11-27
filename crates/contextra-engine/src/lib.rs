@@ -255,10 +255,18 @@ pub struct ContextraConfig {
     pub tenant_policy: TenantPolicy,
     /// Configured metrics sink for recording engine operational metrics.
     pub metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+    /// Configuration of the durable erasure chain (coalescing, SLA, retry, budget).
+    pub erasure: crate::erasure::ErasureConfig,
 }
 
 #[cfg(not(loom))]
 impl ContextraConfig {
+    /// Configures the erasure chain (profile values are set by the facade).
+    pub fn with_erasure(mut self, cfg: crate::erasure::ErasureConfig) -> Self {
+        self.erasure = cfg;
+        self
+    }
+
     // ANCHOR[contextra-engine:BLD-003]
     /// Konfiguriert den optionalen Konsolidierungs-Launcher auf dem Builder.
     pub fn with_consolidation_launcher(mut self, launcher: ConsolidationLauncher) -> Self {
@@ -317,6 +325,7 @@ impl std::fmt::Debug for ContextraConfig {
                 "metrics_sink",
                 &self.metrics_sink.as_ref().map(|_| "dyn MetricsSink"),
             )
+            .field("erasure", &self.erasure)
             .finish()
     }
 }
@@ -345,6 +354,7 @@ impl Default for ContextraConfig {
             consolidation_launcher: None,
             tenant_policy: TenantPolicy::Optional,
             metrics_sink: None,
+            erasure: crate::erasure::ErasureConfig::default(),
         }
     }
 }
@@ -379,6 +389,8 @@ pub struct Contextra {
         Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
     >,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
+    /// Durable erasure chain: kernel port, layer registry, observers and the G3 worker.
+    erasure: crate::erasure::ErasureRuntime,
 }
 
 #[cfg(not(loom))]
