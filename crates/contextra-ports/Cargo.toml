@@ -17,6 +17,7 @@ default = []
 conformance = ["contract-tests"]
 contract-tests = []
 testkit = []
+stage2 = []
 
 [dependencies]
 contextra-types = { workspace = true }
