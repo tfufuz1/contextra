@@ -87,6 +87,7 @@ async fn test_logical_deletion_without_purge_shows_remaining() {
 }
 
 #[tokio::test]
+#[ignore = "WP-0 (Löschketten-RFC): LsmPurger ist gesperrt, bis WP-4 den Rewrite ersetzt"]
 async fn test_purge_clears_remaining_residuals() {
     let (storage, _dir) = create_test_storage().await;
     let clock = SystemClock::new();
@@ -174,6 +175,7 @@ async fn test_sabotage_unremoved_orphan_file_detected_by_scanner() {
 }
 
 #[tokio::test]
+#[ignore = "WP-0 (Löschketten-RFC): LsmPurger ist gesperrt, bis WP-4 den Rewrite ersetzt"]
 async fn test_open_snapshot_blocks_purge() {
     let (storage, _dir) = create_test_storage().await;
     let tenant_id = TenantId::try_new(3).unwrap();
@@ -199,6 +201,7 @@ async fn test_open_snapshot_blocks_purge() {
 }
 
 #[tokio::test]
+#[ignore = "WP-0 (Löschketten-RFC): LsmPurger ist gesperrt, bis WP-4 den Rewrite ersetzt"]
 async fn test_multi_level_sstable_and_wal_only_purge() {
     let (storage, _dir) = create_test_storage().await;
     let clock = SystemClock::new();
