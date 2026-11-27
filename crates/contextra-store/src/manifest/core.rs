@@ -22,8 +22,9 @@ use super::MAX_MANIFEST_ENTRY_SIZE;
 use crate::io_seam::StoreIo;
 use crate::util::DirLock;
 
-pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
-pub const CURRENT_MANIFEST_VERSION: u8 = 1;
+pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"CMAN";
+pub const LEGACY_MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
+pub const CURRENT_MANIFEST_VERSION: u8 = 2;
 
 async fn append_durable(
     file: Arc<parking_lot::Mutex<AppendFile>>,
@@ -56,6 +57,125 @@ async fn sync_all_file(file: Arc<parking_lot::Mutex<AppendFile>>) -> Result<()> 
         .await
         .map_err(|error| ContextraError::Storage(format!("Manifest sync task failed: {error}")))?
         .map_err(|error| ContextraError::Storage(error.to_string()))
+}
+
+fn parse_manifest_bytes(data: &[u8]) -> Result<(Vec<ManifestEntry>, usize, u8)> {
+    if data.is_empty() {
+        return Ok((Vec::new(), 0, CURRENT_MANIFEST_VERSION));
+    }
+    let mut pos = 0usize;
+    let mut version = 0u8;
+    let has_current_header = data.get(..4) == Some(MANIFEST_HEADER_MAGIC.as_slice());
+    let has_legacy_header = data.get(..4) == Some(LEGACY_MANIFEST_HEADER_MAGIC.as_slice());
+    if data.len() >= 5 && (has_current_header || has_legacy_header) {
+        version = *data
+            .get(4)
+            .ok_or_else(|| ContextraError::Storage("MANIFEST version missing".into()))?;
+        let expected_version = if has_current_header { 2 } else { 1 };
+        if version != expected_version {
+            return Err(ContextraError::Storage(format!(
+                "Unsupported MANIFEST format/version pairing: magic version {}",
+                version
+            )));
+        }
+        pos = 5;
+    } else if data.len() < 5 {
+        let current_prefix = MANIFEST_HEADER_MAGIC
+            .get(..data.len())
+            .is_some_and(|prefix| prefix == data);
+        let legacy_prefix = LEGACY_MANIFEST_HEADER_MAGIC
+            .get(..data.len())
+            .is_some_and(|prefix| prefix == data);
+        if current_prefix || legacy_prefix {
+            return Ok((Vec::new(), 0, CURRENT_MANIFEST_VERSION));
+        }
+        return Err(ContextraError::Storage("Unknown MANIFEST format".into()));
+    }
+    if version == 0 {
+        version = 1; // Headerless v0 uses the v1 entry encoding.
+    }
+
+    let mut entries = Vec::new();
+    loop {
+        if pos == data.len() {
+            break;
+        }
+        let entry_pos = pos;
+        let len_end = pos
+            .checked_add(4)
+            .ok_or_else(|| ContextraError::Storage("MANIFEST offset overflow".into()))?;
+        if len_end > data.len() {
+            tracing::warn!("MANIFEST tail truncation detected at offset {entry_pos}");
+            break;
+        }
+        let len_bytes: [u8; 4] = data
+            .get(pos..len_end)
+            .and_then(|slice| slice.try_into().ok())
+            .ok_or_else(|| ContextraError::Storage("MANIFEST length header invalid".into()))?;
+        let len = usize::try_from(u32::from_le_bytes(len_bytes)).map_err(|_| {
+            ContextraError::Storage("MANIFEST frame length is not representable".into())
+        })?;
+        if len < 5 || len > MAX_MANIFEST_ENTRY_SIZE as usize {
+            return Err(ContextraError::Storage(format!(
+                "MANIFEST entry length ({}) invalid or exceeds max size ({}) at offset {}",
+                len, MAX_MANIFEST_ENTRY_SIZE, entry_pos
+            )));
+        }
+        let frame_end = len_end
+            .checked_add(len)
+            .ok_or_else(|| ContextraError::Storage("MANIFEST frame end overflow".into()))?;
+        if frame_end > data.len() {
+            let partial = data.get(len_end..).ok_or_else(|| {
+                ContextraError::Storage("MANIFEST partial frame range invalid".into())
+            })?;
+            if version == 2 || is_valid_tail_truncation_candidate(len, partial) {
+                tracing::warn!("MANIFEST tail truncation detected at offset {entry_pos}");
+                break;
+            }
+            return Err(ContextraError::Storage(format!(
+                "MANIFEST mid-file corruption at offset {}: invalid frame length {}",
+                entry_pos, len
+            )));
+        }
+        let raw = data
+            .get(len_end..frame_end)
+            .ok_or_else(|| ContextraError::Storage("MANIFEST frame range invalid".into()))?;
+        if version == 2 {
+            let frame_tag = raw.get(4).copied().ok_or_else(|| {
+                ContextraError::Storage("MANIFEST v2 frame tag missing".into())
+            })?;
+            if (entry_pos == 5 && frame_tag != 2) || (entry_pos != 5 && frame_tag == 2) {
+                return Err(ContextraError::Storage(format!(
+                    "MANIFEST snapshot must be exactly the first frame (offset {})",
+                    entry_pos
+                )));
+            }
+        }
+        let decoded = if version == 2 {
+            super::entry::decode_v2_frame(raw)
+        } else {
+            ManifestEntry::from_bytes(raw).map(|entry| vec![entry])
+        };
+        pos = frame_end;
+        match decoded {
+            Ok(mut frame_entries) => entries.append(&mut frame_entries),
+            Err(error) if pos == data.len() => {
+                tracing::warn!(
+                    "MANIFEST final-frame CRC/decoding error at EOF offset {}; discarding torn tail: {}",
+                    entry_pos, error
+                );
+                pos = entry_pos;
+                break;
+            }
+            Err(error) => {
+                return Err(ContextraError::Storage(format!(
+                    "MANIFEST entry corruption at offset {}: {}",
+                    entry_pos, error
+                )))
+            }
+        }
+    }
+    Ok((entries, pos, version))
 }
 
 /// Append-only Manifest file handle for recording active SSTable set transitions.
@@ -128,11 +248,13 @@ impl Manifest {
 
         if !is_new && file_len < 5 {
             let prefix = read_append_file(Arc::clone(&file)).await?;
-            if !prefix.is_empty()
-                && !MANIFEST_HEADER_MAGIC
-                    .get(..prefix.len().min(MANIFEST_HEADER_MAGIC.len()))
-                    .is_some_and(|expected| expected == prefix.as_slice())
-            {
+            let current_prefix = MANIFEST_HEADER_MAGIC
+                .get(..prefix.len().min(MANIFEST_HEADER_MAGIC.len()))
+                .is_some_and(|expected| expected == prefix.as_slice());
+            let legacy_prefix = LEGACY_MANIFEST_HEADER_MAGIC
+                .get(..prefix.len().min(LEGACY_MANIFEST_HEADER_MAGIC.len()))
+                .is_some_and(|expected| expected == prefix.as_slice());
+            if !prefix.is_empty() && !current_prefix && !legacy_prefix {
                 return Err(ContextraError::Storage(
                     "Unknown or incomplete MANIFEST format header".into(),
                 ));
@@ -141,6 +263,7 @@ impl Manifest {
             let mut header = Vec::with_capacity(5);
             header.extend_from_slice(MANIFEST_HEADER_MAGIC);
             header.push(CURRENT_MANIFEST_VERSION);
+            header.extend_from_slice(&ManifestState::default().snapshot_frame()?);
             append_durable(Arc::clone(&file), header)
                 .await
                 .map_err(|error| ContextraError::Storage(error.to_string()))?;
@@ -151,6 +274,7 @@ impl Manifest {
             let mut header = Vec::with_capacity(5);
             header.extend_from_slice(MANIFEST_HEADER_MAGIC);
             header.push(CURRENT_MANIFEST_VERSION);
+            header.extend_from_slice(&ManifestState::default().snapshot_frame()?);
             append_durable(Arc::clone(&file), header)
                 .await
                 .map_err(|error| ContextraError::Storage(error.to_string()))?;
@@ -160,28 +284,31 @@ impl Manifest {
             }
         }
 
-        let entries = Self::load_with_io(&path, io.clone()).await?;
-        let state = ManifestState::from_entries(&entries)?;
         let current_bytes = read_append_file(Arc::clone(&file)).await?;
-        let has_header = current_bytes
-            .get(..4)
-            .is_some_and(|magic| magic == MANIFEST_HEADER_MAGIC.as_slice());
-        let mut valid_len = if has_header { 5u64 } else { 0u64 };
-        for entry in &entries {
-            let encoded_len = u64::try_from(entry.to_bytes()?.len()).map_err(|_| {
-                ContextraError::Storage("MANIFEST entry length is not representable".into())
-            })?;
-            valid_len = valid_len
-                .checked_add(encoded_len)
-                .ok_or_else(|| ContextraError::Storage("MANIFEST length overflow".into()))?;
-        }
+        let (entries, valid_offset, version) = parse_manifest_bytes(&current_bytes)?;
+        let state = ManifestState::from_entries(&entries)?;
         let actual_len = u64::try_from(current_bytes.len()).map_err(|_| {
             ContextraError::Storage("MANIFEST length is not representable".into())
         })?;
-        if actual_len > valid_len {
-            truncate_durable(Arc::clone(&file), valid_len).await?;
+        if actual_len > u64::try_from(valid_offset).map_err(|_| {
+            ContextraError::Storage("MANIFEST valid offset is not representable".into())
+        })? {
+            truncate_durable(
+                Arc::clone(&file),
+                u64::try_from(valid_offset).map_err(|_| {
+                    ContextraError::Storage("MANIFEST valid offset is not representable".into())
+                })?,
+            )
+            .await?;
         }
-        Ok(Self {
+        if version == CURRENT_MANIFEST_VERSION && valid_offset == 5 {
+            let empty_snapshot = ManifestState::default().snapshot_frame()?;
+            append_durable(Arc::clone(&file), empty_snapshot)
+                .await
+                .map_err(|error| ContextraError::Storage(error.to_string()))?;
+            sync_all_file(Arc::clone(&file)).await?;
+        }
+        let manifest = Self {
             path,
             io,
             file,
@@ -189,7 +316,16 @@ impl Manifest {
             state: tokio::sync::Mutex::new(state),
             _dir_lock: dir_lock,
             is_poisoned: AtomicBool::new(false),
-        })
+        };
+        if version == 1 {
+            let backup_path = manifest.path.with_file_name("MANIFEST.v1.bak");
+            if !manifest.io.exists(&backup_path).await? {
+                let old_bytes = manifest.io.read(&manifest.path).await?;
+                manifest.io.write_atomic(&backup_path, old_bytes).await?;
+            }
+            manifest.rollover().await?;
+        }
+        Ok(manifest)
     }
 
     /// Checks if the manifest handle has been poisoned by a preceding fsync failure (INV-FSYNC-1).
@@ -215,12 +351,15 @@ impl Manifest {
         if entries.is_empty() {
             return Ok(());
         }
-        let mut batch_bytes = Vec::new();
-        for entry in entries {
-            batch_bytes.extend(entry.to_bytes()?);
-        }
+        let batch_bytes = super::entry::encode_batch_frame(entries)?;
 
         let _operation = self.operation_lock.lock().await;
+        if self.is_poisoned() {
+            return Err(ContextraError::Storage(format!(
+                "Manifest handle for {} is poisoned due to a previous I/O failure",
+                self.path.display()
+            )));
+        }
         let mut state = self.state.lock().await;
         let mut next_state = state.clone();
         for entry in entries {
@@ -244,7 +383,7 @@ impl Manifest {
         drop(_operation);
         if should_rollover {
             if let Err(error) = self
-                .maybe_rollover(&[], super::DEFAULT_ROLLOVER_THRESHOLD_BYTES)
+                .maybe_rollover(super::DEFAULT_ROLLOVER_THRESHOLD_BYTES)
                 .await
             {
                 if self.is_poisoned() {
@@ -271,97 +410,7 @@ impl Manifest {
             return Ok(Vec::new());
         }
         let data = io.read(path).await?;
-        if data.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let mut pos = 0usize;
-        if data.len() >= 5 && data.get(0..4) == Some(MANIFEST_HEADER_MAGIC.as_slice()) {
-            let version = *data
-                .get(4)
-                .ok_or_else(|| ContextraError::Storage("MANIFEST version missing".into()))?;
-            if version > CURRENT_MANIFEST_VERSION {
-                return Err(ContextraError::Storage(format!(
-                    "Unsupported MANIFEST format version: {}",
-                    version
-                )));
-            }
-            pos = 5;
-        } else if data.len() < 5 {
-            let prefix_matches = MANIFEST_HEADER_MAGIC
-                .get(..data.len())
-                .is_some_and(|prefix| prefix == data.as_slice());
-            if prefix_matches {
-                tracing::warn!("Torn MANIFEST header detected; open will initialize it");
-                return Ok(Vec::new());
-            }
-            return Err(ContextraError::Storage("Unknown MANIFEST format".into()));
-        }
-
-        let mut entries = Vec::new();
-        loop {
-            if pos == data.len() {
-                break;
-            }
-            let entry_pos = pos;
-            let len_end = pos.checked_add(4).ok_or_else(|| {
-                ContextraError::Storage("MANIFEST offset overflow".into())
-            })?;
-            if len_end > data.len() {
-                tracing::warn!("MANIFEST tail truncation detected at offset {entry_pos}");
-                break;
-            }
-            let len_bytes: [u8; 4] = data
-                .get(pos..len_end)
-                .and_then(|slice| slice.try_into().ok())
-                .ok_or_else(|| ContextraError::Storage("MANIFEST length header invalid".into()))?;
-            let len = usize::try_from(u32::from_le_bytes(len_bytes)).map_err(|_| {
-                ContextraError::Storage("MANIFEST frame length is not representable".into())
-            })?;
-            if len < 5 || len > MAX_MANIFEST_ENTRY_SIZE as usize {
-                return Err(ContextraError::Storage(format!(
-                    "MANIFEST entry length ({}) invalid or exceeds max size ({}) at offset {}",
-                    len, MAX_MANIFEST_ENTRY_SIZE, entry_pos
-                )));
-            }
-            let frame_end = len_end.checked_add(len).ok_or_else(|| {
-                ContextraError::Storage("MANIFEST frame end overflow".into())
-            })?;
-            if frame_end > data.len() {
-                let partial = data.get(len_end..).ok_or_else(|| {
-                    ContextraError::Storage("MANIFEST partial frame range invalid".into())
-                })?;
-                if is_valid_tail_truncation_candidate(len, partial) {
-                    tracing::warn!("MANIFEST tail truncation detected at offset {entry_pos}");
-                    break;
-                }
-                return Err(ContextraError::Storage(format!(
-                    "MANIFEST mid-file corruption at offset {}: invalid frame length {}",
-                    entry_pos, len
-                )));
-            }
-            let entry_raw = data.get(len_end..frame_end).ok_or_else(|| {
-                ContextraError::Storage("MANIFEST frame range invalid".into())
-            })?;
-            pos = frame_end;
-            match ManifestEntry::from_bytes(entry_raw) {
-                Ok(entry) => entries.push(entry),
-                Err(error) if pos == data.len() => {
-                    tracing::warn!(
-                        "MANIFEST final-frame CRC/decoding error at EOF offset {}; discarding torn tail: {}",
-                        entry_pos, error
-                    );
-                    break;
-                }
-                Err(error) => {
-                    return Err(ContextraError::Storage(format!(
-                        "MANIFEST entry corruption at offset {}: {}",
-                        entry_pos, error
-                    )))
-                }
-            }
-        }
-        Ok(entries)
+        parse_manifest_bytes(&data).map(|(entries, _, _)| entries)
     }
 
     /// Reconstructs the ordered list of currently valid SSTable file names (or path components)

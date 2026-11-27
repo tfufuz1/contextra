@@ -29,6 +29,7 @@ use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use contextra_ports::{VfsFile, VfsOpenOptions};
 
 // ANCHOR[contextra-testkit:FAULT-CONFIG-STRUCT-001]
 /// Konfiguration für deterministische Fehlerinjektion in [`FaultVfs`].
@@ -237,6 +238,38 @@ impl FaultVfs {
 }
 
 impl contextra_ports::Vfs for FaultVfs {
+    fn open(
+        &self,
+        path: &Path,
+        options: &VfsOpenOptions,
+    ) -> contextra_types::Result<Box<dyn VfsFile>> {
+        let exists = self.files.read().contains_key(path);
+        if options.create_new && exists {
+            return Err(contextra_types::ContextraError::Io(io::Error::new(
+                ErrorKind::AlreadyExists,
+                "File already exists in FaultVfs",
+            )));
+        }
+        if !exists && !(options.create || options.create_new) {
+            return Err(contextra_types::ContextraError::Io(io::Error::new(
+                ErrorKind::NotFound,
+                "File not found in FaultVfs",
+            )));
+        }
+        if options.create || options.create_new {
+            self.files.write().entry(path.to_path_buf()).or_default();
+        }
+        if options.truncate {
+            self.check_write_fault()
+                .map_err(contextra_types::ContextraError::Io)?;
+            self.files.write().insert(path.to_path_buf(), Vec::new());
+        }
+        Ok(Box::new(FaultVfsFile {
+            vfs: self.clone(),
+            path: path.to_path_buf(),
+        }))
+    }
+
     fn read(&self, path: &Path) -> contextra_types::Result<Vec<u8>> {
         self.read_file(path)
             .map_err(contextra_types::ContextraError::Io)
@@ -268,6 +301,17 @@ impl contextra_ports::Vfs for FaultVfs {
                 path.display().to_string(),
             ))
         }
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> contextra_types::Result<()> {
+        self.check_write_fault()
+            .map_err(contextra_types::ContextraError::Io)?;
+        let mut files = self.files.write();
+        let contents = files.remove(from).ok_or_else(|| {
+            contextra_types::ContextraError::NotFound(from.display().to_string())
+        })?;
+        files.insert(to.to_path_buf(), contents);
+        Ok(())
     }
 
     fn exists(&self, path: &Path) -> contextra_types::Result<bool> {
@@ -306,6 +350,78 @@ impl contextra_ports::Vfs for FaultVfs {
 
     fn sync_dir(&self, _path: &Path) -> contextra_types::Result<()> {
         self.sync().map_err(contextra_types::ContextraError::Io)
+    }
+}
+
+struct FaultVfsFile {
+    vfs: FaultVfs,
+    path: PathBuf,
+}
+
+impl VfsFile for FaultVfsFile {
+    fn read_at(&self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
+        self.vfs.check_read_fault()?;
+        let offset = usize::try_from(offset)
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "offset overflow"))?;
+        let files = self.vfs.files.read();
+        let data = files
+            .get(&self.path)
+            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found"))?;
+        if offset >= data.len() {
+            return Ok(0);
+        }
+        let count = buf.len().min(data.len() - offset);
+        buf.get_mut(..count)
+            .ok_or_else(|| io::Error::new(ErrorKind::InvalidInput, "read range invalid"))?
+            .copy_from_slice(data.get(offset..offset + count).ok_or_else(|| {
+                io::Error::new(ErrorKind::InvalidInput, "file range invalid")
+            })?);
+        Ok(count)
+    }
+
+    fn write_at(&self, buf: &[u8], offset: u64) -> io::Result<usize> {
+        self.vfs.check_write_fault()?;
+        let offset = usize::try_from(offset)
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "offset overflow"))?;
+        let end = offset
+            .checked_add(buf.len())
+            .ok_or_else(|| io::Error::new(ErrorKind::InvalidInput, "write range overflow"))?;
+        let mut files = self.vfs.files.write();
+        let data = files.entry(self.path.clone()).or_default();
+        if data.len() < end {
+            data.resize(end, 0);
+        }
+        data.get_mut(offset..end)
+            .ok_or_else(|| io::Error::new(ErrorKind::InvalidInput, "write range invalid"))?
+            .copy_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn set_len(&self, len: u64) -> io::Result<()> {
+        self.vfs.check_write_fault()?;
+        let len = usize::try_from(len)
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "length overflow"))?;
+        let mut files = self.vfs.files.write();
+        let data = files.entry(self.path.clone()).or_default();
+        data.resize(len, 0);
+        Ok(())
+    }
+
+    fn len(&self) -> io::Result<u64> {
+        let files = self.vfs.files.read();
+        let len = files
+            .get(&self.path)
+            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found"))?
+            .len();
+        u64::try_from(len).map_err(|_| io::Error::new(ErrorKind::InvalidData, "length overflow"))
+    }
+
+    fn sync_data(&self) -> io::Result<()> {
+        self.vfs.sync()
+    }
+
+    fn sync_all(&self) -> io::Result<()> {
+        self.vfs.sync()
     }
 }
 

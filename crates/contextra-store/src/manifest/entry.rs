@@ -14,11 +14,307 @@ use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
 use super::MAX_MANIFEST_ENTRY_SIZE;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 fn checked_u32_len(len: usize, field: &str) -> Result<u32> {
     u32::try_from(len).map_err(|_| {
         ContextraError::Serialization(format!("Manifest {field} exceeds u32 length"))
     })
+}
+
+fn encode_name(path: &Path, out: &mut Vec<u8>) -> Result<()> {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| ContextraError::Serialization("SST name is not valid UTF-8".into()))?;
+    if !name.ends_with(".sst") || name.contains('/') || name.contains('\\') {
+        return Err(ContextraError::Serialization(format!(
+            "Invalid SST name: {name}"
+        )));
+    }
+    let bytes = name.as_bytes();
+    let len = u16::try_from(bytes.len())
+        .map_err(|_| ContextraError::Serialization("SST name exceeds u16 length".into()))?;
+    out.extend_from_slice(&len.to_le_bytes());
+    out.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn encode_v2_entry(entry: &ManifestEntry, out: &mut Vec<u8>) -> Result<()> {
+    match entry {
+        ManifestEntry::Add { path, max_tx } => {
+            out.push(1);
+            encode_name(path, out)?;
+            out.extend_from_slice(&max_tx.to_le_bytes());
+        }
+        ManifestEntry::Replace { removed, added, added_max_tx, .. } => {
+            out.push(2);
+            out.extend_from_slice(&checked_u32_len(removed.len(), "removed count")?.to_le_bytes());
+            for path in removed {
+                encode_name(path, out)?;
+            }
+            encode_name(added, out)?;
+            out.extend_from_slice(&added_max_tx.to_le_bytes());
+        }
+        ManifestEntry::Remove { path } => {
+            out.push(3);
+            encode_name(path, out)?;
+        }
+        ManifestEntry::RollbackComplete { target_tx } => {
+            out.push(4);
+            out.extend_from_slice(&target_tx.to_le_bytes());
+        }
+        ManifestEntry::WalCheckpoint { hmac } => {
+            out.push(5);
+            out.extend_from_slice(hmac);
+        }
+    }
+    Ok(())
+}
+
+fn finish_v2_frame(tag: u8, body: Vec<u8>) -> Result<Vec<u8>> {
+    let payload_len = body
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| ContextraError::Serialization("Manifest frame length overflow".into()))?;
+    let frame_len = payload_len
+        .checked_add(4)
+        .ok_or_else(|| ContextraError::Serialization("Manifest frame length overflow".into()))?;
+    if frame_len > MAX_MANIFEST_ENTRY_SIZE as usize {
+        return Err(ContextraError::Serialization("Manifest frame exceeds max size".into()));
+    }
+    let frame_len = checked_u32_len(frame_len, "frame")?;
+    let mut crc_payload = Vec::with_capacity(payload_len);
+    crc_payload.push(tag);
+    crc_payload.extend_from_slice(&body);
+    let crc = crc32fast::hash(&crc_payload);
+    let mut frame = Vec::with_capacity(8 + payload_len);
+    frame.extend_from_slice(&frame_len.to_le_bytes());
+    frame.extend_from_slice(&crc.to_le_bytes());
+    frame.extend_from_slice(&crc_payload);
+    Ok(frame)
+}
+
+pub(crate) fn encode_batch_frame(entries: &[ManifestEntry]) -> Result<Vec<u8>> {
+    let mut body = Vec::new();
+    body.extend_from_slice(&checked_u32_len(entries.len(), "batch count")?.to_le_bytes());
+    for entry in entries {
+        encode_v2_entry(entry, &mut body)?;
+    }
+    finish_v2_frame(1, body)
+}
+
+pub(crate) fn encode_snapshot_frame(
+    live: &BTreeMap<std::path::PathBuf, u64>,
+    dead: &BTreeSet<std::path::PathBuf>,
+    rollbacks: &BTreeSet<u64>,
+    wal_hwm: Option<[u8; 32]>,
+) -> Result<Vec<u8>> {
+    let mut body = Vec::new();
+    body.extend_from_slice(&checked_u32_len(live.len(), "live count")?.to_le_bytes());
+    for (name, max_tx) in live {
+        encode_name(name, &mut body)?;
+        body.extend_from_slice(&max_tx.to_le_bytes());
+    }
+    body.extend_from_slice(&checked_u32_len(dead.len(), "dead count")?.to_le_bytes());
+    for name in dead {
+        encode_name(name, &mut body)?;
+    }
+    body.extend_from_slice(&checked_u32_len(rollbacks.len(), "rollback count")?.to_le_bytes());
+    for target_tx in rollbacks {
+        body.extend_from_slice(&target_tx.to_le_bytes());
+    }
+    match wal_hwm {
+        Some(hmac) => {
+            body.push(1);
+            body.extend_from_slice(&hmac);
+        }
+        None => body.push(0),
+    }
+    finish_v2_frame(2, body)
+}
+
+fn take<'a>(data: &'a [u8], pos: &mut usize, len: usize) -> Result<&'a [u8]> {
+    let end = pos
+        .checked_add(len)
+        .ok_or_else(|| ContextraError::Serialization("Manifest offset overflow".into()))?;
+    let result = data
+        .get(*pos..end)
+        .ok_or_else(|| ContextraError::Serialization("Truncated v2 manifest frame".into()))?;
+    *pos = end;
+    Ok(result)
+}
+
+fn take_u16(data: &[u8], pos: &mut usize) -> Result<u16> {
+    Ok(u16::from_le_bytes(take(data, pos, 2)?.try_into().map_err(|_| {
+        ContextraError::Serialization("Invalid u16 in manifest frame".into())
+    })?))
+}
+
+fn take_u32(data: &[u8], pos: &mut usize) -> Result<u32> {
+    Ok(u32::from_le_bytes(take(data, pos, 4)?.try_into().map_err(|_| {
+        ContextraError::Serialization("Invalid u32 in manifest frame".into())
+    })?))
+}
+
+fn take_u64(data: &[u8], pos: &mut usize) -> Result<u64> {
+    Ok(u64::from_le_bytes(take(data, pos, 8)?.try_into().map_err(|_| {
+        ContextraError::Serialization("Invalid u64 in manifest frame".into())
+    })?))
+}
+
+fn take_name(data: &[u8], pos: &mut usize) -> Result<std::path::PathBuf> {
+    let len = usize::from(take_u16(data, pos)?);
+    let bytes = take(data, pos, len)?;
+    let name = std::str::from_utf8(bytes)
+        .map_err(|error| ContextraError::Serialization(format!("Invalid SST name UTF-8: {error}")))?;
+    if !name.ends_with(".sst") || name.contains('/') || name.contains('\\') {
+        return Err(ContextraError::Serialization(format!("Invalid SST name: {name}")));
+    }
+    Ok(std::path::PathBuf::from(name))
+}
+
+fn decode_v2_entry(data: &[u8], pos: &mut usize) -> Result<ManifestEntry> {
+    let tag = *take(data, pos, 1)?
+        .first()
+        .ok_or_else(|| ContextraError::Serialization("Missing manifest entry tag".into()))?;
+    match tag {
+        1 => Ok(ManifestEntry::Add {
+            path: take_name(data, pos)?,
+            max_tx: take_u64(data, pos)?,
+        }),
+        2 => {
+            let count = usize::try_from(take_u32(data, pos)?).map_err(|_| {
+                ContextraError::Serialization("Removed count not representable".into())
+            })?;
+            if count > data.len().saturating_sub(*pos) / 6 {
+                return Err(ContextraError::Serialization(
+                    "Removed count exceeds remaining manifest frame".into(),
+                ));
+            }
+            let mut removed = Vec::with_capacity(count);
+            for _ in 0..count {
+                removed.push(take_name(data, pos)?);
+            }
+            let added = take_name(data, pos)?;
+            let added_max_tx = take_u64(data, pos)?;
+            Ok(ManifestEntry::Replace {
+                removed,
+                added,
+                added_max_tx,
+                rank: 0,
+            })
+        }
+        3 => Ok(ManifestEntry::Remove {
+            path: take_name(data, pos)?,
+        }),
+        4 => Ok(ManifestEntry::RollbackComplete {
+            target_tx: take_u64(data, pos)?,
+        }),
+        5 => Ok(ManifestEntry::WalCheckpoint {
+            hmac: take(data, pos, 32)?.try_into().map_err(|_| {
+                ContextraError::Serialization("Invalid WAL HWM size".into())
+            })?,
+        }),
+        _ => Err(ContextraError::Serialization(format!(
+            "Unknown v2 manifest entry tag {tag}"
+        ))),
+    }
+}
+
+pub(crate) fn decode_v2_frame(raw: &[u8]) -> Result<Vec<ManifestEntry>> {
+    if raw.len() < 5 {
+        return Err(ContextraError::Serialization("v2 manifest frame too short".into()));
+    }
+    let stored_crc = u32::from_le_bytes(raw.get(..4).ok_or_else(|| {
+        ContextraError::Serialization("Missing v2 manifest CRC".into())
+    })?.try_into().map_err(|_| ContextraError::Serialization("Invalid v2 manifest CRC".into()))?);
+    let payload = raw.get(4..).ok_or_else(|| {
+        ContextraError::Serialization("Missing v2 manifest payload".into())
+    })?;
+    if crc32fast::hash(payload) != stored_crc {
+        return Err(ContextraError::Serialization("v2 manifest CRC mismatch".into()));
+    }
+    let mut pos = 1usize;
+    let tag = *payload.first().ok_or_else(|| {
+        ContextraError::Serialization("Missing v2 manifest frame tag".into())
+    })?;
+    let mut entries = Vec::new();
+    match tag {
+        1 => {
+            let count = usize::try_from(take_u32(payload, &mut pos)?).map_err(|_| {
+                ContextraError::Serialization("Batch count not representable".into())
+            })?;
+            if count > payload.len().saturating_sub(pos) {
+                return Err(ContextraError::Serialization(
+                    "Batch count exceeds remaining manifest frame".into(),
+                ));
+            }
+            for _ in 0..count {
+                entries.push(decode_v2_entry(payload, &mut pos)?);
+            }
+        }
+        2 => {
+            let live_count = usize::try_from(take_u32(payload, &mut pos)?).map_err(|_| {
+                ContextraError::Serialization("Live count not representable".into())
+            })?;
+            if live_count > payload.len().saturating_sub(pos) / 14 {
+                return Err(ContextraError::Serialization(
+                    "Live count exceeds remaining snapshot frame".into(),
+                ));
+            }
+            for _ in 0..live_count {
+                entries.push(ManifestEntry::Add {
+                    path: take_name(payload, &mut pos)?,
+                    max_tx: take_u64(payload, &mut pos)?,
+                });
+            }
+            let dead_count = usize::try_from(take_u32(payload, &mut pos)?).map_err(|_| {
+                ContextraError::Serialization("Dead count not representable".into())
+            })?;
+            if dead_count > payload.len().saturating_sub(pos) / 6 {
+                return Err(ContextraError::Serialization(
+                    "Dead count exceeds remaining snapshot frame".into(),
+                ));
+            }
+            for _ in 0..dead_count {
+                entries.push(ManifestEntry::Remove {
+                    path: take_name(payload, &mut pos)?,
+                });
+            }
+            let rollback_count = usize::try_from(take_u32(payload, &mut pos)?).map_err(|_| {
+                ContextraError::Serialization("Rollback count not representable".into())
+            })?;
+            if rollback_count > payload.len().saturating_sub(pos) / 8 {
+                return Err(ContextraError::Serialization(
+                    "Rollback count exceeds remaining snapshot frame".into(),
+                ));
+            }
+            for _ in 0..rollback_count {
+                entries.push(ManifestEntry::RollbackComplete {
+                    target_tx: take_u64(payload, &mut pos)?,
+                });
+            }
+            let has_hwm = *take(payload, &mut pos, 1)?.first().ok_or_else(|| {
+                ContextraError::Serialization("Missing snapshot HWM flag".into())
+            })?;
+            match has_hwm {
+                0 => {}
+                1 => entries.push(ManifestEntry::WalCheckpoint {
+                    hmac: take(payload, &mut pos, 32)?.try_into().map_err(|_| {
+                        ContextraError::Serialization("Invalid snapshot HWM".into())
+                    })?,
+                }),
+                _ => return Err(ContextraError::Serialization("Invalid snapshot HWM flag".into())),
+            }
+        }
+        _ => return Err(ContextraError::Serialization(format!("Unknown v2 manifest frame tag {tag}"))),
+    }
+    if pos != payload.len() {
+        return Err(ContextraError::Serialization("Trailing bytes in v2 manifest frame".into()));
+    }
+    Ok(entries)
 }
 
 /// An entry in the SSTable manifest log.

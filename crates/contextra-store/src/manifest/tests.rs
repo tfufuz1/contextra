@@ -6,6 +6,49 @@ use super::*;
 use std::path::{Path, PathBuf};
 use tempfile::tempdir;
 
+#[test]
+fn manifest_v2_batch_and_snapshot_frames_roundtrip() {
+    let batch = vec![
+        ManifestEntry::Add {
+            path: PathBuf::from("live.sst"),
+            max_tx: 22,
+        },
+        ManifestEntry::Replace {
+            removed: vec![PathBuf::from("old.sst")],
+            added: PathBuf::from("new.sst"),
+            added_max_tx: 23,
+            rank: 99,
+        },
+        ManifestEntry::WalCheckpoint { hmac: [0x37; 32] },
+    ];
+    let encoded = super::entry::encode_batch_frame(&batch).expect("encode batch");
+    let frame = encoded.get(4..).expect("frame payload");
+    let decoded = super::entry::decode_v2_frame(frame).expect("decode batch");
+    assert_eq!(decoded[0], batch[0]);
+    assert_eq!(decoded[1], ManifestEntry::Replace {
+        removed: vec![PathBuf::from("old.sst")],
+        added: PathBuf::from("new.sst"),
+        added_max_tx: 23,
+        rank: 0,
+    });
+    assert_eq!(decoded[2], batch[2]);
+
+    let state = super::state::ManifestState::from_entries(&[
+        ManifestEntry::Add { path: PathBuf::from("live.sst"), max_tx: 22 },
+        ManifestEntry::Add { path: PathBuf::from("dead.sst"), max_tx: 21 },
+        ManifestEntry::Remove { path: PathBuf::from("dead.sst") },
+        ManifestEntry::RollbackComplete { target_tx: 9 },
+        ManifestEntry::WalCheckpoint { hmac: [0x37; 32] },
+    ]).expect("reduce state");
+    let snapshot = state.snapshot_frame().expect("encode snapshot");
+    let decoded = super::entry::decode_v2_frame(snapshot.get(4..).expect("snapshot payload"))
+        .expect("decode snapshot");
+    let restored = super::state::ManifestState::from_entries(&decoded).expect("restore snapshot state");
+    assert_eq!(restored.live(), state.live());
+    assert_eq!(restored.dead(), state.dead());
+    assert_eq!(restored.wal_hwm(), state.wal_hwm());
+}
+
 #[tokio::test]
 async fn manifest_rollover_keeps_wal_hwm_and_dead_sstables() {
     let dir = tempdir().expect("tempdir");
@@ -22,7 +65,7 @@ async fn manifest_rollover_keeps_wal_hwm_and_dead_sstables() {
     ] {
         manifest.append(&entry).await.expect("append manifest entry");
     }
-    manifest.rollover(&[]).await.expect("rollover");
+    manifest.rollover().await.expect("rollover");
 
     let entries = Manifest::load(&path).await.expect("load rolled manifest");
     assert_eq!(Manifest::extract_high_water_mark(&entries), Some(hwm));
@@ -43,6 +86,71 @@ async fn manifest_load_propagates_vfs_read_errors() {
     });
     let io = crate::io_seam::StoreIo::new(std::sync::Arc::new(vfs));
     assert!(Manifest::load_with_io(&path, io).await.is_err());
+}
+
+#[tokio::test]
+async fn manifest_rollover_post_rename_fault_poisons_handle() {
+    let vfs = contextra_testkit::FaultVfs::new();
+    let io = crate::io_seam::StoreIo::new(std::sync::Arc::new(vfs.clone()));
+    let path = PathBuf::from("data/MANIFEST");
+    let manifest = Manifest::open_with_io(&path, None, io.clone())
+        .await
+        .expect("open manifest on fault VFS");
+    manifest
+        .append(&ManifestEntry::Add {
+            path: PathBuf::from("kept.sst"),
+            max_tx: 11,
+        })
+        .await
+        .expect("append live SSTable");
+
+    vfs.reset_counters();
+    vfs.set_config(contextra_testkit::FaultConfig {
+        // Rollover syncs the temp append, the temp inode, then the renamed directory entry.
+        fail_syncs_after: Some(2),
+        ..Default::default()
+    });
+    assert!(manifest.rollover().await.is_err());
+    assert!(manifest.is_poisoned());
+    assert!(manifest
+        .append(&ManifestEntry::WalCheckpoint { hmac: [9; 32] })
+        .await
+        .is_err());
+
+    drop(manifest);
+    vfs.reset_counters();
+    vfs.set_config(contextra_testkit::FaultConfig::default());
+    let recovered = Manifest::open_with_io(&path, None, io).await;
+    assert!(recovered.is_ok(), "renamed snapshot must be readable after restart");
+    let entries = Manifest::load_with_io(&path, crate::io_seam::StoreIo::new(std::sync::Arc::new(vfs)))
+        .await
+        .expect("load renamed snapshot");
+    let state = super::state::ManifestState::from_entries(&entries).expect("reduce snapshot");
+    assert_eq!(state.live().get(Path::new("kept.sst")), Some(&11));
+}
+
+#[tokio::test]
+async fn manifest_v1_is_migrated_with_backup_to_v2_snapshot() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("MANIFEST");
+    let entry = ManifestEntry::Add {
+        path: PathBuf::from("legacy.sst"),
+        max_tx: 42,
+    };
+    let mut legacy = b"MFMN\x01".to_vec();
+    legacy.extend_from_slice(&entry.to_bytes().expect("encode v1 entry"));
+    tokio::fs::write(&path, &legacy).await.expect("write v1 manifest");
+
+    let manifest = Manifest::open(&path).await.expect("migrate v1 manifest");
+    let bytes = tokio::fs::read(&path).await.expect("read migrated manifest");
+    assert_eq!(bytes.get(..5), Some(b"CMAN\x02".as_slice()));
+    assert!(tokio::fs::try_exists(dir.path().join("MANIFEST.v1.bak"))
+        .await
+        .expect("check backup"));
+    let entries = Manifest::load(&path).await.expect("load migrated entries");
+    let state = super::state::ManifestState::from_entries(&entries).expect("reduce migrated entries");
+    assert_eq!(state.live().get(Path::new("legacy.sst")), Some(&42));
+    drop(manifest);
 }
 
 #[test]
@@ -96,10 +204,11 @@ async fn test_manifest_crc_corruption_detection() {
     manifest.append(&entry2).await.expect("append 2");
     drop(manifest);
 
-    // Corrupt entry 2 (flip bytes near the end of the file)
+    // Corrupt the first batch while a later frame remains; mid-file CRC errors fail closed.
     let mut file_bytes = tokio::fs::read(&manifest_path).await.expect("read file");
-    let len = file_bytes.len();
-    file_bytes[len - 2] ^= 0xFF;
+    let snapshot_len = u32::from_le_bytes(file_bytes[5..9].try_into().expect("snapshot length")) as usize;
+    let first_batch_offset = 5 + 4 + snapshot_len;
+    file_bytes[first_batch_offset + 9] ^= 0xFF;
     tokio::fs::write(&manifest_path, file_bytes)
         .await
         .expect("write corrupted file");
@@ -276,16 +385,9 @@ async fn test_manifest_rollover_reduces_size_and_preserves_live_sstables() {
         .expect("pre metadata")
         .len();
 
-    let live_entries_snapshot: Vec<ManifestEntry> = (46..=50)
-        .map(|i| ManifestEntry::Add {
-            path: PathBuf::from(format!("sst-{:04}.sst", i)),
-            max_tx: i as u64,
-        })
-        .collect();
-
-    // Perform rollover with threshold lower than pre_size
+    // Perform rollover with threshold lower than pre_size; state comes from Manifest itself.
     let rolled_over = manifest
-        .maybe_rollover(&live_entries_snapshot, 100)
+        .maybe_rollover(100)
         .await
         .expect("maybe_rollover should succeed");
     assert!(rolled_over, "Rollover should have been triggered");
@@ -410,7 +512,7 @@ async fn test_manifest_rollover_restart_recovery() {
         }
 
         let rolled = manifest
-            .maybe_rollover(&live_sstables, 1)
+            .maybe_rollover(1)
             .await
             .expect("rollover");
         assert!(rolled);
@@ -444,8 +546,7 @@ async fn test_manifest_explicit_rollover() {
     };
     manifest.append(&entry1).await.expect("append 1");
 
-    let live = vec![entry1.clone()];
-    manifest.rollover(&live).await.expect("explicit rollover");
+    manifest.rollover().await.expect("explicit rollover");
 
     let loaded = Manifest::load(&manifest_path).await.expect("load manifest");
     assert_eq!(loaded.len(), 1);

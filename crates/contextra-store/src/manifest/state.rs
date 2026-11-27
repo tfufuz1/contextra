@@ -78,26 +78,12 @@ impl ManifestState {
         self.wal_hwm
     }
 
-    pub(crate) fn snapshot_entries(&self) -> Vec<ManifestEntry> {
-        let mut snapshot = self
-            .live
-            .iter()
-            .map(|(name, max_tx)| ManifestEntry::Add {
-                path: name.clone(),
-                max_tx: *max_tx,
-            })
-            .collect::<Vec<_>>();
-        snapshot.extend(self.dead.iter().cloned().map(|path| ManifestEntry::Remove { path }));
-        snapshot.extend(
-            self.rollbacks
-                .iter()
-                .map(|target_tx| ManifestEntry::RollbackComplete {
-                    target_tx: *target_tx,
-                }),
-        );
-        if let Some(hmac) = self.wal_hwm {
-            snapshot.push(ManifestEntry::WalCheckpoint { hmac });
-        }
-        snapshot
+    pub(crate) fn snapshot_frame(&self) -> Result<Vec<u8>> {
+        super::entry::encode_snapshot_frame(
+            &self.live,
+            &self.dead,
+            &self.rollbacks,
+            self.wal_hwm,
+        )
     }
 }

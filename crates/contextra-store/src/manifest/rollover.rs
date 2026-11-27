@@ -11,7 +11,6 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 
 use super::core::Manifest;
-use super::entry::ManifestEntry;
 
 async fn write_durable_temp(io: &StoreIo, path: &Path, contents: Vec<u8>) -> Result<()> {
     let options = VfsOpenOptions {
@@ -36,24 +35,12 @@ async fn write_durable_temp(io: &StoreIo, path: &Path, contents: Vec<u8>) -> Res
 }
 
 impl Manifest {
-    /// Evaluates whether the MANIFEST file size exceeds `threshold_bytes` and performs an atomic
-    /// rollover if needed.
-    ///
-    /// Rollover process:
-    /// (a) Write current live entries (`live_entries`) as a snapshot into a temporary `MANIFEST.new` file.
-    /// (b) `flush` + `sync_all` on the temporary file.
-    /// (c) Atomically `rename` temporary file to `MANIFEST`.
-    /// (d) `fsync` the parent directory.
-    /// (e) Re-open `MANIFEST` handle in append mode and update `self.file`.
-    ///
-    /// If an error occurs prior to `rename`, the temporary file is cleaned up and the original `MANIFEST`
-    /// remains untouched and valid.
-    /// Forces an atomic rollover of the MANIFEST file regardless of current size.
+    /// Forces an atomic rollover from the state owned by this Manifest.
     ///
     /// Writes live entries into `MANIFEST.new.<pid>.<rand>`, flushes, fsyncs,
     /// atomically renames to `MANIFEST`, and fsyncs the parent directory.
-    pub async fn rollover(&self, live_entries: &[ManifestEntry]) -> Result<()> {
-        let _ = self.maybe_rollover(live_entries, 0).await?;
+    pub async fn rollover(&self) -> Result<()> {
+        let _ = self.maybe_rollover(0).await?;
         Ok(())
     }
 
@@ -61,7 +48,7 @@ impl Manifest {
     /// rollover if needed.
     ///
     /// Rollover process:
-    /// (a) Write current live entries (`live_entries`) as a snapshot into a temporary `MANIFEST.new` file.
+    /// (a) Write this Manifest's reduced state as a snapshot into a temporary file.
     /// (b) `flush` + `sync_all` on the temporary file.
     /// (c) Atomically `rename` temporary file to `MANIFEST`.
     /// (d) `fsync` the parent directory.
@@ -69,14 +56,11 @@ impl Manifest {
     ///
     /// If an error occurs prior to `rename`, the temporary file is cleaned up and the original `MANIFEST`
     /// remains untouched and valid.
-    pub async fn maybe_rollover(
-        &self,
-        _live_entries: &[ManifestEntry],
-        threshold_bytes: u64,
-    ) -> Result<bool> {
+    pub async fn maybe_rollover(&self, threshold_bytes: u64) -> Result<bool> {
         let _operation = self.operation_lock.lock().await;
         let current_len = self.file.lock().committed_len();
-        let durable_entries = self.state.lock().await.snapshot_entries();
+        let state_snapshot = self.state.lock().await.clone();
+        let snapshot_frame = state_snapshot.snapshot_frame()?;
         if current_len < threshold_bytes {
             return Ok(false);
         }
@@ -116,14 +100,9 @@ impl Manifest {
             let mut header = Vec::with_capacity(5);
             header.extend_from_slice(super::core::MANIFEST_HEADER_MAGIC);
             header.push(super::core::CURRENT_MANIFEST_VERSION);
-            let mut contents = header;
+            header.extend_from_slice(&snapshot_frame);
 
-            for entry in &durable_entries {
-                let bytes = entry.to_bytes()?;
-                contents.extend_from_slice(&bytes);
-            }
-
-            write_durable_temp(&self.io, &tmp_path, contents).await?;
+            write_durable_temp(&self.io, &tmp_path, header).await?;
 
             self.io.rename(&tmp_path, &self.path).await.map_err(|e| {
                 ContextraError::Storage(format!(
@@ -181,7 +160,7 @@ impl Manifest {
 
         tracing::info!(
             path = ?self.path,
-            durable_entries_count = durable_entries.len(),
+            live_entries_count = state_snapshot.live().len(),
             "MANIFEST rollover completed successfully"
         );
 
