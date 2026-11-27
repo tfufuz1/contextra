@@ -40,7 +40,9 @@ pub(crate) fn encode_layer(layer: &WitnessLayer, out: &mut Vec<u8>) -> Result<()
         WitnessLayer::Custom(s) => {
             let b = s.as_bytes();
             if b.len() > 64 {
-                return Err(ErasureError::InvalidTarget("custom layer name exceeds 64 bytes"));
+                return Err(ErasureError::InvalidTarget(
+                    "custom layer name exceeds 64 bytes",
+                ));
             }
             out.push(0xFF);
             out.push(b.len() as u8);
@@ -64,7 +66,9 @@ pub(crate) fn decode_layer(r: &mut ByteReader<'_>) -> Result<WitnessLayer, Erasu
         0xFF => {
             let len = r.read_u8()? as usize;
             if len > 64 {
-                return Err(ErasureError::Io("custom layer name exceeds 64 bytes".into()));
+                return Err(ErasureError::Io(
+                    "custom layer name exceeds 64 bytes".into(),
+                ));
             }
             let bytes = r.read_bytes(len)?;
             let s = std::str::from_utf8(bytes)
@@ -187,7 +191,10 @@ pub(crate) fn decode_error_kind(tag: u8) -> Result<LayerErrorKind, ErasureError>
     }
 }
 
-pub(crate) fn encode_exceptions(excs: &[ErasureException], out: &mut Vec<u8>) -> Result<(), ErasureError> {
+pub(crate) fn encode_exceptions(
+    excs: &[ErasureException],
+    out: &mut Vec<u8>,
+) -> Result<(), ErasureError> {
     let n = u16::try_from(excs.len())
         .map_err(|_| ErasureError::InvalidTarget("too many exceptions"))?;
     out.extend_from_slice(&n.to_le_bytes());
@@ -232,7 +239,9 @@ pub(crate) fn encode_exceptions(excs: &[ErasureException], out: &mut Vec<u8>) ->
     Ok(())
 }
 
-pub(crate) fn decode_exceptions(r: &mut ByteReader<'_>) -> Result<Vec<ErasureException>, ErasureError> {
+pub(crate) fn decode_exceptions(
+    r: &mut ByteReader<'_>,
+) -> Result<Vec<ErasureException>, ErasureError> {
     let n = r.read_u16()? as usize;
     let mut out = Vec::with_capacity(n.min(256));
     for _ in 0..n {
@@ -302,8 +311,8 @@ pub(crate) fn encode_resolved_scope(scope: &ResolvedScope) -> Result<Vec<u8>, Er
         out.push(v_tag);
         out.push(k_tag);
         let b = pat.bytes();
-        let len = u32::try_from(b.len())
-            .map_err(|_| ErasureError::InvalidTarget("pattern too large"))?;
+        let len =
+            u32::try_from(b.len()).map_err(|_| ErasureError::InvalidTarget("pattern too large"))?;
         out.extend_from_slice(&len.to_le_bytes());
         out.extend_from_slice(b);
     }
@@ -360,7 +369,9 @@ pub(crate) fn decode_resolved_scope(blob: &[u8]) -> Result<ResolvedScope, Erasur
 
     let n_rules = r.read_u32()? as usize;
     if n_rules > KeyScope::MAX_RULES {
-        return Err(ErasureError::Io("rule count exceeds KeyScope::MAX_RULES".into()));
+        return Err(ErasureError::Io(
+            "rule count exceeds KeyScope::MAX_RULES".into(),
+        ));
     }
     let mut rules = Vec::with_capacity(n_rules);
     for _ in 0..n_rules {
@@ -743,7 +754,9 @@ impl JournalRecord {
         let body_len = u32::try_from(body.len())
             .map_err(|_| ErasureError::InvalidTarget("journal frame exceeds u32"))?;
         if body_len > max_plan_bytes {
-            return Err(ErasureError::InvalidTarget("journal frame exceeds max_plan_bytes"));
+            return Err(ErasureError::InvalidTarget(
+                "journal frame exceeds max_plan_bytes",
+            ));
         }
         let crc = crc32fast::hash(&body);
         let mut frame = Vec::with_capacity(FRAME_HEADER_LEN + body.len());
@@ -1077,37 +1090,38 @@ impl Journal {
             let dir_c = dir.clone();
             let path_c = path.clone();
             let target_len = reserve_bytes.max(JOURNAL_HEADER_LEN as u64);
-            let file_arc = tokio::task::spawn_blocking(move || -> Result<Arc<Mutex<Box<dyn VfsFile>>>, ErasureError> {
-                let opts = VfsOpenOptions {
-                    read: true,
-                    write: true,
-                    create: true,
-                    ..Default::default()
-                };
-                let f = io_c
-                    .open(&path_c, &opts)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                let mut hdr = [0u8; JOURNAL_HEADER_LEN];
-                hdr[..8].copy_from_slice(JOURNAL_MAGIC);
-                hdr[8..10].copy_from_slice(&JOURNAL_VERSION.to_le_bytes());
-                f.write_at(&hdr, 0)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                f.set_len(target_len)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                f.sync_all()
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                io_c.vfs()
-                    .sync_dir(&dir_c)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                if let Some(parent) = dir_c.parent() {
-                    if !parent.as_os_str().is_empty() {
-                        io_c.vfs()
-                            .sync_dir(parent)
-                            .map_err(|e| ErasureError::Io(e.to_string()))?;
+            let file_arc = tokio::task::spawn_blocking(
+                move || -> Result<Arc<Mutex<Box<dyn VfsFile>>>, ErasureError> {
+                    let opts = VfsOpenOptions {
+                        read: true,
+                        write: true,
+                        create: true,
+                        ..Default::default()
+                    };
+                    let f = io_c
+                        .open(&path_c, &opts)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    let mut hdr = [0u8; JOURNAL_HEADER_LEN];
+                    hdr[..8].copy_from_slice(JOURNAL_MAGIC);
+                    hdr[8..10].copy_from_slice(&JOURNAL_VERSION.to_le_bytes());
+                    f.write_at(&hdr, 0)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    f.set_len(target_len)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    f.sync_all().map_err(|e| ErasureError::Io(e.to_string()))?;
+                    io_c.vfs()
+                        .sync_dir(&dir_c)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    if let Some(parent) = dir_c.parent() {
+                        if !parent.as_os_str().is_empty() {
+                            io_c.vfs()
+                                .sync_dir(parent)
+                                .map_err(|e| ErasureError::Io(e.to_string()))?;
+                        }
                     }
-                }
-                Ok(Arc::new(Mutex::new(f)))
-            })
+                    Ok(Arc::new(Mutex::new(f)))
+                },
+            )
             .await
             .map_err(|e| ErasureError::Io(e.to_string()))??;
 
@@ -1142,30 +1156,31 @@ impl Journal {
             let dir_c = dir.clone();
             let path_c = path.clone();
             let target_len = reserve_bytes.max(JOURNAL_HEADER_LEN as u64);
-            let file_arc = tokio::task::spawn_blocking(move || -> Result<Arc<Mutex<Box<dyn VfsFile>>>, ErasureError> {
-                let opts = VfsOpenOptions {
-                    read: true,
-                    write: true,
-                    create: true,
-                    ..Default::default()
-                };
-                let f = io_c
-                    .open(&path_c, &opts)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                let mut hdr = [0u8; JOURNAL_HEADER_LEN];
-                hdr[..8].copy_from_slice(JOURNAL_MAGIC);
-                hdr[8..10].copy_from_slice(&JOURNAL_VERSION.to_le_bytes());
-                f.write_at(&hdr, 0)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                f.set_len(target_len)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                f.sync_all()
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                io_c.vfs()
-                    .sync_dir(&dir_c)
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                Ok(Arc::new(Mutex::new(f)))
-            })
+            let file_arc = tokio::task::spawn_blocking(
+                move || -> Result<Arc<Mutex<Box<dyn VfsFile>>>, ErasureError> {
+                    let opts = VfsOpenOptions {
+                        read: true,
+                        write: true,
+                        create: true,
+                        ..Default::default()
+                    };
+                    let f = io_c
+                        .open(&path_c, &opts)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    let mut hdr = [0u8; JOURNAL_HEADER_LEN];
+                    hdr[..8].copy_from_slice(JOURNAL_MAGIC);
+                    hdr[8..10].copy_from_slice(&JOURNAL_VERSION.to_le_bytes());
+                    f.write_at(&hdr, 0)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    f.set_len(target_len)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    f.sync_all().map_err(|e| ErasureError::Io(e.to_string()))?;
+                    io_c.vfs()
+                        .sync_dir(&dir_c)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    Ok(Arc::new(Mutex::new(f)))
+                },
+            )
             .await
             .map_err(|e| ErasureError::Io(e.to_string()))??;
 
@@ -1251,7 +1266,9 @@ impl Journal {
 
             if body_len > max_plan_bytes {
                 // Prüfen, ob es ein Torn Tail am Ende ist oder mitten in der Datei.
-                let expected_end = pos.saturating_add(FRAME_HEADER_LEN).saturating_add(body_len as usize);
+                let expected_end = pos
+                    .saturating_add(FRAME_HEADER_LEN)
+                    .saturating_add(body_len as usize);
                 if expected_end >= bytes.len() {
                     torn_tail_truncated = true;
                     break;
@@ -1303,7 +1320,10 @@ impl Journal {
 
             match JournalRecord::decode_body(body) {
                 Ok(rec) => {
-                    if matches!(rec, JournalRecord::Completed { .. } | JournalRecord::Summary { .. }) {
+                    if matches!(
+                        rec,
+                        JournalRecord::Completed { .. } | JournalRecord::Summary { .. }
+                    ) {
                         completed_count += 1;
                     }
                     records.push(rec);
@@ -1324,26 +1344,27 @@ impl Journal {
         let io_c = io.clone();
         let path_c = path.clone();
         let current_len = bytes.len() as u64;
-        let (file_arc, reserved_len) = tokio::task::spawn_blocking(move || -> Result<(Arc<Mutex<Box<dyn VfsFile>>>, u64), ErasureError> {
-            let opts = VfsOpenOptions {
-                read: true,
-                write: true,
-                ..Default::default()
-            };
-            let f = io_c
-                .open(&path_c, &opts)
-                .map_err(|e| ErasureError::Io(e.to_string()))?;
-            let final_len = if torn_tail_truncated {
-                f.set_len(valid_end)
+        let (file_arc, reserved_len) = tokio::task::spawn_blocking(
+            move || -> Result<(Arc<Mutex<Box<dyn VfsFile>>>, u64), ErasureError> {
+                let opts = VfsOpenOptions {
+                    read: true,
+                    write: true,
+                    ..Default::default()
+                };
+                let f = io_c
+                    .open(&path_c, &opts)
                     .map_err(|e| ErasureError::Io(e.to_string()))?;
-                f.sync_all()
-                    .map_err(|e| ErasureError::Io(e.to_string()))?;
-                valid_end
-            } else {
-                current_len.max(valid_end)
-            };
-            Ok((Arc::new(Mutex::new(f)), final_len))
-        })
+                let final_len = if torn_tail_truncated {
+                    f.set_len(valid_end)
+                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                    f.sync_all().map_err(|e| ErasureError::Io(e.to_string()))?;
+                    valid_end
+                } else {
+                    current_len.max(valid_end)
+                };
+                Ok((Arc::new(Mutex::new(f)), final_len))
+            },
+        )
         .await
         .map_err(|e| ErasureError::Io(e.to_string()))??;
 
@@ -1515,52 +1536,54 @@ impl Journal {
         let io_c = self.io.clone();
         let poisoned = Arc::clone(&self.poisoned);
 
-        let new_file_arc = tokio::task::spawn_blocking(move || -> Result<Arc<Mutex<Box<dyn VfsFile>>>, ErasureError> {
-            let opts_w = VfsOpenOptions {
-                read: true,
-                write: true,
-                create: true,
-                truncate: true,
-                ..Default::default()
-            };
-            let nf = io_c.open(&new_path, &opts_w).map_err(|_| {
-                poisoned.store(true, Ordering::Release);
-                ErasureError::JournalPoisoned
-            })?;
-            nf.write_at(&buf, 0).map_err(|_| {
-                poisoned.store(true, Ordering::Release);
-                ErasureError::JournalPoisoned
-            })?;
-            nf.set_len(target_len).map_err(|_| {
-                poisoned.store(true, Ordering::Release);
-                ErasureError::JournalPoisoned
-            })?;
-            nf.sync_all().map_err(|_| {
-                poisoned.store(true, Ordering::Release);
-                ErasureError::JournalPoisoned
-            })?;
-            drop(nf);
+        let new_file_arc = tokio::task::spawn_blocking(
+            move || -> Result<Arc<Mutex<Box<dyn VfsFile>>>, ErasureError> {
+                let opts_w = VfsOpenOptions {
+                    read: true,
+                    write: true,
+                    create: true,
+                    truncate: true,
+                    ..Default::default()
+                };
+                let nf = io_c.open(&new_path, &opts_w).map_err(|_| {
+                    poisoned.store(true, Ordering::Release);
+                    ErasureError::JournalPoisoned
+                })?;
+                nf.write_at(&buf, 0).map_err(|_| {
+                    poisoned.store(true, Ordering::Release);
+                    ErasureError::JournalPoisoned
+                })?;
+                nf.set_len(target_len).map_err(|_| {
+                    poisoned.store(true, Ordering::Release);
+                    ErasureError::JournalPoisoned
+                })?;
+                nf.sync_all().map_err(|_| {
+                    poisoned.store(true, Ordering::Release);
+                    ErasureError::JournalPoisoned
+                })?;
+                drop(nf);
 
-            io_c.vfs().rename(&new_path, &log_path).map_err(|_| {
-                poisoned.store(true, Ordering::Release);
-                ErasureError::JournalPoisoned
-            })?;
-            io_c.vfs().sync_dir(&dir_c).map_err(|_| {
-                poisoned.store(true, Ordering::Release);
-                ErasureError::JournalPoisoned
-            })?;
+                io_c.vfs().rename(&new_path, &log_path).map_err(|_| {
+                    poisoned.store(true, Ordering::Release);
+                    ErasureError::JournalPoisoned
+                })?;
+                io_c.vfs().sync_dir(&dir_c).map_err(|_| {
+                    poisoned.store(true, Ordering::Release);
+                    ErasureError::JournalPoisoned
+                })?;
 
-            let opts_rw = VfsOpenOptions {
-                read: true,
-                write: true,
-                ..Default::default()
-            };
-            let reopened = io_c.open(&log_path, &opts_rw).map_err(|_| {
-                poisoned.store(true, Ordering::Release);
-                ErasureError::JournalPoisoned
-            })?;
-            Ok(Arc::new(Mutex::new(reopened)))
-        })
+                let opts_rw = VfsOpenOptions {
+                    read: true,
+                    write: true,
+                    ..Default::default()
+                };
+                let reopened = io_c.open(&log_path, &opts_rw).map_err(|_| {
+                    poisoned.store(true, Ordering::Release);
+                    ErasureError::JournalPoisoned
+                })?;
+                Ok(Arc::new(Mutex::new(reopened)))
+            },
+        )
         .await
         .map_err(|_| {
             self.poisoned.store(true, Ordering::Release);
@@ -1707,9 +1730,10 @@ mod tests {
         let records = all_sample_records();
 
         {
-            let opened = Journal::open(io.clone(), dir.path().to_path_buf(), 4096, 16 * 1024 * 1024)
-                .await
-                .unwrap();
+            let opened =
+                Journal::open(io.clone(), dir.path().to_path_buf(), 4096, 16 * 1024 * 1024)
+                    .await
+                    .unwrap();
             assert!(!opened.corrupt);
             let mut j = opened.journal;
             j.append_batch(&records).await.unwrap();
@@ -1747,7 +1771,10 @@ mod tests {
         assert_eq!(&frame[9..25], &[0xAA; 16]);
         assert_eq!(&frame[25..33], &0x0102_0304_0506_0708u64.to_le_bytes());
         let expected_crc = crc32fast::hash(&frame[8..33]);
-        assert_eq!(u32::from_le_bytes(frame[4..8].try_into().unwrap()), expected_crc);
+        assert_eq!(
+            u32::from_le_bytes(frame[4..8].try_into().unwrap()),
+            expected_crc
+        );
     }
 
     /// TST-STORE-JRN-3: CP-13/CP-14 (Torn Tail vs. Korruption in der Mitte).

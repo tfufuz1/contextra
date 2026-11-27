@@ -396,7 +396,8 @@ fn test_current_thread_and_multithread_runtime_parity() {
         let s = Arc::new(LsmStorage::open(config).await.unwrap());
         let tenant_id = TenantId::try_new(42).unwrap();
         let codec = TenantKeyCodec::new(tenant_id);
-        let key = codec.encode_chunk_key(&contextra_types::CollectionId(1), contextra_types::DocId(7));
+        let key =
+            codec.encode_chunk_key(&contextra_types::CollectionId(1), contextra_types::DocId(7));
         s.put(TxId(1), &key, b"parity_test_value").await.unwrap();
         s.commit(TxId(1)).await.unwrap();
         s.flush().await.unwrap();
@@ -453,7 +454,10 @@ async fn test_worker_panic_mapped_to_err() {
         Ok::<(), contextra_types::ContextraError>(())
     });
 
-    assert!(res.is_err(), "Panics in worker must be caught and mapped to Err");
+    assert!(
+        res.is_err(),
+        "Panics in worker must be caught and mapped to Err"
+    );
     let err_str = res.unwrap_err().to_string();
     assert!(
         err_str.contains("Simulierter Worker Panic"),

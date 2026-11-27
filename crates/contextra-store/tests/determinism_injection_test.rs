@@ -80,9 +80,7 @@ async fn test_system_pressure_with_fake_clock() {
     let cancel_clone = cancel.clone();
 
     let handle = tokio::spawn(async move {
-        monitor
-            .run(cancel_clone, || 10, || 5, 10)
-            .await;
+        monitor.run(cancel_clone, || 10, || 5, 10).await;
     });
 
     clock.advance(Duration::from_millis(150));
@@ -117,8 +115,14 @@ async fn test_sstable_scanner_determinism_across_runs() {
 
     // Insert deterministic test data
     let tx = TxId(100);
-    storage.put(tx, b"t:canary:1:chunk:1", b"val1").await.unwrap();
-    storage.put(tx, b"t:canary:1:chunk:2", b"val2").await.unwrap();
+    storage
+        .put(tx, b"t:canary:1:chunk:1", b"val1")
+        .await
+        .unwrap();
+    storage
+        .put(tx, b"t:canary:1:chunk:2", b"val2")
+        .await
+        .unwrap();
     storage.commit(tx).await.unwrap();
     storage.flush().await.unwrap();
 

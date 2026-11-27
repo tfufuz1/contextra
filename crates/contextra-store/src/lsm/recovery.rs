@@ -270,11 +270,7 @@ impl LsmStorage {
             Option<[u8; 32]>,
         ) = if manifest_exists {
             let state = manifest.state_snapshot().await;
-            let valid_set = state
-                .live()
-                .keys()
-                .map(|name| name.to_path_buf())
-                .collect();
+            let valid_set = state.live().keys().map(|name| name.to_path_buf()).collect();
             let dead_set = state.dead().iter().map(|name| name.to_path_buf()).collect();
             let hwm = state.wal_hwm();
             (Some(valid_set), Some(dead_set), hwm)
@@ -500,7 +496,8 @@ impl LsmStorage {
                         match recovery_policy {
                             super::config::RecoveryPolicy::Fail => {
                                 return Err(ContextraError::Storage(format!(
-                                    "UnmanifestedSstable: {:?}", path
+                                    "UnmanifestedSstable: {:?}",
+                                    path
                                 )));
                             }
                             super::config::RecoveryPolicy::Adopt => {
@@ -510,23 +507,29 @@ impl LsmStorage {
                             }
                             super::config::RecoveryPolicy::Quarantine => {
                                 let quarantine_dir = config.path.join("quarantine");
-                                store_io.create_dir_all(&quarantine_dir).await.map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "Failed to create orphan quarantine directory: {e}"
-                                    ))
-                                })?;
+                                store_io
+                                    .create_dir_all(&quarantine_dir)
+                                    .await
+                                    .map_err(|e| {
+                                        ContextraError::Storage(format!(
+                                            "Failed to create orphan quarantine directory: {e}"
+                                        ))
+                                    })?;
                                 let quarantine_path = quarantine_dir.join(format!(
                                     "{}.{}.{}",
                                     file_name,
                                     clock_arc.now_unix_nanos(),
                                     next_temp_file_counter()
                                 ));
-                                store_io.rename(&path, &quarantine_path).await.map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "Failed to quarantine unmanifested SSTable {:?}: {e}",
-                                        path
-                                    ))
-                                })?;
+                                store_io
+                                    .rename(&path, &quarantine_path)
+                                    .await
+                                    .map_err(|e| {
+                                        ContextraError::Storage(format!(
+                                            "Failed to quarantine unmanifested SSTable {:?}: {e}",
+                                            path
+                                        ))
+                                    })?;
                                 store_io.sync_dir(&quarantine_dir).await?;
                                 store_io.sync_dir(&config.path).await?;
                                 reported_orphans.push(path.clone());
@@ -690,7 +693,9 @@ impl LsmStorage {
         let commit_mutex = Arc::new(tokio::sync::Mutex::new(()));
         let flush_mutex = Arc::new(tokio::sync::Mutex::new(()));
         let pending_sealed_wals = Arc::new(tokio::sync::Mutex::new(Vec::new()));
-        let flush_counter = Arc::new(AtomicU64::new(max_wal_id.map(|m| m.saturating_add(1)).unwrap_or(0)));
+        let flush_counter = Arc::new(AtomicU64::new(
+            max_wal_id.map(|m| m.saturating_add(1)).unwrap_or(0),
+        ));
         let segment_counter = Arc::new(AtomicU64::new(0));
 
         erasure.attach_deps(crate::erasure::purge_lsm::StoreDeps {
@@ -773,8 +778,7 @@ impl LsmStorage {
             };
             for (_ts, old_wal_path) in &wal_files[..wal_files.len() - 1] {
                 if old_wal_path != &active_wal_path {
-                    let uuid_sidecar =
-                        PathBuf::from(format!("{}.uuid", old_wal_path.display()));
+                    let uuid_sidecar = PathBuf::from(format!("{}.uuid", old_wal_path.display()));
                     if let Err(e) = storage
                         .erasure
                         .pending_ref()

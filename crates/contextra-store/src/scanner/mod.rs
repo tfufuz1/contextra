@@ -80,10 +80,8 @@ impl StoreInspector {
             SstableScanner::with_runtime(Arc::clone(&self.storage), self.runtime.clone());
         let wal_scanner = WalScanner::with_runtime(Arc::clone(&self.storage), self.runtime.clone());
 
-        let target = contextra_ports::scanner::ScanTarget::new(
-            "default",
-            *blake3::hash(key).as_bytes(),
-        );
+        let target =
+            contextra_ports::scanner::ScanTarget::new("default", *blake3::hash(key).as_bytes());
         let ctx = contextra_types::RequestContext::new(
             contextra_types::TenantId::new(0),
             contextra_types::TxId::new(0),

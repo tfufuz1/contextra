@@ -87,8 +87,8 @@ pub use compaction::{
 pub use key_source::{KeyMaterialSource, OsKeyMaterialSource, StaticKeyMaterialSource};
 #[cfg(not(loom))]
 pub use lsm::{
-    CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, RecoveryPolicy, WalEntryRef, WalObserver, WriteOrigin,
-    DEFAULT_MAX_OBSERVER_LATENCY,
+    CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, RecoveryPolicy, WalEntryRef,
+    WalObserver, WriteOrigin, DEFAULT_MAX_OBSERVER_LATENCY,
 };
 #[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};

@@ -1,6 +1,7 @@
 //! Write-Ahead Log (WAL) for durability and crash recovery with HMAC chaining.
 
 pub mod encode;
+mod file;
 pub mod flusher;
 pub mod hmac;
 pub mod io;
@@ -13,6 +14,7 @@ mod tests;
 mod open_heal_tests;
 
 pub use encode::*;
+pub(crate) use file::WalFile;
 pub use flusher::*;
 pub use hmac::*;
 pub use replay::*;
@@ -56,14 +58,17 @@ impl PoisonCause {
     }
 }
 
+/// Echtes Dateisystem **ausschließlich** für Schlüssel-, UUID- und Migrationsmarker-Dateien
+/// (`hmac.rs`). Diese brauchen `hard_link` (race-freie Erzeugung), Modus `0600` und ACLs, was
+/// der `Vfs`-Port nicht abbildet. Die WAL-Datendatei läuft vollständig über `StoreIo`.
 #[cfg(not(loom))]
-pub(crate) mod fs {
+pub(crate) mod secure_fs {
     pub use tokio::fs::*;
 }
 
 #[cfg(loom)]
-#[allow(dead_code)]
-pub(crate) mod fs {
+#[allow(dead_code)] // allow: Loom-Mock von secure_fs, nur Teilmenge wird genutzt
+pub(crate) mod secure_fs {
     use std::path::Path;
 
     // INVARIANT-KONFORM: Exklusiv in loom (Single-Thread / Loom-Simulation) für Mock-File-I/O verwendet.
@@ -323,6 +328,7 @@ pub(crate) mod fs {
 }
 
 pub use contextra_crypto::crypto::KeyManager;
+use contextra_ports::VfsOpenOptions;
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -364,16 +370,22 @@ pub struct WalConfig {
     pub min_wal_version: WalVersion,
     pub flusher_config: WalFlusherConfig,
     pub id_gen: Option<Arc<dyn contextra_ports::IdGen>>,
+    /// I/O-Port für die WAL-Datendatei (Default: echtes Dateisystem).
+    pub io: crate::io_seam::StoreIo,
 }
 
 impl std::fmt::Debug for WalConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WalConfig")
             .field("key_manager", &self.key_manager)
-            .field("allow_legacy_integrity_key_fallback", &self.allow_legacy_integrity_key_fallback)
+            .field(
+                "allow_legacy_integrity_key_fallback",
+                &self.allow_legacy_integrity_key_fallback,
+            )
             .field("min_wal_version", &self.min_wal_version)
             .field("flusher_config", &self.flusher_config)
             .field("id_gen", &self.id_gen.as_ref().map(|_| "Arc<dyn IdGen>"))
+            .field("io", &self.io)
             .finish()
     }
 }
@@ -386,6 +398,7 @@ impl Default for WalConfig {
             min_wal_version: WalVersion::V3,
             flusher_config: WalFlusherConfig::default(),
             id_gen: None,
+            io: crate::io_seam::StoreIo::default(),
         }
     }
 }
@@ -400,12 +413,19 @@ impl WalConfig {
         self.id_gen = Some(id_gen);
         self
     }
+
+    /// Setzt den I/O-Port (z. B. `CrashVfs`/`FaultVfs` in Tests).
+    pub fn with_io(mut self, io: crate::io_seam::StoreIo) -> Self {
+        self.io = io;
+        self
+    }
 }
 
 // ANCHOR[contextra-store:WAL-CORE-002]
 /// Hauptstruktur fuer das Write-Ahead-Log mit Append- und Replay-Operationen.
 pub struct Wal {
     pub(crate) path: PathBuf,
+    pub(crate) io: crate::io_seam::StoreIo,
     pub(crate) size: Arc<std::sync::atomic::AtomicU64>,
     pub(crate) header_written: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) key_manager: Option<Arc<KeyManager>>,
@@ -601,20 +621,19 @@ impl Wal {
         };
 
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
+            let uuid_bytes =
+                Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
         } else {
             let key = Self::load_or_create_integrity_key(&path).await?;
             (None, Some(key))
         };
 
-        let file_len = self::fs::metadata(&path)
-            .await
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let file_len = config.io.len(&path).await.unwrap_or(0);
 
         Ok(Self {
             path,
+            io: config.io.clone(),
             size: Arc::new(std::sync::atomic::AtomicU64::new(file_len)),
             header_written: Arc::new(std::sync::atomic::AtomicBool::new(file_len > 0)),
             key_manager: derived_key_manager,
@@ -654,37 +673,44 @@ impl Wal {
 
         // Vor dem eigentlichen Öffnen der WAL-Datei: prüfen, ob ein Crash-Recovery aus
         // einem .bak-Backup nötig ist (z. B. Crash zwischen set_len(0) und V3-Rewrite).
-        let _ = recover_from_bak_if_present(&path).await?;
+        let io = config.io.clone();
+        let _ = recover_from_bak_if_present(&io, &path).await?;
 
         // SD-09-CRYPTO-002: Use a persisted UUID v4 as file_id instead of the
         // filename.  This makes the WAL's cryptographic sub-key independent of
         // the filesystem path — renaming or moving the file cannot cause nonce-
         // reuse between two WAL instances sharing the same master key.
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
+            let uuid_bytes =
+                Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
         } else {
             let key = Self::load_or_create_integrity_key(&path).await?;
             (None, Some(key))
         };
 
-        let (file, is_new) = match self::fs::OpenOptions::new()
-            .create_new(true)
-            .append(true)
-            .read(true)
-            .open(&path)
-            .await
-        {
-            Ok(file) => (file, true),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                let file = self::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .read(true)
-                    .open(&path)
+        let create_opts = VfsOpenOptions {
+            read: true,
+            write: true,
+            create_new: true,
+            append: true,
+            ..Default::default()
+        };
+        let (file, is_new) = match io.open_async(&path, create_opts).await {
+            Ok(file) => (WalFile::new(file), true),
+            Err(ContextraError::Io(e)) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                let open_opts = VfsOpenOptions {
+                    read: true,
+                    write: true,
+                    create: true,
+                    append: true,
+                    ..Default::default()
+                };
+                let file = io
+                    .open_async(&path, open_opts)
                     .await
                     .map_err(|e| ContextraError::Storage(format!("Failed to open WAL: {}", e)))?;
-                (file, false)
+                (WalFile::new(file), false)
             }
             Err(e) => {
                 return Err(ContextraError::Storage(format!(
@@ -703,11 +729,11 @@ impl Wal {
                     e
                 ))
             })?;
-            crate::util::fsync_parent_dir(&path).await?;
+            io.sync_parent_dir(&path).await?;
         }
 
-        let metadata = file
-            .metadata()
+        let file_len = file
+            .len()
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
@@ -720,8 +746,9 @@ impl Wal {
 
         let wal = Self {
             path: path.clone(),
-            size: Arc::new(std::sync::atomic::AtomicU64::new(metadata.len())),
-            header_written: Arc::new(std::sync::atomic::AtomicBool::new(metadata.len() > 0)),
+            io: io.clone(),
+            size: Arc::new(std::sync::atomic::AtomicU64::new(file_len)),
+            header_written: Arc::new(std::sync::atomic::AtomicBool::new(file_len > 0)),
             key_manager: derived_key_manager,
             fallback_integrity_key,
             allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
@@ -740,8 +767,8 @@ impl Wal {
         wal.enable_flusher_with_config(file, config.flusher_config)?;
 
         // If file is not empty, find the last valid HMAC to continue the chain
-        if metadata.len() > 0 {
-            let (entries, version) = wal.replay_with_size_and_version(metadata.len()).await?;
+        if file_len > 0 {
+            let (entries, version) = wal.replay_with_size_and_version(file_len).await?;
             if version < config.min_wal_version || version != WalVersion::V3 {
                 tracing::info!(
                     "WAL {:?} format detected at {:?}. Will be rewritten as V3 after successful replay.",
@@ -754,25 +781,8 @@ impl Wal {
                     WalVersion::V3 => "v3.bak",
                 };
                 let bak_path = PathBuf::from(format!("{}.{}", wal.path.display(), bak_suffix));
-                let copy_res = self::fs::copy(&wal.path, &bak_path).await;
-                if copy_res.is_ok() {
-                    // Backup-Datei fsyncen: Recovery-Sicherheit VOR der Truncation der Original-WAL.
-                    let bak_file = self::fs::OpenOptions::new()
-                        .write(true)
-                        .open(&bak_path)
-                        .await
-                        .map_err(|e| {
-                            ContextraError::Storage(format!(
-                                "Could not reopen WAL backup for fsync: {e}"
-                            ))
-                        })?;
-                    bak_file.sync_all().await.map_err(|e| {
-                        ContextraError::Storage(format!(
-                            "WAL backup fsync failed before rewrite: {e}"
-                        ))
-                    })?;
-                    crate::util::fsync_parent_dir(&bak_path).await?;
-                }
+                // copy_durable: tmp + fsync + rename + Verzeichnis-fsync VOR der Truncation der Original-WAL.
+                let copy_res = wal.io.copy_durable(&wal.path, &bak_path).await;
                 let rewrite_res = wal.rewrite_as_v3(&entries).await;
 
                 if copy_res.is_err() || rewrite_res.is_err() {
@@ -798,19 +808,19 @@ impl Wal {
                 let (verified_end, last_hmac) =
                     if let Some((_, last_entry, end_pos)) = entries.last() {
                         (*end_pos, last_entry.checksum)
-                    } else if metadata.len() >= 4 {
+                    } else if file_len >= 4 {
                         (4u64, [0u8; 32])
                     } else {
                         (0u64, [0u8; 32])
                     };
 
-                if verified_end < metadata.len() {
-                    let discarded_bytes = metadata.len() - verified_end;
+                if verified_end < file_len {
+                    let discarded_bytes = file_len - verified_end;
                     tracing::warn!(
                         wal_path = %wal.path.display(),
                         discarded_bytes,
                         verified_end,
-                        file_len = metadata.len(),
+                        file_len = file_len,
                         "Truncating torn WAL write tail on open"
                     );
                     wal.truncate(verified_end, last_hmac).await?;
@@ -947,10 +957,9 @@ impl Wal {
         // Replay all entries up to the last valid HMAC-verified entry
         let entries = self.replay().await?;
 
-        let metadata = self::fs::metadata(&self.path).await.map_err(|e| {
+        let file_len = self.io.len(&self.path).await.map_err(|e| {
             ContextraError::Storage(format!("Failed to stat WAL for poison recovery: {e}"))
         })?;
-        let file_len = metadata.len();
 
         let (verified_offset, verified_hmac) =
             if let Some((_, last_entry, end_pos)) = entries.last() {
@@ -998,6 +1007,7 @@ impl Wal {
     pub fn open_loom() -> Self {
         let wal = Self {
             path: PathBuf::from("loom.wal"),
+            io: crate::io_seam::StoreIo::default(),
             size: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             header_written: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             key_manager: None,
@@ -1015,7 +1025,7 @@ impl Wal {
             poison_state: Arc::new(std::sync::atomic::AtomicU8::new(0)),
         };
         if let Err(e) = wal.enable_flusher_with_config(
-            self::fs::LoomFile::new(),
+            WalFile::new(file::loom_mem_file()),
             WalFlusherConfig {
                 batch_window_micros: 0,
                 queue_capacity: DEFAULT_WAL_QUEUE_CAPACITY,

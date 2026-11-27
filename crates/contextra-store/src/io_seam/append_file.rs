@@ -84,7 +84,10 @@ impl AppendFile {
     pub(crate) fn read_all(&self) -> io::Result<Vec<u8>> {
         let len = self.file.len()?;
         let cap = usize::try_from(len).map_err(|_| {
-            io::Error::new(io::ErrorKind::InvalidData, "file too large for address space")
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "file too large for address space",
+            )
         })?;
         let mut data = vec![0; cap];
         let mut read = 0usize;

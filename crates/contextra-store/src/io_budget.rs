@@ -165,12 +165,17 @@ impl StoreIoBudget {
         base_ms.saturating_add(x % 15)
     }
 
-    fn effective_erase_bps(&self, now_nanos: u64, last_compaction_nanos: u64, hint: PressureHint) -> u64 {
+    fn effective_erase_bps(
+        &self,
+        now_nanos: u64,
+        last_compaction_nanos: u64,
+        hint: PressureHint,
+    ) -> u64 {
         if self.max_io_bytes_per_second == 0 {
             return 0;
         }
-        let compaction_idle =
-            last_compaction_nanos == 0 || now_nanos.saturating_sub(last_compaction_nanos) > 1_000_000_000;
+        let compaction_idle = last_compaction_nanos == 0
+            || now_nanos.saturating_sub(last_compaction_nanos) > 1_000_000_000;
         let base = if compaction_idle {
             // Ungenutzten Compaction-Anteil leihen.
             self.max_io_bytes_per_second
@@ -231,8 +236,10 @@ impl IoBudget for StoreIoBudget {
                                 hint,
                             );
                             let total_limit = self.max_io_bytes_per_second;
-                            let d_erase = st.erase_bucket.charge_step_with_limit(bytes, erase_limit);
-                            let d_total = st.total_bucket.charge_step_with_limit(bytes, total_limit);
+                            let d_erase =
+                                st.erase_bucket.charge_step_with_limit(bytes, erase_limit);
+                            let d_total =
+                                st.total_bucket.charge_step_with_limit(bytes, total_limit);
                             let delay = match (d_erase, d_total) {
                                 (Some(a), Some(b)) => Some(a.max(b)),
                                 (Some(a), None) => Some(a),

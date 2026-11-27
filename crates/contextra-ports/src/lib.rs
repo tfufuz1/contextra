@@ -172,7 +172,10 @@ mod dyn_safety {
     #[test]
     fn test_ports_reexport_type_id_equality() {
         use std::any::TypeId;
-        assert_eq!(TypeId::of::<crate::Seq>(), TypeId::of::<contextra_types::Seq>());
+        assert_eq!(
+            TypeId::of::<crate::Seq>(),
+            TypeId::of::<contextra_types::Seq>()
+        );
         assert_eq!(
             TypeId::of::<crate::gate::Seq>(),
             TypeId::of::<contextra_types::Seq>()

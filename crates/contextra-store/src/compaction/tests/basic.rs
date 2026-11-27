@@ -1141,9 +1141,21 @@ async fn test_compact_all_and_compact_range_neutral_maintenance() {
     b3.add(b"c", b"val_c", 3, 3).await.expect("add");
     b3.finish().await.expect("build sst3");
 
-    let r1 = Arc::new(SstableReader::open(&p1, create_block_cache(10)).await.expect("open sst1"));
-    let r2 = Arc::new(SstableReader::open(&p2, create_block_cache(10)).await.expect("open sst2"));
-    let r3 = Arc::new(SstableReader::open(&p3, create_block_cache(10)).await.expect("open sst3"));
+    let r1 = Arc::new(
+        SstableReader::open(&p1, create_block_cache(10))
+            .await
+            .expect("open sst1"),
+    );
+    let r2 = Arc::new(
+        SstableReader::open(&p2, create_block_cache(10))
+            .await
+            .expect("open sst2"),
+    );
+    let r3 = Arc::new(
+        SstableReader::open(&p3, create_block_cache(10))
+            .await
+            .expect("open sst3"),
+    );
 
     let sstables = Arc::new(tokio::sync::RwLock::new(vec![r1, r2, r3]));
 
@@ -1152,10 +1164,17 @@ async fn test_compact_all_and_compact_range_neutral_maintenance() {
         .compact_range(b"a"..=b"b", &sstables, tmp.path())
         .await
         .expect("compact_range");
-    assert!(compacted_range, "compact_range should have merged matching SSTables");
+    assert!(
+        compacted_range,
+        "compact_range should have merged matching SSTables"
+    );
 
     let list_after_range = sstables.read().await;
-    assert_eq!(list_after_range.len(), 2, "Expected 2 SSTables after compact_range (merged 2 + sst3)");
+    assert_eq!(
+        list_after_range.len(),
+        2,
+        "Expected 2 SSTables after compact_range (merged 2 + sst3)"
+    );
     drop(list_after_range);
 
     // Compact all -> should merge remaining 2 into 1
@@ -1163,8 +1182,15 @@ async fn test_compact_all_and_compact_range_neutral_maintenance() {
         .compact_all(&sstables, tmp.path())
         .await
         .expect("compact_all");
-    assert!(compacted_all, "compact_all should have merged all remaining SSTables");
+    assert!(
+        compacted_all,
+        "compact_all should have merged all remaining SSTables"
+    );
 
     let list_after_all = sstables.read().await;
-    assert_eq!(list_after_all.len(), 1, "Expected 1 SSTable after compact_all");
+    assert_eq!(
+        list_after_all.len(),
+        1,
+        "Expected 1 SSTable after compact_all"
+    );
 }

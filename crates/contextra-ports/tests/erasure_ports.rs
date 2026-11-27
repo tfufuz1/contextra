@@ -2,6 +2,7 @@
 
 #![allow(deprecated, clippy::unwrap_used, clippy::expect_used)]
 
+use bytes::Bytes;
 use contextra_ports::clock::SystemClock;
 use contextra_ports::erasure::{
     compute_plan_hash, AcceptReceipt, Cancel, DocScope, EraseRequest, ErasureKernel, GateReceipt,
@@ -13,7 +14,6 @@ use contextra_ports::scanner::{
     LayerScanner, LayerWitness, ScanSession, ScanTarget, ScanTechnique, WitnessLayer,
 };
 use contextra_ports::{BoxFuture, RequestContext, TxId};
-use bytes::Bytes;
 use contextra_types::{
     DocId, EraseTarget, ErasureError, ErasureId, ErasurePolicy, ErasureReason, ErasureState,
     ErasureStatus, Guarantee, LayerErrorKind, LayerProgress, Seq, TargetKind, TenantId,
@@ -114,7 +114,10 @@ fn tst_ports_05_key_scope_limits() {
     ));
 
     let too_many_bytes = vec![
-        (KeyPattern::Prefix(vec![b'a'; KeyScope::MAX_BYTES]), Verdict::In),
+        (
+            KeyPattern::Prefix(vec![b'a'; KeyScope::MAX_BYTES]),
+            Verdict::In,
+        ),
         (KeyPattern::Exact(vec![b'b']), Verdict::In),
     ];
     assert!(matches!(
@@ -322,7 +325,10 @@ impl ErasureKernel for MockKernel {
         })
     }
 
-    fn publish_gate<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<GateReceipt, ErasureError>> {
+    fn publish_gate<'a>(
+        &'a self,
+        id: ErasureId,
+    ) -> BoxFuture<'a, Result<GateReceipt, ErasureError>> {
         Box::pin(async move {
             let mut jobs = self.jobs.lock().unwrap();
             let (state, _) = jobs.get_mut(&id).ok_or(ErasureError::NotFound)?;
@@ -449,17 +455,21 @@ impl ErasureKernel for MockKernel {
     }
 
     fn status(&self, id: ErasureId) -> Option<ErasureStatus> {
-        self.jobs.lock().unwrap().get(&id).map(|(st, _)| ErasureStatus {
-            id,
-            state: st.clone(),
-            reached: st.reached(),
-            layers: vec![],
-            exceptions: vec![],
-            requested_at: 0,
-            gated_at: None,
-            sealed_at: None,
-            ledger_index: None,
-        })
+        self.jobs
+            .lock()
+            .unwrap()
+            .get(&id)
+            .map(|(st, _)| ErasureStatus {
+                id,
+                state: st.clone(),
+                reached: st.reached(),
+                layers: vec![],
+                exceptions: vec![],
+                requested_at: 0,
+                gated_at: None,
+                sealed_at: None,
+                ledger_index: None,
+            })
     }
 
     fn privileged_reader(&self, _id: ErasureId) -> Result<Arc<dyn PrivilegedRead>, ErasureError> {
@@ -487,7 +497,11 @@ impl Cancel for DummyCancel {
 
 struct DummyBudget;
 impl IoBudget for DummyBudget {
-    fn acquire<'a>(&'a self, _class: IoClass, _bytes: u64) -> BoxFuture<'a, Result<(), ErasureError>> {
+    fn acquire<'a>(
+        &'a self,
+        _class: IoClass,
+        _bytes: u64,
+    ) -> BoxFuture<'a, Result<(), ErasureError>> {
         Box::pin(async { Ok(()) })
     }
     fn pressure(&self) -> PressureHint {
@@ -526,7 +540,11 @@ impl LayerScanner for DummyScanner {
     fn layer(&self) -> WitnessLayer {
         WitnessLayer::LsmMemtable
     }
-    fn scan_units(&self, session: &mut ScanSession, _ctx: &RequestContext) -> contextra_ports::Result<()> {
+    fn scan_units(
+        &self,
+        session: &mut ScanSession,
+        _ctx: &RequestContext,
+    ) -> contextra_ports::Result<()> {
         session.record_control_match();
         session.record_unit([1u8; 32], false);
         Ok(())
@@ -614,7 +632,12 @@ fn tst_ports_09_mock_erasure_kernel_transitions() {
     let scanner = DummyScanner;
     let ctx = RequestContext::new(tenant, TxId(1));
     let witness = scanner
-        .scan(&ctx, ScanTarget::new("t1", [0u8; 32]), ScanTechnique::Structural, &clock)
+        .scan(
+            &ctx,
+            ScanTarget::new("t1", [0u8; 32]),
+            ScanTechnique::Structural,
+            &clock,
+        )
         .unwrap();
     let seal_rcpt = kernel.seal(id, &[witness]).now_or_never().unwrap().unwrap();
     assert!(seal_rcpt.guarantee.gated && seal_rcpt.guarantee.purged);

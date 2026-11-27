@@ -1,7 +1,5 @@
 #![cfg(feature = "test-hooks")]
-
 // ZWECK: Property-/Beispieltest für zusammenhängende Kandidatenauswahl (S-01) und Tombstone-Schutz bei aktivem Snapshot.
-
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use bytes::Bytes;

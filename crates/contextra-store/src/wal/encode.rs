@@ -15,9 +15,9 @@ fn checked_u32_len(len: usize, field: &str) -> Result<u32> {
 
 fn checked_encoded_size(parts: &[usize], field: &str) -> Result<usize> {
     parts.iter().try_fold(0usize, |total, part| {
-        total.checked_add(*part).ok_or_else(|| {
-            ContextraError::Serialization(format!("WAL {field} size overflow"))
-        })
+        total
+            .checked_add(*part)
+            .ok_or_else(|| ContextraError::Serialization(format!("WAL {field} size overflow")))
     })
 }
 

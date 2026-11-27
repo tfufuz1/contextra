@@ -316,6 +316,20 @@ pub trait Vfs: Send + Sync + 'static {
     /// Reines Abfragen der Dateilänge ohne Seiteneffekte.
     fn len(&self, path: &Path) -> Result<u64>;
 
+    /// Marks the file at `path` read-only (used to seal rotated WAL segments).
+    ///
+    /// Default is a no-op, because purely in-memory implementations have no permission bits.
+    ///
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) oder [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
+    /// falls die Berechtigungen nicht gesetzt werden können.
+    ///
+    /// # Crash
+    /// Ändert nur Metadaten; bei Absturz ist die Datei entweder beschreibbar oder schreibgeschützt.
+    fn set_readonly(&self, _path: &Path) -> Result<()> {
+        Ok(())
+    }
+
     /// Lists entry names (file and directory names, excluding `.` and `..`) inside directory `path`.
     ///
     /// # Fehler

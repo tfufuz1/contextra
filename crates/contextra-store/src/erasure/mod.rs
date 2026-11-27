@@ -39,9 +39,8 @@ use contextra_ports::ledger::{LedgerAnchor, LedgerDraft, LedgerSink};
 use contextra_ports::scanner::{LayerScanner, LayerWitness, ScanTechnique, WitnessLayer};
 use contextra_ports::BoxFuture;
 use contextra_types::{
-    Cursor, ErasureError, ErasureException, ErasureId, ErasurePolicy,
-    ErasureState, ErasureStatus, Guarantee, LayerErrorKind, LayerProgress, LayerState,
-    LayerStatus, Seq, TargetKind, Timestamp,
+    Cursor, ErasureError, ErasureException, ErasureId, ErasurePolicy, ErasureState, ErasureStatus,
+    Guarantee, LayerErrorKind, LayerProgress, LayerState, LayerStatus, Seq, TargetKind, Timestamp,
 };
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -206,9 +205,7 @@ impl Job {
                         LayerState::Purging
                     }
                 }
-                ErasureState::Quarantined {
-                    layer: q_layer,
-                } => {
+                ErasureState::Quarantined { layer: q_layer } => {
                     if q_layer == layer.as_str() {
                         LayerState::Quarantined
                     } else {
@@ -456,11 +453,8 @@ impl StoreErasureKernel {
         };
         let collapse_arc = ks.rebuild_collapse_map();
 
-        let status_map: BTreeMap<ErasureId, ErasureStatus> = ks
-            .jobs
-            .iter()
-            .map(|(id, j)| (*id, j.to_status()))
-            .collect();
+        let status_map: BTreeMap<ErasureId, ErasureStatus> =
+            ks.jobs.iter().map(|(id, j)| (*id, j.to_status())).collect();
         let open_views: Vec<JobView> = ks
             .jobs
             .values()
@@ -784,7 +778,8 @@ impl StoreErasureKernel {
                         };
                         job.raw_records.push(rec.clone());
                         let jg = job.to_job_gate();
-                        self.gate.install_snapshot(|s, ep| s.with_upserted_job(ep, jg.clone()));
+                        self.gate
+                            .install_snapshot(|s, ep| s.with_upserted_job(ep, jg.clone()));
                     }
                 }
             }
@@ -979,10 +974,14 @@ impl ErasureKernel for StoreErasureKernel {
             };
 
             let est_bytes = (r_req.encode_frame(self.cfg.max_plan_bytes)?.len()
-                + r_plan.encode_frame(self.cfg.max_plan_bytes)?.len()) as u64;
+                + r_plan.encode_frame(self.cfg.max_plan_bytes)?.len())
+                as u64;
 
             // (4) Platzbedarf prüfen
-            if !ks.journal.has_space_for(est_bytes.saturating_add(self.cfg.reserve_bytes)) {
+            if !ks
+                .journal
+                .has_space_for(est_bytes.saturating_add(self.cfg.reserve_bytes))
+            {
                 return Err(ErasureError::InsufficientSpace {
                     needed: est_bytes.saturating_add(self.cfg.reserve_bytes),
                     available: 0,
@@ -990,7 +989,11 @@ impl ErasureKernel for StoreErasureKernel {
             }
 
             // (5) Requested + Planned in einem append_batch + sync_data
-            if let Err(e) = ks.journal.append_batch(&[r_req.clone(), r_plan.clone()]).await {
+            if let Err(e) = ks
+                .journal
+                .append_batch(&[r_req.clone(), r_plan.clone()])
+                .await
+            {
                 *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                 return Err(e);
             }
@@ -1030,7 +1033,10 @@ impl ErasureKernel for StoreErasureKernel {
         })
     }
 
-    fn publish_gate<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<GateReceipt, ErasureError>> {
+    fn publish_gate<'a>(
+        &'a self,
+        id: ErasureId,
+    ) -> BoxFuture<'a, Result<GateReceipt, ErasureError>> {
         Box::pin(async move {
             let mut ks = self.state.lock().await;
             if ks.journal.is_poisoned() {
@@ -1073,7 +1079,12 @@ impl ErasureKernel for StoreErasureKernel {
                 let ep = self
                     .gate
                     .install_snapshot(|s, new_ep| s.with_upserted_job(new_ep, jg.clone()));
-                (seq_val, ep, job_ref.plan.target_kind, job_ref.plan.docs.clone())
+                (
+                    seq_val,
+                    ep,
+                    job_ref.plan.target_kind,
+                    job_ref.plan.docs.clone(),
+                )
             };
 
             let gated_rec = JournalRecord::Gated {
@@ -1163,8 +1174,7 @@ impl ErasureKernel for StoreErasureKernel {
                     let now = self.clock.read().now_unix_nanos();
                     let rec = JournalRecord::PurgeStart { id, ts: now };
                     if let Err(e) = ks.journal.append_batch(&[rec.clone()]).await {
-                        *self.health.write() =
-                            crate::lsm::engine::StorageHealth::JournalPoisoned;
+                        *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
                         return Err(e);
                     }
                     if let Some(job_mut) = ks.jobs.get_mut(&id) {
@@ -1243,7 +1253,11 @@ impl ErasureKernel for StoreErasureKernel {
             if !matches!(&job.state, ErasureState::Purging) {
                 return Err(ErasureError::InvalidTransition);
             }
-            let attempt = job.layer_attempts.get(&layer_map_key(layer)).copied().unwrap_or(0);
+            let attempt = job
+                .layer_attempts
+                .get(&layer_map_key(layer))
+                .copied()
+                .unwrap_or(0);
             let cursor_bytes = p
                 .cursor
                 .as_ref()
@@ -1542,11 +1556,9 @@ impl ErasureKernel for StoreErasureKernel {
                     if j.state.is_terminal() {
                         let id_hmac = contextra_crypto::ledger_mac(&self.erasure_log_key, &jid.0)
                             .map_err(|e| ErasureError::Io(e.to_string()))?;
-                        let plan_hmac = contextra_crypto::ledger_mac(
-                            &self.erasure_log_key,
-                            &j.plan.plan_hash,
-                        )
-                        .map_err(|e| ErasureError::Io(e.to_string()))?;
+                        let plan_hmac =
+                            contextra_crypto::ledger_mac(&self.erasure_log_key, &j.plan.plan_hash)
+                                .map_err(|e| ErasureError::Io(e.to_string()))?;
                         let mut g = 0u8;
                         if j.guarantee_reached.gated {
                             g |= 1;
@@ -1664,7 +1676,9 @@ impl ErasureKernel for StoreErasureKernel {
                     job_mut.transition_to(new_state.clone())?;
                 }
                 if let Some(l) = layer {
-                    job_mut.layer_attempts.insert(layer_map_key(l), next_attempt);
+                    job_mut
+                        .layer_attempts
+                        .insert(layer_map_key(l), next_attempt);
                 }
                 job_mut.raw_records.extend(records);
             }
@@ -1727,10 +1741,7 @@ impl ErasureKernel for StoreErasureKernel {
                 WitnessLayer::SsTableAllLevels,
                 deps.clone(),
             )),
-            Arc::new(KernelStoreScanner::new(
-                WitnessLayer::WalAllSegments,
-                deps,
-            )),
+            Arc::new(KernelStoreScanner::new(WitnessLayer::WalAllSegments, deps)),
         ]
     }
 }

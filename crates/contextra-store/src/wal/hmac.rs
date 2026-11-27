@@ -250,7 +250,7 @@ impl Wal {
         };
 
         async fn read_key_file(path: &Path) -> Result<[u8; 32]> {
-            let bytes = super::fs::read(path).await.map_err(|e| {
+            let bytes = super::secure_fs::read(path).await.map_err(|e| {
                 ContextraError::Storage(format!("Failed to read WAL integrity key: {}", e))
             })?;
             if bytes.is_empty() {
@@ -283,7 +283,7 @@ impl Wal {
                 crate::lsm::recovery::next_temp_file_counter()
             ));
 
-            let mut options = super::fs::OpenOptions::new();
+            let mut options = super::secure_fs::OpenOptions::new();
             options.write(true).create_new(true);
             #[cfg(unix)]
             {
@@ -305,14 +305,14 @@ impl Wal {
             };
 
             if let Err(e) = file.write_all(&key).await {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                let _ = super::secure_fs::remove_file(&tmp_path).await;
                 return Err(ContextraError::Storage(format!(
                     "Failed to write WAL integrity key: {}",
                     e
                 )));
             }
             if let Err(e) = file.sync_all().await {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                let _ = super::secure_fs::remove_file(&tmp_path).await;
                 return Err(ContextraError::Storage(format!(
                     "Failed to sync WAL integrity key file: {}",
                     e
@@ -322,12 +322,12 @@ impl Wal {
 
             #[cfg(windows)]
             if let Err(e) = super::io::set_restrictive_file_acl(&tmp_path) {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                let _ = super::secure_fs::remove_file(&tmp_path).await;
                 return Err(e.into());
             }
 
-            let link_res = super::fs::hard_link(&tmp_path, &key_path).await;
-            let _ = super::fs::remove_file(&tmp_path).await;
+            let link_res = super::secure_fs::hard_link(&tmp_path, &key_path).await;
+            let _ = super::secure_fs::remove_file(&tmp_path).await;
 
             match link_res {
                 Ok(()) => {
@@ -345,7 +345,7 @@ impl Wal {
 
     pub(crate) async fn has_migration_marker(wal_path: &Path) -> bool {
         let marker = Self::migration_marker_path(wal_path);
-        super::fs::try_exists(&marker).await.unwrap_or(false)
+        super::secure_fs::try_exists(&marker).await.unwrap_or(false)
     }
 
     pub(crate) fn calculate_retirement_marker_hash(wal_path: &Path, new_key: &[u8; 32]) -> String {
@@ -398,7 +398,7 @@ impl Wal {
             crate::lsm::recovery::next_temp_file_counter()
         ));
 
-        let mut options = super::fs::OpenOptions::new();
+        let mut options = super::secure_fs::OpenOptions::new();
         options.write(true).create_new(true);
 
         let mut file = match options.open(&tmp_path).await {
@@ -414,7 +414,7 @@ impl Wal {
 
         let marker_content = Self::calculate_retirement_marker_hash(wal_path, new_key);
         if let Err(e) = file.write_all(marker_content.as_bytes()).await {
-            let _ = super::fs::remove_file(&tmp_path).await;
+            let _ = super::secure_fs::remove_file(&tmp_path).await;
             return Err(ContextraError::Storage(format!(
                 "Failed to write WAL migration marker: {}",
                 e
@@ -422,7 +422,7 @@ impl Wal {
         }
 
         if let Err(e) = file.sync_all().await {
-            let _ = super::fs::remove_file(&tmp_path).await;
+            let _ = super::secure_fs::remove_file(&tmp_path).await;
             return Err(ContextraError::Storage(format!(
                 "Failed to sync WAL migration marker file: {}",
                 e
@@ -430,8 +430,8 @@ impl Wal {
         }
         drop(file);
 
-        if let Err(e) = super::fs::rename(&tmp_path, &marker_path).await {
-            let _ = super::fs::remove_file(&tmp_path).await;
+        if let Err(e) = super::secure_fs::rename(&tmp_path, &marker_path).await {
+            let _ = super::secure_fs::remove_file(&tmp_path).await;
             return Err(ContextraError::Storage(format!(
                 "Failed to rename WAL migration marker from {} to {}: {}",
                 tmp_path.display(),
@@ -460,7 +460,7 @@ impl Wal {
         };
 
         async fn read_uuid_file(path: &Path) -> Result<[u8; 16]> {
-            let bytes = super::fs::read(path).await.map_err(|e| {
+            let bytes = super::secure_fs::read(path).await.map_err(|e| {
                 ContextraError::Storage(format!("Failed to read WAL UUID sidecar: {}", e))
             })?;
             if bytes.len() != 16 {
@@ -521,7 +521,7 @@ impl Wal {
                 parent.join(tmp_filename)
             };
 
-            let mut options = super::fs::OpenOptions::new();
+            let mut options = super::secure_fs::OpenOptions::new();
             options.write(true).create_new(true);
 
             let mut file = match options.open(&tmp_path).await {
@@ -539,7 +539,7 @@ impl Wal {
             };
 
             if let Err(e) = file.write_all(&bytes).await {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                let _ = super::secure_fs::remove_file(&tmp_path).await;
                 return Err(ContextraError::Storage(format!(
                     "Failed to write WAL UUID sidecar: {}",
                     e
@@ -547,7 +547,7 @@ impl Wal {
             }
 
             if let Err(e) = file.sync_all().await {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                let _ = super::secure_fs::remove_file(&tmp_path).await;
                 return Err(ContextraError::Storage(format!(
                     "Failed to sync WAL UUID sidecar file: {}",
                     e
@@ -555,8 +555,8 @@ impl Wal {
             }
             drop(file);
 
-            let link_res = super::fs::hard_link(&tmp_path, &uuid_path).await;
-            let _ = super::fs::remove_file(&tmp_path).await;
+            let link_res = super::secure_fs::hard_link(&tmp_path, &uuid_path).await;
+            let _ = super::secure_fs::remove_file(&tmp_path).await;
 
             match link_res {
                 Ok(()) => {

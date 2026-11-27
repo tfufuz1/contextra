@@ -2,13 +2,13 @@
 //!
 //! Schreibt periodisch kompakte Manifest-Snapshots, um Logdateien klein zu halten.
 
-use contextra_types::{ContextraError, Result};
 use crate::io_seam::append_file::AppendFile;
 use crate::io_seam::StoreIo;
 use contextra_ports::VfsOpenOptions;
+use contextra_types::{ContextraError, Result};
+use parking_lot::Mutex;
 use std::path::Path;
 use std::sync::Arc;
-use parking_lot::Mutex;
 
 use super::core::Manifest;
 
@@ -23,12 +23,16 @@ async fn write_durable_temp(io: &StoreIo, path: &Path, contents: Vec<u8>) -> Res
     let append_file = Arc::clone(&file);
     tokio::task::spawn_blocking(move || append_file.lock().append_durable(&contents))
         .await
-        .map_err(|error| ContextraError::Storage(format!("Temporary MANIFEST write task failed: {error}")))?
+        .map_err(|error| {
+            ContextraError::Storage(format!("Temporary MANIFEST write task failed: {error}"))
+        })?
         .map_err(|error| ContextraError::Storage(error.to_string()))?;
     let sync_file = Arc::clone(&file);
     tokio::task::spawn_blocking(move || sync_file.lock().sync_all())
         .await
-        .map_err(|error| ContextraError::Storage(format!("Temporary MANIFEST sync task failed: {error}")))?
+        .map_err(|error| {
+            ContextraError::Storage(format!("Temporary MANIFEST sync task failed: {error}"))
+        })?
         .map_err(|error| ContextraError::Storage(error.to_string()))?;
     drop(file);
     Ok(())
@@ -135,7 +139,9 @@ impl Manifest {
                 Ok::<_, ContextraError>((reopened_file, len))
             })
             .await
-            .map_err(|error| ContextraError::Storage(format!("Reopen MANIFEST metadata task failed: {error}")))??;
+            .map_err(|error| {
+                ContextraError::Storage(format!("Reopen MANIFEST metadata task failed: {error}"))
+            })??;
 
             self.file.lock().replace_file(reopened_file, len);
             Ok(())
@@ -144,7 +150,8 @@ impl Manifest {
 
         if let Err(ref e) = rollover_res {
             if rename_attempted {
-                self.is_poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+                self.is_poisoned
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
             }
             tracing::error!(
                 path = ?self.path,
@@ -155,11 +162,11 @@ impl Manifest {
             if !renamed {
                 if let Err(clean_err) = self.io.remove_file(&tmp_path).await {
                     if !matches!(clean_err, ContextraError::NotFound(_)) {
-                    tracing::warn!(
-                        tmp_path = ?tmp_path,
-                        error = %clean_err,
-                        "Failed to remove temporary MANIFEST file after failed rollover"
-                    );
+                        tracing::warn!(
+                            tmp_path = ?tmp_path,
+                            error = %clean_err,
+                            "Failed to remove temporary MANIFEST file after failed rollover"
+                        );
                     }
                 }
             }

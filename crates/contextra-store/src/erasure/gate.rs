@@ -382,7 +382,10 @@ impl StoreGate {
     }
 
     /// Atomarer Snapshot-Tausch unter Rang 960. Liefert die neue Epoche zurück.
-    pub fn install_snapshot(&self, mut build: impl FnMut(&GateSnapshot, u64) -> GateSnapshot) -> u64 {
+    pub fn install_snapshot(
+        &self,
+        mut build: impl FnMut(&GateSnapshot, u64) -> GateSnapshot,
+    ) -> u64 {
         let mut guard = self.snap.write();
         let next_epoch = guard.epoch.saturating_add(1);
         let new_snap = Arc::new(build(&guard, next_epoch));
@@ -534,7 +537,12 @@ mod tests {
     use crate::tenant_codec::TenantKeyCodec;
     use proptest::prelude::*;
 
-    fn make_job(id_byte: u8, rules: Vec<(KeyPattern, Verdict)>, up_to: u64, phase: GatePhase) -> JobGate {
+    fn make_job(
+        id_byte: u8,
+        rules: Vec<(KeyPattern, Verdict)>,
+        up_to: u64,
+        phase: GatePhase,
+    ) -> JobGate {
         JobGate {
             id: ErasureId([id_byte; 16]),
             scope: Arc::new(KeyScope::new(rules).unwrap()),
@@ -614,7 +622,10 @@ mod tests {
         gate.set_fail_closed();
         assert!(gate.is_active());
         assert_eq!(gate.check(b"anything"), GateDecision::Restricted);
-        assert_eq!(gate.check_version(b"anything", Seq(1)), GateDecision::Restricted);
+        assert_eq!(
+            gate.check_version(b"anything", Seq(1)),
+            GateDecision::Restricted
+        );
         assert_eq!(gate.discard_rule(b"anything", Seq(1)), DiscardRule::Keep);
         assert_eq!(
             gate.check_doc(TenantId::try_new(1).unwrap(), "default", DocId(1)),
@@ -631,7 +642,9 @@ mod tests {
             let p = vec![b'a'; len];
             rules.push((KeyPattern::Prefix(p), Verdict::In));
         }
-        gate.install_snapshot(|s, ep| s.with_upserted_job(ep, make_job(3, rules.clone(), 50, GatePhase::Erased)));
+        gate.install_snapshot(|s, ep| {
+            s.with_upserted_job(ep, make_job(3, rules.clone(), 50, GatePhase::Erased))
+        });
         assert!(gate.snapshot().key_index.fallback_linear);
         assert_eq!(gate.check(b"aaa"), GateDecision::Erased);
         assert_eq!(gate.check(b"bbb"), GateDecision::Open);

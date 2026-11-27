@@ -32,10 +32,7 @@ async fn test_temp_file_naming_pattern_and_determinism() {
 
     // rollover() schreibt den reduzierten Zustand des Manifest-Objekts selbst;
     // es gibt keine externen Live-Einträge mehr als Argument.
-    manifest
-        .rollover()
-        .await
-        .expect("manifest rollover");
+    manifest.rollover().await.expect("manifest rollover");
 
     // Read directory entries to ensure no lingering .tmp or MANIFEST.new files exist
     let mut read_dir = fs::read_dir(&db_path).await.expect("read_dir");

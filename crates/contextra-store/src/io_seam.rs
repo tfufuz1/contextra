@@ -115,6 +115,20 @@ impl Vfs for RealFs {
         })
     }
 
+    fn set_readonly(&self, path: &Path) -> Result<()> {
+        let mut perms = std::fs::metadata(path)
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    ContextraError::NotFound(path.display().to_string())
+                } else {
+                    ContextraError::Io(e)
+                }
+            })?
+            .permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(path, perms).map_err(ContextraError::Io)
+    }
+
     fn list_dir(&self, path: &Path) -> Result<Vec<String>> {
         let entries = std::fs::read_dir(path).map_err(ContextraError::Io)?;
         let mut res = Vec::new();
@@ -214,6 +228,8 @@ impl VfsFile for RealFsFile {
 #[derive(Clone)]
 pub struct StoreIo {
     vfs: Arc<dyn Vfs>,
+    /// `true` nur für das echte Dateisystem (`RealFs`); nur dort ist mmap möglich.
+    real_fs: bool,
 }
 
 impl std::fmt::Debug for StoreIo {
@@ -226,6 +242,7 @@ impl Default for StoreIo {
     fn default() -> Self {
         Self {
             vfs: Arc::new(RealFs),
+            real_fs: true,
         }
     }
 }
@@ -233,7 +250,33 @@ impl Default for StoreIo {
 impl StoreIo {
     /// Creates a new `StoreIo` with the specified `Vfs`.
     pub fn new(vfs: Arc<dyn Vfs>) -> Self {
-        Self { vfs }
+        Self {
+            vfs,
+            real_fs: false,
+        }
+    }
+
+    /// Returns `true` if this port is backed by the real filesystem and can serve mmap.
+    pub fn supports_mmap(&self) -> bool {
+        self.real_fs
+    }
+
+    /// Opens `path` as a plain `std::fs::File` for memory mapping.
+    ///
+    /// Returns `Ok(None)` for every non-real `Vfs` (in-memory, crash or fault injection),
+    /// whose callers must fall back to reading through the port. This is the only place
+    /// besides `RealFs` that hands out a raw file descriptor.
+    pub fn open_mmap_source(&self, path: &Path) -> Result<Option<std::fs::File>> {
+        if !self.real_fs {
+            return Ok(None);
+        }
+        std::fs::File::open(path).map(Some).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })
     }
 
     /// Returns a reference to the inner `Vfs`.
@@ -247,11 +290,7 @@ impl StoreIo {
     }
 
     /// Opens a file on the blocking pool through the configured VFS.
-    pub async fn open_async(
-        &self,
-        path: &Path,
-        opts: VfsOpenOptions,
-    ) -> Result<Box<dyn VfsFile>> {
+    pub async fn open_async(&self, path: &Path, opts: VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
         let vfs = Arc::clone(&self.vfs);
         let path = path.to_path_buf();
         tokio::task::spawn_blocking(move || vfs.open(&path, &opts))
@@ -310,6 +349,23 @@ impl StoreIo {
             .map_err(|e| ContextraError::Storage(format!("Join error: {}", e)))?
     }
 
+    /// Marks `path` read-only through the configured VFS.
+    pub async fn set_readonly(&self, path: &Path) -> Result<()> {
+        let vfs = Arc::clone(&self.vfs);
+        let p = path.to_path_buf();
+        tokio::task::spawn_blocking(move || vfs.set_readonly(&p))
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Join error: {}", e)))?
+    }
+
+    /// Copies `from` to `to` durably (read, then atomic tmp+fsync+rename+dir-fsync write).
+    pub async fn copy_durable(&self, from: &Path, to: &Path) -> Result<u64> {
+        let data = self.read(from).await?;
+        let len = data.len() as u64;
+        self.write_atomic(to, data).await?;
+        Ok(len)
+    }
+
     /// Creates directories along `path`.
     pub async fn create_dir_all(&self, path: &Path) -> Result<()> {
         let vfs = Arc::clone(&self.vfs);
@@ -363,6 +419,70 @@ impl StoreIo {
         tokio::task::spawn_blocking(move || vfs.read_dir(&p))
             .await
             .map_err(|e| ContextraError::Storage(format!("Join error: {}", e)))?
+    }
+
+    /// Syncs the parent directory of `path` (empty parent means the current directory).
+    ///
+    /// Windows has no directory fsync (E20) and reports `Unsupported`.
+    pub async fn sync_parent_dir(&self, path: &Path) -> Result<()> {
+        #[cfg(not(windows))]
+        {
+            let parent = path.parent().unwrap_or_else(|| Path::new(""));
+            let dir_path = if parent.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                parent
+            };
+            self.sync_dir(dir_path).await.map_err(|e| {
+                ContextraError::Storage(format!(
+                    "Directory fsync failed for {}: {e}",
+                    dir_path.display()
+                ))
+            })
+        }
+        #[cfg(windows)]
+        {
+            let _ = path;
+            Err(ContextraError::Io(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "Windows directory sync is unsupported under E20",
+            )))
+        }
+    }
+
+    /// Performs fsync on the file at `path` (opens it read-only and syncs).
+    ///
+    /// Windows has no file-by-path sync here (E20) and reports `Unsupported`.
+    pub async fn sync_file(&self, path: &Path) -> Result<()> {
+        #[cfg(not(windows))]
+        {
+            let file = self
+                .open_async(path, VfsOpenOptions::read_only())
+                .await
+                .map_err(|e| {
+                    ContextraError::Storage(format!(
+                        "File open failed for fsync on {}: {e}",
+                        path.display()
+                    ))
+                })?;
+            tokio::task::spawn_blocking(move || file.sync_all())
+                .await
+                .map_err(|e| ContextraError::Storage(format!("Join error: {}", e)))?
+                .map_err(|e| {
+                    ContextraError::Storage(format!(
+                        "File fsync failed for {}: {e}",
+                        path.display()
+                    ))
+                })
+        }
+        #[cfg(windows)]
+        {
+            let _ = path;
+            Err(ContextraError::Io(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "Windows file sync is unsupported under E20",
+            )))
+        }
     }
 
     /// Syncs directory metadata.
