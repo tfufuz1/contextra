@@ -115,3 +115,9 @@ Konformanz grün; keine `let _ =`/`std::fs` im Erase-Pfad (G-2, G-4); Arena-Byte
 | O-V2 | Obsolete-Datei-Meldung: `ProgressSink`-Methode oder `PurgeOutcome`-Feld | `PurgeOutcome.obsolete_files` (kein Port-Umbau); 02 um das Feld ergänzen (kleiner Nachtrag A-4) |
 | O-V3 | `WitnessLayer`-Konstante für HNSW | `WitnessLayer::HnswIndex` existiert ✔ (`hnsw()` als Kurzform im Layer) |
 | O-V4 | DiskANN-Index (`experimental-diskann`) | Außerhalb Stufe 1; Feature-Gate liefert `FeatureDisabled` im Witness |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Stand.** `src/hnsw/erasure.rs` (98 LOC): `HnswErasure` mit `HnswScanner`, Dokumentmenge über `scoped_docs` ✔. **Offen:** nicht im Builder registriert (K-48); **kein** Konformanztest im Crate; Zeile 12 der Datenort-Matrix verlangt zusätzlich: (a) Prüfung, dass das Quantisierungs-Codebook keine Einzelvektor-Information trägt (`TST-VEC-CB-1`, **[?]**), (b) Datei-`save`/`load_mmap` nur über `StoreIo` + Temp/`rename`/`sync_dir` (CP-28), (c) Zeroisierung gelöschter Vektorspeicher im RAM, soweit der Allokator das zulässt, sonst dauerhafte Garantiegrenze „Prozessspeicher“ (Dokumentation und Ledger-Scope-Text, **kein** neuer persistierter Ausnahme-Wert).
+
+**Verbindliche Ergänzungen.** C8 Ergebnisfilter (Suche prüft jede Kandidatenliste gegen `ReadGate`, auch vor `on_gate`); Idempotenz nach Cursor-Reset; `purge` puffert teuren Graph-Repair-Fortschritt intern, damit ein Layer-Neustart (14 §3.4) nicht jedes Mal komplett neu rechnet; `Concurrency`: Suche darf gegen `purge` laufen, Test im Loom-Modell (13).

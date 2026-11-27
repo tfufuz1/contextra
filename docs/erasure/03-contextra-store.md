@@ -493,3 +493,25 @@ Jedes Paket endet mit `cargo build/test --workspace --locked`, `cargo clippy --w
 | O-S4 | `StoreIo::open` ist synchron; Journal nutzt `spawn_blocking` je Operation | Ausreichend für < 5 ms Haltedauer. Messung in `TST-STORE-GATE-9`-Umfeld (Journal-Append-Latenz) |
 | O-S5 | `delete_prefix` hält alle Tombstones im `tx_buffer` | Außerhalb der Löschkette, eigener Fehlerbericht |
 | O-S6 | Die Annahme „Reader-Handles halten Dateien nach `unlink`“ (Linux) gilt auf Windows nicht (Entfernen schlägt fehl) | Pending-Delete behandelt es generisch (Wiederholung); Plattform-Test in WP-12 |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Stand.** `crates/contextra-store/src/erasure/`: `mod.rs` (1 747 LOC, Kernel), `journal.rs` (1 889), `ledger.rs` (523), `gate.rs` (721), `purge_lsm.rs` (818), `pending.rs` (301), `filter.rs` (86), Tests `erasure_kernel_e2e.rs`, `loom_erasure_gate.rs` ✔. WP-3.6 (`StoreIo` statt `tokio::fs`) ist umgesetzt (PR #6093).
+
+**Korrekturen an §4.2 (verbindlich).**
+
+| Methode | Änderung |
+| --- | --- |
+| `begin_purge(id)` **neu** | Logik aus `purge_store` (`mod.rs:1146-1190`) extrahiert; `Gated/KeysDestroying/Failed/Purging ⇒ Purging` mit `PurgeStart`, Gate `Restricted → Erased`; idempotent. `purge_store` ruft es intern |
+| `record_layer` | Vorbedingung unverändert `Purging`; Aufruf nur nach `begin_purge` |
+| `fail` | Schwelle aus `StoreErasureConfig.quarantine_after_attempts` (neu, Default 10; bisher hart `10` bei `mod.rs:1622`); `layer = None` ab Schwelle ⇒ `Quarantined{layer:"job"}`; `Some(l)` ⇒ `layer_cursor.remove(l)`, identisch im Replay (`apply_record_to_jobs`, Zweig `Failed`) |
+| `resume(id)` **neu** | `Quarantined ⇒ Failed{attempt:0} ⇒ Purging`, nur durch Operator-Aufruf |
+| `to_job_view` | `layers_done` aus `layer_cursor` mit `cursor == None` (unverändert; durch Cursor-Entfernung korrekt) |
+
+**K-33 / A-2 (Auslieferungsstopp, weiterhin offen).** `StoreErasureKernel::open_early` leitet `ledger_key` und `erasure_log_key` aus `key_source.fill_key_bytes(&mut prk)` ab (`mod.rs:344`) und erzeugt damit bei **jedem Start** neue Schlüssel; `recovery.rs` übergibt `OsKeyMaterialSource`. Korrekt ist die Ableitung aus einer **persistenten** Wurzel (05 Revision 2): `open_early(.., root: &dyn ErasureRootProvider, ..)`, `ErasureRoot::derive(ErasureLabel::LedgerMac | ErasureLog, &[])`. Die HKDF-Labels sind identisch (`ctx-ledger-mac-v1`, `ctx-erasure-log-v1`), der Wechsel ändert keine Ableitungsvorschrift, wohl aber die Quelle. Journal oder Ledger vorhanden ohne Wurzel ⇒ Fail-closed, keine Neuerzeugung (`TST-STORE-ROOT-3`).
+
+**K-50 (Encoder).** In `journal.rs:97-157` werden Wildcard-Fallbacks (`_ => 1`, `_ => 4`) entfernt; die Encoder liefern `Result` (`JournalPoisoned`/`InvalidTarget`). Golden-Test `TST-STORE-JRN-2` wird um „unbekannter Wert ⇒ Fehler“ ergänzt.
+
+**K-51 (§7.8 Scanner).** `WalAllSegments` iteriert alle `wal-*.log` inklusive `pending_sealed_wals` und der Pending-Delete-Liste, Lesefehler ⇒ `Err`, bei Verschlüsselung Technik `Structural`. Zusätzlich neuer Zeuge `Manifest` (Min/Max-Schlüssel je Datei, alte Manifest-Generationen) — Datenort-Matrix Zeile 7.
+
+**§9 Crash-Matrix.** CP-19 … CP-30 siehe 14 §5. **§10 Tests.** `TST-STORE-ROOT-1…5`, `TST-STORE-WIT-1/2`, `TST-STORE-MAN-2`, `TST-STORE-SST-3`, `TST-STORE-LOCK-1`, `TST-JRN-ENC-1` (Tabelle 14 §6).

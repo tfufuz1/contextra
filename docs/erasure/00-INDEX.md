@@ -1,6 +1,6 @@
 # Contextra Löschkette – Index und Querschnitt (konsolidiert)
 
-*Stand: 27.11.2026 · Basis: `tfufuz1/contextra` `main`, HEAD `e23bcdd` · Grundlage: `KONZEPT-LOESCHKETTE-FUNDAMENT.md` · **Ersetzt** `00-INDEX-QUERSCHNITT.md`, `00a-INDEX-ERGAENZUNG.md`, `00b-INDEX-ERGAENZUNG-2.md`*
+*Stand: 28.11.2026 (Revision 2) · Basis: `tfufuz1/contextra` `main`, HEAD `e12873de6` (Vorversion: `e23bcdd`) · Grundlage: `KONZEPT-LOESCHKETTE-FUNDAMENT.md` · **Ersetzt** `00-INDEX-QUERSCHNITT.md`, `00a-INDEX-ERGAENZUNG.md`, `00b-INDEX-ERGAENZUNG-2.md`*
 
 > **Verifikationsgrenze.** Statische Analyse, keine Rust-Toolchain. Nichts wurde kompiliert oder ausgeführt. **✔** = gelesen (Datei/Symbol), **[?]** = offen, mit Prüfauftrag in der jeweiligen Spezifikation.
 
@@ -9,18 +9,19 @@
 | Nr. | Datei | Crate | Stand am HEAD | Inhalt |
 | --- | --- | --- | --- | --- |
 | 01 | `01-contextra-types.md` | types | umgesetzt ✔ | Typen, Fehler, Zustände, Garantien |
-| 02 | `02-contextra-ports.md` | ports | umgesetzt, A-1/A-3 offen | `ReadGate`, `ErasureLayer`, `ErasureKernel`, `LedgerSink` |
-| 03 | `03-contextra-store.md` | store | Kernel umgesetzt, A-2 offen | Journal, Gate, Filter, Purge, Pending-Delete, Ledger |
+| 02 | `02-contextra-ports.md` | ports | umgesetzt; **offen:** A-1, A-3, A-4 (`begin_purge`), A-8 (`resume`) | `ReadGate`, `ErasureLayer`, `ErasureKernel`, `LedgerSink` |
+| 03 | `03-contextra-store.md` | store | Kernel umgesetzt (≈ 7 000 LOC); **offen:** K-33/A-2, K-45…K-47, K-50, K-51 | Journal, Gate, Filter, Purge, Pending-Delete, Ledger |
 | 04 | `04-contextra-mvcc.md` | mvcc | umgesetzt ✔ | Snapshot-Entzug, Pin-Alterung |
-| 05 | `05-contextra-crypto.md` | crypto | **neu** | Rückbau, Schlüsselwurzel, Stufe 2 |
-| 06 | `06-contextra-text.md` | text | **neu** | Textindex als `ErasureLayer` |
-| 07 | `07-contextra-vector.md` | vector | **neu** | HNSW als `ErasureLayer` |
-| 08 | `08-contextra-graph.md` | graph | **neu** | Provenienz, Graph-Layer |
-| 09 | `09-contextra-checkpoint.md` | checkpoint | **neu** | Restore-Sperre, Taint-Politik |
-| 10 | `10-contextra-engine.md` | engine | **neu** | Treiber, Resolver, Worker, API |
-| 11 | `11-contextra.md` | contextra | **neu** | Builder, Profil |
-| 12 | `12-contextra-mcp.md` | mcp | **neu** | Erase-Werkzeuge |
-| 13 | `13-contextra-testkit.md` | testkit | **neu** | CrashVfs, Konformanz, Referenzmodell |
+| 05 | `05-contextra-crypto.md` | crypto | `ErasureRoot`/`ErasureLabel` umgesetzt ✔, **ohne Verwender** (K-48/K-60); Rückbau, `kv-shredding`, Stufe 2 offen | Rückbau, Schlüsselwurzel, Stufe 2 |
+| 06 | `06-contextra-text.md` | text | `TextErasure` vorhanden ✔ (295 LOC), **nicht verdrahtet** (K-48) | Textindex als `ErasureLayer` |
+| 07 | `07-contextra-vector.md` | vector | `HnswErasure` vorhanden ✔ (98 LOC), **nicht verdrahtet**, ohne Konformanztest (K-48) | HNSW als `ErasureLayer` |
+| 08 | `08-contextra-graph.md` | graph | **nicht umgesetzt** (kein `ErasureLayer`, kein Zeuge) | Provenienz, Graph-Layer |
+| 09 | `09-contextra-checkpoint.md` | checkpoint | Restore-Sperre nur auf Meta-Schlüssel ✔ (K-54 offen); Layer, Taint, Floor **nicht umgesetzt** | Restore-Sperre, Taint-Politik |
+| 10 | `10-contextra-engine.md` | engine | Treiber, Worker, API, Registry, Resolver vorhanden ✔; **offen:** K-45…K-49, K-52, K-53, K-56…K-58 | Treiber, Resolver, Worker, API |
+| 11 | `11-contextra.md` | contextra | Builder-Verdrahtung der Layer **offen** (K-48, K-58) | Builder, Profil |
+| 12 | `12-contextra-mcp.md` | mcp | `contextra_erase`, `_erase_status`, `_erase_dry_run` vorhanden ✔ | Erase-Werkzeuge |
+| 13 | `13-contextra-testkit.md` | testkit | Mocks, Referenzmodell, Konformanzsuite, Loom vorhanden ✔ | CrashVfs, Konformanz, Referenzmodell |
+| 14 | `14-lueckenlosigkeit.md` | quer | **neu (Rev. 2)** | Audit gegen HEAD, Befunde K-45…K-60, Kernel-Vertrag Rev. 2, Datenort-Matrix, CP-19…30, Tests, WPs |
 
 Nicht betroffen: `durable-fs` (kein Abhängiger, Store darf es nicht einbinden), `db`, `rank`, `simd`, `sys`.
 
@@ -70,12 +71,20 @@ Nicht betroffen: `durable-fs` (kein Abhängiger, Store darf es nicht einbinden),
 | K-42 | `deletion_proof_active` steuert Durability-Prüfung, nicht Nachweis ✔ | Name bleibt, Doku korrigiert (11) |
 | K-43 | `#[instrument(skip(self))]` mit Parameter `id` (`delete.rs:14`) ✔ | Gate G-3, Korrektur (10) |
 | K-44 | `drop_collection` ist nicht atomar, lässt HNSW/Graph/Checkpoints und `__col_idx` unberührt ✔ | wird `erase(Collection)` |
+| **K-45…K-60** | Befunde des Audits am HEAD `e12873de6` (Reihenfolgenwiderspruch `record_layer`/`purge_store`, Fehlerpfad und Quarantäne, nicht nachgearbeitete Layer-Reste, unverdrahtete Layer, verschluckte `on_gate`-Fehler, WAL-Zeuge, Restore nach `Completed`, u. a.) | **Vollständig in `14-lueckenlosigkeit.md` §2**; verbindlich, S1-Befunde blockieren Auslieferung |
 
 ## 3. Nachträge
 
 - **A-1 (02 §4.3):** `ProgressSink::register_collapse(&self, keys: &[(Vec<u8>, Seq)])` und `ErasureKernel::register_collapse(id, keys)`; Implementierung ist die vorhandene Methode des Kernels. Der Treiber liefert `KernelProgress { kernel, id }`.
 - **A-2 (03, behebt K-33):** neuer Port `ErasureRootProvider { root() -> ErasureRoot; is_external() -> bool }` in `store/src/key_source.rs`. Implementierungen: `FileErasureRoot` (`<erasure_dir>/root.key`, `write_atomic` + `sync_dir`, Modus 0600, nur beim allerersten Start erzeugt), `DerivedErasureRoot` (aus `KeyManager`, wenn Passphrase gesetzt), `StaticErasureRoot` (Tests). `open_early` nimmt `&dyn ErasureRootProvider`; Schlüssel nur aus `ErasureRoot::derive()` (05 §4). Existiert ein Journal oder Ledger, aber keine Wurzel: Fail-Closed, **keine** Neuerzeugung. Regulated + nicht externe Wurzel ⇒ Start verweigert. Tests `TST-STORE-ROOT-1…5` (Neustart besteht `verify`; stabile `erasure_id_hmac`; fehlende Wurzel; Regulated-Verweigerung; Regression rot auf heutigem Code).
 - **A-3 (02):** `LAYER_TEXT = "TextIndex"`, `LAYER_CHECKPOINTS = "Checkpoints"` und `WitnessLayer::text()/checkpoints()` (liefern `Custom`). Journal-Format unverändert.
+
+- **A-4 (02 §4.6, 14 §3.2):** `ErasureKernel::begin_purge(id)`, idempotent, extrahiert aus `purge_store`; setzt `Purging` (`PurgeStart`) und `Restricted → Erased`. Der Treiber ruft es vor dem ersten Layer. Behebt K-45. Kein Formatwechsel.
+- **A-5 (09, 14 §3.9):** persistenter *Erasure-Floor* aus `completed_summaries`; `restore_checkpoint` verweigert Checkpoints mit `meta.seq_no < gated_seq` eines abgeschlossenen Auftrags, sofern nicht `Rewritten`. Behebt K-54.
+- **A-6 (10/11, 14 §3.6):** `ErasureConfig.required_layers` je Profil; `ErasureError::LayerMissing{layer}` (am Ende). Builder registriert Text → Graph → Vektor → Checkpoint. Behebt K-48.
+- **A-7 (10, 14 K-52):** `ErasureId`-Bytes aus `KeyMaterialSource` (OS-CSPRNG), `SeededRng` nur in Tests.
+- **A-8 (02/10, 14 §3.3):** `ErasureKernel::resume(id)` und `Contextra::erase_resume(id)`; einziger Weg aus `Quarantined`, nie automatisch, kein MCP-Werkzeug.
+- **Fehlerpräzisierung:** Quarantäne-Schwelle liegt allein im Kernel (`StoreErasureConfig.quarantine_after_attempts`); `Failed{layer: Some(l)}` löscht den Layer-Cursor (kein neues Record-Tag).
 
 ## 4. Querschnittsentscheidungen
 
@@ -89,15 +98,20 @@ Nicht betroffen: `durable-fs` (kein Abhängiger, Store darf es nicht einbinden),
 
 **Fehlerklassen.** `Retryable | Permanent | Poisoned | ScopeViolation | Cancelled`. Teilfehler sind `Err`. Kein `let _ =`, kein `unwrap_or_default()` in Erase-/Purge-Pfaden.
 
-**Zustandsautomat.** `Requested → Planned → Gating → Gated → [KeysDestroying] → Purging → Verifying → Sealed → Completed`, Seitenzustände `Failed`, `Quarantined`. Ab `Gated` kein Rücksprung.
+**Zustandsautomat.** `Requested → Planned → Gating → Gated → [KeysDestroying] → Purging → Verifying → Sealed → Completed`, Seitenzustände `Failed`, `Quarantined`. Ab `Gated` kein Rücksprung vor `Gated`. Layer-Arbeit beginnt erst nach `begin_purge` (Zustand `Purging`, A-4); Fehler führen nach `Failed`, der nächste Versuch beginnt wieder mit `begin_purge`; `Quarantined` verlässt nur `resume` (A-8).
 
 **Schichtreihenfolge im Treiber.** (1) RAM-Caches über `ErasureObserver`, (2) Text → Graph → Vektor, (3) Store (`purge_store`), (4) Checkpoints. `expected_layers` enthält genau die registrierten Schichten; eine registrierte, aber leere Schicht meldet `remaining = 0`.
 
-**CI-Gates** (`tools/erasure_gates.py`, je mit Rot-Grün-Test): G-1 kein `block_on` in Erase-/Purge-Pfaden; G-2 kein `let _ =`/`unwrap_or_default()`/`.ok();`; G-3 `instrument` ohne `skip` mit `id`/`key`/`target`; G-4 kein `std::fs`/`tokio::fs` in `store/src/erasure/`, `engine/src/erasure/`, den neuen Layer-Dateien in `text`, `vector`, `graph`, `checkpoint`; G-5 keine `Instant::now`/`SystemTime::now`/`HashMap` in neuen Dateien; G-6 `ReadGate` ohne Default-Methoden.
+**CI-Gates** (`tools/erasure_gates.py`, je mit Rot-Grün-Test): G-1 kein `block_on` in Erase-/Purge-Pfaden; G-2 kein `let _ =`/`unwrap_or_default()`/`.ok();`; G-3 `instrument` ohne `skip` mit `id`/`key`/`target`; G-4 kein `std::fs`/`tokio::fs` in `store/src/erasure/`, `engine/src/erasure/`, den neuen Layer-Dateien in `text`, `vector`, `graph`, `checkpoint`; G-5 keine `Instant::now`/`SystemTime::now`/`HashMap` in neuen Dateien; G-6 `ReadGate` ohne Default-Methoden. **Neu (14 §6):** G-7 kein `tokio::spawn` ohne `TaskTracker` in `engine/src/erasure/`; G-8 `Result` von `fail`/`record_layer`/`on_gate` nicht verworfen; G-9 kein `_ =>` in den Encodern von `store/src/erasure/journal.rs`.
 
 ## 5. Reihenfolge
 
+**Laufzeit-Startreihenfolge** (normativ, 14 §3.11): Wurzel → Kernel (`open_early`) → `LsmStorage` (Gate/Filter vor Replay) → Layer registrieren → `mask_layers` + Observer-Replay → Lesepfade frei (`NotReady` endet) → Worker.
+
+**Arbeitsreihenfolge:**
+
 ```text
+WP-14.0  K-45/46/47 + A-4   (ohne diese läuft keine Layer-Kette durch)
 A-1, A-2, A-3  (vor allem anderen; K-33 ist ein Auslieferungsstopp)
  └─ 05 §3 Rückbau, §4 Wurzel
      ├─ 13 §4 CrashVfs (blockiert Crash-Tests von 03)
@@ -106,6 +120,7 @@ A-1, A-2, A-3  (vor allem anderen; K-33 ist ein Auslieferungsstopp)
      ├─ 07 Vektor ├ parallel
      ├─ 08 Graph ┘
      ├─ 09 Checkpoint + 04 §4
+     ├─ 14 WP-14.2…14.7 (Observer/Start, Pflicht-Layer, Zeugen, Scheduler, Gates)
      └─ 05 §5 Stufe 2 (opt-in)
 ```
 
@@ -119,6 +134,9 @@ Jedes Paket endet mit `cargo build --workspace --locked`, `cargo test --workspac
 4. Leerlauf-CPU des Workers 0; Lesepfad ohne aktive Gates ein Acquire-Load.
 5. `NotMeasured`/`FeatureDisabled` senkt die ausgewiesene Garantie sichtbar (I-6).
 6. `tests/layering.rs` grün.
+7. **Datenort-Matrix** (14 §4): Zeilen 1–16 „geschlossen“ (G1, G3, Zeuge, Crash-Test), Zeilen 17–20 verhindert oder im `ErasureStatus.exceptions` ausgewiesen.
+8. Crash-Matrix CP-1…CP-30 und Loom-Modelle grün; Gates G-1…G-9 grün, `tools/erasure_gates_baseline.txt` ohne Eintrag für `engine/src/erasure/`.
+9. Ohne registrierte Pflicht-Layer wird nie `purged = true` ausgewiesen (I-6).
 
 ## 7. Glossar
 

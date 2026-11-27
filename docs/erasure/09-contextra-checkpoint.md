@@ -150,3 +150,17 @@ Konformanz grün; Restore-Sperre getestet; kein `let _ =` in neuem Code; `warn`-
 | O-K2 | `Rewrite` | eigener Nachtrag |
 | O-K3 | Produktive Nutzung von `metadata` | siehe §7 |
 | O-K4 | Namespace-Aufbau je Mandant | siehe §5.1 |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Stand.** `PersistentCheckpointStore::with_gate` und `ensure_restore_allowed` (`store.rs:463-465, 799-810`) sind umgesetzt ✔, sie prüfen aber nur den Meta-Schlüssel `{namespace}:checkpoint:{name}` gegen **aktive** Gates und bei Epochenwechsel (`restore_checkpoint`, `store.rs:764, 784`). **Nicht umgesetzt:** `TaintQuery`, Politik (`Drop`/`Rewrite`/`LegalHold`), `drop_checkpoint_for_erase`, Layer `CheckpointErasure`, Zeuge `Checkpoints`.
+
+**K-54 (S1).** Nach `Completed` ist der Gate-Eintrag entfernt (I-9). Ein älterer Checkpoint wird dann nicht mehr blockiert; die Barriere `last_tx > meta.tx_id` (`store.rs:773`) greift nicht, weil Erase keine `TxId` erzeugt **[?]** (`TST-CKPT-RESTORE-3` entscheidet). Folge: Wiederherstellen stellt gelöschte Daten wieder her.
+
+**Verbindliche Ergänzungen (A-5, 14 §3.9).**
+
+1. **Erasure-Floor:** `restore_checkpoint(name)` ⇒ `Erased`, wenn ein abgeschlossener Auftrag mit `gated_seq > meta.seq_no` existiert und der Checkpoint nicht `Rewritten` ist. Der Floor stammt aus dem Journal-Summary (über Rollover erhalten) und wird beim Start neu aufgebaut (CP-23).
+2. **Pflicht-Layer:** `CheckpointErasure` ist in Regulated Teil von `required_layers`; `Sealed` verlangt `Checkpoints.remaining == 0`.
+3. **Reihenfolge:** Checkpoint-Bereinigung **nach** `purge_store` (Index §4), vor Verifikation. Hardlink-Klone: Löschen eines Klons löscht nicht die Datei, solange ein weiterer Link existiert; der Zeuge zählt Dateien mit Link-Zähler > 1 als Rest, bis der Quell-Checkpoint selbst bereinigt ist.
+4. **Restore ⇄ Layer-Purge:** exklusive Sperre, solange ein offener Auftrag den Scope berührt (K-9), plus Loom-Modell (c) aus 14 §5.
+5. **Tests:** `TST-CKPT-RESTORE-3` (Floor), `TST-CKPT-HLINK-1` (Link-Zähler), `TST-CKPT-CRASH-1` (CP-29).

@@ -158,3 +158,15 @@ Keine Treffer für `legacy-erasure`; KV-Shredding-Tests grün; `crypto/src` ohne
 | O-C1 | Ziel von `Cargo.toml:60` `required-features` | Lesen, dann Feature zuordnen |
 | O-C2 | Wie liefert `KeyManager` die Basis für `DerivedErasureRoot`? | Eigene Methode `KeyManager::derive_erasure_root(&self) -> Result<ErasureRoot>` mit festem Label |
 | O-C3 | `CryptoError`-Variante für KDF-Fehler | vorhandene nutzen, sonst am Ende anhängen |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Stand.** `src/erasure_root.rs` (74 LOC) ✔: `ErasureRoot` (zeroizing, nicht klonbar), `ErasureLabel{LedgerMac, ErasureLog, VaultEpoch, JobKey}`, `derive(label, context) -> Result<SecretKey<32>>`. **K-40 behoben:** `derive_dek` propagiert den HKDF-Fehler (`dek.rs:76`). **Offen:** Der Store nutzt `ErasureRoot` nicht (K-33, K-60); Feature `kv-shredding` und Rückbau von `legacy-erasure` (K-7/K-41) sind nicht umgesetzt (`Cargo.toml:39-42` unverändert).
+
+**Verbindliche Ergänzungen.**
+
+1. **Verdrahtung.** Der Store ist der einzige Verwender von `ErasureRoot` für `LedgerMac`/`ErasureLog`. `JobKey` (Kontext = `ErasureId`) und `VaultEpoch` sind für Stufe 2 reserviert und dürfen nicht anderweitig benutzt werden. HKDF-Labels bleiben eingefroren (Golden-Test über die vier `info()`-Werte).
+2. **Wurzelquelle** (A-2): `FileErasureRoot` | `DerivedErasureRoot` | `StaticErasureRoot`. Die Zufallsquelle für die **Erst**-Erzeugung ist `KeyMaterialSource` (OS-CSPRNG, fail-closed). Der Wurzel-Dateipfad liegt in `erasure_dir`, nicht im Datenverzeichnis des LSM (Backup-Trennung), Modus 0600, `write_atomic` + `sync_dir` (CP-27).
+3. **Testquellen.** `StaticKeyMaterialSource` füllt bei erschöpftem Strom ein deterministisches Muster (`key_source.rs`) und ist `pub` exportiert. Für Regulated gilt: Start verweigert, wenn die Quelle nicht `OsKeyMaterialSource` ist **oder** die Wurzel nicht extern ist. Zusätzlich `cfg(any(test, feature = "test-utils"))` für `StaticKeyMaterialSource` prüfen **[?]** (`TST-CRYPTO-STATIC-1`).
+4. **Nachweis der Unwiderruflichkeit (Stufe 2).** `KeysDestroying` darf erst `Purging` freigeben, wenn die Schlüsselvernichtung `sync`-durabel ist und ein Wiederlesen der Wurzel/`VaultEpoch` fehlschlägt (`TST-CRYPTO-SHRED-1`). Medienreste (SSD, Snapshots) sind nur über Stufe 2 abgedeckt (14 §4 Zeile 20).
+5. **Zeroize.** `SecretKey` zeroisiert beim Drop; `ErasureRoot` hat kein `Debug`-Inhalt/`Clone`/`Serialize` (Compile-fail-Test `TST-CRYPTO-ROOT-1`).

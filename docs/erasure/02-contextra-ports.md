@@ -279,3 +279,25 @@ Workspace baut ohne `KeyBuf`/Barrier/Keyring; keine neue Kante in `capabilities.
 | O-P1 | `CancellationToken` in `ports`? | Eigener `Cancel`-Trait, falls `tokio-util` nicht bereits Abhängigkeit (**[?]** `ports/Cargo.toml`) |
 | O-P2 | `RecordSealer` jetzt oder in WP-11? | Verschieben nach `seal.rs` hinter Feature, in WP-11 ausarbeiten |
 | O-P3 | `GateId`/`StoreId` aus `types` nutzen? | Nein (01 §4.1) |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Stand.** `crates/contextra-ports/src/erasure.rs` (765 LOC) enthält `KeyScope`, `DocScope`, `ResolvedScope`, `IoBudget`, `ProgressSink`, `Cancel`, `PurgeCx`, `PrivilegedRead`, `ErasureLayer`, `ErasureKernel` ✔. **Nicht vorhanden:** `register_collapse` (A-1), `LAYER_TEXT`/`LAYER_CHECKPOINTS` (A-3).
+
+**Neue Methoden an `ErasureKernel` (additiv, am Ende des Traits):**
+
+```rust
+fn begin_purge<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<(), ErasureError>>;   // A-4, 14 §3.2
+fn resume<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<(), ErasureError>>;        // A-8, 14 §3.3
+```
+
+**Präzisierte Verträge.**
+
+1. `record_layer` bleibt auf Zustand `Purging` beschränkt. Der Aufrufer (Treiber) ruft vorher `begin_purge`. Die Vorbedingung wird nicht aufgeweicht (Fehlerbild K-45).
+2. `fail(id, layer, kind)`: erreicht der Zähler die Schwelle (im Kernel konfiguriert), liefert die Methode `Quarantined{layer}`; für `layer = None` gilt `layer = "job"`. Ist `layer = Some(l)`, verwirft der Kernel den Cursor von `l` (14 §3.4). Rückgabewerte dürfen vom Aufrufer nicht verworfen werden (`#[must_use]`).
+3. `LayerScanner::scan` meldet nicht lesbare Einheiten als `Err`. Eine Einheit, die nicht gelesen werden konnte, ist **nie** `found = false`. Der Treiber wertet `Err` als `Retryable` am Layer.
+4. `ErasureLayer` (§4.5): zusätzlich zu C1–C7 gilt **C8 Ergebnisfilter** — jede Antwort, die Dokumentinhalt liefert, wird vor Rückgabe über `ReadGate` gefiltert, unabhängig von `on_gate` (`CONF-LAYER-READ-1`). `on_gate` darf fehlschlagen und wird wiederholt.
+5. `ErasureObserver` (§4.8): `on_erased` ist **idempotent** und wird nach Neustart für offene Jobs erneut mit `Gated` zugestellt (14 §3.8).
+6. Neue Fehlervarianten am Ende der `non_exhaustive`-Enums: `ErasureError::LayerMissing{layer}`, `ContextraError::NotReady`.
+
+**Zusätzliche Tests.** `TST-PORTS-MUSTUSE-1` (Compile-fail: verworfenes `fail`-Ergebnis), `CONF-LAYER-READ-1`, `CONF-LAYER-IDEM-1` (Layer zweimal ab Cursor `None` ⇒ gleicher Endzustand), Golden-Test der Trait-Signaturen.

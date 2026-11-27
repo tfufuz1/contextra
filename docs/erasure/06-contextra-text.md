@@ -154,3 +154,9 @@ Konformanz grün; Canary grün; `block_on` im Crate nur noch in Tests; G-1/G-2/G
 | O-T1 | Enthalten Morphologie-/Trie-Caches Dokumentbezüge? | Lesen `morphology/trie.rs`; falls nein, Cache unverändert |
 | O-T2 | Hat `commit` später eine Sequenz im Rückgabewert? | Dann `last_seq_no()` durch Rückgabe ersetzen |
 | O-T3 | Mehrere Collections teilen `meta:stats`? | `meta:stats` ist namespacegebunden (`self.key`), je Instanz getrennt ✔ |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Stand.** `src/erasure.rs` (295 LOC) implementiert `ErasureLayer for TextErasure<S: StorageEngine>` ✔; `src/inverted/purge.rs` vorhanden; Konformanztest `tests/text_erasure_conformance.rs` (16 LOC). **Offen:** keine Registrierung im Engine-Builder (K-48), `LAYER_TEXT` (A-3) wird nicht verwendet, Layer meldet `Custom("TextIndex")`.
+
+**Verbindliche Ergänzungen.** (1) C8 Ergebnisfilter: jede Trefferliste (Postings, Phrasen, Snippets) wird vor Rückgabe über `ReadGate` gefiltert, unabhängig von `on_gate`. (2) Idempotenz nach Cursor-Reset (14 §3.4): `purge` ab Cursor `None` ist wiederholbar, `meta:stats` wird deterministisch neu berechnet. (3) Persistenz-Schreibpfade (`plb:`-Listen, `resident_index`) laufen über `StoreIo` (G-4). (4) Test `TST-TEXT-CANARY-1`: Canary-Term nach `erase(Document)` in Postings, `plb:`, `resident_index`, `meta:stats`, Phrasenpositionen: 0 Treffer. (5) Die Konformanzsuite (13) wird vollständig ausgeführt, nicht nur ein Smoke-Test.

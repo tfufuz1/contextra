@@ -126,3 +126,9 @@ Drei Werkzeuge getestet; Policy-Test grün; keine Schlüssel in Antworten/Logs; 
 | O-M1 | `ToolCategory` ist `non_exhaustive`? | lesen; neue Variante am Ende |
 | O-M2 | Konstantzeit-Vergleich vorhanden? | sonst in `crypto` ergänzen (`ct_eq`) |
 | O-M3 | Mandant des Status-Aufrufers | siehe §4.2 |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Stand.** `contextra_erase`, `contextra_erase_status`, `contextra_erase_dry_run` sind in `server_tools.rs` verdrahtet ✔ (Kategorien `DatabaseErase`/`DatabaseRead`, `tests.rs:177-179`).
+
+**Ergänzungen.** (1) `contextra_erase_dry_run` weist `required_layers`, fehlende Layer und die voraussichtlichen Ausnahmen (Datenort-Matrix Zeilen 17–20) aus; `contextra_erase_status` zeigt `exceptions` inklusive `sla_breached_at`/`FeatureDisabled`. (2) **Kein** Werkzeug für `resume` (A-8). (3) Offene MCP-Cursor/Streams: nach `Gated` liefern sie keine Treffer des Scopes mehr (`TST-MCP-CUR-1`, Matrix Zeile 18, **[?]**). (4) Fehlerantworten und Logs nennen nur den gekürzten HMAC der `ErasureId`, nie Schlüssel/Zielbytes (G-3). (5) Das Werkzeug `contextra_erase` ist nur mit expliziter Bestätigung/Plan-Hash aufrufbar (Dry-Run-Hash), um Fehlaufrufe durch Agenten zu verhindern **[?]** Abgleich mit der bestehenden Implementierung.

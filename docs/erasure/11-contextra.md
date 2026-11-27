@@ -95,3 +95,7 @@ Invariantentest grün; Regulated-Verweigerung getestet; `deletion_e2e.rs` ohne L
 | O-F1 | Zählt die Invariante nur `lib.rs`? | Lesen des Invariantentests; Builder-Methoden bleiben am Typ |
 | O-F2 | Re-Export-Pfad über `contextra-db` | prüfen, sonst `contextra-engine`-Typen nicht direkt importieren (Facade kennt nur `db`) |
 | O-F3 | Passphrase-Ableitung der Wurzel | 05 O-C2 |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Verbindliche Ergänzungen.** (1) **Startreihenfolge** 14 §3.11. Der Builder registriert `TextErasure`, `GraphErasure`, `HnswErasure`, `CheckpointErasure` (Registry-Order Text → Graph → Vektor → Checkpoint) **nach** Kernel-Öffnung und **vor** Freigabe der Lesepfade; vor `mask_layers` liefern Lesepfade `NotReady`. (2) **Profile:** *Regulated* ⇒ `required_layers = {Text, Vector, Graph, Checkpoints}` (soweit gebaut), externe Wurzel und externes Ledger Pflicht, `StaticKeyMaterialSource` verboten; *Standard*/*Embedded* ⇒ Löschung läuft, `Sealed` weist fehlende Layer als Ausnahme aus (`purged = false`). (3) `deletion_proof_active` steuert weiterhin nur die Durability-Prüfung (K-42); Doku und Rustdoc benennen das. (4) Die Facade-Invariante ≤ 20 `pub fn` bleibt: `erase*` liegt als `impl Contextra` in der Engine (K-8). (5) Test `TST-ENG-WIRE-1` (14 §6).

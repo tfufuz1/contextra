@@ -253,3 +253,9 @@ Jede Invariante hat damit mindestens **einen** Test, der bei Verletzung rot wird
 | O-X2 | Loom-Version/Feature in Workspace | aus `engine`/`mvcc` übernehmen |
 | O-X3 | Hardlink in `Vfs`-Port aufnehmen? | Nein in Stufe 1 (nur Testhilfe `link`); sonst Port-Änderung mit Nachtrag zu 02 |
 | O-X4 | `SystemUnderTest`-Trait für `ErasureModel::assert_matches` | Implementierung im `contextra`-E2E-Test (testkit kennt keine Engine) |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Stand.** `erasure_mocks.rs` (1 110 LOC; `MockErasureKernel` erzwingt `can_transition_to`), `erasure_model.rs` (440), `conformance/erasure_layer.rs` (566), `tests/loom_erasure.rs`, `tests/erasure_model.rs`, `tests/layer_conformance_selftest.rs` ✔.
+
+**Ergänzungen.** (1) `MockLayer` erhält Fehlerinjektion: `fail_on_gate(n)`, `residue_after_purge(n)` (Zeuge meldet Rest), `fail_purge_retryable(n)`, `slow_purge(units)`. (2) Treibertests laufen gegen **beide** Kernel (`MockErasureKernel`, echter `StoreErasureKernel` über `CrashVfs`); das Referenzmodell prüft, dass die Übergangstabelle in beiden identisch ist (Differential-Test `TST-MODEL-DIFF-1`). (3) Konformanz: neu **C8** `CONF-LAYER-READ-1` und `CONF-LAYER-IDEM-1`; **jeder** produktive Layer (Text, HNSW, Graph, Checkpoint) führt die Suite aus, nicht nur Selbsttests. (4) `CrashVfs`-Szenarien CP-19…CP-30 (14 §5) als Tabelle `crash_matrix()`; Torn-Write, Reorder-nach-`sync_dir`, Verlust ungesyncter Renames. (5) Loom-Modelle: (a) Schreiber gegen Gate-Veröffentlichung, (b) `complete` gegen Lese-Epoche, (c) Layer-`purge` gegen `restore_checkpoint`. (6) Canary `T-DEL-1` läuft in Klartext- und verschlüsseltem WAL-Modus.

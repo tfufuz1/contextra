@@ -261,3 +261,35 @@ Canary grün; Crash-Matrix grün; Leerlauf-CPU 0; Gates G-1…G-6 grün; `tests/
 | O-E3 | Format `__col_idx` | `rg` siehe §5.2 |
 | O-E4 | Fehlerabbildung `ScopeAmbiguous` | siehe §12 |
 | O-E5 | Lebensdauer `record_keys_with_old_values` | siehe §9 |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Stand.** `engine/src/erasure/` (`driver.rs` 524, `api.rs` 233, `resolver.rs` 146, `registry.rs` 101, `caches.rs` 93, `budget.rs` 77, `config.rs` 56, `adapters.rs` 39, `types.rs` 31, `mod.rs` 175) und `background_workers/erasure_worker.rs` (36) ✔. Der Worker ist ereignisgetrieben (Leerlauf-CPU 0 ✔). **Keine Treiber-Tests** (`run_pass`, `drive_job`) — deshalb blieben K-45…K-47 unentdeckt.
+
+**Korrigierter Treiberablauf (ersetzt den Ablauf in §6; normativ).**
+
+```text
+drive_job(job):
+  1  Requested|Planned|Gating  → publish_gate → mask_layers (Fehler ⇒ unmasked, Retry) → Gated
+  2  Quarantined               → return Quarantined           (nur Kernel-Zustand zählt)
+  3  Gated|KeysDestroying|Failed|Purging:
+       kernel.begin_purge(id)                                  ← A-4
+       genau EIN Tick: nächster fälliger Layer (Reihenfolge Text → Graph → Vektor), sonst Store, sonst Checkpoint
+       record_layer / StoreProgress                            → return Progress
+  4  alle Layer + Store erledigt → Verifying: Zeugen sammeln
+       Rest > 0 → fail(layer, Retryable)   (Kernel verwirft Layer-Cursor, §3.4)
+       sonst    → seal
+  5  Sealed → complete → Observer(Completed)
+Jeder Fehler: fail(...) auswerten (Quarantined|Failed|Err), niemals verwerfen.
+```
+
+**Ergänzungen.**
+
+* **K-52 (A-7):** `ErasureId`-Bytes über `KeyMaterialSource`; `SeededRng`-Fallback (`mod.rs:93-98`) nur in Tests. Backoff-Jitter darf PRNG nutzen.
+* **K-53:** Observer-Tasks über `TaskTracker`, `stop()` wartet bis `shutdown_grace`; Replay von `Gated` beim Start (14 §3.8).
+* **K-56:** `tenant_of` ohne Fallback `SYSTEM`; leerer Scope ⇒ `InvalidTarget` in `accept`.
+* **K-57:** ein Tick je Job und Pass, `DriveOutcome::Progress`, `cfg.max_jobs_per_pass`, SLA-Jobs zuerst; SLA-Überschreitung ⇒ Laufzeitfeld `sla_breached_at` im Status.
+* **K-48 (A-6):** `required_layers`, `LayerMissing`; `Contextra::build` registriert Layer (11). 
+* **A-8:** `Contextra::erase_resume(id)`; kein MCP-Werkzeug.
+* **K-55/K-59:** `reap_expired`-Ergebnis wird erfasst; die G-2-Baseline-Einträge für `engine/src/erasure/driver.rs` (5) und `mod.rs` (1) entfallen.
+* **Tests:** `TST-DRV-ORDER-1`, `-FAIL-1/2`, `-RESET-1`, `-GATEERR-1`, `-SCHED-1`, `TST-ENG-WIRE-1`, `TST-ENG-NOTREADY-1`, `TST-ENG-ID-1`, `TST-OBS-REPLAY-1` (14 §6), je gegen den **echten** `StoreErasureKernel` mit `MockLayer`, zusätzlich gegen `MockErasureKernel`.

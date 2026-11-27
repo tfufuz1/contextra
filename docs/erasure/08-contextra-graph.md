@@ -117,3 +117,9 @@ Konformanz grün; Pflichtfeld erzwungen (Compile- oder Laufzeitfehler beim Anleg
 | O-G2 | Persistenzpfad vollständig | siehe §6 |
 | O-G3 | Besitzt `CsrGraph` bereits einen `LayerScanner`? | `rg "impl LayerScanner"`; sonst WP-8.4 anlegen |
 | O-G4 | Semantik „primäre“ Entities (manuell angelegt) bei Dokument-Erase | unberührt; nur Collection-/Tenant-Scope entfernt sie |
+
+## Revision 2 (28.11.2026, Audit gegen HEAD `e12873de6`; Details in 14)
+
+**Stand.** `contextra-graph` enthält **keine** Erasure-Implementierung (kein `ErasureLayer`, kein Scanner, keine Referenz auf `Erasure*`). `EdgeProvenance`/`DocEdgeIndex` existieren (K-22), die Graph-Schlüssel sind tenantweit (K-38). Damit ist Datenort-Matrix **Zeile 13 offen (S1)**: ein `erase(Document)` lässt abgeleitete Entitäten, Kanten und Communities stehen.
+
+**Abnahmekriterien für `GraphErasure`** (zusätzlich zu 08 §1–§10): (1) Layer-Konstante `LAYER_GRAPH` und Zeuge `Graph` (A-3-Stil); (2) Entfernen von Kanten/Entitäten **nur**, wenn ihre Provenienzmenge nach Abzug leer ist; Teilmengen werden um das Dokument verkleinert, Community-Zusammenfassungen, die gelöschten Text enthalten, werden verworfen und neu erzeugt oder als `Stale` markiert und gesperrt; (3) CSR-Neuaufbau über `StoreIo`, Temp/`rename`; (4) C8-Ergebnisfilter für jede Graph-Abfrage; (5) `unprovenanced`-Daten (Altbestand ohne Provenienz) werden im `SealReceipt` als Ausnahme ausgewiesen und senken die Garantie (I-6); (6) Canary `TST-GRAPH-CANARY-1`.
