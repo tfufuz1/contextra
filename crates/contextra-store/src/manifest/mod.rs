@@ -4,6 +4,9 @@
 // ZWECK: Append-Only Manifest-Protokolldatei zur Verfolgung gültiger SSTables für Crash-Safety.
 // INVARIANTEN: fsync NACH jedem Manifest-Eintrag; Add erst nach fsync der SSTable-Datei.
 
+// WP-S6: Längen- und Offsetfelder im Format nie mit `as` abschneiden (`try_from` nutzen).
+#![deny(clippy::cast_possible_truncation)]
+
 mod core;
 mod entry;
 mod recovery;
