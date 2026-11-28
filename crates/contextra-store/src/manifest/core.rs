@@ -378,7 +378,7 @@ impl Manifest {
         let mut state = self.state.lock().await;
         let mut next_state = state.clone();
         for entry in entries {
-            next_state.apply(entry)?;
+            next_state.apply_checked(entry)?;
         }
         append_durable(Arc::clone(&self.file), batch_bytes)
             .await

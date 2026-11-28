@@ -319,6 +319,9 @@ async fn manifest_rollover_crash_vfs_preserves_previously_committed_state() {
         io.create_dir_all(&dir)
             .await
             .expect("create virtual store dir");
+        io.sync_dir(Path::new(""))
+            .await
+            .expect("make store dir durable");
         let path = dir.join("MANIFEST");
         let manifest = Manifest::open_with_io(&path, None, io)
             .await
@@ -345,6 +348,58 @@ async fn manifest_rollover_crash_vfs_preserves_previously_committed_state() {
         let state = recovered.state_snapshot().await;
         assert_eq!(state.live().get(Path::new("committed.sst")), Some(&19));
     }
+}
+
+/// F5/INV-M4: ENOSPC während eines Appends darf weder den Zustand verändern noch einen halben
+/// Frame hinterlassen, der das Manifest nach dem Neustart unlesbar macht.
+#[tokio::test]
+async fn manifest_append_enospc_midframe() {
+    use contextra_testkit::crash_vfs::{CrashPolicy, CrashSeed, CrashVfs, ErrKind};
+
+    let vfs = CrashVfs::new(CrashSeed(0xE05C));
+    let io = crate::io_seam::StoreIo::new(std::sync::Arc::new(vfs.clone()));
+    let dir = PathBuf::from("store");
+    io.create_dir_all(&dir).await.expect("create store dir");
+    io.sync_dir(Path::new(""))
+        .await
+        .expect("make store dir durable");
+    let path = dir.join("MANIFEST");
+    let manifest = Manifest::open_with_io(&path, None, io)
+        .await
+        .expect("open manifest");
+    manifest
+        .append(&ManifestEntry::Add {
+            path: PathBuf::from("committed.sst"),
+            max_tx: 7,
+        })
+        .await
+        .expect("commit first entry");
+
+    vfs.fail_write(&path, 0, ErrKind::NoSpace);
+    let failed = manifest
+        .append(&ManifestEntry::Add {
+            path: PathBuf::from("lost.sst"),
+            max_tx: 8,
+        })
+        .await;
+    assert!(failed.is_err(), "append under ENOSPC must report failure");
+
+    let live = manifest.state_snapshot().await;
+    assert_eq!(live.live().get(Path::new("committed.sst")), Some(&7));
+    assert!(
+        !live.live().contains_key(Path::new("lost.sst")),
+        "failed append must not change the in-memory state"
+    );
+    drop(manifest);
+
+    let restarted = vfs.restart(CrashPolicy::DropUnsynced);
+    let restarted_io = crate::io_seam::StoreIo::new(std::sync::Arc::new(restarted));
+    let recovered = Manifest::open_with_io(&path, None, restarted_io)
+        .await
+        .expect("manifest must stay openable after ENOSPC");
+    let state = recovered.state_snapshot().await;
+    assert_eq!(state.live().get(Path::new("committed.sst")), Some(&7));
+    assert!(!state.live().contains_key(Path::new("lost.sst")));
 }
 
 #[tokio::test]

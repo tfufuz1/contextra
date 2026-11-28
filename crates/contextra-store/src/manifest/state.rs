@@ -21,6 +21,21 @@ impl ManifestState {
         Ok(state)
     }
 
+    /// Wie [`Self::apply`], prüft aber zusätzlich Einträge, die neu geschrieben werden (nicht
+    /// beim Laden alter Manifeste): `Remove` muss eine dem Manifest bekannte Datei betreffen.
+    /// Ein erneutes `Remove` einer bereits toten Datei bleibt idempotent erlaubt.
+    pub(crate) fn apply_checked(&mut self, entry: &ManifestEntry) -> Result<()> {
+        if let ManifestEntry::Remove { path } = entry {
+            let key = SstName::try_from_path(path)?;
+            if !self.live.contains_key(&key) && !self.dead.contains(&key) {
+                return Err(ContextraError::Storage(format!(
+                    "Manifest Remove references unknown SSTable {key:?}"
+                )));
+            }
+        }
+        self.apply(entry)
+    }
+
     pub(crate) fn apply(&mut self, entry: &ManifestEntry) -> Result<()> {
         match entry {
             ManifestEntry::Add { path, max_tx } => {
