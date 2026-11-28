@@ -376,6 +376,16 @@ impl CompactionEngine {
         // Perform the merge
         let min_snapshot_seq = self.snapshot_registry.min_active_seqno();
         let output_path = self.generate_sst_path(data_path)?;
+        // Hard guard (F-04): the output must never be one of the inputs. Otherwise the
+        // merge overwrites its own input, and the old-path cleanup later deletes the output.
+        if input_ssts
+            .iter()
+            .any(|sst| sst.file_path() == output_path.as_path())
+        {
+            return Err(contextra_types::ContextraError::invalid_input(
+                "compaction output path collides with an input SSTable",
+            ));
+        }
         self.merge_sstables_with_cancel(
             &input_ssts,
             &output_path,
@@ -912,13 +922,30 @@ impl CompactionEngine {
         Ok(())
     }
 
-    /// Generates a unique SSTable file path using a monotonic counter.
+    /// Generates a compaction output path that does not name an existing file.
+    ///
+    /// The process-global counter restarts at 1 on every process start, so a fresh
+    /// process can propose a name that a previous session already wrote. Such a name is
+    /// skipped (never overwritten): each probe consumes one counter value, so the scan
+    /// is amortised over the process lifetime (F-04).
     pub fn generate_sst_path(&self, data_path: &std::path::Path) -> Result<PathBuf> {
-        let seq = COMPACTION_SST_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let count = self
-            .compaction_counter
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        Ok(data_path.join(format!("sst-compact-{:020}-{:04}.sst", seq, count % 10000)))
+        // Bounded: a directory that answers "exists" for every candidate must not hang compaction.
+        const MAX_NAME_PROBES: usize = 10_000;
+        for _ in 0..MAX_NAME_PROBES {
+            let seq = COMPACTION_SST_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let count = self
+                .compaction_counter
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let candidate =
+                data_path.join(format!("sst-compact-{:020}-{:04}.sst", seq, count % 10000));
+            let uuid_sidecar = PathBuf::from(format!("{}.uuid", candidate.display()));
+            if !self.vfs.exists(&candidate)? && !self.vfs.exists(&uuid_sidecar)? {
+                return Ok(candidate);
+            }
+        }
+        Err(contextra_types::ContextraError::invalid_input(
+            "no free compaction SSTable name found within the probe budget",
+        ))
     }
 
     /// Runs the background compaction loop.
