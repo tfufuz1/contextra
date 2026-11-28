@@ -1,71 +1,65 @@
+#!/usr/bin/env python3
 """
-contextra_full_audit.py (v7) - Tests, Testbarkeit, Lints, Benchmarks, Fuzz, Mutation, Coverage fuer den aktuellen Repo-Stand.
+contextra_full_audit.py (v4) - Messen, Testen, Befunde pruefen; alle Ergebnisse maschinenlesbar speichern.
 
-Der Fokus liegt auf der Testbarkeit der vorhandenen Crates und Funktionen. Es gibt keine Messung gegen
-Spezifikationsdokumente mehr (keine Gate-/Rueckbau-/Produktlisten).
+Aufruf im Repo-Root (Cargo.toml mit [workspace]):
 
-Aufruf im Repo-Root (dort, wo die Cargo.toml mit [workspace] liegt):
-
-  python3 tools/contextra_full_audit.py --list                 # Plan zeigen, nichts ausfuehren (kein cargo noetig)
-  python3 tools/contextra_full_audit.py --gruppe testbarkeit   # Testbarkeit (Python-Teil laeuft ohne Toolchain)
-  python3 tools/contextra_full_audit.py --gruppe befunde       # nur statische Befunde (kein Build)
-  python3 tools/contextra_full_audit.py --quick                # Preflight, check, fmt, clippy, tests, Testbarkeit
-  python3 tools/contextra_full_audit.py                        # Standard: alles inkl. Benchmarks
-  python3 tools/contextra_full_audit.py --coverage             # zusaetzlich cargo llvm-cov + Funktionsabdeckung
-  python3 tools/contextra_full_audit.py --all                  # zusaetzlich Fuzz, Mutation, Loom, Miri, ASan, Coverage
-  python3 tools/contextra_full_audit.py --only store,mvcc      # nur bestimmte Crates (Kurzname)
-  python3 tools/contextra_full_audit.py --resume evidence/audit-...   # PASS/INFO-Schritte werden uebernommen
+  python3 tools/contextra_full_audit.py --list                       # Plan zeigen, nichts ausfuehren
+  python3 tools/contextra_full_audit.py --gruppe befunde             # nur statische Befunde (kein Build)
+  python3 tools/contextra_full_audit.py --messen --profil smoke      # nur Messung, ca. Minuten (Funktionstest)
+  python3 tools/contextra_full_audit.py --messen --profil standard   # nur Messung, Standardtiefe
+  python3 tools/contextra_full_audit.py --messen --profil max        # maximale Messtiefe (Stunden)
+  python3 tools/contextra_full_audit.py --quick                      # Befunde, check, fmt, clippy, Tests (ohne Messung)
+  python3 tools/contextra_full_audit.py                              # Standard: alles ausser Fuzz/Mutation/Miri/Coverage
+  python3 tools/contextra_full_audit.py --all                        # zusaetzlich Fuzz, Mutation, Loom, Miri, ASan, Coverage
+  python3 tools/contextra_full_audit.py --only store,vector          # nur bestimmte Crates (Kurzname)
+  python3 tools/contextra_full_audit.py --resume evidence/audit-...  # PASS/INFO-Schritte werden uebernommen
   python3 tools/contextra_full_audit.py --vergleich evidence/audit-A evidence/audit-B
 
-Weitere Optionen: --fail-fast, --jobs N, --timeout-faktor F, --root PFAD
+Weitere Optionen: --repeat N, --flake N, --native, --no-overflow-checks, --env K=V (mehrfach),
+  --baseline NAME, --save-baseline NAME, --criterion-home PFAD, --target-dir PFAD, --test-json,
+  --fail-fast, --jobs N, --timeout-faktor F, --root PFAD
 
-Gruppe 3-testbarkeit (Python-Schritte brauchen keinen Build):
-  testbarkeit_crates             Tests je Crate (unit/integration/doctest), ignorierte und assertionlose Tests,
-                                 Anteil der pub-Funktionen mit Testbezug. FAIL: Crate mit Code, aber ohne jeden Test.
-  testbarkeit_funktionen         je Funktion Sichtbarkeit, Komplexitaet, Testnachweis, direkte Umweltzugriffe
-                                 (Zeit, Zufall, Dateisystem, Umgebung, Prozess, Netz, sleep, globaler Zustand).
-                                 FAIL: pub-Funktion ab Komplexitaet KOMPLEX_SCHWELLE ohne Testbezug.
-  testbarkeit_verwaiste_dateien  Test-/Benchdateien, die kein Crate einbindet (laufen nie); fehlende [[test]]-Pfade.
-  liste_tests__<crate>           `cargo test -- --list`: was cargo tatsaechlich als Test kennt; der Bericht stellt die
-                                 statische Zaehlung daneben (Differenz = nie kompilierte oder Makro-Tests).
-  coverage, coverage_funktionen  (--coverage/--all) exakte Funktionsabdeckung je Crate und Liste nie ausgefuehrter Funktionen.
-Der Testnachweis ist eine Namensheuristik auf dem Quelltext (Kommentare/Strings maskiert), keine Typaufloesung;
-generische Namen (new, get, ...) werden als "mehrdeutig" getrennt gefuehrt. Exakt ist nur die Coverage.
+Was gemessen wird (Gruppe 4-messung):
+  hygiene             Messumgebung: Last, CPU-Governor, Turbo, Swap, stoerende Prozesse (Warnungen, kein Abbruch)
+  bench_build         Kompilieren aller Bench-Ziele (Zeit, CPU, Spitzen-RSS des Builds)
+  bench__<crate>__<n> jede Criterion-Bench einzeln, `--repeat` mal; eigenes CRITERION_HOME je Lauf-Verzeichnis
+                      -> bench_runs.csv (jede Wiederholung), bench_results.csv (Median ueber Laeufe, CV, Durchsatz)
+  harness_*           vorhandene Messwerkzeuge von contextra-bench: synthetische Genauigkeit, ANN-Gate,
+                      scale-100k (Einfuegerate, Latenz-Perzentile, RSS) und der additive Bin `contextra-measure`
+                      (ANN-Sweep mit frei waehlbarer Groesse; Datensaetze wie benchmarks/data/de_mini)
+  Jeder Schritt misst zusaetzlich CPU-Zeit (user/sys) und Spitzen-RSS (wait4-Rusage) -> results.csv.
 
-Weitere Schritte: Befunde (cfg(feature) ohne Definition, default-members, Reife-Behauptungen, Bench-/Fuzz-Dateien),
-Toolchain-Preflight (schlaegt er fehl, werden alle cargo-Schritte SKIPPED), fmt/check/clippy/doc, deny/audit,
-Panic-Flaeche, unsafe-Inventar, Tests (lib, integration, doc, nextest, Debug/Release), Benchmarks, Fuzz, Mutation,
-Loom, Miri, ASan.
+Ergebnisse: evidence/audit-<UTC>-<commit>/
+  summary.md            Zusammenfassung: rote Schritte, Messtabellen, Rauschen, Ressourcen, langsamste Tests
+  results.json/.csv     jeder Schritt: Status, Dauer, CPU, RSS, Detail, Log, Metriken
+  metrics.csv           alle Kennzahlen der Harness-Laeufe (Schritt, Schluessel, Wert)
+  bench_runs.csv        Criterion je Benchmark und Wiederholung
+  bench_results.csv     Criterion aggregiert (Median, min, max, CV %, Durchsatz)
+  scale_curve.csv       scale-100k: Dokumente vs. Einfuegerate, Latenz, RSS
+  tests.csv             jeder Einzeltest mit Ergebnis; test_binaries.csv Laufzeit je Test-Binary
+  flake_report.csv      Tests mit uneinheitlichem Ergebnis ueber Wiederholungen, Hang-Kandidaten
+  panic_flaeche.csv, unsafe_inventar.csv, loc.csv
+  criterion/            Rohdaten (CRITERION_HOME), harness/ JSON- und Textausgaben, logs/, env.txt
 
-Ergebnisse: docs/evidence/audit-<UTC>-<commit>/
-  summary.md                      Zusammenfassung (rote Schritte zuerst), Toolchain, Testbarkeit, Reife-Behauptung vs. Beleg
-  results.json/.csv               jeder Schritt mit Status, Dauer, Detail, Log
-  testbarkeit_crates.csv          Kennzahlen je Crate
-  testbarkeit_funktionen.csv      je Funktion: Komplexitaet, Nachweis, Hindernisse
-  testbarkeit_auffaellige_tests.csv  ignorierte (mit/ohne Grund) und assertionlose Tests
-  testbarkeit_verwaist.csv        Dateien, die nie ausgefuehrt werden
-  testbarkeit_vergleich.csv       statische Testzahl gegen `cargo test --list`
-  coverage_crates.csv, coverage_unbedeckt.csv, coverage.json   (nur mit --coverage/--all)
-  panic_flaeche.csv               Panic-/Unwrap-Stellen im Produktivcode je Crate
-  unsafe_inventar.csv             unsafe-Stellen je Crate gegen capabilities.toml
-  bench_results.csv, criterion/   Criterion-Messwerte
-  logs/, env.txt
-
-Nur Python-Standardbibliothek (3.11+). Der Quellcode des Projekts wird nie veraendert.
-Hinweis: Prozessgruppen (start_new_session) sind POSIX-spezifisch; das Skript ist fuer Linux/macOS gedacht.
+Der Quellcode des Projekts wird nie veraendert. Harness-Laeufe starten in einem Arbeitsverzeichnis unter
+der Evidenz, damit hartkodierte relative Ausgabepfade (benchmarks/results/) nicht ins Repo schreiben.
+Nur Python-Standardbibliothek (3.11+), Linux/macOS (Prozessgruppen, wait4).
 """
 from __future__ import annotations
 
 import argparse
-import bisect
 import csv
 import datetime as dt
+import glob
 import json
+import math
 import os
 import platform
 import re
 import shutil
 import signal
+import statistics
 import subprocess
 import sys
 import time
@@ -82,28 +76,27 @@ import tomllib  # noqa: E402
 # Konfiguration
 # ----------------------------------------------------------------------------------------------
 
-BENCHES = {
-    "contextra-mvcc": ["mvcc_bench"],
-    "contextra-crypto": ["crypto_benchmarks"],
-    "contextra-vector": [
-        "distance_bench", "sq8_bench", "hnsw_bench", "hnsw_delete_search_bench", "audit_benchmarks",
-        "flush_threshold_amplification", "partial_rebuild_recall_bench", "distance_nan_impact_bench",
-        "filtered_search_selectivity_bench",
-    ],
-    "contextra-store": ["sstable_bench", "memtable_bench", "wal_bench", "lsm_concurrency_bench",
-                        "block_cache_bench", "redb_comparative_bench"],
-    "contextra-simd": ["simd_bench"],
+# Messtiefe. crit = Criterion-Argumente (leer = Criterion-Standard: 3 s Warmup, 5 s, 100 Samples).
+PROFILES = {
+    "smoke": dict(crit=["--warm-up-time", "0.5", "--measurement-time", "1", "--sample-size", "10"], repeat=1,
+                  ann=[(5_000, 128)], ann_q=100, scale=(10_000, 5_000), flake=0, fuzz=30),
+    "standard": dict(crit=[], repeat=3,
+                     ann=[(10_000, 128), (100_000, 128)], ann_q=500, scale=(100_000, 10_000), flake=0, fuzz=120),
+    "max": dict(crit=["--measurement-time", "10", "--sample-size", "100"], repeat=5,
+                ann=[(10_000, 128), (100_000, 128), (100_000, 768), (500_000, 128)], ann_q=1_000,
+                scale=(1_000_000, 100_000), flake=3, fuzz=600),
 }
 
-FUZZ_CRATES = ["crypto", "store", "text", "vector"]
+BENCH_CRATE = "contextra-bench"
+HARNESS_BINS = {"synthetic": "contextra-bench", "scale": "scale-100k", "measure": "contextra-measure"}
+DATASET_DIR = Path("benchmarks") / "data"
 
-
-PREFLIGHT = "toolchain_preflight"
 SLOW_CRATES = {"contextra-crypto": 3600, "contextra-store": 3600, "contextra-vector": 3600,
                "contextra-graph": 3600, "contextra-engine": 3600}
 DEFAULT_TIMEOUT = 1800
 BENCH_TIMEOUT = 3600
-FUZZ_SECONDS = 120
+PREFLIGHT = "toolchain_preflight"
+SAMPLE_SEC = 0.0  # reserviert
 
 PANIC_KINDS = [("unwrap", "unwrap()"), ("expect", "expect("), ("panic", "panic!"), ("todo", "todo!"),
                ("unimplemented", "unimplemented!"), ("index", "may panic")]
@@ -139,6 +132,41 @@ def has_lib(d: Path) -> bool:
     return (d / "src" / "lib.rs").exists() or "lib" in _toml(d / "Cargo.toml")
 
 
+def fmt_ns(ns: float) -> str:
+    for unit, div in (("s", 1e9), ("ms", 1e6), ("us", 1e3)):
+        if abs(ns) >= div:
+            return f"{ns / div:.3g} {unit}"
+    return f"{ns:.3g} ns"
+
+
+def md_cell(s: object) -> str:
+    return str(s).replace("|", "\\|").replace("\n", " ")
+
+
+def write_csv(path: Path, header: list[str], rows: list[list]) -> None:
+    with open(path, "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(header)
+        w.writerows(rows)
+
+
+def flatten_json(obj, prefix: str = "", out: Optional[dict] = None, limit: int = 400) -> dict:
+    """Numerische und boolesche Blaetter eines JSON-Dokuments als {pfad: wert}."""
+    out = {} if out is None else out
+    if len(out) >= limit:
+        return out
+    if isinstance(obj, bool):
+        out[prefix] = int(obj)
+    elif isinstance(obj, (int, float)):
+        out[prefix] = obj
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            flatten_json(v, f"{prefix}.{k}" if prefix else str(k), out, limit)
+    elif isinstance(obj, list) and len(obj) <= 64:
+        for i, v in enumerate(obj):
+            flatten_json(v, f"{prefix}[{i}]", out, limit)
+    return out
+
 
 # ----------------------------------------------------------------------------------------------
 # Workspace-Modell (aus Cargo.toml, ohne cargo)
@@ -148,14 +176,9 @@ class Workspace:
     def __init__(self, root: Path):
         self.root = root
         ws = _toml(root / "Cargo.toml").get("workspace", {})
-        self.members: dict[str, Path] = {}     # Paketname -> absolutes Verzeichnis
+        self.members: dict[str, Path] = {}
         self.problems: list[str] = []
-        self.fehlend: list[str] = []            # Mitglied in Cargo.toml, Verzeichnis fehlt
-        self.fehlend_default: list[str] = []    # default-member ohne Verzeichnis
         for pat in ws.get("members", []):
-            if "*" not in pat and not (root / pat).exists():
-                self.fehlend.append(pat)
-                continue
             hits = sorted(root.glob(pat)) if "*" in pat else [root / pat]
             for d in hits:
                 name = (_toml(d / "Cargo.toml").get("package") or {}).get("name")
@@ -169,8 +192,6 @@ class Workspace:
             d = (root / pat).resolve()
             if d in by_dir:
                 self.default.append(by_dir[d])
-            elif not (root / pat).exists():
-                self.fehlend_default.append(pat)
             else:
                 self.problems.append(f"default-member {pat} ist kein Workspace-Mitglied")
 
@@ -182,11 +203,21 @@ class Workspace:
 
 
 class Ctx:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, args):
         self.root = root
+        self.args = args
         self.ws = Workspace(root)
         self.caps: dict = _toml(root / "capabilities.toml").get("crates", {})
         self.pin = (_toml(root / "rust-toolchain.toml").get("toolchain") or {}).get("channel", "(kein Pin)")
+        self.profile = PROFILES[args.profil]
+        self.target_dir = Path(args.target_dir or os.environ.get("CARGO_TARGET_DIR") or root / "target").resolve()
+        self.outdir: Path = root  # wird in main gesetzt
+        self.extra_env: dict[str, str] = {}
+        for kv in args.env or []:
+            k, _, v = kv.partition("=")
+            if not k or not _:
+                raise SystemExit(f"--env erwartet KEY=VALUE, erhalten: {kv!r}")
+            self.extra_env[k] = v
 
 
 def crate_for_path(path: str, dir_map: dict[str, str]) -> str:
@@ -199,30 +230,58 @@ def crate_for_path(path: str, dir_map: dict[str, str]) -> str:
 
 
 # ----------------------------------------------------------------------------------------------
-# Prozesse (ganze Gruppe beenden, damit keine Test-Binaries verwaist weiterlaufen)
+# Prozesse: ganze Gruppe beenden, Ressourcen je Kind per wait4 erfassen
 # ----------------------------------------------------------------------------------------------
+
+class Usage:
+    """CPU-Sekunden und Spitzen-RSS eines Kindprozesses samt seiner abgewarteten Nachfahren."""
+
+    def __init__(self) -> None:
+        self.user = self.sys = self.rss_mb = 0.0
+
+    def add(self, ru) -> None:
+        if ru is None:
+            return
+        self.user += ru.ru_utime
+        self.sys += ru.ru_stime
+        div = 1024 * 1024 if sys.platform == "darwin" else 1024  # Linux: KiB, macOS: Bytes
+        self.rss_mb = max(self.rss_mb, ru.ru_maxrss / div)
+
 
 def _kill_group(p: subprocess.Popen) -> None:
     for sig in (signal.SIGTERM, signal.SIGKILL):
         try:
             os.killpg(p.pid, sig)
         except ProcessLookupError:
-            return
+            break
         try:
             p.wait(timeout=15)
-            return
+            break
         except subprocess.TimeoutExpired:
             continue
+    try:
+        p.wait(timeout=5)
+    except (subprocess.TimeoutExpired, ChildProcessError):
+        pass
 
 
-def run_logged(cmd: list[str], cwd: Path, env: dict, out_fh, timeout: int) -> tuple[Optional[int], bool]:
+def run_logged(cmd: list[str], cwd: Path, env: dict, out_fh, timeout: int,
+               usage: Optional[Usage] = None) -> tuple[Optional[int], bool]:
     """Ausgabe in out_fh. Rueckgabe: (returncode | None bei Timeout, timed_out)."""
     p = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=out_fh, stderr=subprocess.STDOUT, start_new_session=True)
+    deadline = time.monotonic() + timeout
     try:
-        return p.wait(timeout=timeout), False
-    except subprocess.TimeoutExpired:
-        _kill_group(p)
-        return None, True
+        while True:
+            pid, status, ru = os.wait4(p.pid, os.WNOHANG)
+            if pid == p.pid:
+                p.returncode = os.waitstatus_to_exitcode(status)
+                if usage is not None:
+                    usage.add(ru)
+                return p.returncode, False
+            if time.monotonic() > deadline:
+                _kill_group(p)
+                return None, True
+            time.sleep(0.05)
     except KeyboardInterrupt:
         _kill_group(p)
         raise
@@ -247,39 +306,105 @@ def run_capture(cmd: list[str], cwd: Path, env: dict, timeout: int) -> tuple[Opt
 # Step
 # ----------------------------------------------------------------------------------------------
 
-PyFn = Callable[[Ctx, Path], "tuple[str, str, str]"]  # (ctx, outdir) -> (status, detail, logtext)
+PyFn = Callable[["Ctx", Path], "tuple[str, str, str]"]          # (ctx, outdir) -> (status, detail, logtext)
+PostFn = Callable[["Step", str, "Ctx", Path, int], None]         # (step, logtext_des_laufs, ctx, outdir, lauf_index)
 
 
 class Step:
     def __init__(self, group: str, name: str, cmd: Optional[list[str]] = None, *, timeout: int = DEFAULT_TIMEOUT,
                  requires: Optional[list[str]] = None, env: Optional[dict] = None, cwd: Optional[Path] = None,
-                 note: str = "", py: Optional[PyFn] = None, info: bool = False, cargo: Optional[bool] = None):
+                 note: str = "", py: Optional[PyFn] = None, info: bool = False, cargo: Optional[bool] = None,
+                 post: Optional[PostFn] = None, repeat: int = 1, measure: bool = False,
+                 skip_if: Optional[Callable[[], str]] = None):
         self.group, self.name, self.cmd = group, name, cmd or []
         self.timeout, self.requires = timeout, requires or []
         self.env, self.cwd, self.note, self.py = env or {}, cwd, note, py
-        self.info = info  # Messung: Exitcode 0 -> INFO statt PASS
+        self.info, self.post, self.repeat, self.measure = info, post, max(1, repeat), measure
+        self.skip_if = skip_if
         self.needs_cargo = cargo if cargo is not None else (bool(self.cmd) and self.cmd[0] == "cargo")
         self.status, self.rc, self.seconds = "PENDING", None, 0.0
         self.log, self.detail = "", ""
+        self.cpu_user = self.cpu_sys = self.rss_mb = 0.0
+        self.load_before = self.load_after = 0.0
+        self.metrics: dict[str, object] = {}
+        # ----------------------------------------------------------------------------------------------
+# Datenablage je Schritt (eine Datei je Schritt und Art: bei erneutem Lauf wird ueberschrieben)
+# ----------------------------------------------------------------------------------------------
+
+def put_data(outdir: Path, kind: str, step: str, payload) -> None:
+    d = outdir / "data"
+    d.mkdir(parents=True, exist_ok=True)
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", step)
+    (d / f"{kind}__{safe}.json").write_text(json.dumps(payload, ensure_ascii=False))
+
+
+def get_data(outdir: Path, kind: str) -> list[tuple[str, object]]:
+    out = []
+    for f in sorted(glob.glob(str(outdir / "data" / f"{kind}__*.json"))):
+        try:
+            out.append((Path(f).stem.split("__", 1)[1], json.loads(Path(f).read_text())))
+        except (OSError, ValueError):
+            continue
+    return out
 
 
 # ----------------------------------------------------------------------------------------------
 # Parser
 # ----------------------------------------------------------------------------------------------
 
+TEST_LINE = re.compile(r"^test (\S+) \.\.\. (ok|FAILED|ignored(?:, .*)?)\s*$")
+TEST_START = re.compile(r"^test (\S+) \.\.\. $")
+RUNNING = re.compile(r"^\s+Running (?:unittests )?(.+?) \(([^)]+)\)\s*$")
+DOCTESTS = re.compile(r"^\s+Doc-tests (\S+)")
+RESULT = re.compile(r"^test result: \w+\. (\d+) passed; (\d+) failed; (\d+) ignored;.*?finished in ([\d.]+)s")
+
+
+def parse_tests(text: str) -> tuple[list[tuple[str, str, str]], list[tuple[str, int, int, int, float]], Optional[tuple[str, str]]]:
+    """-> (Einzeltests [(binary, test, status)], Binaries [(binary, ok, rot, ign, sek)], Hang-Kandidat)."""
+    tests: list[tuple[str, str, str]] = []
+    bins: list[tuple[str, int, int, int, float]] = []
+    cur, last_open = "?", None
+    for line in text.splitlines():
+        m = RUNNING.match(line)
+        if m:
+            cur, last_open = m.group(1), None
+            continue
+        m = DOCTESTS.match(line)
+        if m:
+            cur, last_open = f"doc-tests {m.group(1)}", None
+            continue
+        m = TEST_LINE.match(line)
+        if m:
+            st = "ignored" if m.group(2).startswith("ignored") else m.group(2)
+            tests.append((cur, m.group(1), st))
+            last_open = None
+            continue
+        m = TEST_START.match(line)
+        if m:
+            last_open = (cur, m.group(1))
+            continue
+        m = RESULT.match(line)
+        if m:
+            bins.append((cur, int(m.group(1)), int(m.group(2)), int(m.group(3)), float(m.group(4))))
+            last_open = None
+    return tests, bins, last_open
+
+
 def parse_cargo_test_summary(text: str) -> str:
-    passed = failed = ignored = 0
-    for m in re.finditer(r"test result: \w+\. (\d+) passed; (\d+) failed; (\d+) ignored", text):
-        passed += int(m.group(1)); failed += int(m.group(2)); ignored += int(m.group(3))
-    failing = sorted(set(re.findall(r"^test (\S+) \.\.\. FAILED", text, re.M)))
-    s = f"passed={passed} failed={failed} ignored={ignored}"
+    tests, bins, hang = parse_tests(text)
+    passed = sum(b[1] for b in bins)
+    failed = sum(b[2] for b in bins)
+    ignored = sum(b[3] for b in bins)
+    failing = sorted({t for _, t, s in tests if s == "FAILED"})
+    s = f"passed={passed} failed={failed} ignored={ignored} binaries={len(bins)}"
     if failing:
-        s += " | FAILED: " + ", ".join(failing[:15]) + (" ..." if len(failing) > 15 else "")
+        s += " | FAILED: " + ", ".join(failing[:12]) + (" ..." if len(failing) > 12 else "")
+    if hang:
+        s += f" | HANG? zuletzt begonnen: {hang[1]}"
     return s
 
 
 def parse_nextest_summary(text: str) -> str:
-    # nextest-Summary z. B.: "Summary [ 1.2s] 12 tests run: 11 passed (1 slow), 1 failed, 0 skipped"
     lines = re.findall(r"^.*tests? run: .*$", text, re.M)
     if not lines:
         return "nextest: keine Summary-Zeile gefunden"
@@ -289,7 +414,7 @@ def parse_nextest_summary(text: str) -> str:
     failing = re.findall(r"^\s*(?:FAIL|TIMEOUT|SIGSEGV|ABORT)\s+\[[^\]]*\]\s+(\S.*?)\s*$", text, re.M)
     s = f"passed={p.group(1) if p else 0} failed={f.group(1) if f else 0}"
     if failing:
-        s += " | FAILED: " + ", ".join(sorted(set(failing))[:15])
+        s += " | FAILED: " + ", ".join(sorted(set(failing))[:12])
     return s
 
 
@@ -299,9 +424,19 @@ def parse_clippy(text: str) -> str:
     return f"errors={errs} warnings={warns}"
 
 
-def parse_criterion(text: str) -> str:
-    hits = re.findall(r"^(\S.*?)\s+time:\s+\[(.+?)\]", text, re.M)
-    return f"{len(hits)} Messpunkte" if hits else "keine Criterion-Zeilen erkannt"
+def parse_kv(text: str) -> dict[str, str]:
+    """Zeilen der Form schluessel=wert (Ausgabe von contextra-measure)."""
+    return dict(re.findall(r"^([A-Za-z0-9_@.\-]+)=(\S+)\s*$", text, re.M))
+
+
+def to_num(v: str):
+    try:
+        return int(v)
+    except ValueError:
+        try:
+            return float(v)
+        except ValueError:
+            return v
 
 
 def parse_panic_surface(text: str, dir_map: dict[str, str]) -> dict[str, dict[str, int]]:
@@ -315,12 +450,57 @@ def parse_panic_surface(text: str, dir_map: dict[str, str]) -> dict[str, dict[st
 
 
 # ----------------------------------------------------------------------------------------------
-# Statische Befund-Pruefungen (reines Python, kein Build).
-# FAIL = Befund liegt vor. INFO = Messung/Hinweis ohne Urteil.
+# Bench-Ziele (aus Cargo.toml, nicht hartkodiert)
+# ----------------------------------------------------------------------------------------------
+
+def bench_targets(d: Path) -> list[dict]:
+    """Je Bench-Ziel: name, harness, criterion, features, path, exists."""
+    ct = _toml(d / "Cargo.toml")
+    declared = {b.get("name"): b for b in ct.get("bench", []) if b.get("name")}
+    out = []
+    for name, b in declared.items():
+        p = d / b.get("path", f"benches/{name}.rs")
+        out.append(dict(name=name, harness=b.get("harness", True), features=b.get("required-features", []),
+                        path=p, exists=p.exists(), criterion="criterion" in _read(p)))
+    bdir = d / "benches"
+    if bdir.is_dir() and ct.get("package", {}).get("autobenches", True):
+        for f in sorted(bdir.glob("*.rs")):
+            if f.stem not in declared:
+                out.append(dict(name=f.stem, harness=True, features=[], path=f, exists=True,
+                                criterion="criterion" in _read(f)))
+    return out
+
+
+def criterion_snapshot(home: Path, since: float, target: str) -> list[dict]:
+    """Criterion-Schaetzungen, die seit `since` geschrieben wurden."""
+    rows = []
+    for est in home.rglob("new/estimates.json"):
+        try:
+            if est.stat().st_mtime < since - 1:
+                continue
+            d = json.loads(est.read_text())
+            name = "/".join(est.relative_to(home).parts[:-2])
+            row = dict(benchmark=name, target=target, mean_ns=d["mean"]["point_estimate"],
+                       median_ns=d["median"]["point_estimate"], std_ns=d["std_dev"]["point_estimate"],
+                       ci_low_ns=d["mean"]["confidence_interval"]["lower_bound"],
+                       ci_high_ns=d["mean"]["confidence_interval"]["upper_bound"],
+                       tp_elems=None, tp_bytes=None)
+            bm = est.parent / "benchmark.json"
+            if bm.exists():
+                tp = (json.loads(bm.read_text()).get("throughput") or {})
+                row["tp_elems"], row["tp_bytes"] = tp.get("Elements"), tp.get("Bytes")
+            rows.append(row)
+        except (OSError, KeyError, ValueError):
+            continue
+    return rows
+
+
+# ----------------------------------------------------------------------------------------------
+# Statische Befund-Pruefungen (reines Python, kein Build). FAIL = Befund liegt vor, INFO = Messung/Hinweis.
 # ----------------------------------------------------------------------------------------------
 
 def befund_cfg_features(ctx: Ctx, outdir: Path):
-    """K1/K11: cfg(feature = "x") im Code, aber x ist in keiner Cargo.toml des Crates definiert."""
+    """cfg(feature = "x") im Code, aber x ist in der Cargo.toml des Crates nicht definiert."""
     lines, bad = [], 0
     for name, d in sorted(ctx.ws.members.items()):
         ct = _toml(d / "Cargo.toml")
@@ -345,18 +525,31 @@ def befund_cfg_features(ctx: Ctx, outdir: Path):
     return ("FAIL" if bad else "PASS"), detail, "\n".join(lines) or "ok"
 
 
+def befund_default_members(ctx: Ctx, outdir: Path):
+    ws = ctx.ws
+    not_def = sorted(set(ws.members) - set(ws.default))
+    detail = f"members={len(ws.members)} default-members={len(ws.default)}; nicht in default-members: {not_def or 'keine'}"
+    return ("FAIL" if ws.problems else "INFO"), detail, "\n".join(ws.problems)
 
 
-
-
-
-
-
-
-
-
-
-
+def befund_repo_huelle(ctx: Ctx, outdir: Path):
+    """Vertrauensminimum: Lizenzdatei, README, CI, die test/clippy/fmt tatsaechlich ausfuehrt."""
+    r = ctx.root
+    probs = []
+    if not any(r.glob("LICENSE*")) and not any(r.glob("COPYING*")):
+        probs.append("keine LICENSE-Datei im Root (Cargo.toml deklariert: "
+                     f"{(_toml(r / 'Cargo.toml').get('workspace', {}).get('package', {}) or {}).get('license', '?')})")
+    if not any(r.glob("README*")):
+        probs.append("kein README im Root")
+    wf = r / ".github" / "workflows"
+    text = "\n".join(_read(p) for p in sorted(wf.glob("*.y*ml"))) if wf.is_dir() else ""
+    if not text:
+        probs.append("keine CI-Workflows (.github/workflows)")
+    else:
+        for needle, label in (("cargo test", "cargo test"), ("clippy", "clippy"), ("fmt", "cargo fmt")):
+            if needle not in text:
+                probs.append(f"CI fuehrt `{label}` nirgends aus")
+    return ("FAIL" if probs else "PASS"), f"{len(probs)} Befunde", "\n".join(probs) or "ok"
 
 
 def befund_maturity_claims(ctx: Ctx, outdir: Path):
@@ -370,31 +563,78 @@ def befund_maturity_claims(ctx: Ctx, outdir: Path):
     return ("FAIL" if fehlend else "INFO"), detail, text
 
 
+def befund_zufall_zeit(ctx: Ctx, outdir: Path):
+    """Nichtdeterminismus im Produktivcode (macht Messungen schwer reproduzierbar)."""
+    pats = {"from_entropy": re.compile(r"\bfrom_entropy\b"), "thread_rng": re.compile(r"\bthread_rng\b"),
+            "SystemTime::now": re.compile(r"\bSystemTime::now\b"), "Instant::now": re.compile(r"\bInstant::now\b")}
+    rows = []
+    for name, d in sorted(ctx.ws.members.items()):
+        counts = {k: 0 for k in pats}
+        for rs in (d / "src").rglob("*.rs"):
+            t = _read(rs)
+            for k, rx in pats.items():
+                counts[k] += len(rx.findall(t))
+        if any(counts.values()):
+            rows.append(f"{name}: " + ", ".join(f"{k}={v}" for k, v in counts.items() if v))
+    return "INFO", f"{len(rows)} Crates mit Zufalls-/Zeitquellen (inkl. Test-Module)", "\n".join(rows)
 
 
+def befund_bench_inventar(ctx: Ctx, outdir: Path):
+    """Bench-/Fuzz-Ziele aus den Cargo.toml: fehlende Dateien sind ein Befund, Nicht-Criterion-Benches ein Hinweis."""
+    missing, notes, n_bench, n_fuzz = [], [], 0, 0
+    for name, d in sorted(ctx.ws.members.items()):
+        for b in bench_targets(d):
+            n_bench += 1
+            if not b["exists"]:
+                missing.append(f"{name}: Bench `{b['name']}` -> Datei fehlt ({b['path'].relative_to(ctx.root)})")
+            elif b["harness"]:
+                notes.append(f"{name}/{b['name']}: Standard-Harness (libtest-bench, braucht nightly) wird nicht ausgefuehrt")
+            elif not b["criterion"]:
+                notes.append(f"{name}/{b['name']}: eigener Harness ohne Criterion (keine Criterion-Argumente)")
+        ft = d / "fuzz" / "fuzz_targets"
+        if ft.is_dir():
+            n_fuzz += len(list(ft.glob("*.rs")))
+    detail = f"{n_bench} Bench-Ziele, {n_fuzz} Fuzz-Ziele, {len(missing)} fehlende Dateien"
+    return ("FAIL" if missing else "INFO"), detail, "\n".join(missing + notes) or "ok"
 
 
-def befund_bench_fuzz_dateien(ctx: Ctx, outdir: Path):
-    """Fehlende Bench-/Fuzz-Dateien sind ein Befund; sonst wuerden Schritte still ausbleiben."""
-    missing = []
-    for pkg, names in BENCHES.items():
-        d = ctx.ws.members.get(pkg)
-        if not d:
-            missing.append(f"Paket {pkg} fehlt im Workspace")
-            continue
-        for b in names:
-            if not (d / "benches" / f"{b}.rs").exists():
-                missing.append(f"{pkg}/benches/{b}.rs")
-    for fc in FUZZ_CRATES:
-        name = f"contextra-{fc}"
-        d = ctx.ws.members.get(name)
-        if not d or not (d / "fuzz" / "fuzz_targets").is_dir():
-            missing.append(f"{name}/fuzz/fuzz_targets")
-    return ("FAIL" if missing else "PASS"), f"{len(missing)} fehlende Dateien/Verzeichnisse", "\n".join(missing)
+def befund_daten_verdrahtung(ctx: Ctx, outdir: Path):
+    """Datensaetze in benchmarks/data, die im Code/Skripten nirgends referenziert werden, messen nichts."""
+    base = ctx.root / DATASET_DIR
+    if not base.is_dir():
+        return "INFO", f"{DATASET_DIR} nicht vorhanden", ""
+    haystack = ""
+    for pat in ("*.rs", "*.toml", "*.py", "*.sh", "*.yml", "*.yaml"):
+        for f in ctx.root.rglob(pat):
+            if {"target", "evidence", ".git"} & set(f.parts) or f.name == Path(__file__).name:
+                continue
+            haystack += _read(f)
+    unwired = [d.name for d in sorted(base.iterdir()) if d.is_dir() and d.name not in haystack]
+    detail = f"{len(unwired)} nicht verdrahtete Datensaetze: {unwired}" if unwired else "alle Datensaetze referenziert"
+    return ("FAIL" if unwired else "PASS"), detail, ""
+
+
+def befund_profil(ctx: Ctx, outdir: Path):
+    """Build-Profile und RUSTFLAGS: bestimmen, was die Benchmarks tatsaechlich messen."""
+    prof = _toml(ctx.root / "Cargo.toml").get("profile", {})
+    cfg = _toml(ctx.root / ".cargo" / "config.toml")
+    lines = []
+    for name in ("release", "bench"):
+        if name in prof:
+            lines.append(f"[profile.{name}] " + ", ".join(f"{k}={v}" for k, v in prof[name].items()))
+    rf = (cfg.get("build") or {}).get("rustflags")
+    lines.append(f"[build].rustflags = {rf}" if rf else "keine rustflags in .cargo/config.toml (kein target-cpu=native)")
+    warn = []
+    rel = {**prof.get("release", {}), **prof.get("bench", {})}
+    if rel.get("overflow-checks") is True:
+        warn.append("overflow-checks=true im Release/Bench: Benchmarks messen mit Ueberlaufpruefung (Option --no-overflow-checks vergleicht)")
+    if rel.get("lto") in ("fat", True):
+        warn.append("lto=fat: Bench-Builds sind langsam und speicherhungrig")
+    return "INFO", "; ".join(warn) or "Profile ohne Auffaelligkeit", "\n".join(lines)
 
 
 # ----------------------------------------------------------------------------------------------
-# unsafe-Inventar gegen capabilities.toml
+# Inventare: unsafe gegen capabilities.toml, Zeilen je Crate
 # ----------------------------------------------------------------------------------------------
 
 UNSAFE_WORD = re.compile(r"\bunsafe\b")
@@ -406,7 +646,7 @@ def _unsafe_lines(path: Path) -> int:
         s = line.strip()
         if s.startswith("//") or not UNSAFE_WORD.search(s):
             continue
-        if re.search(r'"[^"]*\bunsafe\b[^"]*"', s):   # Treffer nur im String-Literal
+        if re.search(r'"[^"]*\bunsafe\b[^"]*"', s):
             continue
         n += 1
     return n
@@ -426,16 +666,44 @@ def unsafe_inventar(ctx: Ctx, outdir: Path):
         else:
             verdict = "ok"
         rows.append([name, n, island, verdict])
-    with open(outdir / "unsafe_inventar.csv", "w", newline="") as fh:
-        w = csv.writer(fh)
-        w.writerow(["crate", "unsafe_zeilen", "unsafe_island", "urteil"])
-        w.writerows(rows)
+    write_csv(outdir / "unsafe_inventar.csv", ["crate", "unsafe_zeilen", "unsafe_island", "urteil"], rows)
     detail = f"{len(verstoss)} Verstoesse gegen unsafe_island" if verstoss else "keine Verstoesse"
     return ("FAIL" if verstoss else "PASS"), detail, "\n".join(map(str, rows))
 
 
+def _count_lines(path: Path) -> tuple[int, int]:
+    """(Code-Zeilen, Kommentar-/Leerzeilen) grob: Zeilenkommentare und Leerzeilen zaehlen nicht als Code."""
+    code = other = 0
+    for line in _read(path).splitlines():
+        s = line.strip()
+        if not s or s.startswith("//"):
+            other += 1
+        else:
+            code += 1
+    return code, other
+
+
+def inventar_loc(ctx: Ctx, outdir: Path):
+    rows = []
+    tot = [0, 0, 0, 0]
+    for name, d in sorted(ctx.ws.members.items()):
+        src = [p for p in (d / "src").rglob("*.rs")] if (d / "src").is_dir() else []
+        tst = [p for sub in ("tests", "benches", "fuzz") if (d / sub).is_dir() for p in (d / sub).rglob("*.rs")
+               if "target" not in p.parts]
+        sc = sum(_count_lines(p)[0] for p in src)
+        tc = sum(_count_lines(p)[0] for p in tst)
+        biggest = max(((_count_lines(p)[0], p) for p in src), default=(0, None), key=lambda x: x[0])
+        rows.append([name, len(src), sc, len(tst), tc, biggest[0], str(biggest[1].relative_to(ctx.root)) if biggest[1] else ""])
+        tot = [tot[0] + len(src), tot[1] + sc, tot[2] + len(tst), tot[3] + tc]
+    write_csv(outdir / "loc.csv", ["crate", "src_dateien", "src_zeilen", "test_bench_fuzz_dateien",
+                                   "test_bench_fuzz_zeilen", "groesste_datei_zeilen", "groesste_datei"], rows)
+    over = sum(1 for r in rows if r[5] > 1500)
+    return "INFO", (f"src={tot[1]} Zeilen in {tot[0]} Dateien; test/bench/fuzz={tot[3]} Zeilen in {tot[2]} Dateien; "
+                    f"{over} Crates mit Datei > 1500 Zeilen"), "\n".join(map(str, rows))
+
+
 # ----------------------------------------------------------------------------------------------
-# Toolchain-Preflight und Produkt-Pruefliste (Tag 1)
+# Toolchain-Preflight und Messhygiene
 # ----------------------------------------------------------------------------------------------
 
 def toolchain_preflight(ctx: Ctx, outdir: Path):
@@ -452,716 +720,248 @@ def toolchain_preflight(ctx: Ctx, outdir: Path):
     return "PASS", f"{out.strip()} | Pin {ctx.pin}", text
 
 
+def _sh(cmd: str, timeout: int = 20) -> str:
+    try:
+        return subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout).stdout.strip()
+    except (subprocess.SubprocessError, OSError):
+        return ""
 
 
+def messhygiene(ctx: Ctx, outdir: Path):
+    """Warnungen zur Messumgebung. Rauschen vor der Messung ist guenstiger als Rauschen in den Zahlen."""
+    ncpu = os.cpu_count() or 1
+    load1, load5, _ = os.getloadavg()
+    warn, info = [], []
+    if load1 > 0.3 * ncpu:
+        warn.append(f"Systemlast {load1:.2f} bei {ncpu} CPUs (>30 %): Messungen verrauscht")
+    gov = _sh("cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null")
+    if gov and gov != "performance":
+        warn.append(f"CPU-Governor `{gov}` statt `performance` (cpupower frequency-set -g performance)")
+    elif not gov:
+        info.append("CPU-Governor nicht lesbar (VM/Container/macOS)")
+    nt = _sh("cat /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null")
+    if nt == "0":
+        info.append("Turbo aktiv (Taktschwankungen moeglich; fuer Vergleiche no_turbo=1 setzen)")
+    swap = _sh("grep -E 'SwapTotal|SwapFree' /proc/meminfo 2>/dev/null")
+    m = re.findall(r"(\d+)", swap)
+    if len(m) == 2 and int(m[0]) - int(m[1]) > 100 * 1024:
+        warn.append(f"Swap in Benutzung ({(int(m[0]) - int(m[1])) // 1024} MiB)")
+    top = _sh("ps -eo pcpu,comm --sort=-pcpu 2>/dev/null | sed -n '2,4p'")
+    if top:
+        info.append("Top-Prozesse (CPU %): " + " | ".join(l.strip() for l in top.splitlines()))
+    if ncpu == 1:
+        warn.append("nur 1 CPU: Mess- und Compilerlast konkurrieren; Parallelitaets-Benches sind nicht aussagekraeftig")
+    cpu = _sh("lscpu 2>/dev/null | grep -E 'Model name|^CPU\\(s\\)|MHz' | head -4") or platform.processor()
+    text = f"CPUs={ncpu} load1={load1:.2f} load5={load5:.2f}\n{cpu}\n" + "\n".join(info + warn)
+    ctx_hyg = {"ncpu": ncpu, "load1": load1, "governor": gov, "warnungen": warn}
+    put_data(outdir, "hygiene", "messhygiene", ctx_hyg)
+    return "INFO", ("; ".join(warn) if warn else "keine Warnungen"), text
+    # ----------------------------------------------------------------------------------------------
+# Post-Hooks (werten die Ausgabe eines Laufs aus und legen Daten ab)
+# ----------------------------------------------------------------------------------------------
+
+def parse_tests_json(text: str):
+    """libtest-JSON (--test-json): Einzeltests mit exec_time. Binary-Namen kommen aus den Cargo-Running-Zeilen."""
+    tests, bins, cur = [], [], "?"
+    for line in text.splitlines():
+        m = RUNNING.match(line)
+        if m:
+            cur = m.group(1)
+            continue
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if ev.get("type") == "test" and ev.get("event") in ("ok", "failed", "ignored", "timeout"):
+            tests.append((cur, ev.get("name", "?"), "FAILED" if ev["event"] in ("failed", "timeout") else ev["event"],
+                          ev.get("exec_time")))
+        elif ev.get("type") == "suite" and ev.get("event") in ("ok", "failed"):
+            bins.append((cur, ev.get("passed", 0), ev.get("failed", 0), ev.get("ignored", 0), ev.get("exec_time", 0.0)))
+    return tests, bins
 
 
+def post_test(step: Step, text: str, ctx: Ctx, outdir: Path, run: int) -> None:
+    crate = step.name.split("__", 1)[-1]
+    if ctx.args.test_json and not step.name.startswith("test_doc__"):
+        t4, bins = parse_tests_json(text)
+        _, _, hang = parse_tests(text)
+        rows = [[b, t, s, e] for b, t, s, e in t4]
+    else:
+        t3, bins, hang = parse_tests(text)
+        rows = [[b, t, s, None] for b, t, s in t3]
+    put_data(outdir, "tests", step.name, {"crate": crate, "rows": rows})
+    put_data(outdir, "testbins", step.name, {"crate": crate, "rows": [list(b) for b in bins]})
+    if hang:
+        step.metrics["hang_kandidat"] = f"{hang[0]}::{hang[1]}"
 
 
+def post_bench(step: Step, text: str, ctx: Ctx, outdir: Path, run: int) -> None:
+    home = Path(step.env.get("CRITERION_HOME") or ctx.outdir / "criterion")
+    rows = criterion_snapshot(home, step.t_run0, step.name.split("__")[2] if step.name.count("__") >= 2 else step.name)
+    for r in rows:
+        r["run"] = run + 1
+        r["step"] = step.name
+    step.acc.extend(rows)
+    put_data(outdir, "bench", step.name, step.acc)
+
+
+def _kv_metrics(step: Step, text: str) -> dict:
+    kv = {k: to_num(v) for k, v in parse_kv(text).items()}
+    step.metrics.update(kv)
+    return kv
+
+
+def post_kv(step: Step, text: str, ctx: Ctx, outdir: Path, run: int) -> None:
+    kv = _kv_metrics(step, text)
+    if kv:
+        step.detail = " ".join(f"{k}={v}" for k, v in list(kv.items())[:8])
+
+
+def post_harness_build(step: Step, text: str, ctx: Ctx, outdir: Path, run: int) -> None:
+    sizes = {}
+    for key, b in HARNESS_BINS.items():
+        p = ctx.target_dir / "release" / b
+        if p.exists():
+            sizes[f"bin_mb_{b}"] = round(p.stat().st_size / 1048576, 2)
+    step.metrics.update(sizes)
+    step.detail = ", ".join(f"{k.removeprefix('bin_mb_')}={v} MB" for k, v in sizes.items()) or "keine Binaries gefunden"
+
+
+def _copy_results(workdir: Path, dest: Path) -> list[str]:
+    copied = []
+    src = workdir / "benchmarks" / "results"
+    if src.is_dir():
+        dest.mkdir(parents=True, exist_ok=True)
+        for f in src.rglob("*"):
+            if f.is_file():
+                shutil.copy2(f, dest / f.name)
+                copied.append(f.name)
+    return copied
+
+
+def post_synthetic(step: Step, text: str, ctx: Ctx, outdir: Path, run: int) -> None:
+    files = _copy_results(outdir / "harness" / "work_synthetic", outdir / "harness" / "synthetic")
+    for name in files:
+        if name.endswith(".json"):
+            try:
+                flat = flatten_json(json.loads((outdir / "harness" / "synthetic" / name).read_text()))
+            except (OSError, ValueError):
+                continue
+            step.metrics.update({k: v for k, v in flat.items()})
+    step.detail = f"{len(files)} Ergebnisdateien, {len(step.metrics)} Kennzahlen; " + (
+        "Szenario B uebersprungen" if "Scenario B skipped" in text else "")
+
+
+def post_dataset(step: Step, text: str, ctx: Ctx, outdir: Path, run: int) -> None:
+    post_kv(step, text, ctx, outdir, run)
+
+
+def post_scale(step: Step, text: str, ctx: Ctx, outdir: Path, run: int) -> None:
+    out = Path(step.env.get("_SCALE_OUT", ""))
+    try:
+        d = json.loads(out.read_text())
+    except (OSError, ValueError):
+        step.detail = "keine Ausgabedatei"
+        return
+    iv = d.get("intervals", [])
+    put_data(outdir, "scale", step.name, iv)
+    step.metrics["docs_requested"] = d.get("total_docs_requested")
+    step.metrics["aborted_at_docs"] = d.get("aborted_at_docs")
+    step.metrics["error"] = d.get("error")
+    if iv:
+        last = iv[-1]
+        step.metrics.update({"docs_reached": last["docs_inserted"], "insert_rate_last": last["insert_rate_docs_per_sec"],
+                             "search_p50_ns_last": last["search_p50_ns"], "search_p99_ns_last": last["search_p99_ns"],
+                             "rss_mb_last": round(last["rss_bytes"] / 1048576, 1)})
+    step.detail = (f"{len(iv)} Intervalle, erreicht={step.metrics.get('docs_reached')} von {step.metrics['docs_requested']}"
+                   + (f", ABBRUCH bei {d['aborted_at_docs']}: {d.get('error')}" if d.get("aborted_at_docs") else ""))
+    if d.get("aborted_at_docs") or d.get("error"):
+        step.force_fail = True
+
+
+def post_fuzz(step: Step, text: str, ctx: Ctx, outdir: Path, run: int) -> None:
+    last = None
+    for m in re.finditer(r"^#(\d+)\s+(\w+)\s+cov: (\d+) ft: (\d+) corp: (\d+)/\S+.*?exec/s: (\d+)", text, re.M):
+        last = m
+    if last:
+        step.metrics.update({"execs": int(last.group(1)), "cov": int(last.group(3)), "ft": int(last.group(4)),
+                             "corpus": int(last.group(5)), "exec_per_s": int(last.group(6))})
+        step.detail = f"execs={last.group(1)} cov={last.group(3)} exec/s={last.group(6)}"
+    if re.search(r"Test unit written to|SUMMARY: (libFuzzer|AddressSanitizer)", text):
+        step.force_fail = True
+        step.detail += " | ABSTURZ GEFUNDEN"
+
+
+# ----------------------------------------------------------------------------------------------
+# Flake-Scan: dieselben Tests mehrfach, abwechselnd parallel und mit --test-threads=1
+# ----------------------------------------------------------------------------------------------
+
+def make_flake(crate: str, n: int, timeout: int) -> PyFn:
+    def fn(ctx: Ctx, outdir: Path):
+        env = os.environ.copy()
+        env.update(ctx.extra_env)
+        seen: dict[tuple[str, str], list[tuple[str, str]]] = defaultdict(list)
+        hangs, log, timeouts = [], [], 0
+        for i in range(n):
+            mode = "parallel" if i % 2 == 0 else "threads=1"
+            cmd = ["cargo", "test", "-p", crate, "--tests", "--no-fail-fast", "--locked"]
+            if mode == "threads=1":
+                cmd += ["--", "--test-threads=1"]
+            rc, out, err, to = run_capture(cmd, ctx.root, env, timeout)
+            text = out + "\n" + err
+            tests, bins, hang = parse_tests(text)
+            for b, t, s in tests:
+                seen[(b, t)].append((mode, s))
+            if to:
+                timeouts += 1
+            if hang and (to or rc != 0):
+                hangs.append(f"lauf {i + 1} ({mode}): {hang[0]}::{hang[1]}" + (" [Timeout]" if to else ""))
+            log.append(f"lauf {i + 1}/{n} {mode}: rc={rc} timeout={to} tests={len(tests)} {parse_cargo_test_summary(text)}")
+        rows, flaky = [], []
+        for (b, t), res in sorted(seen.items()):
+            states = {s for _, s in res}
+            incomplete = len(res) < n
+            if len(states) > 1 or incomplete:
+                flaky.append((b, t))
+                rows.append([crate, b, t, ";".join(f"{m}:{s}" for m, s in res) + (";fehlt-in-Laeufen" if incomplete else ""), "flaky"])
+        for h in hangs:
+            rows.append([crate, "", "", h, "hang"])
+        put_data(outdir, "flake", f"flake__{crate}", rows)
+        detail = f"{n} Laeufe, {len(flaky)} uneinheitliche Tests, {len(hangs)} Hang-Kandidaten, {timeouts} Timeouts"
+        return ("FAIL" if flaky or hangs else "PASS"), detail, "\n".join(log + [r[3] for r in rows])
+    return fn
 
 
 # ----------------------------------------------------------------------------------------------
 # Plan
 # ----------------------------------------------------------------------------------------------
 
-def befund_default_members(ctx: Ctx, outdir: Path):
-    """Was `cargo test` ohne --workspace prueft: Mitglieder ausserhalb von default-members werden nicht getestet."""
-    ws = ctx.ws
-    nicht_default = [c for c in ws.names() if c not in ws.default]
-    detail = (f"members={len(ws.members)} default-members={len(ws.default)}; "
-              f"nicht in default-members (von `cargo test` ohne --workspace nicht erfasst): {nicht_default or 'keine'}")
-    bad = bool(ws.fehlend or ws.fehlend_default or ws.problems)
-    extra = [f"Mitglieder ohne Verzeichnis ({len(ws.fehlend)}): {', '.join(ws.fehlend)}",
-             f"default-members ohne Verzeichnis ({len(ws.fehlend_default)}): {', '.join(ws.fehlend_default)}"]
-    return ("FAIL" if bad else "INFO"), detail, "\n".join(extra + ws.problems)
-
-
-# ----------------------------------------------------------------------------------------------
-# Testbarkeit (statisch): Tests je Crate, Testnachweis je Funktion, Hindernisse, verwaiste Testdateien
-#
-# Alles hier ist eine Heuristik auf dem Quelltext (kein Compiler). Kommentare und String-Inhalte
-# werden maskiert, damit Klammern und Namen darin nichts verfaelschen. Der Nachweis "Funktion wird
-# von einem Test aufgerufen" beruht auf Namensabgleich, nicht auf Typaufloesung; mehrdeutige Namen
-# (z. B. `new`, `get`) werden getrennt ausgewiesen. Exakte Funktionsabdeckung liefert nur die
-# Coverage (--coverage, Schritt coverage_funktionen).
-# ----------------------------------------------------------------------------------------------
-
-KOMPLEX_SCHWELLE = 25     # pub-Funktion ab dieser Komplexitaet ohne Testbezug => FAIL
-GENERISCHE_NAMEN = {
-    "new", "default", "get", "set", "len", "is_empty", "from", "into", "iter", "insert", "remove", "push", "pop",
-    "clear", "open", "close", "build", "run", "start", "stop", "next", "read", "write", "flush", "sync", "apply",
-    "load", "save", "name", "id", "key", "value", "size", "contains", "with", "finish", "drop", "clone", "init",
-    "reset", "update", "delete", "put", "take", "peek", "add", "sub", "min", "max", "map", "call", "send", "recv",
-}
-HINDERNISSE = [   # (Kennung, Muster): direkte Zugriffe auf Umwelt ohne erkennbare Abstraktion
-    ("zeit", re.compile(r"\b(?:SystemTime|Instant|Utc|Local)::now\s*\(|\bchrono::\w+::now")),
-    ("zufall", re.compile(r"\bthread_rng\s*\(|\brand::random\b|\bOsRng\b|\bfrom_entropy\b|\bgetrandom\b")),
-    ("dateisystem", re.compile(r"\bstd::fs::|\bfs::(?:read|write|File|create_dir|remove|rename|metadata|copy)\w*"
-                               r"|\bFile::(?:open|create)\b|\bOpenOptions::new\b|\btokio::fs::")),
-    ("umgebung", re.compile(r"\benv::(?:var|vars|args|current_dir|set_var|remove_var)\b")),
-    ("prozess", re.compile(r"\bCommand::new\b|\bprocess::(?:exit|abort)\b")),
-    ("netz", re.compile(r"\b(?:TcpStream|TcpListener|UdpSocket)::\w+")),
-    ("schlafen", re.compile(r"\b(?:thread|tokio::time)::sleep\b")),
-    ("globaler_zustand", re.compile(r"\bstatic\s+mut\b|\bOnceLock\b|\bOnceCell\b|\blazy_static!|\bthread_local!"
-                                    r"|\bstatic\s+\w+\s*:\s*(?:Mutex|RwLock|Atomic)")),
-]
-
-_TOK = re.compile(r'//|/\*|(?<!\w)b?r(#*)"|"|\'')
-_CHAR = re.compile(r"'(?:\\(?:u\{[0-9a-fA-F_]+\}|x[0-9a-fA-F]{2}|.)|[^\\'\n])'")
-_BRACE = re.compile(r"[{}]")
-_CFG_TEST = re.compile(r"#\[cfg\(\s*(?:all\(\s*)?test\b")
-_TEST_ATTR = re.compile(r"#\[\s*(?:[A-Za-z_]\w*::)*(?:test|rstest|test_case|ctx_test)\b[^\]]*\]")
-_IGNORE_ATTR = re.compile(r"#\[\s*ignore\b")
-_IGNORE_GRUND = re.compile(r"#\[\s*ignore\s*=")
-_SHOULD_PANIC = re.compile(r"#\[\s*should_panic\b")
-_FN_NAME = re.compile(r"\bfn\s+(\w+)")
-_FN_DEF = re.compile(r'(?m)^[ \t]*(pub(?:\([^)]*\))?[ \t]+)?(?:(?:const|async|unsafe|default)[ \t]+)*'
-                     r'(?:extern[ \t]+(?:"[^"]*"[ \t]+)?)?fn[ \t]+(\w+)')
-_IMPL_FOR = re.compile(r"(?m)^[ \t]*(?:unsafe[ \t]+)?impl\b[^{};]*?\bfor\b[^{};]*\{")
-_TRAIT_DEF = re.compile(r"(?m)^[ \t]*(?:pub(?:\([^)]*\))?[ \t]+)?(?:unsafe[ \t]+)?trait\b[^{};]*\{")
-_COMPLEX = re.compile(r"\b(?:if|while|for|loop)\b|=>|&&|\|\||\?(?!\w)")
-_ASSERT = re.compile(r"\bassert\w*\s*!|\bdebug_assert\w*\s*!|\bpanic\s*!|\bunreachable\s*!|\bprop_assert\w*\s*!"
-                     r"|\bmatches\s*!|\.unwrap(?:_err)?\s*\(|\.expect(?:_err)?\s*\(|\bassert\w*\s*\(|\?(?!\w)")
-_T_CALL = re.compile(r"(\w+)\s*(?:\(|::<)")
-_T_PATH = re.compile(r"::(\w+)")
-_T_METH = re.compile(r"\.(\w+)")
-_RUST_FENCE = {"", "rust", "no_run", "should_panic", "ignore", "compile_fail", "edition2018", "edition2021",
-               "edition2024"}
-
-
-def _mask(text: str) -> str:
-    """Kommentare und Inhalt von String-/Zeichenliteralen durch Leerzeichen ersetzen (Laenge und Zeilen bleiben)."""
-    out = list(text)
-    n, i = len(text), 0
-
-    def blank(a: int, b: int) -> None:
-        for k in range(a, min(b, n)):
-            if out[k] != "\n":
-                out[k] = " "
-
-    while True:
-        m = _TOK.search(text, i)
-        if not m:
-            break
-        s, a = m.group(0), m.start()
-        if s == "//":
-            j = text.find("\n", a)
-            j = n if j < 0 else j
-            blank(a, j)
-            i = j
-        elif s == "/*":
-            depth, j = 1, a + 2
-            while j < n and depth:
-                if text.startswith("/*", j):
-                    depth, j = depth + 1, j + 2
-                elif text.startswith("*/", j):
-                    depth, j = depth - 1, j + 2
-                else:
-                    j += 1
-            blank(a, j)
-            i = j
-        elif s == '"':
-            j = a + 1
-            while j < n and text[j] != '"':
-                j += 2 if text[j] == "\\" else 1
-            blank(a + 1, j)
-            i = j + 1
-        elif s == "'":
-            c = _CHAR.match(text, a)
-            if c:
-                blank(a + 1, c.end() - 1)
-                i = c.end()
-            else:      # Lifetime
-                i = a + 1
-        else:          # Raw-String r#"..."#
-            close = '"' + m.group(1)
-            e = text.find(close, m.end())
-            e = n if e < 0 else e
-            blank(m.end(), e)
-            i = min(n, e + len(close))
-    return "".join(out)
-
-
-def _brace_end(m: str, start: int) -> int:
-    """Index hinter der schliessenden Klammer zu m[start] == '{' (len(m), wenn unbalanciert)."""
-    depth = 0
-    for b in _BRACE.finditer(m, start):
-        depth += 1 if b.group(0) == "{" else -1
-        if depth == 0:
-            return b.end()
-    return len(m)
-
-
-def _fn_span(m: str, pos: int) -> Optional[tuple[int, int]]:
-    """(Index von '{', Ende des Rumpfs) ab Funktionsname; None bei Deklaration ohne Rumpf."""
-    depth, k, n = 0, pos, len(m)
-    while k < n:
-        c = m[k]
-        if c in "([":
-            depth += 1
-        elif c in ")]":
-            depth -= 1
-        elif depth <= 0 and c == ";":
-            return None
-        elif depth <= 0 and c == "{":
-            return k, _brace_end(m, k)
-        k += 1
-    return None
-
-
-def _skip_attrs(m: str, pos: int) -> int:
-    n = len(m)
-    while True:
-        while pos < n and m[pos].isspace():
-            pos += 1
-        if not m.startswith("#[", pos):
-            return pos
-        depth, k = 0, pos + 1
-        while k < n:
-            if m[k] == "[":
-                depth += 1
-            elif m[k] == "]":
-                depth -= 1
-                if depth == 0:
-                    break
-            k += 1
-        pos = k + 1
-
-
-def _item_end(m: str, pos: int) -> int:
-    """Ende des Items, das hinter einem Attribut ab `pos` beginnt."""
-    pos = _skip_attrs(m, pos)
-    head = m[pos:pos + 24]
-    if re.match(r"(?:pub(?:\([^)]*\))?\s+)?(?:use|static|type|extern\s+crate)\b|(?:pub\s+)?const\s+(?!fn|unsafe)", head):
-        d, k, n = 0, pos, len(m)
-        while k < n:
-            c = m[k]
-            if c in "([{":
-                d += 1
-            elif c in ")]}":
-                d -= 1
-            elif c == ";" and d <= 0:
-                return k + 1
-            k += 1
-        return n
-    depth, k, n = 0, pos, len(m)
-    while k < n:
-        c = m[k]
-        if c in "([":
-            depth += 1
-        elif c in ")]":
-            depth -= 1
-        elif depth <= 0 and c == ";":
-            return k + 1
-        elif depth <= 0 and c == "{":
-            return _brace_end(m, k)
-        k += 1
-    return n
-
-
-def _test_ranges(m: str) -> list[tuple[int, int]]:
-    res, i = [], 0
-    while True:
-        x = _CFG_TEST.search(m, i)
-        if not x:
-            return res
-        e = _item_end(m, m.find("]", x.start()) + 1)
-        res.append((x.start(), e))
-        i = max(e, x.end())
-
-
-def _blank_ranges(m: str, ranges: list[tuple[int, int]]) -> str:
-    if not ranges:
-        return m
-    parts, last = [], 0
-    for a, b in ranges:
-        parts.append(m[last:a])
-        parts.append(re.sub(r"[^\n]", " ", m[a:b]))
-        last = b
-    parts.append(m[last:])
-    return "".join(parts)
-
-
-def _ranges_of(m: str, rx: re.Pattern) -> list[tuple[int, int]]:
-    out = []
-    for x in rx.finditer(m):
-        out.append((x.start(), _brace_end(m, x.end() - 1)))
-    return out
-
-
-def _is_test_path(p: Path) -> bool:
-    return "tests" in p.parts or p.name.startswith("tests") or p.name.endswith(("_tests.rs", "_test.rs"))
-
-
-def _tokens(masked_test_text: str) -> set[str]:
-    t = _FN_NAME.sub("fn", masked_test_text)
-    toks = set(_T_CALL.findall(t))
-    toks.update(_T_PATH.findall(t))
-    toks.update(_T_METH.findall(t))
-    return toks
-
-
-def _doc_tests(orig: str) -> tuple[int, int, str]:
-    """(Doctests, davon ignoriert, Code aller Doctest-Bloecke)."""
-    n = ign = 0
-    code: list[str] = []
-    in_code = False
-    for ln in orig.splitlines():
-        m = re.match(r"\s*(?://[/!])\s?(.*)$", ln)
-        if not m:
-            in_code = False
-            continue
-        body = m.group(1)
-        if body.strip().startswith("```"):
-            if not in_code:
-                info = {t.strip().lower() for t in body.strip()[3:].split(",") if t.strip()}
-                if info <= _RUST_FENCE:
-                    n += 1
-                    ign += 1 if "ignore" in info else 0
-                    in_code = True
-                else:
-                    in_code = None   # fremder Block (text, toml, ...): nicht zaehlen
-            else:
-                in_code = False
-            continue
-        if in_code:
-            code.append(re.sub(r"^#\s", "", body))
-    return n, ign, "\n".join(code)
-
-
-class CrateScan:
-    def __init__(self, name: str, d: Path):
-        self.name, self.dir = name, d
-        ct = _toml(d / "Cargo.toml")
-        self.proc_macro = bool((ct.get("lib") or {}).get("proc-macro"))
-        self.has_lib = has_lib(d)
-        self.has_bin = (d / "src" / "main.rs").exists() or bool(ct.get("bin"))
-        self.fns: list[dict] = []
-        self.tests: list[dict] = []
-        self.doctests = self.doctests_ignoriert = self.proptests = self.prod_zeilen = 0
-        self.tok_unit: set[str] = set()
-        self.tok_integ: set[str] = set()
-        self.tok_doc: set[str] = set()
-        self.integ_dateien: dict[str, int] = {}
-        fz = d / "fuzz" / "fuzz_targets"
-        self.fuzz_targets = len(list(fz.glob("*.rs"))) if fz.is_dir() else 0
-        bd = d / "benches"
-        self.benches = len(list(bd.glob("*.rs"))) if bd.is_dir() else 0
-
-
-def _extract_tests(orig: str, masked: str, nl: list[int], rel: str, art: str) -> list[dict]:
-    res, seen = [], set()
-    for m in _TEST_ATTR.finditer(masked):
-        fm = _FN_NAME.search(masked, m.end())
-        if not fm or fm.start() in seen:
-            continue
-        between = masked[m.end():fm.start()]
-        if "{" in between or "}" in between:
-            continue
-        seen.add(fm.start())
-        span = _fn_span(masked, fm.end())
-        body = masked[span[0]:span[1]] if span else ""
-        lo = max(0, m.start() - 300)
-        w = masked[lo:fm.start()]
-        cut = max(w.rfind("}"), w.rfind(";")) + 1
-        w = w[cut:]
-        grund = bool(_IGNORE_GRUND.search(orig[lo + cut:fm.start()]))
-        res.append(dict(datei=rel, zeile=bisect.bisect_left(nl, fm.start()) + 1, name=fm.group(1), art=art,
-                        ignoriert=bool(_IGNORE_ATTR.search(w)), ignoriert_ohne_grund=bool(_IGNORE_ATTR.search(w)) and not grund,
-                        ohne_assertion=not (_SHOULD_PANIC.search(w) or _ASSERT.search(body))))
-    return res
-
-
-def _scan_crate(root: Path, name: str, d: Path, extra_tests: list[Path]) -> CrateScan:
-    sc = CrateScan(name, d)
-    src = d / "src"
-    for p in sorted(src.rglob("*.rs")) if src.is_dir() else []:
-        if "target" in p.parts:
-            continue
-        orig = _read(p)
-        masked = _mask(orig)
-        nl = [x.start() for x in re.finditer("\n", masked)]
-        rel = str(p.relative_to(root))
-        sc.tests += _extract_tests(orig, masked, nl, rel, "unit")
-        sc.proptests += len(re.findall(r"\bproptest\s*!", masked))
-        if _is_test_path(p.relative_to(d)):
-            sc.tok_unit |= _tokens(masked)
-            continue
-        ranges = _test_ranges(masked)
-        prodm = _blank_ranges(masked, ranges)
-        sc.tok_unit |= _tokens("".join(masked[a:b] for a, b in ranges))
-        sc.prod_zeilen += sum(1 for ln in prodm.splitlines() if ln.strip())
-        n_doc, n_ign, code = _doc_tests(orig)
-        sc.doctests += n_doc
-        sc.doctests_ignoriert += n_ign
-        if code:
-            sc.tok_doc |= _tokens(_mask(code))
-        trait_like = _ranges_of(prodm, _IMPL_FOR) + _ranges_of(prodm, _TRAIT_DEF)
-        for f in _FN_DEF.finditer(prodm):
-            span = _fn_span(prodm, f.end())
-            if not span:
-                continue
-            body = prodm[span[0]:span[1]]
-            vis_raw = (f.group(1) or "").strip()
-            vis = "pub" if vis_raw == "pub" else ("crate" if vis_raw else "privat")
-            im_trait = any(a <= f.start() < b for a, b in trait_like)
-            hind = [k for k, rx in HINDERNISSE if rx.search(body)]
-            sc.fns.append(dict(datei=rel, zeile=bisect.bisect_left(nl, f.start()) + 1, name=f.group(2), vis=vis,
-                               art="trait" if im_trait else "frei", zeilen=body.count("\n") + 1,
-                               komplexitaet=1 + len(_COMPLEX.findall(body)), hindernisse=hind))
-    seen_files: set[Path] = set()
-    tdir = d / "tests"
-    files = (sorted(tdir.rglob("*.rs")) if tdir.is_dir() else []) + [p for p in extra_tests if p.exists()]
-    for p in files:
-        rp = p.resolve()
-        if rp in seen_files:
-            continue
-        if tdir.is_dir() and tdir in p.parents and "ui" in p.relative_to(tdir).parts[:-1]:
-            continue   # trybuild-Fixtures (tests/ui/*.rs) sind Compile-Eingaben, keine Tests
-        seen_files.add(rp)
-        orig = _read(p)
-        masked = _mask(orig)
-        nl = [x.start() for x in re.finditer("\n", masked)]
-        try:
-            rel = str(p.relative_to(root))
-        except ValueError:
-            rel = str(p)
-        t = _extract_tests(orig, masked, nl, rel, "integration")
-        sc.tests += t
-        sc.integ_dateien[rel] = len(t)
-        sc.proptests += len(re.findall(r"\bproptest\s*!", masked))
-        sc.tok_integ |= _tokens(masked)
-    return sc
-
-
-def _declared(ctx: Ctx) -> tuple[dict[str, list[Path]], dict[str, list[Path]], list[str]]:
-    """[[test]]- und [[bench]]-Pfade je Crate (aufgeloest), plus Fehlerliste fuer fehlende Dateien."""
-    tests: dict[str, list[Path]] = {}
-    benches: dict[str, list[Path]] = {}
-    problems: list[str] = []
-    for name, d in ctx.ws.members.items():
-        ct = _toml(d / "Cargo.toml")
-        for kind, store, default in (("test", tests, "tests"), ("bench", benches, "benches")):
-            for e in ct.get(kind, []) or []:
-                path = e.get("path") or f"{default}/{e.get('name')}.rs"
-                rp = (d / path).resolve()
-                store.setdefault(name, []).append(rp)
-                if not rp.exists():
-                    problems.append(f"{name}: [[{kind}]] `{e.get('name')}` verweist auf fehlende Datei {path}")
-    return tests, benches, problems
-
-
-def get_scan(ctx: Ctx) -> dict[str, CrateScan]:
-    if getattr(ctx, "_scan", None) is None:
-        decl_tests, _, _ = _declared(ctx)
-        ctx._scan = {name: _scan_crate(ctx.root, name, d, decl_tests.get(name, []))
-                     for name, d in sorted(ctx.ws.members.items())}
-    return ctx._scan
-
-
-def _selected(ctx: Ctx) -> list[str]:
-    sel = getattr(ctx, "selected", None)
-    return list(sel) if sel else ctx.ws.names()
-
-
-def _nachweis(sc: CrateScan, fn: dict, scans: dict[str, CrateScan]) -> str:
-    """unit | integration | doctest | andere_crates | keiner (+ Zusatz ' (mehrdeutig)')."""
-    nm = fn["name"]
-    if fn["art"] == "trait":
-        return "trait_impl"
-    hit = ""
-    if nm in sc.tok_unit:
-        hit = "unit"
-    elif fn["vis"] != "privat":
-        if nm in sc.tok_integ:
-            hit = "integration"
-        elif nm in sc.tok_doc:
-            hit = "doctest"
-        elif any(nm in o.tok_unit or nm in o.tok_integ for k, o in scans.items() if k != sc.name):
-            hit = "andere_crates"
-    if not hit:
-        return "keiner"
-    if nm in GENERISCHE_NAMEN or len(nm) <= 3:
-        return hit + " (mehrdeutig)"
-    return hit
-
-
-def _fn_rows(ctx: Ctx) -> dict[str, list[dict]]:
-    scans = get_scan(ctx)
-    rows: dict[str, list[dict]] = {}
-    for c in _selected(ctx):
-        sc = scans[c]
-        rows[c] = [dict(fn, crate=c, nachweis=_nachweis(sc, fn, scans)) for fn in sc.fns]
-    return rows
-
-
-def _crate_summary(ctx: Ctx) -> list[dict]:
-    scans = get_scan(ctx)
-    fr = _fn_rows(ctx)
-    out = []
-    for c in _selected(ctx):
-        sc = scans[c]
-        unit = sum(1 for t in sc.tests if t["art"] == "unit")
-        integ = sum(1 for t in sc.tests if t["art"] == "integration")
-        pubs = [f for f in fr[c] if f["vis"] == "pub" and f["art"] == "frei"]
-        belegt = [f for f in pubs if f["nachweis"] not in ("keiner",) and "mehrdeutig" not in f["nachweis"]]
-        mehrd = [f for f in pubs if "mehrdeutig" in f["nachweis"]]
-        quote = round(len(belegt) / len(pubs), 2) if pubs else None
-        if sc.proc_macro:
-            urteil = "ausnahme_proc_macro" if unit + integ == 0 else "ok"
-        elif unit + integ == 0 and sc.doctests == 0 and fr[c]:
-            urteil = "kein_test"
-        elif unit + integ == 0:
-            urteil = "nur_doctests"
-        elif quote is not None and len(pubs) >= 5 and quote < 0.5:
-            urteil = "schwach"
-        else:
-            urteil = "ok"
-        out.append(dict(
-            crate=c, lib=sc.has_lib, prod_zeilen=sc.prod_zeilen, tests_unit=unit, tests_integration=integ,
-            tests_statisch=unit + integ, integrationsdateien=len(sc.integ_dateien), doctests=sc.doctests,
-            ignoriert=sum(1 for t in sc.tests if t["ignoriert"]),
-            ignoriert_ohne_grund=sum(1 for t in sc.tests if t["ignoriert_ohne_grund"]),
-            proptest_bloecke=sc.proptests, fuzz_targets=sc.fuzz_targets, benches=sc.benches,
-            tests_ohne_assertion=sum(1 for t in sc.tests if t["ohne_assertion"]),
-            fns=len(fr[c]), pub_fns=len(pubs), pub_mit_nachweis=len(belegt), pub_mehrdeutig=len(mehrd),
-            pub_ohne_nachweis=len(pubs) - len(belegt) - len(mehrd), nachweis_quote=quote if quote is not None else "",
-            urteil=urteil))
-    return out
-
-
-def _write_csv(path: Path, rows: list[dict]) -> None:
-    if not rows:
-        return
-    with open(path, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
-        w.writeheader()
-        w.writerows(rows)
-
-
-def _md_table(rows: list[dict], cols: list[str]) -> list[str]:
-    L = ["| " + " | ".join(cols) + " |", "|" + "|".join("---" for _ in cols) + "|"]
-    for r in rows:
-        L.append("| " + " | ".join(str(r.get(c, "")) for c in cols) + " |")
-    return L
-
-
-def testbarkeit_crates(ctx: Ctx, outdir: Path):
-    """Tests je Crate: Anzahl, Art, ignorierte und assertionlose Tests, Nachweisquote der pub-Funktionen."""
-    rows = _crate_summary(ctx)
-    _write_csv(outdir / "testbarkeit_crates.csv", rows)
-    scans = get_scan(ctx)
-    detail_rows = []
-    for c in _selected(ctx):
-        for t in scans[c].tests:
-            if t["ignoriert"] or t["ohne_assertion"]:
-                detail_rows.append(dict(crate=c, **t))
-    _write_csv(outdir / "testbarkeit_auffaellige_tests.csv", detail_rows)
-    kein = [r["crate"] for r in rows if r["urteil"] == "kein_test"]
-    schwach = [r["crate"] for r in rows if r["urteil"] == "schwach"]
-    text = "\n".join(_md_table(rows, ["crate", "tests_unit", "tests_integration", "doctests", "ignoriert",
-                                      "tests_ohne_assertion", "pub_fns", "pub_mit_nachweis", "pub_mehrdeutig",
-                                      "pub_ohne_nachweis", "nachweis_quote", "urteil"]))
-    text += ("\n\nHeuristik: Nachweis = Funktionsname wird in Test-Code (unit, integration, doctest) aufgerufen. "
-             "`tests_ohne_assertion` = Test ohne assert/unwrap/expect/?/should_panic (kann nie fehlschlagen oder "
-             "prueft ueber Hilfsfunktionen).\nDetails: testbarkeit_auffaellige_tests.csv")
-    gesamt = sum(r["tests_statisch"] for r in rows)
-    detail = f"{len(rows)} Crates, {gesamt} Tests (statisch); ohne Tests: {kein or 'keine'}; schwach: {schwach or 'keine'}"
-    return ("FAIL" if kein else "PASS"), detail, text
-
-
-def testbarkeit_funktionen(ctx: Ctx, outdir: Path):
-    """Je Funktion: Sichtbarkeit, Komplexitaet, Testnachweis, Hindernisse (direkte Umweltzugriffe)."""
-    fr = _fn_rows(ctx)
-    allrows = [r for c in fr for r in fr[c]]
-    out = [dict(crate=r["crate"], datei=r["datei"], zeile=r["zeile"], funktion=r["name"], sichtbarkeit=r["vis"],
-                art=r["art"], zeilen=r["zeilen"], komplexitaet=r["komplexitaet"], nachweis=r["nachweis"],
-                hindernisse=",".join(r["hindernisse"])) for r in allrows]
-    _write_csv(outdir / "testbarkeit_funktionen.csv", out)
-    kritisch = sorted((r for r in allrows if r["vis"] == "pub" and r["art"] == "frei" and r["nachweis"] == "keiner"
-                       and r["komplexitaet"] >= KOMPLEX_SCHWELLE), key=lambda r: -r["komplexitaet"])
-    hind_cnt: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    for r in allrows:
-        for h in r["hindernisse"]:
-            hind_cnt[r["crate"]][h] += 1
-    L = [f"## pub-Funktionen ohne Testbezug mit Komplexitaet >= {KOMPLEX_SCHWELLE} ({len(kritisch)})", ""]
-    L += [f"- `{r['crate']}` {r['datei']}:{r['zeile']} `{r['name']}` komplexitaet={r['komplexitaet']} "
-          f"zeilen={r['zeilen']}" + (f" hindernisse={','.join(r['hindernisse'])}" if r["hindernisse"] else "")
-          for r in kritisch[:60]] or ["keine"]
-    L += ["", "## Direkte Umweltzugriffe im Produktivcode (schwer deterministisch testbar), Funktionen je Crate", ""]
-    kinds = [k for k, _ in HINDERNISSE]
-    L += _md_table([dict(crate=c, **{k: v.get(k, 0) for k in kinds}) for c, v in sorted(hind_cnt.items())],
-                   ["crate"] + kinds) if hind_cnt else ["keine"]
-    big = sorted((r for r in allrows if r["art"] == "frei"), key=lambda r: -r["komplexitaet"])[:20]
-    L += ["", "## Komplexeste Funktionen (Top 20)", ""]
-    L += [f"- `{r['crate']}` {r['datei']}:{r['zeile']} `{r['name']}` komplexitaet={r['komplexitaet']} "
-          f"nachweis={r['nachweis']}" for r in big]
-    nh = sum(1 for r in allrows if r["hindernisse"])
-    detail = (f"{len(allrows)} Funktionen, {nh} mit direktem Umweltzugriff; "
-              f"{len(kritisch)} komplexe pub-Funktionen ohne Testbezug")
-    return ("FAIL" if kritisch else "PASS"), detail, "\n".join(L)
-
-
-def testbarkeit_verwaiste(ctx: Ctx, outdir: Path):
-    """Test-/Benchdateien, die kein Crate einbindet (laufen nie), und leere Testdateien."""
-    root, members = ctx.root, ctx.ws.members
-    decl_t, decl_b, problems = _declared(ctx)
-    declared_t = {p for v in decl_t.values() for p in v}
-    declared_b = {p for v in decl_b.values() for p in v}
-    member_dirs = {d.resolve(): n for n, d in members.items()}
-    skip = {"target", ".git", "evidence", "node_modules", "fuzz", ".cargo"}
-    rows: list[dict] = []
-    info: list[str] = []
-
-    def owner(p: Path) -> Optional[str]:
-        best = None
-        for d, n in member_dirs.items():
-            if d == p or d in p.parents:
-                if best is None or len(str(d)) > len(str(best[0])):
-                    best = (d, n)
-        return best[1] if best else None
-
-    def top_level(dirp: Path) -> list[Path]:
-        res = sorted(dirp.glob("*.rs"))
-        for sub in sorted(x for x in dirp.iterdir() if x.is_dir()):
-            if (sub / "main.rs").exists() and sub.resolve() not in member_dirs:
-                res.append(sub / "main.rs")
-        return res
-
-    for dirpath, dirnames, _ in os.walk(root):
-        dirnames[:] = [x for x in dirnames if x not in skip and not x.startswith(".")]
-        base = Path(dirpath)
-        if base.name not in ("tests", "benches"):
-            continue
-        kind = "test" if base.name == "tests" else "bench"
-        own = owner(base.parent.resolve())
-        declared = declared_t if kind == "test" else declared_b
-        for f in top_level(base):
-            rp = f.resolve()
-            if rp in declared:
-                continue
-            if own is None:
-                grund = f"gehoert zu keinem Crate (Verzeichnis {base.relative_to(root)} ist kein Package) und ist nirgends per path deklariert"
-            else:
-                pkg = (_toml(members[own] / "Cargo.toml").get("package") or {})
-                if pkg.get("autotests" if kind == "test" else "autobenches", True) is not False:
-                    continue
-                grund = f"{own}: Auto-Erkennung abgeschaltet, Datei nicht als [[{kind}]] deklariert"
-            orig = _read(f)
-            masked = _mask(orig)
-            n = len(_extract_tests(orig, masked, [x.start() for x in re.finditer("\n", masked)], "", "x"))
-            rows.append(dict(datei=str(f.relative_to(root)), art=kind, tests=n if kind == "test" else "", grund=grund))
-
-    scans = get_scan(ctx)
-    for c in _selected(ctx):
-        d = members[c]
-        for rel, n in scans[c].integ_dateien.items():
-            p = root / rel
-            if n == 0 and p.parent == d / "tests" and "harness = false" not in _read(d / "Cargo.toml") \
-                    and not re.search(r"\bfn\s+main\b", _mask(_read(p))):
-                info.append(f"{c}: {rel} enthaelt 0 Tests")
-        for e in (_toml(d / "Cargo.toml").get("test") or []):
-            if e.get("required-features"):
-                info.append(f"{c}: [[test]] `{e.get('name')}` laeuft nur mit Features {e['required-features']}")
-    _write_csv(outdir / "testbarkeit_verwaist.csv", rows)
-    nt = sum(r["tests"] for r in rows if r["art"] == "test" and isinstance(r["tests"], int))
-    text = "## Dateien, die nie ausgefuehrt werden\n\n"
-    text += "\n".join(f"- `{r['datei']}` ({r['art']}, Tests: {r['tests'] or '-'}): {r['grund']}" for r in rows) or "keine"
-    text += "\n\n## Fehlende deklarierte Dateien\n\n" + ("\n".join(f"- {p}" for p in problems) or "keine")
-    text += "\n\n## Hinweise (leer / Feature-abhaengig)\n\n" + ("\n".join(f"- {x}" for x in info) or "keine")
-    detail = f"{len(rows)} verwaiste Dateien ({nt} Tests laufen nie), {len(problems)} fehlende deklarierte Dateien"
-    return ("FAIL" if rows or problems else "PASS"), detail, text
-
-
-def _demangle(n: str) -> str:
-    if not n.startswith("_ZN"):
-        return re.sub(r"::h[0-9a-f]{16}$", "", n)
-    parts, i = [], 3
-    while i < len(n) and n[i].isdigit():
-        j = i
-        while j < len(n) and n[j].isdigit():
-            j += 1
-        ln = int(n[i:j])
-        parts.append(n[j:j + ln])
-        i = j + ln
-    parts = [p for p in parts if not re.fullmatch(r"h[0-9a-f]{16}", p)]
-    s = "::".join(parts)
-    for a, b in (("$LT$", "<"), ("$GT$", ">"), ("$u20$", " "), ("$C$", ","), ("$RF$", "&"), ("$LP$", "("),
-                 ("$RP$", ")"), ("$BP$", "*"), ("$SP$", "@"), ("..", "::")):
-        s = s.replace(a, b)
-    return re.sub(r"\$u([0-9a-f]{2})\$", lambda m: chr(int(m.group(1), 16)), s)
-
-
-def coverage_funktionen(ctx: Ctx, outdir: Path):
-    """Exakte Funktionsabdeckung aus coverage.json (cargo llvm-cov): je Crate und nie ausgefuehrte Funktionen."""
-    cj = outdir / "coverage.json"
-    if not cj.exists():
-        return "SKIPPED", "coverage.json fehlt (Schritt `coverage` nicht gelaufen: --coverage oder --all)", ""
-    data = json.loads(cj.read_text())["data"][0]
-    dmap = ctx.ws.dir_map()
-    per: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
-    for f in data.get("files", []):
-        rel = os.path.relpath(f["filename"], ctx.root)
-        if "/src/" not in "/" + rel or _is_test_path(Path(rel)):
-            continue
-        c = crate_for_path(rel, dmap)
-        fs, ls = f["summary"]["functions"], f["summary"]["lines"]
-        per[c]["fn_gesamt"] += fs["count"]
-        per[c]["fn_belegt"] += fs["covered"]
-        per[c]["zeilen_gesamt"] += ls["count"]
-        per[c]["zeilen_belegt"] += ls["covered"]
-    groups: dict[tuple[str, int], dict] = {}
-    for fn in data.get("functions", []):
-        fname = fn["filenames"][0] if fn.get("filenames") else ""
-        rel = os.path.relpath(fname, ctx.root) if fname else ""
-        if "/src/" not in "/" + rel or _is_test_path(Path(rel)):
-            continue
-        line = fn["regions"][0][0] if fn.get("regions") else 0
-        g = groups.setdefault((rel, line), dict(datei=rel, zeile=line, funktion=_demangle(fn["name"]), aufrufe=0))
-        g["aufrufe"] += fn.get("count", 0)
-    unb = sorted((dict(crate=crate_for_path(g["datei"], dmap), **g) for g in groups.values() if g["aufrufe"] == 0),
-                 key=lambda r: (r["crate"], r["datei"], r["zeile"]))
-    _write_csv(outdir / "coverage_unbedeckt.csv", unb)
-    rows = []
-    for c, v in sorted(per.items()):
-        rows.append(dict(crate=c, funktionen=int(v["fn_gesamt"]), funktionen_belegt=int(v["fn_belegt"]),
-                         funktionen_prozent=round(100 * v["fn_belegt"] / v["fn_gesamt"], 1) if v["fn_gesamt"] else "",
-                         zeilen_prozent=round(100 * v["zeilen_belegt"] / v["zeilen_gesamt"], 1) if v["zeilen_gesamt"] else ""))
-    _write_csv(outdir / "coverage_crates.csv", rows)
-    tf = sum(r["funktionen"] for r in rows)
-    tb = sum(r["funktionen_belegt"] for r in rows)
-    text = "\n".join(_md_table(rows, ["crate", "funktionen", "funktionen_belegt", "funktionen_prozent", "zeilen_prozent"]))
-    text += f"\n\nNie ausgefuehrte Funktionen: {len(unb)} (coverage_unbedeckt.csv)"
-    return "PASS", (f"{tb}/{tf} Funktionen ausgefuehrt ({round(100 * tb / tf, 1) if tf else 0} %), "
-                    f"{len(unb)} nie ausgefuehrt"), text
-
-
-def export_testliste(ctx: Ctx, steps: list["Step"], outdir: Path) -> list[dict]:
-    """Vergleicht statisch gezaehlte Tests mit dem, was `cargo test -- --list` tatsaechlich kennt."""
-    csvp = outdir / "testbarkeit_crates.csv"
-    if not csvp.exists():
-        return []
-    with open(csvp) as fh:
-        stat = {r["crate"]: int(r["tests_statisch"]) for r in csv.DictReader(fh)}
-    rows = []
-    for s in steps:
-        if not s.name.startswith("liste_tests__") or s.status not in ("PASS", "INFO") or not s.log:
-            continue
-        c = s.name.split("__", 1)[1]
-        text = Path(s.log).read_text(errors="replace")
-        gelistet = len(re.findall(r"^\S.*: test$", text, re.M))
-        if c in stat:
-            rows.append(dict(crate=c, statisch=stat[c], gelistet=gelistet, differenz=stat[c] - gelistet))
-    _write_csv(outdir / "testbarkeit_vergleich.csv", rows)
-    return rows
-
-
 def nextest_ok() -> bool:
     return which("cargo-nextest") is not None
 
 
+def build_flags_env(ctx: Ctx) -> dict:
+    env: dict[str, str] = {}
+    rf = ctx.extra_env.get("RUSTFLAGS", os.environ.get("RUSTFLAGS", ""))
+    if ctx.args.native:
+        rf = (rf + " -C target-cpu=native").strip()
+    if rf:
+        env["RUSTFLAGS"] = rf
+    if ctx.args.no_overflow_checks:
+        env["CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS"] = "false"
+        env["CARGO_PROFILE_BENCH_OVERFLOW_CHECKS"] = "false"
+    return env
+
+
+def _bin_skip(ctx: Ctx, binname: str, hint: str = "") -> Callable[[], str]:
+    p = ctx.target_dir / "release" / binname
+    return lambda: "" if p.exists() else f"{p} fehlt{hint}"
+
+
 def build_plan(ctx: Ctx, args, outdir: Path) -> list[Step]:
-    ws = ctx.ws
+    ws, prof = ctx.ws, ctx.profile
     crates = ws.names()
     if args.only:
         wanted = {short(w.strip()) for w in args.only.split(",") if w.strip()}
@@ -1177,17 +977,28 @@ def build_plan(ctx: Ctx, args, outdir: Path) -> list[Step]:
     pk = ["--workspace"] if sel_all else [x for c in crates for x in ("-p", c)]
     pk_lib = ["--workspace"] if sel_all else [x for c in libs for x in ("-p", c)]
     cargo = ["cargo"]
+    flags = build_flags_env(ctx)
     S: list[Step] = []
+    measure_only = args.messen
+    do_static = not measure_only
+    do_measure = not (args.quick)
+    do_deep = args.all
 
-    # --- B: Befund-Pruefung (kein Build) -----------------------------------------------------
-    S += [
-        Step("B-befunde", "befund_cfg_features_undefiniert", py=befund_cfg_features,
-             note="cfg(feature) ohne Definition: Code und Tests werden still nie kompiliert"),
-        Step("B-befunde", "befund_default_members", py=befund_default_members,
-             note="welche Crates `cargo test` ohne --workspace ueberspringt"),
-        Step("B-befunde", "befund_maturity_claims", py=befund_maturity_claims),
-        Step("B-befunde", "befund_bench_fuzz_dateien", py=befund_bench_fuzz_dateien),
-    ]
+    # --- 1: Befunde (kein Build) -------------------------------------------------------------
+    if do_static:
+        S += [
+            Step("1-befunde", "befund_repo_huelle", py=befund_repo_huelle, note="LICENSE, README, CI-Inhalt"),
+            Step("1-befunde", "befund_cfg_features_undefiniert", py=befund_cfg_features),
+            Step("1-befunde", "befund_default_members", py=befund_default_members),
+            Step("1-befunde", "befund_maturity_claims", py=befund_maturity_claims),
+            Step("1-befunde", "befund_zufall_zeit", py=befund_zufall_zeit, note="Reproduzierbarkeit der Messungen"),
+            Step("1-befunde", "befund_bench_inventar", py=befund_bench_inventar),
+            Step("1-befunde", "befund_daten_verdrahtung", py=befund_daten_verdrahtung,
+                 note="Datensaetze in benchmarks/data ohne Referenz messen nichts"),
+            Step("1-befunde", "befund_profil", py=befund_profil, note="Build-Profile, die die Benchmarks pr\u00e4gen"),
+            Step("1-befunde", "inventar_loc", py=inventar_loc, timeout=300),
+            Step("1-befunde", "unsafe_inventar", py=unsafe_inventar, timeout=300, note="gegen capabilities.toml"),
+        ]
 
     # --- 0: Basis ----------------------------------------------------------------------------
     S += [
@@ -1197,127 +1008,168 @@ def build_plan(ctx: Ctx, args, outdir: Path) -> list[Step]:
              "rustc -Vv; cargo -V; cargo clippy -V; cargo fmt -V; rustup show active-toolchain; true"],
              timeout=300, info=True),
         Step("0-basis", "cargo_fetch", cargo + ["fetch", "--locked"], timeout=900),
-        Step("0-basis", "cargo_tree_duplicates", cargo + ["tree", "--workspace", "--duplicates"], timeout=300, info=True),
     ]
+    if do_static:
+        S.append(Step("0-basis", "cargo_tree_duplicates", cargo + ["tree", "--workspace", "--duplicates"],
+                      timeout=300, info=True))
 
-    # --- 1: Statisch -------------------------------------------------------------------------
-    S += [
-        Step("1-statisch", "fmt_check", cargo + ["fmt", "--all", "--", "--check"], requires=["rustfmt"]),
-        Step("1-statisch", "check_alle_targets", cargo + ["check"] + pk + ["--all-targets", "--locked", "--keep-going"]),
-        Step("1-statisch", "check_no_default_features",
-             cargo + ["check"] + pk + ["--no-default-features", "--locked", "--keep-going"]),
-        Step("1-statisch", "doc", cargo + ["doc"] + pk + ["--no-deps", "--locked"], env={"RUSTDOCFLAGS": "-D warnings"}),
-    ]
-    for c in crates:
-        if c in libs:
-            S.append(Step("1-statisch", f"clippy_lib__{c}",
-                          cargo + ["clippy", "-p", c, "--lib", "--locked", "--", "-D", "warnings"]))
-        S.append(Step("1-statisch", f"clippy_alle_targets__{c}",
-                      cargo + ["clippy", "-p", c, "--all-targets", "--locked", "--", "-D", "warnings"]))
-    S += [
-        Step("1-statisch", "feature_matrix_hack", cargo + ["hack", "check", "--each-feature"] + pk +
-             ["--no-dev-deps", "--keep-going"], requires=["cargo-hack"], timeout=3600),
-        Step("1-statisch", "deny", cargo + ["deny", "check"], requires=["cargo-deny"]),
-        Step("1-statisch", "audit", cargo + ["audit"], requires=["cargo-audit"]),
-        Step("1-statisch", "panic_flaeche_lib",
-             cargo + ["clippy"] + pk_lib + ["--lib", "--locked", "--keep-going", "--",
-                      "-W", "clippy::unwrap_used", "-W", "clippy::expect_used", "-W", "clippy::panic",
-                      "-W", "clippy::todo", "-W", "clippy::unimplemented", "-W", "clippy::indexing_slicing"],
-             timeout=3600, info=True,
-             note="Panic-Stellen im Produktivcode (ohne #[cfg(test)]); Auswertung: panic_flaeche.csv"),
-        Step("1-statisch", "unsafe_inventar", py=unsafe_inventar, timeout=300,
-             note="gegen capabilities.toml (unsafe_island)"),
-    ]
-
-    # --- 2: Tests ----------------------------------------------------------------------------
-    use_nextest = nextest_ok()
-    for c in crates:
-        t = SLOW_CRATES.get(c, DEFAULT_TIMEOUT)
-        if c in libs:
-            S.append(Step("2-tests", f"test_lib__{c}",
-                          cargo + ["test", "-p", c, "--lib", "--locked", "--no-fail-fast"], timeout=t))
-        S.append(Step("2-tests", f"test_integration__{c}",
-                      cargo + ["test", "-p", c, "--tests", "--locked", "--no-fail-fast"], timeout=t,
-                      note="umfasst auch lib-Tests; Duplikate gewollt"))
-        if c in libs:
-            S.append(Step("2-tests", f"test_doc__{c}",
-                          cargo + ["test", "-p", c, "--doc", "--locked", "--no-fail-fast"], timeout=t))
-        if use_nextest:
-            S.append(Step("2-tests", f"nextest__{c}",
-                          cargo + ["nextest", "run", "-p", c, "--locked", "--no-fail-fast", "--retries", "0"],
-                          timeout=t, note="je Test eigener Prozess: deckt Test-Interferenz auf"))
-    S.append(Step("2-tests", "test_gesamt_debug",
-                  cargo + ["test"] + pk + ["--all-targets", "--locked", "--no-fail-fast"], timeout=7200))
-    S.append(Step("2-tests", "test_gesamt_release",
-                  cargo + ["test"] + pk + ["--release", "--locked", "--no-fail-fast"], timeout=7200,
-                  note="Release deckt Overflow-/Optimierungsfehler auf (z. B. simd u8)"))
-
-    # --- 3: Testbarkeit ----------------------------------------------------------------------
-    ctx.selected = crates
-    S += [
-        Step("3-testbarkeit", "testbarkeit_crates", py=testbarkeit_crates, timeout=900,
-             note="Tests je Crate, ignorierte/assertionlose Tests, Testnachweis der pub-Funktionen"),
-        Step("3-testbarkeit", "testbarkeit_funktionen", py=testbarkeit_funktionen, timeout=900,
-             note=f"Komplexitaet, Testnachweis, direkte Umweltzugriffe je Funktion (FAIL ab Komplexitaet {KOMPLEX_SCHWELLE})"),
-        Step("3-testbarkeit", "testbarkeit_verwaiste_dateien", py=testbarkeit_verwaiste, timeout=600,
-             note="Test-/Benchdateien ohne Crate-Zuordnung laufen nie"),
-    ]
-    for c in crates:
-        S.append(Step("3-testbarkeit", f"liste_tests__{c}",
-                      cargo + ["test", "-p", c, "--tests", "--locked", "--", "--list"],
-                      timeout=SLOW_CRATES.get(c, DEFAULT_TIMEOUT), info=True,
-                      note="was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)"))
-    if args.all or args.coverage:
+    # --- 2: Statisch -------------------------------------------------------------------------
+    if do_static:
         S += [
-            Step("3-testbarkeit", "coverage", cargo + ["llvm-cov"] + pk + ["--locked", "--no-fail-fast", "--json",
-                 "--ignore-filename-regex", "/(tests|benches|fuzz|examples)/", "--output-path",
-                 str(outdir / "coverage.json")], requires=["cargo-llvm-cov"], timeout=10800),
-            Step("3-testbarkeit", "coverage_funktionen", py=coverage_funktionen, timeout=600,
-                 note="Funktionsabdeckung je Crate, nie ausgefuehrte Funktionen"),
+            Step("2-statisch", "fmt_check", cargo + ["fmt", "--all", "--", "--check"], requires=["rustfmt"]),
+            Step("2-statisch", "check_alle_targets", cargo + ["check"] + pk + ["--all-targets", "--locked", "--keep-going"]),
+            Step("2-statisch", "check_no_default_features",
+                 cargo + ["check"] + pk + ["--no-default-features", "--locked", "--keep-going"]),
+            Step("2-statisch", "doc", cargo + ["doc"] + pk + ["--no-deps", "--locked"], env={"RUSTDOCFLAGS": "-D warnings"}),
+        ]
+        for c in crates:
+            S.append(Step("2-statisch", f"clippy__{c}", cargo + ["clippy", "-p", c, "--all-targets", "--locked", "--",
+                                                                "-D", "warnings"]))
+        S += [
+            Step("2-statisch", "deny", cargo + ["deny", "check"], requires=["cargo-deny"]),
+            Step("2-statisch", "audit", cargo + ["audit"], requires=["cargo-audit"]),
+            Step("2-statisch", "panic_flaeche_lib",
+                 cargo + ["clippy"] + pk_lib + ["--lib", "--locked", "--keep-going", "--",
+                          "-W", "clippy::unwrap_used", "-W", "clippy::expect_used", "-W", "clippy::panic",
+                          "-W", "clippy::todo", "-W", "clippy::unimplemented", "-W", "clippy::indexing_slicing"],
+                 timeout=3600, info=True, note="Panic-Stellen im Produktivcode; Auswertung: panic_flaeche.csv"),
         ]
 
-    # --- 4: Benchmarks -----------------------------------------------------------------------
-    if not args.quick:
-        for pkg, names in BENCHES.items():
-            if pkg not in crates:
-                continue
-            for b in names:
-                S.append(Step("4-bench", f"bench__{pkg}__{b}", cargo + ["bench", "-p", pkg, "--bench", b, "--locked"],
-                              timeout=BENCH_TIMEOUT, note="locomo/long_mem_eval brauchen evtl. externe Daten"))
+    # --- 3: Tests ----------------------------------------------------------------------------
+    if do_static:
+        tj_env: dict[str, str] = {}
+        tj_args: list[str] = []
+        if args.test_json:
+            tj_env = {"RUSTC_BOOTSTRAP": "1", "CARGO_TARGET_DIR": str(ctx.target_dir / "audit-testjson")}
+            tj_args = ["--", "-Z", "unstable-options", "--format", "json", "--report-time"]
+        for c in crates:
+            t = SLOW_CRATES.get(c, DEFAULT_TIMEOUT)
+            S.append(Step("3-tests", f"test__{c}", cargo + ["test", "-p", c, "--tests", "--no-fail-fast", "--locked"] + tj_args,
+                          timeout=t, env=tj_env, post=post_test, note="lib-, Bin- und Integrationstests"))
+            if c in libs:
+                S.append(Step("3-tests", f"test_doc__{c}", cargo + ["test", "-p", c, "--doc", "--locked", "--no-fail-fast"],
+                              timeout=t, post=post_test))
+            if args.nextest and nextest_ok():
+                S.append(Step("3-tests", f"nextest__{c}",
+                              cargo + ["nextest", "run", "-p", c, "--locked", "--no-fail-fast", "--retries", "0"], timeout=t,
+                              note="je Test eigener Prozess: deckt Test-Interferenz auf"))
+        flake_n = args.flake if args.flake is not None else prof["flake"]
+        if flake_n > 0:
+            for c in crates:
+                S.append(Step("3-tests", f"flake_scan__{c}", py=make_flake(c, flake_n, SLOW_CRATES.get(c, DEFAULT_TIMEOUT)),
+                              timeout=SLOW_CRATES.get(c, DEFAULT_TIMEOUT) * flake_n,
+                              note=f"{flake_n} Laeufe, abwechselnd parallel / threads=1"))
+
+    # --- 4: Messung --------------------------------------------------------------------------
+    if do_measure:
+        crit_home = Path(args.criterion_home).resolve() if args.criterion_home else outdir / "criterion"
+        repeat = args.repeat if args.repeat is not None else prof["repeat"]
+        crit_flags = list(prof["crit"])
+        if args.baseline:
+            crit_flags += ["--baseline", args.baseline]
+        if args.save_baseline:
+            crit_flags += ["--save-baseline", args.save_baseline]
+        benv = dict(flags)
+        benv["CRITERION_HOME"] = str(crit_home)
+
+        S.append(Step("4-messung", "messhygiene", py=messhygiene, info=True, cargo=False, timeout=120,
+                      note="Last, Governor, Turbo, Swap: Warnungen vor der Messung"))
+        bench_crates = [c for c in crates if any(b["exists"] and not b["harness"] for b in bench_targets(ws.members[c]))]
+        if bench_crates:
+            S.append(Step("4-messung", "bench_build",
+                          cargo + ["bench", "--no-run", "--locked"] + [x for c in bench_crates for x in ("-p", c)],
+                          env=flags, timeout=7200, measure=True,
+                          note="Kompilierzeit/Speicher der Bench-Ziele (bench-Profil = release)"))
+        for c in bench_crates:
+            for b in bench_targets(ws.members[c]):
+                if not b["exists"] or b["harness"]:
+                    continue
+                cmd = cargo + ["bench", "-p", c, "--bench", b["name"], "--locked"]
+                if b["features"]:
+                    cmd += ["--features", ",".join(b["features"])]
+                if b["criterion"]:
+                    cmd += ["--"] + crit_flags
+                S.append(Step("4-messung", f"bench__{c}__{b['name']}", cmd, env=benv, timeout=BENCH_TIMEOUT,
+                              post=post_bench, repeat=repeat if b["criterion"] else 1, measure=True,
+                              note="" if b["criterion"] else "eigener Harness"))
+
+        if BENCH_CRATE in crates:
+            hroot = outdir / "harness"
+            benv2 = dict(flags)
+            S.append(Step("4-messung", "harness_build",
+                          cargo + ["build", "--release", "-p", BENCH_CRATE, "--bins", "--features", "external-benchmarks",
+                                   "--locked"], env=benv2, timeout=7200, post=post_harness_build, measure=True,
+                          note="Messwerkzeuge von contextra-bench (Release-Profil)"))
+            tdir = ctx.target_dir
+            syn, scl, mea = (tdir / "release" / HARNESS_BINS[k] for k in ("synthetic", "scale", "measure"))
+            S.append(Step("4-messung", "harness_synthetic_genauigkeit", [str(syn)], cwd=hroot / "work_synthetic",
+                          timeout=1800, post=post_synthetic, cargo=False, measure=True,
+                          skip_if=_bin_skip(ctx, HARNESS_BINS["synthetic"]),
+                          note="Szenario A/B (Kontext-Praefix, Reranking); schreibt benchmarks/results in das Arbeitsverzeichnis"))
+            S.append(Step("4-messung", "harness_ann_ci_gate", [str(syn), "--ann"], cwd=hroot / "work_ann", timeout=900,
+                          cargo=False, measure=True, skip_if=_bin_skip(ctx, HARNESS_BINS["synthetic"]),
+                          note="1k Vektoren, 50 Queries: Schwellen des Projekts (nur Smoke-Test)"))
+            hint = " (additiver Bin: benchmarks/contextra-bench/src/bin/measure.rs + [[bin]]-Eintrag, siehe Anleitung)"
+            for n, dim in prof["ann"]:
+                outj = hroot / f"ann_{n}_{dim}d.json"
+                S.append(Step("4-messung", f"harness_ann__{n}x{dim}",
+                              [str(mea), "ann", "--n", str(n), "--dim", str(dim), "--queries", str(prof["ann_q"]),
+                               "--out", str(outj)], cwd=hroot / "work_ann", timeout=BENCH_TIMEOUT * (2 if n >= 100_000 else 1),
+                              post=post_kv, cargo=False, measure=True, skip_if=_bin_skip(ctx, HARNESS_BINS["measure"], hint),
+                              note="HNSW-Sweep: Recall@10, QPS bei Recall 0.90/0.95/0.99, Latenz"))
+            data_root = ctx.root / DATASET_DIR
+            if data_root.is_dir():
+                for dsd in sorted(p for p in data_root.iterdir() if p.is_dir()):
+                    if (dsd / "corpus.jsonl").exists() and (dsd / "queries.jsonl").exists():
+                        S.append(Step("4-messung", f"harness_dataset__{dsd.name}",
+                                      [str(mea), "dataset", "--dir", str(dsd), "--out", str(hroot / f"dataset_{dsd.name}.json")],
+                                      cwd=hroot / f"work_dataset_{dsd.name}", timeout=1800, post=post_dataset, cargo=False,
+                                      measure=True, skip_if=_bin_skip(ctx, HARNESS_BINS["measure"], hint),
+                                      note="NDCG@10, Recall@10, MAP@100, Latenz (Textsuche, siehe disclaimer in der JSON)"))
+            docs, step_sz = prof["scale"]
+            sj = hroot / f"scale_{docs}.json"
+            S.append(Step("4-messung", f"harness_scale__{docs}",
+                          [str(scl), "--docs", str(docs), "--step", str(step_sz), "--dim", "128", "--seed", "42",
+                           "--out", str(sj)], cwd=hroot / "work_scale", timeout=max(3600, docs // 100_000 * 7200),
+                          env={"_SCALE_OUT": str(sj)}, post=post_scale, cargo=False, measure=True,
+                          skip_if=_bin_skip(ctx, HARNESS_BINS["scale"]),
+                          note="Einfuegerate, Such-Perzentile und RSS ueber wachsende Datenmenge"))
 
     # --- 5: Tief -----------------------------------------------------------------------------
-    if args.all:
-        for fc in FUZZ_CRATES:
-            name = f"contextra-{fc}"
-            if name not in crates:
-                continue
-            d = ws.members[name]
-            for tgt in sorted(p.stem for p in (d / "fuzz" / "fuzz_targets").glob("*.rs")):
-                S.append(Step("5-tief", f"fuzz__{fc}__{tgt}",
-                              ["cargo", "+nightly", "fuzz", "run", tgt, "--", f"-max_total_time={FUZZ_SECONDS}"],
-                              cwd=d, requires=["cargo-fuzz"], timeout=FUZZ_SECONDS + 1200))
-        S += [
-            Step("5-tief", "mutation_tier0_1", cargo + ["mutants", "--config", ".cargo/mutants.toml", "--timeout", "120"],
-                 requires=["cargo-mutants"], timeout=14400),
-            Step("5-tief", "loom_mvcc", cargo + ["test", "-p", "contextra-mvcc", "--release", "--locked"],
-                 env={"RUSTFLAGS": "--cfg loom", "LOOM_MAX_PREEMPTIONS": "3"}, timeout=3600),
-            Step("5-tief", "miri_vector_scalar", ["cargo", "+nightly", "miri", "test", "-p", "contextra-vector", "--lib"],
-                 requires=["cargo-miri"], timeout=7200),
-            Step("5-tief", "asan_vector", ["cargo", "+nightly", "test", "-p", "contextra-vector", "--target",
-                 "x86_64-unknown-linux-gnu"], env={"RUSTFLAGS": "-Zsanitizer=address"}, timeout=3600),
-        ]
+    if do_deep and not measure_only:
+        for c in crates:
+            d = ws.members[c]
+            ft = d / "fuzz" / "fuzz_targets"
+            if ft.is_dir():
+                for tgt in sorted(p.stem for p in ft.glob("*.rs")):
+                    S.append(Step("5-tief", f"fuzz__{short(c)}__{tgt}",
+                                  ["cargo", "+nightly", "fuzz", "run", tgt, "--", f"-max_total_time={prof['fuzz']}"],
+                                  cwd=d, requires=["cargo-fuzz"], timeout=prof["fuzz"] + 1200, post=post_fuzz, measure=True))
+        if (ctx.root / ".cargo" / "mutants.toml").exists():
+            S.append(Step("5-tief", "mutation", cargo + ["mutants", "--config", ".cargo/mutants.toml", "--timeout", "120"],
+                          requires=["cargo-mutants"], timeout=14400))
+        for c in crates:
+            if "loom" in _read(ws.members[c] / "Cargo.toml"):
+                S.append(Step("5-tief", f"loom__{short(c)}", cargo + ["test", "-p", c, "--release", "--locked"],
+                              env={"RUSTFLAGS": "--cfg loom", "LOOM_MAX_PREEMPTIONS": "3"}, timeout=3600))
+        islands = [c for c in crates if (ctx.caps.get(c) or {}).get("unsafe_island")]
+        for c in islands:
+            S.append(Step("5-tief", f"miri__{short(c)}", ["cargo", "+nightly", "miri", "test", "-p", c, "--lib"],
+                          requires=["cargo-miri"], timeout=7200))
+            S.append(Step("5-tief", f"asan__{short(c)}", ["cargo", "+nightly", "test", "-p", c, "--target",
+                                                          "x86_64-unknown-linux-gnu"],
+                          env={"RUSTFLAGS": "-Zsanitizer=address"}, timeout=3600))
+        S.append(Step("5-tief", "test_release_workspace", cargo + ["test"] + pk + ["--release", "--locked", "--no-fail-fast"],
+                      timeout=7200, post=post_test, note="Release deckt Overflow-/Optimierungsfehler auf"))
+        S.append(Step("5-tief", "coverage", cargo + ["llvm-cov"] + pk + ["--locked", "--json", "--output-path",
+                                                                       str(outdir / "coverage.json")],
+                      requires=["cargo-llvm-cov"], timeout=10800))
 
     if args.gruppe:
         g = args.gruppe.lower()
-        def _passt(group: str) -> bool:
-            # exakt: Kennung ("s", "1", "t1") oder Gruppenname ("befunde", "statisch") ; kein Praefix-Treffer
-            kennung, _, name = group.lower().partition("-")
-            return g in (kennung, name, group.lower())
-        S = [s for s in S if _passt(s.group)]
-    # Gruppenfilter darf den Preflight nicht wegfiltern, sonst laufen cargo-Schritte ohne Toolchain-Pruefung
-    if any(s.needs_cargo for s in S) and not any(s.name == PREFLIGHT for s in S):
-        S.insert(0, Step("0-basis", PREFLIGHT, py=toolchain_preflight, timeout=1000, cargo=False,
-                         note="Gate (automatisch ergaenzt)"))
+        g = {"bench": "messung", "mess": "messung", "test": "tests"}.get(g, g)
+        S = [s for s in S if s.group.lower().startswith(g) or s.group.split("-", 1)[-1].lower().startswith(g)]
+    S.sort(key=lambda s: s.group)  # stabil: Gruppen-Praefix 0..5 ordnet die Phasen
     return S
 
 
@@ -1349,6 +1201,12 @@ def run_step(step: Step, idx: int, logdir: Path, ctx: Ctx, outdir: Path, tfactor
         step.status, step.detail = "SKIPPED", why
         Path(step.log).write_text(f"SKIPPED: {why}\n")
         return
+    if step.skip_if:
+        why = step.skip_if()
+        if why:
+            step.status, step.detail = "SKIPPED", why
+            Path(step.log).write_text(f"SKIPPED: {why}\n")
+            return
     t0 = time.time()
 
     if step.py:
@@ -1364,54 +1222,81 @@ def run_step(step: Step, idx: int, logdir: Path, ctx: Ctx, outdir: Path, tfactor
         return
 
     env = os.environ.copy()
-    env.update(step.env)
+    env.update(ctx.extra_env)
+    env.update({k: v for k, v in step.env.items() if not k.startswith("_")})
     env.setdefault("CARGO_TERM_COLOR", "never")
     env.setdefault("RUST_BACKTRACE", "1")
     if jobs:
         env["CARGO_BUILD_JOBS"] = str(jobs)
     timeout = int(step.timeout * tfactor)
-    header = f"$ {' '.join(step.cmd)}\n# cwd={step.cwd or ctx.root}\n# env+={step.env}\n\n"
+    cwd = step.cwd or ctx.root
+    cwd.mkdir(parents=True, exist_ok=True)
+    header = (f"$ {' '.join(step.cmd)}\n# cwd={cwd}\n# env+={ {k: v for k, v in step.env.items() if not k.startswith('_')} }\n"
+              f"# wiederholungen={step.repeat}\n\n")
+    usage = Usage()
+    step.load_before = round(os.getloadavg()[0], 2)
+    rc: Optional[int] = 0
+    timed_out = False
     try:
         with open(step.log, "w") as fh:
             fh.write(header)
             fh.flush()
-            rc, timed_out = run_logged(step.cmd, step.cwd or ctx.root, env, fh, timeout)
+            for run in range(step.repeat):
+                if step.repeat > 1:
+                    fh.write(f"\n##### Lauf {run + 1}/{step.repeat}\n")
+                fh.flush()
+                start = fh.tell()
+                step.t_run0 = time.time()
+                rc, timed_out = run_logged(step.cmd, cwd, env, fh, timeout, usage)
+                fh.flush()
+                if step.post:
+                    with open(step.log, "rb") as rf:
+                        rf.seek(start)
+                        chunk = rf.read().decode(errors="replace")
+                    try:
+                        step.post(step, chunk, ctx, outdir, run)
+                    except Exception as e:  # Auswertung darf den Lauf nicht verlieren
+                        step.detail += f" | Auswertung fehlgeschlagen: {type(e).__name__}: {e}"
+                if timed_out or rc != 0:
+                    break
     except FileNotFoundError as e:
         step.status, step.detail = "SKIPPED", f"Befehl nicht gefunden: {e}"
         step.seconds = round(time.time() - t0, 1)
         return
     step.seconds = round(time.time() - t0, 1)
+    step.cpu_user, step.cpu_sys, step.rss_mb = round(usage.user, 1), round(usage.sys, 1), round(usage.rss_mb, 1)
+    step.load_after = round(os.getloadavg()[0], 2)
     if timed_out:
-        step.status, step.detail = "TIMEOUT", f">{timeout}s (zaehlt als rot)"
+        step.status, step.detail = "TIMEOUT", f">{timeout}s je Lauf (zaehlt als rot) " + step.detail
     else:
         step.rc = rc
         step.status = "PASS" if rc == 0 else "FAIL"
         if step.info and step.status == "PASS":
             step.status = "INFO"
+    if step.force_fail and step.status in ("PASS", "INFO"):
+        step.status = "FAIL"
 
-    text = Path(step.log).read_text(errors="replace").split("\n\n", 1)[-1]  # Kopfzeile nicht mitparsen
+    text = Path(step.log).read_text(errors="replace").split("\n\n", 1)[-1]
     if step.name.startswith("nextest__"):
         step.detail = (step.detail + " " + parse_nextest_summary(text)).strip()
-    elif step.name.startswith("test_"):
+    elif step.name.startswith("test"):
         step.detail = (step.detail + " " + parse_cargo_test_summary(text)).strip()
         if "could not compile" in text:
             step.detail += " | COMPILE-FEHLER"
             step.status = "FAIL"
-        elif step.status == "PASS" and re.search(r"test result: \w+\. 0 passed; 0 failed", text) and \
-                not re.search(r"test result: \w+\. [1-9]\d* passed", text):
+        elif step.status == "PASS" and not re.search(r"test result: \w+\. [1-9]\d* passed", text):
             step.detail += " | KEINE TESTS AUSGEFUEHRT"
     elif step.name.startswith("clippy") or step.name == "panic_flaeche_lib":
         step.detail = (step.detail + " " + parse_clippy(text)).strip()
-    elif step.name.startswith("liste_tests__"):
-        step.detail = (step.detail + f" {len(re.findall(r'^\\S.*: test$', text, re.M))} Tests gelistet").strip()
     elif step.name.startswith("bench__"):
-        step.detail = (step.detail + " " + parse_criterion(text)).strip()
+        names = {r["benchmark"] for r in step.acc}
+        step.detail = (step.detail + f" {len(names)} Benchmarks x {step.repeat} Lauf/Laeufe").strip()
     elif step.name.startswith("check_"):
         step.detail = (step.detail + f" errors={len(re.findall(r'^error', text, re.M))}").strip()
-
-
-# ----------------------------------------------------------------------------------------------
-# Auswertungen
+    if step.metrics.get("hang_kandidat"):
+        step.detail += f" | HANG-KANDIDAT {step.metrics['hang_kandidat']}"
+    # ----------------------------------------------------------------------------------------------
+# Auswertungen (lesen die Datendateien; funktionieren auch nach --resume)
 # ----------------------------------------------------------------------------------------------
 
 def export_panic_surface(ctx: Ctx, steps: list[Step], outdir: Path) -> Optional[dict]:
@@ -1419,50 +1304,101 @@ def export_panic_surface(ctx: Ctx, steps: list[Step], outdir: Path) -> Optional[
     if not s:
         return None
     data = parse_panic_surface(Path(s.log).read_text(errors="replace"), ctx.ws.dir_map())
-    with open(outdir / "panic_flaeche.csv", "w", newline="") as fh:
-        w = csv.writer(fh)
-        w.writerow(["crate", "unwrap", "expect", "panic", "todo", "unimplemented", "index", "summe"])
-        for crate, k in sorted(data.items(), key=lambda kv: -sum(kv[1].values())):
-            row = [k.get(x, 0) for x in ("unwrap", "expect", "panic", "todo", "unimplemented", "index")]
-            w.writerow([crate] + row + [sum(row)])
+    rows = []
+    for crate, k in sorted(data.items(), key=lambda kv: -sum(kv[1].values())):
+        r = [k.get(x, 0) for x in ("unwrap", "expect", "panic", "todo", "unimplemented", "index")]
+        rows.append([crate] + r + [sum(r)])
+    write_csv(outdir / "panic_flaeche.csv", ["crate", "unwrap", "expect", "panic", "todo", "unimplemented", "index", "summe"], rows)
     return data
 
 
-def export_bench_csv(root: Path, outdir: Path, since: float) -> int:
-    crit = root / "target" / "criterion"
-    if not crit.exists():
-        return 0
-    rows = []
-    for est in crit.rglob("new/estimates.json"):
-        if est.stat().st_mtime < since:
-            continue
-        try:
-            d = json.loads(est.read_text())
-            name = "/".join(est.relative_to(crit).parts[:-2])
-            rows.append([name, d["mean"]["point_estimate"], d["median"]["point_estimate"],
-                         d["std_dev"]["point_estimate"], d["mean"]["confidence_interval"]["lower_bound"],
-                         d["mean"]["confidence_interval"]["upper_bound"]])
-        except (OSError, KeyError, ValueError):
-            continue
+def aggregate_bench(outdir: Path) -> list[dict]:
+    raw = []
+    for step, rows in get_data(outdir, "bench"):
+        for r in rows:  # type: ignore[union-attr]
+            raw.append(r)
+    if not raw:
+        return []
+    write_csv(outdir / "bench_runs.csv",
+              ["step", "benchmark", "lauf", "mean_ns", "median_ns", "std_ns", "ci_low_ns", "ci_high_ns", "tp_elems", "tp_bytes"],
+              [[r["step"], r["benchmark"], r["run"], r["mean_ns"], r["median_ns"], r["std_ns"], r["ci_low_ns"],
+                r["ci_high_ns"], r.get("tp_elems"), r.get("tp_bytes")] for r in sorted(raw, key=lambda x: (x["step"], x["benchmark"], x["run"]))])
+    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for r in raw:
+        groups[(r["step"], r["benchmark"])].append(r)
+    agg = []
+    for (step, name), rs in sorted(groups.items()):
+        rs.sort(key=lambda x: x["run"])
+        meds = [x["median_ns"] for x in rs]
+        med = statistics.median(meds)
+        cv = (statistics.stdev(meds) / statistics.mean(meds) * 100) if len(meds) > 1 and statistics.mean(meds) > 0 else None
+        last = rs[-1]
+        tp_e = (last["tp_elems"] / (med * 1e-9)) if last.get("tp_elems") and med > 0 else None
+        tp_b = (last["tp_bytes"] / (med * 1e-9)) if last.get("tp_bytes") and med > 0 else None
+        crate = step.split("__")[1] if step.count("__") >= 1 else ""
+        agg.append(dict(crate=crate, step=step, benchmark=name, runs=len(rs), median_ns=med, min_ns=min(meds), max_ns=max(meds),
+                        cv_pct=cv, mean_ns=statistics.mean(x["mean_ns"] for x in rs), std_ns=last["std_ns"],
+                        ci_low_ns=last["ci_low_ns"], ci_high_ns=last["ci_high_ns"], tp_elems_s=tp_e, tp_bytes_s=tp_b))
+    write_csv(outdir / "bench_results.csv",
+              ["crate", "step", "benchmark", "laeufe", "median_ns", "min_ns", "max_ns", "cv_pct", "mean_ns", "std_ns_letzter_lauf",
+               "ci_low_ns", "ci_high_ns", "durchsatz_elem_s", "durchsatz_byte_s"],
+              [[a["crate"], a["step"], a["benchmark"], a["runs"], f"{a['median_ns']:.3f}", f"{a['min_ns']:.3f}", f"{a['max_ns']:.3f}",
+                "" if a["cv_pct"] is None else f"{a['cv_pct']:.2f}", f"{a['mean_ns']:.3f}", f"{a['std_ns']:.3f}",
+                f"{a['ci_low_ns']:.3f}", f"{a['ci_high_ns']:.3f}",
+                "" if a["tp_elems_s"] is None else f"{a['tp_elems_s']:.1f}", "" if a["tp_bytes_s"] is None else f"{a['tp_bytes_s']:.1f}"]
+               for a in agg])
+    return agg
+
+
+def export_tests(outdir: Path) -> dict:
+    rows, bins = [], []
+    for step, p in get_data(outdir, "tests"):
+        for b, t, s, e in p["rows"]:  # type: ignore[index]
+            rows.append([step, p["crate"], b, t, s, "" if e is None else e])  # type: ignore[index]
+    for step, p in get_data(outdir, "testbins"):
+        for b, ok, bad, ign, secs in p["rows"]:  # type: ignore[index]
+            bins.append([step, p["crate"], b, ok, bad, ign, secs])  # type: ignore[index]
     if rows:
-        with open(outdir / "bench_results.csv", "w", newline="") as fh:
-            w = csv.writer(fh)
-            w.writerow(["benchmark", "mean_ns", "median_ns", "stddev_ns", "mean_ci_low_ns", "mean_ci_high_ns"])
-            w.writerows(sorted(rows))
-    return len(rows)
+        write_csv(outdir / "tests.csv", ["schritt", "crate", "binary", "test", "status", "sekunden"], rows)
+    if bins:
+        write_csv(outdir / "test_binaries.csv", ["schritt", "crate", "binary", "ok", "rot", "ignoriert", "sekunden"], bins)
+    flake = []
+    for _, r in get_data(outdir, "flake"):
+        flake.extend(r)  # type: ignore[arg-type]
+    if flake:
+        write_csv(outdir / "flake_report.csv", ["crate", "binary", "test", "ergebnisse_je_lauf", "art"], flake)
+    return {"tests": rows, "bins": bins, "flake": flake}
+
+
+def export_scale(outdir: Path) -> list[list]:
+    rows = []
+    for step, iv in get_data(outdir, "scale"):
+        for x in iv:  # type: ignore[union-attr]
+            rows.append([step, x["docs_inserted"], round(x["insert_rate_docs_per_sec"], 1), x["search_p50_ns"], x["search_p95_ns"],
+                         x["search_p99_ns"], round(x["rss_bytes"] / 1048576, 1)])
+    if rows:
+        write_csv(outdir / "scale_curve.csv", ["schritt", "dokumente", "einfuegerate_docs_s", "suche_p50_ns", "suche_p95_ns",
+                                               "suche_p99_ns", "rss_mb"], rows)
+    return rows
+
+
+def export_metrics(steps: list[Step], outdir: Path) -> list[list]:
+    rows = [[s.name, k, v] for s in steps for k, v in sorted(s.metrics.items())]
+    if rows:
+        write_csv(outdir / "metrics.csv", ["schritt", "schluessel", "wert"], rows)
+    return rows
 
 
 def maturity_table(ctx: Ctx, steps: list[Step]) -> list[str]:
     by = {s.name: s for s in steps}
     lines = ["", "## Reife-Behauptung vs. Beleg (capabilities.toml gegen diesen Lauf)", "",
-             "| Crate | behauptet | lib-Tests | Clippy lib | Urteil |", "|---|---|---|---|---|"]
+             "| Crate | behauptet | Tests | Clippy | Urteil |", "|---|---|---|---|---|"]
     for name, v in sorted(ctx.caps.items()):
         claimed = v.get("maturity", "?")
-        t, c = by.get(f"test_lib__{name}"), by.get(f"clippy_lib__{name}")
+        t, c = by.get(f"test__{name}"), by.get(f"clippy__{name}")
         if not t and not c:
             continue
-        ts = t.status if t else "-"
-        cs = c.status if c else "-"
+        ts, cs = (t.status if t else "-"), (c.status if c else "-")
         if claimed in ("stable", "beta") and (ts not in ("PASS", "-") or cs not in ("PASS", "-")):
             verdict = "**Behauptung ohne Beleg**"
         else:
@@ -1471,66 +1407,117 @@ def maturity_table(ctx: Ctx, steps: list[Step]) -> list[str]:
     return lines
 
 
-def testbarkeit_report(ctx: Ctx, steps: list[Step], outdir: Path) -> list[str]:
+def table(header: list[str], rows: list[list], aligns: Optional[list[str]] = None) -> list[str]:
+    al = aligns or ["---"] * len(header)
+    out = ["| " + " | ".join(header) + " |", "|" + "|".join(al) + "|"]
+    out += ["| " + " | ".join(md_cell(c) for c in r) + " |" for r in rows]
+    return out
+
+
+def measurement_sections(ctx: Ctx, steps: list[Step], outdir: Path, agg: list[dict], scale_rows: list[list]) -> list[str]:
     L: list[str] = []
-    p = outdir / "testbarkeit_crates.csv"
-    if p.exists():
-        with open(p) as fh:
-            rows = list(csv.DictReader(fh))
-        L += ["", "## Testbarkeit je Crate (statisch)", ""]
-        L += _md_table(rows, ["crate", "tests_unit", "tests_integration", "doctests", "ignoriert",
-                              "tests_ohne_assertion", "pub_fns", "pub_mit_nachweis", "pub_ohne_nachweis",
-                              "nachweis_quote", "urteil"])
-    vr = export_testliste(ctx, steps, outdir)
-    if vr:
-        L += ["", "## Statisch gezaehlte Tests gegen `cargo test -- --list`", "",
-              "Differenz > 0: Tests im Quelltext, die cargo nicht kennt (Feature/Plattform/cfg). "
-              "Differenz < 0: Tests aus Makros oder nicht erkannten Attributen.", ""]
-        L += _md_table(vr, ["crate", "statisch", "gelistet", "differenz"])
-    p = outdir / "coverage_crates.csv"
-    if p.exists():
-        with open(p) as fh:
-            rows = list(csv.DictReader(fh))
-        L += ["", "## Funktionsabdeckung je Crate (cargo llvm-cov)", ""]
-        L += _md_table(rows, ["crate", "funktionen", "funktionen_belegt", "funktionen_prozent", "zeilen_prozent"])
+    args = ctx.args
+    L += ["", "## Messung", "",
+          f"- Profil `{args.profil}`, Wiederholungen je Criterion-Bench: "
+          f"{args.repeat if args.repeat is not None else ctx.profile['repeat']}, "
+          f"Criterion-Argumente: `{' '.join(ctx.profile['crit']) or '(Standard)'}`",
+          f"- native CPU-Optimierung: {args.native}; Overflow-Checks aus: {args.no_overflow_checks}; "
+          f"zusaetzliche Umgebung: {ctx.extra_env or '-'}"]
+    hyg = get_data(outdir, "hygiene")
+    if hyg and hyg[0][1].get("warnungen"):  # type: ignore[union-attr]
+        L += ["", "**Warnungen zur Messumgebung:**"] + [f"- {w}" for w in hyg[0][1]["warnungen"]]  # type: ignore[index]
+
+    if agg:
+        noisy = [a for a in agg if a["cv_pct"] is not None and a["cv_pct"] > 10]
+        multi = any(a["runs"] > 1 for a in agg)
+        L += ["", f"### Criterion: {len(agg)} Benchmarks" + (f", {len(noisy)} mit Streuung > 10 % ueber die Laeufe" if multi else ""), "",
+              "Die 25 langsamsten (Median je Lauf, dann Median ueber Laeufe). Vollstaendig: `bench_results.csv`.", ""]
+        top = sorted(agg, key=lambda a: -a["median_ns"])[:25]
+        L += table(["Crate", "Benchmark", "Median", "min..max", "CV %", "Durchsatz"],
+                   [[short(a["crate"]), a["benchmark"], fmt_ns(a["median_ns"]),
+                     f"{fmt_ns(a['min_ns'])}..{fmt_ns(a['max_ns'])}" if a["runs"] > 1 else "-",
+                     "-" if a["cv_pct"] is None else f"{a['cv_pct']:.1f}",
+                     (f"{a['tp_elems_s']:.3g} Elem/s" if a["tp_elems_s"] else (f"{a['tp_bytes_s'] / 1048576:.3g} MiB/s" if a["tp_bytes_s"] else "-"))]
+                    for a in top], ["---", "---", "---:", "---:", "---:", "---:"])
+        if noisy:
+            L += ["", "Unruhigste Benchmarks (CV ueber Laeufe): Ergebnisse unter ca. diesem Rauschen sind nicht belastbar.", ""]
+            L += table(["Crate", "Benchmark", "CV %", "min..max"],
+                       [[short(a["crate"]), a["benchmark"], f"{a['cv_pct']:.1f}", f"{fmt_ns(a['min_ns'])}..{fmt_ns(a['max_ns'])}"]
+                        for a in sorted(noisy, key=lambda a: -a["cv_pct"])[:15]], ["---", "---", "---:", "---:"])
+
+    harness = [s for s in steps if s.name.startswith("harness_") and s.metrics]
+    if harness:
+        L += ["", "### Harness-Kennzahlen", ""]
+        for s in harness:
+            kv = [(k, v) for k, v in s.metrics.items() if not k.startswith("bin_mb_")][:24]
+            if kv:
+                L += [f"**`{s.name}`** ({s.status})", ""] + table(["Kennzahl", "Wert"], [[k, v] for k, v in kv], ["---", "---:"]) + [""]
+    if scale_rows:
+        L += ["", "### Skalierung (scale-100k)", ""]
+        L += table(["Dokumente", "Einfuegerate Docs/s", "Suche p50", "Suche p95", "Suche p99", "RSS MiB"],
+                   [[r[1], r[2], fmt_ns(r[3]), fmt_ns(r[4]), fmt_ns(r[5]), r[6]] for r in scale_rows],
+                   ["---:", "---:", "---:", "---:", "---:", "---:"])
+
+    timed = [s for s in steps if s.status in ("PASS", "INFO", "FAIL") and (s.cpu_user + s.cpu_sys) > 0]
+    if timed:
+        L += ["", "### Ressourcenverbrauch je Schritt (Top 12 nach CPU-Zeit)", ""]
+        L += table(["Schritt", "Wand s", "CPU user s", "CPU sys s", "Spitzen-RSS MiB", "Last vorher/nachher"],
+                   [[f"`{s.name}`", s.seconds, s.cpu_user, s.cpu_sys, s.rss_mb, f"{s.load_before}/{s.load_after}"]
+                    for s in sorted(timed, key=lambda x: -(x.cpu_user + x.cpu_sys))[:12]],
+                   ["---", "---:", "---:", "---:", "---:", "---:"])
     return L
 
 
 def write_reports(ctx: Ctx, steps: list[Step], outdir: Path, meta: dict, final: bool = False) -> None:
     rows = [{"nr": i, "gruppe": s.group, "schritt": s.name, "status": s.status, "rc": s.rc, "sekunden": s.seconds,
-             "detail": s.detail, "log": os.path.relpath(s.log, outdir) if s.log else "",
-             "befehl": " ".join(s.cmd), "hinweis": s.note} for i, s in enumerate(steps)]
-    (outdir / "results.json").write_text(json.dumps({"meta": meta, "steps": rows}, indent=2, ensure_ascii=False))
+             "cpu_user_s": s.cpu_user, "cpu_sys_s": s.cpu_sys, "rss_mb": s.rss_mb, "load_vorher": s.load_before,
+             "load_nachher": s.load_after, "detail": s.detail, "log": os.path.relpath(s.log, outdir) if s.log else "",
+             "befehl": " ".join(s.cmd), "hinweis": s.note, "metrics": s.metrics} for i, s in enumerate(steps)]
+    (outdir / "results.json").write_text(json.dumps({"meta": meta, "steps": rows}, indent=2, ensure_ascii=False, default=str))
     if rows:
+        csv_rows = [{k: v for k, v in r.items() if k != "metrics"} for r in rows]
         with open(outdir / "results.csv", "w", newline="") as fh:
-            w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
+            w = csv.DictWriter(fh, fieldnames=list(csv_rows[0].keys()))
             w.writeheader()
-            w.writerows(rows)
+            w.writerows(csv_rows)
 
     counts: dict[str, int] = defaultdict(int)
     for s in steps:
         counts[s.status] += 1
     order = {"FAIL": 0, "TIMEOUT": 1, "SKIPPED": 2, "INFO": 3, "PASS": 4, "PENDING": 5}
     pre = next((s for s in steps if s.name == PREFLIGHT), None)
-    L = ["# Contextra Voll-Audit", "",
+    L = ["# Contextra Audit und Messung", "",
          f"- Commit: `{meta['commit']}` ({meta['commit_date']}), Branch `{meta.get('branch', '')}`, "
          f"hinter origin: {meta.get('behind', '?')}, ungespeicherte Aenderungen: {meta.get('dirty')}",
-         f"- Start: {meta['start']}  Dauer: {meta['duration_min']} min",
-         f"- Toolchain-Pin: `{ctx.pin}`; Preflight: **{pre.status if pre else 'nicht gelaufen'}** "
-         f"({pre.detail if pre else ''})",
+         f"- Start: {meta['start']}  Dauer: {meta['duration_min']} min  Profil: `{ctx.args.profil}`",
+         f"- Toolchain-Pin: `{ctx.pin}`; Preflight: **{pre.status if pre else 'nicht gelaufen'}** ({pre.detail if pre else ''})",
          f"- Host: {meta['host']}", f"- Nutzer: {meta['user']}", "", "## Gesamt", ""]
     L += [f"- **{k}**: {v}" for k, v in sorted(counts.items(), key=lambda kv: order.get(kv[0], 9))]
     if pre and pre.status != "PASS":
         L += ["", "> **Kein gueltiges Audit:** der Toolchain-Preflight ist nicht bestanden. "
-              "Alle cargo-Schritte sind SKIPPED und zaehlen nicht als gruen."]
+                  "Alle cargo-Schritte sind SKIPPED und zaehlen nicht als gruen."]
     L += ["", "Hinweis: Bei `befund_*`-Schritten bedeutet FAIL, dass der Befund **vorliegt**. "
-          "`INFO` ist eine Messung oder ein Hinweis ohne Urteil.", "",
+              "`INFO` ist eine Messung oder ein Hinweis ohne Urteil.", "",
           "## Rote und uebersprungene Schritte", "", "| Schritt | Status | Sek | Detail | Log |", "|---|---|---:|---|---|"]
     for s in sorted(steps, key=lambda x: order.get(x.status, 9)):
         if s.status in ("FAIL", "TIMEOUT", "SKIPPED"):
-            L.append(f"| `{s.name}` | {s.status} | {s.seconds} | {s.detail} | "
-                     f"`{os.path.relpath(s.log, outdir) if s.log else ''}` |")
+            L.append(f"| `{s.name}` | {s.status} | {s.seconds} | {md_cell(s.detail)} | `{os.path.relpath(s.log, outdir) if s.log else ''}` |")
     if final:
+        agg = aggregate_bench(outdir)
+        scale_rows = export_scale(outdir)
+        export_metrics(steps, outdir)
+        tdata = export_tests(outdir)
+        L += measurement_sections(ctx, steps, outdir, agg, scale_rows) if any(s.group == "4-messung" for s in steps) else []
+        if tdata["bins"]:
+            slow = sorted(tdata["bins"], key=lambda r: -float(r[6]))[:15]
+            L += ["", "## Tests", "", f"{len(tdata['tests'])} Einzeltests erfasst (`tests.csv`). Langsamste Test-Binaries:", ""]
+            L += table(["Crate", "Binary", "ok", "rot", "ignoriert", "Sek"], [[short(r[1]), r[2], r[3], r[4], r[5], r[6]] for r in slow],
+                       ["---", "---", "---:", "---:", "---:", "---:"])
+            ign = sum(r[5] for r in tdata["bins"])
+            L += ["", f"Ignorierte Tests insgesamt: {ign}."]
+        if tdata["flake"]:
+            L += ["", "## Flake-Scan", ""] + table(["Crate", "Test / Hang", "Ergebnisse"],
+                  [[short(r[0]), r[2] or r[3], r[3] if r[2] else ""] for r in tdata["flake"][:40]])
         data = export_panic_surface(ctx, steps, outdir)
         if data:
             L += ["", "## Panic-Flaeche im Produktivcode (Clippy, lib, ohne Tests)", "",
@@ -1545,24 +1532,21 @@ def write_reports(ctx: Ctx, steps: list[Step], outdir: Path, meta: dict, final: 
                 for r in csv.DictReader(fh):
                     if r["urteil"] != "ok" or int(r["unsafe_zeilen"]) > 0:
                         L.append(f"- `{r['crate']}`: {r['unsafe_zeilen']} Zeilen, island={r['unsafe_island']}, {r['urteil']}")
-        nb = export_bench_csv(ctx.root, outdir, meta["t_start_epoch"])
-        if nb:
-            L += ["", f"## Benchmarks: {nb} Messwerte in `bench_results.csv`"]
-        L += testbarkeit_report(ctx, steps, outdir)
         L += maturity_table(ctx, steps)
-    L += ["", "## Alle Schritte", "", "| Gruppe | Schritt | Status | Sek | Detail |", "|---|---|---|---:|---|"]
+    L += ["", "## Alle Schritte", "", "| Gruppe | Schritt | Status | Sek | CPU s | RSS MiB | Detail |", "|---|---|---|---:|---:|---:|---|"]
     for s in steps:
-        L.append(f"| {s.group} | `{s.name}` | {s.status} | {s.seconds} | {s.detail} |")
+        L.append(f"| {s.group} | `{s.name}` | {s.status} | {s.seconds} | {round(s.cpu_user + s.cpu_sys, 1)} | {s.rss_mb} | {md_cell(s.detail)} |")
     (outdir / "summary.md").write_text("\n".join(L) + "\n")
 
 
-def collect_env(root: Path, outdir: Path) -> dict:
+def collect_env(root: Path, outdir: Path, ctx: Ctx) -> dict:
+    root_user = hasattr(os, "geteuid") and os.geteuid() == 0
+
     def sh(cmd: str) -> str:
         try:
             return subprocess.run(cmd, shell=True, cwd=root, capture_output=True, text=True, timeout=60).stdout.strip()
         except (subprocess.SubprocessError, OSError) as e:
             return f"n/a ({e})"
-    root_user = hasattr(os, "geteuid") and os.geteuid() == 0
     meta = {
         "commit": sh("git rev-parse --short HEAD") or "unknown",
         "commit_date": sh("git log -1 --format=%ci"),
@@ -1571,10 +1555,14 @@ def collect_env(root: Path, outdir: Path) -> dict:
         "dirty": bool(sh("git status --porcelain")),
         "host": f"{platform.platform()} | {os.cpu_count()} CPUs | " + sh("grep MemTotal /proc/meminfo 2>/dev/null"),
         "user": sh("id -un") + (" (ROOT: Dateirechte-Tests nicht aussagekraeftig!)" if root_user else ""),
+        "rustc": sh("rustc -V"),
+        "cpu_modell": sh("lscpu 2>/dev/null | grep 'Model name' | head -1"),
+        "argv": " ".join(sys.argv),
     }
-    meta["rustc"] = sh("rustc -V")
     (outdir / "env.txt").write_text("\n".join(f"{k}: {v}" for k, v in meta.items()) + "\n\n"
-                                    + sh("rustup show active-toolchain 2>&1") + "\n\n" + sh("uname -a"))
+                                    + sh("rustup show active-toolchain 2>&1") + "\n\n" + sh("uname -a") + "\n\n"
+                                    + f"profil={ctx.args.profil} native={ctx.args.native} no_overflow_checks={ctx.args.no_overflow_checks}\n"
+                                    + f"extra_env={ctx.extra_env}\n" + f"Cargo.lock sha256: {sh('sha256sum Cargo.lock | cut -d' ' -f1')}\n")
     return meta
 
 
@@ -1604,7 +1592,7 @@ def compare_runs(a: Path, b: Path) -> int:
         return (int(m.group(1)), int(m.group(2))) if m else None
     out += ["", "## Testzahlen (nur Aenderungen)", "", "| Schritt | A (ok/rot) | B (ok/rot) |", "|---|---|---|"]
     for name in sorted(set(sa) & set(sb)):
-        if name.startswith(("test_lib__", "nextest__")):
+        if name.startswith(("test__", "nextest__")):
             ca, cb = counts(sa[name]), counts(sb[name])
             if ca != cb:
                 out.append(f"| `{name}` | {ca} | {cb} |")
@@ -1614,15 +1602,35 @@ def compare_runs(a: Path, b: Path) -> int:
         if not p.exists():
             return {}
         with open(p) as fh:
-            return {r["benchmark"]: float(r["median_ns"]) for r in csv.DictReader(fh)}
+            return {f"{r['crate']}/{r['benchmark']}": (float(r["median_ns"]), float(r["cv_pct"]) if r["cv_pct"] else 0.0)
+                    for r in csv.DictReader(fh)}
     ba, bb = bench(a), bench(b)
     if ba and bb:
-        out += ["", "## Benchmarks (Median, > 5 % Abweichung)", "", "| Benchmark | A ns | B ns | Delta |", "|---|---:|---:|---:|"]
+        out += ["", "## Criterion (Median, Abweichung > 5 % und ueber dem Rauschen beider Laeufe)", "",
+                "| Benchmark | A | B | Delta | Rauschen (max CV) |", "|---|---:|---:|---:|---:|"]
         for k in sorted(set(ba) & set(bb)):
-            if ba[k] > 0:
-                d = (bb[k] - ba[k]) / ba[k] * 100
-                if abs(d) > 5:
-                    out.append(f"| `{k}` | {ba[k]:.0f} | {bb[k]:.0f} | {d:+.1f} % |")
+            if ba[k][0] > 0:
+                d = (bb[k][0] - ba[k][0]) / ba[k][0] * 100
+                noise = max(ba[k][1], bb[k][1])
+                if abs(d) > 5 and abs(d) > noise:
+                    out.append(f"| `{k}` | {fmt_ns(ba[k][0])} | {fmt_ns(bb[k][0])} | {d:+.1f} % | {noise:.1f} % |")
+
+    def metr(d: Path) -> dict:
+        p = d / "metrics.csv"
+        if not p.exists():
+            return {}
+        with open(p) as fh:
+            return {f"{r['schritt']}:{r['schluessel']}": r["wert"] for r in csv.DictReader(fh)}
+    ma_, mb_ = metr(a), metr(b)
+    if ma_ and mb_:
+        out += ["", "## Harness-Kennzahlen (Abweichung > 5 %)", "", "| Kennzahl | A | B | Delta |", "|---|---:|---:|---:|"]
+        for k in sorted(set(ma_) & set(mb_)):
+            try:
+                x, y = float(ma_[k]), float(mb_[k])
+            except ValueError:
+                continue
+            if x != 0 and abs((y - x) / x * 100) > 5:
+                out.append(f"| `{k}` | {x:g} | {y:g} | {(y - x) / x * 100:+.1f} % |")
     text = "\n".join(out) + "\n"
     (b / "vergleich.md").write_text(text)
     print(text)
@@ -1633,21 +1641,31 @@ def compare_runs(a: Path, b: Path) -> int:
 # main
 # ----------------------------------------------------------------------------------------------
 
-START_EPOCH: float = 0.0
-
-
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Contextra: testen, benchmarken, Befunde pruefen, Ergebnisse speichern")
-    ap.add_argument("--quick", action="store_true", help="ohne Benchmarks, Fuzz, Mutation")
-    ap.add_argument("--all", action="store_true", help="zusaetzlich Fuzz, Mutation, Miri, ASan, Loom, Coverage")
-    ap.add_argument("--coverage", action="store_true", help="zusaetzlich cargo llvm-cov und Funktionsabdeckung")
-    ap.add_argument("--only", help="kommagetrennte Crates (Kurzname), z. B. store,mvcc")
-    ap.add_argument("--gruppe", help="nur Gruppe (Name oder Kennung), z. B. befunde, statisch, tests, testbarkeit, bench, tief")
+    ap = argparse.ArgumentParser(description="Contextra: messen, testen, Befunde pruefen, Ergebnisse speichern")
+    ap.add_argument("--profil", choices=sorted(PROFILES), default="standard", help="Messtiefe (smoke|standard|max)")
+    ap.add_argument("--messen", action="store_true", help="nur Messung (Gruppen 0 und 4)")
+    ap.add_argument("--quick", action="store_true", help="ohne Messung, Fuzz, Mutation")
+    ap.add_argument("--all", action="store_true", help="zusaetzlich Fuzz, Mutation, Loom, Miri, ASan, Release-Tests, Coverage")
+    ap.add_argument("--only", help="kommagetrennte Crates (Kurzname), z. B. store,vector")
+    ap.add_argument("--gruppe", help="nur Gruppe: basis, befunde, statisch, tests, messung, tief")
     ap.add_argument("--list", action="store_true", help="Plan anzeigen, nichts ausfuehren")
+    ap.add_argument("--repeat", type=int, help="Wiederholungen je Criterion-Bench (Standard je Profil)")
+    ap.add_argument("--flake", type=int, help="Testwiederholungen je Crate fuer den Flake-Scan (Standard je Profil, 0 = aus)")
+    ap.add_argument("--nextest", action="store_true", help="zusaetzlich cargo-nextest je Crate (je Test eigener Prozess)")
+    ap.add_argument("--test-json", action="store_true",
+                    help="Einzeltest-Laufzeiten ueber libtest-JSON (RUSTC_BOOTSTRAP=1, eigenes Target-Verzeichnis -> voller Neubau)")
+    ap.add_argument("--native", action="store_true", help="Bench-/Harness-Builds mit -C target-cpu=native")
+    ap.add_argument("--no-overflow-checks", action="store_true", help="overflow-checks in release/bench abschalten (A/B-Vergleich)")
+    ap.add_argument("--env", action="append", metavar="KEY=VALUE", help="zusaetzliche Umgebungsvariable fuer alle Schritte (mehrfach)")
+    ap.add_argument("--baseline", help="Criterion: gegen gespeicherte Baseline vergleichen")
+    ap.add_argument("--save-baseline", help="Criterion: Ergebnis als Baseline speichern")
+    ap.add_argument("--criterion-home", help="persistentes CRITERION_HOME (fuer Baselines ueber mehrere Laeufe)")
+    ap.add_argument("--target-dir", help="Cargo-Target-Verzeichnis (Standard: CARGO_TARGET_DIR oder <root>/target)")
     ap.add_argument("--fail-fast", action="store_true")
-    ap.add_argument("--jobs", type=int, help="CARGO_BUILD_JOBS begrenzen (z. B. bei wenig RAM)")
+    ap.add_argument("--jobs", type=int, help="CARGO_BUILD_JOBS begrenzen")
     ap.add_argument("--timeout-faktor", type=float, default=1.0, help="alle Zeitlimits multiplizieren")
-    ap.add_argument("--resume", help="bestehendes docs/evidence/audit-... Verzeichnis fortsetzen")
+    ap.add_argument("--resume", help="bestehendes evidence/audit-... Verzeichnis fortsetzen")
     ap.add_argument("--vergleich", nargs=2, metavar=("A", "B"), help="zwei Lauf-Verzeichnisse vergleichen")
     ap.add_argument("--root", default=".", help="Repo-Root (Standard: aktuelles Verzeichnis)")
     args = ap.parse_args()
@@ -1660,22 +1678,15 @@ def main() -> int:
     if not manifest.exists() or "[workspace]" not in _read(manifest):
         print("Fehler: bitte im Workspace-Root ausfuehren (Cargo.toml mit [workspace]).", file=sys.stderr)
         return 2
-    ctx = Ctx(root)
-    if ctx.ws.fehlend or ctx.ws.fehlend_default or ctx.ws.problems:
-        print(f"Workspace: {len(ctx.ws.fehlend)} Mitglieder ohne Verzeichnis, "
-              f"{len(ctx.ws.fehlend_default)} default-members ohne Verzeichnis, "
-              f"{len(ctx.ws.problems)} sonstige Hinweise (Details im Befund 'default_members')")
+    ctx = Ctx(root, args)
+    if ctx.ws.problems:
+        print("Workspace-Hinweise:", *ctx.ws.problems, sep="\n  ")
 
     start = now_utc()
-    global START_EPOCH
-    START_EPOCH = time.time()
-    t_start = START_EPOCH
-    commit = subprocess.run("git rev-parse --short HEAD", shell=True, cwd=root,
-                            capture_output=True, text=True).stdout.strip() or "nogit"
-    if args.resume:
-        outdir = Path(args.resume).resolve()
-    else:
-        outdir = root / "docs/evidence" / f"audit-{start.strftime('%Y%m%dT%H%M%SZ')}-{commit}"
+    t_start = time.time()
+    commit = subprocess.run("git rev-parse --short HEAD", shell=True, cwd=root, capture_output=True, text=True).stdout.strip() or "nogit"
+    outdir = Path(args.resume).resolve() if args.resume else root / "evidence" / f"audit-{start.strftime('%Y%m%dT%H%M%SZ')}-{commit}"
+    ctx.outdir = outdir
     previous: dict[str, dict] = {}
     if args.resume and (outdir / "results.json").exists():
         previous = {s["schritt"]: s for s in json.loads((outdir / "results.json").read_text())["steps"]}
@@ -1683,15 +1694,16 @@ def main() -> int:
     steps = build_plan(ctx, args, outdir)
     if args.list:
         for i, s in enumerate(steps):
-            print(f"{i:03d} [{s.group}] {s.name:62s} {' '.join(s.cmd) if s.cmd else '(Python-Pruefung)'}")
-        print(f"\n{len(steps)} Schritte")
+            rep = f" x{s.repeat}" if s.repeat > 1 else ""
+            print(f"{i:03d} [{s.group}] {s.name:58s}{rep:4s} {' '.join(s.cmd) if s.cmd else '(Python-Pruefung)'}")
+        print(f"\n{len(steps)} Schritte, Profil {args.profil}")
         return 0
 
     (outdir / "logs").mkdir(parents=True, exist_ok=True)
-    meta = collect_env(root, outdir)
+    meta = collect_env(root, outdir, ctx)
     meta.update({"start": start.isoformat(timespec="seconds"), "t_start_epoch": t_start, "duration_min": 0.0})
     if meta["behind"] not in ("", "0", "?"):
-        print(f"WARNUNG: HEAD liegt {meta['behind']} Commits hinter origin. Erst 'git pull', wenn du den neuesten Stand willst.")
+        print(f"WARNUNG: HEAD liegt {meta['behind']} Commits hinter origin.")
     if meta["dirty"]:
         print("HINWEIS: Arbeitsbaum hat ungespeicherte Aenderungen; sie fliessen in die Ergebnisse ein.")
     if "ROOT" in meta["user"]:
@@ -1706,9 +1718,11 @@ def main() -> int:
                 s.status, s.seconds = prev["status"], prev["sekunden"]
                 s.detail = (prev["detail"] + " (uebernommen)").strip()
                 s.log = str(outdir / prev["log"]) if prev["log"] else ""
-                print(f"[{i+1:03d}/{len(steps)}] {s.group:10s} {s.name} ... uebersprungen ({s.status}, aus frueherem Lauf)")
+                s.metrics = prev.get("metrics") or {}
+                s.cpu_user, s.cpu_sys, s.rss_mb = prev.get("cpu_user_s", 0.0), prev.get("cpu_sys_s", 0.0), prev.get("rss_mb", 0.0)
+                print(f"[{i + 1:03d}/{len(steps)}] {s.group:10s} {s.name} ... uebersprungen ({s.status}, aus frueherem Lauf)")
                 continue
-            print(f"[{i+1:03d}/{len(steps)}] {s.group:10s} {s.name} ...", end=" ", flush=True)
+            print(f"[{i + 1:03d}/{len(steps)}] {s.group:10s} {s.name} ...", end=" ", flush=True)
             run_step(s, i, outdir / "logs", ctx, outdir, args.timeout_faktor, args.jobs, cargo_ok)
             if s.name == PREFLIGHT:
                 cargo_ok = s.status == "PASS"
@@ -1721,12 +1735,8 @@ def main() -> int:
     except KeyboardInterrupt:
         print("\nAbgebrochen. Zwischenergebnisse sind gespeichert. Fortsetzen mit --resume", outdir)
 
-    crit = root / "target" / "criterion"
-    if crit.exists() and any(s.group == "4-bench" for s in steps):
-        shutil.copytree(crit, outdir / "criterion", dirs_exist_ok=True)
     meta["duration_min"] = round((time.time() - t_start) / 60, 1)
     write_reports(ctx, steps, outdir, meta, final=True)
-
     red = [s for s in steps if s.status in ("FAIL", "TIMEOUT")]
     print(f"\nFertig in {meta['duration_min']} min. FAIL/TIMEOUT: {len(red)}  -> {outdir}/summary.md")
     return 1 if red else 0
