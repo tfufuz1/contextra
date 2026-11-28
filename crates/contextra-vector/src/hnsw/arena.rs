@@ -58,6 +58,9 @@ pub struct HnswArena {
     pub count_offsets: RwLock<Vec<usize>>,
     pub counts: RwLock<Vec<u8>>,
     pub free_list: RwLock<Vec<usize>>,
+    /// Per-slot liveness. Guards `free_node` against double release (F-02).
+    /// Lock order: offsets -> capacities -> count_offsets -> counts -> arena -> free_list -> alive.
+    pub alive: RwLock<Vec<bool>>,
     pub total_allocated: AtomicU64,
 }
 
@@ -77,6 +80,7 @@ impl HnswArena {
             count_offsets: RwLock::new(Vec::new()),
             counts: RwLock::new(Vec::new()),
             free_list: RwLock::new(Vec::new()),
+            alive: RwLock::new(Vec::new()),
             total_allocated: AtomicU64::new(0),
         }
     }
@@ -111,6 +115,18 @@ impl HnswArena {
                 "Node connection capacity cannot be 0",
             ));
         }
+        if final_connections.len() > max_layer + 1 {
+            return Err(ContextraError::invalid_input(
+                "Node has more layers than max_layer + 1 allows",
+            ));
+        }
+        // Layer lengths are stored as u8 counts; reject configurations where they could truncate.
+        if m * 2 > usize::from(u8::MAX) {
+            return Err(ContextraError::invalid_input(
+                "HNSW m too large: neighbor counts must fit in u8",
+            ));
+        }
+        let layers_needed = final_connections.len();
         let node_capacity = Self::align_capacity(raw_capacity);
 
         let mut offsets = self.offsets.write();
@@ -119,11 +135,18 @@ impl HnswArena {
         let mut counts = self.counts.write();
         let mut arena = self.arena.write();
         let mut free_list = self.free_list.write();
+        let mut alive = self.alive.write();
 
-        // Search free_list for a slot with sufficient capacity
+        // A freed slot is reusable only if it can hold both the arena block AND the
+        // new node's full layer-count region (F-01: otherwise counts spill into the
+        // neighbouring slot's region).
         let mut found_free_index = None;
         for (i, &freed_idx) in free_list.iter().enumerate() {
-            if freed_idx < capacities.len() && capacities[freed_idx] >= node_capacity {
+            if freed_idx < capacities.len()
+                && capacities[freed_idx] >= node_capacity
+                && Self::slot_layer_count(count_offsets.as_slice(), counts.len(), freed_idx)
+                    >= layers_needed
+            {
                 found_free_index = Some(i);
                 break;
             }
@@ -131,7 +154,17 @@ impl HnswArena {
 
         let (ram_idx, start_offset) = if let Some(free_pos) = found_free_index {
             let reused_idx = free_list.remove(free_pos);
-            (reused_idx, offsets[reused_idx])
+            let region = Self::slot_layer_count(count_offsets.as_slice(), counts.len(), reused_idx);
+            let cs = count_offsets.get(reused_idx).copied().unwrap_or(0);
+            // Clear counts of layers this node does not use, so no stale length survives.
+            for c in counts
+                .iter_mut()
+                .skip(cs + layers_needed)
+                .take(region.saturating_sub(layers_needed))
+            {
+                *c = 0;
+            }
+            (reused_idx, offsets.get(reused_idx).copied().unwrap_or(0))
         } else {
             // Align start offset to 64-byte boundary (16 x u32 elements)
             let current_len = arena.len();
@@ -143,36 +176,31 @@ impl HnswArena {
             arena.resize(start + node_capacity, 0);
             offsets.push(start);
             capacities.push(node_capacity);
+            count_offsets.push(counts.len());
+            let new_len = counts.len() + layers_needed;
+            counts.resize(new_len, 0);
+            alive.push(false);
             (offsets.len() - 1, start)
         };
+        if let Some(live) = alive.get_mut(ram_idx) {
+            *live = true;
+        }
 
-        if ram_idx >= count_offsets.len() {
-            let count_start = counts.len();
-            count_offsets.push(count_start);
-            for (layer, layer_conns) in final_connections.iter().enumerate() {
-                let l_offset = Self::layer_offset(start_offset, layer, m);
-                let layer_cap = if layer == 0 { m * 2 } else { m };
-                let len = layer_conns.len().min(layer_cap);
-                if l_offset + len > arena.len() {
-                    arena.resize(l_offset + len, 0);
-                }
-                arena[l_offset..l_offset + len].copy_from_slice(&layer_conns[..len]);
-                counts.push(len as u8);
+        // Invariant: the slot's count region holds at least `layers_needed` entries
+        // (ensured above for both new and reused slots), so every write stays inside it.
+        let count_start = count_offsets.get(ram_idx).copied().unwrap_or(0);
+        for (layer, layer_conns) in final_connections.iter().enumerate() {
+            let l_offset = Self::layer_offset(start_offset, layer, m);
+            let layer_cap = if layer == 0 { m * 2 } else { m };
+            let len = layer_conns.len().min(layer_cap);
+            if l_offset + len > arena.len() {
+                arena.resize(l_offset + len, 0);
             }
-        } else {
-            let count_start = count_offsets[ram_idx];
-            for (layer, layer_conns) in final_connections.iter().enumerate() {
-                let l_offset = Self::layer_offset(start_offset, layer, m);
-                let layer_cap = if layer == 0 { m * 2 } else { m };
-                let len = layer_conns.len().min(layer_cap);
-                if l_offset + len > arena.len() {
-                    arena.resize(l_offset + len, 0);
-                }
-                arena[l_offset..l_offset + len].copy_from_slice(&layer_conns[..len]);
-                if count_start + layer < counts.len() {
-                    counts[count_start + layer] = len as u8;
-                }
-            }
+            arena[l_offset..l_offset + len].copy_from_slice(&layer_conns[..len]);
+            let slot = counts
+                .get_mut(count_start + layer)
+                .ok_or_else(|| ContextraError::Index("Layer count region overflow".to_string()))?;
+            *slot = len as u8;
         }
 
         self.total_allocated.fetch_add(1, Ordering::SeqCst);
@@ -332,12 +360,37 @@ impl HnswArena {
     }
 
     /// Marks a node's slot as free for future slot reuse.
+    ///
+    /// Idempotent: only a live slot is released. A second call for the same slot is a
+    /// no-op, so the slot cannot be handed out twice and `total_allocated` stays exact (F-02).
     pub fn free_node(&self, ram_idx: usize) {
         let offsets = self.offsets.read();
-        if ram_idx < offsets.len() {
-            self.free_list.write().push(ram_idx);
-            self.total_allocated.fetch_sub(1, Ordering::SeqCst);
+        if ram_idx >= offsets.len() {
+            return;
         }
+        let mut free_list = self.free_list.write();
+        let mut alive = self.alive.write();
+        match alive.get_mut(ram_idx) {
+            Some(live) if *live => {
+                *live = false;
+                free_list.push(ram_idx);
+                self.total_allocated.fetch_sub(1, Ordering::SeqCst);
+            }
+            _ => {}
+        }
+    }
+
+    /// Number of layer-count entries owned by `ram_idx`: the region from its own
+    /// `count_offsets` entry up to the next slot's entry, or to the end for the last slot.
+    fn slot_layer_count(count_offsets: &[usize], counts_len: usize, ram_idx: usize) -> usize {
+        let Some(&start) = count_offsets.get(ram_idx) else {
+            return 0;
+        };
+        let end = count_offsets
+            .get(ram_idx + 1)
+            .copied()
+            .unwrap_or(counts_len);
+        end.saturating_sub(start)
     }
 }
 
@@ -403,5 +456,44 @@ mod tests {
 
         assert!(backlinks.get(5, 1).is_none());
         assert!(backlinks.get(99, 0).is_none());
+    }
+
+    /// F-01: reusing a slot that held fewer layers must not write the new node's
+    /// layer counts into the region of the neighbouring slot.
+    #[test]
+    fn test_slot_reuse_does_not_clobber_neighbor_counts() -> Result<()> {
+        let arena = HnswArena::new();
+        let m = 8;
+        let a = arena.allocate_node(1, m, &[vec![1], vec![2]])?;
+        let b = arena.allocate_node(0, m, &[vec![10, 11, 12]])?;
+        arena.free_node(a);
+        let _c = arena.allocate_node(2, m, &[vec![3], vec![4], vec![5]])?;
+        assert_eq!(arena.get_ram_node_connections(b, 0, m), vec![10, 11, 12]);
+        Ok(())
+    }
+
+    /// F-02: freeing the same slot twice must not hand it out twice.
+    #[test]
+    fn test_double_free_does_not_alias_slots() -> Result<()> {
+        let arena = HnswArena::new();
+        let a = arena.allocate_node(0, 8, &[vec![1]])?;
+        arena.free_node(a);
+        arena.free_node(a);
+        let x = arena.allocate_node(0, 8, &[vec![7]])?;
+        let y = arena.allocate_node(0, 8, &[vec![9]])?;
+        assert_ne!(x, y);
+        Ok(())
+    }
+
+    /// F-02: the second free is a no-op and must not decrement the live count.
+    #[test]
+    fn test_double_free_keeps_total_allocated_consistent() -> Result<()> {
+        let arena = HnswArena::new();
+        let a = arena.allocate_node(0, 8, &[vec![1]])?;
+        assert_eq!(arena.total_allocated.load(Ordering::SeqCst), 1);
+        arena.free_node(a);
+        arena.free_node(a);
+        assert_eq!(arena.total_allocated.load(Ordering::SeqCst), 0);
+        Ok(())
     }
 }
