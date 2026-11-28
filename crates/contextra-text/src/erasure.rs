@@ -65,7 +65,7 @@ impl<S: StorageEngine> TextErasure<S> {
     }
 
     fn layer_error(kind: LayerErrorKind, detail: &'static str) -> LayerError {
-        LayerError { kind, layer: WitnessLayer::from("TextIndex"), detail }
+        LayerError { kind, layer: WitnessLayer::text(), detail }
     }
 
     fn cursor(done: u64, hash: [u8; 8], phase: u8, stats_applied: bool) -> std::result::Result<Cursor, ErasureError> {
@@ -75,7 +75,7 @@ impl<S: StorageEngine> TextErasure<S> {
 }
 
 impl<S: StorageEngine> ErasureLayer for TextErasure<S> {
-    fn layer(&self) -> WitnessLayer { WitnessLayer::from("TextIndex") }
+    fn layer(&self) -> WitnessLayer { WitnessLayer::text() }
 
     fn on_gate<'a>(&'a self, scope: &'a ResolvedScope) -> BoxFuture<'a, std::result::Result<(), LayerError>> {
         Box::pin(async move {

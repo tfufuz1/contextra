@@ -27,7 +27,22 @@ pub enum WitnessLayer {
     Custom(String),
 }
 
+/// Wire-Name der Text-Index-Schicht (Erasure A-3). Entspricht dem bisherigen `Custom("TextIndex")`.
+pub const LAYER_TEXT: &str = "TextIndex";
+/// Wire-Name der Checkpoint-Schicht (Erasure A-3). Journal-Format unverändert.
+pub const LAYER_CHECKPOINTS: &str = "Checkpoints";
+
 impl WitnessLayer {
+    /// Text-Index-Schicht (`LAYER_TEXT`).
+    pub fn text() -> Self {
+        Self::from(LAYER_TEXT)
+    }
+
+    /// Checkpoint-Schicht (`LAYER_CHECKPOINTS`).
+    pub fn checkpoints() -> Self {
+        Self::from(LAYER_CHECKPOINTS)
+    }
+
     /// Gibt den String-Namen der Schicht zurück.
     pub fn as_str(&self) -> &str {
         match self {
@@ -118,4 +133,17 @@ pub trait Purger: Send + Sync {
     /// # Crash
     /// Idempotent; Teilausfälle hinterlassen konsistente Zwischenzustände ohne Datenverlust lebender Einheiten.
     fn purge(&self, ctx: &crate::RequestContext, target: &ScanTarget) -> Result<PurgeStats>;
+}
+
+#[cfg(test)]
+mod layer_constants_tests {
+    use super::*;
+
+    #[test]
+    fn text_and_checkpoint_layers_use_stable_wire_names() {
+        assert_eq!(WitnessLayer::text(), WitnessLayer::Custom("TextIndex".to_string()));
+        assert_eq!(WitnessLayer::checkpoints(), WitnessLayer::Custom("Checkpoints".to_string()));
+        assert_eq!(WitnessLayer::text().as_str(), LAYER_TEXT);
+        assert_eq!(WitnessLayer::checkpoints().as_str(), LAYER_CHECKPOINTS);
+    }
 }

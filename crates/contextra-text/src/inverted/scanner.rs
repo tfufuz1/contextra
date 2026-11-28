@@ -193,7 +193,7 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
 
 impl<S: StorageEngine + 'static> LayerScanner for TextScanner<S> {
     fn layer(&self) -> WitnessLayer {
-        WitnessLayer::from("TextIndex")
+        WitnessLayer::text()
     }
 
     fn scan_units(&self, session: &mut ScanSession, ctx: &RequestContext) -> Result<()> {
