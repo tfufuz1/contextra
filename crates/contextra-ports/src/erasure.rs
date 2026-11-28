@@ -762,4 +762,9 @@ pub trait ErasureKernel: Send + Sync {
     /// # Crash
     /// Reiner RAM-Zugriff ohne Mutation.
     fn store_scanners(&self) -> Vec<Arc<dyn LayerScanner>>;
+    /// A-4 (`begin_purge`): idempotenter Übergang nach `Purging` vor dem ersten Layer.
+    ///
+    /// # Fehler
+    /// `InvalidTransition`, `JournalPoisoned` oder `NotFound`.
+    fn begin_purge<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<(), ErasureError>>;
 }

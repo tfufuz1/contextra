@@ -301,6 +301,17 @@ impl MockKernel {
 }
 
 impl ErasureKernel for MockKernel {
+    fn begin_purge<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<(), ErasureError>> {
+        Box::pin(async move {
+            let mut jobs = self.jobs.lock().unwrap();
+            let (state, _) = jobs.get_mut(&id).ok_or(ErasureError::NotFound)?;
+            if *state != ErasureState::Purging {
+                *state = ErasureState::Purging;
+            }
+            Ok(())
+        })
+    }
+
     fn accept<'a>(
         &'a self,
         req: &'a EraseRequest,
