@@ -449,6 +449,17 @@ impl ErasureKernel for MockErasureKernel {
         })
     }
 
+    fn begin_purge<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<(), ErasureError>> {
+        Box::pin(async move {
+            self.with_job(id, |job, _, _| {
+                if job.state != ErasureState::Purging {
+                    advance(job, ErasureState::Purging)?;
+                }
+                Ok(())
+            })
+        })
+    }
+
     fn purge_store<'a>(
         &'a self,
         id: ErasureId,

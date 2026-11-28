@@ -308,6 +308,56 @@ pub struct StoreErasureKernel {
 }
 
 impl StoreErasureKernel {
+    /// A-4: idempotenter Übergang nach `Purging`, extrahiert aus `purge_store`.
+    /// Liefert Scope und Versuchszähler aus derselben Sperre zurück.
+    pub(crate) async fn begin_purge_inner(
+        &self,
+        id: ErasureId,
+    ) -> Result<(Arc<ResolvedScope>, u32), ErasureError> {
+        let mut ks = self.state.lock().await;
+        if ks.journal.is_poisoned() {
+            return Err(ErasureError::JournalPoisoned);
+        }
+        let job = ks.jobs.get(&id).ok_or(ErasureError::NotFound)?;
+        let valid_state = matches!(
+            job.state,
+            ErasureState::Gated
+                | ErasureState::KeysDestroying
+                | ErasureState::Purging
+                | ErasureState::Verifying
+                | ErasureState::Failed { .. }
+                | ErasureState::Quarantined { .. }
+        );
+        if !valid_state || job.gated_seq.is_none() {
+            return Err(ErasureError::InvalidTransition);
+        }
+        let resume_transition = !matches!(&job.state, ErasureState::Purging);
+        let scope = Arc::clone(&job.plan);
+        let attempt = job.attempt;
+
+        if !job.purge_started || resume_transition {
+            let previous = job.state.clone();
+            if !previous.can_transition_to(&ErasureState::Purging) {
+                return Err(ErasureError::InvalidTransition);
+            }
+            let now = self.clock.read().now_unix_nanos();
+            let rec = JournalRecord::PurgeStart { id, ts: now };
+            if let Err(e) = ks.journal.append_batch(&[rec.clone()]).await {
+                *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
+                return Err(e);
+            }
+            if let Some(job_mut) = ks.jobs.get_mut(&id) {
+                job_mut.purge_started = true;
+                job_mut.transition_to(ErasureState::Purging)?;
+                job_mut.raw_records.push(rec);
+                let jg = job_mut.to_job_gate();
+                self.gate
+                    .install_snapshot(|s, ep| s.with_upserted_job(ep, jg.clone()));
+            }
+            self.refresh_caches(&ks);
+        }
+        Ok((scope, attempt))
+    }
     /// Öffnet den Erasure-Kernel, validiert Journal & Ledger und rekonstruiert aktive Gates (§5.4).
     ///
     /// # Fehler
@@ -1134,6 +1184,10 @@ impl ErasureKernel for StoreErasureKernel {
         })
     }
 
+    fn begin_purge<'a>(&'a self, id: ErasureId) -> BoxFuture<'a, Result<(), ErasureError>> {
+        Box::pin(async move { self.begin_purge_inner(id).await.map(|_| ()) })
+    }
+
     fn purge_store<'a>(
         &'a self,
         id: ErasureId,
@@ -1144,51 +1198,7 @@ impl ErasureKernel for StoreErasureKernel {
                 return Err(ErasureError::Cancelled);
             }
 
-            let (scope, attempt) = {
-                let mut ks = self.state.lock().await;
-                if ks.journal.is_poisoned() {
-                    return Err(ErasureError::JournalPoisoned);
-                }
-                let job = ks.jobs.get(&id).ok_or(ErasureError::NotFound)?;
-                let valid_state = matches!(
-                    job.state,
-                    ErasureState::Gated
-                        | ErasureState::KeysDestroying
-                        | ErasureState::Purging
-                        | ErasureState::Verifying
-                        | ErasureState::Failed { .. }
-                        | ErasureState::Quarantined { .. }
-                );
-                if !valid_state || job.gated_seq.is_none() {
-                    return Err(ErasureError::InvalidTransition);
-                }
-                let resume_transition = !matches!(&job.state, ErasureState::Purging);
-                let scope = Arc::clone(&job.plan);
-                let attempt = job.attempt;
-
-                if !job.purge_started || resume_transition {
-                    let previous = job.state.clone();
-                    if !previous.can_transition_to(&ErasureState::Purging) {
-                        return Err(ErasureError::InvalidTransition);
-                    }
-                    let now = self.clock.read().now_unix_nanos();
-                    let rec = JournalRecord::PurgeStart { id, ts: now };
-                    if let Err(e) = ks.journal.append_batch(&[rec.clone()]).await {
-                        *self.health.write() = crate::lsm::engine::StorageHealth::JournalPoisoned;
-                        return Err(e);
-                    }
-                    if let Some(job_mut) = ks.jobs.get_mut(&id) {
-                        job_mut.purge_started = true;
-                        job_mut.transition_to(ErasureState::Purging)?;
-                        job_mut.raw_records.push(rec);
-                        let jg = job_mut.to_job_gate();
-                        self.gate
-                            .install_snapshot(|s, ep| s.with_upserted_job(ep, jg.clone()));
-                    }
-                    self.refresh_caches(&ks);
-                }
-                (scope, attempt)
-            };
+            let (scope, attempt) = self.begin_purge_inner(id).await?;
 
             let deps = self.deps_ref()?;
             let collapse = self.collapse_snapshot();
